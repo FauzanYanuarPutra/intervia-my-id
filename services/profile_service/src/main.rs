@@ -37,7 +37,9 @@ impl RuntimeMode {
         {
             "compatibility" | "proxy" | "legacy" => Ok(Self::Compatibility),
             "native" => Ok(Self::Native),
-            other => anyhow::bail!("DOMAIN_RUNTIME_MODE must be compatibility or native, got {other:?}"),
+            other => anyhow::bail!(
+                "DOMAIN_RUNTIME_MODE must be compatibility or native, got {other:?}"
+            ),
         }
     }
 
@@ -53,8 +55,11 @@ fn service_name() -> &'static str {
     env!("CARGO_PKG_NAME")
 }
 
-async fn proxy(State(s): State<Arc<AppState>>, req: Request<Body>) -> Result<Response, StatusCode> {
-    if s.mode == RuntimeMode::Native {
+async fn proxy(
+    State(state): State<Arc<AppState>>,
+    request: Request<Body>,
+) -> Result<Response, StatusCode> {
+    if state.mode == RuntimeMode::Native {
         return Ok((
             StatusCode::SERVICE_UNAVAILABLE,
             Json(json!({
@@ -66,7 +71,8 @@ async fn proxy(State(s): State<Arc<AppState>>, req: Request<Body>) -> Result<Res
         )
             .into_response());
     }
-    if !s.proxy_enabled {
+
+    if !state.proxy_enabled {
         return Ok((
             StatusCode::SERVICE_UNAVAILABLE,
             Json(json!({
@@ -78,10 +84,15 @@ async fn proxy(State(s): State<Arc<AppState>>, req: Request<Body>) -> Result<Res
             .into_response());
     }
 
-    let path = req.uri().path_and_query().map(|v| v.as_str()).unwrap_or("/");
-    let url = format!("{}{}", s.upstream.trim_end_matches('/'), path);
-    let method = req.method().clone();
-    let mut rb = s.http.request(method, url);
+    let path = request
+        .uri()
+        .path_and_query()
+        .map(|value| value.as_str())
+        .unwrap_or("/");
+    let url = format!("{}{}", state.upstream.trim_end_matches('/'), path);
+    let method = request.method().clone();
+    let mut request_builder = state.http.request(method, url);
+
     for name in [
         "authorization",
         "content-type",
@@ -91,116 +102,127 @@ async fn proxy(State(s): State<Arc<AppState>>, req: Request<Body>) -> Result<Res
         "x-correlation-id",
         "traceparent",
     ] {
-        if let Some(v) = req.headers().get(name) {
-            if let Ok(vs) = v.to_str() {
-                rb = rb.header(name, vs);
+        if let Some(value) = request.headers().get(name) {
+            if let Ok(value) = value.to_str() {
+                request_builder = request_builder.header(name, value);
             }
         }
     }
-    let body = to_bytes(req.into_body(), 8 * 1024 * 1024)
+
+    let body = to_bytes(request.into_body(), 8 * 1024 * 1024)
         .await
         .map_err(|_| StatusCode::BAD_REQUEST)?;
-    let response = rb
+
+    let response = request_builder
         .body(body.to_vec())
         .send()
         .await
-        .map_err(|e| {
-            tracing::error!(service = service_name(), error = ?e, "legacy upstream request failed");
+        .map_err(|error| {
+            tracing::error!(
+                service = service_name(),
+                error = ?error,
+                "legacy upstream request failed"
+            );
             StatusCode::BAD_GATEWAY
         })?;
 
-    let status = StatusCode::from_u16(response.status().as_u16())
-        .unwrap_or(StatusCode::BAD_GATEWAY);
+    let status =
+        StatusCode::from_u16(response.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
     let content_type = response
         .headers()
         .get("content-type")
-        .and_then(|v| v.to_str().ok())
+        .and_then(|value| value.to_str().ok())
         .map(str::to_owned);
     let request_id = response
         .headers()
         .get("x-request-id")
-        .and_then(|v| v.to_str().ok())
+        .and_then(|value| value.to_str().ok())
         .map(str::to_owned);
     let correlation_id = response
         .headers()
         .get("x-correlation-id")
-        .and_then(|v| v.to_str().ok())
+        .and_then(|value| value.to_str().ok())
         .map(str::to_owned);
     let bytes = response
         .bytes()
         .await
         .map_err(|_| StatusCode::BAD_GATEWAY)?;
 
-    let mut out = Response::new(Body::from(bytes));
-    *out.status_mut() = status;
-    if let Some(ct) = content_type {
-        if let Ok(v) = ct.parse() {
-            out.headers_mut().insert("content-type", v);
+    let mut output = Response::new(Body::from(bytes));
+    *output.status_mut() = status;
+
+    if let Some(value) = content_type {
+        if let Ok(value) = value.parse() {
+            output.headers_mut().insert("content-type", value);
         }
     }
-    if let Some(v) = request_id.and_then(|v| v.parse().ok()) {
-        out.headers_mut().insert("x-request-id", v);
+    if let Some(value) = request_id.and_then(|value| value.parse().ok()) {
+        output.headers_mut().insert("x-request-id", value);
     }
-    if let Some(v) = correlation_id.and_then(|v| v.parse().ok()) {
-        out.headers_mut().insert("x-correlation-id", v);
+    if let Some(value) = correlation_id.and_then(|value| value.parse().ok()) {
+        output.headers_mut().insert("x-correlation-id", value);
     }
-    Ok(out)
+
+    Ok(output)
 }
 
-async fn health(State(s): State<Arc<AppState>>) -> impl IntoResponse {
+async fn health(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     Json(json!({
         "status": "ok",
         "service": service_name(),
-        "mode": s.mode.as_str(),
-        "legacy_proxy_enabled": s.proxy_enabled,
+        "mode": state.mode.as_str(),
+        "legacy_proxy_enabled": state.proxy_enabled,
         "native_handlers_enabled": false
     }))
 }
 
-async fn migration_status(State(s): State<Arc<AppState>>) -> impl IntoResponse {
+async fn migration_status(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let target_db_ready = sqlx::query_scalar::<_, i32>("SELECT 1")
-        .fetch_optional(&s.db)
+        .fetch_optional(&state.db)
         .await
         .ok()
         .flatten()
         == Some(1);
+
     Json(json!({
         "service": service_name(),
-        "mode": s.mode.as_str(),
+        "mode": state.mode.as_str(),
         "target_db_ready": target_db_ready,
-        "legacy_proxy_enabled": s.proxy_enabled,
+        "legacy_proxy_enabled": state.proxy_enabled,
         "native_handlers_enabled": false,
-        "legacy_upstream_configured": !s.upstream.trim().is_empty()
+        "legacy_upstream_configured": !state.upstream.trim().is_empty()
     }))
 }
 
-async fn ready(State(s): State<Arc<AppState>>) -> Response {
+async fn ready(State(state): State<Arc<AppState>>) -> Response {
     let db_ok = sqlx::query_scalar::<_, i32>("SELECT 1")
-        .fetch_one(&s.db)
+        .fetch_one(&state.db)
         .await
         .ok()
         == Some(1);
-    if !db_ok || s.mode == RuntimeMode::Native {
+
+    if !db_ok || state.mode == RuntimeMode::Native {
         return (
             StatusCode::SERVICE_UNAVAILABLE,
             Json(json!({
                 "status": "not_ready",
                 "service": service_name(),
-                "mode": s.mode.as_str(),
+                "mode": state.mode.as_str(),
                 "target_db_ready": db_ok,
                 "native_handlers_enabled": false
             })),
         )
             .into_response();
     }
+
     (
         StatusCode::OK,
         Json(json!({
             "status": "ready",
             "service": service_name(),
-            "mode": s.mode.as_str(),
+            "mode": state.mode.as_str(),
             "target_db_ready": true,
-            "legacy_proxy_enabled": s.proxy_enabled
+            "legacy_proxy_enabled": state.proxy_enabled
         })),
     )
         .into_response()
@@ -215,6 +237,7 @@ async fn main() -> anyhow::Result<()> {
 
     let mode = RuntimeMode::from_env()?;
     let db_url = env::var("DATABASE_URL")?;
+
     let db = PgPoolOptions::new()
         .max_connections(10)
         .connect(&db_url)
@@ -238,9 +261,11 @@ async fn main() -> anyhow::Result<()> {
     let timeout_ms: u64 = env::var("LEGACY_PROXY_TIMEOUT_MS")
         .unwrap_or_else(|_| "5000".into())
         .parse()?;
+
     let http = Client::builder()
         .timeout(Duration::from_millis(timeout_ms))
         .build()?;
+
     let proxy_enabled = env::var("LEGACY_PROXY_ENABLED")
         .unwrap_or_else(|_| "true".into())
         .eq_ignore_ascii_case("true");
@@ -265,10 +290,12 @@ async fn main() -> anyhow::Result<()> {
     let port: u16 = env::var("APP_PORT")
         .unwrap_or_else(|_| "8080".into())
         .parse()?;
+
     axum::serve(
         tokio::net::TcpListener::bind(format!("0.0.0.0:{port}")).await?,
         app,
     )
     .await?;
+
     Ok(())
 }
