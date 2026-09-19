@@ -49,7 +49,7 @@ async fn list(
     Query(query): Query<WorkQuery>,
     Path(business_id): Path<Uuid>,
 ) -> Response {
-    let (actor_id, authorization) = match actor_and_authorization(&state, &headers) {
+    let (_actor_id, authorization) = match actor_and_authorization(&state, &headers) {
         Ok(value) => value,
         Err(response) => return response,
     };
