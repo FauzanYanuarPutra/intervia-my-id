@@ -1651,8 +1651,7 @@ export default function SuperProfile() {
     return () => {
       if (cropSource) URL.revokeObjectURL(cropSource);
     };
-  }, [cropSource]);
-
+  }, [cropSource]);  
   const displayName = firstString(
     detail?.full_name,
     detail?.fullName,
@@ -1663,13 +1662,8 @@ export default function SuperProfile() {
   const handle = normalizePublicProfileHandleInput(
     firstString(detail?.username, user?.username),
   );
-  const bio = firstString(detail?.bio, user?.bio, copy.profileFallback);
+  const bio = firstString(detail?.bio, user?.bio);
   const location = firstString(detail?.location);
-  const phone = firstString(detail?.phone, user?.phone);
-  const joinedDate = formatJoinedDate(
-    detail?.joined_at || detail?.created_at,
-    numberLocale,
-  );
 
   const verified = useMemo(
     () => isVerifiedProfile(detail, mergedMetadata),
@@ -2026,91 +2020,39 @@ export default function SuperProfile() {
         full_name: displayName || 'member',
       })}`
     : '/profile';
-
   const contactVerified = Boolean(
     detail?.phone_verified ||
       detail?.email_verified ||
       mergedMetadata.phone_verified === true ||
       mergedMetadata.email_verified === true,
   );
-  const coreProfileReady = completionItems.every(item => item.complete);
-  const catalogTarget = 5;
-  const catalogComplete = activeListings.length >= catalogTarget;
-  const catalogRemaining = Math.max(0, catalogTarget - activeListings.length);
 
   const trustSignals = [
     {
       key: 'identity',
-      label: isId ? 'Identitas' : 'Identity',
+      label: isId ? 'Identitas terverifikasi' : 'Identity verified',
       active: verified,
       icon: BadgeCheck,
     },
     {
       key: 'contact',
-      label: isId ? 'Kontak' : 'Contact',
+      label: isId ? 'Kontak terverifikasi' : 'Contact verified',
       active: contactVerified,
       icon: MessageCircle,
     },
-    {
-      key: 'profile',
-      label: isId ? 'Profil' : 'Profile',
-      active: coreProfileReady,
-      icon: Check,
-    },
-    {
-      key: 'catalog',
-      label: isId ? 'Katalog 5+' : 'Catalog 5+',
-      active: catalogComplete,
-      icon: ShoppingBag,
-    },
+    ...(!process.env.NEXT_PUBLIC_PROMO_ONLY_MODE
+      ? [
+          {
+            key: 'transaction',
+            label: isId ? 'Siap transaksi' : 'Transaction ready',
+            active: Boolean(user?.transaction_eligible ?? mergedMetadata.transaction_eligible),
+            icon: Check,
+          },
+        ]
+      : []),
   ];
-  const trustSignalCount = trustSignals.filter(item => item.active).length;
-  const trustPercent = Math.round((trustSignalCount / trustSignals.length) * 100);
 
-  const nextTrustMission = !contactVerified
-    ? {
-        label: isId ? 'Verifikasi kontak' : 'Verify contact',
-        helper: isId
-          ? 'Nomor atau email terverifikasi menambah kepercayaan.'
-          : 'A verified phone or email builds trust.',
-        section: 'contact' as OwnerProfileEditSection,
-      }
-    : !coreProfileReady && nextCompletionItem
-      ? {
-          label: nextCompletionItem.label,
-          helper: isId
-            ? `Profil ${profilePercent}% lengkap`
-            : `Profile ${profilePercent}% complete`,
-          section:
-            nextCompletionItem.key === 'bio' || nextCompletionItem.key === 'location'
-              ? ('identity' as OwnerProfileEditSection)
-              : nextCompletionItem.key === 'contact'
-                ? ('contact' as OwnerProfileEditSection)
-                : ('menu' as OwnerProfileEditSection),
-          target:
-            nextCompletionItem.key === 'avatar' || nextCompletionItem.key === 'cover'
-              ? nextCompletionItem.key
-              : undefined,
-        }
-      : !catalogComplete
-        ? {
-            label: isId
-              ? `Tambah ${catalogRemaining} penawaran lagi`
-              : `Add ${catalogRemaining} more offer${catalogRemaining === 1 ? '' : 's'}`,
-            helper: isId
-              ? 'Buka lencana Katalog 5+.'
-              : 'Unlock the Catalog 5+ badge.',
-            href: ROUTES.create,
-          }
-        : !verified
-          ? {
-              label: isId ? 'Pelajari verifikasi identitas' : 'Review identity verification',
-              helper: isId
-                ? 'Lihat status verifikasi yang benar-benar aktif.'
-                : 'Review the verification signals that are actually active.',
-              section: 'trust' as OwnerProfileEditSection,
-            }
-          : null;
+  const trustSignalCount = trustSignals.filter(item => item.active).length;
 
   const attentionAction = unreadChats > 0
     ? {
@@ -2331,9 +2273,11 @@ export default function SuperProfile() {
                       <PencilLine className="h-3.5 w-3.5" />
                     </button>
                   </div>
-                  <p className="mt-0.5 truncate text-[11px] font-semibold text-[color:var(--app-text-soft)] sm:text-xs">
-                    @{handle || 'user'}
-                  </p>
+                  {handle ? (
+                    <p className="mt-0.5 truncate text-[11px] font-semibold text-[color:var(--app-text-soft)] sm:text-xs">
+                      @{handle}
+                    </p>
+                  ) : null}
                 </div>
               </div>
 
@@ -2352,9 +2296,19 @@ export default function SuperProfile() {
                 ) : null}
               </div>
 
-              <p className="mt-2.5 line-clamp-2 max-w-2xl text-[12px] font-medium leading-5 text-[color:var(--app-text-soft)] sm:text-sm sm:leading-6">
-                {bio}
-              </p>
+              {bio ? (
+                <p className="mt-2.5 line-clamp-2 max-w-2xl text-[12px] font-medium leading-5 text-[color:var(--app-text-soft)] sm:text-sm sm:leading-6">
+                  {bio}
+                </p>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => openEditModal('identity')}
+                  className="mt-2.5 inline-flex min-h-9 items-center rounded-xl border border-dashed border-[color:var(--app-border)] px-3 text-[11px] font-bold text-[color:var(--app-text-soft)] transition hover:bg-[color:var(--app-surface-muted)]"
+                >
+                  {copy.bioBusiness}: {isId ? 'Tambahkan deskripsi singkat' : 'Add a short description'}
+                </button>
+              )}
 
               <div className="mt-3 flex min-w-0 gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {trustSignals
@@ -2383,33 +2337,25 @@ export default function SuperProfile() {
                 ) : null}
               </div>
 
-              <div className="mt-4 grid grid-cols-4 divide-x divide-[color:var(--app-border)] border-y border-[color:var(--app-border)] py-2.5 sm:max-w-2xl sm:rounded-xl sm:border sm:py-0">
-                <LocalizedLink href={ROUTES.manageListings} className="min-w-0 px-1 py-1 text-center transition hover:bg-[color:var(--app-surface-muted)] sm:px-3 sm:py-3">
-                  <span className="block truncate text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
+              <div className="mt-4 grid grid-cols-3 divide-x divide-[color:var(--app-border)] rounded-2xl border border-[color:var(--app-border)] py-2.5 sm:max-w-[560px]">
+                <LocalizedLink href={ROUTES.manageListings} className="min-w-0 px-2 text-center transition hover:bg-[color:var(--app-surface-muted)] sm:px-4">
+                  <span className="block text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
                     {formatCompactNumber(activePostCount, numberLocale)}
                   </span>
                   <span className="mt-0.5 block truncate text-[9px] font-semibold text-[color:var(--app-text-soft)] sm:text-[11px]">
-                    {isId ? 'Penawaran' : 'Offers'}
+                    {isId ? 'Etalase' : 'Items'}
                   </span>
                 </LocalizedLink>
-                <button type="button" onClick={() => openSocialModal('followers')} className="min-w-0 px-1 py-1 text-center transition hover:bg-[color:var(--app-surface-muted)] sm:px-3 sm:py-3">
-                  <span className="block truncate text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
+                <button type="button" onClick={() => openSocialModal('followers')} className="min-w-0 px-2 text-center transition hover:bg-[color:var(--app-surface-muted)] sm:px-4">
+                  <span className="block text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
                     {formatCompactNumber(followersCount, numberLocale)}
                   </span>
                   <span className="mt-0.5 block truncate text-[9px] font-semibold text-[color:var(--app-text-soft)] sm:text-[11px]">
                     {copy.followers}
                   </span>
                 </button>
-                <LocalizedLink href={`/reels?creator=${encodeURIComponent(user.id)}`} className="min-w-0 px-1 py-1 text-center transition hover:bg-[color:var(--app-surface-muted)] sm:px-3 sm:py-3">
-                  <span className="block truncate text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
-                    {formatCompactNumber(reelsCount, numberLocale)}
-                  </span>
-                  <span className="mt-0.5 block truncate text-[9px] font-semibold text-[color:var(--app-text-soft)] sm:text-[11px]">
-                    {copy.reels}
-                  </span>
-                </LocalizedLink>
-                <LocalizedLink href={ROUTES.insights} className="min-w-0 px-1 py-1 text-center transition hover:bg-[color:var(--app-surface-muted)] sm:px-3 sm:py-3">
-                  <span className="flex items-center justify-center gap-1 truncate text-sm font-black text-amber-600 dark:text-amber-300 sm:text-base">
+                <LocalizedLink href={ROUTES.insights} className="min-w-0 px-2 text-center transition hover:bg-[color:var(--app-surface-muted)] sm:px-4">
+                  <span className="flex items-center justify-center gap-1 text-sm font-black text-amber-600 dark:text-amber-300 sm:text-base">
                     <Star className="h-3.5 w-3.5 fill-current" />
                     {dashboardStats.user_rating > 0 ? dashboardStats.user_rating.toFixed(1) : '—'}
                   </span>
@@ -2473,86 +2419,6 @@ export default function SuperProfile() {
               <ArrowRight className="h-4 w-4 shrink-0 text-[color:var(--app-text-soft)]" />
             </LocalizedLink>
           ) : null}
-
-          {/* TRUST — proof, not decorative badges. */}
-          <section className="border-y border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-4 sm:rounded-[24px] sm:border sm:px-5">
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <h2 className="text-base font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                  {isId ? 'Kepercayaan' : 'Trust'}
-                </h2>
-                <p className="mt-0.5 text-[10px] font-semibold text-[color:var(--app-text-soft)] sm:text-xs">
-                  {trustSignalCount}/{trustSignals.length} {isId ? 'tanda aktif' : 'signals active'}
-                </p>
-              </div>
-              <span className="text-sm font-black text-emerald-700 dark:text-emerald-300">
-                {trustPercent}%
-              </span>
-            </div>
-
-            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
-              <div className="h-full rounded-full bg-emerald-600 transition-all" style={{ width: `${trustPercent}%` }} />
-            </div>
-
-            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {trustSignals.map(item => {
-                const Icon = item.icon;
-                return (
-                  <div
-                    key={item.key}
-                    className={cn(
-                      'flex min-w-0 items-center gap-2 rounded-xl px-2.5 py-2 text-[10px] font-black sm:text-[11px]',
-                      item.active
-                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'
-                        : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]',
-                    )}
-                  >
-                    <span className={cn('grid h-6 w-6 shrink-0 place-items-center rounded-full', item.active ? 'bg-emerald-600 text-white' : 'bg-black/5 dark:bg-white/10')}>
-                      {item.active ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : <Icon className="h-3.5 w-3.5" />}
-                    </span>
-                    <span className="truncate">{item.label}</span>
-                  </div>
-                );
-              })}
-            </div>
-
-            {nextTrustMission ? (
-              nextTrustMission.href ? (
-                <LocalizedLink
-                  href={nextTrustMission.href}
-                  className="mt-3 flex min-h-12 items-center gap-3 rounded-xl border border-dashed border-emerald-300 bg-emerald-50/55 px-3 transition hover:bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-500/5 dark:hover:bg-emerald-500/10"
-                >
-                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-emerald-600 text-white"><ArrowRight className="h-4 w-4" /></span>
-                  <span className="min-w-0 flex-1"><span className="block truncate text-xs font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">{nextTrustMission.label}</span><span className="mt-0.5 block truncate text-[10px] text-[color:var(--app-text-soft)]">{nextTrustMission.helper}</span></span>
-                </LocalizedLink>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (nextTrustMission.target === 'avatar') {
-                      document.getElementById('owner-avatar-upload')?.click();
-                      return;
-                    }
-                    if (nextTrustMission.target === 'cover') {
-                      document.getElementById('owner-cover-upload')?.click();
-                      return;
-                    }
-                    openEditModal(nextTrustMission.section || 'menu');
-                  }}
-                  className="mt-3 flex min-h-12 w-full items-center gap-3 rounded-xl border border-dashed border-emerald-300 bg-emerald-50/55 px-3 text-left transition hover:bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-500/5 dark:hover:bg-emerald-500/10"
-                >
-                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-emerald-600 text-white"><ArrowRight className="h-4 w-4" /></span>
-                  <span className="min-w-0 flex-1"><span className="block truncate text-xs font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">{nextTrustMission.label}</span><span className="mt-0.5 block truncate text-[10px] text-[color:var(--app-text-soft)]">{nextTrustMission.helper}</span></span>
-                </button>
-              )
-            ) : (
-              <div className="mt-3 flex min-h-11 items-center gap-2 rounded-xl bg-emerald-50 px-3 text-xs font-black text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
-                <BadgeCheck className="h-4 w-4" />
-                {isId ? 'Profil siap dipercaya dan ditemukan.' : 'Your profile is ready to be discovered.'}
-              </div>
-            )}
-          </section>
-
           {profileDetailRows.length > 0 ? (
             <section className="border-y border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] sm:rounded-[24px] sm:border">
               <div className="flex items-center justify-between gap-3 border-b border-[color:var(--app-border)] px-3 py-3 sm:px-5">
@@ -2698,46 +2564,3 @@ export default function SuperProfile() {
               {isId ? 'Komunitas' : 'Community'}
             </LocalizedLink>
           </div>
-        </div>
-      </main>
-
-      <ProfileSocialModal
-        open={Boolean(socialModalTab)}
-        tab={socialModalTab || 'followers'}
-        copy={copy}
-        locale={numberLocale}
-        followers={profileSocial?.followers || []}
-        following={profileSocial?.following || []}
-        followersCount={followersCount}
-        followingCount={followingCount}
-        onTabChange={changeSocialTab}
-        onClose={closeProfileModal}
-      />
-
-      <OwnerProfileEditModal
-        open={Boolean(editSection)}
-        detail={detail}
-        metadata={mergedMetadata}
-        isId={isId}
-        initialSection={editSection || 'menu'}
-        onSectionChange={changeEditSection}
-        onClose={closeProfileModal}
-        onSaved={async () => {
-          await loadProfile('refresh');
-        }}
-      />
-
-      <ImageCropModal
-        open={Boolean(modalKind === 'crop' && cropTarget && cropSource)}
-        imageSrc={cropSource}
-        aspect={cropTarget === 'cover' ? 16 / 9 : 1}
-        maxOutputSize={cropTarget === 'cover' ? 1600 : 512}
-        title={cropTarget === 'cover' ? copy.coverLabel : copy.avatarLabel}
-        shape={cropTarget === 'avatar' ? 'round' : 'rect'}
-        onCancel={closeCropper}
-        onConfirm={confirmCrop}
-      />
-    </>
-  );
-
-}
