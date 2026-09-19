@@ -112,6 +112,8 @@ export default async function HomePage({
   const canViewChannels = hasPermission(business, 'viewChannels');
   const canManageInfo = hasPermission(business, 'manageInfo');
   const canManageInventory = hasPermission(business, 'manageInventory');
+  const canSell = hasPermission(business, 'createSales');
+  const canViewInventory = hasPermission(business, 'viewInventory');
 
   const { ingredients, financeEntries, channels } = await settleHomeControlData({
     ingredients: canViewCosting
@@ -186,19 +188,29 @@ export default async function HomePage({
 
       <PendingOrganizationInvitations />
 
-      <section id="quick-actions" className={`grid gap-2 ${canViewFinance ? 'grid-cols-3' : 'grid-cols-2'}`} aria-label="Aksi cepat">
-        <Link href={`/businesses/${business.id}/orders`} className="merchant-action-sale min-h-14 flex-col gap-1 px-2 text-xs sm:flex-row sm:text-sm">
-          <ShoppingBag className="h-5 w-5 sm:h-4 sm:w-4" /> Jual
-        </Link>
-        {canViewFinance ? (
-          <Link href={`/businesses/${business.id}/finance`} className="merchant-action-money min-h-14 flex-col gap-1 px-2 text-xs sm:flex-row sm:text-sm">
-            <BanknoteArrowDown className="h-5 w-5 sm:h-4 sm:w-4" /> Pengeluaran
-          </Link>
-        ) : null}
-        <Link href={`/businesses/${business.id}/inventory`} className="merchant-action-stock min-h-14 flex-col gap-1 px-2 text-xs sm:flex-row sm:text-sm">
-          <PackagePlus className="h-5 w-5 sm:h-4 sm:w-4" /> {canManageInventory ? 'Tambah stok' : 'Stok'}
-        </Link>
-      </section>
+      {(canSell || canViewFinance || canViewInventory) ? (
+        <section
+          id="quick-actions"
+          className={`grid gap-2 ${[canSell, canViewFinance, canViewInventory].filter(Boolean).length >= 3 ? 'grid-cols-3' : [canSell, canViewFinance, canViewInventory].filter(Boolean).length === 2 ? 'grid-cols-2' : 'grid-cols-1'}`}
+          aria-label="Aksi cepat"
+        >
+          {canSell ? (
+            <Link href={`/businesses/${business.id}/orders`} className="merchant-action-sale min-h-14 flex-col gap-1 px-2 text-xs sm:flex-row sm:text-sm">
+              <ShoppingBag className="h-5 w-5 sm:h-4 sm:w-4" /> Jual
+            </Link>
+          ) : null}
+          {canViewFinance ? (
+            <Link href={`/businesses/${business.id}/finance`} className="merchant-action-money min-h-14 flex-col gap-1 px-2 text-xs sm:flex-row sm:text-sm">
+              <BanknoteArrowDown className="h-5 w-5 sm:h-4 sm:w-4" /> Pengeluaran
+            </Link>
+          ) : null}
+          {canViewInventory ? (
+            <Link href={`/businesses/${business.id}/inventory`} className="merchant-action-stock min-h-14 flex-col gap-1 px-2 text-xs sm:flex-row sm:text-sm">
+              <PackagePlus className="h-5 w-5 sm:h-4 sm:w-4" /> {canManageInventory ? 'Tambah stok' : 'Stok'}
+            </Link>
+          ) : null}
+        </section>
+      ) : null}
 
       <MetricStrip items={dashboard.metrics.map(metric => ({
         label: metric.label,
