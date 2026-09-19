@@ -37,7 +37,9 @@ use chrono::{DateTime, Datelike, Duration, NaiveDate, Utc}; // ✅ Serde enabled
 use uuid::Uuid;
 
 use crate::config::AppState;
-use crate::routes::proofs::{consume_email_otp_proof, consume_phone_otp_proof, validate_phone_otp_proof};
+use crate::routes::proofs::{
+    consume_email_otp_proof, consume_phone_otp_proof, validate_phone_otp_proof,
+};
 use crate::routes::verification::{derive_verification_state, merged_verification_payload};
 
 // Optional: cookie::time::Duration for cookie expiry
@@ -2163,18 +2165,20 @@ pub async fn oauth_google(
                         "email": email
                     })),
                     (ip_address, user_agent),
-                ).await;
-                return (
-                    StatusCode::FORBIDDEN,
-                    Json(json!({"error": error_code})),
-                ).into_response();
+                )
+                .await;
+                return (StatusCode::FORBIDDEN, Json(json!({"error": error_code}))).into_response();
             }
             Err(error) => {
-                tracing::error!("oauth google backoffice allowlist lookup failed: {:?}", error);
+                tracing::error!(
+                    "oauth google backoffice allowlist lookup failed: {:?}",
+                    error
+                );
                 return (
                     StatusCode::SERVICE_UNAVAILABLE,
                     Json(json!({"error":"backoffice google access policy unavailable"})),
-                ).into_response();
+                )
+                    .into_response();
             }
         }
     } else {
@@ -2377,7 +2381,10 @@ pub async fn oauth_google(
 
     if backoffice_application.is_some() {
         for role_name in &approved_backoffice_roles {
-            if !matches!(role_name.as_str(), "admin" | "content_admin" | "sales" | "support") {
+            if !matches!(
+                role_name.as_str(),
+                "admin" | "content_admin" | "sales" | "support"
+            ) {
                 continue;
             }
             if let Ok(Some(role_id)) = sqlx::query_scalar::<_, Uuid>(
