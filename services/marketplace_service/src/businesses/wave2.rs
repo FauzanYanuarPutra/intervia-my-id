@@ -6,6 +6,7 @@ use uuid::Uuid;
 
 use super::{
     control::canonical_manual_finance_entry_type,
+    counterparty::{validate_document_party_tx, CounterpartyError, CounterpartyRole},
     event_outbox::enqueue_business_event,
     execution_policy::{
         allocate_document_number_tx, load_execution_policy_tx, resolve_operational_location_tx,
@@ -117,6 +118,8 @@ pub(crate) struct CreatePurchaseRequest {
     pub(crate) account_key: String,
     #[serde(default)]
     pub(crate) location_id: Option<Uuid>,
+    #[serde(default)]
+    pub(crate) party_id: Option<Uuid>,
     pub(crate) occurred_on: NaiveDate,
     #[serde(default)]
     pub(crate) note: String,
@@ -130,6 +133,7 @@ pub(crate) struct PurchaseRecord {
     pub(crate) location_id: Uuid,
     pub(crate) currency: String,
     pub(crate) document_number: String,
+    pub(crate) party_id: Option<Uuid>,
     pub(crate) correlation_id: Uuid,
     pub(crate) policy_snapshot: serde_json::Value,
     pub(crate) ingredient_id: Uuid,
@@ -458,6 +462,9 @@ impl Wave2Repository {
         if let Some(location_id) = request.location_id {
             fingerprint["location_id"] = serde_json::Value::String(location_id.to_string());
         }
+        if let Some(party_id) = request.party_id {
+            fingerprint["party_id"] = serde_json::Value::String(party_id.to_string());
+        }
         let request_hash = wave2_request_hash(fingerprint)?;
 
         if let Some(existing) = load_purchase(&self.db, business_id, idempotency_key).await? {
@@ -488,6 +495,16 @@ impl Wave2Repository {
         )
         .await
         .map_err(map_execution_policy_error)?;
+        let party_id = validate_document_party_tx(
+            &mut tx,
+            business_id,
+            organization_id,
+            request.party_id,
+            CounterpartyRole::Supplier,
+            account_key == "payable",
+        )
+        .await
+        .map_err(map_purchase_counterparty_error)?;
         let purchase_id = Uuid::new_v4();
         let correlation_id = Uuid::new_v4();
         let document_number = allocate_document_number_tx(
@@ -505,16 +522,16 @@ impl Wave2Repository {
             r#"
             INSERT INTO business_purchases (
               id, business_id, organization_id, location_id, currency, document_number,
-              correlation_id, policy_snapshot, ingredient_id, idempotency_key, request_hash,
+              party_id, correlation_id, policy_snapshot, ingredient_id, idempotency_key, request_hash,
               stock_quantity_delta, total_amount, account_key, occurred_on, note,
               created_by_user_id
             )
             SELECT
-              $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17
+              $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18
             WHERE EXISTS (
               SELECT 1
               FROM business_ingredients
-              WHERE id=$9
+              WHERE id=$10
                 AND business_id=$2
                 AND organization_id=$3
                 AND status='active'
@@ -529,6 +546,7 @@ impl Wave2Repository {
         .bind(location_id)
         .bind(&policy.currency)
         .bind(&document_number)
+        .bind(party_id)
         .bind(correlation_id)
         .bind(policy_snapshot.clone())
         .bind(request.ingredient_id)
@@ -694,6 +712,7 @@ impl Wave2Repository {
             "organization_id": organization_id,
             "location_id": location_id,
             "document_number": document_number,
+            "party_id": party_id,
             "currency": policy.currency,
             "correlation_id": correlation_id,
             "occurred_on": request.occurred_on,
@@ -1041,6 +1060,23 @@ impl Wave2Repository {
     }
 }
 
+fn map_purchase_counterparty_error(
+    error: CounterpartyError,
+) -> Wave2RepositoryError {
+    match error {
+        CounterpartyError::Required => {
+            Wave2RepositoryError::Validation("purchase_party_required")
+        }
+        CounterpartyError::Invalid => {
+            Wave2RepositoryError::Validation("invalid_purchase_party")
+        }
+        CounterpartyError::CustomerRoleInUse
+        | CounterpartyError::SupplierRoleInUse
+        | CounterpartyError::OutstandingBalance
+        | CounterpartyError::Database => Wave2RepositoryError::Database,
+    }
+}
+
 fn map_execution_policy_error(error: ExecutionPolicyError) -> Wave2RepositoryError {
     match error {
         ExecutionPolicyError::LocationRequired => {
@@ -1280,13 +1316,13 @@ async fn load_purchase(
     business_id: Uuid,
     key: Uuid,
 ) -> Result<Option<PurchaseRecord>, Wave2RepositoryError> {
-    sqlx::query_as::<_,PurchaseRecord>("SELECT id,business_id,organization_id,location_id,currency,document_number,correlation_id,policy_snapshot,ingredient_id,idempotency_key,stock_quantity_delta,total_amount,account_key,occurred_on,note,finance_entry_id,created_by_user_id,created_at FROM business_purchases WHERE business_id=$1 AND idempotency_key=$2").bind(business_id).bind(key).fetch_optional(pool).await.map_err(Into::into)
+    sqlx::query_as::<_,PurchaseRecord>("SELECT id,business_id,organization_id,location_id,currency,document_number,party_id,correlation_id,policy_snapshot,ingredient_id,idempotency_key,stock_quantity_delta,total_amount,account_key,occurred_on,note,finance_entry_id,created_by_user_id,created_at FROM business_purchases WHERE business_id=$1 AND idempotency_key=$2").bind(business_id).bind(key).fetch_optional(pool).await.map_err(Into::into)
 }
 async fn load_purchase_tx(
     tx: &mut Transaction<'_, Postgres>,
     id: Uuid,
 ) -> Result<Option<PurchaseRecord>, Wave2RepositoryError> {
-    sqlx::query_as::<_,PurchaseRecord>("SELECT id,business_id,organization_id,location_id,currency,document_number,correlation_id,policy_snapshot,ingredient_id,idempotency_key,stock_quantity_delta,total_amount,account_key,occurred_on,note,finance_entry_id,created_by_user_id,created_at FROM business_purchases WHERE id=$1").bind(id).fetch_optional(&mut **tx).await.map_err(Into::into)
+    sqlx::query_as::<_,PurchaseRecord>("SELECT id,business_id,organization_id,location_id,currency,document_number,party_id,correlation_id,policy_snapshot,ingredient_id,idempotency_key,stock_quantity_delta,total_amount,account_key,occurred_on,note,finance_entry_id,created_by_user_id,created_at FROM business_purchases WHERE id=$1").bind(id).fetch_optional(&mut **tx).await.map_err(Into::into)
 }
 
 #[cfg(test)]
