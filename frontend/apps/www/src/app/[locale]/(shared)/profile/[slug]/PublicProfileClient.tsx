@@ -588,13 +588,25 @@ function getPublicProfileAvatarUrl(profile: PublicUserProfile): string {
 
 function getPublicProfilePhone(profile: PublicUserProfile): string {
   const metadata = asRecord(profile.metadata);
-  const contact = asRecord(metadata?.contact);
   const publicContact = asRecord(metadata?.public_contact);
-  const provider = asRecord(profile.provider_profile);
-  const providerContact = asRecord(provider?.contact);
+
+  const explicitlyPublic = [
+    publicContact?.public_contact_enabled,
+    publicContact?.contact_public,
+    publicContact?.phone_public,
+    publicContact?.show_public_phone,
+    publicContact?.whatsapp_public,
+    metadata?.public_contact_enabled,
+    metadata?.contact_public,
+    metadata?.phone_public,
+    metadata?.show_public_phone,
+    metadata?.whatsapp_public,
+  ].some(value => readBoolean(value));
+
+  if (!explicitlyPublic) return '';
 
   return readNestedString(
-    [publicContact, contact, providerContact, provider, metadata],
+    [publicContact],
     ['whatsapp', 'whatsapp_number', 'phone', 'phone_number', 'contact_phone'],
   );
 }
@@ -1870,24 +1882,19 @@ export default function PublicProfileClient({
 
   // Public trust shows only proof that is active right now.
   // It intentionally does not expose owner-only completion percentages or locked missions.
+  // Keep public trust compact: only show proof-backed signals.
   const publicTrustSignals = [
     {
       key: 'identity',
-      label: localeCode === 'id' ? 'Identitas' : 'Identity',
+      label: localeCode === 'id' ? 'Identitas terverifikasi' : 'Identity verified',
       active: Boolean(profile.identity_verified),
       icon: ShieldCheck,
     },
     {
       key: 'contact',
-      label: localeCode === 'id' ? 'Kontak' : 'Contact',
+      label: localeCode === 'id' ? 'Kontak terverifikasi' : 'Contact verified',
       active: Boolean(profile.email_verified || profile.phone_verified),
       icon: UserCheck,
-    },
-    {
-      key: 'catalog',
-      label: localeCode === 'id' ? 'Katalog 5+' : 'Catalog 5+',
-      active: listings.length >= 5,
-      icon: Store,
     },
     ...(!PROMO_ONLY_MODE
       ? [
@@ -1940,31 +1947,33 @@ export default function PublicProfileClient({
       metadata?.business_category,
       metadata?.category,
       freelancer?.category,
-    ) || detail.roles.map(formatRole).join(', ');
+    );
 
-  const businessHours =
-    firstString(
-      provider?.business_hours,
-      provider?.operational_hours,
-      metadata?.business_hours,
-      metadata?.operational_hours,
-      provider?.response_time,
-    ) || copy.askByChat;
+  const businessHours = firstString(
+    provider?.business_hours,
+    provider?.operational_hours,
+    metadata?.business_hours,
+    metadata?.operational_hours,
+  );
 
   const businessRows = [
     {
       key: 'type',
-      label: copy.businessType,
+      label: localeCode === 'id' ? 'Jenis' : 'Type',
       value:
-        detail.roles.map(formatRole).join(', ') ||
-        (profile.identity_verified ? copy.verified : copy.publicProfile),
-      icon: ShieldCheck,
+        firstString(
+          provider?.business_type,
+          provider?.store_type,
+          metadata?.business_type,
+          metadata?.store_type,
+        ) || '',
+      icon: Store,
     },
     {
       key: 'category',
       label: copy.category,
       value: businessCategory,
-      icon: Store,
+      icon: Package,
     },
     {
       key: 'location',
@@ -2239,263 +2248,122 @@ export default function PublicProfileClient({
     { key: 'posts', label: localeCode === 'id' ? 'Etalase' : 'Storefront' },
     { key: 'about', label: copy.about },
     { key: 'reviews', label: `${copy.reviews} (${reviewCount})` },
-    { key: 'business', label: copy.businessInfo },
   ];
 
   return (
     <>
       <div className="min-h-screen overflow-x-clip bg-[color:var(--app-surface-muted)] pb-[calc(5.5rem+env(safe-area-inset-bottom))] dark:bg-[color:var(--app-surface)] sm:pb-8">
-        <DetailMobileTopBar
-          title={detail.displayName}
-          eyebrow={copy.publicProfile}
-          backLabel={copy.back}
-        />
+        <DetailMobileTopBar title={detail.displayName} eyebrow={copy.publicProfile} backLabel={copy.back} />
 
-        <main className="mx-auto w-full max-w-[1180px] space-y-3 px-0 py-0 sm:space-y-4 sm:px-4 sm:py-4 lg:px-5 lg:py-5">
-          {/* =====================================================
-              PROFILE IDENTITY — same visual language as SuperProfile.
-              Public view changes actions, not identity hierarchy.
-          ====================================================== */}
-          <section className="overflow-hidden border-y border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] sm:rounded-[24px] sm:border sm:shadow-[0_18px_48px_-40px_rgba(15,23,42,0.35)]">
-            <div className="relative h-32 overflow-hidden sm:h-44 lg:h-52">
+        <main className="mx-auto w-full max-w-[1080px] px-0 py-0 sm:px-4 sm:py-4 lg:px-5 lg:py-5">
+          <section className="overflow-hidden border-y border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] sm:rounded-[24px] sm:border sm:shadow-sm">
+            <div className="relative h-28 overflow-hidden sm:h-40">
               {coverUrl ? (
-                <Image
-                  src={coverUrl}
-                  alt={`${detail.displayName} cover`}
-                  fill
-                  priority
-                  unoptimized
-                  sizes="(max-width: 640px) 100vw, 1180px"
-                  className="object-cover"
-                />
+                <Image src={coverUrl} alt="" fill priority unoptimized sizes="(max-width: 640px) 100vw, 1080px" className="object-cover" />
               ) : (
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_16%_24%,rgba(16,185,129,0.32),transparent_32%),radial-gradient(circle_at_78%_22%,rgba(14,165,233,0.16),transparent_28%),linear-gradient(135deg,#d1fae5_0%,#f8fafc_50%,#dcfce7_100%)] dark:bg-[radial-gradient(circle_at_16%_24%,rgba(16,185,129,0.18),transparent_32%),radial-gradient(circle_at_78%_22%,rgba(14,165,233,0.12),transparent_28%),linear-gradient(135deg,#052e25_0%,#0f172a_52%,#022c22_100%)]" />
+                <div className="absolute inset-0 bg-[linear-gradient(135deg,#d1fae5_0%,#f8fafc_58%,#ccfbf1_100%)] dark:bg-[linear-gradient(135deg,#052e25_0%,#0f172a_58%,#022c22_100%)]" />
               )}
-              <div className="absolute inset-0 bg-gradient-to-b from-black/5 via-transparent to-black/40" />
-
-              <div className="absolute right-2.5 top-2.5 flex items-center gap-2 sm:right-4 sm:top-4">
-                <button
-                  type="button"
-                  onClick={handleShareProfile}
-                  className="grid h-9 w-9 place-items-center rounded-full border border-white/35 bg-black/45 text-white shadow-sm backdrop-blur-md transition hover:bg-black/60 sm:h-10 sm:w-10"
-                  aria-label={shareMessage || copy.share}
-                  title={shareMessage || copy.share}
-                >
+              <div className="absolute inset-0 bg-gradient-to-b from-black/5 via-transparent to-black/35" />
+              <div className="absolute right-3 top-3 flex gap-2">
+                <button type="button" onClick={handleShareProfile} className="grid h-9 w-9 place-items-center rounded-full border border-white/40 bg-black/35 text-white backdrop-blur-md transition hover:bg-black/55" aria-label={shareMessage || copy.share} title={shareMessage || copy.share}>
                   {shareMessage ? <Copy className="h-4 w-4" /> : <Share2 className="h-4 w-4" />}
                 </button>
-
                 {!isOwnProfile ? (
-                  <button
-                    type="button"
-                    onClick={handleToggleSaved}
-                    className={`grid h-9 w-9 place-items-center rounded-full border text-white shadow-sm backdrop-blur-md transition sm:h-10 sm:w-10 ${
-                      isSaved
-                        ? 'border-emerald-300 bg-emerald-600'
-                        : 'border-white/35 bg-black/45 hover:bg-black/60'
-                    }`}
-                    aria-label={isSaved ? copy.saved : copy.save}
-                    title={isSaved ? copy.saved : copy.save}
-                  >
-                    <Bookmark className={`h-4 w-4 ${isSaved ? 'fill-current' : ''}`} />
+                  <button type="button" onClick={handleToggleSaved} className={${grid h-9 w-9 place-items-center rounded-full border text-white backdrop-blur-md transition ${${{
+                    isSaved ? 'border-emerald-300 bg-emerald-600' : 'border-white/40 bg-black/35 hover:bg-black/55'
+                  }${} aria-label={isSaved ? copy.saved : copy.save} title={isSaved ? copy.saved : copy.save}>
+                    <Bookmark className={${h-4 w-4 ${${{isSaved ? 'fill-current' : ''}${} />
                   </button>
                 ) : null}
               </div>
             </div>
 
-            <div className="relative px-3 pb-4 sm:px-6 sm:pb-6">
-              <div className="-mt-11 flex min-w-0 items-end gap-3 sm:-mt-14 sm:gap-4">
-                <div className="relative h-[88px] w-[88px] shrink-0 overflow-hidden rounded-full border-[4px] border-[color:var(--app-surface-strong)] bg-[color:var(--app-surface-muted)] shadow-lg sm:h-28 sm:w-28 sm:border-[5px]">
-                  <Image
-                    src={avatarUrl}
-                    alt={detail.displayName}
-                    fill
-                    priority
-                    unoptimized
-                    sizes="112px"
-                    className="object-cover"
-                  />
+            <div className="px-3 pb-4 sm:px-6 sm:pb-5">
+              <div className="-mt-10 flex min-w-0 items-end gap-3 sm:-mt-12 sm:gap-4">
+                <div className="relative h-[78px] w-[78px] shrink-0 overflow-hidden rounded-full border-[4px] border-[color:var(--app-surface-strong)] bg-[color:var(--app-surface-muted)] shadow-md sm:h-24 sm:w-24 sm:border-[5px]">
+                  <Image src={avatarUrl} alt={detail.displayName} fill priority unoptimized sizes="96px" className="object-cover" />
                 </div>
-
-                <div className="min-w-0 flex-1 pb-0.5 sm:pb-2">
+                <div className="min-w-0 flex-1 pb-0.5">
                   <div className="flex min-w-0 items-center gap-1.5">
-                    <h1 className="min-w-0 truncate text-[20px] font-black leading-tight tracking-[-0.025em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[28px]">
-                      {detail.displayName}
-                    </h1>
-                    {profile.identity_verified ? (
-                      <BadgeCheck
-                        className="h-5 w-5 shrink-0 fill-emerald-600 text-white sm:h-6 sm:w-6"
-                        aria-label={copy.verified}
-                      />
-                    ) : null}
+                    <h1 className="min-w-0 truncate text-[20px] font-black leading-tight tracking-[-0.02em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[26px]">{detail.displayName}</h1>
+                    {profile.identity_verified ? <BadgeCheck className="h-5 w-5 shrink-0 fill-emerald-600 text-white" aria-label={copy.verified} /> : null}
                   </div>
-                  <p className="mt-0.5 truncate text-[11px] font-semibold text-[color:var(--app-text-soft)] sm:text-sm">
-                    @{detail.handle}
-                  </p>
+                  <p className="mt-0.5 truncate text-[11px] font-medium text-[color:var(--app-text-soft)] sm:text-xs">@{detail.handle}</p>
                 </div>
               </div>
 
-              <div className="mt-3 flex min-w-0 flex-wrap items-center gap-1.5">
-                {businessCategory ? (
-                  <span className="inline-flex max-w-[70vw] items-center rounded-full bg-[color:var(--app-accent-soft)] px-2.5 py-1 text-[10px] font-bold text-[color:var(--app-accent)] sm:max-w-sm sm:text-[11px]">
-                    <span className="truncate">{businessCategory}</span>
-                  </span>
-                ) : null}
-                <span className="inline-flex max-w-[70vw] items-center gap-1 rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[10px] font-semibold text-[color:var(--app-text-soft)] sm:max-w-sm sm:text-[11px]">
-                  <MapPin className="h-3.5 w-3.5 shrink-0" />
-                  <span className="truncate">{profile.location || copy.locationFallback}</span>
-                </span>
-                {joinedDate ? (
-                  <span className="hidden items-center gap-1 rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[10px] font-semibold text-[color:var(--app-text-soft)] sm:inline-flex sm:text-[11px]">
-                    <CalendarDays className="h-3.5 w-3.5" />
-                    {copy.joined} {joinedDate}
-                  </span>
-                ) : null}
+              <div className="mt-3 flex min-w-0 flex-wrap gap-1.5">
+                {businessCategory ? <span className="inline-flex max-w-full items-center rounded-full bg-[color:var(--app-accent-soft)] px-2.5 py-1 text-[10px] font-bold text-[color:var(--app-accent)] sm:text-[11px]"><span className="truncate">{businessCategory}</span></span> : null}
+                {profile.location ? <span className="inline-flex max-w-full items-center gap-1 rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[10px] font-medium text-[color:var(--app-text-soft)] sm:text-[11px]"><MapPin className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{profile.location}</span></span> : null}
               </div>
 
-              {detail.headline ? (
-                <p className="mt-3 line-clamp-1 max-w-3xl text-[13px] font-black leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-sm">
-                  {detail.headline}
-                </p>
-              ) : null}
-              <p className="mt-1 line-clamp-2 max-w-3xl text-[12px] font-medium leading-5 text-[color:var(--app-text-soft)] sm:line-clamp-3 sm:text-[13px] sm:leading-6">
-                {detail.summary}
-              </p>
+              {detail.headline ? <p className="mt-3 text-[13px] font-extrabold leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-sm">{detail.headline}</p> : null}
+              <p className="mt-1 line-clamp-3 max-w-3xl text-[12px] leading-5 text-[color:var(--app-text-soft)] sm:text-[13px] sm:leading-6">{detail.summary}</p>
 
-              {/* Match SuperProfile: Offers · Followers · Reels · Rating. */}
-              <div className="mt-4 grid grid-cols-4 divide-x divide-[color:var(--app-border)] border-y border-[color:var(--app-border)] py-2.5 sm:max-w-2xl sm:rounded-xl sm:border sm:py-0">
-                <button type="button" onClick={() => setActiveProfileTab('posts')} className="min-w-0 px-1 py-1 text-center transition hover:bg-[color:var(--app-surface-muted)] sm:px-3 sm:py-3">
-                  <span className="block truncate text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
-                    {formatCompactNumber(listings.length, localeCode)}
-                  </span>
-                  <span className="mt-0.5 block truncate text-[9px] font-semibold text-[color:var(--app-text-soft)] sm:text-[11px]">
-                    {localeCode === 'id' ? 'Penawaran' : 'Offers'}
-                  </span>
+              <div className="mt-4 grid grid-cols-3 divide-x divide-[color:var(--app-border)] rounded-2xl border border-[color:var(--app-border)] py-2.5 sm:max-w-[560px]">
+                <button type="button" onClick={() => setActiveProfileTab('posts')} className="min-w-0 px-2 text-center transition hover:bg-[color:var(--app-surface-muted)] sm:px-4">
+                  <span className="block text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">{formatCompactNumber(listings.length, localeCode)}</span>
+                  <span className="mt-0.5 block truncate text-[9px] font-semibold text-[color:var(--app-text-soft)] sm:text-[11px]">{localeCode === 'id' ? 'Etalase' : 'Items'}</span>
                 </button>
-                <button type="button" onClick={() => setSocialModalTab('followers')} className="min-w-0 px-1 py-1 text-center transition hover:bg-[color:var(--app-surface-muted)] sm:px-3 sm:py-3">
-                  <span className="block truncate text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
-                    {formatCompactNumber(followersCount, localeCode)}
-                  </span>
+                <button type="button" onClick={() => setSocialModalTab('followers')} className="min-w-0 px-2 text-center transition hover:bg-[color:var(--app-surface-muted)] sm:px-4">
+                  <span className="block text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">{formatCompactNumber(followersCount, localeCode)}</span>
                   <span className="mt-0.5 block truncate text-[9px] font-semibold text-[color:var(--app-text-soft)] sm:text-[11px]">{copy.followers}</span>
                 </button>
-                <Link href={`/reels?creator=${encodeURIComponent(profile.id)}`} className="min-w-0 px-1 py-1 text-center transition hover:bg-[color:var(--app-surface-muted)] sm:px-3 sm:py-3">
-                  <span className="block truncate text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
-                    {formatCompactNumber(reelsCount, localeCode)}
-                  </span>
-                  <span className="mt-0.5 block truncate text-[9px] font-semibold text-[color:var(--app-text-soft)] sm:text-[11px]">{copy.reelsStat}</span>
-                </Link>
-                <button type="button" onClick={() => setActiveProfileTab('reviews')} className="min-w-0 px-1 py-1 text-center transition hover:bg-[color:var(--app-surface-muted)] sm:px-3 sm:py-3">
-                  <span className="flex items-center justify-center gap-1 truncate text-sm font-black text-amber-600 dark:text-amber-300 sm:text-base">
-                    <Star className="h-3.5 w-3.5 fill-current" />
-                    {typeof rating === 'number' && rating > 0 ? rating.toFixed(1) : '—'}
-                  </span>
+                <button type="button" onClick={() => setActiveProfileTab('reviews')} className="min-w-0 px-2 text-center transition hover:bg-[color:var(--app-surface-muted)] sm:px-4">
+                  <span className="flex items-center justify-center gap-1 text-sm font-black text-amber-600 dark:text-amber-300 sm:text-base"><Star className="h-3.5 w-3.5 fill-current" />{typeof rating === 'number' && rating > 0 ? rating.toFixed(1) : '—'}</span>
                   <span className="mt-0.5 block truncate text-[9px] font-semibold text-[color:var(--app-text-soft)] sm:text-[11px]">{copy.rating}</span>
                 </button>
               </div>
 
-              {/* Visitors get only two primary decisions. */}
-              <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
                 {isOwnProfile ? (
                   <>
-                    <Link href="/profile/edit" className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 text-xs font-black text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)] dark:text-[color:var(--app-text-inverse)]">
-                      <Edit3 className="h-4 w-4" />
-                      {copy.editProfile}
-                    </Link>
-                    <Link href="/manage" className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 text-xs font-black text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)] dark:text-[color:var(--app-text-inverse)]">
-                      <Wrench className="h-4 w-4" />
-                      {copy.managePosts}
-                    </Link>
+                    <Link href="/profile/edit" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 text-xs font-black text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)] dark:text-[color:var(--app-text-inverse)]"><Edit3 className="h-4 w-4" />{copy.editProfile}</Link>
+                    <Link href="/manage" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-xs font-black text-white transition hover:bg-emerald-700"><Wrench className="h-4 w-4" />{copy.managePosts}</Link>
                   </>
                 ) : (
                   <>
-                    <button
-                      type="button"
-                      onClick={() => void handleOpenChat()}
-                      disabled={startingChatKey === 'profile'}
-                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 text-xs font-black text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-wait disabled:opacity-70 sm:min-w-32 sm:text-sm"
-                    >
-                      {startingChatKey === 'profile' ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4" />}
-                      {startingChatKey === 'profile' ? copy.opening : copy.chat}
+                    <button type="button" onClick={() => void handleOpenChat()} disabled={startingChatKey === 'profile'} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-xs font-black text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-wait disabled:opacity-70 sm:min-w-32 sm:text-sm">
+                      {startingChatKey === 'profile' ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4" />}{startingChatKey === 'profile' ? copy.opening : copy.chat}
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => void handleToggleProfileFollow()}
-                      disabled={followLoading}
-                      className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-4 text-xs font-black transition disabled:cursor-wait disabled:opacity-70 sm:text-sm ${
-                        isFollowingProfile
-                          ? 'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]'
-                          : 'border-emerald-600 bg-[color:var(--app-surface-strong)] text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-500/10'
-                      }`}
-                    >
-                      {followLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : isFollowingProfile ? <UserCheck className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
-                      {followLoading ? copy.followLoading : isFollowingProfile ? copy.followingAction : copy.followAction}
+                    <button type="button" onClick={() => void handleToggleProfileFollow()} disabled={followLoading} className={${inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-4 text-xs font-black transition disabled:cursor-wait disabled:opacity-70 sm:text-sm ${${{
+                      isFollowingProfile ? 'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]' : 'border-emerald-600 bg-[color:var(--app-surface-strong)] text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-500/10'
+                    }${}>
+                      {followLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : isFollowingProfile ? <UserCheck className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}{followLoading ? copy.followLoading : isFollowingProfile ? copy.followingAction : copy.followAction}
                     </button>
+                    {whatsAppHref ? <a href={whatsAppHref} target="_blank" rel="noreferrer noopener" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 text-xs font-black text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)] dark:text-[color:var(--app-text-inverse)]"><PhoneCall className="h-4 w-4 text-emerald-600" />{copy.whatsapp}</a> : null}
                   </>
                 )}
               </div>
 
-              {chatError ? (
-                <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-800 dark:border-rose-900/60 dark:bg-rose-500/10 dark:text-rose-200">{chatError}</div>
-              ) : null}
-              {followError ? (
-                <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 dark:border-amber-900/60 dark:bg-amber-500/10 dark:text-amber-200">{followError}</div>
+              {(chatError || followError) ? <div className="mt-3 space-y-2">
+                {chatError ? <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-800 dark:border-rose-900/60 dark:bg-rose-500/10 dark:text-rose-200">{chatError}</div> : null}
+                {followError ? <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 dark:border-amber-900/60 dark:bg-amber-500/10 dark:text-amber-200">{followError}</div> : null}
+              </div> : null}
+
+              {publicTrustSignals.length > 0 ? (
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {publicTrustSignals.map(item => {
+                    const Icon = item.icon;
+                    return <span key={item.key} className="inline-flex min-h-7 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300"><Icon className="h-3.5 w-3.5" />{item.label}</span>;
+                  })}
+                </div>
               ) : null}
             </div>
           </section>
 
-          {/* Public trust mirrors SuperProfile, but only active proof is shown. */}
-          {publicTrustSignals.length > 0 ? (
-            <section className="border-y border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-3 sm:rounded-[24px] sm:border sm:px-5 sm:py-4">
-              <div className="flex min-w-0 flex-col gap-2.5 sm:flex-row sm:items-center sm:gap-3">
-                <div className="flex shrink-0 items-center gap-2">
-                  <span className="grid h-8 w-8 place-items-center rounded-full bg-emerald-600 text-white">
-                    <ShieldCheck className="h-4 w-4" />
-                  </span>
-                  <span className="text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                    {localeCode === 'id' ? 'Kepercayaan' : 'Trust'}
-                  </span>
-                </div>
-                <div className="flex min-w-0 flex-wrap gap-1.5">
-                  {publicTrustSignals.map(item => {
-                    const Icon = item.icon;
-                    return (
-                      <span key={item.key} className="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 text-[10px] font-black text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300 sm:text-[11px]">
-                        <Icon className="h-3.5 w-3.5" />
-                        {item.label}
-                      </span>
-                    );
-                  })}
-                </div>
-              </div>
-            </section>
-          ) : null}
-
-          {/* =====================================================
-              PROFILE CONTENT — one card, simple sticky navigation.
-          ====================================================== */}
-          <section className="border-y border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] sm:overflow-hidden sm:rounded-[24px] sm:border sm:shadow-[0_16px_44px_-38px_rgba(15,23,42,0.25)]">
-            <div className="sticky top-0 z-20 border-b border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)]/96 px-2 backdrop-blur sm:px-4">
-              <ProfileRail
-                activeIndex={profileTabs.findIndex(tab => tab.key === activeProfileTab)}
-                ariaLabel={localeCode === 'id' ? 'Navigasi profil' : 'Profile navigation'}
-                trackClassName="gap-0"
-                viewportClassName="py-0"
-              >
+          <section className="mt-3 overflow-hidden border-y border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] sm:rounded-[24px] sm:border sm:shadow-sm">
+            <div className="sticky top-0 z-20 border-b border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)]/96 backdrop-blur">
+              <ProfileRail activeIndex={Math.max(0, profileTabs.findIndex(tab => tab.key === activeProfileTab))} ariaLabel={localeCode === 'id' ? 'Navigasi profil' : 'Profile navigation'} trackClassName="gap-0" viewportClassName="px-1 py-0">
                 {profileTabs.map(tab => {
                   const active = activeProfileTab === tab.key;
                   return (
                     <ProfileRailItem key={tab.key}>
-                      <button
-                        type="button"
-                        onClick={() => setActiveProfileTab(tab.key)}
-                        aria-current={active ? 'page' : undefined}
-                        className={`relative min-h-12 whitespace-nowrap px-3 text-[12px] font-bold transition sm:min-h-14 sm:px-4 sm:text-sm ${
-                          active
-                            ? 'text-emerald-700 dark:text-emerald-300'
-                            : 'text-[color:var(--app-text-soft)] hover:text-[color:var(--app-text)]'
-                        }`}
-                      >
+                      <button type="button" onClick={() => setActiveProfileTab(tab.key)} aria-current={active ? 'page' : undefined} className={${relative min-h-12 whitespace-nowrap px-4 text-[12px] font-bold transition sm:min-h-14 sm:text-sm ${${{
+                        active ? 'text-emerald-700 dark:text-emerald-300' : 'text-[color:var(--app-text-soft)] hover:text-[color:var(--app-text)]'
+                      }${}>
                         {tab.label}
-                        {active ? <span className="absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-emerald-600" /> : null}
+                        {active ? <span className="absolute inset-x-4 bottom-0 h-0.5 rounded-full bg-emerald-600" /> : null}
                       </button>
                     </ProfileRailItem>
                   );
@@ -2504,144 +2372,83 @@ export default function PublicProfileClient({
             </div>
 
             {activeProfileTab === 'posts' ? (
-              <div className="min-w-0 p-3 sm:p-4 lg:p-5">
-                <div className="min-w-0">
-                  <div className="-mx-3 px-3 pb-1 sm:mx-0 sm:px-0">
-                    <ProfileRail
-                      activeIndex={availableContentTabs.indexOf(resolvedContentTab)}
-                      ariaLabel={localeCode === 'id' ? 'Filter konten profil' : 'Profile content filters'}
-                    >
-                      {availableContentTabs.map(tab => {
-                        const active = resolvedContentTab === tab;
-                        return (
-                          <ProfileRailItem key={tab}>
-                            <button
-                              type="button"
-                              onClick={() => setActiveContentTab(tab)}
-                              aria-pressed={active}
-                              className={`min-h-9 whitespace-nowrap rounded-full border px-3.5 text-[11px] font-bold transition sm:text-xs ${
-                                active
-                                  ? 'border-emerald-600 bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'
-                                  : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text-soft)] hover:border-emerald-300 hover:text-[color:var(--app-text)]'
-                              }`}
-                            >
-                              {tab === 'all' ? copy.all : getProfileContentTabLabel(tab, localeCode)}
-                            </button>
-                          </ProfileRailItem>
-                        );
-                      })}
-                    </ProfileRail>
-                  </div>
-
-                  {visibleListings.length > 0 ? (
-                    <div className="mt-3 grid grid-cols-2 gap-2.5 sm:gap-3 md:grid-cols-3">
-                      {visibleListings.map(item => {
-                        const tab = normalizeProfileContentTab({
-                          type: item.content_type,
-                          category: item.category,
-                          metadata: item.metadata || null,
-                        });
-                        const views = getListingMetric(item, ['view_count', 'views_count', 'views']);
-                        const favorites = getListingMetric(item, ['favorite_count', 'favorites_count', 'like_count', 'likes_count', 'favorites', 'likes']);
-                        const chats = getListingMetric(item, ['chat_count', 'chats_count', 'comment_count', 'comments_count', 'chats', 'comments']);
-                        const location = getListingLocation(item);
-                        const href = buildPublicListingHref(item);
-
-                        return (
-                          <article
-                            key={item.id}
-                            className="group flex min-w-0 flex-col overflow-hidden rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md"
-                          >
-                            <Link href={href} className="relative aspect-square w-full overflow-hidden bg-[color:var(--app-surface-muted)]">
-                              {item.cover_image ? (
-                                <Image
-                                  src={item.cover_image}
-                                  alt={item.title || ''}
-                                  fill
-                                  unoptimized
-                                  sizes="(max-width: 768px) 50vw, 260px"
-                                  className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-                                />
-                              ) : (
-                                <div className="flex h-full items-center justify-center text-[color:var(--app-text-soft)]">
-                                  <Package className="h-8 w-8" />
-                                </div>
-                              )}
-                              <span className={`absolute left-2 top-2 max-w-[80%] truncate rounded-md px-2 py-1 text-[9px] font-black ${getTabTone(tab)}`}>
-                                {getProfileContentTabLabel(tab, localeCode)}
-                              </span>
-                            </Link>
-
-                            <div className="flex min-h-[142px] flex-1 flex-col p-2.5 sm:p-3">
-                              <Link href={href} className="min-w-0">
-                                <h3 className="line-clamp-2 text-[12px] font-extrabold leading-[18px] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-sm sm:leading-5">
-                                  {item.title || (localeCode === 'id' ? 'Postingan' : 'Post')}
-                                </h3>
-                              </Link>
-
-                              {item.summary ? (
-                                <p className="mt-1 hidden line-clamp-2 text-[11px] leading-4 text-[color:var(--app-text-soft)] sm:block">
-                                  {item.summary}
-                                </p>
-                              ) : null}
-
-                              <p className="mt-2 truncate text-[13px] font-black text-emerald-700 dark:text-emerald-300 sm:text-sm">
-                                {formatPublicListingValue(item, localeCode)}
-                              </p>
-
-                              <div className="flex-1" />
-
-                              {location ? (
-                                <p className="mt-1.5 truncate text-[9px] font-medium text-[color:var(--app-text-soft)] sm:text-[10px]">
-                                  {location}
-                                </p>
-                              ) : null}
-
-                              <div className="mt-2 flex items-center gap-2 text-[9px] font-semibold text-[color:var(--app-text-soft)] sm:text-[10px]">
-                                <span className="inline-flex items-center gap-1"><Eye className="h-3 w-3" />{formatCompactNumber(views, localeCode)}</span>
-                                <span className="inline-flex items-center gap-1"><Heart className="h-3 w-3" />{formatCompactNumber(favorites, localeCode)}</span>
-                                <span className="inline-flex items-center gap-1"><MessageCircle className="h-3 w-3" />{formatCompactNumber(chats, localeCode)}</span>
-                              </div>
-
-                              {!isOwnProfile ? (
-                                <button
-                                  type="button"
-                                  onClick={() => void handleOpenChat(buildPublicListingChatQuestion(item, detail.displayName, localeCode), item)}
-                                  disabled={startingChatKey === item.id}
-                                  className="mt-2 inline-flex min-h-7 items-center gap-1 text-[10px] font-black text-emerald-700 transition hover:underline disabled:opacity-60 dark:text-emerald-300"
-                                >
-                                  {startingChatKey === item.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MessageCircle className="h-3.5 w-3.5" />}
-                                  {copy.askDetails}
-                                </button>
-                              ) : null}
-                            </div>
-                          </article>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <EmptyState icon={Package} title={copy.noPosts} description={copy.noPostsDescription} />
-                  )}
+              <div className="p-3 sm:p-5">
+                <div className="-mx-1 overflow-x-auto pb-1 sm:mx-0">
+                  <ProfileRail activeIndex={availableContentTabs.indexOf(resolvedContentTab)} ariaLabel={localeCode === 'id' ? 'Filter etalase' : 'Storefront filter'} trackClassName="gap-2" viewportClassName="px-1 py-0.5">
+                    {availableContentTabs.map(tab => {
+                      const active = resolvedContentTab === tab;
+                      return (
+                        <ProfileRailItem key={tab}>
+                          <button type="button" onClick={() => setActiveContentTab(tab)} aria-pressed={active} className={${min-h-9 whitespace-nowrap rounded-full border px-3 text-[11px] font-bold transition sm:text-xs ${${{
+                            active ? 'border-emerald-600 bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300' : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text-soft)] hover:border-emerald-300 hover:text-[color:var(--app-text)]'
+                          }${}>
+                            {tab === 'all' ? copy.all : getProfileContentTabLabel(tab, localeCode)}
+                          </button>
+                        </ProfileRailItem>
+                      );
+                    })}
+                  </ProfileRail>
                 </div>
 
+                {visibleListings.length > 0 ? (
+                  <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                    {visibleListings.map(item => {
+                      const tab = normalizeProfileContentTab({ type: item.content_type, category: item.category, metadata: item.metadata || null });
+                      const location = getListingLocation(item);
+                      const href = buildPublicListingHref(item);
 
+                      return (
+                        <article key={item.id} className="group flex min-w-0 flex-col overflow-hidden rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] transition hover:-translate-y-0.5 hover:shadow-md">
+                          <Link href={href} className="relative aspect-square w-full overflow-hidden bg-[color:var(--app-surface-muted)]">
+                            {item.cover_image ? <Image src={item.cover_image} alt={item.title || ''} fill unoptimized sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 240px" className="object-cover transition-transform duration-300 group-hover:scale-[1.03]" /> : <div className="flex h-full items-center justify-center text-[color:var(--app-text-soft)]"><Package className="h-8 w-8" /></div>}
+                            <span className="absolute left-2 top-2 max-w-[80%] truncate rounded-md bg-black/55 px-2 py-1 text-[9px] font-bold text-white backdrop-blur-sm">{getProfileContentTabLabel(tab, localeCode)}</span>
+                          </Link>
+                          <div className="flex min-h-[124px] flex-col p-2.5 sm:p-3">
+                            <Link href={href} className="min-w-0"><h3 className="line-clamp-2 text-[12px] font-extrabold leading-[17px] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-sm sm:leading-5">{item.title || (localeCode === 'id' ? 'Produk/Jasa' : 'Product/Service')}</h3></Link>
+                            <p className="mt-2 truncate text-[13px] font-black text-emerald-700 dark:text-emerald-300 sm:text-sm">{formatPublicListingValue(item, localeCode)}</p>
+                            {location ? <p className="mt-1.5 flex items-center gap-1 truncate text-[9px] font-medium text-[color:var(--app-text-soft)] sm:text-[10px]"><MapPin className="h-3 w-3 shrink-0" />{location}</p> : null}
+                            {!isOwnProfile ? (
+                              <button type="button" onClick={() => void handleOpenChat(buildPublicListingChatQuestion(item, detail.displayName, localeCode), item)} disabled={startingChatKey === item.id} className="mt-auto inline-flex min-h-8 items-center justify-center gap-1 rounded-lg bg-emerald-50 px-2 text-[10px] font-black text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-60 dark:bg-emerald-500/10 dark:text-emerald-300">
+                                {startingChatKey === item.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MessageCircle className="h-3.5 w-3.5" />}{copy.askDetails}
+                              </button>
+                            ) : null}
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <EmptyState icon={Package} title={copy.noPosts} description={copy.noPostsDescription} />
+                )}
               </div>
             ) : null}
 
             {activeProfileTab === 'about' ? (
               <div className="p-3 sm:p-5">
-                <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_300px]">
-                  <div className="space-y-3">
+                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
+                  <div className="space-y-4">
                     <section className="rounded-2xl border border-[color:var(--app-border)] p-4 sm:p-5">
-                      <SectionTitle title={copy.aboutTitle} />
+                      <SectionTitle title={copy.aboutTitle} subtitle={businessCategory || detail.headline} />
                       <p className="mt-3 text-sm leading-6 text-[color:var(--app-text-soft)]">{detail.summary}</p>
                     </section>
+
+                    {businessRows.length > 0 ? (
+                      <section className="rounded-2xl border border-[color:var(--app-border)] p-4 sm:p-5">
+                        <SectionTitle title={localeCode === 'id' ? 'Info usaha' : 'Business info'} />
+                        <div className="mt-2 divide-y divide-[color:var(--app-border)]">
+                          {businessRows.map(item => {
+                            const Icon = item.icon;
+                            return <div key={item.key} className="flex gap-3 py-3"><span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[color:var(--app-surface-muted)] text-emerald-600"><Icon className="h-4 w-4" /></span><div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">{item.label}</p><p className="mt-0.5 text-sm font-semibold leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">{item.value}</p></div></div>;
+                          })}
+                        </div>
+                      </section>
+                    ) : null}
 
                     {detail.skills.length > 0 ? (
                       <section className="rounded-2xl border border-[color:var(--app-border)] p-4 sm:p-5">
                         <SectionTitle title={copy.skills} />
                         <div className="mt-3 flex flex-wrap gap-2">
-                          {detail.skills.map(item => <span key={item} className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">{item}</span>)}
+                          {detail.skills.slice(0, 16).map(item => <span key={item} className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">{item}</span>)}
                         </div>
                       </section>
                     ) : null}
@@ -2650,62 +2457,82 @@ export default function PublicProfileClient({
                       <section className="rounded-2xl border border-[color:var(--app-border)] p-4 sm:p-5">
                         <SectionTitle title={copy.experience} />
                         <div className="mt-3 space-y-2">
-                          {detail.experience.map(item => <div key={item} className="rounded-xl bg-[color:var(--app-surface-muted)] px-3 py-2.5 text-sm font-semibold leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">{item}</div>)}
+                          {detail.experience.slice(0, 6).map(item => <div key={item} className="rounded-xl bg-[color:var(--app-surface-muted)] px-3 py-2.5 text-sm font-semibold leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">{item}</div>)}
                         </div>
                       </section>
                     ) : null}
 
-                    {!hasAboutContent ? <EmptyState icon={BriefcaseBusiness} title={copy.aboutTitle} description={copy.noAbout} /> : null}
+                    {detail.education.length > 0 || detail.certifications.length > 0 ? (
+                      <section className="rounded-2xl border border-[color:var(--app-border)] p-4 sm:p-5">
+                        <SectionTitle title={localeCode === 'id' ? 'Lainnya' : 'More'} />
+                        {detail.education.length > 0 ? <div className="mt-3"><p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">{copy.education}</p><div className="mt-1.5 space-y-1.5">{detail.education.slice(0, 4).map(item => <p key={item} className="text-sm leading-5 text-[color:var(--app-text-soft)]">{item}</p>)}</div></div> : null}
+                        {detail.certifications.length > 0 ? <div className="mt-4"><p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">{copy.certifications}</p><div className="mt-1.5 space-y-1.5">{detail.certifications.slice(0, 4).map(item => <p key={item} className="text-sm leading-5 text-[color:var(--app-text-soft)]">{item}</p></div></div> : null}
+                      </section>
+                    ) : null}
                   </div>
 
-                  <aside className="space-y-3">
-                    {detail.roles.length > 0 ? (
-                      <section className="rounded-2xl border border-[color:var(--app-border)] p-4">
-                        <SectionTitle title={copy.roles} />
-                        <div className="mt-3 flex flex-wrap gap-2">{detail.roles.map(item => <span key={item} className="rounded-full bg-[color:var(--app-surface-muted)] px-3 py-1.5 text-xs font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">{formatRole(item)}</span>)}</div>
-                      </section>
-                    ) : null}
-                    {detail.languages.length > 0 ? (
-                      <section className="rounded-2xl border border-[color:var(--app-border)] p-4"><SectionTitle title={copy.languages} /><p className="mt-3 text-sm leading-6 text-[color:var(--app-text-soft)]">{detail.languages.join(' · ')}</p></section>
-                    ) : null}
-                    {detail.education.length > 0 ? (
-                      <section className="rounded-2xl border border-[color:var(--app-border)] p-4"><SectionTitle title={copy.education} /><div className="mt-3 space-y-2">{detail.education.map(item => <p key={item} className="text-sm leading-5 text-[color:var(--app-text-soft)]">{item}</p>)}</div></section>
-                    ) : null}
-                    {detail.certifications.length > 0 ? (
-                      <section className="rounded-2xl border border-[color:var(--app-border)] p-4"><SectionTitle title={copy.certifications} /><div className="mt-3 space-y-2">{detail.certifications.map(item => <p key={item} className="text-sm leading-5 text-[color:var(--app-text-soft)]">{item}</p>)}</div></section>
-                    ) : null}
-                    {detail.links.length > 0 ? (
-                      <section className="rounded-2xl border border-[color:var(--app-border)] p-4">
-                        <SectionTitle title={copy.links} />
-                        <div className="mt-3 space-y-2">{detail.links.map(link => <a key={`${link.label}-${link.url}`} href={link.url} target="_blank" rel="noreferrer noopener" className="flex items-center justify-between gap-3 rounded-xl bg-[color:var(--app-surface-muted)] px-3 py-2.5 text-xs font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]"><span className="truncate">{link.label}</span><ExternalLink className="h-4 w-4 shrink-0 text-emerald-600" /></a>)}</div>
-                      </section>
-                    ) : null}
+                  <aside className="space-y-4">
+                    <section className="rounded-2xl border border-[color:var(--app-border)] p-4">
+                      <SectionTitle title={copy.contact} />
+                      <div className="mt-3 space-y-2">
+                        {isOwnProfile ? (
+                          <>
+                            <Link href="/profile/edit" className="flex min-h-11 items-center gap-3 rounded-xl bg-[color:var(--app-surface-muted)] px-3 text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]"><Edit3 className="h-4 w-4 text-emerald-600" />{copy.editProfile}</Link>
+                            <Link href="/manage" className="flex min-h-11 items-center gap-3 rounded-xl bg-emerald-600 px-3 text-sm font-black text-white"><Wrench className="h-4 w-4" />{copy.managePosts}</Link>
+                          </>
+                        ) : (
+                          <>
+                            <button type="button" onClick={() => void handleOpenChat()} className="flex min-h-11 w-full items-center gap-3 rounded-xl bg-emerald-600 px-3 text-left text-sm font-black text-white"><MessageCircle className="h-4 w-4" />{copy.chatOnLajukan}</button>
+                            {whatsAppHref ? <a href={whatsAppHref} target="_blank" rel="noreferrer noopener" className="flex min-h-11 items-center gap-3 rounded-xl bg-[color:var(--app-surface-muted)] px-3 text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]"><PhoneCall className="h-4 w-4 text-emerald-600" />{copy.whatsapp}</a> : null}
+                          </>
+                        )}
+                      </div>
+                    </section>
+
+                    <section className="rounded-2xl border border-[color:var(--app-border)] p-4">
+                      <SectionTitle title={localeCode === 'id' ? 'Profil' : 'Profile'} />
+                      <div className="mt-3 space-y-3">
+                        {joinedDate ? <div><p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">{copy.joined}</p><p className="mt-0.5 text-sm font-semibold">{joinedDate}</p></div> : null}
+                        {detail.languages.length > 0 ? <div><p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">{copy.languages}</p><p className="mt-0.5 text-sm font-semibold">{detail.languages.join(' · ')}</p></div> : null}
+                        {detail.roles.length > 0 ? <div><p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">{copy.roles}</p><div className="mt-1.5 flex flex-wrap gap-1.5">{detail.roles.slice(0, 8).map(item => <span key={item} className="rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[10px] font-bold text-[color:var(--app-text-soft)]">{formatRole(item)}</span>)}</div></div> : null}
+                        {!joinedDate && detail.languages.length === 0 && detail.roles.length === 0 ? <p className="text-sm text-[color:var(--app-text-soft)]">{copy.noAbout}</p> : null}
+                      </div>
+                    </section>
                   </aside>
                 </div>
+
+                {!hasAboutContent && businessRows.length === 0 ? <div className="mt-4"><EmptyState icon={BriefcaseBusiness} title={copy.aboutTitle} description={copy.noAbout} /></div> : null}
               </div>
             ) : null}
 
             {activeProfileTab === 'reviews' ? (
               <div className="p-3 sm:p-5">
-                <div className="grid gap-3 lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-5">
-                  <section className="rounded-2xl border border-[color:var(--app-border)] p-4 text-center lg:sticky lg:top-16 lg:self-start">
+                <div className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
+                  <section className="rounded-2xl border border-[color:var(--app-border)] p-5 text-center lg:sticky lg:top-16 lg:self-start">
                     <p className="text-4xl font-black tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">{typeof rating === 'number' && rating > 0 ? rating.toFixed(1) : '—'}</p>
-                    <div className="mt-2 flex justify-center gap-1">{Array.from({ length: 5 }).map((_, index) => <Star key={index} className={`h-4 w-4 ${typeof rating === 'number' && rating >= index + 1 ? 'fill-amber-400 text-amber-400' : 'text-slate-300 dark:text-slate-600'}`} />)}</div>
+                    <div className="mt-2 flex justify-center gap-1">
+                      {Array.from({ length: 5 }).map((_, index) => (
+                        <Star key={index} className={${h-4 w-4 ${${{
+                          typeof rating === 'number' && rating >= index + 1 ? 'fill-amber-400 text-amber-400' : 'text-slate-300 dark:text-slate-600'
+                        }${} />
+                      ))}
+                    </div>
                     <p className="mt-2 text-xs text-[color:var(--app-text-soft)]">{formatCompactNumber(reviewCount, localeCode)} {copy.reviewCount}</p>
                   </section>
-
                   <section className="min-w-0">
                     {reviews.length > 0 ? (
                       <div className="space-y-2.5">
                         {reviews.map(review => (
-                          <article key={review.id} className="rounded-2xl border border-[color:var(--app-border)] p-3.5 sm:p-4">
+                          <article key={review.id} className="rounded-2xl border border-[color:var(--app-border)] p-4">
                             <div className="flex items-start gap-3">
                               <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full bg-[color:var(--app-surface-muted)]">
                                 {review.avatarUrl ? <Image src={review.avatarUrl} alt={review.name} fill unoptimized sizes="40px" className="object-cover" /> : <div className="flex h-full items-center justify-center text-sm font-black text-emerald-700">{review.name.slice(0, 1).toUpperCase()}</div>}
                               </div>
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-start justify-between gap-2"><p className="truncate text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">{review.name}</p>{review.date ? <span className="shrink-0 text-[10px] text-[color:var(--app-text-soft)]">{formatReviewDate(review.date, localeCode)}</span> : null}</div>
-                                <div className="mt-1 flex gap-0.5">{Array.from({ length: 5 }).map((_, index) => <Star key={index} className={`h-3.5 w-3.5 ${review.rating >= index + 1 ? 'fill-amber-400 text-amber-400' : 'text-slate-300 dark:text-slate-600'}`} />)}</div>
+                                <div className="mt-1 flex gap-0.5">
+                                  {Array.from({ length: 5 }).map((_, index) => <Star key={index} className={${h-3.5 w-3.5 ${${{review.rating >= index + 1 ? 'fill-amber-400 text-amber-400' : 'text-slate-300 dark:text-slate-600'}${} />)}
+                                </div>
                                 {review.comment ? <p className="mt-2 text-sm leading-6 text-[color:var(--app-text-soft)]">{review.comment}</p> : null}
                               </div>
                             </div>
@@ -2715,53 +2542,6 @@ export default function PublicProfileClient({
                     ) : <EmptyState icon={Star} title={copy.noReviews} description={copy.noReviewsDescription} />}
                   </section>
                 </div>
-              </div>
-            ) : null}
-
-            {activeProfileTab === 'business' ? (
-              <div className="grid gap-3 p-3 sm:p-5 lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-5">
-                <section className="rounded-2xl border border-[color:var(--app-border)] p-4 sm:p-5">
-                  <SectionTitle title={copy.businessInfo} subtitle={detail.headline} />
-                  {businessRows.length > 0 ? (
-                    <div className="mt-3 divide-y divide-[color:var(--app-border)]">
-                      {businessRows.map(item => {
-                        const Icon = item.icon;
-                        return <div key={item.key} className="grid gap-1.5 py-3 sm:grid-cols-[150px_minmax(0,1fr)] sm:gap-4"><div className="flex items-center gap-2 text-[11px] font-bold text-[color:var(--app-text-soft)]"><Icon className="h-4 w-4 text-emerald-600" />{item.label}</div><p className="text-sm font-semibold leading-6 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">{item.value}</p></div>;
-                      })}
-                    </div>
-                  ) : <EmptyState icon={Store} title={copy.businessInfo} description={copy.noBusinessInfo} />}
-                </section>
-
-                <aside className="space-y-3">
-                  <section className="rounded-2xl border border-[color:var(--app-border)] p-4">
-                    <SectionTitle title={copy.contact} />
-                    <div className="mt-3 space-y-2">
-                      {isOwnProfile ? (
-                        <>
-                          <Link href="/profile/edit" className="flex min-h-11 items-center gap-3 rounded-xl bg-[color:var(--app-surface-muted)] px-3 text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]"><Edit3 className="h-4 w-4 text-emerald-600" />{copy.editProfile}</Link>
-                          <Link href="/manage" className="flex min-h-11 items-center gap-3 rounded-xl bg-[color:var(--app-surface-muted)] px-3 text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]"><BriefcaseBusiness className="h-4 w-4 text-emerald-600" />{copy.managePosts}</Link>
-                        </>
-                      ) : (
-                        <>
-                          <button type="button" onClick={() => void handleOpenChat()} className="flex min-h-11 w-full items-center gap-3 rounded-xl bg-emerald-600 px-3 text-left text-sm font-black text-white"><MessageCircle className="h-4 w-4" />{copy.chatOnLajukan}</button>
-                          {whatsAppHref ? <a href={whatsAppHref} target="_blank" rel="noreferrer noopener" className="flex min-h-11 items-center gap-3 rounded-xl bg-[color:var(--app-surface-muted)] px-3 text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]"><PhoneCall className="h-4 w-4 text-emerald-600" />{copy.whatsapp}</a> : null}
-                        </>
-                      )}
-                    </div>
-                  </section>
-
-                  <section className="rounded-2xl border border-[color:var(--app-border)] p-4">
-                    <SectionTitle title={copy.verified} />
-                    <div className="mt-3 space-y-2 text-sm">
-                      {[
-                        { label: 'Email', ready: Boolean(profile.email_verified) },
-                        { label: localeCode === 'id' ? 'Telepon' : 'Phone', ready: Boolean(profile.phone_verified) },
-                        { label: localeCode === 'id' ? 'Identitas' : 'Identity', ready: Boolean(profile.identity_verified) },
-                        ...(!PROMO_ONLY_MODE ? [{ label: localeCode === 'id' ? 'Siap transaksi' : 'Transaction ready', ready: Boolean(profile.transaction_eligible) }] : []),
-                      ].map(item => <div key={item.label} className="flex min-h-9 items-center justify-between gap-3"><span className="text-[color:var(--app-text-soft)]">{item.label}</span>{item.ready ? <CheckCircle2 className="h-5 w-5 text-emerald-600" /> : <span className="h-5 w-5 rounded-full border border-slate-300 dark:border-slate-600" />}</div>)}
-                    </div>
-                  </section>
-                </aside>
               </div>
             ) : null}
           </section>
@@ -2780,5 +2560,5 @@ export default function PublicProfileClient({
         onClose={() => setSocialModalTab(null)}
       />
     </>
-  );
+  );  );
 }
