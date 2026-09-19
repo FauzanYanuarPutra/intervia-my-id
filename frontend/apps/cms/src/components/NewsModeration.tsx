@@ -608,6 +608,32 @@ export default function NewsModeration() {
                 <span>Owner: {selected.owner_id}</span>
               </div>
               {selected.summary ? <p className="rounded-2xl bg-[color:var(--color-surface-muted)] p-4 text-sm font-semibold leading-6 text-[color:var(--color-text)]">{selected.summary}</p> : null}
+              {selected.cover_image ? (
+                <div className="overflow-hidden rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface-muted)]">
+                  <img
+                    src={selected.cover_image}
+                    alt={selected.title}
+                    className="aspect-[16/9] w-full object-cover"
+                    loading="lazy"
+                    onError={event => {
+                      event.currentTarget.style.display = 'none';
+                    }}
+                  />
+                  <div className="border-t border-[color:var(--color-border)] px-3 py-2 text-[11px] font-semibold text-[color:var(--color-text-soft)]">
+                    Gambar sampul artikel
+                  </div>
+                </div>
+              ) : null}
+              <div className="flex flex-wrap gap-2 text-[11px] font-semibold text-[color:var(--color-text-soft)]">
+                <span className="rounded-full bg-[color:var(--color-surface-muted)] px-2.5 py-1">
+                  {readString(newsMeta.rich_body) ? 'Rich text tersedia' : 'Teks polos'}
+                </span>
+                {selected.cover_image ? (
+                  <span className="rounded-full bg-[color:var(--color-surface-muted)] px-2.5 py-1">Cover tersedia</span>
+                ) : (
+                  <span className="rounded-full bg-[color:var(--color-surface-muted)] px-2.5 py-1">Tanpa cover</span>
+                )}
+              </div>
               <div className="max-h-[42vh] overflow-y-auto whitespace-pre-wrap rounded-2xl border border-[color:var(--color-border)] p-4 text-sm leading-7 text-[color:var(--color-text)]">{selected.body}</div>
 
               <section className="rounded-2xl border border-[color:var(--color-border)] p-4">
