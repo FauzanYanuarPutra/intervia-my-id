@@ -4,6 +4,7 @@ use serde_json::{json, Value};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
+use super::audit;
 use super::media::{
     validate_business_image, BusinessImageInput, BusinessImageKind, ValidatedBusinessImage,
 };
@@ -68,6 +69,8 @@ pub(crate) struct CreateBusinessProductRequest {
 
 #[derive(Debug, Clone, Deserialize)]
 pub(crate) struct UpdateBusinessProductRequest {
+    #[serde(default)]
+    pub(crate) reason: Option<String>,
     pub(crate) name: Option<String>,
     pub(crate) category: Option<String>,
     pub(crate) price_label: Option<String>,
@@ -298,6 +301,29 @@ impl ProductRepository {
         )
         .await?;
 
+        audit::record_tx(
+            &mut transaction,
+            organization_id,
+            business_id,
+            None,
+            Some(actor_id),
+            "product.created",
+            "business_product",
+            Some(product_id),
+            Some("Produk dibuat"),
+            json!({
+                "summary": format!("Produk {} dibuat", command.name),
+                "after": {
+                    "name": command.name,
+                    "category": command.category,
+                    "price_label": command.price_label,
+                    "stock_count": command.stock_count,
+                    "stock_unit": command.stock_unit,
+                }
+            }),
+        )
+        .await?;
+
         let row =
             fetch_product_row(&mut transaction, business_id, organization_id, product_id).await?;
         transaction.commit().await?;
@@ -316,6 +342,31 @@ impl ProductRepository {
             validate_update_request(request).map_err(ProductRepositoryError::Validation)?;
         let mut transaction = self.db.begin().await?;
         ensure_product_exists(&mut transaction, business_id, organization_id, product_id).await?;
+
+        let before = fetch_product_row(
+            &mut transaction,
+            business_id,
+            organization_id,
+            product_id,
+        )
+        .await?;
+
+        let status_changed = request
+            .status
+            .as_deref()
+            .is_some_and(|status| status != before.status);
+        if status_changed
+            && request
+                .reason
+                .as_deref()
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .is_none()
+        {
+            return Err(ProductRepositoryError::Validation(
+                ProductValidationError::StatusReason,
+            ));
+        }
 
         let source_type = request.source_type.map(ProductSourceType::as_str);
         let stock_mode = request.stock_mode.map(ProductStockMode::as_str);
@@ -393,6 +444,65 @@ impl ProductRepository {
             json!({ "version": 2, "image_changed": image.is_some() }),
         )
         .await?;
+
+        let mut changed_fields = Vec::new();
+        if request.name.is_some() { changed_fields.push("name"); }
+        if request.category.is_some() { changed_fields.push("category"); }
+        if request.price_label.is_some() { changed_fields.push("price"); }
+        if request.min_stock_alert.is_some() { changed_fields.push("minimum_stock"); }
+        if request.stock_unit.is_some() { changed_fields.push("stock_unit"); }
+        if request.stock_mode.is_some() { changed_fields.push("stock_mode"); }
+        if request.source_type.is_some() { changed_fields.push("source_type"); }
+        if request.owner_label.is_some() { changed_fields.push("owner_label"); }
+        if request.consignment_terms.is_some() { changed_fields.push("consignment_terms"); }
+        if request.notes.is_some() { changed_fields.push("notes"); }
+        if request.image.is_some() { changed_fields.push("image"); }
+        if request.status.is_some() { changed_fields.push("status"); }
+
+        let reason = request
+            .reason
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_owned);
+
+        audit::record_tx(
+            &mut transaction,
+            organization_id,
+            business_id,
+            None,
+            Some(actor_id),
+            if status_changed { "product.status_changed" } else { "product.updated" },
+            "business_product",
+            Some(product_id),
+            reason.as_deref(),
+            json!({
+                "summary": if status_changed {
+                    format!("Status produk: {} → {}", before.status, row.status)
+                } else {
+                    "Detail produk diperbarui".to_owned()
+                },
+                "changed_fields": changed_fields,
+                "before": {
+                    "name": before.name,
+                    "category": before.category,
+                    "price_label": before.price_label,
+                    "status": before.status,
+                    "stock_unit": before.stock_unit,
+                    "min_stock_alert": before.min_stock_alert,
+                },
+                "after": {
+                    "name": row.name,
+                    "category": row.category,
+                    "price_label": row.price_label,
+                    "status": row.status,
+                    "stock_unit": row.stock_unit,
+                    "min_stock_alert": row.min_stock_alert,
+                }
+            }),
+        )
+        .await?;
+
         transaction.commit().await?;
         Ok(row.into_product())
     }
@@ -443,6 +553,23 @@ impl ProductRepository {
                 "reason": request.reason,
             }),
         )
+        audit::record_tx(
+            &mut transaction,
+            organization_id,
+            business_id,
+            None,
+            Some(actor_id),
+            "inventory.adjusted",
+            "business_product",
+            Some(product_id),
+            request.reason.as_deref(),
+            json!({
+                "summary": "Stok produk disesuaikan",
+                "after": { "stock_count": request.stock_count }
+            }),
+        )
+        .await?;
+
         .await?;
         transaction.commit().await?;
         Ok(row.into_product())
@@ -793,6 +920,7 @@ pub(crate) enum ProductValidationError {
     InventoryReason,
     Image,
     EmptyUpdate,
+    StatusReason,
 }
 
 impl ProductValidationError {
@@ -811,6 +939,7 @@ impl ProductValidationError {
             Self::InventoryReason => "invalid_inventory_reason",
             Self::Image => "invalid_product_image",
             Self::EmptyUpdate => "empty_product_update",
+            Self::StatusReason => "product_status_reason_required",
         }
     }
 }
@@ -861,6 +990,9 @@ pub(crate) fn validate_create_request(
 fn validate_update_request(
     mut request: UpdateBusinessProductRequest,
 ) -> Result<UpdateBusinessProductRequest, ProductValidationError> {
+    request.reason = normalize_optional(request.reason.take(), MAX_INVENTORY_REASON_LEN)
+        .ok_or(ProductValidationError::InventoryReason)?;
+
     let has_update = request.name.is_some()
         || request.category.is_some()
         || request.price_label.is_some()
@@ -1067,6 +1199,7 @@ mod tests {
     #[test]
     fn product_status_is_limited_to_database_contract() {
         let request = UpdateBusinessProductRequest {
+            reason: None,
             name: None,
             category: None,
             price_label: None,
