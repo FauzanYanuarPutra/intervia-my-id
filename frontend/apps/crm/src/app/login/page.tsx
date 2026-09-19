@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/ui';
 
 const GOOGLE_ERROR_MESSAGES: Record<string, string> = {
@@ -14,6 +13,7 @@ const GOOGLE_ERROR_MESSAGES: Record<string, string> = {
 };
 
 export default function LoginPage() {
+  const wwwUrl = process.env.NEXT_PUBLIC_WWW_URL || 'http://localhost:3000';
   const initialGoogleError =
     typeof window !== 'undefined'
       ? GOOGLE_ERROR_MESSAGES[new URLSearchParams(window.location.search).get('error') || ''] || ''
@@ -37,10 +37,9 @@ export default function LoginPage() {
             Gunakan akun Google Lajukan atau akun Lajukan nyata yang sudah memiliki role CRM. Tidak ada akun demo atau password bersama.
           </p>
 
-          {(error || initialGoogleError) ? (
-            <div className="mt-5 rounded-2xl border border-[color:var(--color-danger-border)] bg-[color:var(--color-danger-soft)] px-4 py-3 text-sm text-[color:var(--color-danger)]">{error || initialGoogleError}</div>
+          {initialGoogleError ? (
+            <div className="mt-5 rounded-2xl border border-[color:var(--color-danger-border)] bg-[color:var(--color-danger-soft)] px-4 py-3 text-sm text-[color:var(--color-danger)]">{initialGoogleError}</div>
           ) : null}
-          {notice ? <div className="mt-5 rounded-2xl border border-[color:var(--color-primary-border)] bg-[color:var(--color-primary-soft)] px-4 py-3 text-sm text-[color:var(--color-primary)]">{notice}</div> : null}
 
           <Button type="button" onClick={continueWithGoogle} className="mt-6 w-full">
             Lanjut dengan Google
@@ -51,7 +50,7 @@ export default function LoginPage() {
           </div>
 
           <div className="mt-5 rounded-2xl border border-[color:var(--color-border)] bg-[color:color-mix(in_srgb,_var(--color-surface-muted)_72%,_transparent)] px-4 py-3 text-sm leading-6 text-[color:var(--color-text)]">
-            Login Google dan password sama-sama berujung pada HttpOnly session cookie. Aksi sensitif tetap memakai session confirmation dan audit trail.
+            Login Google berujung pada HttpOnly session cookie. Aksi sensitif tetap memakai session confirmation dan audit trail.
           </div>
           <p className="mt-6 text-center"><a href={wwwUrl} className="text-sm font-medium text-[color:var(--color-text)] hover:text-[color:var(--color-primary)]">&larr; Kembali ke situs</a></p>
         </section>
