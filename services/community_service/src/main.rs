@@ -44,9 +44,10 @@ use auth::{is_moderator, optional_actor, request_ip, require_actor, AuthActor};
 use health::{health, ready, root, service_metrics};
 use rate_limit::{enforce_rate_limit, mutation_rate_limit, run_rate_limit_cleanup};
 use runtime::{
-    connect_database_pool, database_session_setup, init_tracing, parse_cors_origins,
-    shutdown_signal, DatabasePoolPurpose,
+    connect_database_pool, init_tracing, parse_cors_origins, shutdown_signal, DatabasePoolPurpose,
 };
+#[cfg(test)]
+use runtime::database_session_setup;
 
 const MAX_TITLE_LEN: usize = 140;
 const MAX_CATEGORY_TITLE_LEN: usize = 72;
