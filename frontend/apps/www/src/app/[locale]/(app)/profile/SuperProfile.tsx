@@ -16,7 +16,6 @@ import {
   BriefcaseBusiness,
   BadgeCheck,
   BarChart3,
-  CalendarDays,
   Camera,
   Check,
   ChevronRight,
@@ -1984,12 +1983,12 @@ export default function SuperProfile() {
       active: contactVerified,
       icon: MessageCircle,
     },
-    ...(!process.env.NEXT_PUBLIC_PROMO_ONLY_MODE
+    ...(!PROMO_ONLY_MODE
       ? [
           {
             key: 'transaction',
             label: isId ? 'Siap transaksi' : 'Transaction ready',
-            active: Boolean(user?.transaction_eligible ?? mergedMetadata.transaction_eligible),
+            active: mergedMetadata.transaction_eligible === true,
             icon: Check,
           },
         ]
@@ -2225,17 +2224,11 @@ export default function SuperProfile() {
                 </div>
               </div>
 
-              <div className="mt-3 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-semibold text-[color:var(--app-text-soft)] sm:text-xs">
-                <span className="inline-flex min-w-0 items-center gap-1.5">
-                  <MapPin className="h-3.5 w-3.5 shrink-0" />
-                  <span className="max-w-[62vw] truncate sm:max-w-sm">
-                    {location || copy.locationFallback}
-                  </span>
-                </span>
-                {joinedDate ? (
-                  <span className="inline-flex items-center gap-1.5">
-                    <CalendarDays className="h-3.5 w-3.5" />
-                    {copy.joined} {joinedDate}
+              <div className="mt-3 flex min-w-0 flex-wrap items-center gap-1.5 text-[11px] font-semibold text-[color:var(--app-text-soft)] sm:text-xs">
+                {location ? (
+                  <span className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1">
+                    <MapPin className="h-3.5 w-3.5 shrink-0" />
+                    <span className="max-w-[72vw] truncate sm:max-w-sm">{location}</span>
                   </span>
                 ) : null}
               </div>
