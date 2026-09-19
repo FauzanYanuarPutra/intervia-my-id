@@ -47,8 +47,8 @@ async fn delete_batch(
 
     let deleted: i64 = match policy_key {
         "privacy_requests_closed" => {
-            sqlx::query_scalar(
-                r#"
+            sqlx::query_scalar::<_, i32>(
+            r#"
                 WITH victims AS (
                   SELECT id
                   FROM core.privacy_requests
@@ -71,8 +71,8 @@ async fn delete_batch(
             .len() as i64
         }
         "security_incidents_closed" => {
-            sqlx::query_scalar(
-                r#"
+            sqlx::query_scalar::<_, i32>(
+            r#"
                 WITH victims AS (
                   SELECT id
                   FROM core.security_incidents
@@ -95,8 +95,8 @@ async fn delete_batch(
             .len() as i64
         }
         "user_moderation_actions" => {
-            sqlx::query_scalar(
-                r#"
+            sqlx::query_scalar::<_, i32>(
+            r#"
                 WITH victims AS (
                   SELECT id
                   FROM core.user_moderation_actions
@@ -143,8 +143,8 @@ async fn run_policy(db: &PgPool, policy_key: &str) -> Result<i64> {
         return Ok(0);
     };
 
-    let run_id: uuid::Uuid = sqlx::query_scalar(
-        r#"
+    let run_id: uuid::Uuid = sqlx::query_scalar::<_, i32>(
+            r#"
         INSERT INTO core.retention_runs (policy_key, status)
         VALUES ($1, 'running')
         RETURNING id
