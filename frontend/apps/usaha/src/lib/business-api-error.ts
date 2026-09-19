@@ -56,6 +56,20 @@ const messages: Record<string, string> = {
   invalid_obligation_entry_type: 'Kategori tagihan tidak valid.',
   obligation_must_be_expense: 'Tagihan rutin harus menggunakan kategori pengeluaran.',
   obligation_due_overflow: 'Jadwal tagihan terlalu jauh untuk diproses.',
+  sale_void_reason_required: 'Tulis alasan koreksi transaksi minimal 3 karakter.',
+  sale_void_reason_too_long: 'Alasan koreksi transaksi terlalu panjang.',
+  sale_already_voided: 'Transaksi ini sudah dikoreksi sebelumnya. Buka riwayat untuk melihat alasannya.',
+  business_sale_resource_not_found: 'Transaksi tidak ditemukan atau sudah berubah.',
+  business_sale_storage_unavailable: 'Riwayat transaksi sedang tidak tersedia. Coba lagi sebentar.',
+  business_order_not_found: 'Pesanan tidak ditemukan atau sudah berubah.',
+  business_order_invalid_transition: 'Status pesanan sudah berubah. Muat ulang lalu pilih langkah berikutnya.',
+  business_order_version_conflict: 'Pesanan baru saja berubah. Muat ulang sebelum memperbarui status.',
+  business_order_insufficient_reserved_stock: 'Stok yang sudah disiapkan tidak cukup untuk langkah ini.',
+  business_order_storage_unavailable: 'Data pesanan sedang tidak tersedia. Coba lagi sebentar.',
+  order_transition_reason_required: 'Tulis alasan pembatalan atau penolakan minimal 3 karakter.',
+  order_transition_reason_too_long: 'Alasan status pesanan terlalu panjang.',
+  business_period_closed: 'Periode pembukuan sudah ditutup. Koreksi perlu dilakukan pada periode yang masih terbuka.',
+  business_day_closed: 'Hari operasional sudah ditutup. Buka kembali hari tersebut sebelum melakukan koreksi.',
 };
 
 function errorRecord(error: unknown): Record<string, unknown> | null {
