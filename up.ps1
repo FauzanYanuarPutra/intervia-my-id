@@ -291,6 +291,7 @@ try {
 
         $BuildPreviousErrorActionPreference = $ErrorActionPreference
         $BuildOutput = @()
+        $BuildCapturedOutput = @()
         $BuildExitCode = 1
         try {
             # Compose progress is streamed while we also retain enough output to
@@ -342,9 +343,37 @@ try {
         $UpArgs += $Services
     }
 
-    & docker @ComposeArgs @UpArgs
-    if ($LASTEXITCODE -ne 0) {
+    $UpPreviousErrorActionPreference = $ErrorActionPreference
+    $UpOutput = @()
+    $UpCapturedOutput = @()
+    $UpExitCode = 1
+    try {
+        $ErrorActionPreference = "Continue"
+        $UpOutput = @(& docker @ComposeArgs @UpArgs 2>&1 | Tee-Object -Variable UpCapturedOutput)
         $UpExitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $UpPreviousErrorActionPreference
+    }
+
+    $UpOutputText = ($UpOutput + @($UpCapturedOutput) | ForEach-Object { $_.ToString() }) -join [Environment]::NewLine
+    $DockerEngineFailure = $UpExitCode -ne 0 -and (
+        $UpOutputText -match "(?i)dockerDesktopLinuxEngine" -or
+        $UpOutputText -match "(?i)/_ping" -or
+        $UpOutputText -match "(?i)500 Internal Server Error" -or
+        $UpOutputText -match "(?i)Cannot connect to the Docker daemon" -or
+        $UpOutputText -match "(?i)is the docker daemon running"
+    )
+
+    if ($UpExitCode -ne 0 -and $DockerEngineFailure) {
+        if (Invoke-DockerEngineRecovery -Reason "Compose up") {
+            Write-Warning "Mengulangi Compose up setelah recovery Docker Engine..."
+            & docker @ComposeArgs @UpArgs
+            $UpExitCode = $LASTEXITCODE
+        }
+    }
+
+    if ($UpExitCode -ne 0) {
         Write-Warning "Runtime gagal menjadi healthy. Menampilkan status dan log core service untuk diagnosis."
         & docker @ComposeArgs ps -a
         & docker @ComposeArgs logs --no-color --tail 120 marketplace_service chat_service identity_service community_service
