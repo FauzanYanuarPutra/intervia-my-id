@@ -68,6 +68,18 @@ describe('Flow Usaha final contracts', () => {
     expect(hpp).toContain('Lanjut: cek hasil');
   });
 
+  it('does not make routine edits depend on retyping audit notes', () => {
+    const product = source('src/components/forms/ProductEditorWorkspace.tsx');
+    const info = source('src/components/forms/BusinessInfoQuickForm.tsx');
+    const operations = source('src/components/forms/OperationsQuickForm.tsx');
+    const hpp = source('src/components/business-control/DurableHppWorkspace.tsx');
+    expect(product).toContain("useState('Pembaruan data produk')");
+    expect(product).toContain("useState('Penyesuaian stok')");
+    expect(info).toContain("useState('Pembaruan info usaha')");
+    expect(operations).toContain("useState('Pembaruan operasional')");
+    expect(hpp).toContain("useState('Pembaruan resep')");
+  });
+
   it('renders negative storefront price deltas with a minus sign', () => {
     const configurator = source('../www/src/app/[locale]/(shared)/toko/[slug]/StorefrontProductConfigurator.tsx');
     expect(configurator).toContain("option.price_delta_cents > 0 ? '+' : '-'");
