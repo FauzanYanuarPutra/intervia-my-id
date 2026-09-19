@@ -307,7 +307,7 @@ impl RecipeRepository {
         .bind(business_id)
         .bind(actor_id)
         .bind(version_id)
-        .bind("Recipe version explicitly published")
+        .bind(request.reason.as_deref().unwrap_or("Perubahan resep"))
         .bind(json!({
             "product_id": product_id,
             "version_number": version_number,
