@@ -24,7 +24,7 @@ export default async function BusinessOperationsPage({ params }: PageProps) {
 
   return (
     <PortalShell activeBusiness={business} availableBusinesses={businesses} viewerName={account?.name ?? null} currentSection="operations">
-      <PageHeader eyebrow="Kelola usaha" title="Jam & operasional" description="Atur status buka dan selesaikan gangguan operasional yang paling penting." />
+      <PageHeader eyebrow="Kelola usaha" title="Jam & operasional" description="Atur buka, tutup, dan jam usaha." />
 
       <MetricStrip items={[
         { label: 'Status usaha', value: business.isOpen ? 'Buka' : 'Tutup' },
@@ -34,7 +34,7 @@ export default async function BusinessOperationsPage({ params }: PageProps) {
 
       <section className="grid gap-4 xl:grid-cols-[340px_minmax(0,1fr)]">
         <div className="merchant-surface-bordered p-4 sm:p-5">
-          <div className="mb-4 flex items-center gap-3"><span className="portal-icon-tile"><Clock3 className="h-4 w-4" /></span><div><h2 className="font-black text-portal-ink">Operasional</h2><p className="text-xs text-portal-soft">Status dan jam buka</p></div></div>
+          <div className="mb-4 flex items-center gap-3"><span className="portal-icon-tile"><Clock3 className="h-4 w-4" /></span><div><h2 className="font-black text-portal-ink">Operasional</h2><p className="text-xs text-portal-soft">Buka, tutup, dan jam usaha.</p></div></div>
           {canManage ? <OperationsQuickForm business={business} /> : (
             <div className="space-y-2">
               <div className="merchant-action-row rounded-xl border border-portal-line"><span className="text-sm text-portal-soft">Status</span><StatusBadge tone={business.isOpen ? 'success' : 'neutral'}>{business.isOpen ? 'Buka' : 'Tutup'}</StatusBadge></div>
@@ -44,7 +44,7 @@ export default async function BusinessOperationsPage({ params }: PageProps) {
         </div>
 
         <div>
-          <div className="mb-2.5 flex items-end justify-between gap-3"><div><h2 className="font-black text-portal-ink">Perlu ditangani</h2><p className="text-xs text-portal-soft">Stok yang bisa mengganggu penjualan.</p></div><Link href={`/businesses/${business.id}/inventory`} className="text-xs font-black text-portal-forest">Buka stok</Link></div>
+          <div className="mb-2.5 flex items-end justify-between gap-3"><div><h2 className="font-black text-portal-ink">Perlu ditangani</h2><p className="text-xs text-portal-soft">Yang perlu dicek dulu.</p></div><Link href={`/businesses/${business.id}/inventory`} className="text-xs font-black text-portal-forest">Buka stok</Link></div>
           <section className="merchant-list border border-portal-line/80">
             {flaggedProducts.length ? flaggedProducts.map(product => (
               <article key={product.id} className="merchant-action-row">
