@@ -706,57 +706,45 @@ export async function updateBusiness(
     : null;
   if (!current) throw new UpstreamHttpError(404, 'business_not_found');
   if (input.metadataPatch) {
-    const rawStore = record(aggregate?.primary_store);
-    if (!rawStore) {
-      throw new UpstreamHttpError(502, 'invalid_marketplace_business_response');
-    }
-    const rawMetadata = metadataOf(rawStore);
-    const publicMetadata = {
-      ...(record(rawMetadata.public) ?? {}),
-      ...(input.category !== undefined ? { category: input.category } : {}),
-      ...(input.schedule !== undefined ? { schedule: input.schedule } : {}),
-      ...(input.locationQuery !== undefined
-        ? { locationQuery: input.locationQuery }
-        : {}),
-    };
-    await requestJson(
-      `${MARKETPLACE_URL}/v1/umkm/stores/${encodeURIComponent(stringValue(rawStore.id))}`,
+    const primaryLocation =
+      current.locations?.find(item => item.isPrimary) ?? current.locations?.[0];
+    const payload = await requestJson(
+      `${MARKETPLACE_URL}/v1/businesses/${encodeURIComponent(current.id)}`,
       {
-        method: 'PUT',
+        method: 'PATCH',
         headers: {
           ...authHeaders(token),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          ...(input.name !== undefined ? { name: input.name } : {}),
-          ...(input.city !== undefined ? { city: input.city } : {}),
-          ...(input.address !== undefined ? { address: input.address } : {}),
-          ...(input.phone !== undefined ? { phone: input.phone } : {}),
-          ...(input.description !== undefined
-            ? { description: input.description }
-            : {}),
-          ...(input.latitude !== undefined && input.latitude !== null
-            ? { lat: input.latitude }
-            : {}),
-          ...(input.longitude !== undefined && input.longitude !== null
-            ? { lng: input.longitude }
-            : {}),
-          metadata: {
-            ...rawMetadata,
-            ...input.metadataPatch,
-            public: publicMetadata,
+          expected_version: current.version ?? 1,
+          name: input.name ?? current.name,
+          capability_key: current.capabilityKey ?? 'general',
+          category: input.category ?? current.category,
+          description: input.description ?? current.description,
+          schedule: input.schedule ?? current.schedule,
+          location_query: input.locationQuery ?? current.locationQuery,
+          primary_location: {
+            name: primaryLocation?.name || 'Lokasi utama',
+            address: input.address ?? current.address,
+            city: input.city ?? current.city,
+            lat: input.latitude === undefined ? current.latitude : input.latitude,
+            lng: input.longitude === undefined ? current.longitude : input.longitude,
+            phone: input.phone ?? current.phone,
+            public_visibility: primaryLocation?.publicVisibility ?? true,
           },
+          metadata_patch: input.metadataPatch,
+          reason: input.reason,
         }),
       },
     );
-    const refreshedAggregate = await getCanonicalAggregate(token, current.id);
-    const refreshed = refreshedAggregate
-      ? mapCanonicalBusiness(refreshedAggregate, account, organizations)
-      : null;
-    if (!refreshed) {
+    const root = nestedRecord(payload);
+    const updatedAggregate = record(root.business) ?? root;
+    const updated = mapCanonicalBusiness(updatedAggregate, account, organizations);
+    if (!updated) {
       throw new UpstreamHttpError(502, 'invalid_marketplace_business_response');
     }
-    return refreshed;
+    return updated;
   }
   const primaryLocation = current.locations?.find(item => item.isPrimary)
     ?? current.locations?.[0];
