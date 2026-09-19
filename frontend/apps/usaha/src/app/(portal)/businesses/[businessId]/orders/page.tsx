@@ -3,6 +3,7 @@ import { ShoppingBag } from 'lucide-react';
 import { CashShiftWorkspace } from '@/components/business-control/CashShiftWorkspace';
 import { OrderInboxWorkspace } from '@/components/business-control/OrderInboxWorkspace';
 import { QuickSaleWorkspace } from '@/components/business-control/QuickSaleWorkspace';
+import { SalesHistoryWorkspace } from '@/components/business-control/SalesHistoryWorkspace';
 import { EmptyState } from '@/components/portal/EmptyState';
 import { MetricStrip } from '@/components/portal/MetricStrip';
 import { PageHeader } from '@/components/portal/PageHeader';
@@ -125,27 +126,12 @@ export default async function BusinessOrdersPage({ params, searchParams }: PageP
       ) : null}
 
       {activeView === 'transaksi' && canViewTransactions ? (
-        <section className="merchant-list border border-portal-line/80">
-          {sales.length ? sales.map(({ sale, lines }) => {
-            const itemSummary = lines.map(line => {
-              const choices = saleLineChoiceSummary(line);
-              return `${line.product_name}${choices ? ` (${choices})` : ''} × ${Number(line.quantity).toLocaleString('id-ID')}`;
-            }).join(', ');
-            const notes = lines.map(line => saleLineNote(line)).filter(Boolean);
-            const grossProfit = sale.cost_complete && sale.cogs_amount !== null ? sale.final_amount - sale.cogs_amount : null;
-            return (
-              <article key={sale.id} className="merchant-action-row sm:grid sm:grid-cols-[minmax(0,1fr)_130px_150px] sm:items-center">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-bold text-portal-ink">{itemSummary}</p>
-                  {notes.length ? <p className="mt-1 truncate text-[11px] font-medium text-portal-forest">Catatan: {notes.join(' · ')}</p> : null}
-                  <p className="mt-1 text-[11px] text-portal-soft">{sale.occurred_on} · {sale.channel_key || 'Langsung'} · {sale.account_key}</p>
-                </div>
-                <div className="text-right"><p className="text-[10px] font-semibold text-portal-soft">Total</p><p className="text-sm font-black text-portal-ink">{money.format(sale.final_amount)}</p></div>
-                <div className="hidden text-right sm:block"><p className="text-[10px] font-semibold text-portal-soft">{canViewCosting ? 'Laba kotor' : 'Biaya'}</p><p className="text-sm font-bold text-portal-ink">{canViewCosting ? (grossProfit === null ? 'HPP belum lengkap' : money.format(grossProfit)) : (sale.cost_complete ? 'Lengkap' : 'Belum lengkap')}</p></div>
-              </article>
-            );
-          }) : <EmptyState title="Belum ada transaksi" description="Penjualan dari Kasir akan muncul di sini." icon={ShoppingBag} />}
-        </section>
+        <SalesHistoryWorkspace
+          businessId={business.id}
+          sales={sales}
+          canVoidSales={canCreateSales}
+          canViewCosting={canViewCosting}
+        />
       ) : null}
 
       {activeView === 'pesanan' ? (
