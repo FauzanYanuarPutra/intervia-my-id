@@ -1,5 +1,8 @@
-use super::inventory::{
-    InventoryError, InventoryMutationRequest, InventoryOperation, InventoryRepository,
+use super::{
+    inventory::{InventoryError, InventoryMutationRequest, InventoryOperation, InventoryRepository},
+    stock_transfer::{
+        CreateStockTransferRequest, StockTransferItemKind, StockTransferRepository,
+    },
 };
 use rust_decimal::Decimal;
 use sqlx::PgPool;
@@ -226,6 +229,96 @@ async fn secondary_branch_mutation_does_not_change_primary_compatibility_stock(p
     .await
     .unwrap();
     assert_eq!(audit_count, 1);
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn ingredient_transfer_is_atomic_idempotent_and_updates_primary_projection(pool: PgPool) {
+    let seeded = seed_inventory_context(&pool).await;
+    let repository = StockTransferRepository::new(pool.clone());
+    let key = Uuid::new_v4();
+    let request = CreateStockTransferRequest {
+        from_location_id: seeded.primary_location_id,
+        to_location_id: seeded.secondary_location_id,
+        item_kind: StockTransferItemKind::Ingredient,
+        ingredient_id: Some(seeded.ingredient_id),
+        product_id: None,
+        quantity: Decimal::from(30),
+        reason: "Isi stok cabang".into(),
+    };
+
+    let first = repository
+        .create(
+            seeded.owner_id,
+            seeded.business_id,
+            seeded.organization_id,
+            key,
+            request.clone(),
+        )
+        .await
+        .unwrap();
+    let replay = repository
+        .create(
+            seeded.owner_id,
+            seeded.business_id,
+            seeded.organization_id,
+            key,
+            request,
+        )
+        .await
+        .unwrap();
+
+    assert!(!first.replayed);
+    assert!(replay.replayed);
+    assert_eq!(replay.transfer.id, first.transfer.id);
+    assert_eq!(first.transfer.source_quantity_before, Decimal::from(100));
+    assert_eq!(first.transfer.source_quantity_after, Decimal::from(70));
+    assert_eq!(first.transfer.destination_quantity_before, Decimal::ZERO);
+    assert_eq!(first.transfer.destination_quantity_after, Decimal::from(30));
+
+    let primary_balance: Decimal = sqlx::query_scalar(
+        "SELECT quantity FROM business_ingredient_balances WHERE location_id=$1 AND ingredient_id=$2",
+    )
+    .bind(seeded.primary_location_id)
+    .bind(seeded.ingredient_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let secondary_balance: Decimal = sqlx::query_scalar(
+        "SELECT quantity FROM business_ingredient_balances WHERE location_id=$1 AND ingredient_id=$2",
+    )
+    .bind(seeded.secondary_location_id)
+    .bind(seeded.ingredient_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let legacy_stock: Decimal =
+        sqlx::query_scalar("SELECT stock_quantity FROM business_ingredients WHERE id=$1")
+            .bind(seeded.ingredient_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+
+    assert_eq!(primary_balance, Decimal::from(70));
+    assert_eq!(secondary_balance, Decimal::from(30));
+    assert_eq!(legacy_stock, Decimal::from(70));
+
+    let movement_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM business_inventory_movements WHERE source_type='stock_transfer' AND source_id=$1",
+    )
+    .bind(first.transfer.id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(movement_count, 2);
+
+    let event_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM events.event_outbox WHERE aggregate_type='business_stock_transfer' AND aggregate_id=$1 AND event_type='marketplace.business.stock_transferred'",
+    )
+    .bind(first.transfer.id.to_string())
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(event_count, 1);
 }
 
 #[sqlx::test(migrations = "./migrations")]
