@@ -476,7 +476,7 @@ jobs:
           # Run schema changes exactly once per release before replacing application
           # replicas. The normal staging/production service processes have startup
           # migrations disabled and only verify the resulting schema.
-          for migration_service in identity_service marketplace_service community_service; do
+          for migration_service in identity_service marketplace_service community_service profile_service media_service news_service order_service payment_service promotion_service crm_service communication_service trust_service support_service review_service; do
             echo "Running release migration: $migration_service"
             docker compose "${compose[@]}" run --rm -T \
               -e MIGRATE_ONLY=1 \
