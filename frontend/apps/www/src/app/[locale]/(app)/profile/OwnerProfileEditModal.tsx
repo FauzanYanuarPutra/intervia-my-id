@@ -518,15 +518,15 @@ export function OwnerProfileEditModal({
         trust: 'Verifikasi',
       }
     : {
-        menu: 'Edit profile',
-        identity: 'Main profile',
+        menu: 'Profile settings',
+        identity: 'Profile',
         contact: 'Contact',
-        business: 'Business or services',
-        professional: 'Professional skills',
+        business: 'Business & services',
+        professional: 'Skills',
         buyer: 'Looking for',
-        history: 'Experience & proof',
-        media: 'Gallery & documents',
-        trust: 'Trust & verification',
+        history: 'Experience',
+        media: 'Gallery',
+        trust: 'Verification',
       };
 
   const updateProfile = async (payload: Record<string, unknown>) => {
