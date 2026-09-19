@@ -43,12 +43,21 @@ export function NewBusinessQuickForm({ initialOwnerPhone = '' }: NewBusinessQuic
   const [phone, setPhone] = useState(initialOwnerPhone);
   const [error, setError] = useState('');
   const [pending, setPending] = useState(false);
+  const [step, setStep] = useState<1 | 2>(1);
   const provisionAttemptRef = useRef<ClientIdempotencyAttempt | null>(null);
   const preset = getBusinessTemplatePreset(templateKey);
 
   function selectTemplate(nextTemplateKey: BusinessTemplateKey) {
     setTemplateKey(nextTemplateKey);
     setCategory(getBusinessTemplatePreset(nextTemplateKey).defaultCategory);
+  }
+
+  function continueToLocation() {
+    setError('');
+    if (name.trim().length < 2) return setError('Isi nama usaha dulu.');
+    if (city.trim().length < 2) return setError('Isi kota usaha.');
+    if (phone.replace(/\s+/g, '').length < 9) return setError('Isi nomor usaha yang aktif.');
+    setStep(2);
   }
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -109,13 +118,25 @@ export function NewBusinessQuickForm({ initialOwnerPhone = '' }: NewBusinessQuic
 
   return (
     <form onSubmit={submit} className="grid gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-[18px] bg-portal-sand/35 px-3 py-2">
-        <span className="text-sm font-bold">Setup inti</span>
-        <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-portal-forest">
-          {progress}/4 siap
-        </span>
+      <div className="rounded-[18px] border border-portal-line/70 bg-white p-1.5">
+        <div className="grid grid-cols-2 gap-1" aria-label="Langkah membuat usaha">
+          <button type="button" onClick={() => setStep(1)} className={`min-h-11 rounded-[14px] px-3 text-left ${step === 1 ? 'bg-portal-mist text-portal-ink' : 'text-portal-soft'}`}>
+            <span className="block text-[10px] font-black uppercase tracking-[.1em]">Langkah 1</span>
+            <span className="mt-0.5 block text-xs font-black">Data dasar</span>
+          </button>
+          <button type="button" onClick={() => name.trim().length >= 2 && city.trim().length >= 2 && phone.replace(/\s+/g, '').length >= 9 ? setStep(2) : setError('Lengkapi data dasar dulu.')} className={`min-h-11 rounded-[14px] px-3 text-left ${step === 2 ? 'bg-portal-mist text-portal-ink' : 'text-portal-soft'}`}>
+            <span className="block text-[10px] font-black uppercase tracking-[.1em]">Langkah 2</span>
+            <span className="mt-0.5 block text-xs font-black">Lokasi usaha</span>
+          </button>
+        </div>
+        <div className="flex items-center justify-between gap-2 px-2 py-2">
+          <span className="text-xs font-semibold text-portal-soft">Setup inti</span>
+          <span className="text-[11px] font-bold text-portal-forest">{progress}/4 siap</span>
+        </div>
       </div>
 
+      {step === 1 ? (
+      <>
       <section className="grid gap-3 rounded-[20px] border border-portal-line/70 bg-white p-4">
         <div className="flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-portal-forest" />
@@ -207,6 +228,14 @@ export function NewBusinessQuickForm({ initialOwnerPhone = '' }: NewBusinessQuic
         </div>
       </section>
 
+      </section>
+      <div className="flex justify-end">
+        <button type="button" onClick={continueToLocation} className="portal-button-primary">
+          Lanjut: lokasi <ArrowRight className="h-4 w-4" />
+        </button>
+      </div>
+      </>
+      ) : (
       <section className="grid gap-3 rounded-[20px] border border-portal-line/70 bg-white p-4">
         <div className="flex items-center gap-2">
           <MapPinned className="h-4 w-4 text-portal-forest" />
@@ -236,15 +265,19 @@ export function NewBusinessQuickForm({ initialOwnerPhone = '' }: NewBusinessQuic
         />
       </section>
 
+      </section>
+      <div className="flex flex-wrap justify-between gap-2">
+        <button type="button" onClick={() => setStep(1)} className="portal-button-secondary">← Data dasar</button>
+        <button type="submit" disabled={pending} className="portal-button-primary">
+          {pending ? 'Membuat workspace...' : `Buat ${preset.label}`} <ArrowRight className="h-4 w-4" />
+        </button>
+      </div>
+      </>
+      )}
+
       {error ? (
         <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
       ) : null}
-      <div className="flex justify-end">
-        <button type="submit" disabled={pending} className="portal-button-primary">
-          {pending ? 'Membuat workspace...' : `Buat ${preset.label}`}{' '}
-          <ArrowRight className="h-4 w-4" />
-        </button>
-      </div>
     </form>
   );
 }
