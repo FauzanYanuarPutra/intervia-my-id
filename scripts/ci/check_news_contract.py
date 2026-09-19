@@ -329,6 +329,41 @@ require(
         "topics",
         "evaluateTrustSafety",
         "isPrivateSourceHost",
+        "rich_body",
+        "cover_image",
+        "sanitizeRichText",
+        "isSafePublicUrl",
+    ),
+)
+
+require(
+    "frontend/apps/www/src/app/[locale]/(shared)/news/submissions/MyNewsSubmissions.tsx",
+    (
+        "NewsRichTextEditor",
+        "rich_body",
+        "cover_image",
+        "statusLabel",
+        "Catatan editor:",
+    ),
+)
+
+require(
+    "frontend/apps/www/src/app/[locale]/(app)/manage/ManageHubClient.tsx",
+    (
+        "newsSubmissions",
+        "newsNeedsAction",
+        "/news/submissions",
+        "/news/submit",
+        "Tindak lanjuti News",
+    ),
+)
+
+require(
+    "frontend/apps/www/src/app/news/rss.xml/route.ts",
+    (
+        "xmlns:atom",
+        "atom:link",
+        "enclosure",
     ),
 )
 
