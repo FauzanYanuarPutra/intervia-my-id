@@ -1,4 +1,10 @@
-use super::sales::{CreateSaleLineRequest, CreateSaleRequest, SaleRepository, SaleRepositoryError};
+use super::{
+    commercial_core::{
+        CommercialCoreError, CommercialCoreRepository, CreatePartyRequest, CreatePaymentRequest,
+        PaymentAllocationRequest, ReversePaymentRequest,
+    },
+    sales::{CreateSaleLineRequest, CreateSaleRequest, SaleRepository, SaleRepositoryError},
+};
 use chrono::NaiveDate;
 use rust_decimal::Decimal;
 use sqlx::PgPool;
@@ -156,6 +162,7 @@ fn sale_request(product_id: Uuid) -> CreateSaleRequest {
         account_key: "cash".into(),
         location_id: None,
         source_order_id: None,
+        party_id: None,
         lines: vec![CreateSaleLineRequest {
             product_id,
             quantity: Decimal::from(2),
@@ -309,6 +316,125 @@ async fn multi_branch_sale_requires_location_and_isolates_stock(pool: PgPool) {
             .await
             .unwrap();
     assert_eq!(primary_stock, Decimal::from(5_000));
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn receivable_partial_payment_reversal_keeps_counterparty_truth(pool: PgPool) {
+    let seeded = seed_costed_product(&pool).await;
+    let commercial = CommercialCoreRepository::new(pool.clone());
+    let (customer, replayed) = commercial
+        .create_party(
+            seeded.actor_id,
+            seeded.business_id,
+            seeded.organization_id,
+            Uuid::new_v4(),
+            CreatePartyRequest {
+                party_kind: "customer".into(),
+                display_name: "Pelanggan Tempo".into(),
+                legal_name: None,
+                phone: None,
+                email: Some("tempo@example.test".into()),
+                tax_identifier: None,
+                address: None,
+                note: String::new(),
+            },
+        )
+        .await
+        .unwrap();
+    assert!(!replayed);
+
+    let mut request = sale_request(seeded.product_id);
+    request.account_key = "receivable".into();
+    request.party_id = Some(customer.id);
+
+    let sale = SaleRepository::new(pool.clone())
+        .create(
+            seeded.actor_id,
+            seeded.business_id,
+            seeded.organization_id,
+            Uuid::new_v4(),
+            request,
+        )
+        .await
+        .unwrap();
+    assert_eq!(sale.sale.sale.party_id, Some(customer.id));
+
+    let payment = commercial
+        .create_payment(
+            seeded.actor_id,
+            seeded.business_id,
+            seeded.organization_id,
+            Uuid::new_v4(),
+            CreatePaymentRequest {
+                direction: "incoming".into(),
+                account_key: "bank".into(),
+                amount: 10_000,
+                occurred_on: NaiveDate::from_ymd_opt(2026, 9, 10).unwrap(),
+                party_id: None,
+                reference: "Transfer pelanggan".into(),
+                note: "Bayar sebagian".into(),
+                allocations: vec![PaymentAllocationRequest {
+                    sale_id: Some(sale.sale.sale.id),
+                    purchase_id: None,
+                    amount: 10_000,
+                }],
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(payment.payment.payment.party_id, Some(customer.id));
+
+    let receivable = commercial
+        .receivables(seeded.business_id, seeded.organization_id)
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|row| row.sale_id == sale.sale.sale.id)
+        .unwrap();
+    assert_eq!(receivable.party_id, Some(customer.id));
+    assert_eq!(receivable.original_amount, 24_000);
+    assert_eq!(receivable.paid_amount, 10_000);
+    assert_eq!(receivable.outstanding_amount, 14_000);
+
+    let archive_error = commercial
+        .archive_party(
+            seeded.actor_id,
+            seeded.business_id,
+            seeded.organization_id,
+            customer.id,
+            customer.version,
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(
+        archive_error,
+        CommercialCoreError::Validation("party_has_outstanding_balance")
+    );
+
+    commercial
+        .reverse_payment(
+            seeded.actor_id,
+            seeded.business_id,
+            seeded.organization_id,
+            payment.payment.payment.id,
+            Uuid::new_v4(),
+            ReversePaymentRequest {
+                occurred_on: NaiveDate::from_ymd_opt(2026, 9, 11).unwrap(),
+                reason: "Transfer dikembalikan bank".into(),
+            },
+        )
+        .await
+        .unwrap();
+
+    let restored = commercial
+        .receivables(seeded.business_id, seeded.organization_id)
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|row| row.sale_id == sale.sale.sale.id)
+        .unwrap();
+    assert_eq!(restored.paid_amount, 0);
+    assert_eq!(restored.outstanding_amount, 24_000);
 }
 
 #[sqlx::test(migrations = "./migrations")]
