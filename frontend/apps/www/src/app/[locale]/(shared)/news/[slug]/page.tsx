@@ -186,9 +186,13 @@ export default async function NewsArticlePage({ params }: PageProps) {
               </section>
             ) : (
               <>
-                <div className="space-y-5 text-[15px] font-medium leading-8 text-slate-700 dark:text-slate-200">
-                  {paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}
-                </div>
+                {article.richBody ? (
+                  <div className="prose prose-slate max-w-none text-[15px] leading-8 dark:prose-invert [&_a]:text-emerald-700 [&_a]:font-semibold [&_blockquote]:border-emerald-500 [&_img]:rounded-2xl [&_img]:shadow-sm" dangerouslySetInnerHTML={{ __html: article.richBody }} />
+                ) : (
+                  <div className="space-y-5 text-[15px] font-medium leading-8 text-slate-700 dark:text-slate-200">
+                    {paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}
+                  </div>
+                )}
 
             {article.businessImpact ? (
               <section className="mt-8 rounded-[24px] border border-emerald-200 bg-emerald-50 p-5 dark:border-emerald-400/20 dark:bg-emerald-400/10">

@@ -1,6 +1,7 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
+import NewsRichTextEditor from './NewsRichTextEditor';
 
 const CATEGORIES = ['Ekonomi', 'Bisnis', 'UMKM', 'Teknologi', 'Keuangan', 'Regulasi', 'Industri', 'Daerah'];
 
@@ -14,11 +15,13 @@ export default function SubmitNewsForm({ locale }: Props) {
     title: '',
     summary: '',
     body: '',
+    rich_body: '',
     category: 'Ekonomi',
     article_kind: 'news',
     location: '',
     topics: '',
     source_urls: '',
+    cover_image: '',
   });
   const [state, setState] = useState<{ loading: boolean; error: string; success: string }>({
     loading: false,
@@ -26,7 +29,7 @@ export default function SubmitNewsForm({ locale }: Props) {
     success: '',
   });
 
-  const update = (key: keyof typeof form, value: string) => {
+  useEffect(() => {\n    try {\n      const draft = JSON.parse(localStorage.getItem('lajukan-news-form-draft') || 'null') as Partial<typeof form> | null;\n      if (draft) setForm(current => ({ ...current, ...draft }));\n    } catch {}\n  }, []);\n\n  useEffect(() => {\n    try { localStorage.setItem('lajukan-news-form-draft', JSON.stringify(form)); } catch {}\n  }, [form]);\n\n  const update = (key: keyof typeof form, value: string) => {
     setForm(current => ({ ...current, [key]: value }));
   };
 
@@ -42,6 +45,8 @@ export default function SubmitNewsForm({ locale }: Props) {
           language: isId ? 'id' : 'en',
           topics: form.topics.split(',').map(value => value.trim()).filter(Boolean),
           source_urls: form.source_urls.split(/\r?\n/).map(value => value.trim()).filter(Boolean),
+          rich_body: form.rich_body,
+          cover_image: form.cover_image.trim(),
         }),
       });
       const payload = (await response.json().catch(() => ({}))) as { error?: string; message?: string };
@@ -60,11 +65,13 @@ export default function SubmitNewsForm({ locale }: Props) {
         title: '',
         summary: '',
         body: '',
+        rich_body: '',
         category: 'Ekonomi',
         article_kind: 'news',
         location: '',
         topics: '',
         source_urls: '',
+        cover_image: '',
       });
       setState({
         loading: false,
@@ -132,9 +139,19 @@ export default function SubmitNewsForm({ locale }: Props) {
         <textarea required minLength={20} maxLength={1000} rows={3} value={form.summary} onChange={event => update('summary', event.target.value)} className={inputClass} placeholder={isId ? 'Ringkas fakta utama dan kenapa berita ini penting.' : 'Summarize the core facts and why they matter.'} />
       </label>
 
+      <div>
+        <label className="text-sm font-bold text-slate-800 dark:text-slate-100">
+          {isId ? 'Isi berita' : 'Article body'}
+        </label>
+        <NewsRichTextEditor locale={locale} value={form.rich_body} onChange={(html, text) => setForm(current => ({ ...current, rich_body: html, body: text }))} />
+        <p className="mt-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
+          {isId ? 'Gunakan toolbar seperti editor berita biasa. Heading, tebal, miring, daftar, kutipan, tautan, dan gambar didukung. HTML akan dibersihkan sebelum disimpan.' : 'Use the toolbar like a standard newsroom editor. Headings, emphasis, lists, quotes, links, and images are supported. HTML is sanitized before storage.'}
+        </p>
+      </div>
+
       <label className="text-sm font-bold text-slate-800 dark:text-slate-100">
-        {isId ? 'Isi berita' : 'Article body'}
-        <textarea required minLength={120} maxLength={20000} rows={12} value={form.body} onChange={event => update('body', event.target.value)} className={inputClass} placeholder={isId ? 'Tulis kronologi, fakta, konteks, dan atribusi sumber. Hindari opini yang disamarkan sebagai fakta.' : 'Write the chronology, facts, context, and source attribution. Do not disguise opinion as fact.'} />
+        {isId ? 'URL gambar sampul (opsional)' : 'Cover image URL (optional)'}
+        <input type="url" maxLength={2048} value={form.cover_image} onChange={event => update('cover_image', event.target.value)} className={inputClass} placeholder="https://..." />
       </label>
 
       <label className="text-sm font-bold text-slate-800 dark:text-slate-100">

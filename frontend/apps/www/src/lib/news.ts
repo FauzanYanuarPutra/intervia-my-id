@@ -13,6 +13,7 @@ type RawNewsRow = {
   title?: unknown;
   summary?: unknown;
   body?: unknown;
+  cover_image?: unknown;
   tags?: unknown;
   cover_image?: unknown;
   metadata?: unknown;
@@ -28,6 +29,7 @@ export type LajukanNewsArticle = {
   title: string;
   summary: string;
   body: string;
+  richBody: string;
   tags: string[];
   coverImage: string | null;
   category: string;
@@ -131,6 +133,7 @@ export function normalizeNewsArticle(row: RawNewsRow): LajukanNewsArticle | null
     title,
     summary: readString(row.summary),
     body: readString(row.body),
+    richBody: readString(news.rich_body),
     tags: publicTags,
     coverImage: readString(row.cover_image) || null,
     category,
