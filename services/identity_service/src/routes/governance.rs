@@ -169,7 +169,13 @@ fn normalize_reason(value: Option<String>, max: usize) -> Option<String> {
 fn valid_privacy_type(value: &str) -> bool {
     matches!(
         value,
-        "access" | "correction" | "export" | "deletion" | "withdraw_consent" | "restrict" | "objection"
+        "access"
+            | "correction"
+            | "export"
+            | "deletion"
+            | "withdraw_consent"
+            | "restrict"
+            | "objection"
     )
 }
 
@@ -267,7 +273,9 @@ pub async fn create_privacy_request(
 ) -> impl IntoResponse {
     let claims = match require_authenticated(&state, &headers).await {
         Ok(value) => value,
-        Err(status) => return (status, Json(json!({"error":"authentication required"}))).into_response(),
+        Err(status) => {
+            return (status, Json(json!({"error":"authentication required"}))).into_response()
+        }
     };
 
     let request_type = payload.request_type.trim().to_ascii_lowercase();
@@ -280,8 +288,10 @@ pub async fn create_privacy_request(
     }
 
     let note = normalize_reason(payload.note, 5000);
-    if matches!(request_type.as_str(), "deletion" | "withdraw_consent" | "restrict" | "objection")
-        && note.is_none()
+    if matches!(
+        request_type.as_str(),
+        "deletion" | "withdraw_consent" | "restrict" | "objection"
+    ) && note.is_none()
     {
         return (
             StatusCode::BAD_REQUEST,
@@ -384,11 +394,7 @@ pub async fn cancel_my_privacy_request(
     let claims = match require_authenticated(&state, &headers).await {
         Ok(value) => value,
         Err(status) => {
-            return (
-                status,
-                Json(json!({"error":"authentication required"})),
-            )
-                .into_response();
+            return (status, Json(json!({"error":"authentication required"}))).into_response();
         }
     };
 
@@ -510,7 +516,9 @@ pub async fn list_my_privacy_requests(
 ) -> impl IntoResponse {
     let claims = match require_authenticated(&state, &headers).await {
         Ok(value) => value,
-        Err(status) => return (status, Json(json!({"error":"authentication required"}))).into_response(),
+        Err(status) => {
+            return (status, Json(json!({"error":"authentication required"}))).into_response()
+        }
     };
 
     let rows = sqlx::query(
@@ -543,11 +551,21 @@ pub async fn list_my_privacy_requests(
                 "verified_at": row.get::<Option<DateTime<Utc>>,_>("verified_at"),
                 "verification_expires_at": row.get::<Option<DateTime<Utc>>,_>("verification_expires_at")
             })).collect();
-            (StatusCode::OK, Json(GovernanceResponse { data: Value::Array(data) })).into_response()
+            (
+                StatusCode::OK,
+                Json(GovernanceResponse {
+                    data: Value::Array(data),
+                }),
+            )
+                .into_response()
         }
         Err(error) => {
             tracing::error!(?error, "list privacy requests failed");
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"database error"}))).into_response()
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error":"database error"})),
+            )
+                .into_response()
         }
     }
 }
@@ -557,7 +575,11 @@ pub async fn list_privacy_requests(
     headers: HeaderMap,
 ) -> impl IntoResponse {
     if let Err(status) = require_governance_access(&state, &headers, "privacy:request:read").await {
-        return (status, Json(json!({"error":"privacy governance access required"}))).into_response();
+        return (
+            status,
+            Json(json!({"error":"privacy governance access required"})),
+        )
+            .into_response();
     }
 
     let rows = sqlx::query(
@@ -592,11 +614,21 @@ pub async fn list_privacy_requests(
                 "verified_at": row.get::<Option<DateTime<Utc>>,_>("verified_at"),
                 "verification_expires_at": row.get::<Option<DateTime<Utc>>,_>("verification_expires_at")
             })).collect();
-            (StatusCode::OK, Json(GovernanceResponse { data: Value::Array(data) })).into_response()
+            (
+                StatusCode::OK,
+                Json(GovernanceResponse {
+                    data: Value::Array(data),
+                }),
+            )
+                .into_response()
         }
         Err(error) => {
             tracing::error!(?error, "list privacy governance queue failed");
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"database error"}))).into_response()
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error":"database error"})),
+            )
+                .into_response()
         }
     }
 }
@@ -609,11 +641,21 @@ pub async fn transition_privacy_request(
 ) -> impl IntoResponse {
     let claims = match require_governance_access(&state, &headers, "privacy:request:manage").await {
         Ok(value) => value,
-        Err(status) => return (status, Json(json!({"error":"privacy governance access required"}))).into_response(),
+        Err(status) => {
+            return (
+                status,
+                Json(json!({"error":"privacy governance access required"})),
+            )
+                .into_response()
+        }
     };
     let status = payload.status.trim().to_ascii_lowercase();
     if !valid_privacy_status(&status) {
-        return (StatusCode::BAD_REQUEST, Json(json!({"error":"invalid privacy request status"}))).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error":"invalid privacy request status"})),
+        )
+            .into_response();
     }
 
     let decision_note = normalize_reason(payload.decision_note, 5000);
@@ -644,13 +686,21 @@ pub async fn transition_privacy_request(
         Ok(value) => value,
         Err(error) => {
             tracing::error!(?error, "privacy request lookup failed");
-            return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"database error"}))).into_response();
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error":"database error"})),
+            )
+                .into_response();
         }
     }) else {
-        return (StatusCode::NOT_FOUND, Json(json!({"error":"privacy request not found"}))).into_response();
+        return (
+            StatusCode::NOT_FOUND,
+            Json(json!({"error":"privacy request not found"})),
+        )
+            .into_response();
     };
 
-    let previous_status = row.get::<String,_>("status");
+    let previous_status = row.get::<String, _>("status");
     if !valid_privacy_transition(&previous_status, &status) {
         return (
             StatusCode::CONFLICT,
@@ -659,7 +709,11 @@ pub async fn transition_privacy_request(
             .into_response();
     }
     if matches!(status.as_str(), "completed" | "rejected")
-        && decision_note.as_deref().map(str::trim).filter(|v| !v.is_empty()).is_none()
+        && decision_note
+            .as_deref()
+            .map(str::trim)
+            .filter(|v| !v.is_empty())
+            .is_none()
     {
         return (
             StatusCode::BAD_REQUEST,
@@ -667,9 +721,11 @@ pub async fn transition_privacy_request(
         )
             .into_response();
     }
-    let assigned_to = payload.assigned_to.or_else(|| row.get::<Option<Uuid>,_>("assigned_to"));
-    let completed_at = matches!(status.as_str(), "completed" | "rejected" | "cancelled")
-        .then_some(Utc::now());
+    let assigned_to = payload
+        .assigned_to
+        .or_else(|| row.get::<Option<Uuid>, _>("assigned_to"));
+    let completed_at =
+        matches!(status.as_str(), "completed" | "rejected" | "cancelled").then_some(Utc::now());
 
     let updated = sqlx::query(
         r#"
@@ -731,7 +787,11 @@ pub async fn transition_privacy_request(
         }
         Err(error) => {
             tracing::error!(?error, "privacy request transition failed");
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"database error"}))).into_response()
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error":"database error"})),
+            )
+                .into_response()
         }
     }
 }
@@ -741,18 +801,33 @@ pub async fn create_security_incident(
     headers: HeaderMap,
     Json(payload): Json<CreateSecurityIncidentRequest>,
 ) -> impl IntoResponse {
-    let claims = match require_governance_access(&state, &headers, "security:incident:manage").await {
+    let claims = match require_governance_access(&state, &headers, "security:incident:manage").await
+    {
         Ok(value) => value,
-        Err(status) => return (status, Json(json!({"error":"security governance access required"}))).into_response(),
+        Err(status) => {
+            return (
+                status,
+                Json(json!({"error":"security governance access required"})),
+            )
+                .into_response()
+        }
     };
 
     let severity = payload.severity.trim().to_ascii_lowercase();
     if !valid_incident_severity(&severity) {
-        return (StatusCode::BAD_REQUEST, Json(json!({"error":"invalid incident severity"}))).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error":"invalid incident severity"})),
+        )
+            .into_response();
     }
     let summary = payload.summary.trim().to_string();
     if summary.is_empty() || summary.chars().count() > 10_000 {
-        return (StatusCode::BAD_REQUEST, Json(json!({"error":"summary must contain 1-10000 characters"}))).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error":"summary must contain 1-10000 characters"})),
+        )
+            .into_response();
     }
 
     let affected_data_classes: Vec<String> = payload
@@ -793,7 +868,7 @@ pub async fn create_security_incident(
 
     match result {
         Ok(row) => {
-            let id = row.get::<Uuid,_>("id");
+            let id = row.get::<Uuid, _>("id");
             audit_governance_event(
                 &state,
                 Some(claims.sub),
@@ -823,7 +898,11 @@ pub async fn create_security_incident(
         }
         Err(error) => {
             tracing::error!(?error, "create security incident failed");
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"database error"}))).into_response()
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error":"database error"})),
+            )
+                .into_response()
         }
     }
 }
@@ -832,8 +911,13 @@ pub async fn list_security_incidents(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> impl IntoResponse {
-    if let Err(status) = require_governance_access(&state, &headers, "security:incident:read").await {
-        return (status, Json(json!({"error":"security governance access required"}))).into_response();
+    if let Err(status) = require_governance_access(&state, &headers, "security:incident:read").await
+    {
+        return (
+            status,
+            Json(json!({"error":"security governance access required"})),
+        )
+            .into_response();
     }
 
     let rows = sqlx::query(
@@ -874,11 +958,21 @@ pub async fn list_security_incidents(
                 "remediated_at": row.get::<Option<DateTime<Utc>>,_>("remediated_at"),
                 "closed_at": row.get::<Option<DateTime<Utc>>,_>("closed_at")
             })).collect();
-            (StatusCode::OK, Json(GovernanceResponse { data: Value::Array(data) })).into_response()
+            (
+                StatusCode::OK,
+                Json(GovernanceResponse {
+                    data: Value::Array(data),
+                }),
+            )
+                .into_response()
         }
         Err(error) => {
             tracing::error!(?error, "list security incidents failed");
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"database error"}))).into_response()
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error":"database error"})),
+            )
+                .into_response()
         }
     }
 }
@@ -889,23 +983,42 @@ pub async fn transition_security_incident(
     Path(id): Path<Uuid>,
     Json(payload): Json<TransitionSecurityIncidentRequest>,
 ) -> impl IntoResponse {
-    let claims = match require_governance_access(&state, &headers, "security:incident:manage").await {
+    let claims = match require_governance_access(&state, &headers, "security:incident:manage").await
+    {
         Ok(value) => value,
-        Err(status) => return (status, Json(json!({"error":"security governance access required"}))).into_response(),
+        Err(status) => {
+            return (
+                status,
+                Json(json!({"error":"security governance access required"})),
+            )
+                .into_response()
+        }
     };
 
     let status = payload.status.trim().to_ascii_lowercase();
     if !valid_incident_status(&status) {
-        return (StatusCode::BAD_REQUEST, Json(json!({"error":"invalid incident status"}))).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error":"invalid incident status"})),
+        )
+            .into_response();
     }
     if let Some(value) = payload.subject_notification_status.as_deref() {
         if !valid_notification_status(value) {
-            return (StatusCode::BAD_REQUEST, Json(json!({"error":"invalid subject notification status"}))).into_response();
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error":"invalid subject notification status"})),
+            )
+                .into_response();
         }
     }
     if let Some(value) = payload.regulator_notification_status.as_deref() {
         if !valid_notification_status(value) {
-            return (StatusCode::BAD_REQUEST, Json(json!({"error":"invalid regulator notification status"}))).into_response();
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error":"invalid regulator notification status"})),
+            )
+                .into_response();
         }
     }
 
@@ -921,22 +1034,32 @@ pub async fn transition_security_incident(
         }
     };
 
-    let current = sqlx::query("SELECT status, severity FROM core.security_incidents WHERE id = $1 FOR UPDATE")
-        .bind(id)
-        .fetch_optional(&mut *tx)
-        .await;
+    let current = sqlx::query(
+        "SELECT status, severity FROM core.security_incidents WHERE id = $1 FOR UPDATE",
+    )
+    .bind(id)
+    .fetch_optional(&mut *tx)
+    .await;
 
     let Some(current) = (match current {
         Ok(value) => value,
         Err(error) => {
             tracing::error!(?error, "security incident lookup failed");
-            return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"database error"}))).into_response();
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error":"database error"})),
+            )
+                .into_response();
         }
     }) else {
-        return (StatusCode::NOT_FOUND, Json(json!({"error":"security incident not found"}))).into_response();
+        return (
+            StatusCode::NOT_FOUND,
+            Json(json!({"error":"security incident not found"})),
+        )
+            .into_response();
     };
 
-    let previous_status = current.get::<String,_>("status");
+    let previous_status = current.get::<String, _>("status");
     if !valid_incident_transition(&previous_status, &status) {
         return (
             StatusCode::CONFLICT,
@@ -952,8 +1075,16 @@ pub async fn transition_security_incident(
             .into_response();
     }
     let now = Utc::now();
-    let containment_at = if status == "contained" { Some(now) } else { None };
-    let remediated_at = if status == "remediated" { Some(now) } else { None };
+    let containment_at = if status == "contained" {
+        Some(now)
+    } else {
+        None
+    };
+    let remediated_at = if status == "remediated" {
+        Some(now)
+    } else {
+        None
+    };
     let closed_at = if status == "closed" { Some(now) } else { None };
 
     let updated = sqlx::query(
@@ -1027,18 +1158,18 @@ pub async fn transition_security_incident(
         }
         Err(error) => {
             tracing::error!(?error, "security incident transition failed");
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"database error"}))).into_response()
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error":"database error"})),
+            )
+                .into_response()
         }
     }
 }
 
-
-
 #[cfg(test)]
 mod tests {
-    use super::{
-        valid_incident_transition, valid_privacy_transition,
-    };
+    use super::{valid_incident_transition, valid_privacy_transition};
 
     #[test]
     fn privacy_transitions_are_ordered() {
