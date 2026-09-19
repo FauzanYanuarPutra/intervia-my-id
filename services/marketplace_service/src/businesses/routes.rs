@@ -651,17 +651,16 @@ async fn list_audit_events(
     )
     .await
     {
-        Ok(items) => {
-                StatusCode::OK,
-                Json(json!({
-                    "data": {
-                        "count": items.len(),
-                        "items": items
-                    }
-                })),
-            )
-                .into_response()
-        }
+        Ok(items) => (
+            StatusCode::OK,
+            Json(json!({
+                "data": {
+                    "count": items.len(),
+                    "items": items
+                }
+            })),
+        )
+            .into_response(),
         Err(_) => api_error(
             StatusCode::SERVICE_UNAVAILABLE,
             "business_audit_storage_unavailable",
