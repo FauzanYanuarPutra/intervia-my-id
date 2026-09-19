@@ -248,6 +248,10 @@ export function ProductModifierEditor({ businessId, productId }: Props) {
   async function save() {
     setError('');
     setMessage('');
+    if (changeReason.trim().length < 3) {
+      setError('Tulis alasan perubahan minimal 3 karakter agar pengaturan pilihan pelanggan bisa ditelusuri.');
+      return;
+    }
     for (const group of groups) {
       if (!group.name.trim()) {
         setError('Nama setiap kelompok pilihan harus diisi.');
@@ -270,12 +274,13 @@ export function ProductModifierEditor({ businessId, productId }: Props) {
       const response = await fetch(`/api/businesses/${businessId}/products/${productId}/modifiers`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ groups }),
+        body: JSON.stringify({ groups, reason: changeReason.trim() }),
       });
       const body = (await response.json().catch(() => ({}))) as { error?: string; data?: { groups?: ModifierGroup[] } };
       if (!response.ok) throw new Error(businessApiErrorMessage(body, 'Pilihan pelanggan belum tersimpan.', response.status));
       if (Array.isArray(body.data?.groups)) setGroups(normalizeGroups(body.data.groups));
       setDirty(false);
+      setChangeReason('');
       setMessage('Pilihan pelanggan tersimpan dan siap dipakai di Kasir serta toko.');
     } catch (value) {
       setError(value instanceof Error ? value.message : 'Pilihan pelanggan belum tersimpan.');
@@ -442,9 +447,20 @@ export function ProductModifierEditor({ businessId, productId }: Props) {
             </p>
           ) : null}
 
+          <label className="mb-2 block text-xs font-semibold text-portal-soft">
+            Alasan perubahan
+            <input
+              value={changeReason}
+              onChange={event => setChangeReason(event.target.value)}
+              maxLength={500}
+              placeholder="Contoh: opsi gula berubah karena resep baru"
+              className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm text-portal-ink"
+            />
+          </label>
+
           <div className="flex flex-wrap gap-2">
             <button type="button" className="portal-button-secondary" onClick={() => { setGroups(current => [...current, groupFromTemplate()]); markDirty(); }}><Plus className="h-4 w-4" /> Tambah kelompok</button>
-            <button type="button" className="portal-button-primary" disabled={saving || loading} onClick={save}><Save className="h-4 w-4" /> {saving ? 'Menyimpan…' : 'Simpan pilihan'}</button>
+            <button type="button" className="portal-button-primary" disabled={saving || loading || changeReason.trim().length < 3} onClick={save}><Save className="h-4 w-4" /> {saving ? 'Menyimpan…' : 'Simpan pilihan'}</button>
           </div>
           {error ? <p role="alert" aria-live="assertive" className="text-sm font-semibold text-portal-ember">{error}</p> : null}
           {message ? <p role="status" aria-live="polite" className="text-sm font-semibold text-portal-forest">{message}</p> : null}
