@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { normalizeSafeExternalHttpUrl } from 'lajukan-ui';
 import { requireAuth } from '@/lib/serverAuth';
 import { parseJsonBody } from '@/lib/serverRequest';
 import { enforceRateLimit } from '@/lib/rateLimit';
@@ -27,65 +28,6 @@ const CATEGORIES = new Set([
 
 const ARTICLE_KINDS = new Set(['news', 'analysis', 'press_release']);
 
-function isPrivateSourceHost(hostname: string): boolean {
-  const host = hostname.toLowerCase().replace(/^\[|\]$/g, '');
-  if (!host || host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local')) {
-    return true;
-  }
-  if (
-    host.includes(':') &&
-    (host === '::' ||
-      host === '::1' ||
-      host.startsWith('fc') ||
-      host.startsWith('fd') ||
-      /^fe[89ab]/.test(host))
-  ) {
-    return true;
-  }
-  const parts = host.split('.').map(Number);
-  if (parts.length === 4 && parts.every(part => Number.isInteger(part) && part >= 0 && part <= 255)) {
-    const [a, b] = parts;
-    return (
-      a === 10 ||
-      a === 127 ||
-      (a === 169 && b === 254) ||
-      (a === 172 && b >= 16 && b <= 31) ||
-      (a === 192 && b === 168) ||
-      a === 0
-    );
-  }
-  return false;
-}
-
-function sanitizeText(value: string, maxLength: number) {
-  return evaluateTrustSafety(value, {
-    maxLength,
-    allowExternalLinks: false,
-    enforceOffPlatformPayment: false,
-  });
-}
-
-function sanitizeTopics(value: unknown): string[] {
-  const raw = Array.isArray(value)
-    ? value
-    : typeof value === 'string'
-      ? value.split(',')
-      : [];
-  const reserved = new Set([
-    'news', 'analysis', 'press_release', 'ekonomi', 'bisnis', 'umkm',
-    'teknologi', 'keuangan', 'regulasi', 'industri', 'daerah',
-  ]);
-  const result: string[] = [];
-  for (const entry of raw) {
-    const topic = readString(entry).toLowerCase().replace(/\s+/g, ' ');
-    if (!topic || topic.length > 36 || reserved.has(topic)) continue;
-    if (!/^[\p{L}\p{N}][\p{L}\p{N}\s._-]*$/u.test(topic)) continue;
-    if (!result.includes(topic)) result.push(topic);
-    if (result.length >= 8) break;
-  }
-  return result;
-}
-
 function sanitizeSources(value: unknown): string[] {
   const raw = Array.isArray(value)
     ? value
@@ -96,25 +38,11 @@ function sanitizeSources(value: unknown): string[] {
   const seen = new Set<string>();
   for (const entry of raw) {
     const source = readString(entry);
-    if (!source || source.length > 2048 || seen.has(source)) continue;
-    try {
-      const parsed = new URL(source);
-      if (
-        !['http:', 'https:'].includes(parsed.protocol) ||
-        parsed.username ||
-        parsed.password ||
-        isPrivateSourceHost(parsed.hostname)
-      ) {
-        continue;
-      }
-      const normalized = parsed.toString();
-      if (seen.has(normalized)) continue;
-      seen.add(normalized);
-      result.push(normalized);
-      if (result.length >= 10) break;
-    } catch {
-      continue;
-    }
+    const normalized = normalizeSafeExternalHttpUrl(source);
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    result.push(normalized);
+    if (result.length >= 10) break;
   }
   return result;
 }
