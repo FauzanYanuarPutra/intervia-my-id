@@ -35,17 +35,34 @@ pub(crate) struct AuthActor {
 
 static RS256_DECODING_KEY: OnceLock<Result<DecodingKey, String>> = OnceLock::new();
 
-fn access_token_algorithm() -> Option<Algorithm> {
-    match env::var("JWT_ACCESS_ALG")
-        .unwrap_or_else(|_| "HS256".to_string())
-        .trim()
-        .to_ascii_uppercase()
-        .as_str()
-    {
-        "HS256" => Some(Algorithm::HS256),
+fn environment_requires_asymmetric_access_tokens() -> bool {
+    env::var("APP_ENV")
+        .ok()
+        .or_else(|| env::var("ENV").ok())
+        .map(|value| {
+            matches!(
+                value.trim().to_ascii_lowercase().as_str(),
+                "production" | "prod" | "staging"
+            )
+        })
+        .unwrap_or(false)
+}
+
+fn resolve_access_token_algorithm(configured: &str, require_asymmetric: bool) -> Option<Algorithm> {
+    match configured.trim().to_ascii_uppercase().as_str() {
         "RS256" => Some(Algorithm::RS256),
+        "HS256" if require_asymmetric => None,
+        "HS256" => Some(Algorithm::HS256),
         _ => None,
     }
+}
+
+fn access_token_algorithm() -> Option<Algorithm> {
+    let configured = env::var("JWT_ACCESS_ALG").unwrap_or_else(|_| "HS256".to_string());
+    resolve_access_token_algorithm(
+        &configured,
+        environment_requires_asymmetric_access_tokens(),
+    )
 }
 
 fn rs256_decoding_key() -> Option<&'static DecodingKey> {
@@ -164,6 +181,23 @@ mod tests {
             name: None,
         };
         assert!(is_moderator(&actor));
+    }
+
+    #[test]
+    fn production_like_environments_reject_hs256_access_tokens() {
+        assert!(resolve_access_token_algorithm("HS256", true).is_none());
+        assert_eq!(
+            resolve_access_token_algorithm("RS256", true),
+            Some(Algorithm::RS256)
+        );
+    }
+
+    #[test]
+    fn development_can_keep_hs256_during_migration() {
+        assert_eq!(
+            resolve_access_token_algorithm("HS256", false),
+            Some(Algorithm::HS256)
+        );
     }
 
     #[test]
