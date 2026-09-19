@@ -523,6 +523,53 @@ impl PublicCommerceRepository {
         .await
         .map_err(storage_error)?;
 
+        // Deliver a first-class in-app transaction notification to every active
+        // business member who can manage orders. This keeps the public order
+        // creation transaction atomic with the notification inbox record.
+        sqlx::query(
+            r#"
+            INSERT INTO user_notifications (
+              id, user_id, category, event_type, title, message, data
+            )
+            SELECT
+              gen_random_uuid(),
+              bm.user_id,
+              'transaction',
+              'order.created',
+              'Pesanan baru masuk',
+              'Ada pesanan baru dari Lajukan yang perlu ditinjau.',
+              jsonb_build_object(
+                'order_id', $1,
+                'order_number', $2,
+                'business_id', $3,
+                'organization_id', $4,
+                'base_status', 'PENDING_PAYMENT',
+                'target', '/usaha/order',
+                'actions', jsonb_build_array('view', 'reject')
+              )
+            FROM business_memberships bm
+            JOIN business_member_roles bmr
+              ON bmr.membership_id = bm.id
+             AND bmr.business_id = bm.business_id
+             AND bmr.organization_id = bm.organization_id
+             AND bmr.effective_until IS NULL
+            JOIN business_role_permissions brp
+              ON brp.role_id = bmr.role_id
+             AND brp.permission_key = 'order.manage'
+            WHERE bm.business_id = $3
+              AND bm.organization_id = $4
+              AND bm.status = 'active'
+            ON CONFLICT DO NOTHING
+            "#,
+        )
+        .bind(inserted_id)
+        .bind(&order_number)
+        .bind(business_id)
+        .bind(organization_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(storage_error)?;
+
         tx.commit().await.map_err(storage_error)?;
         load_public_order_bundle(&self.db, inserted_id, false).await
     }
