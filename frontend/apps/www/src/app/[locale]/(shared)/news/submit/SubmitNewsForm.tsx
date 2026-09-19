@@ -167,8 +167,7 @@ export default function SubmitNewsForm({ locale }: Props) {
 
       <label className="text-sm font-bold text-slate-800 dark:text-slate-100">
         {isId ? 'URL sumber (satu per baris)' : 'Source URLs (one per line)'}
-        <textarea rows={4} value={form.source_urls} onChange={event => update('source_urls', event.target.value)} className={inputClass} placeholder={'https://www.bi.go.id/...
-https://www.bps.go.id/...'} />
+        <textarea rows={4} value={form.source_urls} onChange={event => update('source_urls', event.target.value)} className={inputClass} placeholder={'https://www.bi.go.id/...\nhttps://www.bps.go.id/...'} />
         <span className="mt-1 block text-xs font-semibold leading-5 text-slate-500 dark:text-slate-400">
           {isId ? 'Berita dan analisis wajib menyertakan minimal satu sumber. Rilis bisnis boleh tanpa URL sumber, tetapi akan diberi label Rilis Bisnis.' : 'News and analysis require at least one source. Business releases may omit a source URL but are labeled as such.'}
         </span>
