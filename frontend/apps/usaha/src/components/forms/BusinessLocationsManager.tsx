@@ -18,7 +18,7 @@ export function BusinessLocationsManager({ businessId, businessName, initialLoca
   const [locations, setLocations] = useState(initialLocations);
   const [editing, setEditing] = useState<BusinessLocation | null>(null);
   const [pendingDelete, setPendingDelete] = useState<BusinessLocation | null>(null);
-  const [changeReason, setChangeReason] = useState('');
+  const [changeReason, setChangeReason] = useState('Pembaruan lokasi');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -99,7 +99,7 @@ export function BusinessLocationsManager({ businessId, businessName, initialLoca
         </div>
         <button type="button" className="portal-button-primary" onClick={() => {
           setError('');
-          setChangeReason('');
+          setChangeReason('Pembaruan lokasi');
           setEditing(newLocation());
         }}>
           <Plus className="h-4 w-4" /> Tambah lokasi
@@ -152,7 +152,7 @@ export function BusinessLocationsManager({ businessId, businessName, initialLoca
               className="portal-button-ghost min-h-9 px-2"
               onClick={() => {
                 setError('');
-                setChangeReason('');
+                setChangeReason('Pembaruan lokasi');
                 setEditing(null);
               }}
               aria-label="Tutup editor lokasi"
@@ -243,7 +243,7 @@ export function BusinessLocationsManager({ businessId, businessName, initialLoca
           {error ? <p role="alert" className="mt-3 text-sm text-portal-ember">{error}</p> : null}
 
           <label className="mt-4 grid gap-1.5 text-sm font-semibold">
-            Alasan perubahan
+            Catatan perubahan
             <input
               value={changeReason}
               onChange={event => setChangeReason(event.target.value)}
