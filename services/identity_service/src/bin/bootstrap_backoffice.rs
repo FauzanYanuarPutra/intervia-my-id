@@ -153,10 +153,16 @@ async fn ensure_account(
                 bail!("{} bootstrap username is already taken", spec.slot);
             }
             sqlx::query(
-                "UPDATE core.user_profiles SET username = $1, updated_at = NOW() WHERE user_id = $2",
+                r#"
+                INSERT INTO core.user_profiles (user_id, username, created_at, updated_at)
+                VALUES ($1, $2, NOW(), NOW())
+                ON CONFLICT (user_id) DO UPDATE
+                SET username = EXCLUDED.username,
+                    updated_at = NOW()
+                "#,
             )
-            .bind(&spec.username)
             .bind(user_id)
+            .bind(&spec.username)
             .execute(&mut **tx)
             .await?;
         }
@@ -340,6 +346,12 @@ async fn run() -> Result<()> {
         password: agent_password,
         roles: &["sales", "support"],
     };
+
+    if admin.email.eq_ignore_ascii_case(&agent.email)
+        || admin.username.eq_ignore_ascii_case(&agent.username)
+    {
+        bail!("admin and agent bootstrap identifiers must be distinct");
+    }
 
     let rotate_passwords = env_bool("BACKOFFICE_BOOTSTRAP_ROTATE_PASSWORDS", false)?;
 
