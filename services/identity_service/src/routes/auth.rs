@@ -37,7 +37,7 @@ use chrono::{DateTime, Datelike, Duration, NaiveDate, Utc}; // ✅ Serde enabled
 use uuid::Uuid;
 
 use crate::config::AppState;
-use crate::routes::proofs::{consume_phone_otp_proof, validate_phone_otp_proof};
+use crate::routes::proofs::{consume_email_otp_proof, consume_phone_otp_proof, validate_phone_otp_proof};
 use crate::routes::verification::{derive_verification_state, merged_verification_payload};
 
 // Optional: cookie::time::Duration for cookie expiry
@@ -68,6 +68,10 @@ pub struct RegisterRequest {
     pub username: String,
     pub password: String,
     pub birthdate: String,
+    #[serde(default)]
+    pub email_otp_token: Option<String>,
+    #[serde(default)]
+    pub phone_otp_token: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -987,6 +991,70 @@ pub async fn register(
         .filter(|value| !value.is_empty());
     let masked_phone = phone.as_deref().map(mask_phone_for_log);
     let email = normalize_optional_email(payload.email.as_deref());
+    if email.is_none() && phone.is_none() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "email or phone is required" })),
+        )
+            .into_response();
+    }
+
+    if let Some(email_value) = email.as_deref() {
+        let Some(token) = payload.email_otp_token.as_deref() else {
+            return (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                Json(json!({ "error": "email_otp_required" })),
+            )
+                .into_response();
+        };
+        match consume_email_otp_proof(&state, token, email_value, &["register"]).await {
+            Ok(true) => {}
+            Ok(false) => {
+                return (
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    Json(json!({ "error": "invalid_email_otp_proof" })),
+                )
+                    .into_response();
+            }
+            Err(error) => {
+                tracing::error!("email otp proof validation failed: {:?}", error);
+                return (
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    Json(json!({ "error": "otp service unavailable" })),
+                )
+                    .into_response();
+            }
+        }
+    }
+
+    if let Some(phone_value) = phone.as_deref() {
+        let Some(token) = payload.phone_otp_token.as_deref() else {
+            return (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                Json(json!({ "error": "phone_otp_required" })),
+            )
+                .into_response();
+        };
+        match consume_phone_otp_proof(&state, token, phone_value, &["register"]).await {
+            Ok(true) => {}
+            Ok(false) => {
+                return (
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    Json(json!({ "error": "invalid_phone_otp_proof" })),
+                )
+                    .into_response();
+            }
+            Err(error) => {
+                tracing::error!("phone otp proof validation failed: {:?}", error);
+                return (
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    Json(json!({ "error": "otp service unavailable" })),
+                )
+                    .into_response();
+            }
+        }
+    }
+
     let username = normalize_username(&payload.username);
     let username_attempt = mask_identifier_for_log(&username);
     let birthdate = match NaiveDate::parse_from_str(payload.birthdate.trim(), "%Y-%m-%d") {
