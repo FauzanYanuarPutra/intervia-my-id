@@ -61,7 +61,7 @@ try {
         }
     }
 
-    $script:DockerEngineRecoveryAttempted = $false
+    $DockerRecoveryState = [pscustomobject]@{ Attempted = $false }
     $DockerDesktopCliAvailable = $false
     $DockerDesktopCommand = Get-Command "docker" -ErrorAction SilentlyContinue
     $DesktopStatusProbe = $null
@@ -78,13 +78,13 @@ try {
 
         if (
             $NoDockerEngineRepair -or
-            $script:DockerEngineRecoveryAttempted -or
+            $DockerRecoveryState.Attempted -or
             -not $DockerDesktopCliAvailable
         ) {
             return $false
         }
 
-        $script:DockerEngineRecoveryAttempted = $true
+        $DockerRecoveryState.Attempted = $true
         Write-Warning "Docker Engine gagal pada saat $Reason. Mencoba satu kali recovery Docker Desktop..."
         $RestartProbe = Invoke-DockerNative -Arguments @("desktop", "restart", "--timeout", "120")
         if ($RestartProbe.ExitCode -ne 0) {
