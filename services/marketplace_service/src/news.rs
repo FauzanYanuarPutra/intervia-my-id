@@ -1861,6 +1861,12 @@ async fn edit_news_editorial(
     };
 
     let current_status = editorial_status(&current.content_status, &current.metadata);
+    if !matches!(current_status.as_str(), "pending_review" | "needs_revision" | "published") {
+        return response_error(
+            StatusCode::CONFLICT,
+            "this editorial status cannot be edited from CMS",
+        );
+    }
     if current_status == "published" && action != "correct" {
         return response_error(
             StatusCode::CONFLICT,
@@ -1987,6 +1993,15 @@ async fn edit_news_editorial(
             .to_string(),
     ));
     news.insert("topics".to_string(), json!(topics));
+    let next_editorial_status = if action == "edit" && current_status == "needs_revision" {
+        "pending_review"
+    } else {
+        current_status.as_str()
+    };
+    news.insert(
+        "editorial_status".to_string(),
+        Value::String(next_editorial_status.to_string()),
+    );
     news.insert("editor_last_edited_at".to_string(), Value::String(Utc::now().to_rfc3339()));
     news.insert("editor_last_edited_by".to_string(), Value::String(reviewer_id.to_string()));
 
@@ -2146,7 +2161,7 @@ async fn edit_news_editorial(
     .bind(reviewer_id)
     .bind(&action)
     .bind(&current_status)
-    .bind(&current_status)
+    .bind(news.get("editorial_status").and_then(Value::as_str).unwrap_or(&current_status))
     .bind(&note)
     .execute(&mut *tx)
     .await
