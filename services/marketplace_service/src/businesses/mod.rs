@@ -6,9 +6,9 @@ mod commercial_core;
 mod commercial_core_routes;
 pub(crate) mod control;
 mod counterparty;
-pub(crate) mod domain;
-mod documents;
 mod document_routes;
+mod documents;
+pub(crate) mod domain;
 #[cfg(test)]
 mod documents_persistence_tests;
 mod event_outbox;
