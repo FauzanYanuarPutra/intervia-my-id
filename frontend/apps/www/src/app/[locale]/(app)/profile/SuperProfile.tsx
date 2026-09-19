@@ -2501,3 +2501,8 @@ export default function SuperProfile() {
               {isId ? 'Komunitas' : 'Community'}
             </LocalizedLink>
           </div>
+        </div>
+      </main>
+    </>
+  );
+}
