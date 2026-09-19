@@ -14,7 +14,8 @@ pub use auth::{
     reset_password,
 };
 pub use governance::{
-    create_privacy_request, create_security_incident, list_my_privacy_requests,
+    cancel_my_privacy_request, create_privacy_request, create_security_incident,
+    list_my_privacy_requests,
     list_privacy_requests, list_security_incidents, transition_privacy_request,
     transition_security_incident,
 };
