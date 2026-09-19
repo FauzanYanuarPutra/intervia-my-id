@@ -49,7 +49,7 @@ export default async function BusinessFinancePage({ params, searchParams }: Page
       <PageHeader
         eyebrow="Uang"
         title={activeView === 'activity' ? 'Uang usaha' : activeView === 'plan' ? 'Rencana uang' : 'Transfer aplikasi'}
-        description={activeView === 'activity' ? 'Lihat uang masuk dan keluar. Penjualan dari Kasir masuk otomatis.' : activeView === 'plan' ? 'Lihat yang aman dipakai setelah tagihan dan cadangan.' : 'Cocokkan transfer dari aplikasi dengan catatan usaha.'}
+        description={activeView === 'activity' ? 'Catat uang masuk dan keluar.' : activeView === 'plan' ? 'Atur rencana uang.' : 'Cocokkan transfer.'}
       />
 
       {canView ? (
