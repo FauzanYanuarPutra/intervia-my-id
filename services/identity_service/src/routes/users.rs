@@ -1704,6 +1704,214 @@ pub async fn get_user_detail(
         .into_response()
 }
 
+
+#[derive(Debug, Deserialize)]
+pub struct ModerateUserRequest {
+    pub action: String,
+    pub reason_code: String,
+    pub reason_note: String,
+    pub severity: Option<String>,
+}
+
+fn has_account_moderation_access(claims: &AccessClaims) -> bool {
+    claims.roles.iter().any(|role| {
+        matches!(
+            role.trim().to_ascii_lowercase().as_str(),
+            "admin" | "super_admin"
+        )
+    })
+}
+
+fn normalize_user_moderation_reason(raw: &str) -> Option<&'static str> {
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "legal_violation" => Some("legal_violation"),
+        "fraud_misleading" => Some("fraud_misleading"),
+        "spam" => Some("spam"),
+        "privacy_personal_data" => Some("privacy_personal_data"),
+        "harassment_discrimination" => Some("harassment_discrimination"),
+        "child_safety" => Some("child_safety"),
+        "security_abuse" => Some("security_abuse"),
+        "repeated_policy_violation" => Some("repeated_policy_violation"),
+        "other" => Some("other"),
+        _ => None,
+    }
+}
+
+fn normalize_user_moderation_action(raw: &str) -> Option<&'static str> {
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "warn" => Some("warn"),
+        "restrict" => Some("restrict"),
+        "suspend" => Some("suspend"),
+        "ban" => Some("ban"),
+        "restore" => Some("restore"),
+        _ => None,
+    }
+}
+
+fn normalize_user_moderation_severity(raw: Option<&str>) -> &'static str {
+    match raw.unwrap_or("medium").trim().to_ascii_lowercase().as_str() {
+        "low" => "low",
+        "high" => "high",
+        "critical" => "critical",
+        _ => "medium",
+    }
+}
+
+pub async fn moderate_user(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(target_user_id): Path<Uuid>,
+    Json(payload): Json<ModerateUserRequest>,
+) -> impl IntoResponse {
+    let claims = match decode_access_token(
+        &state.config.jwt_secret,
+        &extract_bearer_token(&headers).unwrap_or_default(),
+    ) {
+        Ok(value) => value,
+        Err(_) => return (StatusCode::UNAUTHORIZED, Json(json!({"error":"invalid token"}))).into_response(),
+    };
+
+    if !has_account_moderation_access(&claims) {
+        return (StatusCode::FORBIDDEN, Json(json!({"error":"account moderation requires admin"}))).into_response();
+    }
+
+    let actor_id = match Uuid::parse_str(&claims.sub) {
+        Ok(value) => value,
+        Err(_) => return (StatusCode::UNAUTHORIZED, Json(json!({"error":"invalid actor"}))).into_response(),
+    };
+    let action = match normalize_user_moderation_action(&payload.action) {
+        Some(value) => value,
+        None => return (StatusCode::BAD_REQUEST, Json(json!({"error":"unsupported moderation action"}))).into_response(),
+    };
+    let reason_code = match normalize_user_moderation_reason(&payload.reason_code) {
+        Some(value) => value,
+        None => return (StatusCode::BAD_REQUEST, Json(json!({"error":"unsupported moderation reason"}))).into_response(),
+    };
+    let reason_note = payload.reason_note.trim();
+    if reason_note.is_empty() {
+        return (StatusCode::BAD_REQUEST, Json(json!({"error":"reason_note is required"}))).into_response();
+    }
+    let severity = normalize_user_moderation_severity(payload.severity.as_deref());
+
+    if actor_id == target_user_id && !has_role(&claims.roles, "super_admin") {
+        return (StatusCode::CONFLICT, Json(json!({"error":"admin cannot moderate their own account"}))).into_response();
+    }
+
+    let target = match sqlx::query(
+        r#"
+        SELECT status::text AS status, is_active
+        FROM core.users
+        WHERE id=$1 AND deleted_at IS NULL
+        FOR UPDATE
+        "#,
+    )
+    .bind(target_user_id)
+    .fetch_optional(&state.db)
+    .await {
+        Ok(Some(row)) => row,
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(json!({"error":"user not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"database error"}))).into_response(),
+    };
+
+    let previous_status: String = target.get("status");
+    let new_status = match action {
+        "warn" => previous_status.as_str(),
+        "restrict" | "suspend" => "disabled",
+        "ban" => "banned",
+        "restore" => "active",
+        _ => previous_status.as_str(),
+    };
+
+    if action == "restore" && !has_role(&claims.roles, "super_admin") && severity != "low" {
+        return (StatusCode::FORBIDDEN, Json(json!({"error":"only super_admin can restore non-low-severity account actions"}))).into_response();
+    }
+
+    let mut tx = match state.db.begin().await {
+        Ok(value) => value,
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"database transaction error"}))).into_response(),
+    };
+
+    if sqlx::query(
+        "UPDATE core.users SET status=$2::user_status, is_active=($2='active'), updated_by=$3, updated_at=NOW() WHERE id=$1"
+    )
+    .bind(target_user_id)
+    .bind(new_status)
+    .bind(actor_id)
+    .execute(&mut *tx)
+    .await
+    .is_err()
+    {
+        let _ = tx.rollback().await;
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"failed to update account status"}))).into_response();
+    }
+
+    if sqlx::query(
+        r#"
+        INSERT INTO core.user_moderation_actions
+          (target_user_id, actor_user_id, action, reason_code, reason_note, severity, previous_status, new_status)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+        "#,
+    )
+    .bind(target_user_id)
+    .bind(actor_id)
+    .bind(action)
+    .bind(reason_code)
+    .bind(reason_note)
+    .bind(severity)
+    .bind(previous_status.clone())
+    .bind(new_status)
+    .execute(&mut *tx)
+    .await
+    .is_err()
+    {
+        let _ = tx.rollback().await;
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"failed to write moderation evidence"}))).into_response();
+    }
+
+    if sqlx::query(
+        r#"
+        INSERT INTO events.audit_logs (entity, action, actor_id, user_id, metadata, created_at)
+        VALUES ('user', 'user.moderation.decision', $1, $2, $3, NOW())
+        "#,
+    )
+    .bind(actor_id)
+    .bind(target_user_id)
+    .bind(json!({
+        "action": action,
+        "reason_code": reason_code,
+        "severity": severity,
+        "previous_status": previous_status,
+        "new_status": new_status
+    }))
+    .execute(&mut *tx)
+    .await
+    .is_err()
+    {
+        let _ = tx.rollback().await;
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"failed to write audit log"}))).into_response();
+    }
+
+    if tx.commit().await.is_err() {
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"failed to commit account moderation"}))).into_response();
+    }
+
+    let _ = sqlx::query("UPDATE core.sessions SET revoked=TRUE WHERE user_id=$1").bind(target_user_id).execute(&state.db).await;
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "success": true,
+            "target_user_id": target_user_id,
+            "action": action,
+            "reason_code": reason_code,
+            "severity": severity,
+            "previous_status": previous_status,
+            "new_status": new_status
+        })),
+    ).into_response()
+}
+
+
 #[cfg(test)]
 mod tests {
     use serde_json::json;
