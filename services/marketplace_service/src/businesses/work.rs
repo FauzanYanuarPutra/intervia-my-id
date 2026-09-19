@@ -505,6 +505,62 @@ impl WorkRepository {
             }
         }
 
+        if let Some((shift_id, opened_by_user_id)) = sqlx::query_as::<_, (Uuid, Uuid)>(
+            r#"
+            SELECT id, opened_by_user_id
+            FROM business_cash_shifts
+            WHERE business_id=$1
+              AND organization_id=$2
+              AND closed_at IS NULL
+            ORDER BY opened_at DESC
+            LIMIT 1
+            "#
+        )
+        .bind(business_id)
+        .bind(organization_id)
+        .fetch_optional(&mut *tx)
+        .await?
+        {
+            let maybe = sqlx::query_as::<_, WorkItemRecord>(
+                r#"
+                INSERT INTO business_work_items (
+                  organization_id, business_id, work_type, title, description,
+                  status, priority, assignee_user_id, created_by_user_id, source_type, source_id, metadata
+                )
+                VALUES (
+                  $1,$2,'cash','Tutup kas shift berjalan',
+                  'Hitung uang fisik dan tutup shift agar kas usaha tetap rapi.',
+                  'todo',80,$3,$4,'cash_shift_open',$5,'{}'::jsonb
+                )
+                ON CONFLICT (business_id, source_type, source_id) DO NOTHING
+                RETURNING id, organization_id, business_id, location_id,
+                          work_type, title, description, status, priority,
+                          assignee_user_id, created_by_user_id, due_at,
+                          source_type, source_id, metadata, completed_at,
+                          created_at, updated_at
+                "#
+            )
+            .bind(organization_id)
+            .bind(business_id)
+            .bind(opened_by_user_id)
+            .bind(actor_id)
+            .bind(shift_id)
+            .fetch_optional(&mut *tx)
+            .await?;
+
+            if let Some(work) = maybe {
+                insert_audit(
+                    &mut tx,
+                    &work,
+                    actor_id,
+                    "work.suggested",
+                    "Work item suggested from open cash shift",
+                )
+                .await?;
+                created += 1;
+            }
+        }
+
         let product_rows = sqlx::query_as::<_, (Uuid, String, f64, f64, String)>(
             r#"
             SELECT product.id,
