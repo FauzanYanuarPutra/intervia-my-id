@@ -597,8 +597,7 @@ fn valid_news_category(value: &str) -> bool {
         value,
         "Ekonomi"
             | "Bisnis"
-            | "UMKM"            | "Teknologi"
-            | "Keuangan"
+            | "UMKM"            | "Teknologi"            | "Keuangan"
             | "Regulasi"
             | "Industri"
             | "Daerah"
@@ -1197,8 +1196,7 @@ async fn notify_editorial_result(
             ),
             "retract" => (
                 "news.retracted",                "Berita ditarik",
-                "Berita telah ditarik dari publikasi. Lihat catatan editor untuk detail.",
-            ),
+                "Berita telah ditarik dari publikasi. Lihat catatan editor untuk detail.",            ),
             _ => return,
         }
     };
@@ -1667,9 +1665,6 @@ async fn update_news_submission(
         );
     }
 
-    drop(news);
-    drop(root);
-
     let final_sources = news_source_urls(&metadata);
     if final_kind != "press_release" && final_sources.is_empty() {
         return response_error(
@@ -1797,8 +1792,7 @@ async fn update_news_submission(
         Some(owner_id),
         "news.resubmitted",
         "news.editorial.changed",
-    )
-    .await    {
+    )    .await    {
         tracing::error!("update_news_submission outbox error: {:?}", error);
         return response_error(
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -2049,6 +2043,9 @@ async fn edit_news_editorial(
         news.insert("correction_note".to_string(), Value::String(note.clone().unwrap_or_default()));
         news.insert("corrected_at".to_string(), Value::String(Utc::now().to_rfc3339()));
     }
+
+    drop(news);
+    drop(root);
 
     let final_sources = news_source_urls(&metadata);
     if article_kind != "press_release" && final_sources.is_empty() {
