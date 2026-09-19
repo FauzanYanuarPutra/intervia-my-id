@@ -18,6 +18,7 @@ export type QuickSaleLineDraft = {
 
 export type QuickSaleDraft = {
   occurredOn: string;
+  locationId?: string | null;
   channelKey: string;
   accountKey: 'cash' | 'bank' | 'ewallet' | 'receivable';
   lines: QuickSaleLineDraft[];
@@ -113,6 +114,7 @@ export function buildQuickSaleRequest(draft: QuickSaleDraft) {
   return {
     occurred_on: draft.occurredOn,
     channel_key: draft.channelKey.trim() || null,
+    ...(draft.locationId ? { location_id: draft.locationId } : {}),
     account_key: draft.accountKey,
     lines,
   };
