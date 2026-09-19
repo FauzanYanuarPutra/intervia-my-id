@@ -86,6 +86,30 @@ def main() -> int:
         'marketplace.business.purchase_received',
         'sealed additive migration',
     )
+    require(
+        'services/marketplace_service/migrations/20260919030000_commercial_core_v1.up.sql',
+        'business_parties', 'business_payments', 'business_payment_allocations',
+        'business_sale_receivable_balances', 'business_purchase_payable_balances',
+        'effect_multiplier', 'payment',
+    )
+    require(
+        'services/marketplace_service/src/businesses/commercial_core.rs',
+        'CommercialCoreRepository', 'create_payment', 'reverse_payment',
+        'payment_allocation_total_mismatch', 'payment_exceeds_outstanding',
+        'marketplace.business.payment_posted', 'marketplace.business.payment_reversed',
+    )
+    require(
+        'services/marketplace_service/src/businesses/commercial_core_routes.rs',
+        '/v1/businesses/{business_id}/parties',
+        '/v1/businesses/{business_id}/payments',
+        '/v1/businesses/{business_id}/receivables',
+        '/v1/businesses/{business_id}/payables',
+    )
+    require(
+        'docs/architecture/commercial-core.md',
+        'Commercial Core V1', 'Party master', 'Payments and allocations',
+        'append-only', 'receivable', 'payable',
+    )
     require('frontend/apps/www/src/lib/usahaWorkspace.ts', 'NEXT_PUBLIC_USAHA_URL')
     require('frontend/apps/www/src/app/[locale]/(shared)/usaha/page.tsx', 'getUsahaWorkspaceUrl', 'redirect')
     require('frontend/apps/www/src/app/[locale]/(shared)/usaha/dashboard/page.tsx', 'getUsahaWorkspaceUrl', 'redirect')

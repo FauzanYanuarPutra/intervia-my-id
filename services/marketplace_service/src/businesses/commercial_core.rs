@@ -923,7 +923,7 @@ fn normalize_payment(request: CreatePaymentRequest) -> Result<NormalizedPayment,
         allocation
             .sale_id
             .or(allocation.purchase_id)
-            .map(Uuid::as_u128)
+            .map(|id| id.as_u128())
             .unwrap_or_default()
     });
     for pair in allocations.windows(2) {
