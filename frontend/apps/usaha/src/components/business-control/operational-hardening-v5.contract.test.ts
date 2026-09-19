@@ -36,7 +36,24 @@ describe('Usaha operational hardening', () => {
   it('uses assertive announcements for cashier failures', () => {
     const source = read('src/components/business-control/QuickSaleWorkspace.tsx');
     expect(source).toContain('role="alert"');
+    expect(source).toContain('Kosongkan pesanan?');
+    expect(source).toContain('SensitiveActionConfirm');
     expect(source).toContain('aria-live="assertive"');
+  });
+
+  it('requires a reason when changing core business information', () => {
+    const source = read('src/components/forms/BusinessInfoQuickForm.tsx');
+    expect(source).toContain('reason.trim().length < 3');
+    expect(source).toContain('reason: reason.trim()');
+    expect(source).toContain('Disimpan di riwayat');
+  });
+
+  it('shows business audit details as before and after when available', () => {
+    const source = read('src/components/portal/ChangeHistoryDrawer.tsx');
+    expect(source).toContain('Lihat detail perubahan');
+    expect(source).toContain('Sebelum');
+    expect(source).toContain('Sesudah');
+    expect(source).toContain('readChanges');
   });
 
   it('keeps product archiving behind a sensitive confirmation', () => {
