@@ -8,6 +8,7 @@ pub(crate) mod control;
 mod counterparty;
 pub(crate) mod domain;
 mod documents;
+mod document_routes;
 mod event_outbox;
 mod execution_policy;
 mod finance_core;
@@ -90,6 +91,7 @@ pub(crate) fn router() -> axum::Router<std::sync::Arc<crate::AppState>> {
     routes::router()
         .merge(product_modifiers::router())
         .merge(commercial_core_routes::router())
+        .merge(document_routes::router())
         .merge(finance_core_routes::router())
         .merge(governance_routes::router())
         .merge(ingredient_management_routes::router())

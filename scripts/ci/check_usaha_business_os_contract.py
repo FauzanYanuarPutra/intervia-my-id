@@ -222,4 +222,28 @@ def main() -> int:
         return 1
     print('Usaha Business OS contract is valid.')
     return 0
+    require(
+        'services/marketplace_service/migrations/20260919070000_document_approval_kernel_v1.up.sql',
+        'business_documents', 'business_document_lines', 'business_document_links',
+        'business_approval_rules', 'business_approval_requests', 'business_approval_decisions',
+    )
+    require(
+        'services/marketplace_service/src/businesses/documents.rs',
+        'DocumentRepository', 'request_approval', 'maker_cannot_approve_own_request',
+        'role_based', 'marketplace.business.document_transitioned',
+        'marketplace.business.approval_decided',
+    )
+    require(
+        'services/marketplace_service/src/businesses/document_routes.rs',
+        '/v1/businesses/{business_id}/documents',
+        '/v1/businesses/{business_id}/approval-rules',
+        '/v1/businesses/{business_id}/approval-requests/{approval_id}/decisions',
+        'document_approval_required',
+    )
+    require(
+        'docs/architecture/document-approval-kernel.md',
+        'Commercial Document and Approval Kernel V1',
+        'draft -> issued -> posted', 'maker', 'checker', 'role_based',
+    )
+
 if __name__ == '__main__': raise SystemExit(main())
