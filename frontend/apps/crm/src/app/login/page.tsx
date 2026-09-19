@@ -4,6 +4,15 @@ import React, { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Button, Input } from '@/ui';
 
+const GOOGLE_ERROR_MESSAGES: Record<string, string> = {
+  google_not_configured: 'Login Google belum dikonfigurasi.',
+  google_oauth_cancelled: 'Login Google dibatalkan.',
+  oauth_state_invalid: 'Sesi login Google kedaluwarsa. Coba lagi.',
+  google_email_not_verified: 'Email Google belum terverifikasi.',
+  google_account_not_authorized_for_crm: 'Akun Google ini belum memiliki akses CRM Lajukan.',
+  google_oauth_error: 'Login Google gagal. Coba lagi.',
+};
+
 export default function LoginPage() {
   const { login } = useAuth();
   const wwwUrl = process.env.NEXT_PUBLIC_WWW_URL || 'http://localhost:3000';
@@ -12,6 +21,11 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const initialGoogleError =
+    typeof window !== 'undefined'
+      ? GOOGLE_ERROR_MESSAGES[new URLSearchParams(window.location.search).get('error') || ''] || ''
+      : '';
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,6 +43,14 @@ export default function LoginPage() {
     }
   };
 
+  const continueWithGoogle = () => {
+    const nextPath =
+      typeof window === 'undefined'
+        ? '/'
+        : new URLSearchParams(window.location.search).get('next') || '/';
+    window.location.assign('/api/auth/google?callbackUrl=' + encodeURIComponent(nextPath));
+  };
+
   return (
     <div className="flex min-h-[100dvh] items-center justify-center px-3 py-4 sm:px-5">
       <div className="grid w-full max-w-[920px] overflow-hidden rounded-[28px] border border-[color:color-mix(in_srgb,_var(--color-border)_80%,_transparent)] bg-[color:color-mix(in_srgb,_var(--color-surface)_92%,_transparent)] shadow-[0_28px_70px_color-mix(in_srgb,var(--color-text)_12%,transparent)] lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -36,17 +58,31 @@ export default function LoginPage() {
           <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[color:var(--color-primary)]">CRM Ops</p>
           <h1 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-[color:var(--color-text)] sm:text-3xl">Masuk CRM</h1>
           <p className="mt-2 max-w-md text-sm leading-6 text-[color:var(--color-text)]">
-            Gunakan akun Lajukan nyata yang sudah diverifikasi dan memiliki role CRM. Tidak ada lagi akun demo atau password bersama.
+            Gunakan akun Google Lajukan atau akun Lajukan nyata yang sudah memiliki role CRM. Tidak ada akun demo atau password bersama.
           </p>
-          {error ? <div className="mt-5 rounded-2xl border border-[color:var(--color-danger-border)] bg-[color:var(--color-danger-soft)] px-4 py-3 text-sm text-[color:var(--color-danger)]">{error}</div> : null}
+
+          {(error || initialGoogleError) ? (
+            <div className="mt-5 rounded-2xl border border-[color:var(--color-danger-border)] bg-[color:var(--color-danger-soft)] px-4 py-3 text-sm text-[color:var(--color-danger)]">{error || initialGoogleError}</div>
+          ) : null}
           {notice ? <div className="mt-5 rounded-2xl border border-[color:var(--color-primary-border)] bg-[color:var(--color-primary-soft)] px-4 py-3 text-sm text-[color:var(--color-primary)]">{notice}</div> : null}
-          <form onSubmit={handlePasswordSubmit} className="mt-6 space-y-4">
+
+          <Button type="button" onClick={continueWithGoogle} className="mt-6 w-full">
+            Lanjut dengan Google
+          </Button>
+
+          <div className="my-4 flex items-center gap-3 text-xs text-[color:var(--color-text)] opacity-70">
+            <span className="h-px flex-1 bg-[color:var(--color-border)]" />
+            <span>atau</span>
+            <span className="h-px flex-1 bg-[color:var(--color-border)]" />
+          </div>
+
+          <form onSubmit={handlePasswordSubmit} className="space-y-4">
             <Input label="Email atau username" type="text" value={email} onChange={e => setEmail(e.target.value)} placeholder="nama@lajukan.com atau @username" autoComplete="username" required />
             <Input label="Password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Password akun" autoComplete="current-password" required />
-            <Button type="submit" disabled={loading} className="w-full">{loading ? 'Membuka CRM...' : 'Masuk CRM'}</Button>
+            <Button type="submit" disabled={loading} className="w-full">{loading ? 'Membuka CRM...' : 'Masuk dengan password'}</Button>
           </form>
           <div className="mt-5 rounded-2xl border border-[color:var(--color-border)] bg-[color:color-mix(in_srgb,_var(--color-surface-muted)_72%,_transparent)] px-4 py-3 text-sm leading-6 text-[color:var(--color-text)]">
-            Kredensial disimpan sebagai HttpOnly session cookie. Aksi sensitif tetap memakai session confirmation dan audit trail.
+            Login Google dan password sama-sama berujung pada HttpOnly session cookie. Aksi sensitif tetap memakai session confirmation dan audit trail.
           </div>
           <p className="mt-6 text-center"><a href={wwwUrl} className="text-sm font-medium text-[color:var(--color-text)] hover:text-[color:var(--color-primary)]">&larr; Kembali ke situs</a></p>
         </section>
