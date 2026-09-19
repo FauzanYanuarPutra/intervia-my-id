@@ -61,6 +61,14 @@ export default async function BusinessTeamPage({ params }: PageProps) {
     <PortalShell activeBusiness={business} availableBusinesses={businesses} viewerName={account?.name ?? null} currentSection="team">
       <PageHeader eyebrow="Kelola usaha" title="Tim & akses" description="Lihat siapa yang bisa masuk ke usaha ini, lalu undang orang baru hanya saat diperlukan." />
 
+      <section className="merchant-surface-bordered flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+        <div>
+          <p className="text-sm font-black text-portal-ink">Pekerjaan tim</p>
+          <p className="mt-1 text-xs leading-5 text-portal-soft">Lihat pekerjaan yang perlu dikerjakan, tugaskan ke anggota, dan pantau penyelesaiannya.</p>
+        </div>
+        <a href={`/businesses/${business.id}/work`} className="portal-button-secondary shrink-0">Buka pekerjaan</a>
+      </section>
+
       {collaborationError ? (
         <div className="merchant-surface-bordered"><EmptyState title="Data tim belum bisa dimuat" description="Coba muat ulang setelah layanan akses kembali tersedia." icon={AlertTriangle} /></div>
       ) : (
