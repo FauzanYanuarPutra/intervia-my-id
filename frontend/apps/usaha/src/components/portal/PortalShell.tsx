@@ -125,7 +125,7 @@ export function PortalShell({
         </header>
 
         <main id="portal-content" tabIndex={-1} className="portal-mobile-content-clearance mx-auto w-full max-w-[1600px] px-3 pt-3 outline-none sm:px-5 sm:pt-4 lg:px-6 lg:pb-8">
-          <div className="min-w-0 space-y-4">{activeBusiness && !accountPage ? <UsahaFlowGuide business={activeBusiness} currentSection={currentSection} /> : null}{children}</div>
+          <div className="min-w-0 space-y-4">{activeBusiness && !accountPage && currentSection === 'home' ? <UsahaFlowGuide business={activeBusiness} currentSection={currentSection} /> : null}{children}</div>
         </main>
       </div>
 
