@@ -12,6 +12,11 @@ describe('business locations UX V3', () => {
     expect(source).not.toContain("onClick={() => void save(locations.filter(item => item.id !== editing.id))}");
   });
 
+  it('persists a human reason with location changes', () => {
+    expect(source).toContain('JSON.stringify({ locations: next, reason })');
+    expect(source).toContain('Alasan perubahan lokasi minimal 3 karakter.');
+  });
+
   it('discards an unsaved location locally without calling the persistence endpoint', () => {
     expect(source).toContain('Buang draft');
     expect(source).toContain('editingExists');
