@@ -343,13 +343,8 @@ impl ProductRepository {
         let mut transaction = self.db.begin().await?;
         ensure_product_exists(&mut transaction, business_id, organization_id, product_id).await?;
 
-        let before = fetch_product_row(
-            &mut transaction,
-            business_id,
-            organization_id,
-            product_id,
-        )
-        .await?;
+        let before =
+            fetch_product_row(&mut transaction, business_id, organization_id, product_id).await?;
 
         let status_changed = request
             .status
@@ -446,18 +441,42 @@ impl ProductRepository {
         .await?;
 
         let mut changed_fields = Vec::new();
-        if request.name.is_some() { changed_fields.push("name"); }
-        if request.category.is_some() { changed_fields.push("category"); }
-        if request.price_label.is_some() { changed_fields.push("price"); }
-        if request.min_stock_alert.is_some() { changed_fields.push("minimum_stock"); }
-        if request.stock_unit.is_some() { changed_fields.push("stock_unit"); }
-        if request.stock_mode.is_some() { changed_fields.push("stock_mode"); }
-        if request.source_type.is_some() { changed_fields.push("source_type"); }
-        if request.owner_label.is_some() { changed_fields.push("owner_label"); }
-        if request.consignment_terms.is_some() { changed_fields.push("consignment_terms"); }
-        if request.notes.is_some() { changed_fields.push("notes"); }
-        if request.image.is_some() { changed_fields.push("image"); }
-        if request.status.is_some() { changed_fields.push("status"); }
+        if request.name.is_some() {
+            changed_fields.push("name");
+        }
+        if request.category.is_some() {
+            changed_fields.push("category");
+        }
+        if request.price_label.is_some() {
+            changed_fields.push("price");
+        }
+        if request.min_stock_alert.is_some() {
+            changed_fields.push("minimum_stock");
+        }
+        if request.stock_unit.is_some() {
+            changed_fields.push("stock_unit");
+        }
+        if request.stock_mode.is_some() {
+            changed_fields.push("stock_mode");
+        }
+        if request.source_type.is_some() {
+            changed_fields.push("source_type");
+        }
+        if request.owner_label.is_some() {
+            changed_fields.push("owner_label");
+        }
+        if request.consignment_terms.is_some() {
+            changed_fields.push("consignment_terms");
+        }
+        if request.notes.is_some() {
+            changed_fields.push("notes");
+        }
+        if request.image.is_some() {
+            changed_fields.push("image");
+        }
+        if request.status.is_some() {
+            changed_fields.push("status");
+        }
 
         let reason = request
             .reason
@@ -472,7 +491,11 @@ impl ProductRepository {
             business_id,
             None,
             Some(actor_id),
-            if status_changed { "product.status_changed" } else { "product.updated" },
+            if status_changed {
+                "product.status_changed"
+            } else {
+                "product.updated"
+            },
             "business_product",
             Some(product_id),
             reason.as_deref(),
