@@ -204,9 +204,8 @@ impl PeriodControlRepository {
             return Err(PeriodControlError::Conflict);
         }
 
-        let existing = sqlx::query_as::<_, AccountingPeriodRecord>(
-            &format!("{PERIOD_SELECT_EXACT} FOR UPDATE"),
-        )
+        let existing =
+            sqlx::query_as::<_, AccountingPeriodRecord>(PERIOD_SELECT_EXACT_FOR_UPDATE)
         .bind(business_id)
         .bind(organization_id)
         .bind(request.period_start)
@@ -341,10 +340,9 @@ impl PeriodControlRepository {
             });
         }
 
-        let current =
-            load_period_tx(&mut tx, business_id, organization_id, period_id, true)
-                .await?
-                .ok_or(PeriodControlError::NotFound)?;
+        let current = load_period_tx(&mut tx, business_id, organization_id, period_id, true)
+            .await?
+            .ok_or(PeriodControlError::NotFound)?;
         if current.status != "closed" {
             return Err(PeriodControlError::Conflict);
         }
@@ -430,13 +428,7 @@ impl PeriodControlRepository {
         let request_hash = canonical_hash(&fingerprint)?;
         let mut tx = self.db.begin().await?;
         lock_close_control(&mut tx, business_id).await?;
-        ensure_location_tx(
-            &mut tx,
-            business_id,
-            organization_id,
-            request.location_id,
-        )
-        .await?;
+        ensure_location_tx(&mut tx, business_id, organization_id, request.location_id).await?;
 
         if let Some(command) =
             load_command_by_key_tx(&mut tx, business_id, organization_id, idempotency_key).await?
@@ -460,15 +452,14 @@ impl PeriodControlRepository {
             });
         }
 
-        let existing = sqlx::query_as::<_, DayCloseRecord>(
-            &format!("{DAY_SELECT_EXACT} FOR UPDATE"),
-        )
-        .bind(business_id)
-        .bind(organization_id)
-        .bind(request.location_id)
-        .bind(request.business_date)
-        .fetch_optional(&mut *tx)
-        .await?;
+        let existing =
+            sqlx::query_as::<_, DayCloseRecord>(DAY_SELECT_EXACT_FOR_UPDATE)
+                .bind(business_id)
+                .bind(organization_id)
+                .bind(request.location_id)
+                .bind(request.business_date)
+                .fetch_optional(&mut *tx)
+                .await?;
 
         let record = match existing {
             Some(existing) if existing.status == "open" => {
@@ -726,7 +717,9 @@ struct CloseCommandRecord {
 
 fn validate_period_range(start: NaiveDate, end: NaiveDate) -> Result<(), PeriodControlError> {
     if end < start || (end - start).num_days() > MAX_PERIOD_DAYS {
-        Err(PeriodControlError::Validation("invalid_accounting_period_range"))
+        Err(PeriodControlError::Validation(
+            "invalid_accounting_period_range",
+        ))
     } else {
         Ok(())
     }
@@ -743,7 +736,9 @@ fn normalize_reason(value: &str) -> Result<String, PeriodControlError> {
 
 fn normalize_snapshot(value: Value) -> Result<Value, PeriodControlError> {
     if !value.is_object() {
-        return Err(PeriodControlError::Validation("close_snapshot_must_be_object"));
+        return Err(PeriodControlError::Validation(
+            "close_snapshot_must_be_object",
+        ));
     }
     let bytes = serde_json::to_vec(&value).map_err(|_| PeriodControlError::Database)?;
     if bytes.len() > MAX_SNAPSHOT_BYTES {
@@ -926,9 +921,12 @@ async fn load_period_tx(
     period_id: Uuid,
     for_update: bool,
 ) -> Result<Option<AccountingPeriodRecord>, PeriodControlError> {
-    let suffix = if for_update { " FOR UPDATE" } else { "" };
-    let sql = format!("{PERIOD_SELECT_ONE}{suffix}");
-    sqlx::query_as::<_, AccountingPeriodRecord>(&sql)
+    let query = if for_update {
+        sqlx::query_as::<_, AccountingPeriodRecord>(PERIOD_SELECT_ONE_FOR_UPDATE)
+    } else {
+        sqlx::query_as::<_, AccountingPeriodRecord>(PERIOD_SELECT_ONE)
+    };
+    query
         .bind(period_id)
         .bind(business_id)
         .bind(organization_id)
@@ -944,9 +942,12 @@ async fn load_day_tx(
     day_id: Uuid,
     for_update: bool,
 ) -> Result<Option<DayCloseRecord>, PeriodControlError> {
-    let suffix = if for_update { " FOR UPDATE" } else { "" };
-    let sql = format!("{DAY_SELECT_ONE}{suffix}");
-    sqlx::query_as::<_, DayCloseRecord>(&sql)
+    let query = if for_update {
+        sqlx::query_as::<_, DayCloseRecord>(DAY_SELECT_ONE_FOR_UPDATE)
+    } else {
+        sqlx::query_as::<_, DayCloseRecord>(DAY_SELECT_ONE)
+    };
+    query
         .bind(day_id)
         .bind(business_id)
         .bind(organization_id)
@@ -980,6 +981,24 @@ FROM business_accounting_periods
 WHERE business_id=$1 AND organization_id=$2 AND period_start=$3 AND period_end=$4
 "#;
 
+const PERIOD_SELECT_ONE_FOR_UPDATE: &str = r#"
+SELECT id,organization_id,business_id,period_start,period_end,status,version,
+       closed_by_user_id,closed_at,close_reason,reopened_by_user_id,reopened_at,
+       reopen_reason,created_at,updated_at
+FROM business_accounting_periods
+WHERE id=$1 AND business_id=$2 AND organization_id=$3
+FOR UPDATE
+"#;
+
+const PERIOD_SELECT_EXACT_FOR_UPDATE: &str = r#"
+SELECT id,organization_id,business_id,period_start,period_end,status,version,
+       closed_by_user_id,closed_at,close_reason,reopened_by_user_id,reopened_at,
+       reopen_reason,created_at,updated_at
+FROM business_accounting_periods
+WHERE business_id=$1 AND organization_id=$2 AND period_start=$3 AND period_end=$4
+FOR UPDATE
+"#;
+
 const DAY_SELECT_LIST: &str = r#"
 SELECT id,organization_id,business_id,location_id,business_date,status,close_snapshot,
        version,closed_by_user_id,closed_at,close_reason,reopened_by_user_id,reopened_at,
@@ -1006,6 +1025,24 @@ FROM business_day_closes
 WHERE business_id=$1 AND organization_id=$2 AND location_id=$3 AND business_date=$4
 "#;
 
+const DAY_SELECT_ONE_FOR_UPDATE: &str = r#"
+SELECT id,organization_id,business_id,location_id,business_date,status,close_snapshot,
+       version,closed_by_user_id,closed_at,close_reason,reopened_by_user_id,reopened_at,
+       reopen_reason,created_at,updated_at
+FROM business_day_closes
+WHERE id=$1 AND business_id=$2 AND organization_id=$3
+FOR UPDATE
+"#;
+
+const DAY_SELECT_EXACT_FOR_UPDATE: &str = r#"
+SELECT id,organization_id,business_id,location_id,business_date,status,close_snapshot,
+       version,closed_by_user_id,closed_at,close_reason,reopened_by_user_id,reopened_at,
+       reopen_reason,created_at,updated_at
+FROM business_day_closes
+WHERE business_id=$1 AND organization_id=$2 AND location_id=$3 AND business_date=$4
+FOR UPDATE
+"#;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1023,6 +1060,6 @@ mod tests {
     #[test]
     fn close_snapshot_must_remain_bounded_object() {
         assert!(normalize_snapshot(json!({"cash":1000})).is_ok());
-        assert!(normalize_snapshot(json!([1,2,3])).is_err());
+        assert!(normalize_snapshot(json!([1, 2, 3])).is_err());
     }
 }

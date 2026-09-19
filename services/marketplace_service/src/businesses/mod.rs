@@ -40,13 +40,13 @@ mod inventory_routes_tests;
 mod inventory_tests;
 pub(crate) mod kernel;
 mod media;
-mod period_control;
-mod period_control_routes;
 #[cfg(test)]
 mod media_migration_tests;
 #[cfg(test)]
 mod modifier_recipe_effect_tests;
 mod modifier_resolution;
+mod period_control;
+mod period_control_routes;
 mod product_modifiers;
 mod products;
 #[cfg(test)]

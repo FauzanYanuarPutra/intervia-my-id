@@ -206,14 +206,7 @@ async fn reopen_day(
         Err(code) => return api_error(StatusCode::BAD_REQUEST, code),
     };
     match PeriodControlRepository::new(state.db.clone())
-        .reopen_day(
-            actor_id,
-            business_id,
-            organization_id,
-            day_id,
-            key,
-            payload,
-        )
+        .reopen_day(actor_id, business_id, organization_id, day_id, key, payload)
         .await
     {
         Ok(outcome) => (StatusCode::OK, Json(json!({"data":outcome}))).into_response(),
@@ -271,15 +264,11 @@ fn period_error_response(error: PeriodControlError) -> Response {
         PeriodControlError::NotFound => {
             api_error(StatusCode::NOT_FOUND, "period_control_not_found")
         }
-        PeriodControlError::Conflict => {
-            api_error(StatusCode::CONFLICT, "period_control_conflict")
-        }
+        PeriodControlError::Conflict => api_error(StatusCode::CONFLICT, "period_control_conflict"),
         PeriodControlError::PeriodClosed => {
             api_error(StatusCode::CONFLICT, "business_period_closed")
         }
-        PeriodControlError::DayClosed => {
-            api_error(StatusCode::CONFLICT, "business_day_closed")
-        }
+        PeriodControlError::DayClosed => api_error(StatusCode::CONFLICT, "business_day_closed"),
         PeriodControlError::Database => api_error(
             StatusCode::SERVICE_UNAVAILABLE,
             "period_control_storage_unavailable",
