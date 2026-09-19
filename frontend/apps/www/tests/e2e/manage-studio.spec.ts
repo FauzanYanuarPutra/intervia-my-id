@@ -154,6 +154,32 @@ async function installManageSession(page: Page) {
       },
     }),
   );
+  await page.route('**/api/news/submissions', route =>
+    fulfillJson(route, {
+      items: [
+        {
+          id: 'news-001',
+          owner_id: OWNER_ID,
+          title: 'Harga pangan dan dampaknya ke UMKM',
+          summary: 'Ringkasan berita.',
+          body: 'Isi berita yang cukup panjang untuk pengujian.',
+          tags: ['news', 'ekonomi', 'harga pangan'],
+          content_status: 'draft',
+          created_at: '2026-09-18T08:00:00.000Z',
+          updated_at: '2026-09-19T08:00:00.000Z',
+          published_at: null,
+          metadata: {
+            news: {
+              editorial_status: 'needs_revision',
+              category: 'Ekonomi',
+              article_kind: 'news',
+              review_note: 'Tambahkan sumber resmi.',
+            },
+          },
+        },
+      ],
+    }),
+  );
   await page.route('**/api/dashboard/stats', route =>
     fulfillJson(route, {
       total_content: 3,
@@ -188,7 +214,7 @@ async function installManageSession(page: Page) {
 test.describe('visual content management studio', () => {
   test.use({ serviceWorkers: 'block' });
 
-  test('manage separates content channels from operations at a glance', async ({
+  test('manage surfaces News submissions and revision attention', async ({
     page,
   }) => {
     await installManageSession(page);
@@ -196,25 +222,18 @@ test.describe('visual content management studio', () => {
     await page.goto('/id/manage', { waitUntil: 'domcontentloaded' });
 
     await expect(page.getByTestId('manage-studio')).toBeVisible();
-    await expect(page.getByTestId('manage-channel-listing')).toContainText(
-      'Supplier kemasan paper bowl',
-    );
-    await expect(page.getByTestId('manage-channel-community')).toContainText(
-      'Cara memilih supplier kemasan',
-    );
-    await expect(page.getByTestId('manage-channel-reel')).toContainText(
-      'Tiga cara bikin kemasan',
-    );
+    await expect(page.getByRole('heading', { name: 'Kelola usaha' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Hari ini' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Kelola' })).toBeVisible();
+
+    const newsLink = page.getByRole('link', { name: /^News/ });
+    await expect(newsLink).toBeVisible();
+    await expect(newsLink).toHaveAttribute('href', /\/id\/news\/submissions$/);
+    await expect(newsLink).toContainText('1 perlu revisi');
     await expect(
-      page.getByRole('heading', { name: 'Operasional' }),
+      page.getByRole('link', { name: /Tindak lanjuti News/i }),
     ).toBeVisible();
 
-    const channelBoxes = await Promise.all(
-      ['listing', 'community', 'reel'].map(kind =>
-        page.getByTestId(`manage-channel-${kind}`).boundingBox(),
-      ),
-    );
-    expect(channelBoxes.every(Boolean)).toBe(true);
     await expectNoHorizontalOverflow(page, 4);
   });
 
@@ -236,18 +255,16 @@ test.describe('visual content management studio', () => {
     await expectNoHorizontalOverflow(page, 4);
   });
 
-  test('manage channel cards remain readable on mobile', async ({ page }) => {
+  test('manage remains readable on mobile with News integration', async ({ page }) => {
     await installManageSession(page);
     await page.setViewportSize({ width: 360, height: 800 });
     await page.goto('/id/manage', { waitUntil: 'domcontentloaded' });
 
-    for (const kind of ['listing', 'community', 'reel']) {
-      const channel = page.getByTestId(`manage-channel-${kind}`);
-      await expect(channel).toBeVisible();
-      const box = await channel.boundingBox();
-      expect(box?.x || 0).toBeGreaterThanOrEqual(0);
-      expect((box?.x || 0) + (box?.width || 0)).toBeLessThanOrEqual(361);
-    }
+    const newsLink = page.getByRole('link', { name: /^News/ });
+    await expect(newsLink).toBeVisible();
+    const box = await newsLink.boundingBox();
+    expect(box?.x || 0).toBeGreaterThanOrEqual(0);
+    expect((box?.x || 0) + (box?.width || 0)).toBeLessThanOrEqual(361);
     await expectNoHorizontalOverflow(page, 4);
   });
 

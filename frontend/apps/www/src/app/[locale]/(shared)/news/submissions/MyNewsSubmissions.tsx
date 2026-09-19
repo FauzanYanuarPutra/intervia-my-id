@@ -418,7 +418,7 @@ export default function MyNewsSubmissions({ locale }: { locale: string }) {
                   {item.title}
                 </p>
                 <p className="mt-1 text-xs font-semibold text-slate-500">
-                  {state.replaceAll('_', ' ')}
+                  {statusLabel(state, isId)}
                 </p>
               </button>
             );
