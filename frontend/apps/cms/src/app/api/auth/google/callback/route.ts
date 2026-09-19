@@ -140,7 +140,13 @@ export async function GET(req: NextRequest) {
         refresh_token: tokens.refresh_token,
       }),
     });
-    if (!backendResponse.ok) return failure(req, 'identity_oauth_failed');
+    if (!backendResponse.ok) {
+      const detail = await backendResponse.json().catch(() => null) as { error?: unknown } | null;
+      const code = typeof detail?.error === 'string' && detail.error.startsWith('google_account_not_authorized_for_')
+        ? detail.error
+        : 'identity_oauth_failed';
+      return failure(req, code);
+    }
 
     const auth = (await backendResponse.json()) as {
       access_token?: string;
