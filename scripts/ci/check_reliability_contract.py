@@ -778,8 +778,8 @@ for path, warning_threshold, hard_ceiling in (
         )
 
 for path, warning_threshold, hard_ceiling in (
-    ("frontend/apps/www/src/app/[locale]/(shared)/reels/ReelsClient.tsx", 300_000, 335_000),
-    ("frontend/apps/www/src/components/community/CommunityFeedClient.tsx", 230_000, 260_000),
+    ("frontend/apps/www/src/app/[locale]/(shared)/reels/ReelsClient.tsx", 295_000, 332_000),
+    ("frontend/apps/www/src/components/community/CommunityFeedClient.tsx", 225_000, 257_000),
 ):
     target = ROOT / path
     if not target.is_file():
@@ -798,8 +798,11 @@ for path, warning_threshold, hard_ceiling in (
 
 for helper_path in (
     "frontend/apps/www/src/app/[locale]/(shared)/reels/reels-client-helpers.ts",
+    "frontend/apps/www/src/app/[locale]/(shared)/reels/reels-client-model.ts",
     "frontend/apps/www/src/app/[locale]/(shared)/reels/reels-studio-helpers.ts",
     "frontend/apps/www/src/components/community/community-feed-helpers.ts",
+    "frontend/apps/www/src/components/community/community-feed-client-model.ts",
+    "frontend/apps/www/src/components/community/community-feed-focus.ts",
 ):
     if not (ROOT / helper_path).is_file():
         errors.append(f"missing frontend responsibility extraction helper: {helper_path}")
