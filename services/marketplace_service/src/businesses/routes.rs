@@ -69,6 +69,10 @@ pub(crate) fn router() -> Router<Arc<AppState>> {
         )
         .route("/v1/businesses/{business_id}/channels", get(list_channels))
         .route(
+            "/v1/businesses/{business_id}/audit-events",
+            get(list_audit_events),
+        )
+        .route(
             "/v1/businesses/{business_id}/channels/{channel_key}",
             axum::routing::put(upsert_channel),
         )
@@ -416,7 +420,7 @@ async fn list_channels(
     headers: HeaderMap,
     Path(business_id): Path<Uuid>,
 ) -> Response {
-    let (actor_id, organization_id) = match business_control_context(
+    let (_, organization_id) = match business_control_context(
         &state,
         &headers,
         business_id,
@@ -608,7 +612,7 @@ async fn list_audit_events(
     Path(business_id): Path<Uuid>,
     query: Option<axum::extract::Query<AuditQuery>>,
 ) -> Response {
-    let (actor_id, organization_id) = match business_control_context(
+    let (_, organization_id) = match business_control_context(
         &state,
         &headers,
         business_id,
@@ -648,8 +652,6 @@ async fn list_audit_events(
     .await
     {
         Ok(items) => {
-            let _ = actor_id;
-            (
                 StatusCode::OK,
                 Json(json!({
                     "data": {
