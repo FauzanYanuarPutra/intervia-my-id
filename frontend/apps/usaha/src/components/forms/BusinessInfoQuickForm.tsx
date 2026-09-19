@@ -47,11 +47,6 @@ export function BusinessInfoQuickForm({ business }: BusinessInfoQuickFormProps) 
       return;
     }
 
-    if (schedule.trim().length < 5) {
-      setError('Jam buka belum valid.');
-      return;
-    }
-
     if (reason.trim().length < 3) {
       setError('Tulis alasan perubahan info usaha minimal 3 karakter.');
       return;
