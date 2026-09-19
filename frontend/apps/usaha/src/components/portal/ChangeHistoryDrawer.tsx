@@ -182,6 +182,15 @@ export function ChangeHistoryDrawer({ businessId, compact = false }: Props) {
                 className="portal-input min-h-11 w-full"
                 autoComplete="off"
               />
+              {query ? (
+                <button
+                  type="button"
+                  onClick={() => setQuery('')}
+                  className="mt-2 text-xs font-bold text-portal-forest hover:underline"
+                >
+                  Hapus pencarian
+                </button>
+              ) : null}
             </label>
 
             {loading && !grouped.length ? (
@@ -205,9 +214,13 @@ export function ChangeHistoryDrawer({ businessId, compact = false }: Props) {
             {!loading && !error && !grouped.length ? (
               <div className="rounded-2xl border border-dashed border-portal-line p-6 text-center">
                 <History className="mx-auto h-6 w-6 text-portal-soft" />
-                <p className="mt-3 text-sm font-black text-portal-ink">Belum ada riwayat yang tercatat</p>
+                <p className="mt-3 text-sm font-black text-portal-ink">
+                  {query.trim() ? 'Tidak ada perubahan yang cocok' : 'Belum ada riwayat yang tercatat'}
+                </p>
                 <p className="mt-1 text-xs leading-5 text-portal-soft">
-                  Perubahan penting berikutnya akan muncul di sini.
+                  {query.trim()
+                    ? 'Coba kata lain, misalnya “stok”, “harga”, atau alasan perubahan.'
+                    : 'Perubahan penting berikutnya akan muncul di sini.'}
                 </p>
               </div>
             ) : null}
