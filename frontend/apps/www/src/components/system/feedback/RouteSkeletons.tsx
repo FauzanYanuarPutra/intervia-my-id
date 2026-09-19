@@ -2042,41 +2042,121 @@ export function OwnerProfileSkeleton() {
     >
       <div className="mx-auto w-full max-w-[1080px] space-y-3 px-0 py-0 sm:space-y-4 sm:px-4 sm:py-4 lg:px-5 lg:py-5">
         <section className="overflow-hidden border-y border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] sm:rounded-[24px] sm:border">
-          <div className="relative h-28 overflow-hidden sm:h-40"><Pulse className="absolute inset-0 h-full w-full rounded-none" /><div className="absolute right-3 top-3"><Pulse className="h-9 w-9 rounded-full" /></div></div>
-          <div className="px-3 pb-4 sm:px-6 sm:pb-5">
-            <div className="-mt-10 flex items-end gap-3 sm:-mt-12 sm:gap-4">
-              <Pulse className="h-[78px] w-[78px] shrink-0 rounded-full ring-[4px] ring-[color:var(--app-surface-strong)] sm:h-24 sm:w-24 sm:ring-[5px]" />
-              <div className="min-w-0 flex-1"><Pulse className="h-6 w-48 max-w-[72%] rounded-lg sm:h-8 sm:w-64" /><Pulse className="mt-2 h-3 w-32 rounded-full sm:w-40" /></div>
+          <div className="relative h-28 overflow-hidden sm:h-36 lg:h-40">
+            <Pulse className="absolute inset-0 h-full w-full rounded-none" />
+            <div className="absolute right-3 top-3 flex gap-2">
+              <Pulse className="h-9 w-9 rounded-full" />
+              <Pulse className="h-9 w-9 rounded-full" />
             </div>
-            <div className="mt-3 flex gap-1.5 overflow-hidden"><Pulse className="h-6 w-28 shrink-0 rounded-full" /><Pulse className="h-6 w-36 shrink-0 rounded-full" /></div>
-            <div className="mt-3 space-y-2"><Pulse className="h-3.5 w-full max-w-[680px] rounded-full" /><Pulse className="h-3.5 w-[72%] max-w-[520px] rounded-full" /></div>
+          </div>
+          <div className="px-3 pb-4 sm:px-5 sm:pb-5">
+            <div className="-mt-10 flex min-w-0 items-end gap-3 sm:-mt-12 sm:gap-4">
+              <Pulse className="h-20 w-20 shrink-0 rounded-full ring-[4px] ring-[color:var(--app-surface-strong)] sm:h-24 sm:w-24 sm:ring-[5px]" />
+              <div className="min-w-0 flex-1">
+                <Pulse className="h-6 w-48 max-w-[72%] rounded-lg sm:h-7 sm:w-64" />
+                <Pulse className="mt-2 h-3 w-32 rounded-full sm:w-40" />
+              </div>
+            </div>
+            <div className="mt-3 flex gap-2 overflow-hidden">
+              <Pulse className="h-7 w-28 shrink-0 rounded-full" />
+              <Pulse className="h-7 w-36 shrink-0 rounded-full" />
+            </div>
+            <div className="mt-3 space-y-2">
+              <Pulse className="h-3.5 w-full max-w-[680px] rounded-full" />
+              <Pulse className="h-3.5 w-[72%] max-w-[520px] rounded-full" />
+            </div>
+            <div className="mt-3 flex gap-1.5 overflow-hidden">
+              <Pulse className="h-7 w-32 shrink-0 rounded-full" />
+              <Pulse className="h-7 w-36 shrink-0 rounded-full" />
+            </div>
             <div className="mt-4 grid grid-cols-3 divide-x divide-[color:var(--app-border)] rounded-2xl border border-[color:var(--app-border)] py-2.5 sm:max-w-[560px]">
-              {Array.from({ length: 3 }).map((_, index) => <div key={index} className="px-2 text-center"><Pulse className="mx-auto h-4 w-10 rounded-full" /><Pulse className="mx-auto mt-2 h-2.5 w-16 rounded-full" /></div>)}
+              {Array.from({ length: 3 }).map((_, index) => (
+                <div key={index} className="px-2 text-center">
+                  <Pulse className="mx-auto h-4 w-10 rounded-full" />
+                  <Pulse className="mx-auto mt-2 h-2.5 w-16 rounded-full" />
+                </div>
+              ))}
             </div>
-            <div className="mt-3 grid grid-cols-2 gap-2 sm:flex"><Pulse className="h-11 w-full rounded-xl sm:w-32" /><Pulse className="h-11 w-full rounded-xl sm:w-40" /></div>
-            <div className="mt-3 flex gap-1.5"><Pulse className="h-7 w-32 rounded-full" /><Pulse className="h-7 w-36 rounded-full" /></div>
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:flex">
+              <Pulse className="h-10 w-full rounded-xl sm:w-32" />
+              <Pulse className="h-10 w-full rounded-xl sm:w-40" />
+            </div>
           </div>
         </section>
 
-        <section className="border-y border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 sm:rounded-[24px] sm:border sm:p-5">
-          <div className="flex items-center justify-between gap-3"><div><Pulse className="h-2.5 w-24 rounded-full" /><Pulse className="mt-2 h-6 w-48 rounded-md" /></div><Pulse className="h-8 w-20 rounded-full" /></div>
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {Array.from({ length: 3 }).map((_, index) => <div key={index} className="rounded-xl bg-[color:var(--app-surface-muted)] p-3"><Pulse className="h-8 w-8 rounded-lg" /><Pulse className="mt-3 h-2.5 w-20 rounded-full" /><Pulse className="mt-2 h-5 w-14 rounded-md" /></div>)}
-          </div>
-        </section>
-
-        <section className="border-y border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 sm:rounded-[24px] sm:border sm:p-5">
-          <div className="flex items-center justify-between gap-3"><Pulse className="h-5 w-40 rounded-md" /><Pulse className="h-3 w-24 rounded-full" /></div>
-          <div className="mt-3 space-y-2">
-            {Array.from({ length: 2 }).map((_, index) => <div key={index} className="flex min-h-14 items-center gap-3 rounded-xl border border-[color:var(--app-border)] px-3 py-2.5"><Pulse className="h-9 w-9 shrink-0 rounded-xl" /><div className="min-w-0 flex-1"><Pulse className="h-3.5 w-40 max-w-[70%] rounded-full" /><Pulse className="mt-2 h-2.5 w-60 max-w-full rounded-full" /></div><Pulse className="h-8 w-16 shrink-0 rounded-lg" /></div>)}
+        <section className="mx-3 min-h-14 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2.5 sm:mx-0 sm:px-4">
+          <div className="flex items-center gap-3">
+            <Pulse className="h-9 w-9 shrink-0 rounded-xl" />
+            <div className="min-w-0 flex-1">
+              <Pulse className="h-3.5 w-48 max-w-[72%] rounded-full" />
+            </div>
+            <Pulse className="h-4 w-4 shrink-0 rounded-full" />
           </div>
         </section>
 
         <section className="overflow-hidden border-y border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] sm:rounded-[24px] sm:border">
-          <div className="border-b border-[color:var(--app-border)] px-3 pb-3 pt-4 sm:px-5"><Pulse className="h-2.5 w-20 rounded-full" /><Pulse className="mt-2 h-6 w-44 rounded-md" /><Pulse className="mt-3 h-10 w-36 rounded-xl" /></div>
-          <div className="flex gap-2 overflow-hidden border-b border-[color:var(--app-border)] px-3 py-3 sm:px-5"><Pulse className="h-9 w-20 shrink-0 rounded-full" /><Pulse className="h-9 w-24 shrink-0 rounded-full" /><Pulse className="h-9 w-20 shrink-0 rounded-full" /></div>
+          <div className="flex items-center justify-between gap-3 border-b border-[color:var(--app-border)] px-3 py-3 sm:px-5">
+            <div>
+              <Pulse className="h-4 w-24 rounded-full" />
+              <Pulse className="mt-2 h-3 w-60 max-w-[70vw] rounded-full" />
+            </div>
+            <Pulse className="h-8 w-14 rounded-full" />
+          </div>
+          <div className="divide-y divide-[color:var(--app-border)]">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <div key={index} className="flex min-h-14 items-center gap-3 px-3 py-2.5 sm:px-5">
+                <Pulse className="h-9 w-9 shrink-0 rounded-xl" />
+                <div className="min-w-0 flex-1">
+                  <Pulse className="h-2.5 w-24 rounded-full" />
+                  <Pulse className="mt-2 h-3.5 w-48 max-w-[70%] rounded-full" />
+                </div>
+                <Pulse className="h-4 w-4 shrink-0 rounded-full" />
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="border-y border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-3 sm:rounded-[24px] sm:border sm:px-5 sm:py-4">
+          <div className="grid grid-cols-4 gap-2">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div key={index} className="flex min-w-0 flex-col items-center gap-1.5 px-1 py-2.5">
+                <Pulse className="h-10 w-10 rounded-xl" />
+                <Pulse className="h-2.5 w-12 max-w-full rounded-full" />
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="overflow-hidden border-y border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] sm:rounded-[24px] sm:border">
+          <div className="flex items-center justify-between gap-3 border-b border-[color:var(--app-border)] px-3 py-3.5 sm:px-5">
+            <div>
+              <Pulse className="h-5 w-24 rounded-md" />
+              <Pulse className="mt-2 h-2.5 w-40 rounded-full" />
+            </div>
+            <Pulse className="h-9 w-20 rounded-xl" />
+          </div>
+          <div className="flex gap-2 overflow-hidden border-b border-[color:var(--app-border)] px-3 py-3 sm:px-5">
+            <Pulse className="h-9 w-20 shrink-0 rounded-full" />
+            <Pulse className="h-9 w-24 shrink-0 rounded-full" />
+          </div>
+          <div className="flex gap-2 overflow-hidden border-b border-[color:var(--app-border)]/70 px-3 py-2.5 sm:px-5">
+            <Pulse className="h-9 w-20 shrink-0 rounded-full" />
+            <Pulse className="h-9 w-24 shrink-0 rounded-full" />
+            <Pulse className="h-9 w-20 shrink-0 rounded-full" />
+            <Pulse className="ml-auto h-9 w-24 shrink-0 rounded-xl" />
+          </div>
           <div className="grid grid-cols-2 gap-3 p-3 sm:grid-cols-3 lg:grid-cols-4 sm:p-5">
-            {Array.from({ length: 6 }).map((_, index) => <article key={index} className="overflow-hidden rounded-2xl border border-[color:var(--app-border)]"><Pulse className="aspect-square w-full rounded-none" /><div className="p-2.5 sm:p-3"><Pulse className="h-3.5 w-full rounded-full" /><Pulse className="mt-2 h-3.5 w-3/4 rounded-full" /><Pulse className="mt-3 h-4 w-20 rounded-full" /><Pulse className="mt-3 h-8 w-full rounded-lg" /></div></article>)}
+            {Array.from({ length: 6 }).map((_, index) => (
+              <article key={index} className="overflow-hidden rounded-2xl border border-[color:var(--app-border)]">
+                <Pulse className="aspect-square w-full rounded-none" />
+                <div className="p-2.5 sm:p-3">
+                  <Pulse className="h-3.5 w-full rounded-full" />
+                  <Pulse className="mt-2 h-3.5 w-3/4 rounded-full" />
+                  <Pulse className="mt-3 h-4 w-20 rounded-full" />
+                  <Pulse className="mt-3 h-8 w-full rounded-lg" />
+                </div>
+              </article>
+            ))}
           </div>
         </section>
       </div>
