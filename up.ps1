@@ -23,6 +23,7 @@ $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
 $RepoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$PreviousComposeParallelLimit = $env:COMPOSE_PARALLEL_LIMIT
 Push-Location $RepoRoot
 
 try {
@@ -305,5 +306,11 @@ try {
     exit $LASTEXITCODE
 }
 finally {
+    if ($null -eq $PreviousComposeParallelLimit) {
+        Remove-Item Env:COMPOSE_PARALLEL_LIMIT -ErrorAction SilentlyContinue
+    }
+    else {
+        $env:COMPOSE_PARALLEL_LIMIT = $PreviousComposeParallelLimit
+    }
     Pop-Location
 }
