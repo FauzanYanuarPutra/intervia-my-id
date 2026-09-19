@@ -1,0 +1,34 @@
+name: Temporary Business Rustfmt
+
+on:
+  push:
+    branches:
+      - automation/rustfmt-fba1187d
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: automation/rustfmt-fba1187d
+      - name: Toolchain
+        run: rustup show
+      - name: Format Marketplace
+        run: cd services/marketplace_service && cargo fmt
+      - name: Commit formatting
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo "Already formatted"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add services/marketplace_service
+          git commit -m "style: apply marketplace rustfmt"
+          git push origin HEAD:automation/rustfmt-fba1187d
