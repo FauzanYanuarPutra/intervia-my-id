@@ -47,6 +47,8 @@ jobs:
             fi
           done
           exit "$failed"
+      - name: Validate domain/database ownership
+        run: python scripts/ci/check_domain_boundaries.py
 
   frontend:
     name: Frontend
