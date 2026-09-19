@@ -88,6 +88,7 @@ export type ControlFinanceEntry = {
   entry_type: string;
   account_key: string;
   amount: number;
+  effect_sign: number;
   occurred_on: string;
   note: string;
   channel_key: string | null;
@@ -128,6 +129,9 @@ export type ControlSaleRecord = {
   channel_key: string | null;
   account_key: 'cash' | 'bank' | 'ewallet' | 'receivable';
   status: 'completed' | 'voided';
+  void_reason: string | null;
+  voided_by_user_id: string | null;
+  voided_at: string | null;
   gross_amount: number;
   discount_amount: number;
   final_amount: number;
@@ -363,6 +367,31 @@ export async function listControlSales(businessId: string) {
   );
 }
 
+export async function voidControlSale(
+  businessId: string,
+  saleId: string,
+  idempotencyKey: string,
+  reason: string,
+): Promise<{ sale: ControlSaleAggregate; replayed: boolean }> {
+  const payload = await requestControl(
+    businessPath(
+      businessId,
+      `/sales/${encodeURIComponent(saleId)}/void`,
+    ),
+    {
+      method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey },
+      body: JSON.stringify({ reason }),
+    },
+  );
+  const root = record(payload) ?? {};
+  const data = record(root.data) ?? root;
+  const sale = data.sale as ControlSaleAggregate | undefined;
+  if (!sale) {
+    throw new BusinessControlHttpError(502, 'invalid_sale_void_response');
+  }
+  return { sale, replayed: data.replayed === true };
+}
 export async function createControlSale(
   businessId: string,
   idempotencyKey: string,
