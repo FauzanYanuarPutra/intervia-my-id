@@ -1,13 +1,13 @@
 use super::*;
 
 #[derive(Debug, Deserialize)]
-struct ContentReportRequest {
+pub struct ContentReportRequest {
     reason: String,
     details: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
-struct ContentModerationRequest {
+pub struct ContentModerationRequest {
     action: String,
     reason_code: String,
     reason_note: Option<String>,
@@ -16,12 +16,12 @@ struct ContentModerationRequest {
 }
 
 #[derive(Debug, Deserialize)]
-struct ContentAppealRequest {
+pub struct ContentAppealRequest {
     reason: String,
 }
 
 #[derive(Debug, Deserialize)]
-struct ContentAppealReviewRequest {
+pub struct ContentAppealReviewRequest {
     action: String,
     note: Option<String>,
 }
