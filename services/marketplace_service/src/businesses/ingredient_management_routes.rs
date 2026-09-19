@@ -73,10 +73,16 @@ async fn update_ingredient(
     }
 }
 
+#[derive(Debug, serde::Deserialize)]
+struct ArchiveIngredientRequest {
+    reason: String,
+}
+
 async fn archive_ingredient(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Path((business_id, ingredient_id)): Path<(Uuid, Uuid)>,
+    Json(payload): Json<ArchiveIngredientRequest>,
 ) -> Response {
     let actor_id = match actor(&state, &headers) {
         Ok(value) => value,
@@ -91,7 +97,13 @@ async fn archive_ingredient(
     };
 
     match IngredientManagementRepository::new(state.db.clone())
-        .archive(actor_id, business_id, organization_id, ingredient_id)
+        .archive(
+            actor_id,
+            business_id,
+            organization_id,
+            ingredient_id,
+            &payload.reason,
+        )
         .await
     {
         Ok(item) => (
