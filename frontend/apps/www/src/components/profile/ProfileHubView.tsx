@@ -1846,7 +1846,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
             activityTitle: 'Aktivitas',
             activitySubtitle: PROMO_ONLY_MODE
               ? 'Reels, komunitas, listing, dan chat.'
-              : 'Reels, komunitas, listing, chat, dan transaksi.'
+              : 'Reels, komunitas, listing, chat, dan transaksi.',
             quickMoves: 'Akses cepat',
             footprint: 'Terbaru',
             signalMap: 'Minat',
@@ -1869,7 +1869,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
               ? 'Kelola storefront, katalog, profil, dan chat usaha.'
               : 'Kelola storefront, katalog, order, QR, dan operasional.',
             profileAction: 'Profil profesional',
-            profileDesc: 'Skill, link, dan verifikasi.'
+            profileDesc: 'Skill, link, dan verifikasi.',
             open: 'Buka',
             upload: 'Upload',
             create: 'Buat',
