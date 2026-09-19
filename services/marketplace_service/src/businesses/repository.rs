@@ -215,30 +215,39 @@ impl BusinessRepository {
         .execute(&mut *transaction)
         .await?;
 
+        let event_key = if command.metadata_patch.as_ref().is_some_and(|value| value.get("locations").is_some()) {
+            "business.locations_updated"
+        } else if command.metadata_patch.as_ref().is_some_and(|value| {
+            value.get("isOpen").is_some() || value.get("reservations").is_some()
+        }) {
+            "business.operations_updated"
+        } else {
+            "business.profile_updated"
+        };
+        let reason = command
+            .reason
+            .as_deref()
+            .unwrap_or("Informasi usaha diperbarui");
+
         audit::record_tx(
             &mut transaction,
             organization_id,
             business_id,
             None,
             Some(actor_id),
-            "business.profile_updated",
+            event_key,
             "business",
             Some(business_id),
-            Some("Profil, operasional, atau lokasi utama diperbarui"),
+            Some(reason),
             json!({
-                "summary": "Informasi utama usaha diperbarui",
+                "summary": match event_key {
+                    "business.locations_updated" => "Lokasi usaha diperbarui",
+                    "business.operations_updated" => "Operasional usaha diperbarui",
+                    _ => "Informasi utama usaha diperbarui"
+                },
                 "version_before": command.expected_version,
                 "version_after": new_version,
-                "changed_fields": [
-                    "name",
-                    "capability_key",
-                    "description",
-                    "category",
-                    "schedule",
-                    "location",
-                    "contact",
-                    "public_visibility"
-                ]
+                "metadata_patch": command.metadata_patch
             }),
         )
         .await?;
@@ -378,6 +387,7 @@ impl BusinessRepository {
         .bind(&command.location_query)
         .bind(&logo_metadata)
         .bind(&banner_metadata)
+        .bind(&command.metadata_patch)
         .bind(business_id)
         .bind(organization_id)
         .execute(&mut *transaction)
