@@ -68,12 +68,30 @@ docker run --rm --network "$NETWORK" \
 backup_dir="$BACKUPS/$(basename "$(tail -n1 "$BACKUP_PATH_FILE")")"
 target_time="$(docker exec "$PRIMARY" psql -U postgres -d postgres -X -A -t -c "SELECT clock_timestamp()")"
 sleep 1
-docker exec "$PRIMARY" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -c   "INSERT INTO pitr_probe VALUES (2,'after',clock_timestamp()); SELECT pg_switch_wal();"
 
+# Commit the post-target transaction before switching WAL. Keeping INSERT and
+# pg_switch_wal() in one psql -c can place the transaction commit record in the
+# new segment, leaving recovery waiting for a segment that was never archived.
+docker exec "$PRIMARY" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -c \
+  "INSERT INTO pitr_probe VALUES (2,'after',clock_timestamp());"
+archived_before="$(docker exec "$PRIMARY" psql -U postgres -d postgres -X -A -t -c "SELECT archived_count FROM pg_stat_archiver")"
+docker exec "$PRIMARY" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -c \
+  "SELECT pg_switch_wal();"
+
+archive_advanced=0
 for _ in $(seq 1 30); do
   archived="$(docker exec "$PRIMARY" psql -U postgres -d postgres -X -A -t -c "SELECT archived_count FROM pg_stat_archiver")"
-  [[ "$archived" =~ ^[0-9]+$ ]] && (( archived > 0 )) && break
+  if [[ "$archived" =~ ^[0-9]+$ ]] && [[ "$archived_before" =~ ^[0-9]+$ ]] && (( archived > archived_before )); then
+    archive_advanced=1
+    break
+  fi
   sleep 1
 done
+if (( archive_advanced == 0 )); then
+  echo "WAL archive did not advance after pg_switch_wal()" >&2
+  docker exec "$PRIMARY" psql -U postgres -d postgres -X -c "SELECT * FROM pg_stat_archiver" >&2 || true
+  docker logs "$PRIMARY" >&2 || true
+  exit 1
+fi
 
 BASE_BACKUP_DIR="$backup_dir" WAL_ARCHIVE_DIR="$ARCHIVE" RECOVERY_TARGET_TIME="$target_time" PITR_ASSERT_SQL="DO \$\$ BEGIN IF (SELECT count(*) FROM pitr_probe WHERE id=1) <> 1 THEN RAISE EXCEPTION 'missing before row'; END IF; IF (SELECT count(*) FROM pitr_probe WHERE id=2) <> 0 THEN RAISE EXCEPTION 'after row survived target-time recovery'; END IF; END \$\$;" PITR_DRILL_PORT=55439 bash "$ROOT/scripts/ops/postgres_pitr_restore_drill.sh"
