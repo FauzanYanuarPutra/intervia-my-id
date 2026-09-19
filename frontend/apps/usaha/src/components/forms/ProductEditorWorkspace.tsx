@@ -35,6 +35,8 @@ export function ProductEditorWorkspace({ businessId, product }: Props) {
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
   const [statusReason, setStatusReason] = useState('');
+  const [changeReason, setChangeReason] = useState('');
+  const [stockReason, setStockReason] = useState('');
   const busy = pendingAction !== null;
 
   async function request(path: string, body: Record<string, unknown>) {
@@ -74,6 +76,10 @@ export function ProductEditorWorkspace({ businessId, product }: Props) {
       setError('Satuan stok harus diisi.');
       return;
     }
+    if (changeReason.trim().length < 3) {
+      setError('Tulis alasan perubahan detail produk minimal 3 karakter.');
+      return;
+    }
 
     begin('detail');
     try {
@@ -83,7 +89,9 @@ export function ProductEditorWorkspace({ businessId, product }: Props) {
         priceLabel: `Rp${new Intl.NumberFormat('id-ID').format(normalizedPrice)}`,
         minStockAlert: normalizedThreshold,
         stockUnit: stockUnit.trim(),
+        reason: changeReason.trim(),
       });
+      setChangeReason('');
       setSuccess('Detail produk tersimpan.');
       refresh();
     } catch (value) {
@@ -99,13 +107,18 @@ export function ProductEditorWorkspace({ businessId, product }: Props) {
       setError('Jumlah stok harus nol atau lebih.');
       return;
     }
+    if (stockReason.trim().length < 3) {
+      setError('Tulis alasan perubahan stok minimal 3 karakter.');
+      return;
+    }
 
     begin('stock');
     try {
       await request(`/api/businesses/${businessId}/products/${product.id}/inventory`, {
         stockCount: normalizedStock,
-        reason: 'manual_adjustment',
+        reason: stockReason.trim(),
       });
+      setStockReason('');
       setSuccess('Stok diperbarui.');
       refresh();
     } catch (value) {
@@ -181,8 +194,19 @@ export function ProductEditorWorkspace({ businessId, product }: Props) {
             Satuan stok
             <input className="portal-input" value={stockUnit} onChange={event => setStockUnit(event.target.value)} maxLength={40} required />
           </label>
+          <label className="grid gap-1.5 text-xs font-semibold text-portal-ink sm:col-span-2">
+            Alasan perubahan detail
+            <input
+              value={changeReason}
+              onChange={event => setChangeReason(event.target.value)}
+              maxLength={500}
+              placeholder="Contoh: harga pemasok berubah"
+              className="portal-input"
+            />
+          </label>
+
           <div className="sm:col-span-2">
-            <button type="submit" disabled={busy} className="portal-button-primary">
+            <button type="submit" disabled={busy || changeReason.trim().length < 3} className="portal-button-primary">
               <Save className="h-4 w-4" /> {pendingAction === 'detail' ? 'Menyimpan...' : 'Simpan detail'}
             </button>
           </div>
@@ -194,7 +218,17 @@ export function ProductEditorWorkspace({ businessId, product }: Props) {
               Stok saat ini
               <input className="portal-input" type="number" min="0" step="any" value={stockCount} onChange={event => setStockCount(event.target.value)} placeholder="Kosong = belum diketahui" />
             </label>
-            <button type="button" onClick={saveStock} disabled={busy} className="portal-button-secondary sm:mb-0.5">
+            <label className="grid flex-1 gap-1.5 text-xs font-semibold text-portal-ink">
+              Alasan perubahan stok
+              <input
+                value={stockReason}
+                onChange={event => setStockReason(event.target.value)}
+                maxLength={500}
+                placeholder="Contoh: stok opname"
+                className="portal-input"
+              />
+            </label>
+            <button type="button" onClick={saveStock} disabled={busy || stockReason.trim().length < 3} className="portal-button-secondary sm:mb-0.5">
               <Save className="h-4 w-4" /> {pendingAction === 'stock' ? 'Menyimpan...' : 'Update stok'}
             </button>
           </div>
