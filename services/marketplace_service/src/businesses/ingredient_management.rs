@@ -106,7 +106,9 @@ impl IngredientManagementRepository {
             .as_deref()
             .map(normalize)
             .filter(|value| value.chars().count() >= 3)
-            .ok_or(IngredientManagementError::Validation("ingredient_change_reason_required"))?;
+            .ok_or(IngredientManagementError::Validation(
+                "ingredient_change_reason_required",
+            ))?;
 
         let mut tx = self.db.begin().await?;
         let before = sqlx::query_as::<_, IngredientRecord>(
