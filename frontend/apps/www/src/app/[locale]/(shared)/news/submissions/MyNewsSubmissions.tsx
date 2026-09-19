@@ -82,7 +82,7 @@ function escapeHtml(value: string): string {
 
 function fallbackRichBody(value: string): string {
   return value
-    .split(/\\r?\\n\\r?\\n+/)
+    .split(/\r?\n\r?\n+/)
     .map(paragraph => paragraph.trim())
     .filter(Boolean)
     .map(paragraph => `<p>${escapeHtml(paragraph)}</p>`)
