@@ -6,6 +6,9 @@ use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 use super::{
+    counterparty::{
+        ensure_party_archive_allowed_tx, validate_party_role_change_tx, CounterpartyError,
+    },
     event_outbox::enqueue_business_event,
     execution_policy::{
         allocate_document_number_tx, load_execution_policy_tx, ExecutionPolicyError,
@@ -190,6 +193,7 @@ pub(crate) struct ReceivableBalanceRecord {
     pub(crate) sale_id: Uuid,
     pub(crate) business_id: Uuid,
     pub(crate) organization_id: Uuid,
+    pub(crate) party_id: Option<Uuid>,
     pub(crate) document_number: String,
     pub(crate) currency: String,
     pub(crate) occurred_on: NaiveDate,
@@ -203,6 +207,7 @@ pub(crate) struct PayableBalanceRecord {
     pub(crate) purchase_id: Uuid,
     pub(crate) business_id: Uuid,
     pub(crate) organization_id: Uuid,
+    pub(crate) party_id: Option<Uuid>,
     pub(crate) document_number: String,
     pub(crate) currency: String,
     pub(crate) occurred_on: NaiveDate,
@@ -363,6 +368,15 @@ impl CommercialCoreRepository {
             note: request.note,
         })?;
         let mut tx = self.db.begin().await?;
+        validate_party_role_change_tx(
+            &mut tx,
+            business_id,
+            organization_id,
+            party_id,
+            &normalized.party_kind,
+        )
+        .await
+        .map_err(map_counterparty_error)?;
         let updated = sqlx::query_as::<_, PartyRecord>(
             r#"
             UPDATE business_parties
@@ -427,6 +441,14 @@ impl CommercialCoreRepository {
             return Err(CommercialCoreError::Validation("invalid_party_version"));
         }
         let mut tx = self.db.begin().await?;
+        ensure_party_archive_allowed_tx(
+            &mut tx,
+            business_id,
+            organization_id,
+            party_id,
+        )
+        .await
+        .map_err(map_counterparty_error)?;
         let archived = sqlx::query_as::<_, PartyRecord>(
             r#"
             UPDATE business_parties
@@ -521,9 +543,6 @@ impl CommercialCoreRepository {
         let policy = load_execution_policy_tx(&mut tx, business_id, organization_id)
             .await
             .map_err(map_policy_error)?;
-        if let Some(party_id) = normalized.party_id {
-            ensure_active_party_tx(&mut tx, business_id, organization_id, party_id).await?;
-        }
 
         validate_allocations_tx(
             &mut tx,
@@ -533,6 +552,11 @@ impl CommercialCoreRepository {
             &normalized,
         )
         .await?;
+        let resolved_party_id =
+            resolve_payment_party_tx(&mut tx, business_id, organization_id, &normalized).await?;
+        if let Some(party_id) = resolved_party_id {
+            ensure_active_party_tx(&mut tx, business_id, organization_id, party_id).await?;
+        }
 
         let payment_id = Uuid::new_v4();
         let correlation_id = Uuid::new_v4();
@@ -588,7 +612,7 @@ impl CommercialCoreRepository {
         .bind(&normalized.account_key)
         .bind(normalized.amount)
         .bind(&policy.currency)
-        .bind(normalized.party_id)
+        .bind(resolved_party_id)
         .bind(normalized.occurred_on)
         .bind(&normalized.reference)
         .bind(&normalized.note)
@@ -830,7 +854,7 @@ impl CommercialCoreRepository {
     ) -> Result<Vec<ReceivableBalanceRecord>, CommercialCoreError> {
         sqlx::query_as::<_, ReceivableBalanceRecord>(
             r#"
-            SELECT sale_id,business_id,organization_id,document_number,currency,occurred_on,
+            SELECT sale_id,business_id,organization_id,party_id,document_number,currency,occurred_on,
                    original_amount,paid_amount,outstanding_amount
             FROM business_sale_receivable_balances
             WHERE business_id=$1 AND organization_id=$2
@@ -851,7 +875,7 @@ impl CommercialCoreRepository {
     ) -> Result<Vec<PayableBalanceRecord>, CommercialCoreError> {
         sqlx::query_as::<_, PayableBalanceRecord>(
             r#"
-            SELECT purchase_id,business_id,organization_id,document_number,currency,occurred_on,
+            SELECT purchase_id,business_id,organization_id,party_id,document_number,currency,occurred_on,
                    original_amount,paid_amount,outstanding_amount
             FROM business_purchase_payable_balances
             WHERE business_id=$1 AND organization_id=$2
@@ -1118,6 +1142,91 @@ async fn classify_party_write_miss(
     } else {
         CommercialCoreError::NotFound
     })
+}
+
+fn map_counterparty_error(error: CounterpartyError) -> CommercialCoreError {
+    match error {
+        CounterpartyError::Required | CounterpartyError::Invalid => {
+            CommercialCoreError::Validation("invalid_counterparty")
+        }
+        CounterpartyError::CustomerRoleInUse => {
+            CommercialCoreError::Validation("party_customer_role_in_use")
+        }
+        CounterpartyError::SupplierRoleInUse => {
+            CommercialCoreError::Validation("party_supplier_role_in_use")
+        }
+        CounterpartyError::OutstandingBalance => {
+            CommercialCoreError::Validation("party_has_outstanding_balance")
+        }
+        CounterpartyError::Database => CommercialCoreError::Database,
+    }
+}
+
+async fn resolve_payment_party_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    business_id: Uuid,
+    organization_id: Uuid,
+    payment: &NormalizedPayment,
+) -> Result<Option<Uuid>, CommercialCoreError> {
+    let mut inferred_party: Option<Uuid> = None;
+
+    for allocation in &payment.allocations {
+        let document_party = if let Some(sale_id) = allocation.sale_id {
+            sqlx::query_scalar::<_, Option<Uuid>>(
+                r#"
+                SELECT party_id
+                FROM business_sales
+                WHERE id=$1 AND business_id=$2 AND organization_id=$3
+                "#,
+            )
+            .bind(sale_id)
+            .bind(business_id)
+            .bind(organization_id)
+            .fetch_optional(&mut **tx)
+            .await?
+            .ok_or(CommercialCoreError::Validation("sale_not_receivable"))?
+        } else if let Some(purchase_id) = allocation.purchase_id {
+            sqlx::query_scalar::<_, Option<Uuid>>(
+                r#"
+                SELECT party_id
+                FROM business_purchases
+                WHERE id=$1 AND business_id=$2 AND organization_id=$3
+                "#,
+            )
+            .bind(purchase_id)
+            .bind(business_id)
+            .bind(organization_id)
+            .fetch_optional(&mut **tx)
+            .await?
+            .ok_or(CommercialCoreError::Validation("purchase_not_payable"))?
+        } else {
+            return Err(CommercialCoreError::Validation(
+                "invalid_payment_allocation",
+            ));
+        };
+
+        if let Some(document_party) = document_party {
+            if let Some(existing) = inferred_party {
+                if existing != document_party {
+                    return Err(CommercialCoreError::Validation(
+                        "payment_mixed_counterparties",
+                    ));
+                }
+            } else {
+                inferred_party = Some(document_party);
+            }
+        }
+    }
+
+    if let (Some(requested), Some(inferred)) = (payment.party_id, inferred_party) {
+        if requested != inferred {
+            return Err(CommercialCoreError::Validation(
+                "payment_party_mismatch",
+            ));
+        }
+    }
+
+    Ok(payment.party_id.or(inferred_party))
 }
 
 async fn ensure_active_party_tx(
