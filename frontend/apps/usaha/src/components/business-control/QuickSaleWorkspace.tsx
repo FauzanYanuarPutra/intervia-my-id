@@ -69,9 +69,12 @@ type ConfiguredProductInput = {
   configurationSummary: string;
 };
 
+type SaleChannelOption = { value: string; label: string };
+
 type Props = {
   businessId: string;
   products: ProductOption[];
+  channels?: SaleChannelOption[];
   defaultDate: string;
 };
 
@@ -91,11 +94,9 @@ const paymentOptions: PaymentOption[] = [
   { value: 'receivable', label: 'Belum bayar', icon: WalletCards },
 ];
 
-const channelOptions = [
+const fallbackChannelOptions: SaleChannelOption[] = [
   { value: 'offline', label: 'Di tempat' },
   { value: 'whatsapp', label: 'WhatsApp' },
-  { value: 'gofood', label: 'GoFood' },
-  { value: 'grabfood', label: 'GrabFood' },
   { value: 'other', label: 'Lainnya' },
 ];
 
@@ -213,10 +214,11 @@ function CartLines({ lines, onQuantity, onEdit }: { lines: DraftLine[]; onQuanti
   );
 }
 
-export function QuickSaleWorkspace({ businessId, products, defaultDate }: Props) {
+export function QuickSaleWorkspace({ businessId, products, channels = [], defaultDate }: Props) {
+  const channelOptions = channels.length ? channels : fallbackChannelOptions;
   const router = useRouter();
   const [occurredOn, setOccurredOn] = useState(defaultDate);
-  const [channelKey, setChannelKey] = useState('offline');
+  const [channelKey, setChannelKey] = useState(channels[0]?.value ?? 'offline');
   const [accountKey, setAccountKey] = useState<CheckoutPaymentMethod>('cash');
   const [lines, setLines] = useState<DraftLine[]>([]);
   const [search, setSearch] = useState('');
@@ -321,7 +323,7 @@ export function QuickSaleWorkspace({ businessId, products, defaultDate }: Props)
     setReceipt(null);
     setFeedback(null);
     setAccountKey('cash');
-    setChannelKey('offline');
+    setChannelKey(channels[0]?.value ?? 'offline');
     setSearch('');
     setFilterKey('all');
   }
