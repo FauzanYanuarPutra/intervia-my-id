@@ -24,6 +24,10 @@ param(
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
+if ($Down -and ($Build -or $Pull -or $Fresh)) {
+    throw "Parameter -Down tidak dapat digabung dengan -Build, -Pull, atau -Fresh. Jalankan aksi tersebut secara terpisah."
+}
+
 $RepoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $PreviousComposeParallelLimit = $env:COMPOSE_PARALLEL_LIMIT
 Push-Location $RepoRoot
@@ -57,7 +61,7 @@ try {
         }
     }
 
-    $DockerEngineRecoveryAttempted = $false
+    $script:DockerEngineRecoveryAttempted = $false
     $DockerDesktopCliAvailable = $false
     $DockerDesktopCommand = Get-Command "docker" -ErrorAction SilentlyContinue
     $DesktopStatusProbe = $null
@@ -66,51 +70,17 @@ try {
         $DockerDesktopCliAvailable = ($DesktopStatusProbe.ExitCode -eq 0)
     }
 
-    # Compose config validation does not guarantee that the Docker daemon is
-    # healthy. Probe the actual Engine API before resolving/building the stack.
-    # This catches Docker Desktop Linux-engine failures such as HTTP 500 on
-    # /_ping before a 22-image build is started.
-    $EngineReady = $false
-    $EngineProbeOutput = @()
-    $EngineExitCode = 1
-    for ($Attempt = 1; $Attempt -le 6; $Attempt++) {
-        $EngineProbe = Invoke-DockerNative -Arguments @("info", "--format", "{{json .ServerVersion}}")
-        $EngineProbeOutput = @($EngineProbe.Output)
-        $EngineExitCode = $EngineProbe.ExitCode
-        if ($EngineExitCode -eq 0) {
-            $EngineReady = $true
-            break
-        }
-
-        if ($Attempt -lt 6) {
-            Start-Sleep -Seconds 3
-        }
-    }
-
-    if (-not $EngineReady -and -not $NoDockerEngineRepair -and $DockerDesktopCliAvailable) {
-        Write-Warning "Docker Engine belum sehat. Mencoba satu kali recovery Docker Desktop..."
-        $RestartProbe = Invoke-DockerNative -Arguments @("desktop", "restart", "--timeout", "120")
-        if ($RestartProbe.ExitCode -eq 0) {
-            for ($Attempt = 1; $Attempt -le 12; $Attempt++) {
-                Start-Sleep -Seconds 5
-                $EngineProbe = Invoke-DockerNative -Arguments @("info", "--format", "{{json .ServerVersion}}")
-                $EngineProbeOutput = @($EngineProbe.Output)
-                $EngineExitCode = $EngineProbe.ExitCode
-                if ($EngineExitCode -eq 0) {
-                    $EngineReady = $true
-                    break
-                }
-            }
-        }
-    }
-
     function Invoke-DockerEngineRecovery {
         param(
             [Parameter(Mandatory = $true)]
             [string]$Reason
         )
 
-        if ($NoDockerEngineRepair -or $script:DockerEngineRecoveryAttempted -or -not $DockerDesktopCliAvailable) {
+        if (
+            $NoDockerEngineRepair -or
+            $script:DockerEngineRecoveryAttempted -or
+            -not $DockerDesktopCliAvailable
+        ) {
             return $false
         }
 
@@ -134,6 +104,31 @@ try {
 
         Write-Warning "Docker Desktop sudah direstart tetapi Docker Engine belum kembali sehat."
         return $false
+    }
+
+    # Compose config validation does not guarantee that the Docker daemon is
+    # healthy. Probe the actual Engine API before resolving/building the stack.
+    # This catches Docker Desktop Linux-engine failures such as HTTP 500 on
+    # /_ping before a 22-image build is started.
+    $EngineReady = $false
+    $EngineProbeOutput = @()
+    $EngineExitCode = 1
+    for ($Attempt = 1; $Attempt -le 6; $Attempt++) {
+        $EngineProbe = Invoke-DockerNative -Arguments @("info", "--format", "{{json .ServerVersion}}")
+        $EngineProbeOutput = @($EngineProbe.Output)
+        $EngineExitCode = $EngineProbe.ExitCode
+        if ($EngineExitCode -eq 0) {
+            $EngineReady = $true
+            break
+        }
+
+        if ($Attempt -lt 6) {
+            Start-Sleep -Seconds 3
+        }
+    }
+
+    if (-not $EngineReady) {
+        $EngineReady = Invoke-DockerEngineRecovery -Reason "initial Docker Engine preflight"
     }
 
     if (-not $EngineReady) {
@@ -318,11 +313,14 @@ try {
             if (Invoke-DockerEngineRecovery -Reason "Compose build") {
                 Write-Warning "Mengulangi Compose build dengan paralelisme 1 untuk mengurangi beban Docker Desktop..."
                 $env:COMPOSE_PARALLEL_LIMIT = "1"
+                $RetryPreviousErrorActionPreference = $ErrorActionPreference
                 try {
+                    $ErrorActionPreference = "Continue"
                     & docker @ComposeArgs @BuildArgs
                     $BuildExitCode = $LASTEXITCODE
                 }
                 finally {
+                    $ErrorActionPreference = $RetryPreviousErrorActionPreference
                     $env:COMPOSE_PARALLEL_LIMIT = $OriginalParallelLimit
                 }
             }
@@ -368,8 +366,15 @@ try {
     if ($UpExitCode -ne 0 -and $DockerEngineFailure) {
         if (Invoke-DockerEngineRecovery -Reason "Compose up") {
             Write-Warning "Mengulangi Compose up setelah recovery Docker Engine..."
-            & docker @ComposeArgs @UpArgs
-            $UpExitCode = $LASTEXITCODE
+            $RetryPreviousErrorActionPreference = $ErrorActionPreference
+            try {
+                $ErrorActionPreference = "Continue"
+                & docker @ComposeArgs @UpArgs
+                $UpExitCode = $LASTEXITCODE
+            }
+            finally {
+                $ErrorActionPreference = $RetryPreviousErrorActionPreference
+            }
         }
     }
 
