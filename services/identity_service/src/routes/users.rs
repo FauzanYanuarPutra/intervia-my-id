@@ -199,7 +199,8 @@ fn normalize_google_backoffice_roles(application: &str, values: &[String]) -> Ve
         if matches!(
             role.as_str(),
             "admin" | "content_admin" | "sales" | "support"
-        ) && !roles.contains(&role) {
+        ) && !roles.contains(&role)
+        {
             roles.push(role);
         }
     }
