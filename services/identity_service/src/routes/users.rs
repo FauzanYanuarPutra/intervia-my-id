@@ -240,11 +240,7 @@ pub async fn list_backoffice_google_access(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> impl IntoResponse {
-    if require_super_admin(&state, &headers).await.is_err() {
-        let status = match require_super_admin(&state, &headers).await {
-            Err(value) => value,
-            Ok(_) => StatusCode::OK,
-        };
+    if let Err(status) = require_super_admin(&state, &headers).await {
         return (status, Json(json!({"error":"backoffice owner access required"}))).into_response();
     }
 
