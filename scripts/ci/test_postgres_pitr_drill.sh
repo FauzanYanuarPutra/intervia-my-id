@@ -9,6 +9,7 @@ NETWORK="lajukan-pitr-net-$$"
 ARCHIVE="$WORK/wal"
 BACKUPS="$WORK/backups"
 mkdir -p "$ARCHIVE" "$BACKUPS"
+chmod 0777 "$ARCHIVE" "$BACKUPS"
 
 cleanup() {
   docker rm -f "$PRIMARY" >/dev/null 2>&1 || true
