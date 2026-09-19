@@ -8,3 +8,5 @@ CREATE DATABASE crm_db;
 CREATE DATABASE communication_db;
 CREATE DATABASE trust_db;
 CREATE DATABASE audit_db;
+CREATE DATABASE support_db;
+CREATE DATABASE review_db;
