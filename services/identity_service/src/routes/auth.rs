@@ -840,10 +840,7 @@ fn resolve_access_token_algorithm(
 
 fn access_token_algorithm() -> Result<Algorithm, anyhow::Error> {
     let configured = env::var("JWT_ACCESS_ALG").unwrap_or_else(|_| "HS256".to_string());
-    resolve_access_token_algorithm(
-        &configured,
-        environment_requires_asymmetric_access_tokens(),
-    )
+    resolve_access_token_algorithm(&configured, environment_requires_asymmetric_access_tokens())
 }
 
 #[cfg(test)]
