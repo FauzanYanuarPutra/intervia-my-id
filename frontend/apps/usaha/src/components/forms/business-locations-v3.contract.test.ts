@@ -14,7 +14,7 @@ describe('business locations UX V3', () => {
 
   it('persists a human reason with location changes', () => {
     expect(source).toContain('JSON.stringify({ locations: next, reason })');
-    expect(source).toContain('Alasan perubahan lokasi minimal 3 karakter.');
+    expect(source).toContain('Tulis alasan perubahan lokasi minimal 3 karakter.');
   });
 
   it('discards an unsaved location locally without calling the persistence endpoint', () => {
