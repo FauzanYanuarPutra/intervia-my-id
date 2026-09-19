@@ -9,6 +9,7 @@ import { SupportRiskWorkspace } from "./SupportRiskWorkspace";
 import { TransactionWorkspace } from "./TransactionWorkspace";
 import { AnalyticsWorkspace } from "./AnalyticsWorkspace";
 import { AdministrationWorkspace } from "./AdministrationWorkspace";
+import ModerationDecisionDialog from "./ModerationDecisionDialog";
 import { OperationsOverview } from "./OperationsOverview";
 import { createEmptyDashboardData } from "./dashboardData";
 import { buildOperationsPriorities } from "./operationsPriority";
@@ -614,6 +615,11 @@ export default function CrmCommandCenter() {
   const [refreshing, setRefreshing] = useState(false);
   const [notice, setNotice] = useState("");
   const [data, setData] = useState<DashboardData>(() => buildInitialData());
+  const [moderationDraft, setModerationDraft] = useState<{
+    listing: CrmListingRow;
+    action: "restore" | "review" | "hide" | "ban";
+  } | null>(null);
+  const [moderationBusy, setModerationBusy] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!accessToken) return;
@@ -732,61 +738,51 @@ export default function CrmCommandCenter() {
       listing: CrmListingRow,
       action: "restore" | "review" | "hide" | "ban",
     ) => {
-      if (!accessToken) return;
       setNotice("");
+      setModerationDraft({ listing, action });
+    },
+    [],
+  );
 
-      const nextStatus =
-        action === "restore" ? "active" : action === "ban" ? "archived" : "paused";
-      const actionLabel = {
-        restore: "dipulihkan",
-        review: "ditandai perlu tinjau",
-        hide: "disembunyikan",
-        ban: "diarsipkan karena pelanggaran",
-      }[action];
-      const moderation = {
-        ...asRecord(listing.metadata.moderation),
-        status: action === "restore" ? "normal" : action,
-        last_action: action,
-        last_reason:
-          listing.reportReasons[0] ||
-          "Keputusan admin berdasarkan laporan dan review manual.",
-        report_count: listing.reportCount,
-        updated_at: new Date().toISOString(),
-      };
-
+  const confirmListingModeration = useCallback(
+    async (input: {
+      action: string;
+      reasonCode: string;
+      reasonNote: string;
+      severity: "low" | "medium" | "high" | "critical";
+    }) => {
+      if (!moderationDraft) return;
+      setModerationBusy(true);
       try {
-        await contentApi.update(accessToken, listing.id, {
-          content_status: nextStatus,
-          metadata: {
-            ...listing.metadata,
-            moderation,
+        const response = await fetch(
+          `/api/crm/listing-moderation/${encodeURIComponent(moderationDraft.listing.id)}`,
+          {
+            method: "PATCH",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: input.action,
+              reason_code: input.reasonCode,
+              reason_note: input.reasonNote,
+              severity: input.severity,
+              legal_hold: input.severity === "high" || input.severity === "critical",
+            }),
           },
-        });
-        setData(current => ({
-          ...current,
-          listings: current.listings.map(item =>
-            item.id === listing.id
-              ? {
-                ...item,
-                rawStatus: nextStatus,
-                status: listingStatus(nextStatus),
-                metadata: {
-                  ...item.metadata,
-                  moderation,
-                },
-                moderationStatus: moderation.status,
-              }
-              : item,
-          ),
-        }));
-        setNotice(`Listing ${listing.title} berhasil ${actionLabel}.`);
-      } catch {
-        setNotice(
-          "Action moderasi listing gagal. Pastikan akun admin punya role content_admin/super_admin dan marketplace service aktif.",
         );
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(String(payload.error || payload.message || "Moderation gagal"));
+        }
+        setNotice(`Keputusan moderasi untuk "${moderationDraft.listing.title}" tersimpan.`);
+        setModerationDraft(null);
+        await loadData();
+      } catch (error) {
+        setNotice(error instanceof Error ? error.message : "Moderation gagal.");
+      } finally {
+        setModerationBusy(false);
       }
     },
-    [accessToken],
+    [loadData, moderationDraft],
   );
 
   const handleUserTrustAction = useCallback(
@@ -990,6 +986,12 @@ export default function CrmCommandCenter() {
               {activePage === "analytics" ? <AnalyticsWorkspace users={filteredData.users} listings={filteredData.listings} transactions={transactions} openSupport={openIssues} /> : null}
               {activePage === "disputes" ? <SupportRiskWorkspace tickets={data.tickets} transactions={transactions} users={data.users} supportFailed={data.failures.includes("support") || data.failures.includes("tickets")} /> : null}
               {activePage === "settings" ? <AdministrationWorkspace /> : null}
+              <ModerationDecisionDialog
+                draft={moderationDraft}
+                busy={moderationBusy}
+                onClose={() => { if (!moderationBusy) setModerationDraft(null); }}
+                onConfirm={confirmListingModeration}
+              />
             </div>
           </main>
         </div>
@@ -1303,7 +1305,7 @@ function ListingsPage({
                   onClick={() => onModerationAction(listing, "ban")}
                   className="rounded-xl border border-slate-200 bg-slate-950 px-3 py-2 text-xs font-bold text-white"
                 >
-                  Ban listing
+                  Tindakan berat
                 </button>
               </div>
             </div>
@@ -1392,7 +1394,7 @@ function ListingsPage({
               onClick={() => onModerationAction(selectedListing, "ban")}
               className="rounded-xl bg-slate-950 px-3 py-2 text-xs font-bold text-white"
             >
-              Ban / arsipkan
+              Tindakan berat
             </button>
           </div>
         </ShellCard>
