@@ -40,6 +40,11 @@ import {
   normalizeProfileMediaList,
 } from '@/lib/profile/profileMedia';
 import { normalizePublicProfileHandleInput } from '@/lib/profile/publicProfileLink';
+import {
+  profileAvatarSrc,
+  readProfileAvatarStyle,
+  readProfileAvatarUrl,
+} from '@/lib/profile/avatar';
 import { cn } from '@/lib/utils';
 
 type MetaRecord = Record<string, unknown>;
@@ -63,6 +68,8 @@ type UserDetailLike = {
   fullName?: string | null;
   username?: string | null;
   bio?: string | null;
+  avatar_url?: string | null;
+  avatarUrl?: string | null;
   location?: string | null;
   phone_verified?: boolean | null;
   email_verified?: boolean | null;
@@ -500,15 +507,15 @@ export function OwnerProfileEditModal({
 
   const sectionTitle: Record<OwnerProfileEditSection, string> = isId
     ? {
-        menu: 'Edit profil',
-        identity: 'Profil utama',
+        menu: 'Atur profil',
+        identity: 'Profil',
         contact: 'Kontak',
-        business: 'Usaha atau jasa',
-        professional: 'Keahlian profesional',
+        business: 'Usaha & jasa',
+        professional: 'Keahlian',
         buyer: 'Sedang mencari',
-        history: 'Pengalaman & bukti',
-        media: 'Galeri & dokumen',
-        trust: 'Kepercayaan & verifikasi',
+        history: 'Pengalaman',
+        media: 'Galeri',
+        trust: 'Verifikasi',
       }
     : {
         menu: 'Edit profile',
@@ -912,6 +919,15 @@ export function OwnerProfileEditModal({
         certificate: 'Certificate',
       };
 
+  const profileName =
+    asString(detail.full_name) ||
+    asString(detail.fullName) ||
+    asString(detail.username) ||
+    (isId ? 'Profil saya' : 'My profile');
+  const profileUsername = asString(detail.username);
+  const profileLocation = asString(detail.location);
+  const profileAvatar = readProfileAvatarUrl(detail);
+
   const content = (
     <div className="fixed inset-0 z-[1600] flex items-end justify-center bg-slate-950/50 backdrop-blur-[2px] sm:items-center sm:p-4">
       <div className="flex h-[100dvh] w-full min-w-0 flex-col overflow-hidden bg-[color:var(--app-surface-strong)] shadow-2xl sm:h-auto sm:max-h-[90dvh] sm:max-w-2xl sm:rounded-[28px] sm:border sm:border-[color:var(--app-border)]">
@@ -1026,6 +1042,36 @@ export function OwnerProfileEditModal({
             </div>
           ) : section === 'menu' ? (
             <div>
+              <div className="mx-4 mt-4 rounded-[20px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3 sm:mx-5">
+                <div className="flex items-center gap-3">
+                  <img
+                    src={profileAvatarSrc(
+                      profileAvatar,
+                      readProfileAvatarStyle(detail),
+                      profileName,
+                    )}
+                    alt=""
+                    className="h-14 w-14 shrink-0 rounded-full object-cover ring-2 ring-white dark:ring-slate-800"
+                  />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                      {profileName}
+                    </p>
+                    {profileUsername ? (
+                      <p className="mt-0.5 truncate text-xs font-semibold text-[color:var(--app-text-soft)]">
+                        @{profileUsername}
+                      </p>
+                    ) : null}
+                    {profileLocation ? (
+                      <p className="mt-0.5 flex items-center gap-1 truncate text-[11px] text-[color:var(--app-text-soft)]">
+                        <MapPin className="h-3 w-3 shrink-0" />
+                        {profileLocation}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+
               <div className="border-b border-[color:var(--app-border)] px-4 py-4 sm:px-5">
                 <p className="text-sm leading-5 text-[color:var(--app-text-soft)]">
                   {isId
@@ -1033,14 +1079,14 @@ export function OwnerProfileEditModal({
                     : 'Edit only what you need. You do not have to fill everything.'}
                 </p>
               </div>
-              <MenuRow icon={UserRound} title={sectionTitle.identity} description={isId ? 'Nama, username, lokasi, bio, dan visibilitas.' : 'Name, username, location, bio, and visibility.'} complete={identityReady} onClick={() => goToSection('identity')} />
-              <MenuRow icon={Phone} title={sectionTitle.contact} description={isId ? 'WhatsApp dan status verifikasi kontak.' : 'WhatsApp and contact verification.'} complete={contactReady} onClick={() => goToSection('contact')} />
-              <MenuRow icon={Store} title={sectionTitle.business} description={isId ? 'Usaha, layanan, area, harga, dan cara melayani.' : 'Business, services, area, pricing, and service mode.'} complete={providerReady} onClick={() => goToSection('business')} />
-              <MenuRow icon={BriefcaseBusiness} title={sectionTitle.professional} description={isId ? 'Keahlian, bahasa, pengalaman, dan tarif profesional.' : 'Skills, languages, experience, and professional rate.'} complete={professionalReady} onClick={() => goToSection('professional')} />
-              <MenuRow icon={Search} title={sectionTitle.buyer} description={isId ? 'Kebutuhan, budget, sektor, dan lokasi yang dicari.' : 'Needs, budget, sector, and preferred location.'} complete={buyerReady} onClick={() => goToSection('buyer')} />
-              <MenuRow icon={GraduationCap} title={sectionTitle.history} description={isId ? 'Pengalaman, pendidikan, sertifikat, dan link.' : 'Experience, education, certificates, and links.'} complete={historyReady} onClick={() => goToSection('history')} />
-              <MenuRow icon={Images} title={sectionTitle.media} description={isId ? 'Galeri usaha dan dokumen pendukung.' : 'Business gallery and supporting documents.'} complete={mediaReady} onClick={() => goToSection('media')} />
-              <MenuRow icon={ShieldCheck} title={sectionTitle.trust} description={isId ? 'Lihat status identitas, email, dan nomor kontak.' : 'Review identity, email, and contact status.'} complete={identityVerified && contactReady} onClick={() => goToSection('trust')} />
+              <MenuRow icon={UserRound} title={sectionTitle.identity} description={isId ? 'Nama, username, lokasi, dan bio.' : 'Name, username, location, and bio.' complete={identityReady} onClick={() => goToSection('identity')} />
+              <MenuRow icon={Phone} title={sectionTitle.contact} description={isId ? 'WhatsApp dan email.' : 'WhatsApp and email.' complete={contactReady} onClick={() => goToSection('contact')} />
+              <MenuRow icon={Store} title={sectionTitle.business} description={isId ? 'Yang kamu jual atau kerjakan.' : 'What you sell or do.' complete={providerReady} onClick={() => goToSection('business')} />
+              <MenuRow icon={BriefcaseBusiness} title={sectionTitle.professional} description={isId ? 'Skill, bahasa, dan pengalaman.' : 'Skills, languages, and experience.' complete={professionalReady} onClick={() => goToSection('professional')} />
+              <MenuRow icon={Search} title={sectionTitle.buyer} description={isId ? 'Kebutuhan, budget, dan lokasi.' : 'Needs, budget, and location.' complete={buyerReady} onClick={() => goToSection('buyer')} />
+              <MenuRow icon={GraduationCap} title={sectionTitle.history} description={isId ? 'Pengalaman, pendidikan, dan sertifikat.' : 'Experience, education, and certificates.' complete={historyReady} onClick={() => goToSection('history')} />
+              <MenuRow icon={Images} title={sectionTitle.media} description={isId ? 'Foto dan dokumen pendukung.' : 'Photos and documents.' complete={mediaReady} onClick={() => goToSection('media')} />
+              <MenuRow icon={ShieldCheck} title={sectionTitle.trust} description={isId ? 'Cek identitas, email, dan WhatsApp.' : 'Check identity, email, and WhatsApp.' complete={identityVerified && contactReady} onClick={() => goToSection('trust')} />
             </div>
           ) : section === 'identity' ? (
             <div className="space-y-4 p-4 sm:p-5">
