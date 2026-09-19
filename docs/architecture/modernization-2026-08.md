@@ -77,3 +77,12 @@ Do not combine these into a single rewrite. Each slice must compile, preserve pu
 - [Caddy Automatic HTTPS](https://caddyserver.com/docs/automatic-https)
 - [OWASP API1: Broken Object Level Authorization](https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/)
 - [GitHub deployment environments](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments)
+
+
+## Domain Ownership Decision — 2026-09
+
+The repository is moving from broad service ownership to explicit domain ownership without performing a big-bang rewrite. The active architecture contract is `domain-service-boundaries-2026-09.md`.
+
+New business capability work must first identify its domain owner and source-of-truth database. Adding a News, Payment, Order, CRM, Profile, Media, Promotion, Communication or Trust table to `marketplace_db` is no longer an acceptable default. The extraction may be incremental, but the target owner must be declared before schema work begins.
+
+The first extraction slices are Media, News, Profile/Business, Order, and Payment/Wallet. Each slice must preserve existing public contracts until parity and rollback evidence are complete.
