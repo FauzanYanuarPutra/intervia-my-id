@@ -1912,6 +1912,16 @@ async fn edit_news_editorial(
         );
     }
 
+    let requested_topics = match payload.topics {
+        Some(topics) => sanitize_topics(Some(topics)),
+        None => Ok(None),
+    };
+    let topics = match requested_topics {
+        Ok(Some(topics)) => topics,
+        Ok(None) => public_topics_from_tags(current.tags.as_deref()),
+        Err(message) => return response_error(StatusCode::BAD_REQUEST, message),
+    };
+
     let next_editorial_status = if action == "edit" && current_status == "needs_revision" {
         "pending_review"
     } else {
@@ -1956,16 +1966,6 @@ async fn edit_news_editorial(
                 news.insert("location".to_string(), Value::String(location.to_string()));
             }
         }
-
-        let requested_topics = match payload.topics {
-            Some(topics) => sanitize_topics(Some(topics)),
-            None => Ok(None),
-        };
-        let topics = match requested_topics {
-            Ok(Some(topics)) => topics,
-            Ok(None) => public_topics_from_tags(current.tags.as_deref()),
-            Err(message) => return response_error(StatusCode::BAD_REQUEST, message),
-        };
 
         let requested_sources = match payload.source_urls {
             Some(sources) => sanitize_news_source_urls(Some(sources)),
