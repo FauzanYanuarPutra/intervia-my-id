@@ -311,15 +311,18 @@ pub(crate) fn validate_business_profile_update(
         .transpose()
         .map_err(|_| ValidationError::InvalidBusinessBanner)?;
 
-    let metadata_patch = request.metadata_patch.map(|value| {
-        if !value.is_object() || value.get("public").is_some() {
-            return Err(ValidationError::InvalidPublicMetadata);
-        }
-        if value.to_string().len() > 200_000 {
-            return Err(ValidationError::InvalidPublicMetadata);
-        }
-        Ok(value)
-    }).transpose()?;
+    let metadata_patch = request
+        .metadata_patch
+        .map(|value| {
+            if !value.is_object() || value.get("public").is_some() {
+                return Err(ValidationError::InvalidPublicMetadata);
+            }
+            if value.to_string().len() > 200_000 {
+                return Err(ValidationError::InvalidPublicMetadata);
+            }
+            Ok(value)
+        })
+        .transpose()?;
     let reason = request
         .reason
         .map(|value| value.split_whitespace().collect::<Vec<_>>().join(" "))
