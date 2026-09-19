@@ -1,6 +1,6 @@
 mod advisor;
-mod audit;
 mod advisor_routes;
+mod audit;
 #[cfg(test)]
 mod availability_persistence_tests;
 mod commercial_core;
