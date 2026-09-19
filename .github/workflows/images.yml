@@ -54,6 +54,39 @@ jobs:
           - image: lajukan-liveness
             context: ./services/liveness_service
             dockerfile: Dockerfile
+          - image: lajukan-profile
+            context: ./services/profile_service
+            dockerfile: Dockerfile
+          - image: lajukan-media
+            context: ./services/media_service
+            dockerfile: Dockerfile
+          - image: lajukan-news
+            context: ./services/news_service
+            dockerfile: Dockerfile
+          - image: lajukan-order
+            context: ./services/order_service
+            dockerfile: Dockerfile
+          - image: lajukan-payment
+            context: ./services/payment_service
+            dockerfile: Dockerfile
+          - image: lajukan-promotion
+            context: ./services/promotion_service
+            dockerfile: Dockerfile
+          - image: lajukan-crm-domain
+            context: ./services/crm_service
+            dockerfile: Dockerfile
+          - image: lajukan-communication
+            context: ./services/communication_service
+            dockerfile: Dockerfile
+          - image: lajukan-trust
+            context: ./services/trust_service
+            dockerfile: Dockerfile
+          - image: lajukan-support
+            context: ./services/support_service
+            dockerfile: Dockerfile
+          - image: lajukan-review
+            context: ./services/review_service
+            dockerfile: Dockerfile
           - image: lajukan-www
             context: ./frontend
             dockerfile: apps/www/Dockerfile
