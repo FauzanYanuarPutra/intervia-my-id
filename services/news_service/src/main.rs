@@ -8,7 +8,7 @@ use tracing_subscriber::{layer::SubscriberExt,util::SubscriberInitExt};
 mod auth;
 mod news;
 mod outbox;
-use auth::{AccessClaims};
+pub(crate) use auth::{auth_claims_from_headers,user_id_from_auth,AccessClaims};
 #[derive(Clone)] pub(crate) struct AppState{pub(crate) db:PgPool,pub(crate) jwt_secret:String,pub(crate) http_client:Client}
 pub(crate) fn has_cms_access(claims:&AccessClaims)->bool{claims.roles.iter().any(|r|matches!(r.to_ascii_lowercase().as_str(),"admin"|"content_admin"|"super_admin"))}
 pub(crate) async fn push_notification_best_effort(state:&Arc<AppState>,user_id:uuid::Uuid,category:&str,event_type:&str,title:&str,message:&str,data:Value){
