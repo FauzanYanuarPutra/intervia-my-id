@@ -213,8 +213,14 @@ async fn require_super_admin(
     state: &Arc<AppState>,
     headers: &HeaderMap,
 ) -> Result<AccessClaims, StatusCode> {
-    let token = extract_bearer_token(headers).ok_or(StatusCode::UNAUTHORIZED)?;
-    let claims = decode_access_token(&state.config.jwt_secret, &token)
+    let token = headers
+        .get(header::AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.strip_prefix("Bearer "))
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+    let claims = decode_access_token(&state.config.jwt_secret, token)
         .map_err(|_| StatusCode::UNAUTHORIZED)?;
     if !has_role(&claims.roles, "super_admin") {
         return Err(StatusCode::FORBIDDEN);
