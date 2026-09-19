@@ -18,6 +18,6 @@ pub use user_lookup::{
     discover_users, get_public_user_profile, get_user_by_email, get_user_by_phone,
 };
 pub use users::{
-    create_backoffice_invitation, delete_me_account, get_me_profile, get_user_detail, list_backoffice_google_access, list_backoffice_invitations, list_my_backoffice_invitations, list_users, revoke_backoffice_invitation, respond_backoffice_invitation, search_backoffice_candidates,
+    create_backoffice_invitation, delete_me_account, get_me_profile, moderate_user, get_user_detail, list_backoffice_google_access, list_backoffice_invitations, list_my_backoffice_invitations, list_users, revoke_backoffice_invitation, respond_backoffice_invitation, search_backoffice_candidates,
     update_me_profile, upsert_backoffice_google_access,
 };
