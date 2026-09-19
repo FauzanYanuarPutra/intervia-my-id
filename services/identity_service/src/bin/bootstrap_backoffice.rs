@@ -253,7 +253,7 @@ async fn ensure_account(
         let role_id: Uuid = sqlx::query_scalar(
             r#"
             SELECT id
-            FROM core.roles
+            FROM roles
             WHERE lower(name::text) = lower($1)
               AND role_type = 'global'
             LIMIT 1
