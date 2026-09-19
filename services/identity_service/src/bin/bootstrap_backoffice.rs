@@ -244,7 +244,7 @@ async fn ensure_account(
         )
         .bind(user_id)
         .bind(if spec.slot == "admin" {
-            "Lajukan Backoffice Admin"
+            "Lajukan Platform Owner"
         } else {
             "Lajukan CRM Agent"
         })
@@ -337,7 +337,7 @@ async fn run() -> Result<()> {
         email: normalize_email(required_env("BACKOFFICE_ADMIN_EMAIL")?)?,
         username: normalize_username(required_env("BACKOFFICE_ADMIN_USERNAME")?)?,
         password: admin_password,
-        roles: &["admin", "content_admin", "sales", "support"],
+        roles: &["super_admin", "admin", "content_admin", "sales", "support"],
     };
     let agent = AccountSpec {
         slot: "agent",
@@ -392,7 +392,7 @@ async fn run() -> Result<()> {
     tx.commit().await?;
 
     println!("backoffice bootstrap completed");
-    println!("admin: {} (@{})", admin.email, admin.username);
+    println!("admin/platform owner: {} (@{})", admin.email, admin.username);
     println!("agent: {} (@{})", agent.email, agent.username);
     Ok(())
 }
