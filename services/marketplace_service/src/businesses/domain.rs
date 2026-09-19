@@ -799,6 +799,8 @@ mod tests {
             },
             logo: None,
             banner: None,
+            metadata_patch: None,
+            reason: None,
         };
 
         let command = validate_business_profile_update(request).expect("valid profile update");
@@ -833,6 +835,8 @@ mod tests {
             },
             logo: None,
             banner: None,
+            metadata_patch: None,
+            reason: None,
         };
 
         assert_eq!(
