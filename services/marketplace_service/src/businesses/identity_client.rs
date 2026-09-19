@@ -304,6 +304,31 @@ mod tests {
     }
 
     #[test]
+    fn work_visibility_and_management_follow_operational_roles() {
+        for role in [
+            "org_admin",
+            "org_manager",
+            "manager",
+            "org_cashier",
+            "cashier",
+            "org_inventory",
+            "inventory",
+            "org_accounting",
+            "accounting",
+            "org_viewer",
+            "viewer",
+        ] {
+            assert!(organization(role).can_view_work());
+        }
+        assert!(organization("org_manager").can_manage_work());
+        assert!(organization("manager").can_manage_work());
+        assert!(!organization("org_cashier").can_manage_work());
+        assert!(!organization("org_inventory").can_manage_work());
+        assert!(!organization("org_accounting").can_manage_work());
+        assert!(!organization("org_viewer").can_manage_work());
+    }
+
+    #[test]
     fn organization_list_parses_identity_public_role_values() {
         let body = r#"{"data":{"count":3,"items":[{"id":"76b836f4-3032-433f-8ac7-04a88f1a8511","current_user_role":"manager"},{"id":"86b836f4-3032-433f-8ac7-04a88f1a8511","current_user_role":"cashier"},{"id":"96b836f4-3032-433f-8ac7-04a88f1a8511","current_user_role":"viewer"}]}}"#;
         let organizations = parse_organization_list(body).expect("identity response");
