@@ -1,0 +1,10 @@
+CREATE DATABASE profile_db;
+CREATE DATABASE media_db;
+CREATE DATABASE news_db;
+CREATE DATABASE order_db;
+CREATE DATABASE payment_db;
+CREATE DATABASE promotion_db;
+CREATE DATABASE crm_db;
+CREATE DATABASE communication_db;
+CREATE DATABASE trust_db;
+CREATE DATABASE audit_db;
