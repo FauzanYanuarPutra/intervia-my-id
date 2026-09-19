@@ -96,6 +96,9 @@ describe('UX V3 primitives', () => {
         title="Hapus lokasi?"
         description="Lokasi akan dihapus dari daftar outlet."
         confirmLabel="Hapus lokasi"
+        requireText
+        value=""
+        onValueChange={() => {}}
         onConfirm={() => {}}
         onCancel={() => {}}
       />,
