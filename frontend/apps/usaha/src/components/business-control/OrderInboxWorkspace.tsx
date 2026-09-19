@@ -340,6 +340,23 @@ export function OrderInboxWorkspace({
                   {sellerOrderStatusLabel[selected.order.base_status]}
                 </StatusBadge>
               </div>
+              {selected.last_transition_reason &&
+              (selected.order.base_status === 'CANCELLED' ||
+                selected.order.base_status === 'REJECTED') ? (
+                <div className="mt-3 rounded-xl bg-red-50 px-3 py-2">
+                  <p className="text-[10px] font-black uppercase tracking-wide text-red-700">
+                    Alasan perubahan
+                  </p>
+                  <p className="mt-1 text-xs font-semibold leading-5 text-red-900">
+                    {selected.last_transition_reason}
+                  </p>
+                  {selected.last_transition_at ? (
+                    <p className="mt-1 text-[10px] text-red-700">
+                      {new Date(selected.last_transition_at).toLocaleString('id-ID')}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
 
             <div className="space-y-4 p-4">
