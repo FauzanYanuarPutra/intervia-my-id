@@ -197,17 +197,19 @@ impl ControlRepository {
     ) -> Result<IngredientRecord, ControlRepositoryError> {
         validate_ingredient(&request)?;
         ensure_business(&self.db, business_id, organization_id).await?;
-        sqlx::query_as::<_, IngredientRecord>(
+
+        let mut tx = self.db.begin().await?;
+        let row = sqlx::query_as::<_, IngredientRecord>(
             r#"
             INSERT INTO business_ingredients (
               business_id, organization_id, name, kind, purchase_unit, recipe_unit,
               conversion_factor, purchase_price_amount, purchase_quantity,
               yield_percent, waste_percent, stock_quantity, minimum_stock, supplier_name
             ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
-            RETURNING id, business_id, organization_id, name, kind, purchase_unit,
-              recipe_unit, conversion_factor, purchase_price_amount, purchase_quantity,
-              yield_percent, waste_percent, stock_quantity, minimum_stock, supplier_name,
-              status, created_at, updated_at
+            RETURNING id, business_id, organization_id, name, kind, purchase_unit, recipe_unit,
+              conversion_factor, purchase_price_amount, purchase_quantity, yield_percent,
+              waste_percent, stock_quantity, minimum_stock, supplier_name, status,
+              created_at, updated_at
             "#,
         )
         .bind(business_id)
@@ -230,23 +232,11 @@ impl ControlRepository {
                 .map(normalize)
                 .filter(|value| !value.is_empty()),
         )
-        .fetch_one(&self.db)
-        .await
-        .map_err(Into::into)?;
-        
-        let mut transaction = self.db.begin().await?;
-        let row = sqlx::query_as::<_, IngredientRecord>(
-            "SELECT id, business_id, organization_id, name, kind, purchase_unit, recipe_unit,
-              conversion_factor, purchase_price_amount, purchase_quantity, yield_percent,
-              waste_percent, stock_quantity, minimum_stock, supplier_name, status,
-              created_at, updated_at
-             FROM business_ingredients WHERE id=$1",
-        )
-        .bind(row.id)
-        .fetch_one(&mut *transaction)
+        .fetch_one(&mut *tx)
         .await?;
+
         super::audit::record_tx(
-            &mut transaction,
+            &mut tx,
             organization_id,
             business_id,
             None,
@@ -269,7 +259,8 @@ impl ControlRepository {
                 }
             }),
         ).await?;
-        transaction.commit().await?;
+
+        tx.commit().await?;
         Ok(row)
     }
 
