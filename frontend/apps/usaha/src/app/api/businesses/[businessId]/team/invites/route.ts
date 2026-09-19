@@ -13,6 +13,8 @@ const organizationRoleByPortalRole: Partial<Record<PortalRole, string>> = {
   manager: 'org_manager',
   cashier: 'org_cashier',
   viewer: 'org_viewer',
+  accounting: 'org_accounting',
+  inventory: 'org_inventory',
 };
 
 export async function POST(
