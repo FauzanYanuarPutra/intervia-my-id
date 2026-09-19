@@ -665,7 +665,7 @@ impl CommercialCoreRepository {
         let request_hash = canonical_hash(&json!({
             "payment_id": payment_id,
             "occurred_on": request.occurred_on,
-            "reason": reason,
+            "reason": &reason,
         }))?;
         let mut tx = self.db.begin().await?;
         idempotency_lock(&mut tx, "payment", business_id, idempotency_key).await?;
@@ -841,8 +841,8 @@ impl CommercialCoreRepository {
                    original_amount,paid_amount,outstanding_amount
             FROM business_sale_receivable_balances
             WHERE business_id=$1 AND organization_id=$2
-            ORDER BY outstanding_amount DESC,occurred_on,id
-            "#.replace(",id", ",sale_id").as_str(),
+            ORDER BY outstanding_amount DESC,occurred_on,sale_id
+            "#,
         )
         .bind(business_id)
         .bind(organization_id)
@@ -1019,12 +1019,9 @@ async fn find_party_by_key_tx(
     organization_id: Uuid,
     idempotency_key: Uuid,
 ) -> Result<Option<(String, PartyRecord)>, CommercialCoreError> {
-    sqlx::query_as::<_, (String, PartyRecord)>(
+    let existing = sqlx::query_as::<_, (String, Uuid)>(
         r#"
-        SELECT request_hash,
-               ROW(id,organization_id,business_id,party_kind,display_name,legal_name,phone,email,
-                   tax_identifier,address,note,status,version,created_by_user_id,updated_by_user_id,
-                   created_at,updated_at)
+        SELECT request_hash,id
         FROM business_parties
         WHERE business_id=$1 AND organization_id=$2 AND idempotency_key=$3
         "#,
@@ -1032,6 +1029,36 @@ async fn find_party_by_key_tx(
     .bind(business_id)
     .bind(organization_id)
     .bind(idempotency_key)
+    .fetch_optional(&mut **tx)
+    .await?;
+
+    let Some((request_hash, party_id)) = existing else {
+        return Ok(None);
+    };
+    let party = load_party_tx(tx, business_id, organization_id, party_id)
+        .await?
+        .ok_or(CommercialCoreError::Database)?;
+    Ok(Some((request_hash, party)))
+}
+
+async fn load_party_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    business_id: Uuid,
+    organization_id: Uuid,
+    party_id: Uuid,
+) -> Result<Option<PartyRecord>, CommercialCoreError> {
+    sqlx::query_as::<_, PartyRecord>(
+        r#"
+        SELECT id,organization_id,business_id,party_kind,display_name,legal_name,phone,email,
+               tax_identifier,address,note,status,version,created_by_user_id,updated_by_user_id,
+               created_at,updated_at
+        FROM business_parties
+        WHERE id=$1 AND business_id=$2 AND organization_id=$3
+        "#,
+    )
+    .bind(party_id)
+    .bind(business_id)
+    .bind(organization_id)
     .fetch_optional(&mut **tx)
     .await
     .map_err(Into::into)
