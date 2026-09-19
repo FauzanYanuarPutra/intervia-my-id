@@ -36,6 +36,124 @@ type LocaleCode = 'id' | 'en';
 type NotificationTab = 'all' | 'activity' | 'opportunity' | 'system';
 type NotificationGroup = 'new' | 'today' | 'yesterday' | 'earlier';
 
+
+type OrderNotificationActionProps = {
+  item: {
+    id: string;
+    data?: unknown;
+    is_read: boolean;
+  };
+  isId: boolean;
+  onCompleted: () => Promise<void> | void;
+};
+
+function readOrderActionData(item: { data?: unknown }) {
+  const data =
+    item.data && typeof item.data === 'object' && !Array.isArray(item.data)
+      ? (item.data as Record<string, unknown>)
+      : {};
+  return {
+    orderId: typeof data.order_id === 'string' ? data.order_id : '',
+    businessId: typeof data.business_id === 'string' ? data.business_id : '',
+    expectedVersion:
+      typeof data.expected_version === 'number' && Number.isSafeInteger(data.expected_version)
+        ? data.expected_version
+        : typeof data.expected_version === 'string'
+          ? Number(data.expected_version)
+          : 1,
+    baseStatus: typeof data.base_status === 'string' ? data.base_status : '',
+    actions: Array.isArray(data.actions)
+      ? data.actions.filter(value => typeof value === 'string')
+      : [],
+  };
+}
+
+function isOrderCreatedNotification(item: { event_type?: string | null; data?: unknown }) {
+  return item.event_type === 'order.created' && readOrderActionData(item).orderId;
+}
+
+function OrderNotificationActions({
+  item,
+  isId,
+  onCompleted,
+}: OrderNotificationActionProps) {
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const actionData = readOrderActionData(item);
+
+  if (!isOrderCreatedNotification(item) || !actionData.businessId) return null;
+
+  const canReject =
+    actionData.actions.includes('reject') &&
+    actionData.baseStatus === 'PENDING_PAYMENT';
+
+  if (!canReject) return null;
+
+  const reject = async () => {
+    if (submitting) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const response = await fetch(
+        `/api/businesses/${encodeURIComponent(actionData.businessId)}/orders/${encodeURIComponent(actionData.orderId)}/transition`,
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'idempotency-key': crypto.randomUUID(),
+          },
+          body: JSON.stringify({
+            expected_version: actionData.expectedVersion,
+            next_status: 'REJECTED',
+            reason: isId ? 'Ditolak dari notifikasi Lajukan' : 'Rejected from Lajukan notification',
+          }),
+        },
+      );
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(payload.error || 'transition_failed');
+      }
+      await onCompleted();
+    } catch {
+      setError(
+        isId
+          ? 'Pesanan berubah. Buka detail pesanan untuk memeriksa status terbaru.'
+          : 'The order changed. Open the order to check its latest status.',
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <span className="mt-2 flex flex-wrap items-center gap-1.5" onClick={event => event.stopPropagation()}>
+      <Link
+        href="/usaha/order"
+        onClick={() => {
+          if (!item.is_read) void onCompleted();
+        }}
+        className="inline-flex min-h-8 items-center rounded-full bg-[color:var(--app-accent-soft)] px-3 text-[10px] font-black text-[color:var(--app-accent)]"
+      >
+        {isId ? 'Buka pesanan' : 'Open order'}
+      </Link>
+      <button
+        type="button"
+        disabled={submitting}
+        onClick={() => void reject()}
+        className="inline-flex min-h-8 items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-3 text-[10px] font-black text-rose-700 disabled:opacity-50 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-200"
+      >
+        <XCircle className="h-3.5 w-3.5" />
+        {submitting ? (isId ? 'Menolak...' : 'Rejecting...') : isId ? 'Tolak' : 'Reject'}
+      </button>
+      {error ? (
+        <span className="basis-full text-[9.5px] font-semibold text-rose-600 dark:text-rose-300">
+          {error}
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
 type NotificationClassifierInput = {
   category?: string | null;
   eventType?: string | null;
@@ -746,6 +864,14 @@ export default function NotificationsPage() {
                               </span>
                             ) : null}
 
+                            <OrderNotificationActions
+                              item={item}
+                              isId={isId}
+                              onCompleted={async () => {
+                                await markRead(item.id);
+                                await refetch();
+                              }}
+                            />
                             <span className="mt-2 flex min-w-0 items-center gap-2">
                               <span
                                 className={cn(
