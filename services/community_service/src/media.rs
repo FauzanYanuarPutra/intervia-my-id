@@ -108,7 +108,11 @@ pub(crate) fn is_allowed_video_type(content_type: &str, file_name: Option<&str>)
     )
 }
 
-pub(crate) fn is_allowed_media_type(content_type: &str, allow_video: bool, file_name: Option<&str>) -> bool {
+pub(crate) fn is_allowed_media_type(
+    content_type: &str,
+    allow_video: bool,
+    file_name: Option<&str>,
+) -> bool {
     is_allowed_image_type(content_type, file_name)
         || (allow_video && is_allowed_video_type(content_type, file_name))
 }
@@ -161,7 +165,10 @@ pub(crate) fn clean_feed_media_url(value: &str) -> Option<String> {
     Some(clean.to_string())
 }
 
-pub(crate) fn first_feed_media_url(thread_urls: &[String], root_post: Option<&PostRow>) -> Option<String> {
+pub(crate) fn first_feed_media_url(
+    thread_urls: &[String],
+    root_post: Option<&PostRow>,
+) -> Option<String> {
     thread_urls
         .iter()
         .chain(
