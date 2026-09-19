@@ -21,7 +21,7 @@ export default async function BusinessLocationsPage({ params }: { params: Promis
 
   return (
     <PortalShell activeBusiness={state.activeBusiness} availableBusinesses={state.businesses} viewerName={state.account.name} currentSection="locations">
-      <PageHeader eyebrow="Kelola usaha" title="Lokasi & outlet" description="Lihat cabang utama dulu, lalu ubah alamat atau pin hanya saat dibutuhkan." />
+      <PageHeader eyebrow="Kelola usaha" title="Lokasi & outlet" description="Atur alamat, cabang, dan pin lokasi." />
 
       <MetricStrip items={[
         { label: 'Total outlet', value: locations.length },
