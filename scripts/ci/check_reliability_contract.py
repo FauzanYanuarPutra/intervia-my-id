@@ -134,6 +134,38 @@ for marker in (
 if base_compose.count("JWT_PRIVATE_KEY_PEM: ${JWT_PRIVATE_KEY_PEM:-}") != 1:
     errors.append("JWT private signing key must be exposed only to Identity")
 
+for marker in (
+    "JWT_ACCESS_ALG: ${JWT_ACCESS_ALG:?JWT_ACCESS_ALG=RS256 is required in production}",
+    "JWT_PUBLIC_KEY_PEM: ${JWT_PUBLIC_KEY_PEM:?JWT_PUBLIC_KEY_PEM is required in production}",
+):
+    if marker not in prod_compose:
+        errors.append(f"production compose missing fail-closed JWT marker: {marker}")
+
+if prod_compose.count(
+    "JWT_PUBLIC_KEY_PEM: ${JWT_PUBLIC_KEY_PEM:?JWT_PUBLIC_KEY_PEM is required in production}"
+) < 4:
+    errors.append("production Identity, Marketplace, Community and Chat must require JWT public verification key")
+
+if prod_compose.count(
+    "JWT_PRIVATE_KEY_PEM: ${JWT_PRIVATE_KEY_PEM:?JWT_PRIVATE_KEY_PEM is required in production}"
+) != 1:
+    errors.append("production JWT private signing key must be required only by Identity")
+
+for path, source in (
+    ("services/identity_service/src/routes/auth.rs", identity_auth_source),
+    ("services/marketplace_service/src/auth.rs", marketplace_auth_source),
+    ("services/community_service/src/auth.rs", community_auth_source),
+):
+    for marker in (
+        "environment_requires_asymmetric_access_tokens",
+        '"production" | "prod" | "staging"',
+    ):
+        if marker not in source:
+            errors.append(f"{path} missing fail-closed production JWT marker: {marker}")
+
+if "HS256 access tokens are disabled in production; configure RS256" not in chat_runtime_config:
+    errors.append("Chat production runtime must reject HS256 access tokens")
+
 for path, source in (
     ("services/identity_service/src/routes/auth.rs", identity_auth_source),
     ("services/marketplace_service/src/auth.rs", marketplace_auth_source),
@@ -371,6 +403,7 @@ marketplace_outbox_source = read("services/marketplace_service/src/outbox.rs")
 marketplace_health_source = read("services/marketplace_service/src/health.rs")
 marketplace_public_commerce_source = read("services/marketplace_service/src/businesses/public_commerce.rs")
 marketplace_seller_orders_source = read("services/marketplace_service/src/businesses/seller_orders.rs")
+marketplace_business_outbox_source = read("services/marketplace_service/src/businesses/event_outbox.rs")
 marketplace_outbox_identity_migration = read("services/marketplace_service/migrations/20260918190000_marketplace_outbox_event_identity.up.sql")
 for marker in (
     "tokio::spawn(async move",
@@ -395,22 +428,39 @@ for marker in (
     if marker not in marketplace_outbox_source:
         errors.append(f"Marketplace outbox configuration contract missing marker: {marker}")
 
+for required_marker in (
+    "INSERT INTO outbox_events",
+    "INSERT INTO events.event_outbox",
+    "routing_key",
+    "event_key",
+    "ON CONFLICT (event_key) WHERE event_key IS NOT NULL DO NOTHING",
+):
+    if required_marker not in marketplace_business_outbox_source:
+        errors.append(
+            f"Business OS outbox persistence boundary missing convergence marker: {required_marker}"
+        )
+
 for path, source in (
     ("services/marketplace_service/src/businesses/public_commerce.rs", marketplace_public_commerce_source),
     ("services/marketplace_service/src/businesses/seller_orders.rs", marketplace_seller_orders_source),
 ):
     for required_marker in (
-        "INSERT INTO outbox_events",
-        "INSERT INTO events.event_outbox",
-        "routing_key",
+        "enqueue_business_event",
         "event_key",
         "event_id",
         "schema_version",
-        "ON CONFLICT (event_key) WHERE event_key IS NOT NULL DO NOTHING",
     ):
         if required_marker not in source:
             errors.append(
-                f"{path} lost Business OS outbox convergence marker: {required_marker}"
+                f"{path} lost Business OS event producer marker: {required_marker}"
+            )
+    for forbidden_marker in (
+        "INSERT INTO outbox_events",
+        "INSERT INTO events.event_outbox",
+    ):
+        if forbidden_marker in source:
+            errors.append(
+                f"{path} bypasses the Business OS outbox persistence boundary: {forbidden_marker}"
             )
 
 for marker in (
@@ -726,6 +776,33 @@ for path, warning_threshold, hard_ceiling in (
             f"{path} is {size:,} bytes; continue responsibility-based extraction "
             "before scale-driven service splits"
         )
+
+for path, warning_threshold, hard_ceiling in (
+    ("frontend/apps/www/src/app/[locale]/(shared)/reels/ReelsClient.tsx", 300_000, 335_000),
+    ("frontend/apps/www/src/components/community/CommunityFeedClient.tsx", 230_000, 260_000),
+):
+    target = ROOT / path
+    if not target.is_file():
+        continue
+    size = target.stat().st_size
+    if size > hard_ceiling:
+        errors.append(
+            f"{path} exceeded the frontend architecture debt ceiling "
+            f"({size:,} > {hard_ceiling:,} bytes); extract a coherent UI/state responsibility "
+            "instead of growing the client monolith"
+        )
+    elif size > warning_threshold:
+        warnings.append(
+            f"{path} is {size:,} bytes; keep extracting state-owned feature modules"
+        )
+
+for helper_path in (
+    "frontend/apps/www/src/app/[locale]/(shared)/reels/reels-client-helpers.ts",
+    "frontend/apps/www/src/app/[locale]/(shared)/reels/reels-studio-helpers.ts",
+    "frontend/apps/www/src/components/community/community-feed-helpers.ts",
+):
+    if not (ROOT / helper_path).is_file():
+        errors.append(f"missing frontend responsibility extraction helper: {helper_path}")
 
 for path, source, main_source in (
     (

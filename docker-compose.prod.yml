@@ -8,6 +8,9 @@ services:
       APP_ENV: production
       RUST_LOG: ${RUST_LOG:-warn}
       RUN_MIGRATIONS_ON_STARTUP: "false"
+      JWT_ACCESS_ALG: ${JWT_ACCESS_ALG:?JWT_ACCESS_ALG=RS256 is required in production}
+      JWT_PRIVATE_KEY_PEM: ${JWT_PRIVATE_KEY_PEM:?JWT_PRIVATE_KEY_PEM is required in production}
+      JWT_PUBLIC_KEY_PEM: ${JWT_PUBLIC_KEY_PEM:?JWT_PUBLIC_KEY_PEM is required in production}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
 
   marketplace_service:
@@ -19,6 +22,8 @@ services:
       APP_ENV: production
       RUST_LOG: ${RUST_LOG:-warn}
       RUN_MIGRATIONS_ON_STARTUP: "false"
+      JWT_ACCESS_ALG: ${JWT_ACCESS_ALG:?JWT_ACCESS_ALG=RS256 is required in production}
+      JWT_PUBLIC_KEY_PEM: ${JWT_PUBLIC_KEY_PEM:?JWT_PUBLIC_KEY_PEM is required in production}
       FRONTEND_URL: ${FRONTEND_URL:-https://www.lajukan.com}
       PAYMENTS_ENABLED: ${PAYMENTS_ENABLED:-false}
       ORDER_ENGINE_API_ENABLED: ${ORDER_ENGINE_API_ENABLED:-false}
@@ -52,6 +57,8 @@ services:
       APP_ENV: production
       RUST_LOG: ${RUST_LOG:-warn}
       RUN_MIGRATIONS_ON_STARTUP: "false"
+      JWT_ACCESS_ALG: ${JWT_ACCESS_ALG:?JWT_ACCESS_ALG=RS256 is required in production}
+      JWT_PUBLIC_KEY_PEM: ${JWT_PUBLIC_KEY_PEM:?JWT_PUBLIC_KEY_PEM is required in production}
       COMMUNITY_UPLOAD_DIR: /app/uploads/forum
       COMMUNITY_MEDIA_PUBLIC_PATH: /api/forum/media
       INTERNAL_API_URL: http://identity_service:8080
@@ -86,6 +93,8 @@ services:
     environment:
       ENV: production
       APP_ENV: production
+      JWT_ACCESS_ALG: ${JWT_ACCESS_ALG:?JWT_ACCESS_ALG=RS256 is required in production}
+      JWT_PUBLIC_KEY_PEM: ${JWT_PUBLIC_KEY_PEM:?JWT_PUBLIC_KEY_PEM is required in production}
       PHX_HOST: ${PHX_HOST:-lajukan.com}
       SCYLLA_NODES: ${SCYLLA_NODES:?SCYLLA_NODES must point to the production Scylla cluster}
     healthcheck:
