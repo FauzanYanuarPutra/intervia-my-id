@@ -233,7 +233,6 @@ export function NewBusinessQuickForm({ initialOwnerPhone = '' }: NewBusinessQuic
         </button>
       </div>
       </>
-        </>
       ) : (
       <>
       <section className="grid gap-3 rounded-[20px] border border-portal-line/70 bg-white p-4">
