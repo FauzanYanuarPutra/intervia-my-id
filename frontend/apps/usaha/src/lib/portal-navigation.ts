@@ -14,12 +14,12 @@ const labels: Record<PortalSection, string> = {
   finance: 'Uang',
   reports: 'Laporan',
   channels: 'Jual Online',
-  info: 'Pengaturan Usaha',
-  locations: 'Lokasi & Outlet',
-  operations: 'Jam & Operasional',
-  team: 'Tim & Akses',
-  buyerPage: 'Tampilan Toko',
-  security: 'Keamanan akun',
+  info: 'Profil Usaha',
+  locations: 'Lokasi',
+  operations: 'Operasional',
+  team: 'Tim',
+  buyerPage: 'Toko',
+  security: 'Keamanan',
 };
 
 const desktopPrimaryOrder: PortalSection[] = [
