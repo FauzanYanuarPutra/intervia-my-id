@@ -3,7 +3,13 @@ use rust_decimal::Decimal;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use super::wave2::{CreatePurchaseRequest, Wave2Repository};
+use super::{
+    commercial_core::{
+        CommercialCoreRepository, CreatePartyRequest, CreatePaymentRequest,
+        PaymentAllocationRequest,
+    },
+    wave2::{CreatePurchaseRequest, Wave2Repository},
+};
 
 struct SeededPurchaseContext {
     actor_id: Uuid,
@@ -320,6 +326,96 @@ async fn multi_branch_purchase_posts_stock_only_to_selected_location(pool: PgPoo
             .await
             .unwrap();
     assert_eq!(legacy_projection, Decimal::from(2));
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn payable_purchase_payment_resolves_supplier_counterparty(pool: PgPool) {
+    let seeded = seed_purchase_context(&pool).await;
+    let commercial = CommercialCoreRepository::new(pool.clone());
+    let (supplier, replayed) = commercial
+        .create_party(
+            seeded.actor_id,
+            seeded.business_id,
+            seeded.organization_id,
+            Uuid::new_v4(),
+            CreatePartyRequest {
+                party_kind: "supplier".into(),
+                display_name: "Supplier Alpukat".into(),
+                legal_name: None,
+                phone: None,
+                email: Some("supplier@example.test".into()),
+                tax_identifier: None,
+                address: None,
+                note: String::new(),
+            },
+        )
+        .await
+        .unwrap();
+    assert!(!replayed);
+
+    let mut request = purchase_request(seeded.ingredient_id);
+    request.account_key = "payable".into();
+    request.party_id = Some(supplier.id);
+    let purchase = Wave2Repository::new(pool.clone())
+        .create_purchase(
+            seeded.actor_id,
+            seeded.business_id,
+            seeded.organization_id,
+            Uuid::new_v4(),
+            request,
+        )
+        .await
+        .unwrap();
+    assert_eq!(purchase.purchase.party_id, Some(supplier.id));
+
+    let payment = commercial
+        .create_payment(
+            seeded.actor_id,
+            seeded.business_id,
+            seeded.organization_id,
+            Uuid::new_v4(),
+            CreatePaymentRequest {
+                direction: "outgoing".into(),
+                account_key: "bank".into(),
+                amount: 90_000,
+                occurred_on: NaiveDate::from_ymd_opt(2026, 9, 14).unwrap(),
+                party_id: None,
+                reference: "Transfer supplier".into(),
+                note: "Pelunasan stok".into(),
+                allocations: vec![PaymentAllocationRequest {
+                    sale_id: None,
+                    purchase_id: Some(purchase.purchase.id),
+                    amount: 90_000,
+                }],
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(payment.payment.payment.party_id, Some(supplier.id));
+
+    let payable = commercial
+        .payables(seeded.business_id, seeded.organization_id)
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|row| row.purchase_id == purchase.purchase.id)
+        .unwrap();
+    assert_eq!(payable.party_id, Some(supplier.id));
+    assert_eq!(payable.original_amount, 90_000);
+    assert_eq!(payable.paid_amount, 90_000);
+    assert_eq!(payable.outstanding_amount, 0);
+
+    let archived = commercial
+        .archive_party(
+            seeded.actor_id,
+            seeded.business_id,
+            seeded.organization_id,
+            supplier.id,
+            supplier.version,
+        )
+        .await
+        .unwrap();
+    assert_eq!(archived.status, "archived");
 }
 
 #[sqlx::test(migrations = "./migrations")]
