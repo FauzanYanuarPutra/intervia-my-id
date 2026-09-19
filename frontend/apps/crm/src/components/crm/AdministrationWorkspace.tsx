@@ -244,6 +244,7 @@ export function AdministrationWorkspace() {
             <h2 className="font-bold">Security incidents</h2>
             <p className="text-xs opacity-70">Severity, containment, remediation, dan status notifikasi.</p>
           </div>
+          <span className="rounded-full border px-2.5 py-1 text-xs font-bold">{securityIncidents.filter(x => x.status !== 'closed').length} terbuka</span>
         </div>
         <div className="mt-4 rounded-xl border p-3">
           <div className="grid gap-2 sm:grid-cols-[140px_1fr_auto]">
@@ -267,8 +268,6 @@ export function AdministrationWorkspace() {
               Catat
             </button>
           </div>
-        </div>
-          <span className="rounded-full border px-2.5 py-1 text-xs font-bold">{securityIncidents.filter(x => x.status !== 'closed').length} terbuka</span>
         </div>
         <div className="mt-3 space-y-2">
           {securityIncidents.slice(0, 8).map(item => (
