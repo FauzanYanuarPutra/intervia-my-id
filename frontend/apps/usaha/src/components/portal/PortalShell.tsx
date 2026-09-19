@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { Bell, Building2, LockKeyhole, Store, UserRound } from 'lucide-react';
 import { BusinessSwitcher } from '@/components/portal/BusinessSwitcher';
+import { ChangeHistoryDrawer } from '@/components/portal/ChangeHistoryDrawer';
 import { InvitationIndicator } from '@/components/portal/InvitationIndicator';
 import { LogoutButton } from '@/components/portal/LogoutButton';
 import { MobileNav } from '@/components/portal/MobileNav';
@@ -69,6 +70,11 @@ export function PortalShell({
               <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-portal-mist text-portal-forest"><LockKeyhole className="h-4 w-4" /></span>
               <span>Keamanan akun</span>
             </Link>
+          ) : null}
+          {activeBusiness ? (
+            <div className="mb-1 px-2">
+              <ChangeHistoryDrawer businessId={activeBusiness.id} />
+            </div>
           ) : null}
           <div className="flex items-center gap-3 rounded-xl px-2 py-2">
             <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-[#f4f6f4] text-portal-forest"><UserRound className="h-4 w-4" /></span>
