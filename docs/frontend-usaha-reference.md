@@ -24,8 +24,9 @@ Project-local copy: `frontend/usaha/docs/frontend-usaha-reference.md`
 - `http://localhost:3003` points to `frontend/usaha`, not `frontend/www`.
 - `frontend/www` links into this app through `buildUsahaPath()` in `frontend/www/src/lib/umkmSurface.ts`.
 - In development, the `usaha` service is started on port `3003` by `docker-compose.dev.yml`.
-- The app is demo-first and in-memory. There is no persistent database, no external auth provider, and no backend service dedicated to this portal yet.
-- Session state is stored in an HTTP-only cookie named `usaha_session`.
+- **Current status (2026-09-19):** `usaha` is a backend-connected business portal. Authentication and organization membership come from Identity Service; canonical business, product and business-control data come from Marketplace Service through the Next.js BFF/server adapters.
+- Do not use the older demo/in-memory statements in this document as runtime truth. The current source of truth is the code under `frontend/apps/usaha/src/lib/*` plus the BFF routes under `frontend/apps/usaha/src/app/api/*`.
+- Session state is still exposed to the frontend through server-side auth/session helpers; the portal no longer owns the business source-of-truth in an in-memory store.
 - Most UX decisions are computed dynamically from business state, role, and permissions instead of being hardcoded page by page.
 
 ### Integration boundary with `frontend/www`
@@ -77,8 +78,8 @@ This means guest users can browse seeded detailed pages too, not only the root d
 | App shell | `frontend/usaha/src/components/portal/PortalShell.tsx` | Shared portal layout, header, 3-step cards, nav, business switcher, mobile nav |
 | Entry/state resolution | `frontend/usaha/src/lib/portal-server.ts` | Decides guest vs logged-in vs demo mode and active business |
 | UX decision engine | `frontend/usaha/src/lib/portal-logic.ts` | Computes progress, primary CTA, task cards, management menu, section links |
-| Store and mutations | `frontend/usaha/src/lib/portal-store.ts` | In-memory account/business store and all business mutations |
-| Session/auth | `frontend/usaha/src/lib/portal-session.ts`, `frontend/usaha/src/app/api/auth/*` | Cookie session read/write/clear and auth endpoints |
+| Store and mutations | `frontend/apps/usaha/src/lib/business-server.ts`, `business-control-server.ts`, `business-wave2-server.ts` | Backend adapters, canonical business reads, sales/HPP/finance/operations mutations |
+| Session/auth | `frontend/apps/usaha/src/lib/auth-session.ts`, `frontend/apps/usaha/src/app/api/auth/*` | Server-side access token/session handling and auth endpoints |
 | Seed data and roles | `frontend/usaha/src/lib/portal-data.ts`, `frontend/usaha/src/lib/portal-types.ts` | Roles, permissions, role summaries, seed businesses, seed accounts |
 | Per-page UI | `frontend/usaha/src/app/(portal)/*`, `frontend/usaha/src/app/(auth)/*` | Route-level rendering for auth, dashboard, business pages, security |
 | Client-side form actions | `frontend/usaha/src/components/forms/*` | Submit mutations, show inline errors/success, redirect, `router.refresh()` |
@@ -1323,18 +1324,20 @@ Yes
 
 - `InviteMemberQuickForm`
 
-## 11. Known Limitations and AI Caveats
+## 11. Current Integration Notes and AI Caveats
 
-If this document is given to another AI or used for future implementation planning, these constraints matter:
+These are the current constraints that matter when changing `usaha`:
 
-1. Do not assume a real backend. The app uses an in-memory store.
-2. Do not assume `frontend/www` owns this portal's rendering or state. It only links into it.
-3. Do not assume auth is production-grade. It is phone-only demo auth.
-4. Do not assume order/reservation mutations exist. Those areas are mostly read-only today.
-5. Do not assume team invites become members automatically. Invite acceptance is not implemented.
-6. Do not assume buyer-page readiness is a manually edited flag. It is derived from setup state.
-7. Do not assume dashboard CTAs are static. They are computed from business state and permissions.
-8. Do not assume guest mode is limited to `/`. Seed business fallback also affects detailed business pages.
+1. Identity Service is the source of truth for authentication, organizations, members, and invitations.
+2. Marketplace Service is the source of truth for canonical business data, products, sales, orders, HPP, channels, finance, cash shifts, and other business-control domains exposed through `/v1/businesses/*`.
+3. Next.js API routes are a BFF boundary. Preserve object-level authorization and map backend errors through `businessApiErrorMessage` / `normalizeBusinessApiError` instead of leaking raw technical codes to users.
+4. Financial writes, sales, settlement, cash-shift, and other consequential operations should preserve idempotency and explicit audit reasons.
+5. `manageRoles` exists in the permission model, but role-changing UI/backend support must be verified before claiming that active member roles can be changed.
+6. External food-platform channel configuration is currently a business-control layer; do not describe it as provider API synchronization unless a provider connector/webhook exists and is verified.
+7. Storefront readiness is derived from canonical business/catalog state; editing should happen at the source entity and preview should not silently become a second source of truth.
+8. Multi-location data exists, but location-aware operational scoping is not yet universal across every business-control ledger. Treat `location_id` support as a separate integration milestone rather than assuming every metric is outlet-specific.
+9. Dashboard projections must be treated as derived summaries. Domain detail pages remain the authoritative view when freshness matters.
+10. The portal now includes shared loading and error boundaries under `src/app/(portal)/loading.tsx` and `src/app/(portal)/error.tsx`.
 
 ## 12. Files to Read First
 
