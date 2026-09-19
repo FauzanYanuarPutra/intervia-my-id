@@ -73,6 +73,8 @@ pub(crate) struct ReplaceRecipeRequest {
     pub(crate) name: String,
     pub(crate) servings: Decimal,
     pub(crate) items: Vec<RecipeItemInput>,
+    #[serde(default)]
+    pub(crate) reason: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, FromRow)]
