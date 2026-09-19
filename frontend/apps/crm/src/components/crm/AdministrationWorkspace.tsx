@@ -56,6 +56,8 @@ export function AdministrationWorkspace() {
   const [securityIncidents, setSecurityIncidents] = useState<SecurityIncident[]>([]);
   const [busy, setBusy] = useState(false);
   const [governanceBusy, setGovernanceBusy] = useState(false);
+  const [incidentSeverity, setIncidentSeverity] = useState('medium');
+  const [incidentSummary, setIncidentSummary] = useState('');
   const [message, setMessage] = useState('');
 
   const loadInvitations = useCallback(async () => {
@@ -82,6 +84,29 @@ export function AdministrationWorkspace() {
     void loadInvitations();
     void loadGovernance();
   }, [loadInvitations, loadGovernance]);
+
+  const createIncident = async () => {
+    if (incidentSummary.trim().length < 3 || governanceBusy) return;
+    setGovernanceBusy(true);
+    setMessage('');
+    try {
+      await json('/api/backoffice/governance/security', {
+        method: 'POST',
+        body: JSON.stringify({
+          severity: incidentSeverity,
+          summary: incidentSummary.trim(),
+          affected_data_classes: [],
+        }),
+      });
+      setIncidentSummary('');
+      await loadGovernance();
+      setMessage('Security incident dicatat.');
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : 'Gagal mencatat incident.');
+    } finally {
+      setGovernanceBusy(false);
+    }
+  };
 
   const transitionGovernance = async (kind: 'privacy' | 'security', id: string, status: string) => {
     setGovernanceBusy(true);
@@ -219,6 +244,30 @@ export function AdministrationWorkspace() {
             <h2 className="font-bold">Security incidents</h2>
             <p className="text-xs opacity-70">Severity, containment, remediation, dan status notifikasi.</p>
           </div>
+        </div>
+        <div className="mt-4 rounded-xl border p-3">
+          <div className="grid gap-2 sm:grid-cols-[140px_1fr_auto]">
+            <select value={incidentSeverity} onChange={e => setIncidentSeverity(e.target.value)} className="rounded-lg border bg-transparent px-2 py-2 text-xs">
+              <option value="low">low</option>
+              <option value="medium">medium</option>
+              <option value="high">high</option>
+              <option value="critical">critical</option>
+            </select>
+            <input
+              value={incidentSummary}
+              onChange={e => setIncidentSummary(e.target.value.slice(0, 10000))}
+              placeholder="Ringkasan incident…"
+              className="rounded-lg border px-3 py-2 text-xs"
+            />
+            <button
+              disabled={governanceBusy || incidentSummary.trim().length < 3}
+              onClick={() => void createIncident()}
+              className="rounded-lg bg-[color:var(--color-primary)] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+            >
+              Catat
+            </button>
+          </div>
+        </div>
           <span className="rounded-full border px-2.5 py-1 text-xs font-bold">{securityIncidents.filter(x => x.status !== 'closed').length} terbuka</span>
         </div>
         <div className="mt-3 space-y-2">
