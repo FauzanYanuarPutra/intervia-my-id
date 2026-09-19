@@ -144,6 +144,9 @@ struct EditorialEditNewsRequest {
     source_urls: Option<Vec<String>>,
     cover_image: Option<String>,
     slug: Option<String>,
+    seo_title: Option<String>,
+    seo_description: Option<String>,
+    og_image: Option<String>,
     note: Option<String>,
     action: Option<String>,
 }
@@ -1956,6 +1959,47 @@ async fn edit_news_editorial(
     news.insert("topics".to_string(), json!(topics));
     news.insert("editor_last_edited_at".to_string(), Value::String(Utc::now().to_rfc3339()));
     news.insert("editor_last_edited_by".to_string(), Value::String(reviewer_id.to_string()));
+
+    let mut seo = news.get("seo").cloned().unwrap_or_else(|| json!({}));
+    if !seo.is_object() {
+        seo = json!({});
+    }
+    let seo = seo.as_object_mut().expect("seo object initialized");
+    if let Some(value) = payload.seo_title {
+        let value = value.trim();
+        if value.len() > 160 {
+            return response_error(StatusCode::BAD_REQUEST, "seo_title is too long");
+        }
+        if value.is_empty() {
+            seo.remove("title");
+        } else {
+            seo.insert("title".to_string(), Value::String(value.to_string()));
+        }
+    }
+    if let Some(value) = payload.seo_description {
+        let value = value.trim();
+        if value.len() > 320 {
+            return response_error(StatusCode::BAD_REQUEST, "seo_description is too long");
+        }
+        if value.is_empty() {
+            seo.remove("description");
+        } else {
+            seo.insert("description".to_string(), Value::String(value.to_string()));
+        }
+    }
+    if let Some(value) = payload.og_image {
+        let value = value.trim();
+        if value.len() > 2_048 {
+            return response_error(StatusCode::BAD_REQUEST, "og_image is too long");
+        }
+        if value.is_empty() {
+            seo.remove("og_image");
+        } else {
+            seo.insert("og_image".to_string(), Value::String(value.to_string()));
+        }
+    }
+    news.insert("seo".to_string(), Value::Object(seo.clone()));
+
     if action == "correct" {
         news.insert("correction_note".to_string(), Value::String(note.clone().unwrap_or_default()));
         news.insert("corrected_at".to_string(), Value::String(Utc::now().to_rfc3339()));
@@ -1994,6 +2038,11 @@ async fn edit_news_editorial(
         .map(|value| make_slug(&value))
         .filter(|value| !value.is_empty())
         .or_else(|| current.slug.clone());
+
+    let cover_image = match payload.cover_image {
+        Some(value) => trimmed(Some(value)),
+        None => current.cover_image.clone(),
+    };
 
     if let Some(ref slug) = slug {
         let conflict = sqlx::query_scalar::<_, bool>(
@@ -2035,7 +2084,7 @@ async fn edit_news_editorial(
     .bind(summary)
     .bind(body)
     .bind(tags)
-    .bind(trimmed(payload.cover_image))
+    .bind(cover_image)
     .bind(metadata)
     .fetch_one(&mut *tx)
     .await
