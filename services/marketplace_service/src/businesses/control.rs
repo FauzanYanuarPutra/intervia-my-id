@@ -263,7 +263,8 @@ impl ControlRepository {
                     "supplier_name": row.supplier_name
                 }
             }),
-        ).await?;
+        )
+        .await?;
 
         tx.commit().await?;
         Ok(row)
@@ -416,20 +417,23 @@ impl ControlRepository {
     ) -> Result<ChannelSettingRecord, ControlRepositoryError> {
         let channel_key = validate_channel(channel_key, &request)?;
         ensure_business(&self.db, business_id, organization_id).await?;
-        let reason = request.reason.clone().unwrap_or_else(|| "Pengaturan kanal diperbarui".to_owned());
+        let reason = request
+            .reason
+            .clone()
+            .unwrap_or_else(|| "Pengaturan kanal diperbarui".to_owned());
         if reason.trim().chars().count() < 3 {
-            return Err(ControlRepositoryError::Validation("channel_change_reason_required"));
+            return Err(ControlRepositoryError::Validation(
+                "channel_change_reason_required",
+            ));
         }
 
         let mut tx = self.db.begin().await?;
-        let before = sqlx::query_as::<_, ChannelSettingRecord>(
-            CHANNEL_SELECT_BY_KEY,
-        )
-        .bind(business_id)
-        .bind(organization_id)
-        .bind(&channel_key)
-        .fetch_optional(&mut *tx)
-        .await?;
+        let before = sqlx::query_as::<_, ChannelSettingRecord>(CHANNEL_SELECT_BY_KEY)
+            .bind(business_id)
+            .bind(organization_id)
+            .bind(&channel_key)
+            .fetch_optional(&mut *tx)
+            .await?;
 
         let item = sqlx::query_as::<_, ChannelSettingRecord>(
             r#"
@@ -495,7 +499,8 @@ impl ControlRepository {
                     "enabled": item.enabled
                 }
             }),
-        ).await?;
+        )
+        .await?;
 
         tx.commit().await?;
         Ok(item)
