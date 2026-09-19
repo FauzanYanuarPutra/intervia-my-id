@@ -15,7 +15,6 @@ type RawNewsRow = {
   body?: unknown;
   cover_image?: unknown;
   tags?: unknown;
-  cover_image?: unknown;
   metadata?: unknown;
   content_status?: unknown;
   published_at?: unknown;
