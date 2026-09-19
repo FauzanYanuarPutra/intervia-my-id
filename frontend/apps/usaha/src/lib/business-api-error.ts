@@ -8,6 +8,7 @@ const messages: Record<string, string> = {
   auth_required: 'Sesi Anda berakhir. Masuk lagi untuk melanjutkan.',
   business_access_denied: 'Anda tidak memiliki akses untuk mengubah usaha ini.',
   business_not_found: 'Usaha tidak ditemukan atau sudah tidak tersedia.',
+  business_profile_change_reason_required: 'Tulis alasan perubahan info usaha minimal 3 karakter.',
   business_version_conflict: 'Data usaha sudah berubah. Muat ulang lalu simpan kembali.',
   identity_unavailable: 'Layanan akun sedang tidak tersedia. Coba lagi sebentar.',
   provisioning_retryable: 'Layanan usaha sedang sibuk. Coba lagi sebentar.',
