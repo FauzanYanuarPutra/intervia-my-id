@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { ArrowRight, BarChart3, Building2, Newspaper, Search, Send, Store, TrendingUp } from 'lucide-react';
+import { ArrowRight, BarChart3, Building2, Clock3, Newspaper, Search, Send, Store, TrendingUp } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { buildNewsPath, buildNewsUrl, getPublishedNews } from '@/lib/news';
 
@@ -94,47 +94,7 @@ export default async function NewsIndexPage({ params, searchParams }: PageProps)
 
   return (
     <main className="page-shell page-rhythm pb-12 pt-6">
-      <section className="overflow-hidden rounded-[32px] border border-slate-200 bg-[linear-gradient(135deg,#f8fafc_0%,#ecfdf5_52%,#fff7ed_100%)] p-5 shadow-[0_24px_64px_-48px_rgba(15,23,42,0.34)] dark:border-white/10 dark:bg-[linear-gradient(135deg,#0f172a_0%,#052e24_56%,#1c1917_100%)] sm:p-8">
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-end">
-          <div>
-            <p className="inline-flex items-center gap-2 rounded-full bg-slate-950 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-white dark:bg-white dark:text-slate-950">
-              <Newspaper className="h-3.5 w-3.5" />
-              Lajukan News
-            </p>
-            <h1 className="mt-4 max-w-4xl text-3xl font-bold tracking-[-0.06em] text-slate-950 dark:text-white sm:text-5xl">
-              {isId ? 'Berita yang berhenti bukan di headline, tapi di dampaknya ke usaha.' : 'News that goes beyond headlines to explain business impact.'}
-            </h1>
-            <p className="mt-4 max-w-3xl text-sm font-semibold leading-7 text-slate-600 dark:text-slate-300 sm:text-base">
-              {isId
-                ? 'Ekonomi, bisnis, UMKM, teknologi, regulasi, dan perkembangan daerah. Kiriman komunitas masuk antrean editorial sebelum dapat diterbitkan sebagai Lajukan News.'
-                : 'Economy, business, SMEs, technology, regulation, and local developments. Community submissions enter editorial review before publication as Lajukan News.'}
-            </p>
-            <div className="mt-5 flex flex-wrap gap-2">
-              <Link href="/news/submit" className="inline-flex min-h-10 items-center gap-2 rounded-full bg-emerald-700 px-4 text-sm font-bold text-white hover:bg-emerald-800">
-                <Send className="h-4 w-4" />
-                {isId ? 'Kirim berita' : 'Submit news'}
-              </Link>
-              <Link href="/news/submissions" className="inline-flex min-h-10 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 hover:border-emerald-200 dark:border-white/10 dark:bg-white/10 dark:text-white">
-                {isId ? 'Kiriman saya' : 'My submissions'}
-              </Link>
-              <Link href="/blog" className="inline-flex min-h-10 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 hover:border-emerald-200 dark:border-white/10 dark:bg-white/10 dark:text-white">
-                <BarChart3 className="h-4 w-4" />
-                {isId ? 'Panduan usaha' : 'Business guides'}
-              </Link>
-            </div>
-          </div>
-          <aside className="rounded-[26px] border border-white/80 bg-white/90 p-5 dark:border-white/10 dark:bg-slate-950/60">
-            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300">
-              {isId ? 'Standar publikasi' : 'Publishing standard'}
-            </p>
-            <p className="mt-3 text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">
-              {isId
-                ? 'News dipisahkan dari opini dan forum. Sumber, koreksi, jenis konten, dan jejak review disimpan agar informasi tetap dapat dipertanggungjawabkan.'
-                : 'News is separated from opinion and forum content. Sources, corrections, content type, and review history are retained for accountability.'}
-            </p>
-          </aside>
-        </div>
-      </section>
+      <section className="border-y border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950"><div className="px-4 py-5 sm:px-6"><div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-extrabold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">Lajukan News</p><h1 className="mt-1 text-3xl font-black tracking-[-0.045em] text-slate-950 dark:text-white sm:text-4xl">{isId ? 'Berita ekonomi & usaha' : 'Economy & business news'}</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">{isId ? 'Berita, perkembangan daerah, dan informasi yang relevan untuk pelaku usaha.' : 'News, local developments, and information relevant to business owners.'}</p></div><Link href="/news/submit" className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 text-sm font-bold text-white hover:bg-emerald-800"><Send className="h-4 w-4" />{isId ? 'Kirim berita' : 'Submit news'}</Link></div></div></section>
 
       <nav aria-label={isId ? 'Kategori berita' : 'News categories'} className="flex gap-2 overflow-x-auto pb-1">
         <Link href="/news" className={`shrink-0 rounded-full border px-3.5 py-2 text-sm font-bold ${!category ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-slate-200 bg-white text-slate-700 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200'}`}>
@@ -151,43 +111,7 @@ export default async function NewsIndexPage({ params, searchParams }: PageProps)
         ))}
       </nav>
 
-      <form
-        method="get"
-        className="flex flex-col gap-2 rounded-[24px] border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-slate-900 sm:flex-row sm:items-center"
-        role="search"
-      >
-        {category ? <input type="hidden" name="category" value={category} /> : null}
-        <label htmlFor="news-search" className="sr-only">
-          {isId ? 'Cari berita' : 'Search news'}
-        </label>
-        <div className="relative min-w-0 flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            id="news-search"
-            name="q"
-            defaultValue={query}
-            maxLength={160}
-            placeholder={isId ? 'Cari judul, ringkasan, atau isi berita…' : 'Search titles, summaries, or article text…'}
-            className="min-h-11 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/10 dark:bg-white/[0.05] dark:text-white"
-          />
-        </div>
-        <div className="flex gap-2">
-          <button
-            type="submit"
-            className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-emerald-700 px-4 text-sm font-bold text-white hover:bg-emerald-800"
-          >
-            {isId ? 'Cari' : 'Search'}
-          </button>
-          {query ? (
-            <Link
-              href={buildNewsIndexHref({ category })}
-              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 text-sm font-bold text-slate-600 dark:border-white/10 dark:text-slate-300"
-            >
-              {isId ? 'Hapus' : 'Clear'}
-            </Link>
-          ) : null}
-        </div>
-      </form>
+      <form method="get" className="flex gap-2 border-b border-slate-200 pb-4 dark:border-white/10" role="search">{category ? <input type="hidden" name="category" value={category} /> : null}<label htmlFor="news-search" className="sr-only">{isId ? 'Cari berita' : 'Search news'}</label><div className="relative min-w-0 flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input id="news-search" name="q" defaultValue={query} maxLength={160} placeholder={isId ? 'Cari berita…' : 'Search news…'} className="min-h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-sm font-semibold text-slate-900 outline-none focus:border-emerald-500 dark:border-white/10 dark:bg-slate-900 dark:text-white" /></div><button type="submit" className="min-h-11 rounded-xl bg-slate-950 px-5 text-sm font-bold text-white dark:bg-white dark:text-slate-950">{isId ? 'Cari' : 'Search'}</button></form>
 
       {query ? (
         <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">
@@ -197,20 +121,7 @@ export default async function NewsIndexPage({ params, searchParams }: PageProps)
 
       {featured ? (
         <section className="grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.65fr)]">
-          <Link href={buildNewsPath(featured.slug)} className="group rounded-[30px] border border-slate-200 bg-white p-5 shadow-[0_22px_54px_-44px_rgba(15,23,42,0.32)] transition hover:-translate-y-0.5 hover:border-emerald-200 dark:border-white/10 dark:bg-slate-900 sm:p-7">
-            <div className="flex flex-wrap gap-2 text-[11px] font-bold uppercase tracking-[0.12em]">
-              <span className="rounded-full bg-emerald-50 px-3 py-1 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">{featured.category}</span>
-              {featured.location ? <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600 dark:bg-white/10 dark:text-slate-300">{featured.location}</span> : null}
-            </div>
-            <h2 className="mt-4 text-2xl font-bold tracking-[-0.05em] text-slate-950 group-hover:text-emerald-800 dark:text-white dark:group-hover:text-emerald-200 sm:text-4xl">
-              {featured.title}
-            </h2>
-            <p className="mt-4 max-w-3xl text-sm font-semibold leading-7 text-slate-600 dark:text-slate-300">{featured.summary}</p>
-            <div className="mt-5 flex items-center justify-between gap-3 text-xs font-bold text-slate-500 dark:text-slate-400">
-              <span>{formatDate(featured.publishedAt, locale)}</span>
-              <span className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-300">{isId ? 'Baca berita' : 'Read'} <ArrowRight className="h-3.5 w-3.5" /></span>
-            </div>
-          </Link>
+          <Link href={buildNewsPath(featured.slug)} className="group overflow-hidden border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-900">{featured.coverImage ? <div className="aspect-[16/9] overflow-hidden bg-slate-100 dark:bg-slate-800"><img src={featured.coverImage} alt="" className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.02]" loading="eager" /></div> : <div className="flex aspect-[16/9] items-end bg-slate-100 p-5 dark:bg-slate-800"><span className="text-xs font-extrabold uppercase tracking-[0.16em] text-slate-400">Lajukan News</span></div>}<div className="p-5 sm:p-7"><div className="flex items-center gap-2 text-xs font-extrabold text-emerald-700 dark:text-emerald-300"><span>{featured.category}</span>{featured.location ? <><span className="text-slate-300">•</span><span className="text-slate-500">{featured.location}</span></> : null}</div><h2 className="mt-2 text-3xl font-black leading-tight tracking-[-0.04em] text-slate-950 group-hover:text-emerald-800 dark:text-white sm:text-4xl">{featured.title}</h2>{featured.summary ? <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-600 dark:text-slate-300">{featured.summary}</p> : null}<div className="mt-4 flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400"><Clock3 className="h-3.5 w-3.5" />{formatDate(featured.publishedAt, locale)}</div></div></Link>
           <div className="grid gap-3">
             <Link href="/explore" className="rounded-[26px] border border-slate-200 bg-[#f8f5ee] p-5 dark:border-white/10 dark:bg-white/[0.04]">
               <Store className="h-5 w-5 text-emerald-700 dark:text-emerald-300" />
@@ -233,22 +144,7 @@ export default async function NewsIndexPage({ params, searchParams }: PageProps)
       )}
 
       {rest.length > 0 ? (
-        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {rest.map(article => (
-            <Link key={article.id} href={buildNewsPath(article.slug)} className="group flex min-h-[260px] flex-col rounded-[28px] border border-slate-200 bg-white p-5 transition hover:-translate-y-0.5 hover:border-emerald-200 dark:border-white/10 dark:bg-slate-900">
-              <div className="flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-[0.12em]">
-                <span className="rounded-full bg-emerald-50 px-3 py-1 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">{article.category}</span>
-                {article.articleKind === 'press_release' ? <span className="rounded-full bg-amber-50 px-3 py-1 text-amber-700 dark:bg-amber-400/10 dark:text-amber-200">{isId ? 'Rilis bisnis' : 'Business release'}</span> : null}
-              </div>
-              <h2 className="mt-3 text-xl font-bold tracking-[-0.04em] text-slate-950 group-hover:text-emerald-800 dark:text-white dark:group-hover:text-emerald-200">{article.title}</h2>
-              <p className="mt-3 line-clamp-4 text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">{article.summary}</p>
-              <div className="mt-auto flex items-center justify-between gap-3 pt-5 text-xs font-bold text-slate-500 dark:text-slate-400">
-                <span>{formatDate(article.publishedAt, locale)}</span>
-                <ArrowRight className="h-4 w-4 text-emerald-700 dark:text-emerald-300" />
-              </div>
-            </Link>
-          ))}
-        </section>
+        <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]"><div><div className="mb-4 border-b-2 border-slate-950 pb-2 dark:border-white"><h2 className="text-xl font-black text-slate-950 dark:text-white">{isId ? 'Berita terbaru' : 'Latest news'}</h2></div><div className="divide-y divide-slate-200 dark:divide-white/10">{rest.map(article => <Link key={article.id} href={buildNewsPath(article.slug)} className="group grid gap-4 py-5 sm:grid-cols-[180px_minmax(0,1fr)]"><div className="aspect-[16/10] overflow-hidden bg-slate-100 dark:bg-slate-800">{article.coverImage ? <img src={article.coverImage} alt="" className="h-full w-full object-cover transition group-hover:scale-[1.02]" loading="lazy" /> : <div className="flex h-full items-end p-3 text-[10px] font-extrabold uppercase tracking-[0.14em] text-slate-400">Lajukan News</div>}</div><div className="min-w-0"><div className="text-xs font-extrabold text-emerald-700 dark:text-emerald-300">{article.category}</div><h3 className="mt-1 text-xl font-extrabold leading-7 tracking-[-0.025em] text-slate-950 group-hover:text-emerald-800 dark:text-white">{article.title}</h3>{article.summary ? <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-600 dark:text-slate-300">{article.summary}</p> : null}<p className="mt-3 text-xs font-semibold text-slate-500">{formatDate(article.publishedAt, locale)}{article.location ? ` · ${article.location}` : ''}</p></div></Link>)}</div></div><aside className="hidden lg:block"><div className="sticky top-20 border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-slate-900"><p className="text-xs font-extrabold uppercase tracking-[0.14em] text-slate-500">{isId ? 'Tentang Lajukan News' : 'About Lajukan News'}</p><p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">{isId ? 'Kiriman komunitas melewati review editorial sebelum diterbitkan. Sumber dan koreksi material dicatat.' : 'Community submissions go through editorial review before publication. Sources and material corrections are recorded.'}</p></div></aside></section>
       ) : null}
 
       {nextCursor ? (
