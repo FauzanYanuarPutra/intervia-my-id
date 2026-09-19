@@ -498,6 +498,7 @@ fn public_topics_from_tags(tags: Option<&[String]>) -> Vec<String> {
         .take(8)
         .collect()
 }
+
 pub(crate) fn prepare_submission_metadata(mut metadata: Value, owner_id: Uuid) -> Value {
     if !metadata.is_object() {
         metadata = json!({});
@@ -996,7 +997,8 @@ async fn sync_source_references_tx(
         .bind(source_url)
         .bind(source_domain(source_url))
         .execute(&mut **tx)
-        .await?;    }
+        .await?;
+    }
     Ok(())
 }
 
@@ -1495,7 +1497,8 @@ async fn update_news_submission(
         Ok(None) => return response_error(StatusCode::NOT_FOUND, "news submission not found"),
         Err(error) => {
             tracing::error!("update_news_submission load error: {:?}", error);
-            return response_error(                StatusCode::INTERNAL_SERVER_ERROR,
+            return response_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
                 "failed to update news submission",
             );
         }
@@ -1994,7 +1997,8 @@ async fn edit_news_editorial(
         "pending_review"
     } else {
         current_status.as_str()
-    };    news.insert(
+    };
+    news.insert(
         "editorial_status".to_string(),
         Value::String(next_editorial_status.to_string()),
     );
@@ -2496,7 +2500,8 @@ async fn moderate_news(
                     );
                     return response_error(
                         StatusCode::INTERNAL_SERVER_ERROR,
-                        "failed to validate independent source review",                    );
+                        "failed to validate independent source review",
+                    );
                 }
             }
         }
@@ -2996,3 +3001,474 @@ async fn update_news_source(
         {
             Ok(urls) => urls,
             Err(error) => {
+                tracing::error!("update_news_source provenance check error: {:?}", error);
+                return response_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to validate publication provenance",
+                );
+            }
+        };
+        if !other_verified_urls
+            .iter()
+            .any(|source_url| is_allowed_news_source_url(source_url))
+        {
+            return response_error(
+                StatusCode::CONFLICT,
+                "published news requires a verified source; verify a replacement or retract first",
+            );
+        }
+    }
+
+    let updated = match sqlx::query_as::<_, NewsSourceRow>(
+        r#"
+        UPDATE news_source_references
+        SET
+          source_kind = COALESCE($3, source_kind),
+          verification_status = COALESCE($4, verification_status),
+          editor_note = CASE WHEN $5::text IS NULL THEN editor_note ELSE $5 END,
+          checked_at = NOW(),
+          last_seen_at = NOW()
+        WHERE id = $1 AND content_id = $2
+        RETURNING
+          id, content_id, position, source_url, source_domain, source_kind,
+          verification_status, editor_note, checked_at, first_seen_at, last_seen_at
+        "#,
+    )
+    .bind(source_id)
+    .bind(content_id)
+    .bind(&source_kind)
+    .bind(&verification_status)
+    .bind(&note)
+    .fetch_optional(&mut *tx)
+    .await
+    {
+        Ok(Some(row)) => row,
+        Ok(None) => return response_error(StatusCode::NOT_FOUND, "news source not found"),
+        Err(error) => {
+            tracing::error!("update_news_source error: {:?}", error);
+            return response_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to update news source",
+            );
+        }
+    };
+
+    if let Err(error) = sqlx::query(
+        r#"
+        INSERT INTO news_source_review_events (
+          content_id, source_id, reviewer_id,
+          from_source_kind, to_source_kind,
+          from_verification_status, to_verification_status,
+          note
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        "#,
+    )
+    .bind(content_id)
+    .bind(source_id)
+    .bind(reviewer_id)
+    .bind(&current_source.source_kind)
+    .bind(&updated.source_kind)
+    .bind(&current_source.verification_status)
+    .bind(&updated.verification_status)
+    .bind(&note)
+    .execute(&mut *tx)
+    .await
+    {
+        tracing::error!("update_news_source audit error: {:?}", error);
+        return response_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record news source review",
+        );
+    }
+
+    if let Err(error) = enqueue_news_outbox_tx(
+        &mut tx,
+        &article,
+        Some(reviewer_id),
+        "news.source.reviewed",
+        "news.editorial.changed",
+    )
+    .await
+    {
+        tracing::error!("update_news_source outbox error: {:?}", error);
+        return response_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to enqueue news source review",
+        );
+    }
+
+    if let Err(error) = tx.commit().await {
+        tracing::error!("update_news_source commit error: {:?}", error);
+        return response_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to update news source",
+        );
+    }
+
+    (StatusCode::OK, Json(updated)).into_response()
+}
+
+async fn list_editorial_history(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    if cms_reviewer_id(&headers, &state).is_none() {
+        return response_error(StatusCode::FORBIDDEN, "cms access required");
+    }
+    let content_id = match Uuid::parse_str(id.trim()) {
+        Ok(id) => id,
+        Err(_) => return response_error(StatusCode::BAD_REQUEST, "invalid news id"),
+    };
+
+    let rows = sqlx::query_as::<_, EditorialEventRow>(
+        r#"
+        SELECT id, content_id, actor_id, actor_role, action, from_status, to_status, note, created_at
+        FROM news_editorial_events
+        WHERE content_id = $1
+        ORDER BY created_at DESC, id DESC
+        "#,
+    )
+    .bind(content_id)
+    .fetch_all(&state.db)
+    .await;
+
+    match rows {
+        Ok(items) => {
+            let versions = sqlx::query_as::<_, NewsVersionRow>(
+                r#"
+                SELECT
+                  id, content_id, version_number, actor_id, actor_role, action,
+                  editorial_status, title, summary, body, tags, cover_image,
+                  metadata, content_status, published_at, created_at
+                FROM news_article_versions
+                WHERE content_id = $1
+                ORDER BY version_number DESC
+                LIMIT 50
+                "#,
+            )
+            .bind(content_id)
+            .fetch_all(&state.db)
+            .await
+            .unwrap_or_default();
+            let sources = sqlx::query_as::<_, NewsSourceRow>(
+                r#"
+                SELECT
+                  id, content_id, position, source_url, source_domain, source_kind,
+                  verification_status, editor_note, checked_at, first_seen_at, last_seen_at
+                FROM news_source_references
+                WHERE content_id = $1
+                ORDER BY position ASC, id ASC
+                "#,
+            )
+            .bind(content_id)
+            .fetch_all(&state.db)
+            .await
+            .unwrap_or_default();
+            let source_reviews = sqlx::query_as::<_, NewsSourceReviewEventRow>(
+                r#"
+                SELECT
+                  id, content_id, source_id, reviewer_id,
+                  from_source_kind, to_source_kind,
+                  from_verification_status, to_verification_status,
+                  note, created_at
+                FROM news_source_review_events
+                WHERE content_id = $1
+                ORDER BY created_at DESC, id DESC
+                LIMIT 100
+                "#,
+            )
+            .bind(content_id)
+            .fetch_all(&state.db)
+            .await
+            .unwrap_or_default();
+            (
+                StatusCode::OK,
+                Json(json!({
+                    "items": items,
+                    "versions": versions,
+                    "sources": sources,
+                    "source_reviews": source_reviews
+                })),
+            )
+                .into_response()
+        }
+        Err(error) => {
+            tracing::error!("list_editorial_history query error: {:?}", error);
+            response_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load editorial history",
+            )
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        is_allowed_news_source_url, moderation_action_allowed, moderation_action_requires_note,
+        moderation_target, normalize_editorial_priority, normalize_editorial_sensitivity,
+        normalize_fact_check_status, normalize_legal_review_status, normalize_news_category_filter,
+        normalize_news_language, normalize_news_search_query, normalize_queue_status,
+        parse_news_cursor, parse_requested_publish_at, public_news_metadata,
+        removes_verified_source, source_domain, validate_submission_payload,
+    };
+    use chrono::{Duration, Utc};
+    use serde_json::json;
+
+    #[test]
+    fn moderation_actions_map_to_publication_states() {
+        assert_eq!(moderation_target("approve"), Some(("active", "published")));
+        assert_eq!(
+            moderation_target("needs_revision"),
+            Some(("draft", "needs_revision"))
+        );
+        assert_eq!(moderation_target("reject"), Some(("archived", "rejected")));
+        assert_eq!(
+            moderation_target("retract"),
+            Some(("archived", "retracted"))
+        );
+        assert_eq!(moderation_target("unknown"), None);
+    }
+
+    #[test]
+    fn editorial_queue_rejects_unknown_statuses() {
+        assert!(normalize_queue_status(Some("pending_review".into())).is_ok());
+        assert!(normalize_queue_status(Some("all".into())).is_ok());
+        assert!(normalize_queue_status(Some("made_up".into())).is_err());
+    }
+
+    #[test]
+    fn editorial_actions_are_state_safe() {
+        assert!(moderation_action_allowed("pending_review", "approve"));
+        assert!(moderation_action_allowed(
+            "pending_review",
+            "needs_revision"
+        ));
+        assert!(moderation_action_allowed("pending_review", "reject"));
+        assert!(moderation_action_allowed("published", "correct"));
+        assert!(moderation_action_allowed("published", "retract"));
+        assert!(!moderation_action_allowed("published", "approve"));
+        assert!(!moderation_action_allowed("rejected", "approve"));
+        assert!(!moderation_action_allowed("retracted", "correct"));
+    }
+
+    #[test]
+    fn consequential_editorial_actions_require_notes() {
+        assert!(!moderation_action_requires_note("approve"));
+        assert!(moderation_action_requires_note("needs_revision"));
+        assert!(moderation_action_requires_note("reject"));
+        assert!(moderation_action_requires_note("correct"));
+        assert!(moderation_action_requires_note("retract"));
+    }
+
+    #[test]
+    fn source_domain_normalizes_common_urls() {
+        assert_eq!(
+            source_domain("https://www.bi.go.id/id/publikasi"),
+            Some("bi.go.id".to_string())
+        );
+        assert_eq!(
+            source_domain("http://example.com:8080/path"),
+            Some("example.com".to_string())
+        );
+    }
+
+    #[test]
+    fn public_metadata_does_not_leak_editorial_private_fields() {
+        let metadata = json!({
+            "news": {
+                "category": "Ekonomi",
+                "article_kind": "news",
+                "language": "id",
+                "location": "Banten",
+                "business_impact": "Dampak publik",
+                "contributor_id": "11111111-1111-1111-1111-111111111111",
+                "reviewer_id": "22222222-2222-2222-2222-222222222222",
+                "review_note": "catatan internal",
+                "previous_review_note": "catatan lama",
+                "source_urls": ["https://unverified.example/"]
+            }
+        });
+        let verified_sources = vec!["https://www.bi.go.id/".to_string()];
+        let public = public_news_metadata(&metadata, Some(&verified_sources));
+
+        assert_eq!(
+            public
+                .pointer("/news/category")
+                .and_then(|value| value.as_str()),
+            Some("Ekonomi")
+        );
+        assert_eq!(
+            public
+                .pointer("/news/source_urls/0")
+                .and_then(|value| value.as_str()),
+            Some("https://www.bi.go.id/")
+        );
+        assert!(public.pointer("/news/contributor_id").is_none());
+        assert!(public.pointer("/news/reviewer_id").is_none());
+        assert!(public.pointer("/news/review_note").is_none());
+        assert!(public.pointer("/news/previous_review_note").is_none());
+    }
+
+    #[test]
+    fn published_source_guard_only_triggers_on_verified_downgrade() {
+        assert!(removes_verified_source("verified", Some("broken")));
+        assert!(removes_verified_source("verified", Some("rejected")));
+        assert!(removes_verified_source("verified", Some("unverified")));
+        assert!(!removes_verified_source("verified", Some("verified")));
+        assert!(!removes_verified_source("verified", None));
+        assert!(!removes_verified_source("unverified", Some("broken")));
+    }
+
+    #[test]
+    fn public_source_policy_rejects_local_or_credentialed_urls() {
+        assert!(is_allowed_news_source_url(
+            "https://www.bi.go.id/id/publikasi"
+        ));
+        assert!(!is_allowed_news_source_url("http://127.0.0.1/admin"));
+        assert!(!is_allowed_news_source_url("http://10.10.0.1/internal"));
+        assert!(!is_allowed_news_source_url("http://localhost:8080/private"));
+        assert!(!is_allowed_news_source_url("http://[::1]/private"));
+        assert!(!is_allowed_news_source_url(
+            "https://user:pass@example.com/source"
+        ));
+        assert!(!is_allowed_news_source_url("file:///etc/passwd"));
+    }
+
+    #[test]
+    fn news_category_filter_canonicalizes_supported_values() {
+        assert_eq!(
+            normalize_news_category_filter(Some("umkm".to_string())).unwrap(),
+            Some("UMKM".to_string())
+        );
+        assert_eq!(
+            normalize_news_category_filter(Some("Bisnis".to_string())).unwrap(),
+            Some("Bisnis".to_string())
+        );
+        assert!(normalize_news_category_filter(Some("unknown".to_string())).is_err());
+        assert_eq!(normalize_news_category_filter(None).unwrap(), None);
+    }
+
+    #[test]
+    fn news_search_query_bounds_full_text_cost() {
+        assert_eq!(
+            normalize_news_search_query(Some("  ekonomi   umkm  ".to_string())).unwrap(),
+            Some("ekonomi   umkm".to_string())
+        );
+        assert!(normalize_news_search_query(Some("x".repeat(161))).is_err());
+        assert!(normalize_news_search_query(Some(
+            (0..25)
+                .map(|index| format!("term{index}"))
+                .collect::<Vec<_>>()
+                .join(" ")
+        ))
+        .is_err());
+        assert_eq!(normalize_news_search_query(None).unwrap(), None);
+    }
+
+    #[test]
+    fn news_language_filter_accepts_only_supported_locales() {
+        assert_eq!(
+            normalize_news_language(Some("ID".to_string())).unwrap(),
+            Some("id".to_string())
+        );
+        assert_eq!(
+            normalize_news_language(Some("en".to_string())).unwrap(),
+            Some("en".to_string())
+        );
+        assert!(normalize_news_language(Some("fr".to_string())).is_err());
+        assert_eq!(normalize_news_language(None).unwrap(), None);
+    }
+
+    #[test]
+    fn generic_news_submission_requires_editorial_quality_floor() {
+        let valid_metadata = json!({
+            "news": {
+                "category": "Ekonomi",
+                "article_kind": "news",
+                "language": "id",
+                "source_urls": ["https://www.bi.go.id/id/publikasi"]
+            }
+        });
+        let body = "a".repeat(120);
+
+        assert!(validate_submission_payload(
+            "Judul berita yang valid",
+            Some("Ringkasan berita yang cukup panjang."),
+            &body,
+            &valid_metadata,
+        )
+        .is_ok());
+
+        assert!(validate_submission_payload(
+            "Pendek",
+            Some("Ringkasan berita yang cukup panjang."),
+            &body,
+            &valid_metadata,
+        )
+        .is_err());
+
+        let missing_sources = json!({
+            "news": {
+                "category": "Ekonomi",
+                "article_kind": "analysis",
+                "language": "id",
+                "source_urls": []
+            }
+        });
+        assert!(validate_submission_payload(
+            "Analisis ekonomi terbaru",
+            Some("Ringkasan analisis yang cukup panjang."),
+            &body,
+            &missing_sources,
+        )
+        .is_err());
+
+        let press_release = json!({
+            "news": {
+                "category": "Bisnis",
+                "article_kind": "press_release",
+                "language": "id",
+                "source_urls": []
+            }
+        });
+        assert!(validate_submission_payload(
+            "Rilis bisnis perusahaan",
+            Some("Ringkasan rilis bisnis yang cukup panjang."),
+            &body,
+            &press_release,
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn editorial_readiness_and_schedule_values_are_bounded() {
+        assert!(normalize_fact_check_status(Some("verified".into())).is_ok());
+        assert!(normalize_fact_check_status(Some("truthy".into())).is_err());
+        assert!(normalize_legal_review_status(Some("approved".into())).is_ok());
+        assert!(normalize_legal_review_status(Some("skipped".into())).is_err());
+        assert!(normalize_editorial_priority(Some("urgent".into())).is_ok());
+        assert!(normalize_editorial_priority(Some("critical".into())).is_err());
+        assert!(normalize_editorial_sensitivity(Some("high".into())).is_ok());
+        assert!(normalize_editorial_sensitivity(Some("extreme".into())).is_err());
+
+        let now = Utc::now();
+        let past = (now - Duration::hours(1)).to_rfc3339();
+        assert_eq!(
+            parse_requested_publish_at(Some(past), now).unwrap(),
+            Some(now)
+        );
+        let too_far = (Utc::now() + Duration::days(91)).to_rfc3339();
+        assert!(parse_requested_publish_at(Some(too_far), Utc::now()).is_err());
+    }
+
+    #[test]
+    fn cursor_parser_accepts_timestamp_and_uuid() {
+        let cursor = "2026-09-18T00:00:00+00:00|11111111-1111-1111-1111-111111111111";
+        assert!(parse_news_cursor(Some(cursor)).unwrap().is_some());
+        assert!(parse_news_cursor(Some("broken")).is_err());
+        assert!(parse_news_cursor(Some(&"x".repeat(97))).is_err());
+    }
+}
