@@ -204,6 +204,16 @@ function applyNoIndexHeader(res: NextResponse) {
   return res;
 }
 
+function applyNoStoreHeaders(res: NextResponse) {
+  res.headers.set(
+    'Cache-Control',
+    'private, no-store, max-age=0, must-revalidate',
+  );
+  res.headers.set('Pragma', 'no-cache');
+  res.headers.set('Expires', '0');
+  return res;
+}
+
 function applyTemporaryRedirectHeaders(res: NextResponse) {
   res.headers.set(
     'Cache-Control',
@@ -779,6 +789,12 @@ export async function proxy(req: NextRequest) {
   // send News back to Home. Access control below still applies to protected
   // News children such as /news/submit and /news/submissions.
   const isNewsRoute = routePathForNews(pathname, locale);
+
+  // News is content that can be enabled/disabled and revalidated independently.
+  // Never let browser/CDN caching preserve an old redirect or stale route state.
+  // This is intentionally no-store rather than a long-lived cache policy.
+  const finalizeNewsResponse = (res: NextResponse) =>
+    applyNoStoreHeaders(applySecurityHeaders(res));
 
   // 4. Route auth checks
   const routePath = '/' + segments.slice(2).join('/');
