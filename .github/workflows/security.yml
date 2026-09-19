@@ -172,15 +172,21 @@ jobs:
           packages = lock.get("packages", {})
           payload = {}
 
-          for meta in packages.values():
+          for package_path, meta in packages.items():
               if not isinstance(meta, dict):
                   continue
-              name = meta.get("name")
               version = meta.get("version")
-              if not name or not version:
+              if not version:
                   continue
               if bool(meta.get("dev")):
                   continue
+
+              name = meta.get("name")
+              if not name and package_path.startswith("node_modules/"):
+                  name = package_path.split("node_modules/")[-1]
+              if not name or "/" not in name and name.startswith("@"):
+                  continue
+
               payload.setdefault(name, set()).add(version)
 
           payload = {name: sorted(versions) for name, versions in payload.items()}
