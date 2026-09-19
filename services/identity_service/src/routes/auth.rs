@@ -562,30 +562,13 @@ async fn invalidate_roles_cache_for_user(state: Arc<AppState>, user_id: Uuid) {
 }
 
 // **PERFORMANCE:** Query digabungkan menjadi satu round-trip DB menggunakan ARRAY_AGG.
-async fn get_roles_permissions_cached(
+async fn get_roles_permissions_from_db(
     state: &Arc<AppState>,
     user_id: Uuid,
 ) -> Result<RolesPermissions, sqlx::Error> {
-    let cache_key = format!("user:roles:{}", user_id);
-
-    // Try redis first
-    if let Ok(mut conn) = state.redis.get().await {
-        let redis_result: Result<Option<String>, _> =
-            conn.get::<_, Option<String>>(cache_key.clone()).await;
-        if let Ok(Some(cached_json)) = redis_result {
-            if let Ok(rp) = serde_json::from_str::<RolesPermissions>(&cached_json) {
-                return Ok(rp);
-            } else {
-                tracing::warn!("Failed to parse cached roles json for user {}", user_id);
-            }
-        }
-    }
-
-    // Cache miss -> query DB (single optimized query)
-    // Menggunakan LEFT JOIN untuk memastikan user tetap mendapat {[], []} jika tidak punya role/permission.
     let row = sqlx::query_as::<_, RolesPermissionsRow>(
         r#"
-        SELECT 
+        SELECT
             COALESCE(ARRAY_AGG(DISTINCT r.name) FILTER (WHERE r.name IS NOT NULL), '{}') AS roles,
             COALESCE(ARRAY_AGG(DISTINCT p.name) FILTER (WHERE p.name IS NOT NULL), '{}') AS permissions
         FROM core.user_roles ur
@@ -593,14 +576,14 @@ async fn get_roles_permissions_cached(
         LEFT JOIN role_permissions rp ON rp.role_id = r.id
         LEFT JOIN permissions p ON p.id = rp.permission_id
         WHERE ur.user_id = $1
-        GROUP BY ur.user_id -- Meskipun hanya 1 baris, GROUP BY memastikan ARRAY_AGG bekerja
+        GROUP BY ur.user_id
         "#,
     )
     .bind(user_id)
     .fetch_optional(&state.db)
     .await?;
 
-    let rp = match row {
+    Ok(match row {
         Some(r) => RolesPermissions {
             roles: r.roles,
             permissions: r.permissions,
@@ -609,22 +592,39 @@ async fn get_roles_permissions_cached(
             roles: vec![],
             permissions: vec![],
         },
-    };
+    })
+}
 
-    // set cache async (best-effort)
-    let json_str = match serde_json::to_string(&rp) {
-        Ok(s) => s,
-        Err(_) => return Ok(rp), // if serialize fails, just return rp
-    };
-    let cache_key_clone = cache_key.clone();
-    let state_clone = state.clone();
-    tokio::spawn(async move {
-        if let Ok(mut conn) = state_clone.redis.get().await {
-            let _ = conn
-                .set_ex::<String, String, ()>(cache_key_clone, json_str, CACHE_TTL_SECONDS)
-                .await;
+async fn get_roles_permissions_cached(
+    state: &Arc<AppState>,
+    user_id: Uuid,
+) -> Result<RolesPermissions, sqlx::Error> {
+    let cache_key = format!("user:roles:{}", user_id);
+
+    if let Ok(mut conn) = state.redis.get().await {
+        let redis_result: Result<Option<String>, _> =
+            conn.get::<_, Option<String>>(cache_key.clone()).await;
+        if let Ok(Some(cached_json)) = redis_result {
+            if let Ok(rp) = serde_json::from_str::<RolesPermissions>(&cached_json) {
+                return Ok(rp);
+            }
+            tracing::warn!("Failed to parse cached roles json for user {}", user_id);
         }
-    });
+    }
+
+    let rp = get_roles_permissions_from_db(state, user_id).await?;
+
+    if let Ok(json_str) = serde_json::to_string(&rp) {
+        let cache_key_clone = cache_key.clone();
+        let state_clone = state.clone();
+        tokio::spawn(async move {
+            if let Ok(mut conn) = state_clone.redis.get().await {
+                let _ = conn
+                    .set_ex::<String, String, ()>(cache_key_clone, json_str, CACHE_TTL_SECONDS)
+                    .await;
+            }
+        });
+    }
 
     Ok(rp)
 }
@@ -1241,7 +1241,7 @@ pub async fn register(
         Err(e) => tracing::error!("error fetching default role: {:?}", e),
     }
 
-    let rp = get_roles_permissions_cached(&state, user_id)
+    let rp = get_roles_permissions_from_db(&state, user_id)
         .await
         .unwrap_or(RolesPermissions {
             roles: vec![],
@@ -1529,7 +1529,7 @@ pub async fn login(
     .execute(&mut *tx)
     .await;
 
-    let rp = get_roles_permissions_cached(&state, user_data.id)
+    let rp = get_roles_permissions_from_db(&state, user_data.id)
         .await
         .unwrap_or(RolesPermissions {
             roles: vec![],
@@ -1848,7 +1848,7 @@ pub async fn login_phone(
     .execute(&mut *tx)
     .await;
 
-    let rp = get_roles_permissions_cached(&state, user_data.id)
+    let rp = get_roles_permissions_from_db(&state, user_data.id)
         .await
         .unwrap_or(RolesPermissions {
             roles: vec![],
@@ -2192,7 +2192,7 @@ pub async fn oauth_google(
             .into_response();
     }
 
-    let mut rp = get_roles_permissions_cached(&state, user_id)
+    let mut rp = get_roles_permissions_from_db(&state, user_id)
         .await
         .unwrap_or(RolesPermissions {
             roles: vec![],
@@ -2222,7 +2222,7 @@ pub async fn oauth_google(
                 .execute(&state.db)
                 .await;
                 invalidate_roles_cache_for_user(state.clone(), user_id).await;
-                rp = get_roles_permissions_cached(&state, user_id)
+                rp = get_roles_permissions_from_db(&state, user_id)
                     .await
                     .unwrap_or(RolesPermissions {
                         roles: vec![],
@@ -2372,7 +2372,7 @@ pub async fn refresh_token(
     match find_and_verify_session(&state, payload.session_id, &payload.refresh_token).await {
         Ok(Some((user_id, _expires_at))) => {
             // Ambil roles dan permissions user
-            let rp = match get_roles_permissions_cached(&state, user_id).await {
+            let rp = match get_roles_permissions_from_db(&state, user_id).await {
                 Ok(rp) => rp,
                 Err(e) => {
                     tracing::error!("error fetching roles permissions: {:?}", e);
@@ -3045,7 +3045,7 @@ pub async fn me(State(state): State<Arc<AppState>>, headers: HeaderMap) -> impl 
     // --- Optional: Jika ingin mengaktifkan caching roles/permissions ---
     // Uncomment dan gunakan jika ingin sertakan roles & permissions di response
     /*
-    let rp = match get_roles_permissions_cached(&state, user_id).await {
+    let rp = match get_roles_permissions_from_db(&state, user_id).await {
         Ok(rp) => rp,
         Err(e) => {
             tracing::error!("error fetching roles and permissions: {:?}", e);
