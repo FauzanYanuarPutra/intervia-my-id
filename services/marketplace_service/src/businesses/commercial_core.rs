@@ -1372,6 +1372,7 @@ async fn validate_allocations_tx(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn insert_payment_finance_entry_tx(
     tx: &mut Transaction<'_, Postgres>,
     payment_id: Uuid,

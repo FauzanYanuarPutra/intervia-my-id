@@ -8,6 +8,7 @@ use uuid::Uuid;
 /// The legacy write is intentionally retained during convergence. Producers
 /// must call this boundary instead of duplicating outbox SQL so the eventual
 /// legacy cutover has one owner.
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn enqueue_business_event(
     tx: &mut Transaction<'_, Postgres>,
     event_id: Uuid,

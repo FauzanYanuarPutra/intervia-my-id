@@ -787,6 +787,7 @@ async fn ensure_location_tx(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn insert_command_tx(
     tx: &mut Transaction<'_, Postgres>,
     organization_id: Uuid,
@@ -971,14 +972,6 @@ FROM business_accounting_periods
 WHERE id=$1 AND business_id=$2 AND organization_id=$3
 "#;
 
-const PERIOD_SELECT_EXACT: &str = r#"
-SELECT id,organization_id,business_id,period_start,period_end,status,version,
-       closed_by_user_id,closed_at,close_reason,reopened_by_user_id,reopened_at,
-       reopen_reason,created_at,updated_at
-FROM business_accounting_periods
-WHERE business_id=$1 AND organization_id=$2 AND period_start=$3 AND period_end=$4
-"#;
-
 const PERIOD_SELECT_ONE_FOR_UPDATE: &str = r#"
 SELECT id,organization_id,business_id,period_start,period_end,status,version,
        closed_by_user_id,closed_at,close_reason,reopened_by_user_id,reopened_at,
@@ -1013,14 +1006,6 @@ SELECT id,organization_id,business_id,location_id,business_date,status,close_sna
        reopen_reason,created_at,updated_at
 FROM business_day_closes
 WHERE id=$1 AND business_id=$2 AND organization_id=$3
-"#;
-
-const DAY_SELECT_EXACT: &str = r#"
-SELECT id,organization_id,business_id,location_id,business_date,status,close_snapshot,
-       version,closed_by_user_id,closed_at,close_reason,reopened_by_user_id,reopened_at,
-       reopen_reason,created_at,updated_at
-FROM business_day_closes
-WHERE business_id=$1 AND organization_id=$2 AND location_id=$3 AND business_date=$4
 "#;
 
 const DAY_SELECT_ONE_FOR_UPDATE: &str = r#"

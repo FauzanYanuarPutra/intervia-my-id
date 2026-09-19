@@ -42,7 +42,7 @@ async fn list_transfers(
 ) -> Response {
     let actor_id = match actor(&state, &headers) {
         Ok(value) => value,
-        Err(response) => return response,
+        Err(code) => return api_error(StatusCode::UNAUTHORIZED, code),
     };
     let repository = StockTransferRepository::new(state.db.clone());
     let organization_id = match repository.organization_for_business(business_id).await {
@@ -70,7 +70,7 @@ async fn create_transfer(
 ) -> Response {
     let actor_id = match actor(&state, &headers) {
         Ok(value) => value,
-        Err(response) => return response,
+        Err(code) => return api_error(StatusCode::UNAUTHORIZED, code),
     };
     let idempotency_key = match parse_idempotency_key(&headers) {
         Ok(value) => value,
@@ -104,15 +104,14 @@ async fn create_transfer(
     }
 }
 
-fn actor(state: &AppState, headers: &HeaderMap) -> Result<Uuid, Response> {
+fn actor(state: &AppState, headers: &HeaderMap) -> Result<Uuid, &'static str> {
     headers
         .get(header::AUTHORIZATION)
         .and_then(|value| value.to_str().ok())
         .map(str::trim)
         .filter(|value| value.starts_with("Bearer ") && value.len() > 7)
-        .ok_or_else(|| api_error(StatusCode::UNAUTHORIZED, "auth_required"))?;
-    user_id_from_auth(headers, &state.jwt_secret)
-        .ok_or_else(|| api_error(StatusCode::UNAUTHORIZED, "auth_required"))
+        .ok_or("auth_required")?;
+    user_id_from_auth(headers, &state.jwt_secret).ok_or("auth_required")
 }
 
 fn parse_idempotency_key(headers: &HeaderMap) -> Result<Uuid, &'static str> {

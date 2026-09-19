@@ -754,7 +754,6 @@ mod tests {
     }
 
     #[test]
-    #[test]
     fn finance_validation_rejects_manual_document_payments() {
         for entry_type in ["receivable_payment", "payable_payment"] {
             let request = CreateFinanceEntryRequest {
@@ -774,6 +773,7 @@ mod tests {
         }
     }
 
+    #[test]
     fn finance_validation_keeps_owner_drawing_distinct() {
         let request = CreateFinanceEntryRequest {
             entry_type: "owner_drawing".to_owned(),

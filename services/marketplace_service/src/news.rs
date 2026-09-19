@@ -2994,9 +2994,9 @@ mod tests {
         assert!(normalize_editorial_sensitivity(Some("extreme".into())).is_err());
 
         let now = Utc::now();
-        let past = (now.clone() - Duration::hours(1)).to_rfc3339();
+        let past = (now - Duration::hours(1)).to_rfc3339();
         assert_eq!(
-            parse_requested_publish_at(Some(past), now.clone()).unwrap(),
+            parse_requested_publish_at(Some(past), now).unwrap(),
             Some(now)
         );
         let too_far = (Utc::now() + Duration::days(91)).to_rfc3339();
