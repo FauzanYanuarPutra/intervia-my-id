@@ -25,7 +25,7 @@ export default async function BusinessHppPage({ params }: PageProps) {
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <Link href={`/businesses/${business.id}/products`} className="portal-button-secondary"><ArrowLeft className="h-4 w-4" /> Kembali ke produk</Link>
-            <div className="flex max-w-2xl gap-2 rounded-2xl border border-portal-line bg-white px-3 py-2 text-xs leading-5 text-portal-soft"><Info className="mt-0.5 h-4 w-4 shrink-0 text-portal-forest" /><p>Harga beli dan stok diambil otomatis dari <strong>Stok & Belanja</strong>. Kamu cukup mengatur bahan yang dipakai untuk satu produk.</p></div>
+            <div className="flex max-w-2xl gap-2 rounded-2xl border border-portal-line bg-white px-3 py-2 text-xs leading-5 text-portal-soft"><Info className="mt-0.5 h-4 w-4 shrink-0 text-portal-forest" /><p>Harga beli dan stok diambil otomatis dari <strong>Stok & Belanja</strong>. Atur bahan yang dipakai untuk satu produk.</p></div>
           </div>
           {canView ? (
             <DurableHppWorkspace
@@ -33,7 +33,7 @@ export default async function BusinessHppPage({ params }: PageProps) {
               ingredients={ingredients}
               products={business.products.map(product => ({ id: product.id, name: product.name, priceLabel: product.priceLabel }))}
             />
-          ) : <div className="portal-panel p-5 text-sm text-portal-soft">Peranmu tidak memiliki akses melihat modal, biaya bahan, dan margin produk.</div>}
+          ) : <div className="portal-panel p-5 text-sm text-portal-soft">Kamu tidak punya akses melihat modal produk.</div>}
         </div>
       </SectionCard>
     </PortalShell>
