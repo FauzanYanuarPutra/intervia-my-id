@@ -1,0 +1,22 @@
+use axum::{extract::State,http::StatusCode,response::IntoResponse,routing::get,Json,Router};
+use serde_json::json;
+use sqlx::{postgres::PgPoolOptions,PgPool};
+use std::{env,net::SocketAddr,sync::Arc};
+use tracing_subscriber::{layer::SubscriberExt,util::SubscriberInitExt};
+#[derive(Clone)] struct AppState{db:PgPool}
+async fn health(State(s):State<Arc<AppState>>)->impl IntoResponse{
+ let ok=sqlx::query_scalar::<_,i32>("SELECT 1").fetch_one(&s.db).await.ok()==Some(1);
+ if ok {(StatusCode::OK,Json(json!({"status":"ok","service":env!("CARGO_PKG_NAME")})))} else {(StatusCode::SERVICE_UNAVAILABLE,Json(json!({"status":"degraded","service":env!("CARGO_PKG_NAME")})))}
+}
+async fn ready(State(s):State<Arc<AppState>>)->impl IntoResponse{
+ match sqlx::query_scalar::<_,i32>("SELECT 1").fetch_one(&s.db).await{Ok(1)=>(StatusCode::OK,Json(json!({"status":"ready","service":env!("CARGO_PKG_NAME")}))),_=>(StatusCode::SERVICE_UNAVAILABLE,Json(json!({"status":"not_ready","service":env!("CARGO_PKG_NAME")})))}
+}
+#[tokio::main] async fn main()->anyhow::Result<()>{
+ tracing_subscriber::registry().with(tracing_subscriber::EnvFilter::from_default_env()).with(tracing_subscriber::fmt::layer().json()).init();
+ let url=env::var("DATABASE_URL")?;
+ let pool=PgPoolOptions::new().max_connections(10).connect(&url).await?;
+ sqlx::migrate!("./migrations").run(&pool).await?;
+ let app=Router::new().route("/health",get(health)).route("/ready",get(ready)).with_state(Arc::new(AppState{db:pool}));
+ let port:u16=env::var("APP_PORT").unwrap_or_else(|_|"8080".into()).parse()?;
+ axum::serve(tokio::net::TcpListener::bind(SocketAddr::from(([0,0,0,0],port))).await?,app).await?; Ok(())
+}
