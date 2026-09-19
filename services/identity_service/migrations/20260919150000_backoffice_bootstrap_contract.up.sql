@@ -19,7 +19,7 @@ CREATE TRIGGER backoffice_bootstrap_slots_update_timestamp
 BEFORE UPDATE ON core.backoffice_bootstrap_slots
 FOR EACH ROW EXECUTE FUNCTION public.update_timestamp();
 
-INSERT INTO core.roles (id, name, description, system, role_type)
+INSERT INTO roles (id, name, description, system, role_type)
 VALUES
     (gen_random_uuid(), 'admin', 'Platform backoffice administrator', TRUE, 'global'),
     (gen_random_uuid(), 'content_admin', 'CMS editorial administrator', TRUE, 'global'),
