@@ -1,5 +1,7 @@
 import { buildNewsUrl, getPublishedNews } from '@/lib/news';
 
+const FEED_URL = 'https://www.lajukan.com/news/rss.xml';
+
 function escapeXml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
@@ -24,15 +26,17 @@ export async function GET() {
       <pubDate>${new Date(article.publishedAt).toUTCString()}</pubDate>
       <category>${escapeXml(article.category)}</category>
       <description>${escapeXml(article.summary)}</description>
+      ${article.coverImage ? `<enclosure url="${escapeXml(article.coverImage)}" type="image/*" />` : ""}
     </item>`;
     })
     .join('\n');
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0">
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>Lajukan News</title>
     <link>${escapeXml(channelUrl)}</link>
+    <atom:link href="${escapeXml(FEED_URL)}" rel="self" type="application/rss+xml" />
     <description>Berita ekonomi, bisnis, UMKM, teknologi, regulasi, dan daerah untuk pelaku usaha.</description>
     <language>id-ID</language>
     <lastBuildDate>${new Date().toUTCString()}</lastBuildDate>
