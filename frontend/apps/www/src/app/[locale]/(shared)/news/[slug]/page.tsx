@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
-import { ArrowLeft, BookOpenText, CalendarDays, ExternalLink, Hash, MapPin, Store } from 'lucide-react';
+import { ArrowLeft, BookOpenText, CalendarDays, ExternalLink, Hash, MapPin, Store, Clock3 } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import {
   buildNewsArticleJsonLd,
@@ -139,6 +139,9 @@ export default async function NewsArticlePage({ params }: PageProps) {
                 alt={article.title}
                 className="aspect-[16/9] w-full object-cover"
                 loading="eager"
+                onError={(event) => {
+                  event.currentTarget.style.display = 'none';
+                }}
               />
               <figcaption className="px-4 py-2.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
                 {isId ? 'Media utama artikel' : 'Article featured media'}
@@ -151,6 +154,12 @@ export default async function NewsArticlePage({ params }: PageProps) {
               {formatDate(article.publishedAt, locale)}
             </span>
             <span className="inline-flex min-h-8 items-center rounded-full bg-white px-3 dark:bg-white/10">{article.byline}</span>
+            {article.updatedAt !== article.publishedAt ? (
+              <span className="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-white px-3 dark:bg-white/10">
+                <Clock3 className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-300" />
+                {isId ? 'Diperbarui' : 'Updated'} {formatDate(article.updatedAt, locale)}
+              </span>
+            ) : null}
             {article.location ? (
               <Link
                 href={buildNewsFacetPath('location', article.location)}
