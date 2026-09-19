@@ -30,7 +30,7 @@ export default async function BuyerPagePreview({ params }: PageProps) {
       <PageHeader
         eyebrow="Kelola usaha"
         title="Tampilan toko"
-        description="Cek apa yang dilihat pelanggan, lalu buka halaman publik aslinya."
+        description="Atur tampilan toko dan cek halaman publik."
         action={<a href={business.publicUrl} target="_blank" rel="noreferrer" className="portal-button-primary"><Store className="h-4 w-4" /> Buka toko <ExternalLink className="h-4 w-4" /></a>}
       />
 
