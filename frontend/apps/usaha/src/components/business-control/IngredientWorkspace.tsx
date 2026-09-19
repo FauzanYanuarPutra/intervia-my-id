@@ -564,11 +564,11 @@ export function IngredientWorkspace({
         </div>
       </section>
 
-      <details open className="rounded-xl border border-portal-line bg-white group">
+      <details className="rounded-xl border border-portal-line bg-white group">
         <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 sm:px-5">
           <div>
             <p className="font-bold text-portal-ink">Tambah bahan</p>
-            <p className="mt-0.5 text-xs text-portal-soft">Ceritakan cara kamu membeli dan memakai bahan. Lajukan yang menghitung detail teknisnya.</p>
+            <p className="mt-0.5 text-xs text-portal-soft">Buka hanya saat mau menambah bahan baru.</p>
           </div>
           <ChevronDown className="h-4 w-4 text-portal-soft transition group-open:rotate-180" />
         </summary>
