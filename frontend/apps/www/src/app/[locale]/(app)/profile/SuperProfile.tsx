@@ -1763,62 +1763,6 @@ export default function SuperProfile() {
       ),
     ),
   );
-
-  const completionItems = useMemo(
-    () => [
-      {
-        key: 'avatar',
-        label: copy.photoProfile,
-        complete: Boolean(
-          normalizeProfileMediaUrl(avatarUrlInput) ||
-          detail?.avatar_url ||
-          detail?.avatarUrl ||
-          detail?.metadata?.avatar_url,
-        ),
-      },
-      {
-        key: 'bio',
-        label: copy.bioBusiness,
-        complete: Boolean(firstString(detail?.bio, user?.bio)),
-      },
-      {
-        key: 'location',
-        label: copy.businessLocation,
-        complete: Boolean(location),
-      },
-      {
-        key: 'contact',
-        label: copy.contact,
-        complete: Boolean(phone || detail?.email || user?.email),
-      },
-      {
-        key: 'cover',
-        label: copy.businessPhoto,
-        complete: Boolean(effectiveCoverUrl),
-      },
-    ],
-    [
-      avatarUrlInput,
-      copy,
-      detail,
-      effectiveCoverUrl,
-      location,
-      phone,
-      user,
-    ],
-  );
-
-  const profilePercent = useMemo(() => {
-    const complete = completionItems.filter(item => item.complete).length;
-    return Math.round((complete / completionItems.length) * 100);
-  }, [completionItems]);
-
-  const incompleteCompletionItems = useMemo(
-    () => completionItems.filter(item => !item.complete),
-    [completionItems],
-  );
-  const nextCompletionItem = incompleteCompletionItems[0] || null;
-
   const sourceListings =
     activeTab === 'drafts' ? draftListings : activeListings;
 
