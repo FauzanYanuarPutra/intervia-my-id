@@ -108,6 +108,38 @@ pub(crate) async fn validate_phone_otp_proof(
     ))
 }
 
+
+pub(crate) async fn consume_email_otp_proof(
+    state: &AppState,
+    token: &str,
+    expected_email: &str,
+    allowed_purposes: &[&str],
+) -> Result<bool> {
+    let Some(token) = normalize_proof_token(token) else {
+        return Ok(false);
+    };
+    let key = format!("{OTP_VERIFICATION_PREFIX}{token}");
+    let Some(raw) = consume_redis_value(state, &key).await? else {
+        return Ok(false);
+    };
+    Ok(valid_email_otp_payload(
+        &raw,
+        expected_email,
+        allowed_purposes,
+    ))
+}
+
+fn valid_email_otp_payload(raw: &str, expected_email: &str, allowed_purposes: &[&str]) -> bool {
+    let Ok(payload) = serde_json::from_str::<OtpVerificationPayload>(raw) else {
+        return false;
+    };
+    payload.kind == "email"
+        && payload.target.trim().eq_ignore_ascii_case(expected_email.trim())
+        && allowed_purposes
+            .iter()
+            .any(|purpose| payload.purpose == *purpose)
+}
+
 pub(crate) async fn consume_phone_otp_proof(
     state: &AppState,
     token: &str,
