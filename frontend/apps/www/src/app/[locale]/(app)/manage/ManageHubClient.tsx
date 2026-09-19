@@ -569,6 +569,12 @@ export default function ManageHubClient({ isId }: ManageHubClientProps) {
   const shortcuts = useMemo<ShortcutItem[]>(
     () => [
       {
+        id: 'news-submit',
+        href: '/news/submit',
+        label: isId ? 'Kirim News' : 'Submit news',
+        icon: Newspaper,
+      },
+      {
         id: 'promotion',
         href: '/create?mode=promotion',
         label: isId ? 'Promosi' : 'Promotion',
