@@ -1,78 +1,48 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# Lajukan domain cutover runner.
-#
-# This command is intentionally explicit: it performs the real backfill only when
-# the operator supplies live PostgreSQL credentials. It never guesses database
-# credentials and never drops the legacy database.
+# Real domain backfill runner. It never deletes legacy rows.
 #
 # Required:
 #   LEGACY_PGHOST LEGACY_PGPORT LEGACY_PGUSER LEGACY_PGPASSWORD
 #   TARGET_PGHOST TARGET_PGPORT TARGET_PGUSER TARGET_PGPASSWORD
-#
 # Optional:
-#   TARGET_DB_PREFIX (default: "")
+#   DOMAIN=news|order|payment|crm|communication|trust|profile|promotion
 #   DRY_RUN=true
-#
-# Usage:
-#   DOMAIN=news ./domain-cutover.sh
-#   DOMAIN=order ./domain-cutover.sh
-#   DOMAIN=payment ./domain-cutover.sh
-#   DOMAIN=crm ./domain-cutover.sh
-#   DOMAIN=communication ./domain-cutover.sh
-#   DOMAIN=trust ./domain-cutover.sh
-#   DOMAIN=profile ./domain-cutover.sh
-#   DOMAIN=promotion ./domain-cutover.sh
-#
-# The script is expand/backfill/switch-safe: it never deletes source rows.
-# Legacy writes must be frozen or dual-written by the application before a
-# production cutover is declared complete.
 
 required=(LEGACY_PGHOST LEGACY_PGPORT LEGACY_PGUSER LEGACY_PGPASSWORD TARGET_PGHOST TARGET_PGPORT TARGET_PGUSER TARGET_PGPASSWORD)
-for key in "${required[@]}"; do
-  [[ -n "${!key:-}" ]] || { echo "missing $key" >&2; exit 2; }
+for key in "\${required[@]}"; do
+  [[ -n "\${!key:-}" ]] || { echo "missing $key" >&2; exit 2; }
 done
 
-DOMAIN="${DOMAIN:-}"
-DRY_RUN="${DRY_RUN:-false}"
-export PGPASSWORD="${TARGET_PGPASSWORD}"
-
-legacy_psql() {
-  PGPASSWORD="${LEGACY_PGPASSWORD}" psql -X -v ON_ERROR_STOP=1 \
-    -h "${LEGACY_PGHOST}" -p "${LEGACY_PGPORT}" -U "${LEGACY_PGUSER}" -d marketplace_db "$@"
-}
-
-target_psql() {
-  PGPASSWORD="${TARGET_PGPASSWORD}" psql -X -v ON_ERROR_STOP=1 \
-    -h "${TARGET_PGHOST}" -p "${TARGET_PGPORT}" -U "${TARGET_PGUSER}" -d "$1" "${@:2}"
-}
+DOMAIN="\${DOMAIN:-}"
+DRY_RUN="\${DRY_RUN:-false}"
 
 ensure_target_db() {
   local db="$1"
   echo "==> ensuring target database $db exists"
-  if [[ "${DRY_RUN}" == "true" ]]; then return; fi
-  PGPASSWORD="${TARGET_PGPASSWORD}" psql -X -v ON_ERROR_STOP=1 \
-    -h "${TARGET_PGHOST}" -p "${TARGET_PGPORT}" -U "${TARGET_PGUSER}" -d postgres \
-    -v db="$db" -c 'SELECT 1 FROM pg_database WHERE datname = :'db \ 
-    | grep -q 1 || PGPASSWORD="${TARGET_PGPASSWORD}" psql -X -v ON_ERROR_STOP=1 \
-      -h "${TARGET_PGHOST}" -p "${TARGET_PGPORT}" -U "${TARGET_PGUSER}" -d postgres \
-      -c "CREATE DATABASE \"$db\";"
+  [[ "$DRY_RUN" == "true" ]] && return 0
+  local exists
+  exists="$(PGPASSWORD="$TARGET_PGPASSWORD" psql -X -At -h "$TARGET_PGHOST" -p "$TARGET_PGPORT" -U "$TARGET_PGUSER" -d postgres -c "SELECT 1 FROM pg_database WHERE datname = '$db'")"
+  if [[ "$exists" != "1" ]]; then
+    PGPASSWORD="$TARGET_PGPASSWORD" psql -X -v ON_ERROR_STOP=1 -h "$TARGET_PGHOST" -p "$TARGET_PGPORT" -U "$TARGET_PGUSER" -d postgres -c "CREATE DATABASE \"$db\";"
+  fi
 }
 
 run_sql_file() {
-  local db="$1"; local file="$2"
+  local db="$1"
+  local file="$2"
   echo "==> applying $DOMAIN backfill to $db from $file"
-  if [[ "${DRY_RUN}" == "true" ]]; then
-    sed -n '1,240p' "$file"
-    return
+  if [[ "$DRY_RUN" == "true" ]]; then
+    cat "$file"
+    return 0
   fi
-  TARGET_PGPASSWORD="${TARGET_PGPASSWORD}" psql -X -v ON_ERROR_STOP=1 \
-    -h "${TARGET_PGHOST}" -p "${TARGET_PGPORT}" -U "${TARGET_PGUSER}" -d "$db" \
-    -v legacy_host="${LEGACY_PGHOST}" \
-    -v legacy_port="${LEGACY_PGPORT}" \
-    -v legacy_user="${LEGACY_PGUSER}" \
-    -v legacy_password="${LEGACY_PGPASSWORD}" \
+  PGPASSWORD="$TARGET_PGPASSWORD" psql -X -v ON_ERROR_STOP=1 \
+    -h "$TARGET_PGHOST" -p "$TARGET_PGPORT" -U "$TARGET_PGUSER" -d "$db" \
+    -v legacy_host="$LEGACY_PGHOST" \
+    -v legacy_port="$LEGACY_PGPORT" \
+    -v legacy_user="$LEGACY_PGUSER" \
+    -v legacy_password="$LEGACY_PGPASSWORD" \
     -f "$file"
 }
 
