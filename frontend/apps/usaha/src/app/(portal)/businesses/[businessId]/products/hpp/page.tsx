@@ -21,7 +21,7 @@ export default async function BusinessHppPage({ params }: PageProps) {
 
   return (
     <PortalShell activeBusiness={business} availableBusinesses={businesses} viewerName={account?.name ?? null} currentSection="products">
-      <SectionCard eyebrow="Barang" title="Modal produk" description="Pilih produk dan isi bahan yang dipakai. Lajukan menghitung modal per porsi, perkiraan untung, margin, dan berapa banyak yang masih bisa dibuat.">
+      <SectionCard eyebrow="Barang" title="Modal produk" description="Isi bahan dan modal produk.">
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <Link href={`/businesses/${business.id}/products`} className="portal-button-secondary"><ArrowLeft className="h-4 w-4" /> Kembali ke produk</Link>
