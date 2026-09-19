@@ -1,4 +1,5 @@
 type ProductUpdateInput = {
+  reason?: string;
   name?: string;
   category?: string;
   priceLabel?: string;
@@ -25,6 +26,7 @@ function trimmed(value: string | undefined) {
 export function productUpdatePayload(input: ProductUpdateInput) {
   return {
     ...(input.name !== undefined ? { name: trimmed(input.name) } : {}),
+    ...(input.reason !== undefined ? { reason: trimmed(input.reason) } : {}),
     ...(input.category !== undefined ? { category: trimmed(input.category) } : {}),
     ...(input.priceLabel !== undefined ? { price_label: trimmed(input.priceLabel) } : {}),
     ...(input.status !== undefined
