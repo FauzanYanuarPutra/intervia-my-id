@@ -88,6 +88,10 @@ pub struct PhoneLoginRequest {
 #[derive(Debug, Deserialize)]
 pub struct GoogleOAuthRequest {
     pub id_token: String,
+    /// Optional first-party backoffice consumer. CRM/CMS Google sign-in is
+    /// allowlist-gated; public WWW Google auth keeps its existing behavior.
+    #[serde(default)]
+    pub application: Option<String>,
     #[serde(default)]
     pub provider_user_id: Option<String>,
     #[serde(default)]
@@ -335,6 +339,14 @@ fn normalize_optional_email(raw: Option<&str>) -> Option<String> {
             Some(email)
         }
     })
+}
+
+fn normalize_backoffice_application(raw: Option<&str>) -> Option<&'static str> {
+    match raw.map(str::trim).map(str::to_ascii_lowercase).as_deref() {
+        Some("crm") => Some("crm"),
+        Some("cms") => Some("cms"),
+        _ => None,
+    }
 }
 
 fn normalize_username(raw: &str) -> String {
@@ -2001,6 +2013,60 @@ pub async fn oauth_google(
             .into_response();
     }
 
+    // First-party backoffice Google login is an approval flow, not an
+    // open registration flow. Check the allowlist BEFORE creating/linking any
+    // local account so an unauthorized Google address can never be provisioned
+    // merely by attempting OAuth.
+    let backoffice_application = normalize_backoffice_application(payload.application.as_deref());
+    let approved_backoffice_roles: Vec<String> = if let Some(application) = backoffice_application {
+        match sqlx::query_as::<_, (String, Vec<String>)>(
+            r#"
+            SELECT status, role_names
+            FROM core.backoffice_google_access
+            WHERE lower(email::text) = lower($1)
+              AND application = $2
+              AND status = 'approved'
+            LIMIT 1
+            "#,
+        )
+        .bind(&email)
+        .bind(application)
+        .fetch_optional(&state.db)
+        .await
+        {
+            Ok(Some((_status, roles))) => roles,
+            Ok(None) => {
+                let error_code = format!("google_account_not_authorized_for_{application}");
+                record_audit_log(
+                    state.clone(),
+                    "user".to_string(),
+                    "oauth.google.login.denied",
+                    None,
+                    None,
+                    Some(json!({
+                        "provider": "google",
+                        "application": application,
+                        "email": email
+                    })),
+                    (ip_address, user_agent),
+                ).await;
+                return (
+                    StatusCode::FORBIDDEN,
+                    Json(json!({"error": error_code})),
+                ).into_response();
+            }
+            Err(error) => {
+                tracing::error!("oauth google backoffice allowlist lookup failed: {:?}", error);
+                return (
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    Json(json!({"error":"backoffice google access policy unavailable"})),
+                ).into_response();
+            }
+        }
+    } else {
+        Vec::new()
+    };
+
     match verify_google_oauth_schema(&state).await {
         Ok(true) => {}
         Ok(false) => {
@@ -2190,6 +2256,33 @@ pub async fn oauth_google(
             Json(json!({"error":"database error"})),
         )
             .into_response();
+    }
+
+    if backoffice_application.is_some() {
+        for role_name in &approved_backoffice_roles {
+            if !matches!(role_name.as_str(), "admin" | "content_admin" | "sales" | "support") {
+                continue;
+            }
+            if let Ok(Some(role_id)) = sqlx::query_scalar::<_, Uuid>(
+                "SELECT id FROM roles WHERE lower(name::text) = lower($1) AND role_type = 'global' LIMIT 1"
+            )
+            .bind(role_name)
+            .fetch_optional(&state.db)
+            .await
+            {
+                if let Err(error) = sqlx::query(
+                    "INSERT INTO core.user_roles (user_id, role_id) VALUES ($1, $2) ON CONFLICT DO NOTHING"
+                )
+                .bind(user_id)
+                .bind(role_id)
+                .execute(&state.db)
+                .await
+                {
+                    tracing::error!("oauth google backoffice role grant failed: {:?}", error);
+                }
+            }
+        }
+        invalidate_roles_cache_for_user(state.clone(), user_id).await;
     }
 
     let mut rp = get_roles_permissions_from_db(&state, user_id)
