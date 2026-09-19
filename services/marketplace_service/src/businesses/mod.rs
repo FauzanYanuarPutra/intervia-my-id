@@ -6,8 +6,8 @@ mod commercial_core;
 mod commercial_core_routes;
 pub(crate) mod control;
 pub(crate) mod domain;
-mod execution_policy;
 mod event_outbox;
+mod execution_policy;
 mod finance_core;
 mod finance_core_routes;
 #[cfg(test)]
