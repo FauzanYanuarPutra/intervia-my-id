@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "updated_at": "2026-09-20",
   "principles": [
     "one source-of-truth owner per business entity",
@@ -36,7 +36,8 @@
         "crm",
         "notifications",
         "support",
-        "cms"
+        "cms",
+        "reviews"
       ]
     },
     {
