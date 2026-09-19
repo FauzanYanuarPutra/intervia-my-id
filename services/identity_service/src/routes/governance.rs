@@ -418,7 +418,7 @@ pub async fn cancel_my_privacy_request(
     .fetch_optional(&mut *tx)
     .await;
 
-    let Some(row) = match row {
+    let Some(row) = (match row {
         Ok(value) => value,
         Err(error) => {
             tracing::error!(?error, "privacy cancellation lookup failed");
@@ -428,7 +428,7 @@ pub async fn cancel_my_privacy_request(
             )
                 .into_response();
         }
-    } else {
+    }) else {
         return (
             StatusCode::NOT_FOUND,
             Json(json!({"error":"privacy request not found"})),
@@ -640,13 +640,13 @@ pub async fn transition_privacy_request(
     .fetch_optional(&mut *tx)
     .await;
 
-    let Some(row) = match row {
+    let Some(row) = (match row {
         Ok(value) => value,
         Err(error) => {
             tracing::error!(?error, "privacy request lookup failed");
             return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"database error"}))).into_response();
         }
-    } else {
+    }) else {
         return (StatusCode::NOT_FOUND, Json(json!({"error":"privacy request not found"}))).into_response();
     };
 
@@ -898,9 +898,6 @@ pub async fn transition_security_incident(
     if !valid_incident_status(&status) {
         return (StatusCode::BAD_REQUEST, Json(json!({"error":"invalid incident status"}))).into_response();
     }
-    if payload.affected_user_count.is_some_and(|value| value < 0) {
-        return (StatusCode::BAD_REQUEST, Json(json!({"error":"affected_user_count cannot be negative"}))).into_response();
-    }
     if let Some(value) = payload.subject_notification_status.as_deref() {
         if !valid_notification_status(value) {
             return (StatusCode::BAD_REQUEST, Json(json!({"error":"invalid subject notification status"}))).into_response();
@@ -929,13 +926,13 @@ pub async fn transition_security_incident(
         .fetch_optional(&mut *tx)
         .await;
 
-    let Some(current) = match current {
+    let Some(current) = (match current {
         Ok(value) => value,
         Err(error) => {
             tracing::error!(?error, "security incident lookup failed");
             return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"database error"}))).into_response();
         }
-    } else {
+    }) else {
         return (StatusCode::NOT_FOUND, Json(json!({"error":"security incident not found"}))).into_response();
     };
 
