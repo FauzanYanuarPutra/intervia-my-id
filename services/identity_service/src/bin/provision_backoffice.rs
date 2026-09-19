@@ -44,7 +44,9 @@ async fn run() -> Result<()> {
     let (raw_target, raw_roles) = parse_args()?;
     let target = normalize_backoffice_target(&raw_target)?;
     let requested_roles = parse_backoffice_roles(&raw_roles)?;
-    let database_url = env::var("DATABASE_URL").context("DATABASE_URL is required")?;
+    let database_url = env::var("IDENTITY_DATABASE_URL")
+        .or_else(|_| env::var("DATABASE_URL"))
+        .context("IDENTITY_DATABASE_URL (or DATABASE_URL) is required")?;
 
     let pool = PgPoolOptions::new()
         .max_connections(2)
@@ -117,7 +119,7 @@ async fn run() -> Result<()> {
         let role_name = requested_role.as_str();
         let role_id: Uuid = sqlx::query_scalar(
             r#"
-            SELECT id FROM core.roles
+            SELECT id FROM roles
             WHERE lower(name::text) = lower($1) AND role_type = 'global'
             LIMIT 1
             "#,
