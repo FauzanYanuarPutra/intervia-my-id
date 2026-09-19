@@ -126,6 +126,7 @@ export type ControlSaleRecord = {
   business_id: string;
   organization_id: string;
   occurred_on: string;
+  document_number: string;
   channel_key: string | null;
   account_key: 'cash' | 'bank' | 'ewallet' | 'receivable';
   status: 'completed' | 'voided';
