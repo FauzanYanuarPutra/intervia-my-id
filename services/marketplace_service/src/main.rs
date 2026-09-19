@@ -42,7 +42,9 @@ mod runtime_metrics;
 mod schema_contract;
 mod wallet_support;
 use auth::{auth_claims_from_headers, user_id_from_auth, user_id_from_token_string, AccessClaims};
-use content_projection::{is_public_reference_response_metadata, project_content_response_metadata};
+use content_projection::{
+    is_public_reference_response_metadata, project_content_response_metadata,
+};
 use health::{health, ready, service_metrics};
 use identity_projection::{
     run_identity_event_consumer, run_identity_inbox_processor, IdentityProjectionConfig,

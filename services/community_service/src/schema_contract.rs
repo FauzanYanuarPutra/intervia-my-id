@@ -458,4 +458,3 @@ pub(crate) async fn verify_schema_contract(db: &PgPool) -> anyhow::Result<()> {
     }
     Ok(())
 }
-
