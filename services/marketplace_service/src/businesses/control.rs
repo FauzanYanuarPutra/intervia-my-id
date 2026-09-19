@@ -117,6 +117,8 @@ pub(crate) struct UpsertChannelRequest {
     pub(crate) enabled: bool,
     #[serde(default)]
     pub(crate) metadata: Value,
+    #[serde(default)]
+    pub(crate) reason: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, FromRow)]
@@ -403,6 +405,7 @@ impl ControlRepository {
 
     pub(crate) async fn upsert_channel(
         &self,
+        actor_id: Uuid,
         business_id: Uuid,
         organization_id: Uuid,
         channel_key: &str,
@@ -410,7 +413,22 @@ impl ControlRepository {
     ) -> Result<ChannelSettingRecord, ControlRepositoryError> {
         let channel_key = validate_channel(channel_key, &request)?;
         ensure_business(&self.db, business_id, organization_id).await?;
-        sqlx::query_as::<_, ChannelSettingRecord>(
+        let reason = request.reason.clone().unwrap_or_else(|| "Pengaturan kanal diperbarui".to_owned());
+        if reason.trim().chars().count() < 3 {
+            return Err(ControlRepositoryError::Validation("channel_change_reason_required"));
+        }
+
+        let mut tx = self.db.begin().await?;
+        let before = sqlx::query_as::<_, ChannelSettingRecord>(
+            CHANNEL_SELECT_BY_KEY,
+        )
+        .bind(business_id)
+        .bind(organization_id)
+        .bind(&channel_key)
+        .fetch_optional(&mut *tx)
+        .await?;
+
+        let item = sqlx::query_as::<_, ChannelSettingRecord>(
             r#"
             INSERT INTO business_channel_settings (
               business_id, organization_id, channel_key, display_name, fee_rate_bps,
@@ -433,7 +451,7 @@ impl ControlRepository {
         )
         .bind(business_id)
         .bind(organization_id)
-        .bind(channel_key)
+        .bind(&channel_key)
         .bind(normalize(&request.display_name))
         .bind(request.fee_rate_bps)
         .bind(request.fixed_fee_amount)
@@ -441,9 +459,43 @@ impl ControlRepository {
         .bind(request.target_margin_bps)
         .bind(request.enabled)
         .bind(request.metadata)
-        .fetch_one(&self.db)
-        .await
-        .map_err(Into::into)
+        .fetch_one(&mut *tx)
+        .await?;
+
+        audit::record_tx(
+            &mut tx,
+            organization_id,
+            business_id,
+            None,
+            Some(actor_id),
+            "channel.updated",
+            "business_channel",
+            Some(item.id),
+            Some(&reason),
+            serde_json::json!({
+                "summary": format!("Kanal {} diperbarui", item.display_name),
+                "created": before.is_none(),
+                "before": before.as_ref().map(|value| serde_json::json!({
+                    "display_name": value.display_name,
+                    "fee_rate_bps": value.fee_rate_bps,
+                    "fixed_fee_amount": value.fixed_fee_amount,
+                    "merchant_promo_amount": value.merchant_promo_amount,
+                    "target_margin_bps": value.target_margin_bps,
+                    "enabled": value.enabled
+                })),
+                "after": {
+                    "display_name": item.display_name,
+                    "fee_rate_bps": item.fee_rate_bps,
+                    "fixed_fee_amount": item.fixed_fee_amount,
+                    "merchant_promo_amount": item.merchant_promo_amount,
+                    "target_margin_bps": item.target_margin_bps,
+                    "enabled": item.enabled
+                }
+            }),
+        ).await?;
+
+        tx.commit().await?;
+        Ok(item)
     }
 
     pub(crate) async fn list_finance_entries(
@@ -520,6 +572,14 @@ SELECT id, business_id, organization_id, channel_key, display_name, fee_rate_bps
 FROM business_channel_settings
 WHERE business_id=$1 AND organization_id=$2
 ORDER BY channel_key
+"#;
+
+const CHANNEL_SELECT_BY_KEY: &str = r#"
+SELECT id, business_id, organization_id, channel_key, display_name, fee_rate_bps,
+  fixed_fee_amount, merchant_promo_amount, target_margin_bps, enabled, metadata,
+  created_at, updated_at
+FROM business_channel_settings
+WHERE business_id=$1 AND organization_id=$2 AND channel_key=$3
 "#;
 
 const FINANCE_SELECT: &str = r#"
