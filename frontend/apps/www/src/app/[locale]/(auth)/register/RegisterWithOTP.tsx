@@ -68,6 +68,7 @@ export default function RegisterWithOTP() {
   );
 
   const [fullName, setFullName] = useState('');
+  const [birthdate, setBirthdate] = useState('');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
@@ -88,6 +89,20 @@ export default function RegisterWithOTP() {
   const [error, setError] = useState('');
 
   const normalizedUsername = normalizeUsername(username);
+  const normalizedBirthdate = birthdate.trim();
+  const birthdateValid = /^\d{4}-\d{2}-\d{2}$/.test(normalizedBirthdate);
+  const adultAgeValid = (() => {
+    if (!birthdateValid) return false;
+    const [year, month, day] = normalizedBirthdate.split('-').map(Number);
+    const selected = new Date(year, month - 1, day);
+    const today = new Date();
+    let age = today.getFullYear() - selected.getFullYear();
+    const beforeBirthday =
+      today.getMonth() < selected.getMonth() ||
+      (today.getMonth() === selected.getMonth() && today.getDate() < selected.getDate());
+    if (beforeBirthday) age -= 1;
+    return age >= 18 && selected < today;
+  })();
   const normalizedEmail = email.trim().toLowerCase();
   const otpCooldownLeft = Math.max(0, otpResendAt - Date.now());
   const otpCooldownSeconds = Math.ceil(otpCooldownLeft / 1000);
@@ -111,6 +126,7 @@ export default function RegisterWithOTP() {
   const passwordBlockingError = passwordPolicyError || passwordIdentityError;
   const canSubmit =
     fullName.trim().length >= 2 &&
+    adultAgeValid &&
     usernameValid &&
     normalizedEmail.includes('@') &&
     otpToken.length > 0 &&
@@ -142,6 +158,7 @@ export default function RegisterWithOTP() {
       await register({
         full_name: fullName.trim(),
         username: normalizedUsername,
+        birthdate: normalizedBirthdate,
         email: normalizedEmail,
         password,
         email_otp_token: otpToken,
@@ -299,6 +316,32 @@ export default function RegisterWithOTP() {
               className={`${inputClass} pl-11 pr-4`}
             />
           </span>
+        </label>
+
+        <label className="block">
+          <span className="mb-1.5 block text-xs font-bold text-[color:var(--app-text)]">
+            {isId ? 'Tanggal lahir' : 'Date of birth'}
+          </span>
+          <input
+            value={birthdate}
+            onChange={event => setBirthdate(event.target.value)}
+            type="date"
+            max={new Date().toISOString().slice(0, 10)}
+            autoComplete="bday"
+            className={inputClass}
+          />
+          <span className="mt-1 block text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+            {isId
+              ? 'Lajukan saat ini menetapkan usia minimum 18 tahun untuk akun.'
+              : 'Lajukan currently requires account holders to be at least 18.'}
+          </span>
+          {birthdate && !adultAgeValid ? (
+            <span className="mt-1 block text-[11px] font-semibold text-[color:var(--app-danger)]">
+              {isId
+                ? 'Akun Lajukan saat ini hanya tersedia untuk pengguna berusia 18 tahun atau lebih.'
+                : 'Lajukan accounts currently require users to be 18 or older.'}
+            </span>
+          ) : null}
         </label>
 
         <label className="block">
