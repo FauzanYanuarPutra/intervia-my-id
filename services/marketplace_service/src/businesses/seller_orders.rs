@@ -684,11 +684,15 @@ mod tests {
     fn cancellation_and_rejection_require_a_reason() {
         assert!(matches!(
             normalize_reason(None, OrderState::Cancelled),
-            Err(SellerOrderRepositoryError::Validation("order_transition_reason_required"))
+            Err(SellerOrderRepositoryError::Validation(
+                "order_transition_reason_required"
+            ))
         ));
         assert!(matches!(
             normalize_reason(Some("x"), OrderState::Rejected),
-            Err(SellerOrderRepositoryError::Validation("order_transition_reason_required"))
+            Err(SellerOrderRepositoryError::Validation(
+                "order_transition_reason_required"
+            ))
         ));
         assert_eq!(
             normalize_reason(Some("salah input"), OrderState::Cancelled).unwrap(),
@@ -698,10 +702,24 @@ mod tests {
 
     #[test]
     fn seller_can_cancel_before_fulfillment_but_not_after_shipping() {
-        assert!(allowed_seller_status_labels(&order("PAID", "PHYSICAL_GOODS", "courier")).contains(&"CANCELLED".to_owned()));
-        assert!(allowed_seller_status_labels(&order("PROCESSING", "PHYSICAL_GOODS", "courier")).contains(&"CANCELLED".to_owned()));
-        assert!(allowed_seller_status_labels(&order("IN_SERVICE", "SERVICE_MARKETPLACE", "service")).contains(&"CANCELLED".to_owned()));
-        assert!(!allowed_seller_status_labels(&order("SHIPPED", "PHYSICAL_GOODS", "courier")).contains(&"CANCELLED".to_owned()));
+        assert!(
+            allowed_seller_status_labels(&order("PAID", "PHYSICAL_GOODS", "courier"))
+                .contains(&"CANCELLED".to_owned())
+        );
+        assert!(
+            allowed_seller_status_labels(&order("PROCESSING", "PHYSICAL_GOODS", "courier"))
+                .contains(&"CANCELLED".to_owned())
+        );
+        assert!(allowed_seller_status_labels(&order(
+            "IN_SERVICE",
+            "SERVICE_MARKETPLACE",
+            "service"
+        ))
+        .contains(&"CANCELLED".to_owned()));
+        assert!(
+            !allowed_seller_status_labels(&order("SHIPPED", "PHYSICAL_GOODS", "courier"))
+                .contains(&"CANCELLED".to_owned())
+        );
     }
 
     #[test]
