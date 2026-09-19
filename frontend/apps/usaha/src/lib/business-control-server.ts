@@ -7,6 +7,20 @@ import type { SellerOrderAggregate } from '@/lib/business-control/seller-orders'
 const MARKETPLACE_URL =
   process.env.INTERNAL_MARKETPLACE_URL || 'http://marketplace_service:8081';
 
+export type ControlAuditEvent = {
+  id: string;
+  business_id: string;
+  organization_id: string;
+  location_id: string | null;
+  actor_user_id: string | null;
+  event_key: string;
+  subject_type: string;
+  subject_id: string | null;
+  reason: string | null;
+  metadata: Record<string, unknown>;
+  occurred_at: string;
+};
+
 export type ControlIngredient = {
   id: string;
   business_id: string;
@@ -231,6 +245,20 @@ async function requestControl(
 
 function businessPath(businessId: string, suffix: string) {
   return `/v1/businesses/${encodeURIComponent(businessId)}${suffix}`;
+}
+
+export async function listControlAuditEvents(
+  businessId: string,
+  options: { subjectType?: string; subjectId?: string; limit?: number } = {},
+) {
+  const params = new URLSearchParams();
+  if (options.subjectType) params.set('subject_type', options.subjectType);
+  if (options.subjectId) params.set('subject_id', options.subjectId);
+  if (options.limit) params.set('limit', String(Math.min(250, Math.max(1, options.limit))));
+  const suffix = params.toString() ? `/audit-events?${params.toString()}` : '/audit-events';
+  return items<ControlAuditEvent>(
+    await requestControl(businessPath(businessId, suffix)),
+  );
 }
 
 export async function listControlIngredients(businessId: string) {
