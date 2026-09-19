@@ -445,6 +445,7 @@ impl SellerOrderRepository {
 
         let items = load_items_tx(&mut tx, order_id).await?;
         let allowed_next_statuses = allowed_seller_status_labels(&updated);
+        let last_transition_at = updated.updated_at;
         tx.commit().await?;
 
         Ok(TransitionSellerOrderOutcome {
@@ -453,7 +454,7 @@ impl SellerOrderRepository {
                 items,
                 allowed_next_statuses,
                 last_transition_reason: reason.clone(),
-                last_transition_at: Some(updated.updated_at),
+                last_transition_at: Some(last_transition_at),
             },
             replayed: false,
         })
