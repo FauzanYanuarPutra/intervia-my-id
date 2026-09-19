@@ -140,7 +140,10 @@ async fn document_create_is_idempotent_and_owner_managed_lifecycle_is_explicit(p
         .unwrap();
 
     assert!(!first.replayed);
-    assert_eq!(first.document.document.location_id, Some(seeded.location_id));
+    assert_eq!(
+        first.document.document.location_id,
+        Some(seeded.location_id)
+    );
     assert_eq!(first.document.document.currency, "IDR");
     assert!(first.document.document.document_number.contains("-QUO-"));
     assert_eq!(first.document.document.status, "draft");

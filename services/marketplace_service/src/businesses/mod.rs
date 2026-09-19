@@ -6,11 +6,11 @@ mod commercial_core;
 mod commercial_core_routes;
 pub(crate) mod control;
 mod counterparty;
-pub(crate) mod domain;
-mod documents;
 mod document_routes;
+mod documents;
 #[cfg(test)]
 mod documents_persistence_tests;
+pub(crate) mod domain;
 mod event_outbox;
 mod execution_policy;
 mod finance_core;
