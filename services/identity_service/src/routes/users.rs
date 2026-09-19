@@ -196,9 +196,10 @@ fn normalize_google_backoffice_roles(application: &str, values: &[String]) -> Ve
     let mut roles = Vec::new();
     for value in values {
         let role = value.trim().to_ascii_lowercase();
-        if matches!(role.as_str(), "admin" | "content_admin" | "sales" | "support")
-            && !roles.contains(&role)
-        {
+        if matches!(
+            role.as_str(),
+            "admin" | "content_admin" | "sales" | "support"
+        ) && !roles.contains(&role) {
             roles.push(role);
         }
     }
@@ -410,11 +411,14 @@ pub async fn upsert_backoffice_google_access(
         }
         Err(error) => {
             tracing::error!("upsert backoffice google access failed: {:?}", error);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"database error"}))).into_response()
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error":"database error"})),
+            )
+                .into_response()
         }
     }
 }
-
 
 fn normalize_optional_text(value: Option<String>) -> Option<String> {
     value.and_then(|v| {
