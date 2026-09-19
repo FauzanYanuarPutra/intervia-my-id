@@ -60,6 +60,12 @@ marketplace_auth_source = read("services/marketplace_service/src/auth.rs")
 community_auth_source = read("services/community_service/src/auth.rs")
 community_health_source = read("services/community_service/src/health.rs")
 community_rate_limit_source = read("services/community_service/src/rate_limit.rs")
+marketplace_content_projection_source = read("services/marketplace_service/src/content_projection.rs")
+community_media_source = read("services/community_service/src/media.rs")
+reels_client_source = read("frontend/apps/www/src/app/[locale]/(shared)/reels/ReelsClient.tsx")
+reels_runtime_helpers_source = read("frontend/apps/www/src/app/[locale]/(shared)/reels/reels-runtime-helpers.ts")
+community_feed_client_source = read("frontend/apps/www/src/components/community/CommunityFeedClient.tsx")
+community_feed_media_source = read("frontend/apps/www/src/components/community/CommunityFeedMedia.tsx")
 identity_auth_source = read("services/identity_service/src/routes/auth.rs")
 chat_runtime_config = read("services/chat_service/config/runtime.exs")
 business_money_source = read("services/marketplace_service/src/businesses/kernel/money.rs")
@@ -758,8 +764,8 @@ for marker in (
         errors.append(f"capacity runbook missing decision marker: {marker}")
 
 for path, warning_threshold, hard_ceiling in (
-    ("services/marketplace_service/src/main.rs", 750_000, 827_000),
-    ("services/community_service/src/main.rs", 280_000, 302_000),
+    ("services/marketplace_service/src/main.rs", 750_000, 823_000),
+    ("services/community_service/src/main.rs", 280_000, 295_000),
 ):
     target = ROOT / path
     if not target.is_file():
@@ -778,8 +784,8 @@ for path, warning_threshold, hard_ceiling in (
         )
 
 for path, warning_threshold, hard_ceiling in (
-    ("frontend/apps/www/src/app/[locale]/(shared)/reels/ReelsClient.tsx", 295_000, 332_000),
-    ("frontend/apps/www/src/components/community/CommunityFeedClient.tsx", 225_000, 257_000),
+    ("frontend/apps/www/src/app/[locale]/(shared)/reels/ReelsClient.tsx", 295_000, 326_000),
+    ("frontend/apps/www/src/components/community/CommunityFeedClient.tsx", 225_000, 248_000),
 ):
     target = ROOT / path
     if not target.is_file():
@@ -800,12 +806,62 @@ for helper_path in (
     "frontend/apps/www/src/app/[locale]/(shared)/reels/reels-client-helpers.ts",
     "frontend/apps/www/src/app/[locale]/(shared)/reels/reels-client-model.ts",
     "frontend/apps/www/src/app/[locale]/(shared)/reels/reels-studio-helpers.ts",
+    "frontend/apps/www/src/app/[locale]/(shared)/reels/reels-runtime-helpers.ts",
     "frontend/apps/www/src/components/community/community-feed-helpers.ts",
     "frontend/apps/www/src/components/community/community-feed-client-model.ts",
     "frontend/apps/www/src/components/community/community-feed-focus.ts",
+    "frontend/apps/www/src/components/community/CommunityFeedMedia.tsx",
 ):
     if not (ROOT / helper_path).is_file():
         errors.append(f"missing frontend responsibility extraction helper: {helper_path}")
+
+for marker in (
+    "project_content_response_metadata",
+    "project_public_reference_metadata",
+    "project_reference_scalar",
+):
+    if marker not in marketplace_content_projection_source:
+        errors.append(f"Marketplace content projection boundary missing marker: {marker}")
+if "mod content_projection;" not in marketplace_source:
+    errors.append("Marketplace content projection boundary is not wired from main.rs")
+for marker in ("fn project_content_response_metadata", "fn project_public_reference_metadata"):
+    if marker in marketplace_source:
+        errors.append(f"Marketplace content projection responsibility leaked back into main.rs: {marker}")
+
+for marker in (
+    "pub(crate) fn upload_dir",
+    "has_valid_media_signature",
+    "first_feed_media_url",
+):
+    if marker not in community_media_source:
+        errors.append(f"Community media boundary missing marker: {marker}")
+if "mod media;" not in community_main_source:
+    errors.append("Community media boundary is not wired from main.rs")
+for marker in ("fn upload_dir", "fn has_valid_media_signature", "fn first_feed_media_url"):
+    if marker in community_main_source:
+        errors.append(f"Community media responsibility leaked back into main.rs: {marker}")
+
+for marker in (
+    "startVideoFramePump",
+    "drawStudioCanvasEffect",
+    "getReelsCameraErrorMessage",
+):
+    if marker not in reels_runtime_helpers_source:
+        errors.append(f"Reels runtime helper boundary missing marker: {marker}")
+for marker in ("function startVideoFramePump", "function drawStudioCanvasEffect"):
+    if marker in reels_client_source:
+        errors.append(f"Reels runtime responsibility leaked back into ReelsClient.tsx: {marker}")
+
+for marker in (
+    "CommunityMediaGalleryPreview",
+    "CommunityMediaPreview",
+    "CommunityMediaTile",
+):
+    if marker not in community_feed_media_source:
+        errors.append(f"Community feed media boundary missing marker: {marker}")
+for marker in ("function CommunityMediaTile", "function CommunityMediaGalleryPreview"):
+    if marker in community_feed_client_source:
+        errors.append(f"Community media responsibility leaked back into CommunityFeedClient.tsx: {marker}")
 
 for path, source, main_source in (
     (
