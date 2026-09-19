@@ -141,7 +141,7 @@ export default async function NewsArticlePage({ params }: PageProps) {
                 loading="eager"
               />
               <figcaption className="px-4 py-2.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                {article.title}
+                {isId ? 'Media utama artikel' : 'Article featured media'}
               </figcaption>
             </figure>
           ) : null}
