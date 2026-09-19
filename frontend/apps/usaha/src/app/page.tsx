@@ -9,12 +9,11 @@ import {
   Store,
 } from 'lucide-react';
 import { ReconcileBusinessButton } from '@/components/forms/ReconcileBusinessButton';
+import { BusinessProfileHero } from '@/components/portal/BusinessProfileHero';
 import { MetricStrip } from '@/components/portal/MetricStrip';
-import { PageHeader } from '@/components/portal/PageHeader';
 import { PendingOrganizationInvitations } from '@/components/portal/PendingOrganizationInvitations';
 import { PortalShell } from '@/components/portal/PortalShell';
 import { ProgressTracker } from '@/components/portal/ProgressTracker';
-import { StatusBadge } from '@/components/portal/StatusBadge';
 import {
   listControlChannels,
   listControlFinanceEntries,
@@ -24,7 +23,7 @@ import { buildHomeDashboard } from '@/lib/business-control/home-dashboard';
 import { jakartaDateKey, summarizeControlCenter } from '@/lib/business-control/insights';
 import { buildMerchantNextActions } from '@/lib/business-control/next-actions';
 import { settleHomeControlData } from '@/lib/home-control-data';
-import { getSetupSteps, getStatusCopy, hasPermission } from '@/lib/portal-logic';
+import { getSetupSteps, hasPermission } from '@/lib/portal-logic';
 import { resolvePortalHomeState } from '@/lib/portal-server';
 
 const money = new Intl.NumberFormat('id-ID', {
@@ -108,7 +107,6 @@ export default async function HomePage({
   const locations = business.locations ?? [];
   const setupSteps = getSetupSteps(business);
   const incompleteSetup = setupSteps.some(step => !step.done);
-  const status = getStatusCopy(business);
   const canViewCosting = hasPermission(business, 'viewCosting');
   const canViewFinance = hasPermission(business, 'viewFinance');
   const canViewChannels = hasPermission(business, 'viewChannels');
@@ -154,15 +152,15 @@ export default async function HomePage({
   const foundationAction = canManageInfo
     ? !business.infoComplete
       ? {
-          title: 'Lengkapi data utama usaha',
-          description: 'Pastikan nama, kategori, dan kontak usaha sudah benar.',
+          title: 'Lengkapi profil usaha',
+          description: 'Isi nama, kategori, dan kontak.',
           href: `/businesses/${business.id}/info`,
           priority: 1_000,
         }
       : !locations.some(item => item.isPrimary)
         ? {
-            title: 'Pastikan lokasi utama',
-            description: 'Alamat utama membantu operasional dan pelanggan menemukan usaha.',
+            title: 'Cek lokasi utama',
+            description: 'Pastikan alamat dan pin sudah benar.',
             href: `/businesses/${business.id}/locations`,
             priority: 1_000,
           }
@@ -184,12 +182,7 @@ export default async function HomePage({
 
   return (
     <PortalShell activeBusiness={business} availableBusinesses={state.businesses} viewerName={viewerName} currentSection="home">
-      <PageHeader
-        eyebrow="Hari ini"
-        title={business.name}
-        description="Lihat kondisi usaha, lalu kerjakan yang paling penting."
-        meta={<><StatusBadge tone={business.isOpen ? 'success' : 'neutral'}>{status.label}</StatusBadge><span className="text-xs text-portal-soft">{business.city} · {business.category}</span></>}
-      />
+      <BusinessProfileHero business={business} />
 
       <PendingOrganizationInvitations />
 
@@ -199,7 +192,7 @@ export default async function HomePage({
         </Link>
         {canViewFinance ? (
           <Link href={`/businesses/${business.id}/finance`} className="merchant-action-money min-h-14 flex-col gap-1 px-2 text-xs sm:flex-row sm:text-sm">
-            <BanknoteArrowDown className="h-5 w-5 sm:h-4 sm:w-4" /> Catat pengeluaran
+            <BanknoteArrowDown className="h-5 w-5 sm:h-4 sm:w-4" /> Pengeluaran
           </Link>
         ) : null}
         <Link href={`/businesses/${business.id}/inventory`} className="merchant-action-stock min-h-14 flex-col gap-1 px-2 text-xs sm:flex-row sm:text-sm">
