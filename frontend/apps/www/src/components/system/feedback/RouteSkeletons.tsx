@@ -2038,9 +2038,9 @@ export function OwnerProfileSkeleton() {
       className="min-h-screen max-w-full overflow-x-clip bg-[color:var(--app-surface-muted)] pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pb-8"
       data-skeleton-route="true"
       aria-busy="true"
-      aria-label="Loading your profile"
+      aria-label="Memuat profil"
     >
-      <div className="mx-auto w-full max-w-[1080px] space-y-3 px-0 py-0 sm:space-y-4 sm:px-4 sm:py-4 lg:px-5 lg:py-5">
+      <div className="mx-auto w-full max-w-[1120px] space-y-3 px-0 py-0 sm:space-y-4 sm:px-4 sm:py-4 lg:px-5 lg:py-5">
         <section className="overflow-hidden border-y border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] sm:rounded-[24px] sm:border">
           <div className="relative h-28 overflow-hidden sm:h-36 lg:h-40">
             <Pulse className="absolute inset-0 h-full w-full rounded-none" />
