@@ -59,7 +59,7 @@ pub(crate) struct UpdateWorkItemRequest {
     #[serde(default)]
     pub(crate) priority: Option<i16>,
     #[serde(default)]
-    pub(crate) assignee_user_id: Option<Uuid>,
+    pub(crate) assignee_user_id: Option<Option<Uuid>>,
     #[serde(default)]
     pub(crate) due_at: Option<DateTime<Utc>>,
 }
@@ -369,11 +369,13 @@ impl WorkRepository {
             .transpose()?;
 
         let assignee = if can_manage {
-            if request.assignee_user_id.is_some() {
-                self.ensure_assignee(business_id, organization_id, request.assignee_user_id)
-                    .await?;
+            match request.assignee_user_id {
+                None => existing.assignee_user_id,
+                Some(value) => {
+                    self.ensure_assignee(business_id, organization_id, value).await?;
+                    value
+                }
             }
-            request.assignee_user_id
         } else {
             existing.assignee_user_id
         };
