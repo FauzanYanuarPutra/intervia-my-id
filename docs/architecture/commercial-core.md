@@ -35,3 +35,11 @@ allocations and payment reversal effects rather than mutable status flags.
 This is not a full invoice/tax/general-ledger system. It provides the durable Party,
 Payment, Allocation, AR/AP settlement, correlation, document numbering, and outbox
 foundation that later Invoice/Bill/Refund/Tax modules can build on.
+
+
+## Migration rule
+
+`20260919050000_commercial_core_v1` is the sealed additive migration for Commercial
+Core V1. It replaced the earlier unshipped working migration before any successful
+deployment. Future schema changes must use new forward migrations; do not modify the
+sealed migration after it exists on `main`.
