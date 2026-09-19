@@ -40,24 +40,24 @@ CREATE TABLE IF NOT EXISTS business_parties (
   UNIQUE (business_id, idempotency_key)
 );
 
-CREATE INDEX idx_business_parties_directory
+CREATE INDEX IF NOT EXISTS idx_business_parties_directory
   ON business_parties (business_id, organization_id, status, party_kind, display_name, id);
 
-CREATE UNIQUE INDEX ux_business_parties_email
+CREATE UNIQUE INDEX IF NOT EXISTS ux_business_parties_email
   ON business_parties (business_id, lower(email))
   WHERE email IS NOT NULL AND status='active';
 
-CREATE UNIQUE INDEX ux_business_parties_tax_identifier
+CREATE UNIQUE INDEX IF NOT EXISTS ux_business_parties_tax_identifier
   ON business_parties (business_id, tax_identifier)
   WHERE tax_identifier IS NOT NULL AND status='active';
 
-CREATE UNIQUE INDEX ux_business_sales_scope_identity
+CREATE UNIQUE INDEX IF NOT EXISTS ux_business_sales_scope_identity
   ON business_sales (id, business_id, organization_id);
 
-CREATE UNIQUE INDEX ux_business_purchases_scope_identity
+CREATE UNIQUE INDEX IF NOT EXISTS ux_business_purchases_scope_identity
   ON business_purchases (id, business_id, organization_id);
 
-CREATE TABLE business_payments (
+CREATE TABLE IF NOT EXISTS business_payments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id UUID NOT NULL,
   business_id UUID NOT NULL,
@@ -96,15 +96,15 @@ CREATE TABLE business_payments (
   UNIQUE (business_id, idempotency_key)
 );
 
-CREATE INDEX idx_business_payments_timeline
+CREATE INDEX IF NOT EXISTS idx_business_payments_timeline
   ON business_payments (
     business_id, organization_id, occurred_on DESC, created_at DESC, id DESC
   );
-CREATE INDEX idx_business_payments_party
+CREATE INDEX IF NOT EXISTS idx_business_payments_party
   ON business_payments (business_id, organization_id, party_id, occurred_on DESC)
   WHERE party_id IS NOT NULL;
 
-CREATE TABLE business_payment_allocations (
+CREATE TABLE IF NOT EXISTS business_payment_allocations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id UUID NOT NULL,
   business_id UUID NOT NULL,
@@ -132,16 +132,16 @@ CREATE TABLE business_payment_allocations (
     )
 );
 
-CREATE UNIQUE INDEX ux_business_payment_allocations_sale
+CREATE UNIQUE INDEX IF NOT EXISTS ux_business_payment_allocations_sale
   ON business_payment_allocations (payment_id, sale_id)
   WHERE sale_id IS NOT NULL;
-CREATE UNIQUE INDEX ux_business_payment_allocations_purchase
+CREATE UNIQUE INDEX IF NOT EXISTS ux_business_payment_allocations_purchase
   ON business_payment_allocations (payment_id, purchase_id)
   WHERE purchase_id IS NOT NULL;
-CREATE INDEX idx_business_payment_allocations_sale_lookup
+CREATE INDEX IF NOT EXISTS idx_business_payment_allocations_sale_lookup
   ON business_payment_allocations (business_id, organization_id, sale_id)
   WHERE sale_id IS NOT NULL;
-CREATE INDEX idx_business_payment_allocations_purchase_lookup
+CREATE INDEX IF NOT EXISTS idx_business_payment_allocations_purchase_lookup
   ON business_payment_allocations (business_id, organization_id, purchase_id)
   WHERE purchase_id IS NOT NULL;
 
@@ -222,9 +222,13 @@ BEGIN
 END;
 $$;
 
+DROP TRIGGER IF EXISTS trg_business_payments_append_only ON business_payments;
+
 CREATE TRIGGER trg_business_payments_append_only
 BEFORE UPDATE OR DELETE ON business_payments
 FOR EACH ROW EXECUTE FUNCTION reject_business_commercial_evidence_mutation();
+
+DROP TRIGGER IF EXISTS trg_business_payment_allocations_append_only ON business_payment_allocations;
 
 CREATE TRIGGER trg_business_payment_allocations_append_only
 BEFORE UPDATE OR DELETE ON business_payment_allocations
