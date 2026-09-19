@@ -4,10 +4,7 @@ BEGIN;
 -- Human work sits above canonical sales/inventory/finance sources without
 -- duplicating those domains. Work items may link to a source record and use
 -- a unique source pair to make recommendation synchronization idempotent.
-
-ALTER TABLE business_permissions
-  DROP CONSTRAINT IF EXISTS chk_business_permissions_key_nonempty;
-
+\n
 INSERT INTO business_permissions (permission_key, description) VALUES
   ('work.view', 'View operational work assigned to the business'),
   ('work.manage', 'Create, assign, prioritize and manage operational work')
