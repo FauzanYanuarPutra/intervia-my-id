@@ -33,7 +33,7 @@ use identity_service::organizations::routes::{
     list_organizations,
 };
 use identity_service::routes::{
-    change_password, create_backoffice_invitation, delete_me_account, discover_users, get_me_profile, get_public_user_profile,
+    change_password, create_backoffice_invitation, delete_me_account, moderate_user, discover_users, get_me_profile, get_public_user_profile,
     get_user_by_email, get_user_by_phone, get_user_detail, health_check, list_backoffice_google_access, list_backoffice_invitations, list_my_backoffice_invitations, list_users, login,
     login_phone, logout, me, oauth_google, ready_check, refresh_token, register, reset_password,
     revoke_backoffice_invitation, respond_backoffice_invitation, search_backoffice_candidates, service_metrics, update_me_profile, upsert_backoffice_google_access,
@@ -603,6 +603,7 @@ async fn main() -> Result<()> {
         )
         .route("/users", get(list_users))
         .route("/users/{id}", get(get_user_detail))
+        .route("/users/{id}/moderate", post(moderate_user))
         .route("/backoffice/google-access", get(list_backoffice_google_access).post(upsert_backoffice_google_access))
         .route("/backoffice/candidates", get(search_backoffice_candidates))
         .route("/backoffice/invitations", get(list_backoffice_invitations).post(create_backoffice_invitation))
