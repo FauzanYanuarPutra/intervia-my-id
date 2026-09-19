@@ -13,10 +13,23 @@ DRILL_NAME="${DRILL_NAME:-lajukan-pitr-drill-$$}"
 WORK_ROOT="${WORK_ROOT:-$(mktemp -d)}"
 PGDATA_HOST="$WORK_ROOT/pgdata"
 PORT="${PITR_DRILL_PORT:-55439}"
+HOST_UID="$(id -u)"
+HOST_GID="$(id -g)"
 
 cleanup() {
   docker rm -f "$DRILL_NAME" >/dev/null 2>&1 || true
   if [[ "${KEEP_PITR_WORKDIR:-0}" != "1" ]]; then
+    # The official PostgreSQL image may chown the bind-mounted PGDATA to its
+    # postgres UID. Normalize ownership in a disposable root container before
+    # host cleanup so a successful drill cannot fail only while removing files.
+    if [[ -d "$PGDATA_HOST" ]]; then
+      docker run --rm \
+        -v "$PGDATA_HOST:/pgdata" \
+        -e HOST_UID="$HOST_UID" \
+        -e HOST_GID="$HOST_GID" \
+        "$POSTGRES_IMAGE" \
+        sh -ec 'chown -R "$HOST_UID:$HOST_GID" /pgdata' >/dev/null 2>&1 || true
+    fi
     rm -rf "$WORK_ROOT"
   else
     echo "Keeping PITR workdir: $WORK_ROOT"
