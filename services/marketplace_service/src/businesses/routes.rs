@@ -610,7 +610,7 @@ async fn list_audit_events(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Path(business_id): Path<Uuid>,
-    query: Option<axum::extract::Query<AuditQuery>>,
+    axum::extract::Query(query): axum::extract::Query<AuditQuery>,
 ) -> Response {
     let (_, organization_id) = match business_control_context(
         &state,
@@ -624,7 +624,6 @@ async fn list_audit_events(
         Err(response) => return response,
     };
 
-    let query = query.map(|value| value.0).unwrap_or_default();
     let subject_type = query
         .subject_type
         .as_deref()
