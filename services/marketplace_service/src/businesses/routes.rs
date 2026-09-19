@@ -608,7 +608,7 @@ async fn list_audit_events(
     Path(business_id): Path<Uuid>,
     query: Option<axum::extract::Query<AuditQuery>>,
 ) -> Response {
-    let (actor_id, organization_id) = match business_control_context(
+    let (_, organization_id) = match business_control_context(
         &state,
         &headers,
         business_id,
@@ -647,19 +647,16 @@ async fn list_audit_events(
     )
     .await
     {
-        Ok(items) => {
-            let _ = actor_id;
-            (
-                StatusCode::OK,
-                Json(json!({
-                    "data": {
-                        "count": items.len(),
-                        "items": items
-                    }
-                })),
-            )
-                .into_response()
-        },
+        Ok(items) => (
+            StatusCode::OK,
+            Json(json!({
+                "data": {
+                    "count": items.len(),
+                    "items": items
+                }
+            })),
+        )
+            .into_response(),
         Err(_) => api_error(
             StatusCode::SERVICE_UNAVAILABLE,
             "business_audit_storage_unavailable",
