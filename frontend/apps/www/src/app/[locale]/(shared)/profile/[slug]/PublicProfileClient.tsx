@@ -12,7 +12,6 @@ import {
   BadgeCheck,
   Bookmark,
   BriefcaseBusiness,
-  CalendarDays,
   CheckCircle2,
   Clock3,
   Copy,
