@@ -197,7 +197,7 @@ fn normalize_google_backoffice_roles(application: &str, values: &[String]) -> Ve
     let mut roles = Vec::new();
     for value in values {
         let role = value.trim().to_ascii_lowercase();
-        if matches!(role.as_str(), "admin" | "content_admin" | "sales" | "support")
+        if matches!(role.as_str(), "admin" | "content_admin" | "moderator" | "sales" | "support")
             && !roles.contains(&role)
         {
             roles.push(role);
@@ -311,7 +311,7 @@ pub async fn upsert_backoffice_google_access(
     };
     let role_names = normalize_google_backoffice_roles(application, &payload.role_names);
     let allowed_roles: &[&str] = match application {
-        "crm" => &["admin", "sales", "support"],
+        "crm" => &["admin", "moderator", "sales", "support"],
         "cms" => &["admin", "content_admin"],
         _ => &[],
     };
