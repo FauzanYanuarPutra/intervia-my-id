@@ -2496,8 +2496,42 @@ export default function PublicProfileClient({
                     {detail.education.length > 0 || detail.certifications.length > 0 ? (
                       <section className="rounded-2xl border border-[color:var(--app-border)] p-4 sm:p-5">
                         <SectionTitle title={localeCode === 'id' ? 'Lainnya' : 'More'} />
-                        {detail.education.length > 0 ? <div className="mt-3"><p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">{copy.education}</p><div className="mt-1.5 space-y-1.5">{detail.education.slice(0, 4).map(item => <p key={item} className="text-sm leading-5 text-[color:var(--app-text-soft)]">{item}</p>)}</div></div> : null}
-                        {detail.certifications.length > 0 ? <div className="mt-4"><p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">{copy.certifications}</p><div className="mt-1.5 space-y-1.5">{detail.certifications.slice(0, 4).map(item => <p key={item} className="text-sm leading-5 text-[color:var(--app-text-soft)]">{item}</p></div></div> : null}
+
+                        {detail.education.length > 0 && (
+                          <div className="mt-3">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">
+                              {copy.education}
+                            </p>
+                            <div className="mt-1.5 space-y-1.5">
+                              {detail.education.slice(0, 4).map(item => (
+                                <p
+                                  key={item}
+                                  className="text-sm leading-5 text-[color:var(--app-text-soft)]"
+                                >
+                                  {item}
+                                </p>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {detail.certifications.length > 0 && (
+                          <div className="mt-4">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">
+                              {copy.certifications}
+                            </p>
+                            <div className="mt-1.5 space-y-1.5">
+                              {detail.certifications.slice(0, 4).map(item => (
+                                <p
+                                  key={item}
+                                  className="text-sm leading-5 text-[color:var(--app-text-soft)]"
+                                >
+                                  {item}
+                                </p>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </section>
                     ) : null}
                   </div>
