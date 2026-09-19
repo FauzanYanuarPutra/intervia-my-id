@@ -36,8 +36,8 @@ def main() -> int:
     require(
         'frontend/apps/usaha/src/lib/portal-navigation.ts',
         'Beranda', 'Jual', 'Barang', 'Stok', 'Uang', 'Laporan',
-        'Jual Online', 'Pengaturan Usaha', 'Lokasi & Outlet', 'Tim & Akses',
-        'Tampilan Toko', 'desktopPrimaryNavigation', 'mobilePrimaryNavigation',
+        'Jual Online', 'Profil Usaha', 'Lokasi', 'Tim',
+        'Toko', 'desktopPrimaryNavigation', 'mobilePrimaryNavigation',
         'portalMenuNavigation',
     )
     forbid(
@@ -52,7 +52,7 @@ def main() -> int:
     require(
         'frontend/apps/usaha/src/components/portal/PortalShell.tsx',
         'Lajukan Usaha', 'portalSectionLabel', '<SidebarNav', '<MobileNav',
-        'Tim & Akses', 'Keamanan akun', 'Tambah usaha',
+        'Tim', 'Keamanan', 'Tambah usaha',
     )
     forbid('frontend/apps/usaha/src/components/portal/PortalShell.tsx', 'Usaha Portal', 'Workspace bisnis')
 
@@ -181,7 +181,7 @@ def main() -> int:
 
     require(
         'frontend/apps/usaha/src/app/page.tsx',
-        'Perlu perhatian', 'Kondisi usaha', 'Kerjakan',
+        'BusinessProfileHero', 'Perlu perhatian', 'Kondisi usaha', 'Kerjakan',
         'merchant-action-sale', 'merchant-action-money', 'merchant-action-stock',
         'buildMerchantNextActions', 'buildHomeDashboard', 'listControlIngredients',
         'listControlFinanceEntries', 'listControlChannels', 'const recipeCount = null',
