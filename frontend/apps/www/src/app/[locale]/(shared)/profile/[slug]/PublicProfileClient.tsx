@@ -2605,5 +2605,5 @@ export default function PublicProfileClient({
         onClose={() => setSocialModalTab(null)}
       />
     </>
-  );  );
+  );
 }
