@@ -26,8 +26,10 @@ use uuid::Uuid;
 
 use sqlx::Row;
 
+use crate::backoffice::{
+    is_backoffice_eligible, parse_backoffice_application, validate_application_roles,
+};
 use crate::config::AppState;
-use crate::backoffice::{is_backoffice_eligible, parse_backoffice_application, validate_application_roles};
 use crate::routes::proofs::{consume_identity_verification_proof, consume_phone_otp_proof};
 use crate::routes::verification::{derive_verification_state, merged_verification_payload};
 
@@ -197,8 +199,10 @@ fn normalize_google_backoffice_roles(application: &str, values: &[String]) -> Ve
     let mut roles = Vec::new();
     for value in values {
         let role = value.trim().to_ascii_lowercase();
-        if matches!(role.as_str(), "admin" | "content_admin" | "moderator" | "sales" | "support")
-            && !roles.contains(&role)
+        if matches!(
+            role.as_str(),
+            "admin" | "content_admin" | "moderator" | "sales" | "support"
+        ) && !roles.contains(&role)
         {
             roles.push(role);
         }
@@ -237,7 +241,7 @@ async fn require_super_admin(
             AND u.is_active = TRUE
             AND u.status = 'active'
         )
-        "#
+        "#,
     )
     .bind(user_id)
     .fetch_one(&state.db)
@@ -268,7 +272,11 @@ pub async fn list_backoffice_google_access(
     headers: HeaderMap,
 ) -> impl IntoResponse {
     if let Err(status) = require_super_admin(&state, &headers).await {
-        return (status, Json(json!({"error":"backoffice owner access required"}))).into_response();
+        return (
+            status,
+            Json(json!({"error":"backoffice owner access required"})),
+        )
+            .into_response();
     }
 
     match sqlx::query(
@@ -313,21 +321,43 @@ pub async fn upsert_backoffice_google_access(
     let claims = match require_super_admin(&state, &headers).await {
         Ok(value) => value,
         Err(status) => {
-            return (status, Json(json!({"error":"backoffice owner access required"}))).into_response();
+            return (
+                status,
+                Json(json!({"error":"backoffice owner access required"})),
+            )
+                .into_response();
         }
     };
 
     let email = match normalize_backoffice_email(&payload.email) {
         Some(value) => value,
-        None => return (StatusCode::BAD_REQUEST, Json(json!({"error":"invalid email"}))).into_response(),
+        None => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error":"invalid email"})),
+            )
+                .into_response()
+        }
     };
     let application = match normalize_google_backoffice_application(&payload.application) {
         Some(value) => value,
-        None => return (StatusCode::BAD_REQUEST, Json(json!({"error":"application must be crm or cms"}))).into_response(),
+        None => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error":"application must be crm or cms"})),
+            )
+                .into_response()
+        }
     };
     let status = match payload.status.trim().to_ascii_lowercase().as_str() {
         "pending" | "approved" | "revoked" => payload.status.trim().to_ascii_lowercase(),
-        _ => return (StatusCode::BAD_REQUEST, Json(json!({"error":"invalid status"}))).into_response(),
+        _ => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error":"invalid status"})),
+            )
+                .into_response()
+        }
     };
     let role_names = normalize_google_backoffice_roles(application, &payload.role_names);
     let allowed_roles: &[&str] = match application {
@@ -335,11 +365,15 @@ pub async fn upsert_backoffice_google_access(
         "cms" => &["admin", "content_admin"],
         _ => &[],
     };
-    if role_names.iter().any(|role| !allowed_roles.contains(&role.as_str())) {
+    if role_names
+        .iter()
+        .any(|role| !allowed_roles.contains(&role.as_str()))
+    {
         return (
             StatusCode::BAD_REQUEST,
             Json(json!({"error":"role is not valid for this application"})),
-        ).into_response();
+        )
+            .into_response();
     }
 
     let result = sqlx::query(
@@ -392,15 +426,19 @@ pub async fn upsert_backoffice_google_access(
                     "role_names": row.get::<Vec<String>, _>("role_names"),
                     "status": row.get::<String, _>("status")
                 })),
-            ).into_response()
+            )
+                .into_response()
         }
         Err(error) => {
             tracing::error!("upsert backoffice google access failed: {:?}", error);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"database error"}))).into_response()
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error":"database error"})),
+            )
+                .into_response()
         }
     }
 }
-
 
 fn normalize_optional_text(value: Option<String>) -> Option<String> {
     value.and_then(|v| {
@@ -1704,7 +1742,6 @@ pub async fn get_user_detail(
         .into_response()
 }
 
-
 #[derive(Debug, Deserialize)]
 pub struct ModerateUserRequest {
     pub action: String,
@@ -1768,33 +1805,69 @@ pub async fn moderate_user(
         &extract_bearer_token(&headers).unwrap_or_default(),
     ) {
         Ok(value) => value,
-        Err(_) => return (StatusCode::UNAUTHORIZED, Json(json!({"error":"invalid token"}))).into_response(),
+        Err(_) => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(json!({"error":"invalid token"})),
+            )
+                .into_response()
+        }
     };
 
     if !has_account_moderation_access(&claims) {
-        return (StatusCode::FORBIDDEN, Json(json!({"error":"account moderation requires admin"}))).into_response();
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({"error":"account moderation requires admin"})),
+        )
+            .into_response();
     }
 
     let actor_id = match Uuid::parse_str(&claims.sub) {
         Ok(value) => value,
-        Err(_) => return (StatusCode::UNAUTHORIZED, Json(json!({"error":"invalid actor"}))).into_response(),
+        Err(_) => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(json!({"error":"invalid actor"})),
+            )
+                .into_response()
+        }
     };
     let action = match normalize_user_moderation_action(&payload.action) {
         Some(value) => value,
-        None => return (StatusCode::BAD_REQUEST, Json(json!({"error":"unsupported moderation action"}))).into_response(),
+        None => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error":"unsupported moderation action"})),
+            )
+                .into_response()
+        }
     };
     let reason_code = match normalize_user_moderation_reason(&payload.reason_code) {
         Some(value) => value,
-        None => return (StatusCode::BAD_REQUEST, Json(json!({"error":"unsupported moderation reason"}))).into_response(),
+        None => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error":"unsupported moderation reason"})),
+            )
+                .into_response()
+        }
     };
     let reason_note = payload.reason_note.trim();
     if reason_note.is_empty() {
-        return (StatusCode::BAD_REQUEST, Json(json!({"error":"reason_note is required"}))).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error":"reason_note is required"})),
+        )
+            .into_response();
     }
     let severity = normalize_user_moderation_severity(payload.severity.as_deref());
 
     if actor_id == target_user_id && !has_role(&claims.roles, "super_admin") {
-        return (StatusCode::CONFLICT, Json(json!({"error":"admin cannot moderate their own account"}))).into_response();
+        return (
+            StatusCode::CONFLICT,
+            Json(json!({"error":"admin cannot moderate their own account"})),
+        )
+            .into_response();
     }
 
     let target = match sqlx::query(
@@ -1807,10 +1880,23 @@ pub async fn moderate_user(
     )
     .bind(target_user_id)
     .fetch_optional(&state.db)
-    .await {
+    .await
+    {
         Ok(Some(row)) => row,
-        Ok(None) => return (StatusCode::NOT_FOUND, Json(json!({"error":"user not found"}))).into_response(),
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"database error"}))).into_response(),
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({"error":"user not found"})),
+            )
+                .into_response()
+        }
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error":"database error"})),
+            )
+                .into_response()
+        }
     };
 
     let previous_status: String = target.get("status");
@@ -1823,12 +1909,22 @@ pub async fn moderate_user(
     };
 
     if action == "restore" && !has_role(&claims.roles, "super_admin") && severity != "low" {
-        return (StatusCode::FORBIDDEN, Json(json!({"error":"only super_admin can restore non-low-severity account actions"}))).into_response();
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({"error":"only super_admin can restore non-low-severity account actions"})),
+        )
+            .into_response();
     }
 
     let mut tx = match state.db.begin().await {
         Ok(value) => value,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"database transaction error"}))).into_response(),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error":"database transaction error"})),
+            )
+                .into_response()
+        }
     };
 
     if sqlx::query(
@@ -1888,14 +1984,25 @@ pub async fn moderate_user(
     .is_err()
     {
         let _ = tx.rollback().await;
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"failed to write audit log"}))).into_response();
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error":"failed to write audit log"})),
+        )
+            .into_response();
     }
 
     if tx.commit().await.is_err() {
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"failed to commit account moderation"}))).into_response();
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error":"failed to commit account moderation"})),
+        )
+            .into_response();
     }
 
-    let _ = sqlx::query("UPDATE core.sessions SET revoked=TRUE WHERE user_id=$1").bind(target_user_id).execute(&state.db).await;
+    let _ = sqlx::query("UPDATE core.sessions SET revoked=TRUE WHERE user_id=$1")
+        .bind(target_user_id)
+        .execute(&state.db)
+        .await;
 
     (
         StatusCode::OK,
@@ -1908,9 +2015,9 @@ pub async fn moderate_user(
             "previous_status": previous_status,
             "new_status": new_status
         })),
-    ).into_response()
+    )
+        .into_response()
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -1965,7 +2072,6 @@ mod tests {
     }
 }
 
-
 #[derive(Debug, Deserialize)]
 pub struct BackofficeCandidateQuery {
     pub q: String,
@@ -1978,11 +2084,19 @@ pub async fn search_backoffice_candidates(
     Query(query): Query<BackofficeCandidateQuery>,
 ) -> impl IntoResponse {
     if let Err(status) = require_super_admin(&state, &headers).await {
-        return (status, Json(json!({"error":"backoffice owner access required"}))).into_response();
+        return (
+            status,
+            Json(json!({"error":"backoffice owner access required"})),
+        )
+            .into_response();
     }
     let q = query.q.trim().to_string();
     if q.len() < 2 {
-        return (StatusCode::BAD_REQUEST, Json(json!({"error":"search requires at least 2 characters"}))).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error":"search requires at least 2 characters"})),
+        )
+            .into_response();
     }
     let limit = query.limit.unwrap_or(20).clamp(1, 50);
 
@@ -2009,36 +2123,48 @@ pub async fn search_backoffice_candidates(
     .bind(&q)
     .bind(limit)
     .fetch_all(&state.db)
-    .await {
+    .await
+    {
         Ok(rows) => rows,
         Err(error) => {
             tracing::error!("backoffice candidate search failed: {:?}", error);
-            return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"database error"}))).into_response();
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error":"database error"})),
+            )
+                .into_response();
         }
     };
 
-    let data: Vec<Value> = rows.into_iter().map(|row| {
-        let metadata: Value = row.get::<Option<Value>, _>("metadata").unwrap_or_else(|| json!({}));
-        let identity_verified = metadata.pointer("/verification/identity_verified")
-            .and_then(Value::as_bool).unwrap_or(false);
-        let eligible = is_backoffice_eligible(
-            row.get("is_active"),
-            row.get::<String, _>("status") == "banned",
-            row.get("email_verified"),
-            row.get("phone_verified"),
-        );
-        json!({
-            "id": row.get::<Uuid,_>("id"),
-            "email": row.get::<String,_>("email"),
-            "username": row.get::<Option<String>,_>("username"),
-            "full_name": row.get::<Option<String>,_>("full_name"),
-            "status": row.get::<String,_>("status"),
-            "email_verified": row.get::<bool,_>("email_verified"),
-            "phone_verified": row.get::<bool,_>("phone_verified"),
-            "identity_verified": identity_verified,
-            "eligible": eligible
+    let data: Vec<Value> = rows
+        .into_iter()
+        .map(|row| {
+            let metadata: Value = row
+                .get::<Option<Value>, _>("metadata")
+                .unwrap_or_else(|| json!({}));
+            let identity_verified = metadata
+                .pointer("/verification/identity_verified")
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
+            let eligible = is_backoffice_eligible(
+                row.get("is_active"),
+                row.get::<String, _>("status") == "banned",
+                row.get("email_verified"),
+                row.get("phone_verified"),
+            );
+            json!({
+                "id": row.get::<Uuid,_>("id"),
+                "email": row.get::<String,_>("email"),
+                "username": row.get::<Option<String>,_>("username"),
+                "full_name": row.get::<Option<String>,_>("full_name"),
+                "status": row.get::<String,_>("status"),
+                "email_verified": row.get::<bool,_>("email_verified"),
+                "phone_verified": row.get::<bool,_>("phone_verified"),
+                "identity_verified": identity_verified,
+                "eligible": eligible
+            })
         })
-    }).collect();
+        .collect();
 
     (StatusCode::OK, Json(json!({"data": data}))).into_response()
 }
@@ -2058,19 +2184,43 @@ pub async fn create_backoffice_invitation(
 ) -> impl IntoResponse {
     let claims = match require_super_admin(&state, &headers).await {
         Ok(value) => value,
-        Err(status) => return (status, Json(json!({"error":"backoffice owner access required"}))).into_response(),
+        Err(status) => {
+            return (
+                status,
+                Json(json!({"error":"backoffice owner access required"})),
+            )
+                .into_response()
+        }
     };
     let application = match parse_backoffice_application(&payload.application) {
         Some(value) => value,
-        None => return (StatusCode::BAD_REQUEST, Json(json!({"error":"application must be crm or cms"}))).into_response(),
+        None => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error":"application must be crm or cms"})),
+            )
+                .into_response()
+        }
     };
     let roles = match validate_application_roles(application, &payload.role_names) {
         Ok(value) => value,
-        Err(error) => return (StatusCode::BAD_REQUEST, Json(json!({"error": error.to_string()}))).into_response(),
+        Err(error) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": error.to_string()})),
+            )
+                .into_response()
+        }
     };
     let inviter_id = match Uuid::parse_str(&claims.sub) {
         Ok(value) => value,
-        Err(_) => return (StatusCode::UNAUTHORIZED, Json(json!({"error":"invalid actor"}))).into_response(),
+        Err(_) => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(json!({"error":"invalid actor"})),
+            )
+                .into_response()
+        }
     };
 
     let user = match sqlx::query(
@@ -2081,15 +2231,31 @@ pub async fn create_backoffice_invitation(
         WHERE u.id = $1 AND u.deleted_at IS NULL
         LIMIT 1
         "#,
-    ).bind(payload.invitee_user_id).fetch_optional(&state.db).await {
+    )
+    .bind(payload.invitee_user_id)
+    .fetch_optional(&state.db)
+    .await
+    {
         Ok(Some(row)) => row,
-        Ok(None) => return (StatusCode::NOT_FOUND, Json(json!({"error":"user not found"}))).into_response(),
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"database error"}))).into_response(),
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({"error":"user not found"})),
+            )
+                .into_response()
+        }
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error":"database error"})),
+            )
+                .into_response()
+        }
     };
 
     let eligible = is_backoffice_eligible(
         user.get("is_active"),
-        user.get::<String,_>("status") == "banned",
+        user.get::<String, _>("status") == "banned",
         user.get("email_verified"),
         user.get("phone_verified"),
     );
@@ -2116,7 +2282,8 @@ pub async fn create_backoffice_invitation(
     .bind(application.as_str())
     .bind(&roles)
     .bind(days)
-    .fetch_one(&state.db).await;
+    .fetch_one(&state.db)
+    .await;
 
     match result {
         Ok(row) => {
@@ -2129,17 +2296,25 @@ pub async fn create_backoffice_invitation(
                 "expires_in_days": days
             })).execute(&state.db).await;
 
-            (StatusCode::CREATED, Json(json!({
-                "id": row.get::<Uuid,_>("id"),
-                "status": row.get::<String,_>("status"),
-                "expires_at": row.get::<DateTime<Utc>,_>("expires_at"),
-                "application": row.get::<String,_>("application"),
-                "role_names": row.get::<Vec<String>,_>("role_names")
-            }))).into_response()
+            (
+                StatusCode::CREATED,
+                Json(json!({
+                    "id": row.get::<Uuid,_>("id"),
+                    "status": row.get::<String,_>("status"),
+                    "expires_at": row.get::<DateTime<Utc>,_>("expires_at"),
+                    "application": row.get::<String,_>("application"),
+                    "role_names": row.get::<Vec<String>,_>("role_names")
+                })),
+            )
+                .into_response()
         }
         Err(error) => {
             tracing::error!("create backoffice invitation failed: {:?}", error);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"database error"}))).into_response()
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error":"database error"})),
+            )
+                .into_response()
         }
     }
 }
@@ -2150,11 +2325,23 @@ pub async fn list_backoffice_invitations(
 ) -> impl IntoResponse {
     let claims = match require_super_admin(&state, &headers).await {
         Ok(value) => value,
-        Err(status) => return (status, Json(json!({"error":"backoffice owner access required"}))).into_response(),
+        Err(status) => {
+            return (
+                status,
+                Json(json!({"error":"backoffice owner access required"})),
+            )
+                .into_response()
+        }
     };
     let inviter_id = match Uuid::parse_str(&claims.sub) {
         Ok(value) => value,
-        Err(_) => return (StatusCode::UNAUTHORIZED, Json(json!({"error":"invalid actor"}))).into_response(),
+        Err(_) => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(json!({"error":"invalid actor"})),
+            )
+                .into_response()
+        }
     };
     let _ = sqlx::query(
         "UPDATE core.backoffice_invitations SET status='expired', responded_at=COALESCE(responded_at,NOW()) WHERE status='pending' AND expires_at < NOW()"
@@ -2171,24 +2358,37 @@ pub async fn list_backoffice_invitations(
         WHERE i.invited_by = $1
         ORDER BY i.created_at DESC
         LIMIT 100
-        "#
-    ).bind(inviter_id).fetch_all(&state.db).await {
+        "#,
+    )
+    .bind(inviter_id)
+    .fetch_all(&state.db)
+    .await
+    {
         Ok(rows) => {
-            let data: Vec<Value> = rows.into_iter().map(|row| json!({
-                "id": row.get::<Uuid,_>("id"),
-                "application": row.get::<String,_>("application"),
-                "role_names": row.get::<Vec<String>,_>("role_names"),
-                "status": row.get::<String,_>("status"),
-                "expires_at": row.get::<DateTime<Utc>,_>("expires_at"),
-                "created_at": row.get::<DateTime<Utc>,_>("created_at"),
-                "invitee_user_id": row.get::<Uuid,_>("invitee_user_id"),
-                "email": row.get::<String,_>("email"),
-                "username": row.get::<Option<String>,_>("username"),
-                "full_name": row.get::<Option<String>,_>("full_name")
-            })).collect();
+            let data: Vec<Value> = rows
+                .into_iter()
+                .map(|row| {
+                    json!({
+                        "id": row.get::<Uuid,_>("id"),
+                        "application": row.get::<String,_>("application"),
+                        "role_names": row.get::<Vec<String>,_>("role_names"),
+                        "status": row.get::<String,_>("status"),
+                        "expires_at": row.get::<DateTime<Utc>,_>("expires_at"),
+                        "created_at": row.get::<DateTime<Utc>,_>("created_at"),
+                        "invitee_user_id": row.get::<Uuid,_>("invitee_user_id"),
+                        "email": row.get::<String,_>("email"),
+                        "username": row.get::<Option<String>,_>("username"),
+                        "full_name": row.get::<Option<String>,_>("full_name")
+                    })
+                })
+                .collect();
             (StatusCode::OK, Json(json!({"data": data}))).into_response()
         }
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"database error"}))).into_response(),
+        Err(_) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error":"database error"})),
+        )
+            .into_response(),
     }
 }
 
@@ -2199,11 +2399,23 @@ pub async fn revoke_backoffice_invitation(
 ) -> impl IntoResponse {
     let claims = match require_super_admin(&state, &headers).await {
         Ok(value) => value,
-        Err(status) => return (status, Json(json!({"error":"backoffice owner access required"}))).into_response(),
+        Err(status) => {
+            return (
+                status,
+                Json(json!({"error":"backoffice owner access required"})),
+            )
+                .into_response()
+        }
     };
     let actor_id = match Uuid::parse_str(&claims.sub) {
         Ok(value) => value,
-        Err(_) => return (StatusCode::UNAUTHORIZED, Json(json!({"error":"invalid actor"}))).into_response(),
+        Err(_) => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(json!({"error":"invalid actor"})),
+            )
+                .into_response()
+        }
     };
     let result = sqlx::query(
         r#"
@@ -2211,8 +2423,12 @@ pub async fn revoke_backoffice_invitation(
         SET status='revoked', responded_at=NOW(), updated_at=NOW()
         WHERE id=$1 AND invited_by=$2 AND status='pending'
         RETURNING invitee_user_id, application
-        "#
-    ).bind(invitation_id).bind(actor_id).fetch_optional(&state.db).await;
+        "#,
+    )
+    .bind(invitation_id)
+    .bind(actor_id)
+    .fetch_optional(&state.db)
+    .await;
     match result {
         Ok(Some(row)) => {
             let _ = sqlx::query(
@@ -2224,8 +2440,16 @@ pub async fn revoke_backoffice_invitation(
             })).execute(&state.db).await;
             (StatusCode::OK, Json(json!({"success":true}))).into_response()
         }
-        Ok(None) => (StatusCode::NOT_FOUND, Json(json!({"error":"pending invitation not found"}))).into_response(),
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"database error"}))).into_response(),
+        Ok(None) => (
+            StatusCode::NOT_FOUND,
+            Json(json!({"error":"pending invitation not found"})),
+        )
+            .into_response(),
+        Err(_) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error":"database error"})),
+        )
+            .into_response(),
     }
 }
 
@@ -2233,13 +2457,28 @@ pub async fn list_my_backoffice_invitations(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> impl IntoResponse {
-    let claims = match decode_access_token(&state.config.jwt_secret, &extract_bearer_token(&headers).unwrap_or_default()) {
+    let claims = match decode_access_token(
+        &state.config.jwt_secret,
+        &extract_bearer_token(&headers).unwrap_or_default(),
+    ) {
         Ok(value) => value,
-        Err(_) => return (StatusCode::UNAUTHORIZED, Json(json!({"error":"invalid token"}))).into_response(),
+        Err(_) => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(json!({"error":"invalid token"})),
+            )
+                .into_response()
+        }
     };
     let user_id = match Uuid::parse_str(&claims.sub) {
         Ok(value) => value,
-        Err(_) => return (StatusCode::UNAUTHORIZED, Json(json!({"error":"invalid token subject"}))).into_response(),
+        Err(_) => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(json!({"error":"invalid token subject"})),
+            )
+                .into_response()
+        }
     };
     let _ = sqlx::query(
         "UPDATE core.backoffice_invitations SET status='expired', responded_at=COALESCE(responded_at,NOW()) WHERE invitee_user_id=$1 AND status='pending' AND expires_at < NOW()"
@@ -2248,20 +2487,33 @@ pub async fn list_my_backoffice_invitations(
         r#"SELECT id, application, role_names, status, expires_at, created_at
            FROM core.backoffice_invitations
            WHERE invitee_user_id=$1 AND status='pending'
-           ORDER BY created_at DESC"#
-    ).bind(user_id).fetch_all(&state.db).await {
+           ORDER BY created_at DESC"#,
+    )
+    .bind(user_id)
+    .fetch_all(&state.db)
+    .await
+    {
         Ok(rows) => {
-            let data: Vec<Value> = rows.into_iter().map(|row| json!({
-                "id": row.get::<Uuid,_>("id"),
-                "application": row.get::<String,_>("application"),
-                "role_names": row.get::<Vec<String>,_>("role_names"),
-                "status": row.get::<String,_>("status"),
-                "expires_at": row.get::<DateTime<Utc>,_>("expires_at"),
-                "created_at": row.get::<DateTime<Utc>,_>("created_at")
-            })).collect();
+            let data: Vec<Value> = rows
+                .into_iter()
+                .map(|row| {
+                    json!({
+                        "id": row.get::<Uuid,_>("id"),
+                        "application": row.get::<String,_>("application"),
+                        "role_names": row.get::<Vec<String>,_>("role_names"),
+                        "status": row.get::<String,_>("status"),
+                        "expires_at": row.get::<DateTime<Utc>,_>("expires_at"),
+                        "created_at": row.get::<DateTime<Utc>,_>("created_at")
+                    })
+                })
+                .collect();
             (StatusCode::OK, Json(json!({"data": data}))).into_response()
         }
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"database error"}))).into_response(),
+        Err(_) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error":"database error"})),
+        )
+            .into_response(),
     }
 }
 
@@ -2273,21 +2525,48 @@ pub async fn respond_backoffice_invitation(
 ) -> impl IntoResponse {
     let token = match extract_bearer_token(&headers) {
         Some(value) => value,
-        None => return (StatusCode::UNAUTHORIZED, Json(json!({"error":"missing token"}))).into_response(),
+        None => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(json!({"error":"missing token"})),
+            )
+                .into_response()
+        }
     };
     let claims = match decode_access_token(&state.config.jwt_secret, &token) {
         Ok(value) => value,
-        Err(_) => return (StatusCode::UNAUTHORIZED, Json(json!({"error":"invalid token"}))).into_response(),
+        Err(_) => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(json!({"error":"invalid token"})),
+            )
+                .into_response()
+        }
     };
     let user_id = match Uuid::parse_str(&claims.sub) {
         Ok(value) => value,
-        Err(_) => return (StatusCode::UNAUTHORIZED, Json(json!({"error":"invalid token subject"}))).into_response(),
+        Err(_) => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(json!({"error":"invalid token subject"})),
+            )
+                .into_response()
+        }
     };
-    let accept = payload.get("accept").and_then(Value::as_bool).unwrap_or(false);
+    let accept = payload
+        .get("accept")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
 
     let mut tx = match state.db.begin().await {
         Ok(value) => value,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"database transaction error"}))).into_response(),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error":"database transaction error"})),
+            )
+                .into_response()
+        }
     };
 
     let invite = match sqlx::query(
@@ -2307,7 +2586,11 @@ pub async fn respond_backoffice_invitation(
         let _ = sqlx::query("UPDATE core.backoffice_invitations SET status='expired', responded_at=NOW() WHERE id=$1")
             .bind(invitation_id).execute(&mut *tx).await;
         let _ = tx.commit().await;
-        return (StatusCode::GONE, Json(json!({"error":"invitation expired"}))).into_response();
+        return (
+            StatusCode::GONE,
+            Json(json!({"error":"invitation expired"})),
+        )
+            .into_response();
     }
 
     let application: String = invite.get("application");
@@ -2316,7 +2599,11 @@ pub async fn respond_backoffice_invitation(
         let _ = sqlx::query("UPDATE core.backoffice_invitations SET status='rejected', responded_at=NOW(), updated_at=NOW() WHERE id=$1")
             .bind(invitation_id).execute(&mut *tx).await;
         let _ = tx.commit().await;
-        return (StatusCode::OK, Json(json!({"success":true,"status":"rejected"}))).into_response();
+        return (
+            StatusCode::OK,
+            Json(json!({"success":true,"status":"rejected"})),
+        )
+            .into_response();
     }
 
     let email: String = invite.get("email");
@@ -2333,21 +2620,41 @@ pub async fn respond_backoffice_invitation(
         "UPDATE core.backoffice_invitations SET status='accepted', accepted_at=NOW(), responded_at=NOW(), updated_at=NOW() WHERE id=$1"
     ).bind(invitation_id).execute(&mut *tx).await.map_err(|_| ()).ok();
 
-    sqlx::query("UPDATE core.sessions SET revoked=TRUE WHERE user_id=$1").bind(user_id).execute(&mut *tx).await.map_err(|_| ()).ok();
+    sqlx::query("UPDATE core.sessions SET revoked=TRUE WHERE user_id=$1")
+        .bind(user_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|_| ())
+        .ok();
 
     if tx.commit().await.is_err() {
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"failed to finalize invitation"}))).into_response();
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error":"failed to finalize invitation"})),
+        )
+            .into_response();
     }
 
-    record_audit_log(state.clone(),"backoffice.invitation.accepted",Some(user_id),Some(json!({
-        "invitation_id": invitation_id, "application": application, "role_names": roles
-    })),&headers).await;
+    record_audit_log(
+        state.clone(),
+        "backoffice.invitation.accepted",
+        Some(user_id),
+        Some(json!({
+            "invitation_id": invitation_id, "application": application, "role_names": roles
+        })),
+        &headers,
+    )
+    .await;
 
-    (StatusCode::OK, Json(json!({
-        "success": true,
-        "status": "accepted",
-        "application": application,
-        "role_names": roles,
-        "message": "Akses backoffice aktif setelah login Google yang diizinkan."
-    }))).into_response()
+    (
+        StatusCode::OK,
+        Json(json!({
+            "success": true,
+            "status": "accepted",
+            "application": application,
+            "role_names": roles,
+            "message": "Akses backoffice aktif setelah login Google yang diizinkan."
+        })),
+    )
+        .into_response()
 }
