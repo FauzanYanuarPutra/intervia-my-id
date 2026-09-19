@@ -180,6 +180,7 @@ fn sale_request(product_id: Uuid) -> CreateSaleRequest {
         account_key: "cash".to_owned(),
         location_id: None,
         source_order_id: None,
+        party_id: None,
         lines: vec![CreateSaleLineRequest {
             product_id,
             quantity: Decimal::from(2),
