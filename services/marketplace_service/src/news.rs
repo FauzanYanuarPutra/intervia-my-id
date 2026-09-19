@@ -125,6 +125,8 @@ struct UpdateNewsSubmissionRequest {
     title: Option<String>,
     summary: Option<String>,
     body: Option<String>,
+    rich_body: Option<String>,
+    cover_image: Option<String>,
     category: Option<String>,
     article_kind: Option<String>,
     location: Option<String>,
@@ -1530,6 +1532,29 @@ async fn update_news_submission(
     if body.len() < 120 || body.len() > 20_000 {
         return response_error(StatusCode::BAD_REQUEST, "body must be 120-20000 characters");
     }
+    let rich_body = match payload.rich_body {
+        Some(value) => {
+            let value = value.trim().to_string();
+            if value.is_empty() || value.len() > 60_000 {
+                return response_error(StatusCode::BAD_REQUEST, "rich body must be 1-60000 characters");
+            }
+            Some(value)
+        }
+        None => None,
+    };
+    let cover_image = match payload.cover_image {
+        Some(value) => {
+            let value = value.trim().to_string();
+            if value.is_empty() {
+                None
+            } else if !is_allowed_news_source_url(&value) {
+                return response_error(StatusCode::BAD_REQUEST, "unsupported news cover image URL");
+            } else {
+                Some(value)
+            }
+        }
+        None => current.cover_image.clone(),
+    };
 
     let requested_topics = match sanitize_topics(payload.topics) {
         Ok(value) => value,
@@ -1586,6 +1611,9 @@ async fn update_news_submission(
         }
         if let Some(source_urls) = requested_sources {
             news.insert("source_urls".to_string(), json!(source_urls));
+        }
+        if let Some(rich_body) = rich_body.as_ref() {
+            news.insert("rich_body".to_string(), Value::String(rich_body.clone()));
         }
 
         final_category = news
@@ -1670,15 +1698,16 @@ async fn update_news_submission(
             title = $2,
             summary = $3,
             body = $4,
-            tags = $5,
-            metadata = $6,
+            cover_image = $5,
+            tags = $6,
+            metadata = $7,
             content_status = 'draft',
             listing_status = 'draft',
             updated_at = NOW(),
             last_saved_at = NOW(),
             draft_version = draft_version + 1
         WHERE id = $1
-          AND owner_id = $7
+          AND owner_id = $8
           AND content_type = 'news'
         RETURNING
             id, owner_id, slug, title, summary, body, tags, cover_image, metadata,
@@ -1689,6 +1718,7 @@ async fn update_news_submission(
     .bind(title)
     .bind(summary)
     .bind(body)
+    .bind(&cover_image)
     .bind(tags)
     .bind(metadata)
     .bind(owner_id)

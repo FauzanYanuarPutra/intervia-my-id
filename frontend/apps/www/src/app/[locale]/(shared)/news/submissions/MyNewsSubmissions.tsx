@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import NewsRichTextEditor from '../submit/NewsRichTextEditor';
 
 type NewsItem = {
   id: string;
@@ -10,6 +11,9 @@ type NewsItem = {
   tags?: string[] | null;
   content_status: string;
   metadata?: Record<string, unknown>;
+  cover_image?: string | null;
+  published_at?: string | null;
+  created_at: string;
   updated_at: string;
 };
 
@@ -17,9 +21,11 @@ type SubmissionForm = {
   title: string;
   summary: string;
   body: string;
+  rich_body: string;
   category: string;
   article_kind: string;
   location: string;
+  cover_image: string;
   topics: string;
   source_urls: string;
 };
@@ -43,9 +49,11 @@ const EMPTY_FORM: SubmissionForm = {
   title: '',
   summary: '',
   body: '',
+  rich_body: '',
   category: 'Ekonomi',
   article_kind: 'news',
   location: '',
+  cover_image: '',
   topics: '',
   source_urls: '',
 };
@@ -64,6 +72,44 @@ function urls(value: unknown): string[] {
   return Array.isArray(value) ? value.map(text).filter(Boolean) : [];
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function fallbackRichBody(value: string): string {
+  return value
+    .split(/\r?\n\r?\n+/)
+    .map(paragraph => paragraph.trim())
+    .filter(Boolean)
+    .map(paragraph => `<p>${escapeHtml(paragraph)}</p>`)
+    .join('');
+}
+
+function formatDate(value?: string | null, locale = 'id-ID'): string {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  return date.toLocaleString(locale, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+}
+
+function statusLabel(status: string, isId: boolean): string {
+  const labels: Record<string, [string, string]> = {
+    pending_review: ['Menunggu review', 'Pending review'],
+    needs_revision: ['Perlu revisi', 'Needs revision'],
+    published: ['Terbit', 'Published'],
+    rejected: ['Ditolak', 'Rejected'],
+    retracted: ['Ditarik', 'Retracted'],
+  };
+  return labels[status]?.[isId ? 0 : 1] || status.replaceAll('_', ' ');
+}
+
 function topics(value: unknown, category: string, kind: string): string[] {
   const reserved = new Set([
     'news',
@@ -79,14 +125,17 @@ export function submissionFormFromItem(item: NewsItem): SubmissionForm {
   const news = record(record(item.metadata).news);
   const category = text(news.category) || 'Ekonomi';
   const kind = text(news.article_kind) || 'news';
+  const storedRichBody = text(news.rich_body);
 
   return {
     title: item.title,
     summary: item.summary || '',
     body: item.body,
+    rich_body: storedRichBody || fallbackRichBody(item.body),
     category,
     article_kind: kind,
     location: text(news.location),
+    cover_image: text(item.cover_image),
     topics: topics(item.tags, category, kind).join(', '),
     source_urls: urls(news.source_urls).join('\n'),
   };
@@ -123,6 +172,7 @@ export default function MyNewsSubmissions({ locale }: { locale: string }) {
   const [items, setItems] = useState<NewsItem[]>([]);
   const [selectedId, setSelectedId] = useState('');
   const [form, setForm] = useState<SubmissionForm>(EMPTY_FORM);
+  const [uploadingCover, setUploadingCover] = useState(false);
   const [status, setStatus] = useState({
     loading: true,
     saving: false,
@@ -141,6 +191,41 @@ export default function MyNewsSubmissions({ locale }: { locale: string }) {
     selected &&
       ['pending_review', 'needs_revision', 'rejected'].includes(editorialStatus),
   );
+
+  const uploadCover = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    setUploadingCover(true);
+    setStatus(current => ({ ...current, error: '', success: '' }));
+    try {
+      const data = new FormData();
+      data.append('image', file);
+      const response = await fetch('/api/content/upload-images', {
+        method: 'POST',
+        body: data,
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        urls?: string[];
+        files?: Array<{ url?: string }>;
+        error?: string;
+      };
+      const url = payload.urls?.[0] || payload.files?.[0]?.url;
+      if (!response.ok || !url) {
+        throw new Error(payload.error || (isId ? 'Gagal mengunggah gambar.' : 'Image upload failed.'));
+      }
+      setForm(current => ({ ...current, cover_image: url }));
+    } catch (error) {
+      setStatus(current => ({
+        ...current,
+        error: error instanceof Error
+          ? error.message
+          : (isId ? 'Gagal mengunggah gambar.' : 'Image upload failed.'),
+      }));
+    } finally {
+      setUploadingCover(false);
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -258,6 +343,8 @@ export default function MyNewsSubmissions({ locale }: { locale: string }) {
               .split(/\r?\n/)
               .map(value => value.trim())
               .filter(Boolean),
+            rich_body: form.rich_body,
+            cover_image: form.cover_image.trim(),
           }),
         },
       );
@@ -347,9 +434,26 @@ export default function MyNewsSubmissions({ locale }: { locale: string }) {
         ) : (
           <>
             <div className="mb-5">
-              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-300">
-                {editorialStatus.replaceAll('_', ' ')}
-              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-800 dark:bg-emerald-400/10 dark:text-emerald-200">
+                  {statusLabel(editorialStatus, isId)}
+                </span>
+                {selected.created_at ? (
+                  <span className="text-xs font-semibold text-slate-500">
+                    {isId ? 'Dikirim' : 'Submitted'} {formatDate(selected.created_at, isId ? 'id-ID' : 'en-US')}
+                  </span>
+                ) : null}
+                {selected.updated_at && selected.updated_at !== selected.created_at ? (
+                  <span className="text-xs font-semibold text-slate-500">
+                    {isId ? 'Diperbarui' : 'Updated'} {formatDate(selected.updated_at, isId ? 'id-ID' : 'en-US')}
+                  </span>
+                ) : null}
+                {selected.published_at ? (
+                  <span className="text-xs font-semibold text-slate-500">
+                    {isId ? 'Terbit' : 'Published'} {formatDate(selected.published_at, isId ? 'id-ID' : 'en-US')}
+                  </span>
+                ) : null}
+              </div>
               {text(meta.review_note) ? (
                 <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-900 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-100">
                   <strong>{isId ? 'Catatan editor:' : 'Editor note:'}</strong>{' '}
@@ -466,21 +570,77 @@ export default function MyNewsSubmissions({ locale }: { locale: string }) {
                 />
               </label>
 
-              <label className="text-sm font-bold text-slate-800 dark:text-slate-100">
-                {isId ? 'Isi' : 'Body'}
-                <textarea
-                  disabled={!editable}
-                  rows={12}
-                  value={form.body}
-                  onChange={event =>
-                    setForm(current => ({
-                      ...current,
-                      body: event.target.value,
-                    }))
-                  }
-                  className={inputClass}
-                />
-              </label>
+              <div className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                <span className="mb-1 block">{isId ? 'Isi berita' : 'Article body'}</span>
+                {editable ? (
+                  <NewsRichTextEditor
+                    value={form.rich_body}
+                    locale={locale}
+                    onChange={(html, plainText) =>
+                      setForm(current => ({
+                        ...current,
+                        rich_body: html,
+                        body: plainText,
+                      }))
+                    }
+                  />
+                ) : (
+                  <div className="prose prose-slate max-w-none rounded-2xl border border-slate-200 p-4 text-sm font-medium leading-7 dark:prose-invert dark:border-white/10">
+                    {form.body}
+                  </div>
+                )}
+              </div>
+
+              <section className="rounded-2xl border border-slate-200 p-4 dark:border-white/10">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-bold text-slate-900 dark:text-white">
+                      {isId ? 'Gambar sampul' : 'Cover image'}
+                    </p>
+                    <p className="mt-1 text-xs font-semibold text-slate-500">
+                      {isId ? 'Dipakai di kartu berita, halaman artikel, dan distribusi SEO.' : 'Used on news cards, the article page, and SEO distribution.'}
+                    </p>
+                  </div>
+                  {editable ? (
+                    <label className="inline-flex min-h-9 cursor-pointer items-center rounded-xl border border-slate-200 px-3 text-xs font-bold text-slate-700 dark:border-white/10 dark:text-slate-200">
+                      {uploadingCover ? (isId ? 'Mengunggah...' : 'Uploading...') : (isId ? 'Upload gambar' : 'Upload image')}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="sr-only"
+                        disabled={uploadingCover}
+                        onChange={uploadCover}
+                      />
+                    </label>
+                  ) : null}
+                </div>
+                {form.cover_image ? (
+                  <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200 dark:border-white/10">
+                    <img
+                      src={form.cover_image}
+                      alt={form.title}
+                      className="aspect-[16/9] w-full object-cover"
+                      loading="lazy"
+                      onError={event => {
+                        event.currentTarget.style.display = 'none';
+                      }}
+                    />
+                    {editable ? (
+                      <button
+                        type="button"
+                        onClick={() => setForm(current => ({ ...current, cover_image: '' }))}
+                        className="w-full border-t border-slate-200 px-3 py-2 text-left text-xs font-bold text-red-600 dark:border-white/10 dark:text-red-300"
+                      >
+                        {isId ? 'Hapus gambar sampul' : 'Remove cover image'}
+                      </button>
+                    ) : null}
+                  </div>
+                ) : (
+                  <p className="mt-3 rounded-xl bg-slate-50 p-3 text-xs font-semibold text-slate-500 dark:bg-white/[0.04]">
+                    {isId ? 'Belum ada gambar sampul.' : 'No cover image yet.'}
+                  </p>
+                )}
+              </section>
 
               <label className="text-sm font-bold text-slate-800 dark:text-slate-100">
                 {isId ? 'URL sumber' : 'Source URLs'}
