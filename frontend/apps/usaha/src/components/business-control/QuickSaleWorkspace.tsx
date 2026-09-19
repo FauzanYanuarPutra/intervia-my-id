@@ -70,11 +70,13 @@ type ConfiguredProductInput = {
 };
 
 type SaleChannelOption = { value: string; label: string };
+type SaleLocationOption = { id: string; name: string; city?: string; isPrimary?: boolean };
 
 type Props = {
   businessId: string;
   products: ProductOption[];
   channels?: SaleChannelOption[];
+  locations?: SaleLocationOption[];
   defaultDate: string;
 };
 
@@ -214,11 +216,13 @@ function CartLines({ lines, onQuantity, onEdit }: { lines: DraftLine[]; onQuanti
   );
 }
 
-export function QuickSaleWorkspace({ businessId, products, channels = [], defaultDate }: Props) {
+export function QuickSaleWorkspace({ businessId, products, channels = [], locations = [], defaultDate }: Props) {
   const channelOptions = channels.length ? channels : fallbackChannelOptions;
+  const defaultLocationId = locations.find(location => location.isPrimary)?.id ?? locations[0]?.id ?? null;
   const router = useRouter();
   const [occurredOn, setOccurredOn] = useState(defaultDate);
   const [channelKey, setChannelKey] = useState(channels[0]?.value ?? 'offline');
+  const [locationId, setLocationId] = useState<string | null>(defaultLocationId);
   const [accountKey, setAccountKey] = useState<CheckoutPaymentMethod>('cash');
   const [lines, setLines] = useState<DraftLine[]>([]);
   const [search, setSearch] = useState('');
@@ -354,7 +358,7 @@ export function QuickSaleWorkspace({ businessId, products, channels = [], defaul
   async function submit() {
     if (!canPay || saving) return;
     try {
-      const payload = buildQuickSaleRequest({ occurredOn, channelKey, accountKey, lines });
+      const payload = buildQuickSaleRequest({ occurredOn, channelKey, accountKey, locationId, lines });
       const idempotencyKey = attemptKey.current ?? crypto.randomUUID();
       attemptKey.current = idempotencyKey;
       setSaving(true);
@@ -563,6 +567,22 @@ export function QuickSaleWorkspace({ businessId, products, channels = [], defaul
     <div className="relative grid min-h-[560px] gap-4 pb-28 lg:grid-cols-[minmax(0,1fr)_360px] lg:pb-0">
       <section className={`${mobileStage === 'catalog' ? 'block' : 'hidden'} min-w-0 lg:block`}>
         <div className="sticky top-0 z-[var(--portal-layer-sticky)] -mx-1 space-y-2 bg-white/95 px-1 pb-2 backdrop-blur">
+          {locations.length > 1 ? (
+            <label className="grid gap-1.5 rounded-xl border border-portal-line bg-white px-3 py-2 text-[11px] font-bold text-portal-soft">
+              Outlet transaksi
+              <select
+                className="min-h-9 w-full rounded-lg border border-portal-line bg-[#fafbf9] px-2.5 text-sm font-bold text-portal-ink outline-none"
+                value={locationId ?? ''}
+                onChange={event => setLocationId(event.target.value || null)}
+              >
+                {locations.map(location => (
+                  <option key={location.id} value={location.id}>
+                    {location.name}{location.city ? ` · ${location.city}` : ''}{location.isPrimary ? ' · Utama' : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
           <div className="relative">
             <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-portal-soft" />
             <input className="portal-input h-11 w-full rounded-xl pl-10 pr-10 text-sm" value={search} onChange={event => setSearch(event.target.value)} placeholder="Cari produk…" aria-label="Cari produk" autoComplete="off" />
