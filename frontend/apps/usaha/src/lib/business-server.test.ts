@@ -400,11 +400,11 @@ describe('canonical Usaha Business adapter', () => {
 
     await updateBusiness(BUSINESS_ID, { metadataPatch: { isOpen: false } });
 
-    expect(fetchMock).toHaveBeenCalledWith(
-      `http://marketplace_service:8081/v1/umkm/stores/${STORE_ID}`,
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      `http://marketplace_service:8081/v1/businesses/${BUSINESS_ID}`,
       expect.objectContaining({
-        method: 'PUT',
-        body: expect.stringContaining('"isOpen":false'),
+        method: 'PATCH',
+        body: expect.stringContaining('"metadata_patch":{"isOpen":false}'),
       }),
     );
   });
