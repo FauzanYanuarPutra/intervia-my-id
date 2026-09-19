@@ -263,7 +263,7 @@ async fn create_ingredient(
         Err(response) => return response,
     };
     match ControlRepository::new(state.db.clone())
-        .create_ingredient(business_id, organization_id, payload)
+        .create_ingredient(actor_id, business_id, organization_id, payload)
         .await
     {
         Ok(item) => (
