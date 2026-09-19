@@ -1,5 +1,3 @@
-BEGIN;
-
 -- Commercial Core V1
 -- First-class counterparty and payment/allocation primitives shared by every
 -- business type. Financial evidence remains append-only; party master data is
@@ -233,5 +231,3 @@ DROP TRIGGER IF EXISTS trg_business_payment_allocations_append_only ON business_
 CREATE TRIGGER trg_business_payment_allocations_append_only
 BEFORE UPDATE OR DELETE ON business_payment_allocations
 FOR EACH ROW EXECUTE FUNCTION reject_business_commercial_evidence_mutation();
-
-COMMIT;
