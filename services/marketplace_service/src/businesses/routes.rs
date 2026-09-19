@@ -251,7 +251,7 @@ async fn create_ingredient(
     Path(business_id): Path<Uuid>,
     Json(payload): Json<CreateIngredientRequest>,
 ) -> Response {
-    let (_, organization_id) = match business_control_context(
+    let (actor_id, organization_id) = match business_control_context(
         &state,
         &headers,
         business_id,
@@ -446,7 +446,7 @@ async fn upsert_channel(
     Path((business_id, channel_key)): Path<(Uuid, String)>,
     Json(payload): Json<UpsertChannelRequest>,
 ) -> Response {
-    let (_, organization_id) = match business_control_context(
+    let (actor_id, organization_id) = match business_control_context(
         &state,
         &headers,
         business_id,
