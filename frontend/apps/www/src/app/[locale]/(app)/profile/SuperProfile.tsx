@@ -1727,41 +1727,42 @@ export default function SuperProfile() {
     dashboardStats.unread_messages,
   );
 
-  const activePostCount = Math.max(
-    dashboardStats.total_content,
-    activeListings.length,
-  );
+  const activePostCount = activeListings.length;
 
-  const followersCount = Math.max(
-    profileSocial?.followersCount ?? 0,
-    Math.floor(
-      readNumber(
-        mergedMetadata.followers_count ??
-          mergedMetadata.follower_count ??
-          mergedMetadata.followers,
-      ),
-    ),
-    profileSocial?.followers.length ?? 0,
-  );
+  const followersCount = profileSocial
+    ? Math.max(profileSocial.followersCount, profileSocial.followers.length)
+    : Math.max(
+        0,
+        Math.floor(
+          readNumber(
+            mergedMetadata.followers_count ??
+              mergedMetadata.follower_count ??
+              mergedMetadata.followers,
+          ),
+        ),
+      );
 
-  const followingCount = Math.max(
-    profileSocial?.followingCount ?? 0,
-    Math.floor(
-      readNumber(mergedMetadata.following_count ?? mergedMetadata.following),
-    ),
-    profileSocial?.following.length ?? 0,
-  );
+  const followingCount = profileSocial
+    ? Math.max(profileSocial.followingCount, profileSocial.following.length)
+    : Math.max(
+        0,
+        Math.floor(
+          readNumber(mergedMetadata.following_count ?? mergedMetadata.following),
+        ),
+      );
 
-  const reelsCount = Math.max(
-    profileSocial?.reelsCount ?? 0,
-    Math.floor(
-      readNumber(
-        mergedMetadata.reels_count ??
-          mergedMetadata.reel_count ??
-          mergedMetadata.videos_count,
-      ),
-    ),
-  );
+  const reelsCount = profileSocial
+    ? Math.max(profileSocial.reelsCount, 0)
+    : Math.max(
+        0,
+        Math.floor(
+          readNumber(
+            mergedMetadata.reels_count ??
+              mergedMetadata.reel_count ??
+              mergedMetadata.videos_count,
+          ),
+        ),
+      );
   const sourceListings =
     activeTab === 'drafts' ? draftListings : activeListings;
 
