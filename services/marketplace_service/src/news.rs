@@ -1912,64 +1912,152 @@ async fn edit_news_editorial(
         );
     }
 
+    let next_editorial_status = if action == "edit" && current_status == "needs_revision" {
+        "pending_review"
+    } else {
+        current_status.as_str()
+    };
+
     let mut metadata = current.metadata.clone();
     if !metadata.is_object() {
         metadata = json!({});
     }
-    let root = metadata
-        .as_object_mut()
-        .expect("metadata object was initialized");
-    let news = root.entry("news".to_string()).or_insert_with(|| json!({}));
-    if !news.is_object() {
-        *news = json!({});
+    {
+        let root = metadata
+            .as_object_mut()
+            .expect("metadata object was initialized");
+        let news = root.entry("news".to_string()).or_insert_with(|| json!({}));
+        if !news.is_object() {
+            *news = json!({});
+        }
+        let news = news
+            .as_object_mut()
+            .expect("news metadata object was initialized");
+
+        if let Some(category) = trimmed(payload.category) {
+            if !valid_news_category(&category) {
+                return response_error(StatusCode::BAD_REQUEST, "unsupported news category");
+            }
+            news.insert("category".to_string(), Value::String(category));
+        }
+        if let Some(kind) = trimmed(payload.article_kind) {
+            if !valid_article_kind(&kind) {
+                return response_error(StatusCode::BAD_REQUEST, "unsupported article kind");
+            }
+            news.insert("article_kind".to_string(), Value::String(kind));
+        }
+        if let Some(location) = payload.location {
+            let location = location.trim();
+            if location.is_empty() {
+                news.remove("location");
+            } else if location.len() > 120 {
+                return response_error(StatusCode::BAD_REQUEST, "location is too long");
+            } else {
+                news.insert("location".to_string(), Value::String(location.to_string()));
+            }
+        }
+
+        let requested_topics = match payload.topics {
+            Some(topics) => sanitize_topics(Some(topics)),
+            None => Ok(None),
+        };
+        let topics = match requested_topics {
+            Ok(Some(topics)) => topics,
+            Ok(None) => public_topics_from_tags(current.tags.as_deref()),
+            Err(message) => return response_error(StatusCode::BAD_REQUEST, message),
+        };
+
+        let requested_sources = match payload.source_urls {
+            Some(sources) => sanitize_news_source_urls(Some(sources)),
+            None => Ok(None),
+        };
+        let source_urls = match requested_sources {
+            Ok(Some(sources)) => sources,
+            Ok(None) => news_source_urls(&current.metadata),
+            Err(message) => return response_error(StatusCode::BAD_REQUEST, message),
+        };
+
+        news.insert("source_urls".to_string(), json!(source_urls));
+        news.insert(
+            "language".to_string(),
+            Value::String(
+                news.get("language")
+                    .and_then(Value::as_str)
+                    .filter(|value| matches!(*value, "id" | "en"))
+                    .unwrap_or("id")
+                    .to_string(),
+            ),
+        );
+        news.insert("topics".to_string(), json!(topics));
+        news.insert(
+            "editorial_status".to_string(),
+            Value::String(next_editorial_status.to_string()),
+        );
+        news.insert(
+            "editor_last_edited_at".to_string(),
+            Value::String(Utc::now().to_rfc3339()),
+        );
+        news.insert(
+            "editor_last_edited_by".to_string(),
+            Value::String(reviewer_id.to_string()),
+        );
+
+        let mut seo = news.get("seo").cloned().unwrap_or_else(|| json!({}));
+        if !seo.is_object() {
+            seo = json!({});
+        }
+        let seo = seo.as_object_mut().expect("seo object initialized");
+        if let Some(value) = payload.seo_title {
+            let value = value.trim();
+            if value.len() > 160 {
+                return response_error(StatusCode::BAD_REQUEST, "seo_title is too long");
+            }
+            if value.is_empty() {
+                seo.remove("title");
+            } else {
+                seo.insert("title".to_string(), Value::String(value.to_string()));
+            }
+        }
+        if let Some(value) = payload.seo_description {
+            let value = value.trim();
+            if value.len() > 320 {
+                return response_error(StatusCode::BAD_REQUEST, "seo_description is too long");
+            }
+            if value.is_empty() {
+                seo.remove("description");
+            } else {
+                seo.insert("description".to_string(), Value::String(value.to_string()));
+            }
+        }
+        if let Some(value) = payload.og_image {
+            let value = value.trim();
+            if value.len() > 2_048 {
+                return response_error(StatusCode::BAD_REQUEST, "og_image is too long");
+            }
+            if value.is_empty() {
+                seo.remove("og_image");
+            } else {
+                seo.insert("og_image".to_string(), Value::String(value.to_string()));
+            }
+        }
+        news.insert("seo".to_string(), Value::Object(seo.clone()));
+
+        if action == "correct" {
+            news.insert(
+                "correction_note".to_string(),
+                Value::String(note.clone().unwrap_or_default()),
+            );
+            news.insert(
+                "corrected_at".to_string(),
+                Value::String(Utc::now().to_rfc3339()),
+            );
+        }
     }
-    let news = news
-        .as_object_mut()
+
+    let news = metadata
+        .get("news")
+        .and_then(Value::as_object)
         .expect("news metadata object was initialized");
-
-    if let Some(category) = trimmed(payload.category) {
-        if !valid_news_category(&category) {
-            return response_error(StatusCode::BAD_REQUEST, "unsupported news category");
-        }
-        news.insert("category".to_string(), Value::String(category));
-    }
-    if let Some(kind) = trimmed(payload.article_kind) {
-        if !valid_article_kind(&kind) {
-            return response_error(StatusCode::BAD_REQUEST, "unsupported article kind");
-        }
-        news.insert("article_kind".to_string(), Value::String(kind));
-    }
-    if let Some(location) = payload.location {
-        let location = location.trim();
-        if location.is_empty() {
-            news.remove("location");
-        } else if location.len() > 120 {
-            return response_error(StatusCode::BAD_REQUEST, "location is too long");
-        } else {
-            news.insert("location".to_string(), Value::String(location.to_string()));
-        }
-    }
-
-    let requested_topics = match payload.topics {
-        Some(topics) => sanitize_topics(Some(topics)),
-        None => Ok(None),
-    };
-    let topics = match requested_topics {
-        Ok(Some(topics)) => topics,
-        Ok(None) => public_topics_from_tags(current.tags.as_deref()),
-        Err(message) => return response_error(StatusCode::BAD_REQUEST, message),
-    };
-
-    let requested_sources = match payload.source_urls {
-        Some(sources) => sanitize_news_source_urls(Some(sources)),
-        None => Ok(None),
-    };
-    let source_urls = match requested_sources {
-        Ok(Some(sources)) => sources,
-        Ok(None) => news_source_urls(&current.metadata),
-        Err(message) => return response_error(StatusCode::BAD_REQUEST, message),
-    };
-
     let category = news
         .get("category")
         .and_then(Value::as_str)
@@ -1984,74 +2072,6 @@ async fn edit_news_editorial(
         .filter(|value| valid_article_kind(value))
         .unwrap_or("news")
         .to_string();
-    news.insert("source_urls".to_string(), json!(source_urls));
-    news.insert("language".to_string(), Value::String(
-        news.get("language")
-            .and_then(Value::as_str)
-            .filter(|value| matches!(*value, "id" | "en"))
-            .unwrap_or("id")
-            .to_string(),
-    ));
-    news.insert("topics".to_string(), json!(topics));
-    let next_editorial_status = if action == "edit" && current_status == "needs_revision" {
-        "pending_review"
-    } else {
-        current_status.as_str()
-    };
-    news.insert(
-        "editorial_status".to_string(),
-        Value::String(next_editorial_status.to_string()),
-    );
-    news.insert("editor_last_edited_at".to_string(), Value::String(Utc::now().to_rfc3339()));
-    news.insert("editor_last_edited_by".to_string(), Value::String(reviewer_id.to_string()));
-
-    let mut seo = news.get("seo").cloned().unwrap_or_else(|| json!({}));
-    if !seo.is_object() {
-        seo = json!({});
-    }
-    let seo = seo.as_object_mut().expect("seo object initialized");
-    if let Some(value) = payload.seo_title {
-        let value = value.trim();
-        if value.len() > 160 {
-            return response_error(StatusCode::BAD_REQUEST, "seo_title is too long");
-        }
-        if value.is_empty() {
-            seo.remove("title");
-        } else {
-            seo.insert("title".to_string(), Value::String(value.to_string()));
-        }
-    }
-    if let Some(value) = payload.seo_description {
-        let value = value.trim();
-        if value.len() > 320 {
-            return response_error(StatusCode::BAD_REQUEST, "seo_description is too long");
-        }
-        if value.is_empty() {
-            seo.remove("description");
-        } else {
-            seo.insert("description".to_string(), Value::String(value.to_string()));
-        }
-    }
-    if let Some(value) = payload.og_image {
-        let value = value.trim();
-        if value.len() > 2_048 {
-            return response_error(StatusCode::BAD_REQUEST, "og_image is too long");
-        }
-        if value.is_empty() {
-            seo.remove("og_image");
-        } else {
-            seo.insert("og_image".to_string(), Value::String(value.to_string()));
-        }
-    }
-    news.insert("seo".to_string(), Value::Object(seo.clone()));
-
-    if action == "correct" {
-        news.insert("correction_note".to_string(), Value::String(note.clone().unwrap_or_default()));
-        news.insert("corrected_at".to_string(), Value::String(Utc::now().to_rfc3339()));
-    }
-
-    drop(news);
-    drop(root);
 
     let final_sources = news_source_urls(&metadata);
     if article_kind != "press_release" && final_sources.is_empty() {
