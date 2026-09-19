@@ -35,6 +35,7 @@ This documentation system describes what exists in the repository now. It is not
 - `architecture/modernization-2026-08.md`
 - `architecture/domain-service-boundaries-2026-09.md`
 - `architecture/domain-ownership.json`
+- `architecture/event-contracts-v1.json`
 - `architecture/crm-architecture.md`
 - `architecture/ai-creation-hub.md`
 - `architecture/decisions/ADR-0001-crm-owner-internal-boundary.md`
