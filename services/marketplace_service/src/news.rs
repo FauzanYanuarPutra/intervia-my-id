@@ -26,6 +26,7 @@ pub(crate) fn router() -> Router<Arc<AppState>> {
         .route("/v1/news/submissions/mine", get(list_my_news_submissions))
         .route("/v1/news/submissions/{id}", patch(update_news_submission))
         .route("/v1/news/editorial/queue", get(list_editorial_queue))
+        .route("/v1/news/{id}/editorial/edit", patch(edit_news_editorial))
         .route("/v1/news/editorial/metrics", get(get_editorial_metrics))
         .route("/v1/news/{id}/editorial", get(list_editorial_history))
         .route(
@@ -129,6 +130,22 @@ struct UpdateNewsSubmissionRequest {
     location: Option<String>,
     topics: Option<Vec<String>>,
     source_urls: Option<Vec<String>>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct EditorialEditNewsRequest {
+    title: Option<String>,
+    summary: Option<String>,
+    body: Option<String>,
+    category: Option<String>,
+    article_kind: Option<String>,
+    location: Option<String>,
+    topics: Option<Vec<String>>,
+    source_urls: Option<Vec<String>>,
+    cover_image: Option<String>,
+    slug: Option<String>,
+    note: Option<String>,
+    action: Option<String>,
 }
 
 #[derive(Debug, Serialize, FromRow)]
@@ -1762,6 +1779,349 @@ async fn update_news_submission(
             StatusCode::INTERNAL_SERVER_ERROR,
             "failed to update news submission",
         );
+    }
+
+    (StatusCode::OK, Json(updated)).into_response()
+}
+
+async fn edit_news_editorial(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    Json(payload): Json<EditorialEditNewsRequest>,
+) -> impl IntoResponse {
+    let reviewer_id = match cms_reviewer_id(&headers, &state) {
+        Some(id) => id,
+        None => return response_error(StatusCode::FORBIDDEN, "cms access required"),
+    };
+    let content_id = match Uuid::parse_str(id.trim()) {
+        Ok(id) => id,
+        Err(_) => return response_error(StatusCode::BAD_REQUEST, "invalid news id"),
+    };
+
+    let action = payload
+        .action
+        .as_deref()
+        .unwrap_or("edit")
+        .trim()
+        .to_ascii_lowercase();
+    if !matches!(action.as_str(), "edit" | "correct") {
+        return response_error(StatusCode::BAD_REQUEST, "unsupported editorial edit action");
+    }
+
+    let note = trimmed(payload.note);
+    let mut tx = match state.db.begin().await {
+        Ok(tx) => tx,
+        Err(error) => {
+            tracing::error!("edit_news_editorial begin error: {:?}", error);
+            return response_error(StatusCode::INTERNAL_SERVER_ERROR, "failed to edit news");
+        }
+    };
+
+    let current = match load_news_for_review(&mut tx, content_id).await {
+        Ok(Some(row)) => row,
+        Ok(None) => return response_error(StatusCode::NOT_FOUND, "news article not found"),
+        Err(error) => {
+            tracing::error!("edit_news_editorial load error: {:?}", error);
+            return response_error(StatusCode::INTERNAL_SERVER_ERROR, "failed to edit news");
+        }
+    };
+
+    let current_status = editorial_status(&current.content_status, &current.metadata);
+    if current_status == "published" && action != "correct" {
+        return response_error(
+            StatusCode::CONFLICT,
+            "published news must use the correction workflow",
+        );
+    }
+    if current_status != "published" && action == "correct" {
+        return response_error(
+            StatusCode::CONFLICT,
+            "correction workflow is only available for published news",
+        );
+    }
+    if action == "correct" && note.is_none() {
+        return response_error(
+            StatusCode::BAD_REQUEST,
+            "correction note is required",
+        );
+    }
+
+    let title = trimmed(payload.title).unwrap_or_else(|| current.title.clone());
+    if title.len() < 3 || title.len() > 240 {
+        return response_error(StatusCode::BAD_REQUEST, "title must be 3-240 characters");
+    }
+    let summary = match payload.summary {
+        Some(value) => Some(value.trim().to_string()),
+        None => current.summary.clone(),
+    };
+    if summary
+        .as_ref()
+        .map(|value| value.len() < 20 || value.len() > 1000)
+        .unwrap_or(true)
+    {
+        return response_error(
+            StatusCode::BAD_REQUEST,
+            "summary must be 20-1000 characters",
+        );
+    }
+    let body = trimmed(payload.body).unwrap_or_else(|| current.body.clone());
+    if body.len() < 120 || body.len() > 20_000 {
+        return response_error(
+            StatusCode::BAD_REQUEST,
+            "body must be 120-20000 characters",
+        );
+    }
+
+    let mut metadata = current.metadata.clone();
+    if !metadata.is_object() {
+        metadata = json!({});
+    }
+    let root = metadata
+        .as_object_mut()
+        .expect("metadata object was initialized");
+    let news = root.entry("news".to_string()).or_insert_with(|| json!({}));
+    if !news.is_object() {
+        *news = json!({});
+    }
+    let news = news
+        .as_object_mut()
+        .expect("news metadata object was initialized");
+
+    if let Some(category) = trimmed(payload.category) {
+        if !valid_news_category(&category) {
+            return response_error(StatusCode::BAD_REQUEST, "unsupported news category");
+        }
+        news.insert("category".to_string(), Value::String(category));
+    }
+    if let Some(kind) = trimmed(payload.article_kind) {
+        if !valid_article_kind(&kind) {
+            return response_error(StatusCode::BAD_REQUEST, "unsupported article kind");
+        }
+        news.insert("article_kind".to_string(), Value::String(kind));
+    }
+    if let Some(location) = payload.location {
+        let location = location.trim();
+        if location.is_empty() {
+            news.remove("location");
+        } else if location.len() > 120 {
+            return response_error(StatusCode::BAD_REQUEST, "location is too long");
+        } else {
+            news.insert("location".to_string(), Value::String(location.to_string()));
+        }
+    }
+
+    let requested_topics = match payload.topics {
+        Some(topics) => sanitize_topics(Some(topics)),
+        None => Ok(None),
+    };
+    let topics = match requested_topics {
+        Ok(Some(topics)) => topics,
+        Ok(None) => public_topics_from_tags(current.tags.as_deref()),
+        Err(message) => return response_error(StatusCode::BAD_REQUEST, message),
+    };
+
+    let requested_sources = match payload.source_urls {
+        Some(sources) => sanitize_news_source_urls(Some(sources)),
+        None => Ok(None),
+    };
+    let source_urls = match requested_sources {
+        Ok(Some(sources)) => sources,
+        Ok(None) => news_source_urls(&metadata),
+        Err(message) => return response_error(StatusCode::BAD_REQUEST, message),
+    };
+
+    let category = news
+        .get("category")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| valid_news_category(value))
+        .unwrap_or("Ekonomi")
+        .to_string();
+    let article_kind = news
+        .get("article_kind")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| valid_article_kind(value))
+        .unwrap_or("news")
+        .to_string();
+    news.insert("source_urls".to_string(), json!(source_urls));
+    news.insert("language".to_string(), Value::String(
+        news.get("language")
+            .and_then(Value::as_str)
+            .filter(|value| matches!(*value, "id" | "en"))
+            .unwrap_or("id")
+            .to_string(),
+    ));
+    news.insert("topics".to_string(), json!(topics));
+    news.insert("editor_last_edited_at".to_string(), Value::String(Utc::now().to_rfc3339()));
+    news.insert("editor_last_edited_by".to_string(), Value::String(reviewer_id.to_string()));
+    if action == "correct" {
+        news.insert("correction_note".to_string(), Value::String(note.clone().unwrap_or_default()));
+        news.insert("corrected_at".to_string(), Value::String(Utc::now().to_rfc3339()));
+    }
+
+    let final_sources = news_source_urls(&metadata);
+    if article_kind != "press_release" && final_sources.is_empty() {
+        return response_error(
+            StatusCode::BAD_REQUEST,
+            "news and analysis require at least one valid public source URL",
+        );
+    }
+    if let Err(message) = validate_submission_payload(
+        &title,
+        summary.as_deref(),
+        &body,
+        &metadata,
+    ) {
+        return response_error(StatusCode::BAD_REQUEST, message);
+    }
+
+    let mut tags = vec![
+        "news".to_string(),
+        category.to_lowercase(),
+        article_kind.clone(),
+    ];
+    for topic in topics {
+        if !tags.iter().any(|existing| existing == &topic) {
+            tags.push(topic);
+        }
+    }
+
+    let slug = payload
+        .slug
+        .and_then(|value| trimmed(Some(value)))
+        .map(|value| make_slug(&value))
+        .filter(|value| !value.is_empty())
+        .or_else(|| current.slug.clone());
+
+    if let Some(ref slug) = slug {
+        let conflict = sqlx::query_scalar::<_, bool>(
+            "SELECT EXISTS(SELECT 1 FROM content_items WHERE slug = $1 AND id <> $2)",
+        )
+        .bind(slug)
+        .bind(current.id)
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap_or(false);
+        if conflict {
+            return response_error(StatusCode::CONFLICT, "news slug already exists");
+        }
+    }
+
+    let updated = match sqlx::query_as::<_, NewsRow>(
+        r#"
+        UPDATE content_items
+        SET
+            slug = $2,
+            title = $3,
+            summary = $4,
+            body = $5,
+            tags = $6,
+            cover_image = $7,
+            metadata = $8,
+            updated_at = NOW(),
+            last_saved_at = NOW(),
+            draft_version = draft_version + 1
+        WHERE id = $1 AND content_type = 'news'
+        RETURNING
+            id, owner_id, slug, title, summary, body, tags, cover_image, metadata,
+            content_status, published_at, created_at, updated_at
+        "#,
+    )
+    .bind(current.id)
+    .bind(slug)
+    .bind(title)
+    .bind(summary)
+    .bind(body)
+    .bind(tags)
+    .bind(trimmed(payload.cover_image))
+    .bind(metadata)
+    .fetch_one(&mut *tx)
+    .await
+    {
+        Ok(row) => row,
+        Err(error) => {
+            tracing::error!("edit_news_editorial update error: {:?}", error);
+            return response_error(StatusCode::INTERNAL_SERVER_ERROR, "failed to edit news");
+        }
+    };
+
+    if let Err(error) = sync_source_references_tx(&mut tx, updated.id, &updated.metadata).await {
+        tracing::error!("edit_news_editorial source sync error: {:?}", error);
+        return response_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to synchronize news sources",
+        );
+    }
+
+    if let Err(error) = sqlx::query(
+        r#"
+        INSERT INTO news_editorial_events (
+            content_id, actor_id, actor_role, action, from_status, to_status, note
+        )
+        VALUES ($1, $2, 'editor', $3, $4, $5, $6)
+        "#,
+    )
+    .bind(updated.id)
+    .bind(reviewer_id)
+    .bind(&action)
+    .bind(&current_status)
+    .bind(&current_status)
+    .bind(&note)
+    .execute(&mut *tx)
+    .await
+    {
+        tracing::error!("edit_news_editorial audit error: {:?}", error);
+        return response_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record editorial edit",
+        );
+    }
+
+    if let Err(error) =
+        record_version_tx(&mut tx, &updated, Some(reviewer_id), "editor", &action).await
+    {
+        tracing::error!("edit_news_editorial version error: {:?}", error);
+        return response_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record news version",
+        );
+    }
+
+    let event_type = if action == "correct" {
+        "news.corrected"
+    } else {
+        "news.edited"
+    };
+    let routing_key = if action == "correct" {
+        "news.publication.changed"
+    } else {
+        "news.editorial.changed"
+    };
+    if let Err(error) = enqueue_news_outbox_tx(
+        &mut tx,
+        &updated,
+        Some(reviewer_id),
+        event_type,
+        routing_key,
+    )
+    .await
+    {
+        tracing::error!("edit_news_editorial outbox error: {:?}", error);
+        return response_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to enqueue editorial event",
+        );
+    }
+
+    if let Err(error) = tx.commit().await {
+        tracing::error!("edit_news_editorial commit error: {:?}", error);
+        return response_error(StatusCode::INTERNAL_SERVER_ERROR, "failed to edit news");
+    }
+
+    if action == "correct" {
+        notify_editorial_result(&state, &updated, "correct", note.as_deref()).await;
     }
 
     (StatusCode::OK, Json(updated)).into_response()
