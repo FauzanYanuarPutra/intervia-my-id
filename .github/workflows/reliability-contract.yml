@@ -64,10 +64,17 @@ jobs:
           bash -n scripts/ops/generate_jwt_access_keypair.sh
           bash -n scripts/ops/verify_jwt_access_keypair.sh
           bash -n scripts/ops/postgres_pitr_preflight.sh
+          bash -n scripts/ops/postgres_pitr_basebackup.sh
+          bash -n scripts/ops/postgres_pitr_restore_drill.sh
+          bash -n scripts/ci/test_postgres_pitr_drill.sh
           bash -n scripts/load/run-capacity-baseline.sh
       - name: Exercise isolated PostgreSQL restore drill
         shell: bash
         run: bash scripts/ci/test_postgres_restore_drill.sh
+
+      - name: Exercise PostgreSQL point-in-time recovery drill
+        shell: bash
+        run: bash scripts/ci/test_postgres_pitr_drill.sh
 
       - name: Validate Grafana dashboard JSON
         run: python -m json.tool infrastructure/observability/grafana/dashboards/lajukan-overview.json >/dev/null

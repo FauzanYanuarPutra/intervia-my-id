@@ -32,3 +32,38 @@ Production PITR is considered **verified** only when all of these have evidence:
 
 Logical dumps and the existing isolated logical-restore drill remain useful,
 but they are a separate recovery layer and do not substitute for PITR.
+
+
+## Executable base-backup and target-time drill
+
+The repository now includes two explicit PITR recovery tools:
+
+```bash
+DATABASE_URL='postgres://...' \
+BACKUP_ROOT=/secure/offhost/postgres \
+scripts/ops/postgres_pitr_basebackup.sh
+```
+
+This creates a streamed-WAL `pg_basebackup` recovery set with SHA-256 checksums
+and a manifest containing backup timestamps and LSN boundaries.
+
+A disposable target-time restore can then be exercised with:
+
+```bash
+BASE_BACKUP_DIR=/secure/offhost/postgres/<timestamp> \
+WAL_ARCHIVE_DIR=/secure/offhost/wal \
+RECOVERY_TARGET_TIME='2026-09-19 00:00:00+00' \
+PITR_ASSERT_SQL='SELECT 1' \
+scripts/ops/postgres_pitr_restore_drill.sh
+```
+
+The Reliability Contract runs `scripts/ci/test_postgres_pitr_drill.sh`. That test
+starts an isolated PostgreSQL instance with continuous WAL archiving, writes a
+row before the recovery target and another after it, takes a base backup, forces
+WAL archival, restores to the requested timestamp, and fails unless the
+pre-target row exists while the post-target row does not.
+
+This CI drill proves the repository recovery mechanics. It **does not prove**
+that production WAL is currently reaching independent storage, that production
+retention satisfies the RPO, or that production-sized restores satisfy the RTO.
+Those remain operational evidence requirements.

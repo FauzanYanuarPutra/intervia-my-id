@@ -34,6 +34,9 @@ outbox_requeue_script = read("scripts/ops/requeue_marketplace_outbox_event.sh")
 jwt_keygen_script = read("scripts/ops/generate_jwt_access_keypair.sh")
 jwt_verify_script = read("scripts/ops/verify_jwt_access_keypair.sh")
 pitr_preflight_script = read("scripts/ops/postgres_pitr_preflight.sh")
+pitr_basebackup_script = read("scripts/ops/postgres_pitr_basebackup.sh")
+pitr_restore_script = read("scripts/ops/postgres_pitr_restore_drill.sh")
+pitr_restore_test = read("scripts/ci/test_postgres_pitr_drill.sh")
 jwt_rotation_doc = read("docs/operations/jwt-access-key-rotation.md")
 pitr_readiness_doc = read("docs/operations/pitr-readiness.md")
 quality_workflow = read(".github/workflows/quality.yml")
@@ -207,6 +210,21 @@ for path, source, markers in (
         "scripts/ops/postgres_pitr_preflight.sh",
         pitr_preflight_script,
         ("SHOW wal_level", "SHOW archive_mode", "SHOW archive_command", "max_wal_senders"),
+    ),
+    (
+        "scripts/ops/postgres_pitr_basebackup.sh",
+        pitr_basebackup_script,
+        ("pg_basebackup", "--wal-method=stream", "checksums.sha256", "manifest.env"),
+    ),
+    (
+        "scripts/ops/postgres_pitr_restore_drill.sh",
+        pitr_restore_script,
+        ("recovery.signal", "restore_command", "recovery_target_time", "PITR_ASSERT_SQL"),
+    ),
+    (
+        "scripts/ci/test_postgres_pitr_drill.sh",
+        pitr_restore_test,
+        ("pitr_probe", "pg_switch_wal", "after row survived target-time recovery"),
     ),
 ):
     for required_marker in markers:
