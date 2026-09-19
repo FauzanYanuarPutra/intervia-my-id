@@ -186,9 +186,28 @@ for marker in ("JWT_PRIVATE_KEY_PEM", "EncodingKey::from_rsa_pem", "JWT_KEY_ID")
     if marker not in identity_auth_source:
         errors.append(f"Identity access-token signing boundary missing marker: {marker}")
 
-for marker in ("struct Money", "enum Currency", "checked_add", "checked_sub", "AmountOverflow"):
+for marker in (
+    "struct Money",
+    "enum Currency",
+    "checked_add",
+    "checked_sub",
+    "checked_mul_i64",
+    "AmountOverflow",
+    "CurrencyMismatch",
+):
     if marker not in business_money_source:
         errors.append(f"Business Money primitive missing invariant marker: {marker}")
+
+for marker in (
+    "money::Money",
+    "Money::idr(0)",
+    ".checked_mul_i64(i64::from(item.quantity))",
+    ".checked_add(line_money)",
+    '"order_total_overflow"',
+    "Decimal::new(subtotal_money.minor_units(), 2)",
+):
+    if marker not in marketplace_public_commerce_source:
+        errors.append(f"Public commerce checkout missing checked Money contract: {marker}")
 
 for path, source, markers in (
     (
