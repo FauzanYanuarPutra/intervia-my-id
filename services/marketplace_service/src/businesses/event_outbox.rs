@@ -63,8 +63,8 @@ mod tests {
         let source = include_str!("event_outbox.rs");
         let legacy_insert = ["INSERT INTO", "outbox_events"].join(" ");
         let canonical_insert = ["INSERT INTO", "events.event_outbox"].join(" ");
-        assert_eq!(source.matches(&legacy_insert).count(), 1);
-        assert_eq!(source.matches(&canonical_insert).count(), 1);
+        assert_eq!(source.matches(legacy_insert.as_str()).count(), 1);
+        assert_eq!(source.matches(canonical_insert.as_str()).count(), 1);
         assert!(source.contains("ON CONFLICT (event_key)"));
     }
 }
