@@ -26,6 +26,9 @@ for _ in $(seq 1 60); do
   sleep 1
 done
 
+docker exec "$PRIMARY" sh -ec 'printf "%s\n" "host replication postgres 0.0.0.0/0 trust" >> "$PGDATA/pg_hba.conf"'
+docker exec "$PRIMARY" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -c "SELECT pg_reload_conf();" >/dev/null
+
 docker exec "$PRIMARY" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -c   "CREATE TABLE pitr_probe(id integer primary key, label text, created_at timestamptz default clock_timestamp()); INSERT INTO pitr_probe VALUES (1,'before',clock_timestamp());"
 
 DATABASE_URL="postgres://postgres@$PRIMARY:5432/postgres" BACKUP_ROOT="/backups" docker run --rm --network "$NETWORK"   -v "$ROOT:/repo:ro"   -v "$BACKUPS:/backups"   -e DATABASE_URL="postgres://postgres@$PRIMARY:5432/postgres"   -e BACKUP_ROOT=/backups   postgres:16-alpine   sh -lc "apk add --no-cache bash coreutils >/dev/null && bash /repo/scripts/ops/postgres_pitr_basebackup.sh" >/tmp/lajukan-pitr-backup-path.txt
