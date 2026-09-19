@@ -10,14 +10,9 @@ const MARKETPLACE_URL =
 type GenericRecord = Record<string, unknown>;
 
 function asObject(value: unknown): GenericRecord {
-  if (value && typeof value === 'object' && !Array.isArray(value)) {
-    return value as GenericRecord;
-  }
-  return {};
-}
-
-function asString(value: unknown): string {
-  return typeof value === 'string' ? value.trim() : '';
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as GenericRecord)
+    : {};
 }
 
 export async function PATCH(
@@ -30,82 +25,48 @@ export async function PATCH(
   const body = await parseJsonBody(req);
   if (!body.ok) return body.response;
   const payload = asObject(body.data);
-  const action = asString(payload.action);
-  const note = asString(payload.note);
+
+  const action = String(payload.action || '').trim().toLowerCase();
+  const reasonCode = String(
+    payload.reason_code || payload.reason || 'other',
+  ).trim().toLowerCase();
+  const note =
+    typeof payload.reason_note === 'string'
+      ? payload.reason_note
+      : typeof payload.note === 'string'
+        ? payload.note
+        : undefined;
+  const severity =
+    typeof payload.severity === 'string' ? payload.severity : 'medium';
 
   const resolved = await params;
   const id = resolved.id;
-  const currentRes = await fetch(`${MARKETPLACE_URL}/v1/content/${id}`, {
-    headers: { Authorization: `Bearer ${auth.ctx.token}` },
-    cache: 'no-store',
-  });
-  const current = await currentRes.json().catch(() => null);
-  if (!currentRes.ok || !current || typeof current !== 'object') {
+
+  try {
+    const upstream = await fetch(
+      `${MARKETPLACE_URL}/v1/content/${encodeURIComponent(id)}/moderate`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${auth.ctx.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action,
+          reason_code: reasonCode,
+          reason_note: note,
+          severity,
+          legal_hold: payload.legal_hold === true,
+        }),
+        cache: 'no-store',
+      },
+    );
+    const response = await upstream.json().catch(() => ({}));
+    return NextResponse.json(response, { status: upstream.status });
+  } catch {
     return NextResponse.json(
-      { error: 'Failed to load listing' },
-      { status: currentRes.status || 502 },
+      { error: 'Moderation service unavailable' },
+      { status: 503 },
     );
   }
-
-  const currentRecord = current as GenericRecord;
-  const metadata = asObject(currentRecord.metadata);
-  const moderation = asObject(metadata.listing_moderation);
-  const history = Array.isArray(moderation.actions)
-    ? (moderation.actions as GenericRecord[])
-    : [];
-
-  const nextState =
-    action === 'ban'
-      ? 'banned'
-      : action === 'restrict'
-        ? 'restricted'
-        : action === 'flag'
-          ? 'under_review'
-          : action === 'unban'
-            ? 'clean'
-            : 'flagged';
-
-  const nextMetadata = {
-    ...metadata,
-    listing_moderation: {
-      ...moderation,
-      state: nextState,
-      note: note || moderation.note || null,
-      updated_at: new Date().toISOString(),
-      actions: [
-        {
-          id: crypto.randomUUID(),
-          actor_id: auth.ctx.userId,
-          action,
-          note: note || null,
-          created_at: new Date().toISOString(),
-        },
-        ...history,
-      ].slice(0, 20),
-    },
-  };
-
-  const nextStatus =
-    action === 'ban' || action === 'restrict'
-      ? 'archived'
-      : currentRecord.content_status || currentRecord.status || 'draft';
-
-  const res = await fetch(`${MARKETPLACE_URL}/v1/content/${id}`, {
-    method: 'PUT',
-    headers: {
-      Authorization: `Bearer ${auth.ctx.token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      ...currentRecord,
-      content_status: nextStatus,
-      metadata: nextMetadata,
-    }),
-  });
-
-  const response = await res.json().catch(() => ({}));
-  return NextResponse.json(
-    { ...response, moderation: nextMetadata.listing_moderation },
-    { status: res.status },
-  );
 }
