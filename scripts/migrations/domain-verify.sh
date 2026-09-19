@@ -93,6 +93,20 @@ verify_promotion() {
   compare "promotion banners" promotion_db     "SELECT count(*) FROM banners"     "SELECT count(*) FROM banners"
 }
 
+
+verify_support() {
+  compare "support tickets" support_db     "SELECT count(*) FROM support_tickets"     "SELECT count(*) FROM support_tickets"
+  compare "support replies" support_db     "SELECT count(*) FROM support_ticket_replies"     "SELECT count(*) FROM support_ticket_replies"
+  compare_columns "support tickets" support_db support_tickets
+  compare_columns "support replies" support_db support_ticket_replies
+}
+
+verify_review() {
+  compare "review rows" review_db     "SELECT count(*) FROM reviews"     "SELECT count(*) FROM reviews"
+  compare "review rating invariant" review_db     "SELECT count(*), COALESCE(sum(rating),0) FROM reviews"     "SELECT count(*), COALESCE(sum(rating),0) FROM reviews"
+  compare_columns "reviews" review_db reviews
+}
+
 run_domain() {
   case "$1" in
     news) verify_news ;;
