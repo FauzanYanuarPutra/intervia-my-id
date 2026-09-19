@@ -2134,7 +2134,10 @@ async fn main() -> anyhow::Result<()> {
         .route("/", get(root))
         .route("/v1/map/references", get(list_map_references))
         .route("/v1/content", get(list_content).post(create_content))
-        .route("/v1/content/moderation/queue", get(moderation::list_moderation_queue))
+        .route(
+            "/v1/content/moderation/queue",
+            get(moderation::list_moderation_queue),
+        )
         .route(
             "/v1/content/{id}",
             get(get_content)
@@ -2143,12 +2146,18 @@ async fn main() -> anyhow::Result<()> {
                 .delete(delete_content),
         )
         .route("/v1/content/{id}/report", post(moderation::report_content))
-        .route("/v1/content/{id}/moderate", post(moderation::moderate_content))
+        .route(
+            "/v1/content/{id}/moderate",
+            post(moderation::moderate_content),
+        )
         .route(
             "/v1/content/{id}/moderation/history",
             get(moderation::get_moderation_history),
         )
-        .route("/v1/content/{id}/appeal", post(moderation::submit_content_appeal))
+        .route(
+            "/v1/content/{id}/appeal",
+            post(moderation::submit_content_appeal),
+        )
         .route(
             "/v1/content/appeals/{appeal_id}/review",
             post(moderation::review_content_appeal),
