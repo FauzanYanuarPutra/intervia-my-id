@@ -33,9 +33,12 @@ This documentation system describes what exists in the repository now. It is not
 - `architecture/transaction-status.md`
 - `architecture/deployment-architecture.md`
 - `architecture/modernization-2026-08.md`
+- `architecture/domain-service-boundaries-2026-09.md`
+- `architecture/domain-ownership.json`
 - `architecture/crm-architecture.md`
 - `architecture/ai-creation-hub.md`
 - `architecture/decisions/ADR-0001-crm-owner-internal-boundary.md`
+- `architecture/decisions/ADR-0002-domain-owned-databases.md`
 
 ## Product
 
