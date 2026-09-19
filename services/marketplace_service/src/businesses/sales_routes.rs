@@ -392,6 +392,8 @@ mod tests {
                 void_reason: None,
                 voided_by_user_id: None,
                 voided_at: None,
+                void_idempotency_key: None,
+                void_request_hash: None,
                 gross_amount: 10_000,
                 discount_amount: 0,
                 final_amount: 10_000,
