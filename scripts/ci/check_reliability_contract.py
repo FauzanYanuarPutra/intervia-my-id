@@ -61,7 +61,9 @@ community_auth_source = read("services/community_service/src/auth.rs")
 community_health_source = read("services/community_service/src/health.rs")
 community_rate_limit_source = read("services/community_service/src/rate_limit.rs")
 marketplace_content_projection_source = read("services/marketplace_service/src/content_projection.rs")
+marketplace_wallet_support_source = read("services/marketplace_service/src/wallet_support.rs")
 community_media_source = read("services/community_service/src/media.rs")
+community_normalization_source = read("services/community_service/src/normalization.rs")
 reels_client_source = read("frontend/apps/www/src/app/[locale]/(shared)/reels/ReelsClient.tsx")
 reels_runtime_helpers_source = read("frontend/apps/www/src/app/[locale]/(shared)/reels/reels-runtime-helpers.ts")
 community_feed_client_source = read("frontend/apps/www/src/components/community/CommunityFeedClient.tsx")
@@ -764,8 +766,8 @@ for marker in (
         errors.append(f"capacity runbook missing decision marker: {marker}")
 
 for path, warning_threshold, hard_ceiling in (
-    ("services/marketplace_service/src/main.rs", 750_000, 823_000),
-    ("services/community_service/src/main.rs", 280_000, 295_000),
+    ("services/marketplace_service/src/main.rs", 750_000, 810_000),
+    ("services/community_service/src/main.rs", 280_000, 292_000),
 ):
     target = ROOT / path
     if not target.is_file():
@@ -840,6 +842,42 @@ if "mod media;" not in community_main_source:
 for marker in ("fn upload_dir", "fn has_valid_media_signature", "fn first_feed_media_url"):
     if marker in community_main_source:
         errors.append(f"Community media responsibility leaked back into main.rs: {marker}")
+
+for marker in (
+    "wallet_default_environment",
+    "midtrans_server_key_for_environment",
+    "midtrans_signature",
+    "parse_major_amount_cents",
+):
+    if marker not in marketplace_wallet_support_source:
+        errors.append(f"Marketplace wallet support boundary missing marker: {marker}")
+if "mod wallet_support;" not in marketplace_source:
+    errors.append("Marketplace wallet support boundary is not wired from main.rs")
+for marker in (
+    "fn wallet_default_environment",
+    "fn midtrans_server_key_for_environment",
+    "fn midtrans_signature",
+):
+    if marker in marketplace_source:
+        errors.append(f"Marketplace wallet support responsibility leaked back into main.rs: {marker}")
+
+for marker in (
+    "normalize_group_privacy",
+    "normalize_group_member_role",
+    "normalize_reel_filter_preset",
+    "normalize_reel_live_status",
+):
+    if marker not in community_normalization_source:
+        errors.append(f"Community normalization boundary missing marker: {marker}")
+if "mod normalization;" not in community_main_source:
+    errors.append("Community normalization boundary is not wired from main.rs")
+for marker in (
+    "fn normalize_group_privacy",
+    "fn normalize_group_member_role",
+    "fn normalize_reel_live_status",
+):
+    if marker in community_main_source:
+        errors.append(f"Community normalization responsibility leaked back into main.rs: {marker}")
 
 for marker in (
     "startVideoFramePump",
