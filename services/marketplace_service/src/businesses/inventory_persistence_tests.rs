@@ -1,8 +1,8 @@
 use super::{
-    inventory::{InventoryError, InventoryMutationRequest, InventoryOperation, InventoryRepository},
-    stock_transfer::{
-        CreateStockTransferRequest, StockTransferItemKind, StockTransferRepository,
+    inventory::{
+        InventoryError, InventoryMutationRequest, InventoryOperation, InventoryRepository,
     },
+    stock_transfer::{CreateStockTransferRequest, StockTransferItemKind, StockTransferRepository},
 };
 use rust_decimal::Decimal;
 use sqlx::PgPool;
