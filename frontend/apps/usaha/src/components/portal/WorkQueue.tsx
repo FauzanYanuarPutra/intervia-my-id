@@ -186,10 +186,12 @@ export function WorkQueue({
             <p className="mt-1 text-xs text-portal-soft">{openCount} pekerjaan terbuka · {mineCount} untukmu</p>
           </div>
           <div className="flex gap-2">
-            <button type="button" onClick={refreshSuggestions} disabled={syncing} className="portal-button-secondary">
-              {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-              Perbarui
-            </button>
+            {canManage ? (
+              <button type="button" onClick={refreshSuggestions} disabled={syncing} className="portal-button-secondary">
+                {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                Perbarui rekomendasi
+              </button>
+            ) : null}
             {canManage ? (
               <button type="button" onClick={() => setShowCreate(value => !value)} className="portal-button-primary">
                 <UserRoundPlus className="h-4 w-4" /> Tambah
