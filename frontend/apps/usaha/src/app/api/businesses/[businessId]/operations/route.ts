@@ -6,11 +6,15 @@ export async function PATCH(request: Request, context: { params: Promise<{ busin
   const { businessId } = await context.params;
   try {
     const body = (await request.json()) as Record<string, unknown>;
+    const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
+    if (reason.length < 3) {
+      return NextResponse.json({ error: 'Alasan perubahan operasional wajib diisi.', code: 'operation_change_reason_required' }, { status: 400 });
+    }
     const schedule = typeof body.schedule === 'string' ? body.schedule.trim() : undefined;
     const metadataPatch: Record<string, unknown> = {};
     if (typeof body.isOpen === 'boolean') metadataPatch.isOpen = body.isOpen;
     if (Array.isArray(body.reservations)) metadataPatch.reservations = body.reservations;
-    const business = await updateBusiness(businessId, { schedule, metadataPatch });
+    const business = await updateBusiness(businessId, { schedule, metadataPatch, reason });
     return NextResponse.json({ ok: true, business });
   } catch (error) {
     const normalized = normalizeBusinessApiError(error, 'Gagal memperbarui operasional.');
