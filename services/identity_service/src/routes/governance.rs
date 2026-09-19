@@ -220,7 +220,6 @@ fn valid_incident_transition(current: &str, next: &str) -> bool {
         (current, next),
         ("open", "contained")
             | ("open", "investigating")
-            | ("open", "closed")
             | ("contained", "investigating")
             | ("contained", "remediated")
             | ("investigating", "contained")
