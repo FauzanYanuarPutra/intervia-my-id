@@ -83,6 +83,31 @@ services:
       APP_ENV: prod
       RUST_LOG: ${RUST_LOG:-warn}
       RUN_MIGRATIONS_ON_STARTUP: "false"
+  support_service:
+    build: !reset null
+    image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-support:${IMAGE_TAG:?IMAGE_TAG is required}
+    pull_policy: always
+    environment:
+      ENV: prod
+      APP_ENV: prod
+      RUST_LOG: ${RUST_LOG:-warn}
+      RUN_MIGRATIONS_ON_STARTUP: "false"
+      DOMAIN_RUNTIME_MODE: ${DOMAIN_RUNTIME_MODE:-compatibility}
+      LEGACY_PROXY_ENABLED: ${LEGACY_PROXY_ENABLED:-true}
+      LEGACY_PROXY_TIMEOUT_MS: ${LEGACY_PROXY_TIMEOUT_MS:-5000}
+  review_service:
+    build: !reset null
+    image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-review:${IMAGE_TAG:?IMAGE_TAG is required}
+    pull_policy: always
+    environment:
+      ENV: prod
+      APP_ENV: prod
+      RUST_LOG: ${RUST_LOG:-warn}
+      RUN_MIGRATIONS_ON_STARTUP: "false"
+      DOMAIN_RUNTIME_MODE: ${DOMAIN_RUNTIME_MODE:-compatibility}
+      LEGACY_PROXY_ENABLED: ${LEGACY_PROXY_ENABLED:-true}
+      LEGACY_PROXY_TIMEOUT_MS: ${LEGACY_PROXY_TIMEOUT_MS:-5000}
+
   identity_service:
     build: !reset null
     image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-identity:${IMAGE_TAG:?IMAGE_TAG is required}
