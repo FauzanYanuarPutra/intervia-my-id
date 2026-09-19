@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { authApi, type AuthMeResponse } from '@/lib/api';
 import { safeInternalRedirect } from '@/lib/sessionProxy';
 
-const ALLOWED_ROLES = ['sales', 'admin', 'support', 'super_admin'];
+const ALLOWED_ROLES = ['sales', 'admin', 'moderator', 'support', 'super_admin'];
 const STEP_UP_KEY = 'crm_stepup_verified_at';
 const SESSION_MARKER = 'cookie-session';
 
