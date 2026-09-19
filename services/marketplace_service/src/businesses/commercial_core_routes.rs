@@ -50,10 +50,7 @@ pub(crate) fn router() -> Router<Arc<AppState>> {
             "/v1/businesses/{business_id}/receivables",
             get(list_receivables),
         )
-        .route(
-            "/v1/businesses/{business_id}/payables",
-            get(list_payables),
-        )
+        .route("/v1/businesses/{business_id}/payables", get(list_payables))
 }
 
 #[derive(Debug, Deserialize)]
@@ -78,12 +75,17 @@ async fn list_parties(
     Path(business_id): Path<Uuid>,
     Query(query): Query<PartyListQuery>,
 ) -> Response {
-    let (_, organization) =
-        match commercial_context(&state, &headers, business_id, CommercialAccess::ViewParties).await
-        {
-            Ok(value) => value,
-            Err(response) => return response,
-        };
+    let (_, organization) = match commercial_context(
+        &state,
+        &headers,
+        business_id,
+        CommercialAccess::ViewParties,
+    )
+    .await
+    {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
     match CommercialCoreRepository::new(state.db.clone())
         .list_parties(business_id, organization.id, query.include_archived)
         .await
@@ -103,13 +105,17 @@ async fn create_party(
     Path(business_id): Path<Uuid>,
     Json(payload): Json<CreatePartyRequest>,
 ) -> Response {
-    let (actor_id, organization) =
-        match commercial_context(&state, &headers, business_id, CommercialAccess::ManageParties)
-            .await
-        {
-            Ok(value) => value,
-            Err(response) => return response,
-        };
+    let (actor_id, organization) = match commercial_context(
+        &state,
+        &headers,
+        business_id,
+        CommercialAccess::ManageParties,
+    )
+    .await
+    {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
     let key = match idempotency_key(&headers) {
         Ok(value) => value,
         Err(code) => return api_error(StatusCode::BAD_REQUEST, code),
@@ -137,13 +143,17 @@ async fn update_party(
     Path((business_id, party_id)): Path<(Uuid, Uuid)>,
     Json(payload): Json<UpdatePartyRequest>,
 ) -> Response {
-    let (actor_id, organization) =
-        match commercial_context(&state, &headers, business_id, CommercialAccess::ManageParties)
-            .await
-        {
-            Ok(value) => value,
-            Err(response) => return response,
-        };
+    let (actor_id, organization) = match commercial_context(
+        &state,
+        &headers,
+        business_id,
+        CommercialAccess::ManageParties,
+    )
+    .await
+    {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
     match CommercialCoreRepository::new(state.db.clone())
         .update_party(actor_id, business_id, organization.id, party_id, payload)
         .await
@@ -159,13 +169,17 @@ async fn archive_party(
     Path((business_id, party_id)): Path<(Uuid, Uuid)>,
     Json(payload): Json<ArchivePartyRequest>,
 ) -> Response {
-    let (actor_id, organization) =
-        match commercial_context(&state, &headers, business_id, CommercialAccess::ManageParties)
-            .await
-        {
-            Ok(value) => value,
-            Err(response) => return response,
-        };
+    let (actor_id, organization) = match commercial_context(
+        &state,
+        &headers,
+        business_id,
+        CommercialAccess::ManageParties,
+    )
+    .await
+    {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
     match CommercialCoreRepository::new(state.db.clone())
         .archive_party(
             actor_id,
@@ -187,12 +201,17 @@ async fn list_payments(
     Path(business_id): Path<Uuid>,
     Query(query): Query<PaymentListQuery>,
 ) -> Response {
-    let (_, organization) =
-        match commercial_context(&state, &headers, business_id, CommercialAccess::ViewPayments).await
-        {
-            Ok(value) => value,
-            Err(response) => return response,
-        };
+    let (_, organization) = match commercial_context(
+        &state,
+        &headers,
+        business_id,
+        CommercialAccess::ViewPayments,
+    )
+    .await
+    {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
     match CommercialCoreRepository::new(state.db.clone())
         .list_payments(business_id, organization.id, query.limit)
         .await
@@ -212,12 +231,17 @@ async fn create_payment(
     Path(business_id): Path<Uuid>,
     Json(payload): Json<CreatePaymentRequest>,
 ) -> Response {
-    let (actor_id, organization) =
-        match commercial_context(&state, &headers, business_id, CommercialAccess::ViewPayments).await
-        {
-            Ok(value) => value,
-            Err(response) => return response,
-        };
+    let (actor_id, organization) = match commercial_context(
+        &state,
+        &headers,
+        business_id,
+        CommercialAccess::ViewPayments,
+    )
+    .await
+    {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
 
     let direction = payload.direction.trim().to_ascii_lowercase();
     let may_post = if direction == "incoming" {
@@ -256,13 +280,17 @@ async fn reverse_payment(
     Path((business_id, payment_id)): Path<(Uuid, Uuid)>,
     Json(payload): Json<ReversePaymentRequest>,
 ) -> Response {
-    let (actor_id, organization) =
-        match commercial_context(&state, &headers, business_id, CommercialAccess::ManagePayments)
-            .await
-        {
-            Ok(value) => value,
-            Err(response) => return response,
-        };
+    let (actor_id, organization) = match commercial_context(
+        &state,
+        &headers,
+        business_id,
+        CommercialAccess::ManagePayments,
+    )
+    .await
+    {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
     let key = match idempotency_key(&headers) {
         Ok(value) => value,
         Err(code) => return api_error(StatusCode::BAD_REQUEST, code),
@@ -288,12 +316,17 @@ async fn list_receivables(
     headers: HeaderMap,
     Path(business_id): Path<Uuid>,
 ) -> Response {
-    let (_, organization) =
-        match commercial_context(&state, &headers, business_id, CommercialAccess::ViewPayments).await
-        {
-            Ok(value) => value,
-            Err(response) => return response,
-        };
+    let (_, organization) = match commercial_context(
+        &state,
+        &headers,
+        business_id,
+        CommercialAccess::ViewPayments,
+    )
+    .await
+    {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
     match CommercialCoreRepository::new(state.db.clone())
         .receivables(business_id, organization.id)
         .await
@@ -312,12 +345,17 @@ async fn list_payables(
     headers: HeaderMap,
     Path(business_id): Path<Uuid>,
 ) -> Response {
-    let (_, organization) =
-        match commercial_context(&state, &headers, business_id, CommercialAccess::ViewPayments).await
-        {
-            Ok(value) => value,
-            Err(response) => return response,
-        };
+    let (_, organization) = match commercial_context(
+        &state,
+        &headers,
+        business_id,
+        CommercialAccess::ViewPayments,
+    )
+    .await
+    {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
     match CommercialCoreRepository::new(state.db.clone())
         .payables(business_id, organization.id)
         .await
@@ -353,8 +391,9 @@ impl CommercialAccess {
                     || organization.can_manage_inventory_controls()
                     || organization.can_manage_finance_controls()
             }
-            Self::ViewPayments => organization.can_view_finance_controls()
-                || organization.can_record_sales(),
+            Self::ViewPayments => {
+                organization.can_view_finance_controls() || organization.can_record_sales()
+            }
             Self::ManagePayments => organization.can_manage_finance_controls(),
         }
     }

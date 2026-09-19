@@ -393,13 +393,9 @@ impl CommercialCoreRepository {
         .await?;
 
         let Some(updated) = updated else {
-            return Err(classify_party_write_miss(
-                &mut tx,
-                business_id,
-                organization_id,
-                party_id,
-            )
-            .await?);
+            return Err(
+                classify_party_write_miss(&mut tx, business_id, organization_id, party_id).await?,
+            );
         };
         insert_outbox(
             &mut tx,
@@ -451,13 +447,9 @@ impl CommercialCoreRepository {
         .await?;
 
         let Some(archived) = archived else {
-            return Err(classify_party_write_miss(
-                &mut tx,
-                business_id,
-                organization_id,
-                party_id,
-            )
-            .await?);
+            return Err(
+                classify_party_write_miss(&mut tx, business_id, organization_id, party_id).await?,
+            );
         };
         insert_outbox(
             &mut tx,
@@ -530,13 +522,7 @@ impl CommercialCoreRepository {
             .await
             .map_err(map_policy_error)?;
         if let Some(party_id) = normalized.party_id {
-            ensure_active_party_tx(
-                &mut tx,
-                business_id,
-                organization_id,
-                party_id,
-            )
-            .await?;
+            ensure_active_party_tx(&mut tx, business_id, organization_id, party_id).await?;
         }
 
         validate_allocations_tx(
@@ -664,7 +650,11 @@ impl CommercialCoreRepository {
         idempotency_key: Uuid,
         request: ReversePaymentRequest,
     ) -> Result<PaymentOutcome, CommercialCoreError> {
-        let reason = normalized_required(&request.reason, MAX_NOTE, "payment_reversal_reason_required")?;
+        let reason = normalized_required(
+            &request.reason,
+            MAX_NOTE,
+            "payment_reversal_reason_required",
+        )?;
         let request_hash = canonical_hash(&json!({
             "payment_id": payment_id,
             "occurred_on": request.occurred_on,
@@ -878,23 +868,44 @@ impl CommercialCoreRepository {
 
 fn normalize_party(request: CreatePartyRequest) -> Result<NormalizedParty, CommercialCoreError> {
     let party_kind = request.party_kind.trim().to_ascii_lowercase();
-    if !matches!(party_kind.as_str(), "customer" | "supplier" | "both" | "other") {
+    if !matches!(
+        party_kind.as_str(),
+        "customer" | "supplier" | "both" | "other"
+    ) {
         return Err(CommercialCoreError::Validation("invalid_party_kind"));
     }
     Ok(NormalizedParty {
         party_kind,
-        display_name: normalized_required(&request.display_name, MAX_PARTY_NAME, "invalid_party_name")?,
-        legal_name: normalized_optional(request.legal_name.as_deref(), MAX_LEGAL_NAME, "invalid_party_legal_name")?,
+        display_name: normalized_required(
+            &request.display_name,
+            MAX_PARTY_NAME,
+            "invalid_party_name",
+        )?,
+        legal_name: normalized_optional(
+            request.legal_name.as_deref(),
+            MAX_LEGAL_NAME,
+            "invalid_party_legal_name",
+        )?,
         phone: normalized_optional(request.phone.as_deref(), MAX_PHONE, "invalid_party_phone")?,
         email: normalized_optional(request.email.as_deref(), MAX_EMAIL, "invalid_party_email")?
             .map(|value| value.to_ascii_lowercase()),
-        tax_identifier: normalized_optional(request.tax_identifier.as_deref(), MAX_TAX_ID, "invalid_party_tax_identifier")?,
-        address: normalized_optional(request.address.as_deref(), MAX_ADDRESS, "invalid_party_address")?,
+        tax_identifier: normalized_optional(
+            request.tax_identifier.as_deref(),
+            MAX_TAX_ID,
+            "invalid_party_tax_identifier",
+        )?,
+        address: normalized_optional(
+            request.address.as_deref(),
+            MAX_ADDRESS,
+            "invalid_party_address",
+        )?,
         note: normalized_text(&request.note, MAX_NOTE, "party_note_too_long")?,
     })
 }
 
-fn normalize_payment(request: CreatePaymentRequest) -> Result<NormalizedPayment, CommercialCoreError> {
+fn normalize_payment(
+    request: CreatePaymentRequest,
+) -> Result<NormalizedPayment, CommercialCoreError> {
     let direction = request.direction.trim().to_ascii_lowercase();
     if !matches!(direction.as_str(), "incoming" | "outgoing") {
         return Err(CommercialCoreError::Validation("invalid_payment_direction"));
@@ -907,19 +918,29 @@ fn normalize_payment(request: CreatePaymentRequest) -> Result<NormalizedPayment,
         return Err(CommercialCoreError::Validation("invalid_payment_amount"));
     }
     if request.allocations.is_empty() || request.allocations.len() > MAX_PAYMENT_ALLOCATIONS {
-        return Err(CommercialCoreError::Validation("invalid_payment_allocations"));
+        return Err(CommercialCoreError::Validation(
+            "invalid_payment_allocations",
+        ));
     }
 
     let mut allocations = request.allocations;
     for allocation in &allocations {
-        if allocation.amount <= 0 || (allocation.sale_id.is_some() == allocation.purchase_id.is_some()) {
-            return Err(CommercialCoreError::Validation("invalid_payment_allocation"));
+        if allocation.amount <= 0
+            || (allocation.sale_id.is_some() == allocation.purchase_id.is_some())
+        {
+            return Err(CommercialCoreError::Validation(
+                "invalid_payment_allocation",
+            ));
         }
         if direction == "incoming" && allocation.sale_id.is_none() {
-            return Err(CommercialCoreError::Validation("incoming_payment_requires_sale"));
+            return Err(CommercialCoreError::Validation(
+                "incoming_payment_requires_sale",
+            ));
         }
         if direction == "outgoing" && allocation.purchase_id.is_none() {
-            return Err(CommercialCoreError::Validation("outgoing_payment_requires_purchase"));
+            return Err(CommercialCoreError::Validation(
+                "outgoing_payment_requires_purchase",
+            ));
         }
     }
     allocations.sort_by_key(|allocation| {
@@ -933,14 +954,21 @@ fn normalize_payment(request: CreatePaymentRequest) -> Result<NormalizedPayment,
         let left = pair[0].sale_id.or(pair[0].purchase_id);
         let right = pair[1].sale_id.or(pair[1].purchase_id);
         if left == right {
-            return Err(CommercialCoreError::Validation("duplicate_payment_allocation"));
+            return Err(CommercialCoreError::Validation(
+                "duplicate_payment_allocation",
+            ));
         }
     }
-    let allocated = allocations.iter().try_fold(0i64, |total, allocation| {
-        total.checked_add(allocation.amount)
-    }).ok_or(CommercialCoreError::Validation("payment_amount_overflow"))?;
+    let allocated = allocations
+        .iter()
+        .try_fold(0i64, |total, allocation| {
+            total.checked_add(allocation.amount)
+        })
+        .ok_or(CommercialCoreError::Validation("payment_amount_overflow"))?;
     if allocated != request.amount {
-        return Err(CommercialCoreError::Validation("payment_allocation_total_mismatch"));
+        return Err(CommercialCoreError::Validation(
+            "payment_allocation_total_mismatch",
+        ));
     }
 
     Ok(NormalizedPayment {
@@ -949,7 +977,11 @@ fn normalize_payment(request: CreatePaymentRequest) -> Result<NormalizedPayment,
         amount: request.amount,
         occurred_on: request.occurred_on,
         party_id: request.party_id,
-        reference: normalized_text(&request.reference, MAX_REFERENCE, "payment_reference_too_long")?,
+        reference: normalized_text(
+            &request.reference,
+            MAX_REFERENCE,
+            "payment_reference_too_long",
+        )?,
         note: normalized_text(&request.note, MAX_NOTE, "payment_note_too_long")?,
         allocations,
     })
@@ -1152,10 +1184,14 @@ async fn validate_allocations_tx(
             if row.1 != currency {
                 return Err(CommercialCoreError::Validation("payment_currency_mismatch"));
             }
-            let outstanding = row.0.checked_sub(row.2)
+            let outstanding = row
+                .0
+                .checked_sub(row.2)
                 .ok_or(CommercialCoreError::Database)?;
             if allocation.amount > outstanding {
-                return Err(CommercialCoreError::Validation("payment_exceeds_outstanding"));
+                return Err(CommercialCoreError::Validation(
+                    "payment_exceeds_outstanding",
+                ));
             }
         }
         if let Some(purchase_id) = allocation.purchase_id {
@@ -1188,10 +1224,14 @@ async fn validate_allocations_tx(
             if row.1 != currency {
                 return Err(CommercialCoreError::Validation("payment_currency_mismatch"));
             }
-            let outstanding = row.0.checked_sub(row.2)
+            let outstanding = row
+                .0
+                .checked_sub(row.2)
                 .ok_or(CommercialCoreError::Database)?;
             if allocation.amount > outstanding {
-                return Err(CommercialCoreError::Validation("payment_exceeds_outstanding"));
+                return Err(CommercialCoreError::Validation(
+                    "payment_exceeds_outstanding",
+                ));
             }
         }
     }

@@ -252,10 +252,9 @@ impl StockTransferRepository {
             });
         }
 
-        let item_id = normalized
-            .ingredient_id
-            .or(normalized.product_id)
-            .ok_or(StockTransferError::Validation("stock_transfer_item_required"))?;
+        let item_id = normalized.ingredient_id.or(normalized.product_id).ok_or(
+            StockTransferError::Validation("stock_transfer_item_required"),
+        )?;
         sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))")
             .bind(format!(
                 "stock-transfer-item:{business_id}:{}:{item_id}",
@@ -266,24 +265,12 @@ impl StockTransferRepository {
 
         let quantities = match normalized.item_kind {
             StockTransferItemKind::Ingredient => {
-                transfer_ingredient_tx(
-                    &mut tx,
-                    actor_id,
-                    business_id,
-                    organization_id,
-                    &normalized,
-                )
-                .await?
+                transfer_ingredient_tx(&mut tx, actor_id, business_id, organization_id, &normalized)
+                    .await?
             }
             StockTransferItemKind::Product => {
-                transfer_product_tx(
-                    &mut tx,
-                    actor_id,
-                    business_id,
-                    organization_id,
-                    &normalized,
-                )
-                .await?
+                transfer_product_tx(&mut tx, actor_id, business_id, organization_id, &normalized)
+                    .await?
             }
         };
 
@@ -431,10 +418,7 @@ fn normalize_request(
         ));
     }
     let max = Decimal::from(MAX_QUANTITY);
-    if request.quantity <= Decimal::ZERO
-        || request.quantity.scale() > 6
-        || request.quantity > max
-    {
+    if request.quantity <= Decimal::ZERO || request.quantity.scale() > 6 || request.quantity > max {
         return Err(StockTransferError::Validation(
             "stock_transfer_quantity_invalid",
         ));
@@ -481,7 +465,9 @@ async fn transfer_ingredient_tx(
 ) -> Result<TransferQuantities, StockTransferError> {
     let ingredient_id = transfer
         .ingredient_id
-        .ok_or(StockTransferError::Validation("stock_transfer_item_required"))?;
+        .ok_or(StockTransferError::Validation(
+            "stock_transfer_item_required",
+        ))?;
     let legacy_stock = sqlx::query_scalar::<_, Decimal>(
         r#"
         SELECT stock_quantity
@@ -602,9 +588,9 @@ async fn transfer_product_tx(
     organization_id: Uuid,
     transfer: &NormalizedStockTransfer,
 ) -> Result<TransferQuantities, StockTransferError> {
-    let product_id = transfer
-        .product_id
-        .ok_or(StockTransferError::Validation("stock_transfer_item_required"))?;
+    let product_id = transfer.product_id.ok_or(StockTransferError::Validation(
+        "stock_transfer_item_required",
+    ))?;
     let legacy_stock = sqlx::query_scalar::<_, Option<Decimal>>(
         r#"
         SELECT stock_count::numeric
@@ -900,7 +886,9 @@ async fn insert_ingredient_movements_tx(
 ) -> Result<(), StockTransferError> {
     let ingredient_id = transfer
         .ingredient_id
-        .ok_or(StockTransferError::Validation("stock_transfer_item_required"))?;
+        .ok_or(StockTransferError::Validation(
+            "stock_transfer_item_required",
+        ))?;
     for (location_id, movement_type, delta, before, after) in [
         (
             transfer.from_location_id,
@@ -952,9 +940,9 @@ async fn insert_product_movements_tx(
     transfer: &NormalizedStockTransfer,
     quantities: TransferQuantities,
 ) -> Result<(), StockTransferError> {
-    let product_id = transfer
-        .product_id
-        .ok_or(StockTransferError::Validation("stock_transfer_item_required"))?;
+    let product_id = transfer.product_id.ok_or(StockTransferError::Validation(
+        "stock_transfer_item_required",
+    ))?;
     for (location_id, movement_type, delta, before, after) in [
         (
             transfer.from_location_id,
