@@ -24,7 +24,7 @@ export function BusinessInfoQuickForm({ business }: BusinessInfoQuickFormProps) 
   const [phone, setPhone] = useState(business.phone);
   const [description, setDescription] = useState(business.description);
   const [schedule, setSchedule] = useState(business.schedule);
-  const [reason, setReason] = useState('');
+  const [reason, setReason] = useState('Pembaruan info usaha');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isPending, setIsPending] = useState(false);
@@ -89,7 +89,7 @@ export function BusinessInfoQuickForm({ business }: BusinessInfoQuickFormProps) 
         return;
       }
 
-      setReason('');
+      setReason('Pembaruan info usaha');
       setSuccess('Info usaha tersimpan.');
       startTransition(() => {
         router.refresh();
@@ -209,7 +209,7 @@ export function BusinessInfoQuickForm({ business }: BusinessInfoQuickFormProps) 
       </details>
 
       <label className="grid gap-2 text-sm font-semibold text-portal-ink">
-        Kenapa data ini diubah?
+        Catatan perubahan
         <input
           value={reason}
           onChange={event => setReason(event.target.value)}
@@ -219,7 +219,7 @@ export function BusinessInfoQuickForm({ business }: BusinessInfoQuickFormProps) 
           aria-describedby="business-info-change-reason-hint"
         />
         <span id="business-info-change-reason-hint" className="text-[11px] font-normal leading-5 text-portal-soft">
-          Wajib minimal 3 karakter. Catatan ini hanya untuk riwayat perubahan, bukan bagian dari profil publik.
+          Sudah diisi otomatis. Ganti bila perlu untuk memberi konteks perubahan.
         </span>
       </label>
 
