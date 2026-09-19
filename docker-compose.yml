@@ -1048,6 +1048,7 @@ networks:
 
 volumes:
   identity_postgres_data:
+  domain_postgres_data:
   community_postgres_data:
   marketplace_postgres_data:
   redis_data:
