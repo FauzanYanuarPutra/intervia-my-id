@@ -55,8 +55,7 @@ export default function SubmitNewsForm({ locale }: Props) {
           ...form,
           language: isId ? 'id' : 'en',
           topics: form.topics.split(',').map(value => value.trim()).filter(Boolean),
-          source_urls: form.source_urls.split(/\r?
-/).map(value => value.trim()).filter(Boolean),
+          source_urls: form.source_urls.split(/\r?\n/).map(value => value.trim()).filter(Boolean),
           rich_body: form.rich_body,
           cover_image: form.cover_image.trim(),
         }),
