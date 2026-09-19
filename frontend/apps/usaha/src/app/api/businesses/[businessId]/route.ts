@@ -11,6 +11,13 @@ export async function PATCH(request: Request, context: { params: Promise<{ busin
   const { businessId } = await context.params;
   try {
     const body = (await request.json()) as Record<string, unknown>;
+    const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
+    if (reason.length < 3) {
+      return NextResponse.json(
+        { error: 'Alasan perubahan info usaha wajib diisi minimal 3 karakter.', code: 'business_profile_change_reason_required' },
+        { status: 400 },
+      );
+    }
     const business = await updateBusiness(businessId, {
       name: typeof body.name === 'string' ? body.name.trim() : undefined,
       category: typeof body.category === 'string' ? body.category.trim() : undefined,
@@ -22,6 +29,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ busin
       schedule: typeof body.schedule === 'string' ? body.schedule.trim() : undefined,
       latitude: body.latitude === undefined ? undefined : readNumber(body.latitude),
       longitude: body.longitude === undefined ? undefined : readNumber(body.longitude),
+      reason,
     });
     return NextResponse.json({ ok: true, business });
   } catch (error) {
