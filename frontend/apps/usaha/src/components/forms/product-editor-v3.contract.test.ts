@@ -12,6 +12,8 @@ describe('product editor V3', () => {
     expect(editor).not.toContain('ModalSurface');
     expect(editor).toContain('/inventory');
     expect(editor).toContain('ProductModifierEditor');
+    expect(editor).toContain('Detail lainnya');
+    expect(editor).not.toContain('<details open');
     expect(editor).toContain('Simpan status');
     expect(editor).toContain('SensitiveActionConfirm');
     expect(editor).toContain('Arsipkan produk?');
