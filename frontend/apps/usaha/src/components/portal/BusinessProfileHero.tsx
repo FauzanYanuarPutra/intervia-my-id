@@ -16,6 +16,10 @@ function stockAttentionCount(business: BusinessRecord) {
 export function BusinessProfileHero({ business }: BusinessProfileHeroProps) {
   const status = getStatusCopy(business);
   const canManageInfo = hasPermission(business, 'manageInfo');
+  const canSell = hasPermission(business, 'createSales');
+  const canViewInventory = hasPermission(business, 'viewInventory');
+  const canViewFinance = hasPermission(business, 'viewFinance');
+  const canViewReports = hasPermission(business, 'viewReports');
   const stockAttention = stockAttentionCount(business);
   const location = business.city || business.address || 'Lokasi belum diisi';
 
@@ -98,16 +102,18 @@ export function BusinessProfileHero({ business }: BusinessProfileHeroProps) {
             <PencilLine className="h-4 w-4" />
             {canManageInfo ? 'Edit profil' : 'Lihat profil'}
           </Link>
-          <Link href={`/businesses/${business.id}/orders`} className="portal-button-primary">
-            <ShoppingBag className="h-4 w-4" /> Jual
-          </Link>
+          {canSell ? (
+            <Link href={`/businesses/${business.id}/orders`} className="portal-button-primary">
+              <ShoppingBag className="h-4 w-4" /> Jual
+            </Link>
+          ) : null}
         </div>
 
         <div className="mt-3 flex flex-wrap gap-1.5">
-          <Link href={`/businesses/${business.id}/products`} className="merchant-chip">Produk</Link>
-          <Link href={`/businesses/${business.id}/inventory`} className="merchant-chip">Stok</Link>
-          <Link href={`/businesses/${business.id}/finance`} className="merchant-chip">Uang</Link>
-          <Link href={`/businesses/${business.id}/reports`} className="merchant-chip">Laporan <ArrowRight className="h-3.5 w-3.5" /></Link>
+                    <Link href={`/businesses/${business.id}/products`} className="merchant-chip">Produk</Link>
+          {canViewInventory ? <Link href={`/businesses/${business.id}/inventory`} className="merchant-chip">Stok</Link> : null}
+          {canViewFinance ? <Link href={`/businesses/${business.id}/finance`} className="merchant-chip">Uang</Link> : null}
+          {canViewReports ? <Link href={`/businesses/${business.id}/reports`} className="merchant-chip">Laporan <ArrowRight className="h-3.5 w-3.5" /></Link> : null}
         </div>
       </div>
     </section>
