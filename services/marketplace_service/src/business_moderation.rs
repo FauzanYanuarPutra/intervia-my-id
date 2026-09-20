@@ -890,3 +890,1092 @@ async fn get_business_moderation_history(
     )
         .into_response()
 }
+
+#[derive(Debug, Deserialize)]
+pub struct BusinessReportRequest {
+    pub reason_code: String,
+    pub details: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct BusinessAppealRequest {
+    pub reason: String,
+    #[serde(default)]
+    pub evidence: Value,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct BusinessVerificationRequest {
+    #[serde(default)]
+    pub method: Option<String>,
+    #[serde(default)]
+    pub evidence: Value,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct BusinessVerificationReviewRequest {
+    pub status: String,
+    pub reason_note: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct BusinessModerationAssignmentRequest {
+    pub assigned_to: Option<Uuid>,
+    pub due_hours: Option<i64>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct BusinessModerationEvidenceRequest {
+    pub evidence_type: String,
+    pub label: String,
+    pub source_url: Option<String>,
+    pub note: Option<String>,
+    #[serde(default)]
+    pub metadata: Value,
+}
+
+#[derive(Debug, Deserialize, Default)]
+pub struct ListCrmNotificationsQuery {
+    pub unread_only: Option<bool>,
+    pub limit: Option<i64>,
+}
+
+fn normalize_business_report_reason(raw: &str) -> Option<&'static str> {
+    match raw.trim().to_ascii_lowercase().replace(['-', ' '], "_").as_str() {
+        "inaccurate_information" | "inaccurate" => Some("inaccurate_information"),
+        "not_found" | "closed" | "no_longer_exists" => Some("not_found"),
+        "duplicate_business" | "duplicate" => Some("duplicate_business"),
+        "fraud_misleading" | "fraud" | "scam" => Some("fraud_misleading"),
+        "policy_violation" | "policy" => Some("policy_violation"),
+        "privacy_personal_data" | "privacy" => Some("privacy_personal_data"),
+        "copyright" => Some("copyright"),
+        "other" => Some("other"),
+        _ => None,
+    }
+}
+
+fn normalize_business_verification_method(raw: Option<&str>) -> Option<&'static str> {
+    match raw.unwrap_or("owner_claim").trim().to_ascii_lowercase().replace(['-', ' '], "_").as_str() {
+        "owner_claim" | "claim" => Some("owner_claim"),
+        "manual" => Some("manual"),
+        "document" | "documents" => Some("document"),
+        "reference" => Some("reference"),
+        _ => None,
+    }
+}
+
+fn normalize_business_evidence_type(raw: &str) -> Option<&'static str> {
+    match raw.trim().to_ascii_lowercase().replace(['-', ' '], "_").as_str() {
+        "photo" | "image" => Some("photo"),
+        "document" | "file" => Some("document"),
+        "url" | "link" => Some("url"),
+        "note" => Some("note"),
+        "screenshot" => Some("screenshot"),
+        "other" => Some("other"),
+        _ => None,
+    }
+}
+
+fn normalize_business_evidence_url(value: Option<String>) -> Option<String> {
+    let value = value?.trim().to_string();
+    if value.is_empty() || value.len() > 1000 {
+        return None;
+    }
+    if value.starts_with("/api/forum/media/")
+        || value.starts_with("https://")
+        || value.starts_with("http://")
+    {
+        Some(value)
+    } else {
+        None
+    }
+}
+
+fn business_report_severity(reason_code: &str) -> &'static str {
+    match reason_code {
+        "fraud_misleading" | "policy_violation" | "privacy_personal_data" => "high",
+        "copyright" | "duplicate_business" => "medium",
+        _ => "low",
+    }
+}
+
+async fn push_crm_notification(
+    state: &Arc<AppState>,
+    event_type: &str,
+    business_id: Option<Uuid>,
+    title: &str,
+    message: &str,
+    data: Value,
+) {
+    let result = sqlx::query(
+        r#"
+        INSERT INTO internal_moderation.crm_notifications
+          (category, event_type, business_id, title, message, data)
+        VALUES ('business',$1,$2,$3,$4,$5)
+        "#,
+    )
+    .bind(event_type)
+    .bind(business_id)
+    .bind(title)
+    .bind(message)
+    .bind(data)
+    .execute(&state.db)
+    .await;
+    if let Err(error) = result {
+        tracing::warn!("push_crm_notification error: {:?}", error);
+    }
+}
+
+pub(crate) fn public_business_source_type(metadata: &Value) -> String {
+    let object = match metadata.as_object() {
+        Some(value) => value,
+        None => return "owner_managed".to_string(),
+    };
+    let record_kind = object
+        .get("record_kind")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    let source_dataset = object
+        .get("source_dataset")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .trim();
+    if record_kind.contains("reference")
+        || !source_dataset.is_empty()
+        || object.get("source_url").and_then(Value::as_str).is_some()
+    {
+        "reference".to_string()
+    } else {
+        "owner_managed".to_string()
+    }
+}
+
+async fn report_business(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(store_ref): Path<String>,
+    Json(payload): Json<BusinessReportRequest>,
+) -> impl IntoResponse {
+    let reporter_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let store = match find_umkm_store_row(&state.db, store_ref.as_str()).await {
+        Ok(Some(value)) => value,
+        Ok(None) => return err(StatusCode::NOT_FOUND, "umkm store not found").into_response(),
+        Err(error) => {
+            tracing::error!("report_business store load error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load business").into_response();
+        }
+    };
+    let reason_code = match normalize_business_report_reason(&payload.reason_code) {
+        Some(value) => value,
+        None => return err(StatusCode::BAD_REQUEST, "unsupported business report reason").into_response(),
+    };
+    let details = normalize_text(payload.details, 4000);
+    let report_id: Uuid = match sqlx::query(
+        r#"
+        INSERT INTO internal_moderation.business_reports
+          (business_id, reporter_user_id, reason_code, details, status)
+        VALUES ($1,$2,$3,$4,'open')
+        ON CONFLICT (business_id, reporter_user_id)
+        WHERE status IN ('open','reviewing')
+        DO UPDATE SET reason_code=EXCLUDED.reason_code, details=EXCLUDED.details, updated_at=NOW()
+        RETURNING id
+        "#,
+    )
+    .bind(store.id)
+    .bind(reporter_id)
+    .bind(reason_code)
+    .bind(details.as_deref())
+    .fetch_one(&state.db)
+    .await
+    {
+        Ok(row) => row.get("id"),
+        Err(error) => {
+            tracing::error!("report_business insert error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to submit business report").into_response();
+        }
+    };
+
+    let severity = business_report_severity(reason_code);
+    let existing_case = match sqlx::query(
+        r#"
+        SELECT id
+        FROM internal_moderation.business_moderation_cases
+        WHERE business_id = $1
+          AND status IN ('open','reviewing','awaiting_owner','escalated','appealed')
+        ORDER BY updated_at DESC
+        LIMIT 1
+        "#,
+    )
+    .bind(store.id)
+    .fetch_optional(&state.db)
+    .await
+    {
+        Ok(row) => row.map(|value| value.get::<Uuid,_>("id")),
+        Err(error) => {
+            tracing::error!("report_business case lookup error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to open business review case").into_response();
+        }
+    };
+
+    let case_id = if let Some(case_id) = existing_case {
+        let _ = sqlx::query(
+            r#"
+            INSERT INTO internal_moderation.business_moderation_events
+              (case_id, actor_id, action, reason_code, reason_note, severity,
+               previous_status, new_status, missing_fields, business_snapshot)
+            VALUES ($1,$2,'report_received',$3,$4,$5,'open','reviewing','[]'::jsonb,$6)
+            "#,
+        )
+        .bind(case_id)
+        .bind(reporter_id)
+        .bind(reason_code)
+        .bind(details.as_deref())
+        .bind(severity)
+        .bind(json!({"business_id": store.id, "report_id": report_id}))
+        .execute(&state.db)
+        .await;
+        case_id
+    } else {
+        match sqlx::query(
+            r#"
+            INSERT INTO internal_moderation.business_moderation_cases
+              (business_id, owner_user_id, opened_by, source, status, severity,
+               current_action, current_reason_code, current_reason_note, missing_fields,
+               due_at, opened_at, updated_at)
+            VALUES ($1,$2,$3,'user_report','open',$4,NULL,$5,$6,'[]'::jsonb,
+                    NOW() + INTERVAL '24 hours',NOW(),NOW())
+            RETURNING id
+            "#,
+        )
+        .bind(store.id)
+        .bind(store.owner_user_id)
+        .bind(reporter_id)
+        .bind(severity)
+        .bind(reason_code)
+        .bind(details.as_deref())
+        .fetch_one(&state.db)
+        .await
+        {
+            Ok(row) => {
+                let case_id: Uuid = row.get("id");
+                let _ = sqlx::query(
+                    r#"
+                    INSERT INTO internal_moderation.business_moderation_events
+                      (case_id, actor_id, action, reason_code, reason_note, severity,
+                       previous_status, new_status, missing_fields, business_snapshot)
+                    VALUES ($1,$2,'report_received',$3,$4,$5,NULL,'open','[]'::jsonb,$6)
+                    "#,
+                )
+                .bind(case_id)
+                .bind(reporter_id)
+                .bind(reason_code)
+                .bind(details.as_deref())
+                .bind(severity)
+                .bind(json!({"business_id": store.id, "report_id": report_id}))
+                .execute(&state.db)
+                .await;
+                case_id
+            }
+            Err(error) => {
+                tracing::error!("report_business case create error: {:?}", error);
+                return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to open business review case").into_response();
+            }
+        }
+    };
+
+    push_notification_best_effort(
+        &state,
+        store.owner_user_id,
+        "business",
+        "business_report_received",
+        "Ada laporan tentang usaha",
+        "Usaha Anda menerima laporan dan sedang ditinjau oleh tim Lajukan.",
+        json!({"business_id": store.id, "case_id": case_id}),
+    )
+    .await;
+    push_crm_notification(
+        &state,
+        "business_report_received",
+        Some(store.id),
+        "Laporan usaha baru",
+        &format!("{} menerima laporan baru: {}.", store.name, reason_code),
+        json!({"business_id": store.id, "case_id": case_id, "report_id": report_id, "reason_code": reason_code}),
+    )
+    .await;
+
+    (
+        StatusCode::CREATED,
+        Json(json!({"report_id": report_id, "case_id": case_id, "status": "open"})),
+    )
+        .into_response()
+}
+
+async fn request_business_appeal(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(store_ref): Path<String>,
+    Json(payload): Json<BusinessAppealRequest>,
+) -> impl IntoResponse {
+    let appellant_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let store = match find_umkm_store_row(&state.db, store_ref.as_str()).await {
+        Ok(Some(value)) => value,
+        Ok(None) => return err(StatusCode::NOT_FOUND, "umkm store not found").into_response(),
+        Err(_) => return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load business").into_response(),
+    };
+    if store.owner_user_id != appellant_id {
+        return err(StatusCode::FORBIDDEN, "only the business owner can appeal").into_response();
+    }
+    let reason = match normalize_text(Some(payload.reason), 4000) {
+        Some(value) => value,
+        None => return err(StatusCode::BAD_REQUEST, "appeal reason is required").into_response(),
+    };
+    let case = match sqlx::query(
+        r#"
+        SELECT id, current_action, status
+        FROM internal_moderation.business_moderation_cases
+        WHERE business_id = $1
+          AND current_action IN ('hide','reject')
+        ORDER BY updated_at DESC
+        LIMIT 1
+        "#,
+    )
+    .bind(store.id)
+    .fetch_optional(&state.db)
+    .await
+    {
+        Ok(Some(row)) => row,
+        Ok(None) => return err(StatusCode::CONFLICT, "there is no appealable moderation decision").into_response(),
+        Err(_) => return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load moderation case").into_response(),
+    };
+    let case_id: Uuid = case.get("id");
+    if case.get::<String,_>("status") != "resolved" {
+        return err(StatusCode::CONFLICT, "moderation case is not ready for appeal").into_response();
+    }
+
+    let evidence = if payload.evidence.is_array() { payload.evidence } else { json!([]) };
+    let appeal_id: Uuid = match sqlx::query(
+        r#"
+        INSERT INTO internal_moderation.business_appeals
+          (case_id, business_id, appellant_user_id, reason, evidence,
+           status, submitted_by_ip, submitted_user_agent)
+        VALUES ($1,$2,$3,$4,$5,'pending',$6::inet,$7)
+        RETURNING id
+        "#,
+    )
+    .bind(case_id)
+    .bind(store.id)
+    .bind(appellant_id)
+    .bind(&reason)
+    .bind(evidence)
+    .bind(headers.get("x-real-ip").or_else(|| headers.get("x-forwarded-for")).and_then(|v| v.to_str().ok()).and_then(|v| v.split(',').next()).map(str::trim))
+    .bind(headers.get("user-agent").and_then(|v| v.to_str().ok()))
+    .fetch_one(&state.db)
+    .await
+    {
+        Ok(row) => row.get("id"),
+        Err(error) => {
+            tracing::error!("request_business_appeal insert error: {:?}", error);
+            return err(StatusCode::CONFLICT, "an appeal is already pending").into_response();
+        }
+    };
+
+    let _ = sqlx::query(
+        "UPDATE internal_moderation.business_moderation_cases SET status='appealed', updated_at=NOW() WHERE id=$1",
+    )
+    .bind(case_id)
+    .execute(&state.db)
+    .await;
+
+    let _ = sqlx::query(
+        r#"
+        INSERT INTO internal_moderation.business_moderation_events
+          (case_id, actor_id, action, reason_code, reason_note, severity,
+           previous_status, new_status, missing_fields, business_snapshot)
+        SELECT id,$2,'appeal_submitted','other',$3,severity,status,'appealed','[]'::jsonb,
+               jsonb_build_object('business_id',$1,'appeal_id',$4)
+        FROM internal_moderation.business_moderation_cases
+        WHERE id=$5
+        "#,
+    )
+    .bind(store.id)
+    .bind(appellant_id)
+    .bind(&reason)
+    .bind(appeal_id)
+    .bind(case_id)
+    .execute(&state.db)
+    .await;
+
+    push_crm_notification(
+        &state,
+        "business_appeal_received",
+        Some(store.id),
+        "Banding usaha baru",
+        &format!("{} mengajukan banding atas keputusan penayangan.", store.name),
+        json!({"business_id": store.id, "case_id": case_id, "appeal_id": appeal_id}),
+    )
+    .await;
+
+    (
+        StatusCode::CREATED,
+        Json(json!({"appeal_id": appeal_id, "case_id": case_id, "status": "pending"})),
+    )
+        .into_response()
+}
+
+async fn request_business_verification(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(store_ref): Path<String>,
+    Json(payload): Json<BusinessVerificationRequest>,
+) -> impl IntoResponse {
+    let owner_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let store = match find_umkm_store_row(&state.db, store_ref.as_str()).await {
+        Ok(Some(value)) => value,
+        Ok(None) => return err(StatusCode::NOT_FOUND, "umkm store not found").into_response(),
+        Err(_) => return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load business").into_response(),
+    };
+    if store.owner_user_id != owner_id {
+        return err(StatusCode::FORBIDDEN, "only the business owner can request verification").into_response();
+    }
+    let method = match normalize_business_verification_method(payload.method.as_deref()) {
+        Some(value) => value,
+        None => return err(StatusCode::BAD_REQUEST, "unsupported verification method").into_response(),
+    };
+    let evidence = if payload.evidence.is_array() { payload.evidence } else { json!([]) };
+
+    let row = sqlx::query(
+        r#"
+        INSERT INTO internal_moderation.business_verifications
+          (business_id, owner_user_id, status, method, requested_at, evidence, updated_at)
+        VALUES ($1,$2,'pending',$3,NOW(),$4,NOW())
+        ON CONFLICT (business_id)
+        WHERE status IN ('unverified','pending','verified')
+        DO UPDATE SET
+          status='pending',
+          method=EXCLUDED.method,
+          requested_at=NOW(),
+          reviewed_at=NULL,
+          reviewed_by=NULL,
+          review_reason=NULL,
+          evidence=EXCLUDED.evidence,
+          updated_at=NOW()
+        RETURNING id
+        "#,
+    )
+    .bind(store.id)
+    .bind(owner_id)
+    .bind(method)
+    .bind(evidence)
+    .fetch_one(&state.db)
+    .await;
+
+    let verification_id: Uuid = match row {
+        Ok(row) => row.get("id"),
+        Err(error) => {
+            tracing::error!("request_business_verification error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to request verification").into_response();
+        }
+    };
+
+    push_crm_notification(
+        &state,
+        "business_verification_requested",
+        Some(store.id),
+        "Permintaan verifikasi usaha",
+        &format!("{} meminta verifikasi profil usaha.", store.name),
+        json!({"business_id": store.id, "verification_id": verification_id, "method": method}),
+    )
+    .await;
+
+    (
+        StatusCode::CREATED,
+        Json(json!({"verification_id": verification_id, "status": "pending"})),
+    )
+        .into_response()
+}
+
+async fn review_business_verification(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<BusinessVerificationReviewRequest>,
+) -> impl IntoResponse {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+        Some(value) => value,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    if !has_business_moderation_access(&claims) {
+        return err(StatusCode::FORBIDDEN, "business verification permission required").into_response();
+    }
+    let actor_id = match Uuid::parse_str(claims.sub.trim()) {
+        Ok(value) => value,
+        Err(_) => return err(StatusCode::UNAUTHORIZED, "invalid actor").into_response(),
+    };
+    let status = match payload.status.trim().to_ascii_lowercase().as_str() {
+        "verified" => "verified",
+        "rejected" => "rejected",
+        _ => return err(StatusCode::BAD_REQUEST, "verification status must be verified or rejected").into_response(),
+    };
+    let note = normalize_text(payload.reason_note, 4000);
+    if status == "rejected" && note.is_none() {
+        return err(StatusCode::BAD_REQUEST, "verification rejection requires a reason").into_response();
+    }
+
+    let row = match sqlx::query(
+        r#"
+        SELECT id, business_id, owner_user_id, status
+        FROM internal_moderation.business_verifications
+        WHERE business_id=$1
+        ORDER BY updated_at DESC
+        LIMIT 1
+        "#,
+    )
+    .bind(id)
+    .fetch_optional(&state.db)
+    .await
+    {
+        Ok(Some(row)) => row,
+        Ok(None) => return err(StatusCode::NOT_FOUND, "verification request not found").into_response(),
+        Err(_) => return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load verification").into_response(),
+    };
+    if row.get::<String,_>("status") != "pending" {
+        return err(StatusCode::CONFLICT, "verification request is not pending").into_response();
+    }
+    let verification_id: Uuid = row.get("id");
+    let owner_id: Uuid = row.get("owner_user_id");
+
+    if sqlx::query(
+        r#"
+        UPDATE internal_moderation.business_verifications
+        SET status=$2, reviewed_at=NOW(), reviewed_by=$3, review_reason=$4, updated_at=NOW()
+        WHERE id=$1
+        "#,
+    )
+    .bind(verification_id)
+    .bind(status)
+    .bind(actor_id)
+    .bind(note.as_deref())
+    .execute(&state.db)
+    .await
+    .is_err()
+    {
+        return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to save verification decision").into_response();
+    }
+
+    push_notification_best_effort(
+        &state,
+        owner_id,
+        "business",
+        "business_verification_reviewed",
+        if status == "verified" { "Usaha terverifikasi" } else { "Verifikasi usaha belum disetujui" },
+        if status == "verified" {
+            "Profil usaha Anda sudah diverifikasi oleh tim Lajukan."
+        } else {
+            "Permintaan verifikasi usaha belum disetujui. Buka detail untuk melihat alasan dan melengkapi bukti."
+        },
+        json!({"business_id": id, "verification_id": verification_id, "status": status, "reason_note": note}),
+    )
+    .await;
+
+    push_crm_notification(
+        &state,
+        "business_verification_reviewed",
+        Some(id),
+        "Verifikasi usaha diproses",
+        &format!("Keputusan verifikasi usaha: {}.", status),
+        json!({"business_id": id, "verification_id": verification_id, "status": status}),
+    )
+    .await;
+
+    (
+        StatusCode::OK,
+        Json(json!({"verification_id": verification_id, "status": status, "reason_note": note})),
+    )
+        .into_response()
+}
+
+async fn assign_business_case(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<BusinessModerationAssignmentRequest>,
+) -> impl IntoResponse {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+        Some(value) => value,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    if !has_business_moderation_access(&claims) {
+        return err(StatusCode::FORBIDDEN, "business moderation permission required").into_response();
+    }
+    let actor_id = match Uuid::parse_str(claims.sub.trim()) {
+        Ok(value) => value,
+        Err(_) => return err(StatusCode::UNAUTHORIZED, "invalid actor").into_response(),
+    };
+    let due_at = payload
+        .assigned_to
+        .and(payload.due_hours)
+        .map(|hours| Utc::now() + chrono::Duration::hours(hours.clamp(1, 168)));
+
+    let updated = sqlx::query(
+        r#"
+        UPDATE internal_moderation.business_moderation_cases
+        SET assigned_to=$2, due_at=$3, updated_at=NOW()
+        WHERE id = (
+          SELECT id
+          FROM internal_moderation.business_moderation_cases
+          WHERE business_id=$1
+          ORDER BY updated_at DESC
+          LIMIT 1
+        )
+        RETURNING id, status, assigned_to, due_at
+        "#,
+    )
+    .bind(id)
+    .bind(payload.assigned_to)
+    .bind(due_at)
+    .fetch_optional(&state.db)
+    .await;
+
+    let row = match updated {
+        Ok(Some(row)) => row,
+        Ok(None) => return err(StatusCode::NOT_FOUND, "business moderation case not found").into_response(),
+        Err(error) => {
+            tracing::error!("assign_business_case error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to assign moderation case").into_response();
+        }
+    };
+    let case_id: Uuid = row.get("id");
+
+    let _ = sqlx::query(
+        r#"
+        INSERT INTO internal_moderation.business_moderation_events
+          (case_id, actor_id, action, reason_code, reason_note, severity,
+           previous_status, new_status, missing_fields, business_snapshot)
+        SELECT id,$2,'assigned','other',$3,severity,status,status,'[]'::jsonb,
+               jsonb_build_object('business_id',$1,'assigned_to',$4,'due_at',$5)
+        FROM internal_moderation.business_moderation_cases
+        WHERE id=$6
+        "#,
+    )
+    .bind(id)
+    .bind(actor_id)
+    .bind(if payload.assigned_to.is_some() { "Case assigned by CRM" } else { "Case unassigned by CRM" })
+    .bind(payload.assigned_to)
+    .bind(due_at)
+    .bind(case_id)
+    .execute(&state.db)
+    .await;
+
+    push_crm_notification(
+        &state,
+        "business_case_assigned",
+        Some(id),
+        "Tugas moderasi diperbarui",
+        "Assignment dan SLA kasus usaha berhasil diperbarui.",
+        json!({"business_id": id, "case_id": case_id, "assigned_to": payload.assigned_to, "due_at": due_at}),
+    )
+    .await;
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "case_id": case_id,
+            "status": row.get::<String,_>("status"),
+            "assigned_to": row.get::<Option<Uuid>,_>("assigned_to"),
+            "due_at": row.get::<Option<DateTime<Utc>>,_>("due_at")
+        })),
+    )
+        .into_response()
+}
+
+async fn add_business_evidence(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<BusinessModerationEvidenceRequest>,
+) -> impl IntoResponse {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+        Some(value) => value,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    if !has_business_moderation_access(&claims) {
+        return err(StatusCode::FORBIDDEN, "business moderation permission required").into_response();
+    }
+    let actor_id = match Uuid::parse_str(claims.sub.trim()) {
+        Ok(value) => value,
+        Err(_) => return err(StatusCode::UNAUTHORIZED, "invalid actor").into_response(),
+    };
+    let evidence_type = match normalize_business_evidence_type(&payload.evidence_type) {
+        Some(value) => value,
+        None => return err(StatusCode::BAD_REQUEST, "unsupported evidence type").into_response(),
+    };
+    let label = match normalize_text(Some(payload.label), 120) {
+        Some(value) => value,
+        None => return err(StatusCode::BAD_REQUEST, "evidence label is required").into_response(),
+    };
+    let source_url = normalize_business_evidence_url(payload.source_url);
+    if source_url.is_none() && evidence_type != "note" {
+        return err(StatusCode::BAD_REQUEST, "evidence source URL is required").into_response();
+    }
+    let note = normalize_text(payload.note, 4000);
+    let metadata = if payload.metadata.is_object() { payload.metadata } else { json!({}) };
+
+    let case_id: Uuid = match sqlx::query(
+        r#"
+        SELECT id
+        FROM internal_moderation.business_moderation_cases
+        WHERE business_id=$1
+        ORDER BY updated_at DESC
+        LIMIT 1
+        "#,
+    )
+    .bind(id)
+    .fetch_optional(&state.db)
+    .await
+    {
+        Ok(Some(row)) => row.get("id"),
+        Ok(None) => return err(StatusCode::NOT_FOUND, "business moderation case not found").into_response(),
+        Err(_) => return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load moderation case").into_response(),
+    };
+
+    let evidence_id: Uuid = match sqlx::query(
+        r#"
+        INSERT INTO internal_moderation.business_moderation_evidence
+          (case_id, added_by, evidence_type, label, source_url, note, metadata)
+        VALUES ($1,$2,$3,$4,$5,$6,$7)
+        RETURNING id
+        "#,
+    )
+    .bind(case_id)
+    .bind(actor_id)
+    .bind(evidence_type)
+    .bind(label)
+    .bind(source_url.as_deref())
+    .bind(note.as_deref())
+    .bind(metadata)
+    .fetch_one(&state.db)
+    .await
+    {
+        Ok(row) => row.get("id"),
+        Err(error) => {
+            tracing::error!("add_business_evidence error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to save evidence").into_response();
+        }
+    };
+
+    push_crm_notification(
+        &state,
+        "business_evidence_added",
+        Some(id),
+        "Bukti kasus diperbarui",
+        "Bukti baru ditambahkan ke riwayat moderasi usaha.",
+        json!({"business_id": id, "case_id": case_id, "evidence_id": evidence_id}),
+    )
+    .await;
+
+    (StatusCode::CREATED, Json(json!({"evidence_id": evidence_id, "case_id": case_id}))).into_response()
+}
+
+async fn list_crm_notifications(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<ListCrmNotificationsQuery>,
+) -> impl IntoResponse {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+        Some(value) => value,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    if !has_business_moderation_access(&claims) {
+        return err(StatusCode::FORBIDDEN, "crm notification permission required").into_response();
+    }
+    let limit = query.limit.unwrap_or(50).clamp(1, 200);
+    let unread_only = query.unread_only.unwrap_or(false);
+    let rows = sqlx::query(
+        r#"
+        SELECT id, category, event_type, business_id, title, message, data,
+               is_read, read_by, read_at, created_at
+        FROM internal_moderation.crm_notifications
+        WHERE ($1::bool = FALSE OR is_read = FALSE)
+        ORDER BY created_at DESC
+        LIMIT $2
+        "#,
+    )
+    .bind(unread_only)
+    .bind(limit)
+    .fetch_all(&state.db)
+    .await;
+
+    match rows {
+        Ok(rows) => (
+            StatusCode::OK,
+            Json(json!({
+                "items": rows.into_iter().map(|row| json!({
+                    "id": row.get::<Uuid,_>("id"),
+                    "category": row.get::<String,_>("category"),
+                    "event_type": row.get::<String,_>("event_type"),
+                    "business_id": row.get::<Option<Uuid>,_>("business_id"),
+                    "title": row.get::<String,_>("title"),
+                    "message": row.get::<String,_>("message"),
+                    "data": row.get::<Value,_>("data"),
+                    "is_read": row.get::<bool,_>("is_read"),
+                    "read_by": row.get::<Option<Uuid>,_>("read_by"),
+                    "read_at": row.get::<Option<DateTime<Utc>>,_>("read_at"),
+                    "created_at": row.get::<DateTime<Utc>,_>("created_at")
+                })).collect::<Vec<_>>()
+            })),
+        )
+            .into_response(),
+        Err(error) => {
+            tracing::error!("list_crm_notifications error: {:?}", error);
+            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load CRM notifications").into_response()
+        }
+    }
+}
+
+async fn mark_crm_notification_read(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+) -> impl IntoResponse {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+        Some(value) => value,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    if !has_business_moderation_access(&claims) {
+        return err(StatusCode::FORBIDDEN, "crm notification permission required").into_response();
+    }
+    let actor_id = match Uuid::parse_str(claims.sub.trim()) {
+        Ok(value) => value,
+        Err(_) => return err(StatusCode::UNAUTHORIZED, "invalid actor").into_response(),
+    };
+    let updated = sqlx::query(
+        r#"
+        UPDATE internal_moderation.crm_notifications
+        SET is_read=TRUE, read_by=$2, read_at=COALESCE(read_at,NOW()), updated_at=NOW()
+        WHERE id=$1
+        RETURNING id, is_read, read_at
+        "#,
+    )
+    .bind(id)
+    .bind(actor_id)
+    .fetch_optional(&state.db)
+    .await;
+    match updated {
+        Ok(Some(row)) => (StatusCode::OK, Json(json!({
+            "id": row.get::<Uuid,_>("id"),
+            "is_read": row.get::<bool,_>("is_read"),
+            "read_at": row.get::<Option<DateTime<Utc>>,_>("read_at")
+        }))).into_response(),
+        Ok(None) => err(StatusCode::NOT_FOUND, "crm notification not found").into_response(),
+        Err(_) => err(StatusCode::INTERNAL_SERVER_ERROR, "failed to mark CRM notification read").into_response(),
+    }
+}
+
+async fn mark_all_crm_notifications_read(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+        Some(value) => value,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    if !has_business_moderation_access(&claims) {
+        return err(StatusCode::FORBIDDEN, "crm notification permission required").into_response();
+    }
+    let actor_id = match Uuid::parse_str(claims.sub.trim()) {
+        Some(value) => value,
+        None => return err(StatusCode::UNAUTHORIZED, "invalid actor").into_response(),
+    };
+    match sqlx::query(
+        r#"
+        UPDATE internal_moderation.crm_notifications
+        SET is_read=TRUE, read_by=$1, read_at=COALESCE(read_at,NOW()), updated_at=NOW()
+        WHERE is_read=FALSE
+        "#,
+    )
+    .bind(actor_id)
+    .execute(&state.db)
+    .await
+    {
+        Ok(result) => (StatusCode::OK, Json(json!({"updated_count": result.rows_affected()}))).into_response(),
+        Err(_) => err(StatusCode::INTERNAL_SERVER_ERROR, "failed to mark CRM notifications read").into_response(),
+    }
+}
+
+async fn review_business_appeal(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(appeal_id): Path<Uuid>,
+    Json(payload): Json<BusinessAppealReviewRequest>,
+) -> impl IntoResponse {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+        Some(value) => value,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    if !has_business_moderation_access(&claims) {
+        return err(StatusCode::FORBIDDEN, "business appeal permission required").into_response();
+    }
+    let actor_id = match Uuid::parse_str(claims.sub.trim()) {
+        Ok(value) => value,
+        Err(_) => return err(StatusCode::UNAUTHORIZED, "invalid actor").into_response(),
+    };
+    let action = payload.action.trim().to_ascii_lowercase();
+    let status = match action.as_str() {
+        "overturn" => "overturned",
+        "uphold" => "upheld",
+        "needs_information" => "needs_information",
+        _ => return err(StatusCode::BAD_REQUEST, "unsupported appeal decision").into_response(),
+    };
+    let note = normalize_text(payload.note, 4000);
+    if status != "needs_information" && note.is_none() {
+        return err(StatusCode::BAD_REQUEST, "appeal decision note is required").into_response();
+    }
+
+    let row = match sqlx::query(
+        r#"
+        SELECT a.id, a.case_id, a.business_id, a.appellant_user_id, a.status,
+               s.name, s.owner_user_id
+        FROM internal_moderation.business_appeals a
+        JOIN umkm_stores s ON s.id=a.business_id
+        WHERE a.id=$1
+        "#,
+    )
+    .bind(appeal_id)
+    .fetch_optional(&state.db)
+    .await
+    {
+        Ok(Some(row)) => row,
+        Ok(None) => return err(StatusCode::NOT_FOUND, "appeal not found").into_response(),
+        Err(_) => return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load appeal").into_response(),
+    };
+    if !matches!(row.get::<String,_>("status").as_str(), "pending" | "in_review") {
+        return err(StatusCode::CONFLICT, "appeal is already resolved").into_response();
+    }
+    let case_id: Uuid = row.get("case_id");
+    let business_id: Uuid = row.get("business_id");
+    let owner_id: Uuid = row.get("owner_user_id");
+
+    let mut tx = match state.db.begin().await {
+        Ok(tx) => tx,
+        Err(_) => return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to open appeal transaction").into_response(),
+    };
+
+    let new_active = status == "overturned";
+    if sqlx::query(
+        r#"
+        UPDATE internal_moderation.business_appeals
+        SET status=$2, reviewer_id=$3, reviewer_note=$4, updated_at=NOW(), resolved_at=CASE WHEN $2 <> 'needs_information' THEN NOW() ELSE NULL END
+        WHERE id=$1
+        "#,
+    )
+    .bind(appeal_id)
+    .bind(status)
+    .bind(actor_id)
+    .bind(note.as_deref())
+    .execute(&mut *tx)
+    .await
+    .is_err()
+    {
+        let _ = tx.rollback().await;
+        return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to save appeal decision").into_response();
+    }
+
+    if status == "needs_information" {
+        if sqlx::query("UPDATE internal_moderation.business_moderation_cases SET status='reviewing', updated_at=NOW() WHERE id=$1")
+            .bind(case_id)
+            .execute(&mut *tx)
+            .await
+            .is_err()
+        {
+            let _ = tx.rollback().await;
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to reopen business review").into_response();
+        }
+    } else {
+        if sqlx::query("UPDATE umkm_stores SET is_active=$2, updated_at=NOW() WHERE id=$1")
+            .bind(business_id)
+            .bind(new_active)
+            .execute(&mut *tx)
+            .await
+            .is_err()
+        {
+            let _ = tx.rollback().await;
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to apply appeal decision").into_response();
+        }
+        if sqlx::query("UPDATE internal_moderation.business_moderation_cases SET status='resolved', updated_at=NOW(), resolved_at=NOW() WHERE id=$1")
+            .bind(case_id)
+            .execute(&mut *tx)
+            .await
+            .is_err()
+        {
+            let _ = tx.rollback().await;
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to resolve business case").into_response();
+        }
+    }
+
+    if sqlx::query(
+        r#"
+        INSERT INTO internal_moderation.business_moderation_events
+          (case_id, actor_id, action, reason_code, reason_note, severity,
+           previous_status, new_status, missing_fields, business_snapshot)
+        SELECT c.id,$2,$3,'other',$4,c.severity,c.status,c.status,'[]'::jsonb,
+               jsonb_build_object('business_id',$1,'appeal_id',$5)
+        FROM internal_moderation.business_moderation_cases c
+        WHERE c.id=$6
+        "#,
+    )
+    .bind(business_id)
+    .bind(actor_id)
+    .bind(format!("appeal_{}", action))
+    .bind(note.as_deref())
+    .bind(appeal_id)
+    .bind(case_id)
+    .execute(&mut *tx)
+    .await
+    .is_err()
+    {
+        let _ = tx.rollback().await;
+        return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to write appeal history").into_response();
+    }
+
+    if tx.commit().await.is_err() {
+        return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to commit appeal decision").into_response();
+    }
+
+    push_notification_best_effort(
+        &state,
+        owner_id,
+        "business",
+        "business_appeal_reviewed",
+        if status == "overturned" { "Banding usaha diterima" } else if status == "upheld" { "Banding usaha selesai" } else { "Bukti tambahan diperlukan" },
+        if status == "overturned" {
+            "Keputusan sebelumnya dibatalkan dan usaha dapat ditampilkan kembali."
+        } else if status == "upheld" {
+            "Banding telah ditinjau dan keputusan sebelumnya tetap berlaku."
+        } else {
+            "Tim Lajukan membutuhkan informasi atau bukti tambahan untuk memproses banding Anda."
+        },
+        json!({"business_id": business_id, "appeal_id": appeal_id, "status": status, "reason_note": note}),
+    )
+    .await;
+    push_crm_notification(
+        &state,
+        "business_appeal_reviewed",
+        Some(business_id),
+        "Banding usaha diproses",
+        &format!("Banding usaha untuk {} diproses: {}.", row.get::<String,_>("name"), status),
+        json!({"business_id": business_id, "appeal_id": appeal_id, "status": status}),
+    )
+    .await;
+
+    (StatusCode::OK, Json(json!({"appeal_id": appeal_id, "status": status, "reason_note": note}))).into_response()
+}
