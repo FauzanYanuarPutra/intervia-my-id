@@ -22,6 +22,7 @@ Options:
   --profile NAME          Repeatable. Enables an optional Compose profile.
   --service NAME          Repeatable. Starts only selected services.
   --build                 Build selected/all buildable services first.
+  --buildclear             Compatibility alias for --build.
   --pull                  Pull images before startup.
   --down                  Stop the selected environment stack.
   --fresh                 Recreate containers; volumes are preserved.
@@ -53,7 +54,7 @@ while (($#)); do
       SERVICES+=("$2")
       shift 2
       ;;
-    --build)
+    --build|--buildclear)
       BUILD=1
       shift
       ;;
