@@ -28,7 +28,14 @@ export async function POST(
       idempotencyKey,
       body,
     );
-    return NextResponse.json(payload, { status: 201 });
+    const replayed =
+      payload &&
+      typeof payload === 'object' &&
+      'data' in payload &&
+      Boolean(
+        (payload as { data?: { replayed?: boolean } }).data?.replayed,
+      );
+    return NextResponse.json(payload, { status: replayed ? 200 : 201 });
   } catch (error) {
     return errorResponse(error);
   }
