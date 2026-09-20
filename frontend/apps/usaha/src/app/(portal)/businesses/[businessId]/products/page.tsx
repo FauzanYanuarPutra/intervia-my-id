@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { Calculator, Plus, Search, Store } from 'lucide-react';
+import { Calculator, Search, Store } from 'lucide-react';
 import { EmptyState } from '@/components/portal/EmptyState';
 import { PageHeader } from '@/components/portal/PageHeader';
 import { PortalShell } from '@/components/portal/PortalShell';
@@ -8,6 +8,7 @@ import { ProductThumb } from '@/components/portal/ProductThumb';
 import { StatusBadge } from '@/components/portal/StatusBadge';
 import { ProductEditorWorkspace } from '@/components/forms/ProductEditorWorkspace';
 import { ProductQuickForm } from '@/components/forms/ProductQuickForm';
+import { ProductCreateModal } from '@/components/forms/ProductCreateModal';
 import { productPrimaryMode } from '@/lib/business-control/progressive-disclosure';
 import { hasPermission } from '@/lib/portal-logic';
 import { resolvePortalBusinessPageState } from '@/lib/portal-server';
@@ -85,11 +86,7 @@ export default async function BusinessProductsPage({ params, searchParams }: Pag
         eyebrow="Produk"
         title="Produk yang dijual"
         description="Foto, nama, harga, dan stok dulu. Detail lain dibuka saat diperlukan."
-        action={canManage && business.products.length && !selectedProduct ? (
-          <a href="#tambah-produk" className="portal-button-primary">
-            <Plus className="h-4 w-4" /> Produk
-          </a>
-        ) : null}
+        action={canManage ? <ProductCreateModal businessId={business.id} /> : null}
       />
 
       {primaryMode === 'add-product' ? (
@@ -149,16 +146,15 @@ export default async function BusinessProductsPage({ params, searchParams }: Pag
             </section>
 
             {canManage ? (
-              <details id="tambah-produk" className="merchant-surface-bordered group">
-                <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3.5 font-black text-portal-ink sm:px-5">
-                  <span>Tambah produk</span>
-                  <span className="text-xs text-portal-forest group-open:hidden">Buka</span>
-                  <span className="hidden text-xs text-portal-forest group-open:inline">Tutup</span>
-                </summary>
-                <div className="border-t border-portal-line/70 p-4 sm:p-5">
-                  <ProductQuickForm businessId={business.id} />
+              <section className="merchant-surface-bordered flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+                <div>
+                  <p className="font-black text-portal-ink">Tambah produk</p>
+                  <p className="mt-1 text-xs leading-5 text-portal-soft">
+                    Buka form di jendela terpisah supaya daftar produk tetap rapi.
+                  </p>
                 </div>
-              </details>
+                <ProductCreateModal businessId={business.id} />
+              </section>
             ) : null}
 
             {(canViewCosting || canViewChannels) ? (
