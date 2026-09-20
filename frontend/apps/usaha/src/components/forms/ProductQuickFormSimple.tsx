@@ -3,6 +3,7 @@
 import { startTransition, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus } from 'lucide-react';
+import { ProductDetailsModal } from './ProductDetailsModal';
 import { ChoiceChips } from '@/components/interaction/ChoiceChips';
 import { BusinessImageCropUpload } from '@/components/media/BusinessImageCropUpload';
 import { businessApiErrorMessage } from '@/lib/business-api-error';
@@ -38,6 +39,7 @@ export function ProductQuickForm({ businessId }: ProductQuickFormProps) {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isPending, setIsPending] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -145,74 +147,38 @@ export function ProductQuickForm({ businessId }: ProductQuickFormProps) {
         </label>
       </div>
 
-      <details className="group rounded-2xl border border-portal-line bg-white">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3.5 text-sm font-bold text-portal-ink">
-          <span>Detail lainnya <span className="ml-2 text-xs font-normal text-portal-soft">Kategori, stok tipis, titipan</span></span>
-          <span className="text-xs font-bold text-portal-forest group-open:hidden">Buka</span>
-          <span className="hidden text-xs font-bold text-portal-forest group-open:inline">Tutup</span>
-        </summary>
-        <div className="grid gap-4 border-t border-portal-line p-4">
-          <div className="grid gap-4">
-            <div className="grid gap-2 text-sm font-semibold text-portal-ink">
-              <span>Kategori</span>
-              <ChoiceChips
-                value={category}
-                onChange={setCategory}
-                ariaLabel="Kategori produk"
-                options={categoryOptions.map(value => ({ value, label: value }))}
-              />
-            </div>
-            <div className="grid gap-2 text-sm font-semibold text-portal-ink">
-              <span>Sumber barang</span>
-              <ChoiceChips
-                value={sourceType}
-                onChange={setSourceType}
-                ariaLabel="Sumber barang"
-                options={sourceTypeOptions}
-              />
-            </div>
-          </div>
+      <ProductDetailsModal
+        open={detailsOpen}
+        onClose={() => setDetailsOpen(false)}
+        category={category}
+        onCategoryChange={setCategory}
+        sourceType={sourceType}
+        onSourceTypeChange={setSourceType}
+        minStockAlert={minStockAlert}
+        onMinStockAlertChange={setMinStockAlert}
+        stockUnit={stockUnit}
+        onStockUnitChange={setStockUnit}
+        stockMode={stockMode}
+        onStockModeChange={setStockMode}
+        ownerLabel={ownerLabel}
+        onOwnerLabelChange={setOwnerLabel}
+        consignmentTerms={consignmentTerms}
+        onConsignmentTermsChange={setConsignmentTerms}
+        notes={notes}
+        onNotesChange={setNotes}
+      />
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="grid gap-2 text-sm font-semibold text-portal-ink">
-              Batas stok tipis
-              <input type="number" inputMode="decimal" min="0" step="any" value={minStockAlert} onChange={event => setMinStockAlert(event.target.value)} placeholder="Contoh: 5" className="portal-input" />
-            </label>
-            <label className="grid gap-2 text-sm font-semibold text-portal-ink">
-              Satuan stok
-              <input maxLength={40} value={stockUnit} onChange={event => setStockUnit(event.target.value)} placeholder="pcs / botol / cup" className="portal-input" />
-            </label>
-          </div>
-
-          <div className="grid gap-2 text-sm font-semibold text-portal-ink">
-            <span>Cara menghitung stok</span>
-            <ChoiceChips
-              value={stockMode}
-              onChange={setStockMode}
-              ariaLabel="Cara menghitung stok"
-              options={stockModeOptions}
-            />
-          </div>
-
-          {sourceType === 'consignment' ? (
-            <div className="grid gap-4 rounded-xl bg-[#f7f8f5] p-3 sm:grid-cols-2">
-              <label className="grid gap-2 text-sm font-semibold text-portal-ink">
-                Nama penitip / supplier
-                <input value={ownerLabel} onChange={event => setOwnerLabel(event.target.value)} placeholder="Contoh: Bu Rini Snack" className="portal-input" />
-              </label>
-              <label className="grid gap-2 text-sm font-semibold text-portal-ink">
-                Aturan titip jual
-                <input value={consignmentTerms} onChange={event => setConsignmentTerms(event.target.value)} placeholder="Contoh: bagi hasil 80/20" className="portal-input" />
-              </label>
-            </div>
-          ) : null}
-
-          <label className="grid gap-2 text-sm font-semibold text-portal-ink">
-            <span>Catatan <span className="font-normal text-portal-soft">(opsional)</span></span>
-            <input value={notes} onChange={event => setNotes(event.target.value)} placeholder="Contoh: paling laris pagi hari" className="portal-input" />
-          </label>
-        </div>
-      </details>
+      <button
+        type="button"
+        onClick={() => setDetailsOpen(true)}
+        className="flex w-full items-center justify-between gap-3 rounded-2xl border border-portal-line bg-white px-4 py-3.5 text-left transition hover:border-portal-forest/40"
+      >
+        <span>
+          <span className="block text-sm font-bold text-portal-ink">Detail lainnya</span>
+          <span className="mt-0.5 block text-xs font-normal text-portal-soft">Kategori, stok, titipan, dan catatan</span>
+        </span>
+        <span className="shrink-0 rounded-full bg-portal-mist px-3 py-1 text-xs font-bold text-portal-forest">Atur</span>
+      </button>
 
       {error ? <p role="alert" className="rounded-xl bg-red-50 px-3 py-2.5 text-sm font-semibold text-portal-ember">{error}</p> : null}
       {success ? <p role="status" className="rounded-xl bg-emerald-50 px-3 py-2.5 text-sm font-semibold text-portal-forest">{success}</p> : null}
