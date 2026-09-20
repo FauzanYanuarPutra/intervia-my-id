@@ -110,6 +110,15 @@ jobs:
               throw "up.ps1 launcher contract missing: $pattern"
             }
           }
+          $forbiddenLauncherPatterns = @(
+            'Test-DockerResourceFailure -OutputText $BatchBuildText -and',
+            'Test-DockerResourceFailure -OutputText $RetryText -and'
+          )
+          foreach ($pattern in $forbiddenLauncherPatterns) {
+            if ($launcher -match [regex]::Escape($pattern)) {
+              throw "up.ps1 launcher has invalid boolean-expression binding: $pattern"
+            }
+          }
           Write-Host "All PowerShell syntax and launcher contract checks passed."
 
   frontend:
