@@ -667,6 +667,88 @@ export default function BusinessModerationWorkspace() {
         </div>
       ) : null}
 
+      {referenceDraft ? (
+        <div className="fixed inset-0 z-[125] flex items-center justify-center bg-slate-950/35 p-4">
+          <div className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-700">Data referensi peta</p>
+                <h2 className="mt-1 text-lg font-bold text-slate-950">
+                  {referenceDraft.action === "hide" ? "Sembunyikan dari peta publik" : "Pulihkan ke peta publik"}
+                </h2>
+                <p className="mt-1 text-sm font-semibold text-slate-600">{referenceDraft.reference.title}</p>
+              </div>
+              <button type="button" onClick={() => setReferenceDraft(null)} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600">
+                Tutup
+              </button>
+            </div>
+
+            <div className="mt-5">
+              <p className="text-sm font-bold text-slate-950">Alasan keputusan</p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {[
+                  ["inaccurate_information", "Informasi tidak akurat"],
+                  ["not_found", "Lokasi/usaha tidak ditemukan"],
+                  ["duplicate_business", "Data duplikat"],
+                  ["policy_violation", "Tidak sesuai kebijakan"],
+                  ["privacy_personal_data", "Masalah privasi/data pribadi"],
+                  ["copyright", "Masalah hak cipta/media"],
+                  ["quality", "Kualitas data"],
+                  ["other", "Lainnya"],
+                ].map(([value, label]) => (
+                  <label key={value} className="flex cursor-pointer items-start gap-2 rounded-2xl border border-slate-200 p-3 text-xs font-semibold">
+                    <input type="radio" name="reference-reason" checked={reasonCode === value} onChange={() => setReasonCode(value)} className="mt-0.5" />
+                    <span>{label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <label className="mt-4 block text-sm font-bold text-slate-950">
+              Catatan {referenceDraft.action === "hide" || reasonCode === "other" ? "(wajib)" : "(opsional)"}
+              <textarea
+                value={reasonNote}
+                onChange={event => setReasonNote(event.target.value)}
+                rows={4}
+                maxLength={4000}
+                placeholder="Jelaskan secara faktual mengapa data referensi perlu diubah."
+                className="mt-2 w-full rounded-2xl border border-slate-200 p-3 text-sm outline-none focus:border-slate-400"
+              />
+            </label>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setReferenceDraft(null)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-600">
+                Batal
+              </button>
+              <button
+                type="button"
+                disabled={busy || ((referenceDraft.action === "hide" || reasonCode === "other") && !reasonNote.trim())}
+                onClick={() => {
+                  if (!accessToken || !referenceDraft) return;
+                  setBusy(true);
+                  void businessModerationApi.moderateReference(accessToken, referenceDraft.reference.id, {
+                    action: referenceDraft.action,
+                    reason_code: reasonCode,
+                    reason_note: reasonNote.trim() || undefined,
+                    severity,
+                    legal_hold: severity === "high" || severity === "critical",
+                  }).then(async () => {
+                    setReferenceDraft(null);
+                    setNotice(referenceDraft.action === "hide" ? "Data referensi disembunyikan dan dicatat di history moderasi." : "Data referensi dipulihkan.");
+                    await loadBusinesses();
+                  }).catch(error => {
+                    setNotice(error instanceof Error ? error.message : "Keputusan data referensi gagal.");
+                  }).finally(() => setBusy(false));
+                }}
+                className={\`rounded-xl px-4 py-2 text-sm font-bold text-white \${referenceDraft.action === "hide" ? "bg-rose-600" : "bg-emerald-600"} disabled:opacity-50\`}
+              >
+                {busy ? "Menyimpan..." : referenceDraft.action === "hide" ? "Sembunyikan" : "Pulihkan"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {verificationDraft ? (
         <div className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/35 p-4">
           <div className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl">
