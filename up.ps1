@@ -61,21 +61,42 @@ try {
             [string[]]$Arguments
         )
 
-        # PowerShell 7.4+ can turn a non-zero native exit code into an
-        # ErrorRecord when $PSNativeCommandUseErrorActionPreference is enabled.
-        # The launcher intentionally needs the exit code/output as data so a
-        # broken Docker daemon can be diagnosed instead of terminating here.
-        $PreviousErrorActionPreference = $ErrorActionPreference
+        # Docker Compose intentionally writes its normal BuildKit progress to
+        # native stderr. Merging stderr with stdout (2>&1) makes PowerShell
+        # render ordinary Compose progress as NativeCommandError records.
+        # Capture the two streams separately, then return plain strings so the
+        # launcher can decide whether a failure is real from the exit code.
+        $StderrPath = [System.IO.Path]::GetTempFileName()
         try {
-            $ErrorActionPreference = "Continue"
-            $Output = @(& docker @Arguments 2>&1)
+            $PreviousErrorActionPreference = $ErrorActionPreference
+            $Stdout = @()
+            $ExitCode = 1
+            try {
+                $ErrorActionPreference = "Continue"
+                $Stdout = @(& docker @Arguments 1> $StderrPath)
+                $ExitCode = $LASTEXITCODE
+            }
+            finally {
+                $ErrorActionPreference = $PreviousErrorActionPreference
+            }
+
+            $Stderr = @()
+            if (Test-Path -LiteralPath $StderrPath) {
+                $RawStderr = Get-Content -Raw -LiteralPath $StderrPath
+                if (-not [string]::IsNullOrEmpty($RawStderr)) {
+                    $Stderr = @($RawStderr -split "\r?\n" | Where-Object { $_ -ne "" })
+                }
+            }
+
             [pscustomobject]@{
-                ExitCode = $LASTEXITCODE
-                Output = $Output
+                ExitCode = $ExitCode
+                Output = @($Stdout) + @($Stderr)
+                Stdout = @($Stdout)
+                Stderr = @($Stderr)
             }
         }
         finally {
-            $ErrorActionPreference = $PreviousErrorActionPreference
+            Remove-Item -LiteralPath $StderrPath -Force -ErrorAction SilentlyContinue
         }
     }
 
