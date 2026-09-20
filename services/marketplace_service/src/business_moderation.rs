@@ -293,6 +293,16 @@ pub(crate) fn router() -> Router<Arc<AppState>> {
         .route("/v1/crm/businesses", get(list_crm_businesses))
         .route("/v1/crm/businesses/{id}/moderation/history", get(get_business_moderation_history))
         .route("/v1/crm/businesses/{id}/moderate", post(moderate_business))
+        .route("/v1/crm/businesses/{id}/moderation/assign", post(assign_business_case))
+        .route("/v1/crm/businesses/{id}/moderation/evidence", post(add_business_evidence))
+        .route("/v1/crm/businesses/{id}/verification/review", post(review_business_verification))
+        .route("/v1/crm/appeals/{appeal_id}/review", post(review_business_appeal))
+        .route("/v1/crm/notifications", get(list_crm_notifications))
+        .route("/v1/crm/notifications/{id}/read", post(mark_crm_notification_read))
+        .route("/v1/crm/notifications/read-all", post(mark_all_crm_notifications_read))
+        .route("/v1/umkm/stores/{store_ref}/report", post(report_business))
+        .route("/v1/umkm/stores/{store_ref}/appeal", post(request_business_appeal))
+        .route("/v1/umkm/stores/{store_ref}/verification/request", post(request_business_verification))
 }
 
 async fn list_crm_businesses(
