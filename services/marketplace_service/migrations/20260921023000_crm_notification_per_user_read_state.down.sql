@@ -1,0 +1,2 @@
+DROP INDEX IF EXISTS internal_moderation.idx_crm_notification_reads_user;
+DROP TABLE IF EXISTS internal_moderation.crm_notification_reads;
