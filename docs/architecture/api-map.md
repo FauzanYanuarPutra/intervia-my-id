@@ -26,7 +26,7 @@ Base evidence: `services/marketplace_service/src/main.rs`.
 - Wallet: `/v1/wallet/balance`, ledger, topups, withdrawals, Midtrans notify.
 - Notifications: `/v1/notifications`, unread count, read/read-all, stream.
 - Support: `/v1/support/tickets`, replies.
-- CRM: `/v1/crm/leads`, `/v1/crm/leads/{id}`, `/v1/crm/activities`. Current API is lead/activity-only; target owner CRM APIs are documented in `architecture/crm-architecture.md`.
+- CRM: `/v1/crm/leads`, `/v1/crm/leads/{id}`, `/v1/crm/activities`, `/v1/crm/businesses`, `/v1/crm/businesses/{id}/moderate`, `/v1/crm/businesses/{id}/moderation/history`. Business review APIs cover completeness checks, request-completion decisions, visibility moderation, reason/severity evidence, immutable history, and owner/CRM notifications. Owner CRM expansion remains documented in `architecture/crm-architecture.md`.
 - Super-app ops: `/v1/super-app/orders`, trust profiles.
 - CMS: `/v1/sectors`, `/v1/banners`.
 - News editorial CMS: `/v1/news/editorial/queue`, `/v1/news/editorial/metrics`, `/v1/news/{id}/editorial`, `/v1/news/{id}/editorial/edit`, `/v1/news/{id}/sources/{source_id}`, `/v1/news/{id}/moderate`. These flows own review, source verification, scheduling, correction/retraction, versioning, audit events and publication outbox.
