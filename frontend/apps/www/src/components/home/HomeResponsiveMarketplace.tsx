@@ -2476,60 +2476,81 @@ function GameProgressCard({
   if (compact) {
     return (
       <section
-        className="lajukan-game-progress-card relative overflow-hidden rounded-[14px] border border-slate-100 bg-white px-2.5 py-2 text-[color:var(--app-text)] shadow-[0_6px_18px_-16px_rgba(15,23,42,0.2)] dark:border-zinc-800/80 dark:bg-zinc-950 dark:text-zinc-50"
-        data-layout="compact"
+        className="lajukan-game-progress-card relative overflow-hidden rounded-2xl border border-zinc-100 bg-white px-3.5 py-3.5 text-[color:var(--app-text)] shadow-[0_8px_24px_-20px_rgba(15,23,42,0.24)] dark:border-zinc-800/80 dark:bg-zinc-950 dark:text-zinc-50"
+        data-layout="compact-readable"
       >
-        <div className="relative flex min-w-0 items-center gap-2">
-          <div className="relative grid h-8 w-8 shrink-0 place-items-center rounded-[10px] bg-gradient-to-br from-emerald-500 to-teal-600 text-white">
-            <span className="text-[11px] font-black leading-none">{snapshot.level}</span>
-            <span className="absolute -bottom-0.5 -right-0.5 grid h-3.5 w-3.5 place-items-center rounded-[4px] bg-amber-400">
-              <Trophy className="h-2 w-2 text-emerald-950" />
-            </span>
-          </div>
-
-          <div className="min-w-0 w-[86px] shrink-0">
-            <div className="flex items-center gap-1">
-              <span className="truncate text-[9px] font-bold text-zinc-500 dark:text-zinc-400">
-                Lvl {snapshot.level}
-              </span>
-              <span className="truncate text-[9px] font-bold text-amber-600 dark:text-amber-400">
-                {snapshot.rank}
+        <div className="relative space-y-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="relative grid h-11 w-11 shrink-0 place-items-center rounded-[13px] bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-sm shadow-emerald-500/20">
+              <span className="text-sm font-black leading-none">{snapshot.level}</span>
+              <span className="absolute -bottom-1 -right-1 grid h-5 w-5 place-items-center rounded-md bg-amber-400 shadow-sm">
+                <Trophy className="h-2.5 w-2.5 text-emerald-950" />
               </span>
             </div>
-            <div className="mt-1 flex items-center gap-1">
-              <div className="h-1 min-w-0 flex-1 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-[13px] font-black leading-5 text-zinc-900 dark:text-zinc-50">
+                    Lvl {snapshot.level}
+                  </p>
+                  <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">
+                    {snapshot.rank}
+                  </p>
+                </div>
+                <span className="shrink-0 text-[11px] font-bold text-zinc-500 dark:text-zinc-400">
+                  {snapshot.xp}/{snapshot.xpGoal}
+                </span>
+              </div>
+
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-emerald-500 via-teal-400 to-amber-400"
+                  className="h-full rounded-full bg-gradient-to-r from-emerald-500 via-teal-400 to-amber-400 transition-all duration-500"
                   style={{ width: `${snapshot.xpPercent}%` }}
                 />
               </div>
-              <span className="shrink-0 text-[7px] font-bold text-zinc-400">
-                {snapshot.xp}/{snapshot.xpGoal}
-              </span>
             </div>
           </div>
 
-          <span className="hidden h-5 w-px bg-zinc-200 sm:block dark:bg-zinc-800" />
-
-          <div className="min-w-0 flex-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <div className="flex min-w-max items-center gap-1.5">
-              <span className="rounded-full bg-zinc-50 px-2 py-1 text-[9px] font-bold text-zinc-600 dark:bg-zinc-900 dark:text-zinc-300">
+          <div className="grid grid-cols-2 overflow-hidden rounded-xl border border-zinc-100 bg-zinc-50/70 dark:border-zinc-800 dark:bg-zinc-900/40 sm:grid-cols-4">
+            <div className="min-w-0 px-3 py-2.5 sm:border-r sm:border-zinc-100 sm:dark:border-zinc-800">
+              <p className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400">
+                {isId ? 'Saldo' : 'Balance'}
+              </p>
+              <p className="mt-0.5 truncate text-sm font-black text-zinc-900 dark:text-zinc-50">
                 {walletLoading ? '…' : amountLabel}
-              </span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2 py-1 text-[9px] font-bold text-orange-700 dark:bg-orange-500/10 dark:text-orange-300">
-                <Flame className="h-2.5 w-2.5" />
+              </p>
+            </div>
+
+            <div className="min-w-0 border-l border-zinc-100 px-3 py-2.5 dark:border-zinc-800 sm:border-l-0 sm:border-r">
+              <p className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400">
+                Streak
+              </p>
+              <p className="mt-0.5 flex items-center gap-1 text-sm font-black text-orange-600 dark:text-orange-400">
+                <Flame className="h-3.5 w-3.5" />
                 {snapshot.streak}x
-              </span>
-              <Link
-                href={activeQuest.href}
-                className="inline-flex min-w-0 items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-bold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300"
-              >
-                <Zap className="h-2.5 w-2.5 shrink-0" />
+              </p>
+            </div>
+
+            <Link
+              href={activeQuest.href}
+              className="min-w-0 border-t border-zinc-100 px-3 py-2.5 transition hover:bg-white sm:border-l-0 sm:border-r sm:border-t-0 dark:border-zinc-800 dark:hover:bg-zinc-900/70"
+            >
+              <p className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400">
+                {isId ? 'Quest aktif' : 'Active quest'}
+              </p>
+              <p className="mt-0.5 truncate text-sm font-black text-emerald-700 dark:text-emerald-300">
                 +{activeQuest.xp} XP
-              </Link>
-              <span className="rounded-full bg-amber-50 px-2 py-1 text-[9px] font-bold text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
+              </p>
+            </Link>
+
+            <div className="min-w-0 border-l border-t border-zinc-100 px-3 py-2.5 dark:border-zinc-800 sm:border-l-0 sm:border-t-0">
+              <p className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400">
+                {isId ? 'Berikutnya' : 'Next reward'}
+              </p>
+              <p className="mt-0.5 truncate text-sm font-black text-amber-700 dark:text-amber-300">
                 {snapshot.nextReward}
-              </span>
+              </p>
             </div>
           </div>
         </div>
@@ -5610,8 +5631,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
           onOpenFilters={openSearchFilters}
         />
         {/* <MobileAppDownloadSection isId={isId} /> */}
-        <QuickCategoriesSection isId={isId} />
-        <div className="grid gap-1.5">
+        {isAuthenticated ? (
           <GameProgressCard
             isId={isId}
             isAuthenticated={isAuthenticated}
@@ -5621,8 +5641,9 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
             walletLoading={walletLoading}
             compact
           />
-          <DailyLoginRewardCard locale={locale} compact />
-        </div>
+        ) : null}
+        <QuickCategoriesSection isId={isId} />
+        <DailyLoginRewardCard locale={locale} compact />
         <TrendingSearchSection isId={isId} />
 
         <HomeUmkmMapPreview
@@ -5697,8 +5718,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
                 onSubmit={handleSearchSubmit}
                 onOpenFilters={openSearchFilters}
               />
-              <QuickCategoriesSection isId={isId} />
-              <div className="grid gap-1.5">
+              {isAuthenticated ? (
                 <GameProgressCard
                   isId={isId}
                   isAuthenticated={isAuthenticated}
@@ -5708,8 +5728,9 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
                   walletLoading={walletLoading}
                   compact
                 />
-                <DailyLoginRewardCard locale={locale} compact />
-              </div>
+              ) : null}
+              <QuickCategoriesSection isId={isId} />
+              <DailyLoginRewardCard locale={locale} compact />
               <TrendingSearchSection isId={isId} />
 
               <HomeUmkmMapPreview
