@@ -143,8 +143,8 @@ async fn run_policy(db: &PgPool, policy_key: &str) -> Result<i64> {
         return Ok(0);
     };
 
-    let run_id: uuid::Uuid = sqlx::query_scalar::<_, i32>(
-            r#"
+    let run_id: uuid::Uuid = sqlx::query_scalar::<_, uuid::Uuid>(
+        r#"
         INSERT INTO core.retention_runs (policy_key, status)
         VALUES ($1, 'running')
         RETURNING id
