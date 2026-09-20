@@ -1201,9 +1201,9 @@ function Sidebar({
           <div className="mt-4 shrink-0 rounded-2xl border border-slate-200 bg-slate-50 p-3">
             {!collapsed ? (
               <>
-                <p className="text-xs font-bold text-slate-900">Mode CRM v1</p>
+                <p className="text-xs font-bold text-slate-900">CRM Operator</p>
                 <p className="mt-1 text-xs leading-5 text-slate-500">
-                  Fokus transaksi, chat, listing, dan moderasi.
+                  Data real → antrean → tindakan → audit → efek ke produk.
                 </p>
               </>
             ) : (
