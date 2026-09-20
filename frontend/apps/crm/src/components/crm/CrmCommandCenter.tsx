@@ -29,6 +29,7 @@ import {
   usersApi,
   type CrmActivity,
   type CrmBusiness,
+  type CrmNotification,
   type CrmContentItem,
   type CrmLead,
   type SuperAppOrder,
@@ -633,12 +634,14 @@ export default function CrmCommandCenter() {
   const [moderationBusy, setModerationBusy] = useState(false);
   const [newsPendingCount, setNewsPendingCount] = useState(0);
   const [businessPendingCount, setBusinessPendingCount] = useState(0);
+  const [crmNotifications, setCrmNotifications] = useState<CrmNotification[]>([]);
+  const [crmNotificationOpen, setCrmNotificationOpen] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!accessToken) return;
     setRefreshing(true);
     const failures: string[] = [];
-    const [leadRes, activityRes, ticketRes, orderRes, trustRes, contentRes, userRes, businessRes, newsMetricsRes] =
+    const [leadRes, activityRes, ticketRes, orderRes, trustRes, contentRes, userRes, businessRes, crmNotificationRes, newsMetricsRes] =
       await Promise.allSettled([
         leadApi.list(accessToken, { limit: "120" }),
         activityApi.list(accessToken, { limit: "60" }),
@@ -648,6 +651,7 @@ export default function CrmCommandCenter() {
         contentApi.list(accessToken, { limit: "160", offset: "0" }),
         usersApi.list(accessToken),
         businessModerationApi.list(accessToken, { limit: "100" }),
+        businessModerationApi.notifications(accessToken),
         newsApi.metrics(accessToken),
       ]);
 
@@ -670,6 +674,9 @@ export default function CrmCommandCenter() {
         ["unreviewed", "under_review", "needs_completion", "escalated"].includes(item.review_state),
       ).length,
     );
+    if (crmNotificationRes.status === "fulfilled") {
+      setCrmNotifications(crmNotificationRes.value.items || []);
+    }
 
     if (newsMetricsRes.status === "fulfilled") {
       const metrics = asRecord(newsMetricsRes.value);
@@ -951,7 +958,24 @@ export default function CrmCommandCenter() {
             query={query}
             userLabel={user?.username || user?.email || "Admin"}
             refreshing={refreshing}
-            notificationCount={openIssues + highRiskOrders + newsPendingCount + businessPendingCount}
+            notificationCount={openIssues + highRiskOrders + newsPendingCount + businessPendingCount + crmNotifications.filter(item => !item.is_read).length}
+            crmNotifications={crmNotifications}
+            crmNotificationOpen={crmNotificationOpen}
+            onToggleCrmNotifications={() => setCrmNotificationOpen(current => !current)}
+            onMarkCrmNotificationRead={id => {
+              if (!accessToken) return;
+              void businessModerationApi.markNotificationRead(accessToken, id).then(() => {
+                setCrmNotifications(current =>
+                  current.map(item => item.id === id ? { ...item, is_read: true } : item),
+                );
+              });
+            }}
+            onMarkAllCrmNotificationsRead={() => {
+              if (!accessToken) return;
+              void businessModerationApi.markAllNotificationsRead(accessToken).then(() => {
+                setCrmNotifications(current => current.map(item => ({ ...item, is_read: true })));
+              });
+            }}
             profileOpen={profileOpen}
             onQueryChange={setQuery}
             onRefresh={handleRefresh}
@@ -1125,6 +1149,11 @@ function TopBar({
   userLabel,
   refreshing,
   notificationCount,
+  crmNotifications,
+  crmNotificationOpen,
+  onToggleCrmNotifications,
+  onMarkCrmNotificationRead,
+  onMarkAllCrmNotificationsRead,
   profileOpen,
   onQueryChange,
   onRefresh,
@@ -1137,6 +1166,11 @@ function TopBar({
   userLabel: string;
   refreshing: boolean;
   notificationCount: number;
+  crmNotifications: CrmNotification[];
+  crmNotificationOpen: boolean;
+  onToggleCrmNotifications: () => void;
+  onMarkCrmNotificationRead: (id: string) => void;
+  onMarkAllCrmNotificationsRead: () => void;
   profileOpen: boolean;
   onQueryChange: (value: string) => void;
   onRefresh: () => void;
@@ -1177,6 +1211,63 @@ function TopBar({
         >
           {refreshing ? "Memuat..." : "Refresh"}
         </button>
+
+        <div className="relative">
+          <button
+            type="button"
+            onClick={onToggleCrmNotifications}
+            className="relative inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"
+            aria-label="Notifikasi CRM"
+            aria-expanded={crmNotificationOpen}
+          >
+            <Icon name="bell" className="h-4 w-4" />
+            {crmNotifications.filter(item => !item.is_read).length ? (
+              <span className="absolute -right-0.5 -top-0.5 min-w-5 rounded-full bg-rose-500 px-1 text-center text-[9px] font-black text-white">
+                {crmNotifications.filter(item => !item.is_read).length > 99 ? "99+" : crmNotifications.filter(item => !item.is_read).length}
+              </span>
+            ) : null}
+          </button>
+          {crmNotificationOpen ? (
+            <div className="absolute right-0 top-14 z-[100] w-[min(92vw,390px)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+              <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+                <div>
+                  <p className="text-sm font-bold text-slate-950">Notifikasi CRM</p>
+                  <p className="text-[11px] font-semibold text-slate-500">Aktivitas usaha, laporan, banding, dan verifikasi.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={onMarkAllCrmNotificationsRead}
+                  className="text-[11px] font-bold text-emerald-700"
+                >
+                  Tandai semua
+                </button>
+              </div>
+              <div className="max-h-[420px] overflow-y-auto">
+                {crmNotifications.length ? crmNotifications.slice(0, 30).map(item => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => onMarkCrmNotificationRead(item.id)}
+                    className={\`block w-full border-b border-slate-100 px-4 py-3 text-left transition hover:bg-slate-50 \${item.is_read ? "bg-white" : "bg-emerald-50/50"}\`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-slate-900">{item.title}</p>
+                        <p className="mt-1 text-xs leading-5 text-slate-500">{item.message}</p>
+                        <p className="mt-1 text-[10px] font-semibold text-slate-400">{item.created_at}</p>
+                      </div>
+                    </div>
+                  </button>
+                )) : (
+                  <div className="px-4 py-8 text-center text-xs font-semibold text-slate-500">
+                    Belum ada notifikasi CRM.
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : null}
+        </div>
         <button
           type="button"
           className="relative inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700"
