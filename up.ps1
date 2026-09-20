@@ -77,6 +77,7 @@ try {
 
     $DockerRecoveryState = [pscustomobject]@{
         Attempted = $false
+        AttemptCount = 0
         Succeeded = $false
         Reason = "not-run"
     }
@@ -122,7 +123,7 @@ try {
             return $false
         }
 
-        if ($DockerRecoveryState.Attempted) {
+        if ($DockerRecoveryState.AttemptCount -ge 2) {
             return $false
         }
 
@@ -132,6 +133,7 @@ try {
         }
 
         $DockerRecoveryState.Attempted = $true
+        $DockerRecoveryState.AttemptCount++
         $DockerRecoveryState.Reason = $Reason
         Write-Warning "Docker Engine gagal pada saat $Reason. Mencoba satu kali recovery Docker Desktop..."
 
@@ -433,12 +435,10 @@ try {
                         }
 
                         foreach ($ServiceName in $FallbackServices) {
-                            if (-not $DockerRecoveryState.Succeeded) {
-                                $PreServiceProbe = Invoke-DockerNative -Arguments @("info", "--format", "{{json .ServerVersion}}")
-                                if ($PreServiceProbe.ExitCode -ne 0) {
-                                    if (-not (Invoke-DockerEngineRecovery -Reason "fallback build $ServiceName")) {
-                                        throw "Docker Engine tidak sehat sebelum fallback build service '$ServiceName'."
-                                    }
+                            $PreServiceProbe = Invoke-DockerNative -Arguments @("info", "--format", "{{json .ServerVersion}}")
+                            if ($PreServiceProbe.ExitCode -ne 0) {
+                                if (-not (Invoke-DockerEngineRecovery -Reason "fallback build $ServiceName")) {
+                                    throw "Docker Engine tidak sehat sebelum fallback build service '$ServiceName'."
                                 }
                             }
 
@@ -458,9 +458,21 @@ try {
                             if ($ServiceExitCode -ne 0) {
                                 $ServiceProbe = Invoke-DockerNative -Arguments @("info", "--format", "{{json .ServerVersion}}")
                                 if ($ServiceProbe.ExitCode -ne 0) {
-                                    throw "Docker Engine gagal saat fallback build service '$ServiceName'."
+                                    if (Invoke-DockerEngineRecovery -Reason "retry fallback build $ServiceName") {
+                                        try {
+                                            $ErrorActionPreference = "Continue"
+                                            & docker @ComposeArgs @ServiceBuildArgs
+                                            $ServiceExitCode = $LASTEXITCODE
+                                        }
+                                        finally {
+                                            $ErrorActionPreference = $ServicePreviousErrorActionPreference
+                                        }
+                                    }
                                 }
-                                throw "Fallback Docker Compose build gagal pada service '$ServiceName' (exit code $ServiceExitCode)."
+
+                                if ($ServiceExitCode -ne 0) {
+                                    throw "Fallback Docker Compose build gagal pada service '$ServiceName' (exit code $ServiceExitCode)."
+                                }
                             }
                         }
 
