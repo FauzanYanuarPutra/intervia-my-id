@@ -323,16 +323,16 @@ export function DailyLoginRewardCard({ locale, compact = false }: Props) {
                       : 'Claiming coins...'
                     : claimedToday
                       ? isId
-                        ? \`Hari \${streak}/7 masuk\`
-                        : \`Day \${streak}/7 claimed\`
+                        ? `Hari ${streak}/7 masuk`
+                        : `Day ${streak}/7 claimed`
                       : isId
-                        ? \`Claim H\${nextStreakDay}: +\${todayCoin} koin\`
-                        : \`Claim D\${nextStreakDay}: +\${todayCoin} coins\`}
+                        ? `Claim H${nextStreakDay}: +${todayCoin} koin`
+                        : `Claim D${nextStreakDay}: +${todayCoin} coins`}
               </p>
               <p className="truncate text-[9px] leading-3.5 text-[color:var(--app-text-soft)]">
                 {isId
-                  ? \`1 koin = Rp\${coinValueRupiah.toLocaleString('id-ID')} · Reset \${resetLabel}\`
-                  : \`1 coin = IDR \${coinValueRupiah.toLocaleString('id-ID')} · Reset \${resetLabel}\`}
+                  ? `1 koin = Rp${coinValueRupiah.toLocaleString('id-ID')} · Reset ${resetLabel}`
+                  : `1 coin = IDR ${coinValueRupiah.toLocaleString('id-ID')} · Reset ${resetLabel}`}
               </p>
             </div>
 
@@ -393,13 +393,13 @@ export function DailyLoginRewardCard({ locale, compact = false }: Props) {
                         : 'border-slate-200/80 bg-white/82 text-[color:var(--app-text-soft)]',
                     isNext ? 'ring-1 ring-amber-400/60' : '',
                   )}
-                  title={day.voucher ? (isId ? 'Hari voucher' : 'Voucher day') : \`+\${day.coin_amount} coin\`}
+                  title={day.voucher ? (isId ? 'Hari voucher' : 'Voucher day') : `+${day.coin_amount} coin`}
                 >
                   <p className="text-[7px] font-bold leading-3">
                     {isId ? 'H' : 'D'}{day.day}
                   </p>
                   <p className="mt-0.5 truncate text-[7px] font-bold leading-3">
-                    {day.voucher ? 'V' : \`+\${day.coin_amount}\`}
+                    {day.voucher ? 'V' : `+${day.coin_amount}`}
                   </p>
                 </div>
               );
@@ -409,10 +409,10 @@ export function DailyLoginRewardCard({ locale, compact = false }: Props) {
           <div className="mt-1.5 flex min-w-0 items-center gap-1.5">
             <p className="min-w-0 flex-1 truncate px-0.5 text-[8px] font-semibold text-amber-700 dark:text-amber-300">
               {claimedToday
-                ? \`+\${todayCoin} koin · +\${todayXp} XP\`
+                ? `+${todayCoin} koin · +${todayXp} XP`
                 : isId
-                  ? \`Belum claim · +\${todayCoin} koin sebelum reset\`
-                  : \`Not claimed · +\${todayCoin} coins before reset\`}
+                  ? `Belum claim · +${todayCoin} koin sebelum reset`
+                  : `Not claimed · +${todayCoin} coins before reset`}
             </p>
             <Link
               href={'/' + locale + '/transactions'}
