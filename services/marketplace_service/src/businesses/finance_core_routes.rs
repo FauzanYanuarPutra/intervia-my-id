@@ -18,7 +18,7 @@ use crate::{user_id_from_auth, AppState};
 use super::{
     finance_core::{
         CorrectFinanceEntryRequest, CreateFinanceCoreEntryRequest, FinanceCoreError,
-        FinanceCoreRepository, MoveAllocationRequest,
+        FinanceCoreRepository, MoveAllocationRequest, TransferFinanceCoreRequest,
     },
     identity_client::IdentityClient,
     products::ProductRepository,
@@ -35,6 +35,10 @@ pub(crate) fn router() -> Router<Arc<AppState>> {
         .route(
             "/v1/businesses/{business_id}/finance-core/entries",
             get(history).post(create_entry),
+        )
+        .route(
+            "/v1/businesses/{business_id}/finance-core/transfers",
+            post(transfer_accounts),
         )
         .route(
             "/v1/businesses/{business_id}/finance-core/entries/{entry_id}/correct",
@@ -157,6 +161,43 @@ async fn create_entry(
     };
     match FinanceCoreRepository::new(state.db.clone())
         .create_manual_entry(actor_id, business_id, organization_id, key, payload)
+        .await
+    {
+        Ok(outcome) => (
+            if outcome.replayed {
+                StatusCode::OK
+            } else {
+                StatusCode::CREATED
+            },
+            Json(json!({"data": outcome})),
+        )
+            .into_response(),
+        Err(error) => finance_error_response(error),
+    }
+}
+
+async fn transfer_accounts(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(business_id): Path<Uuid>,
+    Json(payload): Json<TransferFinanceCoreRequest>,
+) -> Response {
+    let (actor_id, organization_id) = match finance_context(&state, &headers, business_id).await {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    let key = match idempotency_key(&headers) {
+        Ok(value) => value,
+        Err(code) => return api_error(StatusCode::BAD_REQUEST, code),
+    };
+    match FinanceCoreRepository::new(state.db.clone())
+        .transfer_accounts(
+            actor_id,
+            business_id,
+            organization_id,
+            key,
+            payload,
+        )
         .await
     {
         Ok(outcome) => (
