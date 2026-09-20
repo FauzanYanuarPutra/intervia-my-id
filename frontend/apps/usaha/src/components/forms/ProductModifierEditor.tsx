@@ -1,6 +1,7 @@
 'use client';
 
 import { businessApiErrorMessage } from '@/lib/business-api-error';
+import { RupiahInput } from './RupiahInput';
 
 import { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, Plus, Save, Trash2 } from 'lucide-react';
@@ -126,10 +127,6 @@ function rupiahFromCents(value: number) {
   return Math.round(value / 100);
 }
 
-function centsFromRupiah(value: string) {
-  const amount = Number(value || 0);
-  return Number.isFinite(amount) ? Math.round(amount * 100) : 0;
-}
 
 function invalidEffect(effect: ModifierRecipeEffect) {
   if (!effect.ingredient_id || !Number.isFinite(effect.quantity) || effect.quantity < 0) return true;
@@ -370,7 +367,18 @@ export function ProductModifierEditor({ businessId, productId }: Props) {
                       </label>
                       <input className="portal-input bg-white" value={option.label} onChange={event => updateOption(group.id, option.id, { label: event.target.value })} placeholder="Contoh: Less Sugar" maxLength={100} />
                       <label className="grid gap-1 text-[10px] font-bold text-portal-soft">Harga tambahan (Rp)
-                        <input className="portal-input min-h-10 w-full bg-white" type="number" step="500" value={rupiahFromCents(option.price_delta_cents) || ''} onChange={event => updateOption(group.id, option.id, { price_delta_cents: centsFromRupiah(event.target.value) })} placeholder="0" aria-label={`Harga tambahan ${option.label || 'opsi'}`} />
+                        <RupiahInput
+                          min={0}
+                          value={rupiahFromCents(option.price_delta_cents)}
+                          onValueChange={value =>
+                            updateOption(group.id, option.id, {
+                              price_delta_cents: Math.round((value ?? 0) * 100),
+                            })
+                          }
+                          placeholder="0"
+                          aria-label={`Harga tambahan ${option.label || 'opsi'}`}
+                          className="portal-input min-h-10 bg-white"
+                        />
                       </label>
                       <label className="inline-flex min-h-10 items-center gap-2 text-xs font-semibold text-portal-ink"><input type="checkbox" checked={option.enabled} onChange={event => updateOption(group.id, option.id, { enabled: event.target.checked })} /> Tersedia</label>
                       <button type="button" className="grid h-11 w-11 place-items-center rounded-xl text-portal-soft hover:bg-red-50 hover:text-red-700" aria-label={`Hapus ${option.label || 'opsi'}`} disabled={group.options.length <= 1} onClick={() => updateGroup(group.id, { options: group.options.filter(item => item.id !== option.id) })}><Trash2 className="h-4 w-4" /></button>
