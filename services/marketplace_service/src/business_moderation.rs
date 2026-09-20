@@ -1984,10 +1984,30 @@ async fn assign_business_case(
         Ok(value) => value,
         Err(_) => return err(StatusCode::UNAUTHORIZED, "invalid actor").into_response(),
     };
-    let due_at = payload
-        .assigned_to
-        .and(payload.due_hours)
-        .map(|hours| Utc::now() + chrono::Duration::hours(hours.clamp(1, 168)));
+    let current_due_at: Option<DateTime<Utc>> = match sqlx::query(
+        r#"
+        SELECT due_at
+        FROM internal_moderation.business_moderation_cases
+        WHERE business_id=$1
+        ORDER BY updated_at DESC
+        LIMIT 1
+        "#,
+    )
+    .bind(id)
+    .fetch_optional(&state.db)
+    .await
+    {
+        Ok(row) => row.and_then(|value| value.get::<Option<DateTime<Utc>>,_>("due_at")),
+        Err(error) => {
+            tracing::error!("assign_business_case current SLA lookup error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load moderation SLA").into_response();
+        }
+    };
+    let due_at = match (payload.assigned_to, payload.due_hours, current_due_at) {
+        (None, _, _) => None,
+        (Some(_), Some(hours), _) => Some(Utc::now() + chrono::Duration::hours(hours.clamp(1, 168))),
+        (Some(_), None, existing) => existing.or_else(|| Some(Utc::now() + chrono::Duration::hours(24))),
+    };
 
     let updated = sqlx::query(
         r#"
