@@ -152,16 +152,17 @@ export function ProductEditorWorkspace({ businessId, product, closeHref }: Props
   }
 
   return (
-    <ModalSurface
-      open
-      onOpenChange={nextOpen => {
-        if (!nextOpen && !busy) router.push(closeHref);
-      }}
-      ariaLabel="Kelola produk"
-      size="lg"
-      presentation="adaptive"
-      panelClassName="max-h-[92dvh] overflow-hidden"
-    >
+    <>
+      <ModalSurface
+        open
+        onOpenChange={nextOpen => {
+          if (!nextOpen && !busy) router.push(closeHref);
+        }}
+        ariaLabel="Kelola produk"
+        size="lg"
+        presentation="adaptive"
+        panelClassName="max-h-[92dvh] overflow-hidden"
+      >
       <section className="flex max-h-[92dvh] min-h-0 flex-col overflow-hidden">
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-portal-line px-4 py-3.5 sm:px-5">
           <div className="min-w-0">
@@ -311,7 +312,8 @@ export function ProductEditorWorkspace({ businessId, product, closeHref }: Props
         {success ? <p role="status" aria-live="polite" className="rounded-xl bg-emerald-50 px-3 py-2.5 text-sm font-semibold text-portal-forest">{success}</p> : null}
           </div>
         </div>
-      </section>
+        </section>
+      </ModalSurface>
 
       <SensitiveActionConfirm
         open={archiveConfirmOpen}
@@ -324,6 +326,6 @@ export function ProductEditorWorkspace({ businessId, product, closeHref }: Props
         }}
         onConfirm={() => void saveStatus()}
       />
-    </ModalSurface>
+    </>
   );
 }
