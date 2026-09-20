@@ -502,6 +502,29 @@ function simplifyCheckoutErrorMessage(message: string, isId: boolean): string {
   if (normalized === 'Customer phone is required') {
     return isId ? 'Nomor HP-nya jangan kosong.' : 'Phone number is required.';
   }
+  if (normalized === 'UMKM orders are disabled for now') {
+    return isId
+      ? 'Fitur pesan sedang dimatikan sementara. Coba lagi beberapa saat lagi.'
+      : 'Ordering is temporarily unavailable. Please try again shortly.';
+  }
+  if (normalized === 'Store not found') {
+    return isId
+      ? 'Usaha ini sudah tidak tersedia. Coba buka ulang halaman usahanya.'
+      : 'This business is no longer available. Please reopen the storefront.';
+  }
+  if (normalized === 'Forbidden') {
+    return isId
+      ? 'Pesanan ini tidak bisa diproses dari akun kamu.'
+      : 'This order cannot be processed from your account.';
+  }
+  if (
+    normalized === 'Failed to create UMKM order' ||
+    normalized === 'Failed to create order'
+  ) {
+    return isId
+      ? 'Pesanan belum berhasil dibuat. Coba lagi sebentar.'
+      : 'The order could not be created. Please try again shortly.';
+  }
   return normalized;
 }
 
