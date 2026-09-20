@@ -18,7 +18,7 @@ param(
     # Docker Desktop before BuildKit gets a chance to recover. Keep it
     # configurable while defaulting to a stable local-development value.
     [ValidateRange(1, 32)]
-    [int]$ParallelLimit = 2
+    [int]$ParallelLimit = 1
 )
 
 $ErrorActionPreference = "Stop"
