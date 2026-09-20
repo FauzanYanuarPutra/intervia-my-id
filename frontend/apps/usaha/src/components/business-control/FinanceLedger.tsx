@@ -868,8 +868,31 @@ export function FinanceLedger({ businessId, initialEntries, channels = [] }: Pro
                   <div className="mt-3 rounded-xl border border-portal-line bg-[#fafbf9] p-3">
                     <div className="flex items-center justify-between"><div className="flex items-center gap-2"><History className="h-4 w-4 text-portal-forest" /><p className="text-xs font-black text-portal-ink">Koreksi tanpa menghapus histori</p></div><button type="button" onClick={() => setCorrectingId(null)} className="p-1 text-portal-soft"><X className="h-4 w-4" /></button></div>
                     <div className="mt-3 grid grid-cols-2 gap-2"><button type="button" onClick={() => setCorrectionMode('correct')} className={correctionMode === 'correct' ? 'portal-button-primary justify-center' : 'portal-button-secondary justify-center'}><PencilLine className="h-4 w-4" /> Perbaiki</button><button type="button" onClick={() => setCorrectionMode('void')} className={correctionMode === 'void' ? 'portal-button-primary justify-center' : 'portal-button-secondary justify-center'}><RotateCcw className="h-4 w-4" /> Batalkan</button></div>
-                    <label className="mt-3 block text-xs font-semibold text-portal-soft">Alasan wajib<input value={correctionReason} onChange={event => setCorrectionReason(event.target.value)} placeholder="Contoh: nominal salah input" className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3" /></label>
-<RupiahInput min={1} value={correctionAmount ? Number(correctionAmount) : null} onValueChange={value => setCorrectionAmount(value == null ? '' : String(value))} className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3" />
+                    <label className="mt-3 block text-xs font-semibold text-portal-soft">
+                      Alasan wajib
+                      <input
+                        value={correctionReason}
+                        onChange={event => setCorrectionReason(event.target.value)}
+                        placeholder="Contoh: nominal salah input"
+                        className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3"
+                      />
+                    </label>
+                    {correctionMode === 'correct' ? (
+                      <label className="mt-3 block text-xs font-semibold text-portal-soft">
+                        Nominal pengganti
+                        <RupiahInput
+                          min={1}
+                          value={correctionAmount ? Number(correctionAmount) : null}
+                          onValueChange={value =>
+                            setCorrectionAmount(
+                              value == null ? '' : String(value),
+                            )
+                          }
+                          className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3"
+                          placeholder="120.000"
+                        />
+                      </label>
+                    ) : null}
                     <div className="mt-3">
                       <EffectPreview
                         ariaLabel="Dampak koreksi"
