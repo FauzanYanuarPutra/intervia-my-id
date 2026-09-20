@@ -1351,7 +1351,7 @@ function ListingsPage({
               className="h-36 bg-gradient-to-br from-slate-100 to-slate-200 bg-cover bg-center"
               style={
                 listing.image
-                  ? { backgroundImage: `url("${resolveMediaUrl(listing.image, wwwUrl)}")` }
+                  ? { backgroundImage: 'url("\' + resolveMediaUrl(listing.image, wwwUrl) + '")' }
                   : undefined
               }
             >
