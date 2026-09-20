@@ -925,6 +925,12 @@ pub struct BusinessModerationAssignmentRequest {
 }
 
 #[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize)]
+pub struct BusinessAppealReviewRequest {
+    pub action: String,
+    pub note: Option<String>,
+}
+
 pub struct BusinessModerationEvidenceRequest {
     pub evidence_type: String,
     pub label: String,
