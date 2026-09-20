@@ -5643,6 +5643,17 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
           />
         ) : null}
         <QuickCategoriesSection isId={isId} />
+        {!isAuthenticated ? (
+          <GameProgressCard
+            isId={isId}
+            isAuthenticated={isAuthenticated}
+            summary={summary}
+            walletAmountLabel={walletAmountLabel}
+            walletModeLabel={walletModeLabel}
+            walletLoading={walletLoading}
+            compact
+          />
+        ) : null}
         <DailyLoginRewardCard locale={locale} compact />
         <TrendingSearchSection isId={isId} />
 
@@ -5730,6 +5741,17 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
                 />
               ) : null}
               <QuickCategoriesSection isId={isId} />
+              {!isAuthenticated ? (
+                <GameProgressCard
+                  isId={isId}
+                  isAuthenticated={isAuthenticated}
+                  summary={summary}
+                  walletAmountLabel={walletAmountLabel}
+                  walletModeLabel={walletModeLabel}
+                  walletLoading={walletLoading}
+                  compact
+                />
+              ) : null}
               <DailyLoginRewardCard locale={locale} compact />
               <TrendingSearchSection isId={isId} />
 
