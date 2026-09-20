@@ -123,6 +123,7 @@ export default function BusinessModerationWorkspace() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [verificationDraft, setVerificationDraft] = useState<CrmBusiness | null>(null);
   const [verificationReason, setVerificationReason] = useState("");
+  const [evidenceDraft, setEvidenceDraft] = useState<{ label: string; url: string; note: string } | null>(null);
   const [draft, setDraft] = useState<{ business: CrmBusiness; action: Action } | null>(null);
   const [reasonCode, setReasonCode] = useState<string>("quality");
   const [reasonNote, setReasonNote] = useState("");
@@ -438,6 +439,15 @@ export default function BusinessModerationWorkspace() {
                   <p className="mt-1 text-sm font-black text-slate-950">{verificationLabel(String((verification || {}).status || selected.verification_status))}</p>
                 </div>
               </div>
+              <div className="mt-3 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setEvidenceDraft({ label: "", url: "", note: "" })}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700"
+                >
+                  + Tambah bukti
+                </button>
+              </div>
             ) : null}
 
             {reports.length ? (
@@ -540,6 +550,149 @@ export default function BusinessModerationWorkspace() {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      ) : null}
+
+      {verificationDraft ? (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/35 p-4">
+          <div className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.14em] text-sky-700">Verifikasi usaha</p>
+                <h2 className="mt-1 text-lg font-bold text-slate-950">{verificationDraft.name}</h2>
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  Verifikasi ini adalah status verifikasi di platform Lajukan, bukan klaim bahwa seluruh izin pemerintah sudah diverifikasi.
+                </p>
+              </div>
+              <button type="button" onClick={() => setVerificationDraft(null)} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600">
+                Tutup
+              </button>
+            </div>
+            <label className="mt-5 block text-sm font-bold text-slate-950">
+              Catatan keputusan
+              <textarea
+                value={verificationReason}
+                onChange={event => setVerificationReason(event.target.value)}
+                rows={4}
+                maxLength={4000}
+                placeholder="Catatan dapat menjelaskan bukti yang diperiksa atau alasan penolakan."
+                className="mt-2 w-full rounded-2xl border border-slate-200 p-3 text-sm outline-none focus:border-sky-400"
+              />
+            </label>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setVerificationDraft(null)}
+                className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-600"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                disabled={!verificationReason.trim() || busy}
+                onClick={() => {
+                  if (!accessToken || !verificationDraft) return;
+                  setBusy(true);
+                  void businessModerationApi.reviewVerification(accessToken, verificationDraft.id, {
+                    status: "rejected",
+                    reason_note: verificationReason.trim(),
+                  }).then(async () => {
+                    setNotice("Verifikasi usaha ditolak dan alasannya tersimpan.");
+                    setVerificationDraft(null);
+                    setVerificationReason("");
+                    await loadBusinesses();
+                    if (selected?.id === verificationDraft.id) await openHistory(verificationDraft);
+                  }).catch(error => setNotice(error instanceof Error ? error.message : "Keputusan verifikasi gagal."))
+                    .finally(() => setBusy(false));
+                }}
+                className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+              >
+                Tolak verifikasi
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  if (!accessToken || !verificationDraft) return;
+                  setBusy(true);
+                  void businessModerationApi.reviewVerification(accessToken, verificationDraft.id, {
+                    status: "verified",
+                    reason_note: verificationReason.trim() || "Bukti verifikasi diperiksa dan dinyatakan cukup.",
+                  }).then(async () => {
+                    setNotice("Usaha berhasil diverifikasi.");
+                    setVerificationDraft(null);
+                    setVerificationReason("");
+                    await loadBusinesses();
+                    if (selected?.id === verificationDraft.id) await openHistory(verificationDraft);
+                  }).catch(error => setNotice(error instanceof Error ? error.message : "Keputusan verifikasi gagal."))
+                    .finally(() => setBusy(false));
+                }}
+                className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+              >
+                Verifikasi
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {evidenceDraft && selected ? (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/35 p-4">
+          <div className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.14em] text-sky-700">Bukti kasus</p>
+                <h2 className="mt-1 text-lg font-bold text-slate-950">{selected.name}</h2>
+              </div>
+              <button type="button" onClick={() => setEvidenceDraft(null)} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600">Tutup</button>
+            </div>
+            <div className="mt-5 space-y-3">
+              <input
+                value={evidenceDraft.label}
+                onChange={event => setEvidenceDraft(current => current && ({ ...current, label: event.target.value }))}
+                placeholder="Nama bukti, misalnya NIB / screenshot lokasi"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-semibold outline-none focus:border-sky-400"
+              />
+              <input
+                value={evidenceDraft.url}
+                onChange={event => setEvidenceDraft(current => current && ({ ...current, url: event.target.value }))}
+                placeholder="URL media/dokumen"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-semibold outline-none focus:border-sky-400"
+              />
+              <textarea
+                value={evidenceDraft.note}
+                onChange={event => setEvidenceDraft(current => current && ({ ...current, note: event.target.value }))}
+                rows={4}
+                placeholder="Catatan bukti (opsional)"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-sky-400"
+              />
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setEvidenceDraft(null)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-600">Batal</button>
+              <button
+                type="button"
+                disabled={busy || !evidenceDraft.label.trim() || !evidenceDraft.url.trim()}
+                onClick={() => {
+                  if (!accessToken || !selected || !evidenceDraft) return;
+                  setBusy(true);
+                  void businessModerationApi.addEvidence(accessToken, selected.id, {
+                    evidence_type: "url",
+                    label: evidenceDraft.label.trim(),
+                    source_url: evidenceDraft.url.trim(),
+                    note: evidenceDraft.note.trim() || undefined,
+                  }).then(async () => {
+                    setEvidenceDraft(null);
+                    setNotice("Bukti kasus berhasil ditambahkan.");
+                    await openHistory(selected);
+                  }).catch(error => setNotice(error instanceof Error ? error.message : "Bukti gagal disimpan."))
+                    .finally(() => setBusy(false));
+                }}
+                className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+              >
+                Simpan bukti
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
