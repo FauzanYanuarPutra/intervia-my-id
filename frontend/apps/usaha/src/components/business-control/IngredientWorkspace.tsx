@@ -603,7 +603,7 @@ export function IngredientWorkspace({
               <label className="min-w-40 flex-1 text-[11px] font-semibold text-portal-soft">Harga total
                 <div className="mt-1 flex min-h-11 items-center rounded-xl border border-portal-line bg-white px-3">
                   <span className="mr-2 text-sm text-portal-soft">Rp</span>
-                  <RupiahInput prefix="" min={0} value={purchasePrice ? Number(purchasePrice) : null} onValueChange={value => setPurchasePrice(value == null ? '' : String(value))} placeholder="30.000" className="min-w-0 flex-1 border-0 bg-transparent text-sm text-portal-ink outline-none pl-0" />
+                  <RupiahInput min={0} value={purchasePrice ? Number(purchasePrice) : null} onValueChange={value => setPurchasePrice(value == null ? '' : String(value))} placeholder="30.000" className="min-w-0 flex-1 border-0 bg-transparent text-sm text-portal-ink outline-none pl-0" />
                 </div>
               </label>
             </div>
