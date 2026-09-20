@@ -145,6 +145,18 @@ export async function createFinanceCoreEntry(
   });
 }
 
+export async function transferFinanceCoreAccounts(
+  businessId: string,
+  idempotencyKey: string,
+  input: Record<string, unknown>,
+) {
+  return requestFinanceCore(path(businessId, '/transfers'), {
+    method: 'POST',
+    headers: { 'Idempotency-Key': idempotencyKey },
+    body: JSON.stringify(input),
+  });
+}
+
 export async function correctFinanceCoreEntry(
   businessId: string,
   entryId: string,
