@@ -5,7 +5,7 @@ export const PRIMARY_CRM_PAGES = [
 ] as const satisfies readonly PageId[];
 
 export const SECONDARY_CRM_PAGES = [
-  'analytics', 'settings',
+  'analytics', 'settings', 'guide',
 ] as const satisfies readonly PageId[];
 
 export const CRM_NAV_ITEMS: readonly CrmNavItem[] = [
@@ -19,5 +19,6 @@ export const CRM_NAV_ITEMS: readonly CrmNavItem[] = [
   { id: 'chat', label: 'Percakapan', hint: 'Inbox prospek & support', icon: 'chat' },
   { id: 'disputes', label: 'Support & Risiko', hint: 'Tiket, dispute, dan risiko', icon: 'disputes' },
   { id: 'analytics', label: 'Analytics', hint: 'GMV dan konversi', icon: 'analytics' },
-  { id: 'settings', label: 'Administrasi', hint: 'Role dan pengaturan', icon: 'settings' },
+  { id: 'settings', label: 'Administrasi', hint: 'Role, akses & governance', icon: 'settings' },
+  { id: 'guide', label: 'Panduan CRM', hint: 'Apa ini, flow & dampaknya', icon: 'guide' },
 ];
