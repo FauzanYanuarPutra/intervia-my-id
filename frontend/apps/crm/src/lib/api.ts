@@ -211,6 +211,13 @@ export type CrmBusiness = {
   missing_fields: string[];
   completeness_percent: number;
   image_urls: string[];
+  source_type: 'owner_managed' | 'reference' | string;
+  report_count: number;
+  latest_report_reason: string | null;
+  assigned_to: string | null;
+  due_at: string | null;
+  verification_status: 'unverified' | 'pending' | 'verified' | 'rejected' | string;
+  verification_method: string | null;
 };
 
 export type CrmBusinessModerationEvent = {
@@ -226,6 +233,20 @@ export type CrmBusinessModerationEvent = {
   missing_fields: string[];
   business_snapshot: JsonRecord;
   legal_hold: boolean;
+  created_at: string;
+};
+
+export type CrmNotification = {
+  id: string;
+  category: string;
+  event_type: string;
+  business_id: string | null;
+  title: string;
+  message: string;
+  data: JsonRecord;
+  is_read: boolean;
+  read_by: string | null;
+  read_at: string | null;
   created_at: string;
 };
 
@@ -722,6 +743,9 @@ export const businessModerationApi = {
     return fetchJson<{
       cases: Array<JsonRecord>;
       events: CrmBusinessModerationEvent[];
+      appeals?: Array<JsonRecord>;
+      reports?: Array<JsonRecord>;
+      evidence?: Array<JsonRecord>;
     }>(
       `${MARKETPLACE_URL}/v1/crm/businesses/${encodeURIComponent(id)}/moderation/history`,
       { method: 'GET', token },
@@ -743,6 +767,81 @@ export const businessModerationApi = {
     return fetchJson(
       `${MARKETPLACE_URL}/v1/crm/businesses/${encodeURIComponent(id)}/moderate`,
       { method: 'POST', token, body: JSON.stringify(data) },
+    );
+  },
+
+  assign: async (token: string, id: string, assignedTo: string | null, dueHours?: number) => {
+    return fetchJson(
+      `${MARKETPLACE_URL}/v1/crm/businesses/${encodeURIComponent(id)}/moderation/assign`,
+      {
+        method: 'POST',
+        token,
+        body: JSON.stringify({ assigned_to: assignedTo, due_hours: dueHours }),
+      },
+    );
+  },
+
+  addEvidence: async (
+    token: string,
+    id: string,
+    data: {
+      evidence_type: 'photo' | 'document' | 'url' | 'note' | 'screenshot' | 'other';
+      label: string;
+      source_url?: string;
+      note?: string;
+      metadata?: JsonRecord;
+    },
+  ) => {
+    return fetchJson(
+      `${MARKETPLACE_URL}/v1/crm/businesses/${encodeURIComponent(id)}/moderation/evidence`,
+      { method: 'POST', token, body: JSON.stringify(data) },
+    );
+  },
+
+  reviewVerification: async (
+    token: string,
+    id: string,
+    data: { status: 'verified' | 'rejected'; reason_note?: string },
+  ) => {
+    return fetchJson(
+      `${MARKETPLACE_URL}/v1/crm/businesses/${encodeURIComponent(id)}/verification/review`,
+      { method: 'POST', token, body: JSON.stringify(data) },
+    );
+  },
+
+  reviewAppeal: async (
+    token: string,
+    appealId: string,
+    data: { action: 'overturn' | 'uphold' | 'needs_information'; note?: string },
+  ) => {
+    return fetchJson(
+      `${MARKETPLACE_URL}/v1/crm/appeals/${encodeURIComponent(appealId)}/review`,
+      { method: 'POST', token, body: JSON.stringify(data) },
+    );
+  },
+
+  notifications: async (token: string, unreadOnly = false) => {
+    const query = new URLSearchParams({
+      unread_only: unreadOnly ? 'true' : 'false',
+      limit: '50',
+    }).toString();
+    return fetchJson<{ items: CrmNotification[] }>(
+      `${MARKETPLACE_URL}/v1/crm/notifications?${query}`,
+      { method: 'GET', token },
+    );
+  },
+
+  markNotificationRead: async (token: string, id: string) => {
+    return fetchJson(
+      `${MARKETPLACE_URL}/v1/crm/notifications/${encodeURIComponent(id)}/read`,
+      { method: 'POST', token },
+    );
+  },
+
+  markAllNotificationsRead: async (token: string) => {
+    return fetchJson(
+      `${MARKETPLACE_URL}/v1/crm/notifications/read-all`,
+      { method: 'POST', token },
     );
   },
 };
