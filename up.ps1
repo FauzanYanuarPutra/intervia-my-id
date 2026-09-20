@@ -361,25 +361,22 @@ try {
 
         Write-Host "Building Docker images..." -ForegroundColor Cyan
         $BuildPreviousErrorActionPreference = $ErrorActionPreference
-        $BuildCapturedOutput = [System.Collections.Generic.List[string]]::new()
         $BuildExitCode = 1
+        $BuildLogPath = Join-Path ([System.IO.Path]::GetTempPath()) "lajukan-up-build-$PID.log"
         try {
             $ErrorActionPreference = "Continue"
-            & docker @ComposeArgs @BuildArgs 2>&1 | ForEach-Object {
-                $line = $_.ToString()
-                Write-Host $line
-                $BuildCapturedOutput.Add($line)
-                if ($BuildCapturedOutput.Count -gt 200) {
-                    $BuildCapturedOutput.RemoveAt(0)
-                }
-            }
+            Remove-Item -LiteralPath $BuildLogPath -Force -ErrorAction SilentlyContinue
+            & docker @ComposeArgs @BuildArgs 2>&1 | Tee-Object -FilePath $BuildLogPath
             $BuildExitCode = $LASTEXITCODE
         }
         finally {
             $ErrorActionPreference = $BuildPreviousErrorActionPreference
         }
 
-        $BuildOutputText = $BuildCapturedOutput -join [Environment]::NewLine
+        $BuildOutputText = ""
+        if (Test-Path -LiteralPath $BuildLogPath) {
+            $BuildOutputText = Get-Content -LiteralPath $BuildLogPath -Raw -ErrorAction SilentlyContinue
+        }
         $DockerEngineFailure =
             $BuildExitCode -ne 0 -and (Test-DockerEngineFailure -OutputText $BuildOutputText)
 
@@ -391,9 +388,7 @@ try {
                 $RetryPreviousErrorActionPreference = $ErrorActionPreference
                 try {
                     $ErrorActionPreference = "Continue"
-                    & docker @ComposeArgs @BuildArgs 2>&1 | ForEach-Object {
-                        Write-Host $_.ToString()
-                    }
+                    & docker @ComposeArgs @BuildArgs 2>&1 | Tee-Object -FilePath $BuildLogPath
                     $BuildExitCode = $LASTEXITCODE
                 }
                 finally {
@@ -404,8 +399,11 @@ try {
         }
 
         if ($BuildExitCode -ne 0) {
+            Write-Error "Docker Compose build gagal (exit code $BuildExitCode). Log: $BuildLogPath"
             exit $BuildExitCode
         }
+        Write-Host "Docker image build completed successfully." -ForegroundColor Green
+        Remove-Item -LiteralPath $BuildLogPath -Force -ErrorAction SilentlyContinue
     }
 
     $UpArgs = @("up", "-d", "--remove-orphans", "--wait", "--wait-timeout", "420")
@@ -420,25 +418,22 @@ try {
 
     Write-Host "Starting Docker Compose services..." -ForegroundColor Cyan
     $UpPreviousErrorActionPreference = $ErrorActionPreference
-    $UpCapturedOutput = [System.Collections.Generic.List[string]]::new()
     $UpExitCode = 1
+    $UpLogPath = Join-Path ([System.IO.Path]::GetTempPath()) "lajukan-up-start-$PID.log"
     try {
         $ErrorActionPreference = "Continue"
-        & docker @ComposeArgs @UpArgs 2>&1 | ForEach-Object {
-            $line = $_.ToString()
-            Write-Host $line
-            $UpCapturedOutput.Add($line)
-            if ($UpCapturedOutput.Count -gt 200) {
-                $UpCapturedOutput.RemoveAt(0)
-            }
-        }
+        Remove-Item -LiteralPath $UpLogPath -Force -ErrorAction SilentlyContinue
+        & docker @ComposeArgs @UpArgs 2>&1 | Tee-Object -FilePath $UpLogPath
         $UpExitCode = $LASTEXITCODE
     }
     finally {
         $ErrorActionPreference = $UpPreviousErrorActionPreference
     }
 
-    $UpOutputText = $UpCapturedOutput -join [Environment]::NewLine
+    $UpOutputText = ""
+    if (Test-Path -LiteralPath $UpLogPath) {
+        $UpOutputText = Get-Content -LiteralPath $UpLogPath -Raw -ErrorAction SilentlyContinue
+    }
     $DockerEngineFailure =
         $UpExitCode -ne 0 -and (Test-DockerEngineFailure -OutputText $UpOutputText)
 
@@ -450,9 +445,7 @@ try {
             $RetryPreviousErrorActionPreference = $ErrorActionPreference
             try {
                 $ErrorActionPreference = "Continue"
-                & docker @ComposeArgs @UpArgs 2>&1 | ForEach-Object {
-                    Write-Host $_.ToString()
-                }
+                & docker @ComposeArgs @UpArgs 2>&1 | Tee-Object -FilePath $UpLogPath
                 $UpExitCode = $LASTEXITCODE
             }
             finally {
@@ -463,6 +456,7 @@ try {
     }
 
     if ($UpExitCode -ne 0) {
+        Write-Warning "Docker Compose startup gagal (exit code $UpExitCode). Log: $UpLogPath"
         Write-Warning "Runtime gagal menjadi healthy. Menampilkan status dan log core service untuk diagnosis."
         & docker @ComposeArgs ps -a
         & docker @ComposeArgs logs --no-color --tail 120 marketplace_service chat_service identity_service community_service
