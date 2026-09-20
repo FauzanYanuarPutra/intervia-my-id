@@ -1808,7 +1808,7 @@ export function UmkmDiscoveryPanel({
             className={cn(
               'pointer-events-none absolute z-[1100]',
               edgeToEdge
-                ? 'right-3 top-[calc(env(safe-area-inset-top)+8.35rem)] sm:top-[calc(env(safe-area-inset-top)+7.55rem)] lg:right-4 lg:top-[calc(env(safe-area-inset-top)+7.25rem)]'
+                ? 'right-3 top-[calc(env(safe-area-inset-top)+10.25rem)] sm:top-[calc(env(safe-area-inset-top)+9.65rem)] lg:right-4 lg:top-[calc(env(safe-area-inset-top)+7.25rem)]'
                 : 'bottom-3 left-3 sm:bottom-4',
             )}
           >
@@ -1908,7 +1908,7 @@ export function UmkmDiscoveryPanel({
           {renderDiscoveryMap('h-full w-full', true)}
         </div>
 
-        <div className="pointer-events-none absolute inset-x-0 top-[calc(env(safe-area-inset-top)+7.15rem)] z-[1150] flex justify-center px-3 sm:top-[calc(env(safe-area-inset-top)+6.55rem)] lg:left-[510px] lg:right-4 lg:top-[calc(env(safe-area-inset-top)+6.35rem)] lg:px-0">
+        <div className="pointer-events-none absolute inset-x-0 top-[calc(env(safe-area-inset-top)+9rem)] z-[1150] flex justify-center px-3 sm:top-[calc(env(safe-area-inset-top)+8.55rem)] lg:left-[510px] lg:right-4 lg:top-[calc(env(safe-area-inset-top)+6.35rem)] lg:px-0">
           <div
             className="pointer-events-auto inline-flex rounded-full border border-white/80 bg-white/94 p-1 shadow-[0_18px_40px_-24px_rgba(15,23,42,0.34)] dark:border-white/10 dark:bg-slate-950/88"
             role="group"
@@ -1955,7 +1955,7 @@ export function UmkmDiscoveryPanel({
 
         {error ? (
           <div
-            className="absolute left-3 right-3 top-[calc(env(safe-area-inset-top)+12.25rem)] z-[1160] mx-auto max-w-md rounded-[22px] border border-rose-200 bg-white/96 p-4 text-center shadow-[0_18px_44px_-28px_rgba(244,63,94,0.36)] dark:border-rose-900/60 dark:bg-slate-950/94"
+            className="absolute left-3 right-3 top-[calc(env(safe-area-inset-top)+13.25rem)] z-[1160] mx-auto max-w-md rounded-[22px] border border-rose-200 bg-white/96 p-4 text-center shadow-[0_18px_44px_-28px_rgba(244,63,94,0.36)] dark:border-rose-900/60 dark:bg-slate-950/94"
             role="alert"
             data-testid="umkm-error-state"
           >
@@ -1975,7 +1975,7 @@ export function UmkmDiscoveryPanel({
 
         {loading && mapOnly && !selectedPlace && !error ? (
           <div
-            className="absolute left-3 right-3 top-[calc(env(safe-area-inset-top)+11rem)] z-[1160] mx-auto max-w-xs rounded-full border border-white/80 bg-white/94 px-4 py-2 text-center text-[11px] font-bold text-slate-700 shadow-[0_18px_40px_-28px_rgba(15,23,42,0.32)] dark:border-white/10 dark:bg-slate-950/88 dark:text-slate-100"
+            className="absolute left-3 right-3 top-[calc(env(safe-area-inset-top)+13rem)] z-[1160] mx-auto max-w-xs rounded-full border border-white/80 bg-white/94 px-4 py-2 text-center text-[11px] font-bold text-slate-700 shadow-[0_18px_40px_-28px_rgba(15,23,42,0.32)] dark:border-white/10 dark:bg-slate-950/88 dark:text-slate-100"
             role="status"
           >
             {isId ? 'Mencari usaha sekitar...' : 'Finding nearby businesses...'}
@@ -1987,15 +1987,15 @@ export function UmkmDiscoveryPanel({
             className={cn(
               'absolute inset-x-2 bottom-[calc(0.30rem+env(safe-area-inset-bottom))] z-[1250] mx-auto flex max-w-[760px] flex-col overflow-hidden rounded-[26px] border border-white/86 bg-white/97 p-2 shadow-[0_24px_64px_-40px_rgba(15,23,42,0.48)]  transition-all duration-300 dark:border-white/10 dark:bg-slate-950/94 sm:inset-x-4 lg:inset-x-auto lg:bottom-3 lg:left-3 lg:top-[calc(env(safe-area-inset-top)+6.85rem)] lg:mx-0 lg:w-[486px] lg:max-w-none lg:rounded-[24px] lg:p-3',
               sheetExpanded
-                ? 'max-h-[min(calc(var(--app-viewport-height)-7rem),520px)] lg:max-h-[calc(var(--app-viewport-height)-1.5rem)]'
-                : 'max-h-[100px] min-h-[100px] lg:max-h-[calc(var(--app-viewport-height)-1.5rem)] lg:min-h-0',
+                ? 'max-h-[min(54vh,calc(var(--app-viewport-height)-10.5rem))] lg:max-h-[calc(var(--app-viewport-height)-1.5rem)]'
+                : 'max-h-[132px] min-h-[132px] lg:max-h-[calc(var(--app-viewport-height)-1.5rem)] lg:min-h-0',
             )}
             data-testid="umkm-results-sheet"
           >
             <button
               type="button"
               onClick={() => setSheetExpanded(current => !current)}
-              className="mx-auto mb-1 flex h-4 w-16 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-100 lg:hidden"
+              className="mx-auto mb-1 flex h-7 w-14 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-100 lg:hidden"
               aria-expanded={sheetExpanded}
               aria-label={
                 sheetExpanded
@@ -2016,9 +2016,9 @@ export function UmkmDiscoveryPanel({
 
             <div className="flex min-w-0 shrink-0 items-center justify-between gap-2 px-1 pb-1">
               <div className="min-w-0">
-                <p className="line-clamp-1 text-[1rem] font-bold leading-tight tracking-[-0.035em] text-[color:var(--app-text)]">
+                <h1 className="line-clamp-2 text-[1.02rem] font-bold leading-tight tracking-[-0.035em] text-[color:var(--app-text)] sm:text-lg">
                   {sheetTitle}
-                </p>
+                </h1>
                 <p className="mt-0.5 hidden line-clamp-1 text-[11px] font-semibold leading-4 text-[color:var(--app-text-soft)] sm:block">
                   {sheetSubtitle}
                 </p>
