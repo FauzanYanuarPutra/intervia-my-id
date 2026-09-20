@@ -3266,6 +3266,12 @@ mod tests {
             "needs_revision"
         ));
         assert!(moderation_action_allowed("pending_review", "reject"));
+        assert!(moderation_action_allowed("needs_revision", "approve"));
+        assert!(moderation_action_allowed(
+            "needs_revision",
+            "needs_revision"
+        ));
+        assert!(moderation_action_allowed("needs_revision", "reject"));
         assert!(moderation_action_allowed("published", "correct"));
         assert!(moderation_action_allowed("published", "retract"));
         assert!(!moderation_action_allowed("published", "approve"));
