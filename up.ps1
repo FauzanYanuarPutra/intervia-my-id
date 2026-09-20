@@ -61,13 +61,23 @@ try {
         }
     }
 
-    $DockerRecoveryState = [pscustomobject]@{ Attempted = $false }
+    $DockerRecoveryState = [pscustomobject]@{
+        Attempted = $false
+        Succeeded = $false
+        Reason = "not-run"
+    }
     $DockerDesktopCliAvailable = $false
     $DockerDesktopCommand = Get-Command "docker" -ErrorAction SilentlyContinue
     $DesktopStatusProbe = $null
+    $DesktopVersionProbe = $null
     if ($DockerDesktopCommand) {
+        # `status` can return non-zero when Desktop/Engine is broken, so use
+        # `version` as the capability probe and keep status for diagnostics.
+        $DesktopVersionProbe = Invoke-DockerNative -Arguments @("desktop", "version", "--short")
         $DesktopStatusProbe = Invoke-DockerNative -Arguments @("desktop", "status", "--format", "json")
-        $DockerDesktopCliAvailable = ($DesktopStatusProbe.ExitCode -eq 0)
+        $DockerDesktopCliAvailable =
+            ($DesktopVersionProbe.ExitCode -eq 0) -or
+            ($DesktopStatusProbe.ExitCode -eq 0)
     }
 
     function Test-DockerEngineFailure {
@@ -93,33 +103,51 @@ try {
             [string]$Reason
         )
 
-        if (
-            $NoDockerEngineRepair -or
-            $DockerRecoveryState.Attempted -or
-            -not $DockerDesktopCliAvailable
-        ) {
+        if ($NoDockerEngineRepair) {
+            $DockerRecoveryState.Reason = "disabled"
+            return $false
+        }
+
+        if ($DockerRecoveryState.Attempted) {
+            return $false
+        }
+
+        if (-not $DockerDesktopCliAvailable) {
+            $DockerRecoveryState.Reason = "docker-desktop-cli-unavailable"
             return $false
         }
 
         $DockerRecoveryState.Attempted = $true
+        $DockerRecoveryState.Reason = $Reason
         Write-Warning "Docker Engine gagal pada saat $Reason. Mencoba satu kali recovery Docker Desktop..."
+
         $RestartProbe = Invoke-DockerNative -Arguments @("desktop", "restart", "--timeout", "120")
         if ($RestartProbe.ExitCode -ne 0) {
             $RestartDetails = ($RestartProbe.Output -join " ").Trim()
-            Write-Warning "Recovery Docker Desktop gagal: $RestartDetails"
-            return $false
-        }
+            Write-Warning "docker desktop restart gagal: $RestartDetails"
+            Write-Warning "Mencoba docker desktop start sebagai fallback..."
 
+            $StartProbe = Invoke-DockerNative -Arguments @("desktop", "start", "--timeout", "120")
+            if ($StartProbe.ExitCode -ne 0) {
+                $StartDetails = ($StartProbe.Output -join " ").Trim()
+                Write-Warning "docker desktop start juga gagal: $StartDetails"
+                $DockerRecoveryState.Reason = "restart-and-start-failed"
+                return $false
+            }
+        }
         for ($RecoveryAttempt = 1; $RecoveryAttempt -le 24; $RecoveryAttempt++) {
             Start-Sleep -Seconds 5
             $RecoveryProbe = Invoke-DockerNative -Arguments @("info", "--format", "{{json .ServerVersion}}")
             if ($RecoveryProbe.ExitCode -eq 0) {
+                $DockerRecoveryState.Succeeded = $true
+                $DockerRecoveryState.Reason = "recovered"
                 Write-Host "Docker Engine kembali sehat setelah recovery." -ForegroundColor Green
                 return $true
             }
         }
 
-        Write-Warning "Docker Desktop sudah direstart tetapi Docker Engine belum kembali sehat."
+        $DockerRecoveryState.Reason = "engine-still-unhealthy"
+        Write-Warning "Docker Desktop sudah direstart/start tetapi Docker Engine belum kembali sehat."
         return $false
     }
 
@@ -159,15 +187,29 @@ try {
             "Docker Engine tidak sehat/tidak merespons.",
             "Status probe: $EngineDetails",
             "Docker Desktop status: $DesktopStatus",
+            "Docker Desktop CLI: $($DockerRecoveryState.Reason)",
             "",
-            "Recovery otomatis sudah dicoba satu kali.",
+            $(if ($DockerRecoveryState.Attempted) {
+                if ($DockerRecoveryState.Succeeded) {
+                    "Recovery otomatis berhasil memulihkan Docker Engine."
+                }
+                else {
+                    "Recovery otomatis sudah dicoba tetapi Engine belum pulih."
+                }
+            }
+            elseif ($NoDockerEngineRepair) {
+                "Recovery otomatis dinonaktifkan oleh -NoDockerEngineRepair."
+            }
+            else {
+                "Recovery otomatis tidak dijalankan karena Docker Desktop CLI tidak terdeteksi."
+            }),
             "Perbaikan manual:",
-            "  1. docker desktop status",
-            "  2. docker desktop restart",
-            "  3. docker info",
-            "  4. Jalankan lagi .\up.ps1 ... -Build",
+            "  1. docker desktop version",
+            "  2. docker desktop status",
+            "  3. docker desktop restart",
+            "  4. docker info",
+            "  5. Jalankan lagi .\up.ps1 ... -Build",
             "",
-            "Gunakan -NoDockerEngineRepair bila restart otomatis tidak diinginkan.",
             "Jangan gunakan 'docker compose down -v' untuk masalah ini; volume database tidak perlu dihapus."
         ) -join [Environment]::NewLine
 
