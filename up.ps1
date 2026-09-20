@@ -645,7 +645,7 @@ try {
 
                         $env:COMPOSE_PARALLEL_LIMIT = $AdaptiveLimit.ToString()
                     }
-                    elseif (Test-DockerResourceFailure -OutputText $BatchBuildText -and $AdaptiveLimit -gt 1) {
+                    elseif ((Test-DockerResourceFailure -OutputText $BatchBuildText) -and ($AdaptiveLimit -gt 1)) {
                         # Resource exhaustion is different from a broken Dockerfile.
                         # Do not restart Desktop; reduce concurrency and retry only
                         # the same batch. This keeps the fast path fast while giving
@@ -661,7 +661,7 @@ try {
 
                         if ($RetryBatchProbe.ExitCode -ne 0) {
                             $RetryText = ($RetryBatchProbe.Output -join [Environment]::NewLine)
-                            if (Test-DockerResourceFailure -OutputText $RetryText -and $AdaptiveLimit -gt 1) {
+                            if ((Test-DockerResourceFailure -OutputText $RetryText) -and ($AdaptiveLimit -gt 1)) {
                                 $AdaptiveLimit = 1
                                 $env:COMPOSE_PARALLEL_LIMIT = "1"
                                 Write-Warning "Resource masih penuh; retry terakhir batch [$BatchLabel] dengan paralelisme 1..."
