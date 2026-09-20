@@ -10,7 +10,7 @@ import { TransactionWorkspace } from "./TransactionWorkspace";
 import { AnalyticsWorkspace } from "./AnalyticsWorkspace";
 import { AdministrationWorkspace } from "./AdministrationWorkspace";
 import ModerationDecisionDialog from "./ModerationDecisionDialog";
-import NewsEditorialWorkspace from "./NewsEditorialWorkspace";
+import NewsEditorialWorkspace from "../NewsEditorialWorkspace";
 import { OperationsOverview } from "./OperationsOverview";
 import { createEmptyDashboardData } from "./dashboardData";
 import { buildOperationsPriorities } from "./operationsPriority";
