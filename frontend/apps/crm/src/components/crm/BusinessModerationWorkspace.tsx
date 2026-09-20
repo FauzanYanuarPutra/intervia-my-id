@@ -257,6 +257,30 @@ export default function BusinessModerationWorkspace() {
         </div>
       ) : null}
 
+      <div className="rounded-2xl border border-slate-200 bg-white p-2">
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => setActiveTab("businesses")}
+            className={`rounded-xl px-3 py-2.5 text-xs font-bold ${activeTab === "businesses" ? "bg-emerald-600 text-white" : "bg-slate-50 text-slate-600"}`}
+          >
+            Usaha terdaftar
+            <span className="ml-1 opacity-70">({businesses.length})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("references")}
+            className={`rounded-xl px-3 py-2.5 text-xs font-bold ${activeTab === "references" ? "bg-slate-900 text-white" : "bg-slate-50 text-slate-600"}`}
+          >
+            Data referensi peta
+            <span className="ml-1 opacity-70">({references.length})</span>
+          </button>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-3">
+        <div className="flex flex-col gap-2 lg:flex-row">
+          <input
       <div className="rounded-2xl border border-slate-200 bg-white p-3">
         <div className="flex flex-col gap-2 lg:flex-row">
           <input
@@ -268,18 +292,30 @@ export default function BusinessModerationWorkspace() {
             placeholder="Cari nama usaha, kota, alamat..."
             className="min-h-11 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold outline-none focus:border-emerald-300 focus:bg-white"
           />
-          <select
-            value={status}
-            onChange={event => setStatus(event.target.value)}
-            className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold"
-          >
-            <option value="all">Semua status</option>
-            <option value="needs_review">Perlu ditinjau</option>
-            <option value="needs_completion">Perlu dilengkapi</option>
-            <option value="approved">Disetujui</option>
-            <option value="hidden">Disembunyikan</option>
-            <option value="escalated">Peninjauan lanjut</option>
-          </select>
+          {activeTab === "businesses" ? (
+            <select
+              value={status}
+              onChange={event => setStatus(event.target.value)}
+              className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold"
+            >
+              <option value="all">Semua status</option>
+              <option value="needs_review">Perlu ditinjau</option>
+              <option value="needs_completion">Perlu dilengkapi</option>
+              <option value="approved">Disetujui</option>
+              <option value="hidden">Disembunyikan</option>
+              <option value="escalated">Peninjauan lanjut</option>
+            </select>
+          ) : (
+            <select
+              value={referenceStatus}
+              onChange={event => setReferenceStatus(event.target.value)}
+              className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold"
+            >
+              <option value="active">Referensi aktif</option>
+              <option value="archived">Disembunyikan</option>
+              <option value="all">Semua referensi</option>
+            </select>
+          )}
           <button
             type="button"
             onClick={() => void loadBusinesses()}
@@ -294,6 +330,67 @@ export default function BusinessModerationWorkspace() {
         <div className="rounded-3xl border border-slate-200 bg-white p-8 text-sm font-semibold text-slate-500">
           Memuat data usaha...
         </div>
+      ) : activeTab === "references" ? (
+        !references.length ? (
+          <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center">
+            <p className="text-base font-bold text-slate-900">Belum ada data referensi pada filter ini</p>
+            <p className="mt-1 text-sm text-slate-500">Data referensi berasal dari sumber pihak ketiga yang disimpan dengan provenance dan lisensi.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {references.map(reference => (
+              <article key={reference.id} className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="grid gap-4 md:grid-cols-[120px_1fr]">
+                  <div className="aspect-square overflow-hidden rounded-2xl bg-slate-100">
+                    {reference.cover_image ? (
+                      <img src={reference.cover_image} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="grid h-full place-items-center p-3 text-center text-[11px] font-bold text-slate-400">Tidak ada media</div>
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <h2 className="text-base font-bold text-slate-950">{reference.title}</h2>
+                        <p className="mt-1 text-xs font-semibold text-slate-500">{reference.city || "Lokasi belum tercatat"}{reference.address ? ` · ${reference.address}` : ""}</p>
+                      </div>
+                      <span className={`rounded-full border px-2.5 py-1 text-[11px] font-bold ${reference.content_status === "active" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-rose-200 bg-rose-50 text-rose-700"}`}>
+                        {reference.content_status === "active" ? "Tampil" : "Disembunyikan"}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">{reference.summary || "Data referensi peta tanpa ringkasan."}</p>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                      <div className="rounded-xl bg-slate-50 p-3">
+                        <p className="text-[11px] font-bold text-slate-500">Sumber</p>
+                        <p className="mt-1 text-xs font-bold text-slate-800">{reference.source_title || reference.source_dataset || "Sumber tidak tercatat"}</p>
+                      </div>
+                      <div className="rounded-xl bg-slate-50 p-3">
+                        <p className="text-[11px] font-bold text-slate-500">Lisensi</p>
+                        <p className="mt-1 text-xs font-bold text-slate-800">{reference.source_license || "Lisensi belum tercatat"}</p>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {reference.source_url ? (
+                        <a href={reference.source_url} target="_blank" rel="noreferrer" className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700">
+                          Buka sumber
+                        </a>
+                      ) : null}
+                      {reference.content_status === "active" ? (
+                        <button type="button" onClick={() => { setReferenceDraft({ reference, action: "hide" }); setReasonCode("quality"); setReasonNote(""); setSeverity("medium"); }} className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700">
+                          Sembunyikan
+                        </button>
+                      ) : (
+                        <button type="button" onClick={() => { setReferenceDraft({ reference, action: "restore" }); setReasonCode("quality"); setReasonNote(""); setSeverity("medium"); }} className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white">
+                          Pulihkan
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        )
       ) : !filtered.length ? (
         <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center">
           <p className="text-base font-bold text-slate-900">Belum ada usaha pada filter ini</p>
