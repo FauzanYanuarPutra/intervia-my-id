@@ -295,7 +295,7 @@ export default function NewsEditorialWorkspace({
     if (!selected) return;
     applySelected(selected);
     void loadHistory(selected.id);
-  }, [selected?.id]);
+  }, [selected, applySelected, loadHistory]);
 
   const updateSource = async (
     source: NewsSource,
