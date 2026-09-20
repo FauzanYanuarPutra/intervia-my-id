@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import type { ProductModifierGroup, ProductModifierSelection } from 'lajukan-ui';
 import { SensitiveActionConfirm } from '@/components/interaction/SensitiveActionConfirm';
+import { RupiahInput } from '@/components/forms/RupiahInput';
 import { businessApiErrorMessage } from '@/lib/business-api-error';
 import { QuickSaleProductConfigurator } from './QuickSaleProductConfigurator';
 import {
@@ -472,7 +473,15 @@ export function QuickSaleWorkspace({ businessId, products, channels = [], locati
           {accountKey === 'cash' ? (
             <div className="mt-4 rounded-2xl bg-[#f5f7f3] p-3.5">
               <div className="flex items-center justify-between gap-3"><label htmlFor="cash-tendered" className="text-sm font-bold text-portal-ink">Uang diterima</label>{tenderedAmount >= total ? <span className="text-xs font-bold text-emerald-700">Cukup</span> : null}</div>
-              <div className="relative mt-2"><span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-portal-soft">Rp</span><input id="cash-tendered" className="portal-input h-12 w-full bg-white pl-9 text-lg font-black tabular-nums" type="number" inputMode="numeric" min={0} step="1000" value={tenderedAmount || ''} onFocus={event => event.currentTarget.select()} onChange={event => setTenderedAmount(Number(event.target.value) || 0)} /></div>
+              <div className="relative mt-2">
+                <RupiahInput
+                  id="cash-tendered"
+                  min={0}
+                  value={tenderedAmount}
+                  onValueChange={value => setTenderedAmount(value ?? 0)}
+                  className="portal-input h-12 text-lg font-black tabular-nums"
+                />
+              </div>
               <div className="mt-2.5 grid grid-cols-3 gap-2">{cashPresets.slice(0, 6).map(amount => { const exact = amount === total; const active = tenderedAmount === amount; return <button key={amount} type="button" className={`min-h-11 rounded-xl border px-2 py-2 text-xs font-black transition active:scale-95 ${active ? 'border-portal-ink bg-portal-ink text-white' : 'border-portal-line bg-white text-portal-ink hover:bg-[#fafbf9]'}`} onClick={() => setTenderedAmount(amount)}>{exact ? 'Uang pas' : money.format(amount).replace(',00', '')}</button>; })}</div>
               <div className="mt-3 flex items-center justify-between border-t border-portal-line pt-3"><span className="text-sm font-semibold text-portal-soft">Kembalian</span><span className="text-2xl font-black tabular-nums text-portal-ink">{money.format(cashChange)}</span></div>
             </div>
