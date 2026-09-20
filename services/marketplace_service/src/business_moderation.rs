@@ -180,6 +180,15 @@ fn collect_metadata_images(metadata: &Value) -> Vec<String> {
                         collect(value, urls, seen);
                     }
                 }
+                // Business OS stores canonical public media under nested
+                // objects such as metadata.public. Recurse only into known
+                // presentation containers so unrelated website/social URLs
+                // are not misclassified as business photos.
+                for key in ["public", "storefront", "profile", "presentation", "business_media"] {
+                    if let Some(value) = map.get(key) {
+                        collect(value, urls, seen);
+                    }
+                }
             }
             _ => {}
         }
