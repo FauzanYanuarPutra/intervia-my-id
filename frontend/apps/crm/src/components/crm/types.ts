@@ -2,6 +2,7 @@ export type PageId =
   | 'dashboard'
   | 'pipeline'
   | 'users'
+  | 'businesses'
   | 'listings'
   | 'news'
   | 'transactions'
@@ -25,6 +26,7 @@ export type IconName =
   | 'settings'
   | 'transactions'
   | 'users'
+  | 'businesses'
   | 'news';
 
 export type CrmNavItem = {
