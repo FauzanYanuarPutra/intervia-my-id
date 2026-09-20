@@ -294,21 +294,15 @@ export function StockPurchaseYieldWorkspace({
             </label>
             <label className="text-xs font-semibold text-portal-soft">
               Total dibayar
-              <input
-                type="number"
-                min="1"
-                <RupiahInput
-                  min={1}
-                  value={totalAmount ? Number(totalAmount) : null}
-                  onValueChange={value => setTotalAmount(value == null ? ''' : '' : String(value))}
-                  disabled={!canManage}
-                  className="mt-1 w-full rounded-xl border border-portal-line px-3 py-2.5 text-sm text-portal-ink"
-                  placeholder="70.000"
-                />
-                onChange={event => setTotalAmount(event.target.value)}
+              <RupiahInput
+                min={1}
+                value={totalAmount ? Number(totalAmount) : null}
+                onValueChange={value =>
+                  setTotalAmount(value == null ? '' : String(value))
+                }
                 disabled={!canManage}
                 className="mt-1 w-full rounded-xl border border-portal-line px-3 py-2.5 text-sm text-portal-ink"
-                placeholder="70000"
+                placeholder="70.000"
               />
             </label>
           </div>
