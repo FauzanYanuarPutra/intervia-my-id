@@ -23,7 +23,8 @@ export type IconName =
   | 'search'
   | 'settings'
   | 'transactions'
-  | 'users';
+  | 'users'
+  | 'news';
 
 export type CrmNavItem = {
   id: PageId;
