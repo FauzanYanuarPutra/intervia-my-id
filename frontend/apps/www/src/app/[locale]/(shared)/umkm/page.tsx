@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
 import { UmkmDiscoveryClient } from '@/components/super-app/UmkmDiscoveryClient';
+import { serializeJsonLd } from '@/lib/seo/jsonLd';
 import type { DiscoveryStore } from '@/components/super-app/UmkmDiscoveryPanel';
 import {
   getUmkmStoreById,
@@ -54,26 +55,43 @@ async function getDeepLinkedStore(storeSlug: string, storeId: string): Promise<U
   return null;
 }
 
-export async function generateMetadata({ params }: Pick<PageProps, 'params'>): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+  searchParams,
+}: PageProps): Promise<Metadata> {
   const { locale } = await params;
+  const query = await searchParams;
   const isId = locale === 'id';
   const lang = isId ? 'id' : 'en';
-  const title = isId ? 'Peta Usaha di Lajukan' : 'Lajukan Business Map';
+  const hasDiscoveryParams = Boolean(
+    query.q?.trim() ||
+      query.city?.trim() ||
+      query.store?.trim() ||
+      query.storeId?.trim() ||
+      query.business?.trim() ||
+      query.category?.trim() ||
+      query.view === 'map',
+  );
+  const title = isId
+    ? 'Peta & Daftar Usaha Lokal Indonesia | Lajukan'
+    : 'Local Business Map & Directory | Lajukan';
   const description = isId
-    ? 'Lihat usaha lokal melalui peta. Untuk pencarian bisnis utama, gunakan Jelajahi Lajukan.'
-    : 'Find local businesses on the map. Use Lajukan Explore for primary business discovery.';
-  const canonical = `https://www.lajukan.com/${lang}/explore?type=businesses`;
+    ? 'Cari usaha lokal di peta atau daftar Lajukan. Temukan UMKM, toko, kuliner, jasa, tempat usaha, dan bisnis sekitar berdasarkan lokasi.'
+    : 'Find local businesses on the Lajukan map and directory. Discover shops, food, services, places, and nearby businesses.';
+  const canonical = `https://www.lajukan.com/${lang}/umkm`;
 
   return {
     title,
     description,
-    robots: { index: false, follow: true },
+    robots: hasDiscoveryParams
+      ? { index: false, follow: true }
+      : { index: true, follow: true },
     alternates: {
       canonical,
       languages: {
-        id: 'https://www.lajukan.com/id/explore?type=businesses',
-        en: 'https://www.lajukan.com/en/explore?type=businesses',
-        'x-default': 'https://www.lajukan.com/id/explore?type=businesses',
+        id: 'https://www.lajukan.com/id/umkm',
+        en: 'https://www.lajukan.com/en/umkm',
+        'x-default': 'https://www.lajukan.com/id/umkm',
       },
     },
     openGraph: {
@@ -98,10 +116,44 @@ export default async function UmkmPage({ params, searchParams }: PageProps) {
   ]);
   const listedStores = listedStoresResult.status === 'fulfilled' ? listedStoresResult.value.filter(isPublicUmkmStoreVisible).map(toDiscoveryStore) : undefined;
   const deepLinkedStore = deepLinkedStoreResult.status === 'fulfilled' && deepLinkedStoreResult.value && isPublicUmkmStoreVisible(deepLinkedStoreResult.value) ? toDiscoveryStore(deepLinkedStoreResult.value) : null;
-  const initialStores = listedStores === undefined && !deepLinkedStore ? undefined : mergeDeepLinkedUmkmStore(listedStores || [], deepLinkedStore);
+  const initialStores = listedStores === undefined && !deepLinkedStore
+    ? undefined
+    : mergeDeepLinkedUmkmStore(listedStores || [], deepLinkedStore);
+  const seoStores = (listedStores || []).slice(0, 10);
+  const baseUrl = 'https://www.lajukan.com';
+  const seoJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name:
+      locale === 'id'
+        ? 'Peta & Daftar Usaha Lokal Indonesia | Lajukan'
+        : 'Local Business Map & Directory | Lajukan',
+    url: `${baseUrl}/${locale}/umkm`,
+    isPartOf: {
+      '@type': 'WebSite',
+      name: 'Lajukan',
+      url: baseUrl,
+    },
+    mainEntity: {
+      '@type': 'ItemList',
+      itemListOrder: 'https://schema.org/ItemListOrderAscending',
+      numberOfItems: seoStores.length,
+      itemListElement: seoStores.map((store, index) => ({
+        '@type': 'ListItem',
+        position: index + 1,
+        url: `${baseUrl}/${locale}/toko/${encodeURIComponent(store.slug)}`,
+        name: store.name,
+      })),
+    },
+  };
 
   return (
-    <UmkmDiscoveryClient
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(seoJsonLd) }}
+      />
+      <UmkmDiscoveryClient
       locale={locale}
       isId={locale === 'id'}
       initialQuery={resolvedSearchParams.q || ''}
@@ -112,6 +164,7 @@ export default async function UmkmPage({ params, searchParams }: PageProps) {
       initialMapOnly={resolvedSearchParams.view === 'map'}
       initialStores={initialStores}
       initialCount={initialStores?.length}
-    />
+      />
+    </>
   );
 }
