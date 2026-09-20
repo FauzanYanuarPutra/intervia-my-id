@@ -293,7 +293,7 @@ export function MapQuickControls({
       className={cn(
         'relative z-[1100] flex flex-col gap-1.5 sm:max-w-none sm:items-end',
         compact
-          ? 'max-w-[min(76vw,300px)] items-end'
+          ? 'max-w-[min(70vw,220px)] items-end'
           : 'max-w-[min(84vw,250px)] items-start',
       )}
     >
