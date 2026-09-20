@@ -416,17 +416,24 @@ try {
                     $RetryProbe = Invoke-DockerNative -Arguments @("info", "--format", "{{json .ServerVersion}}")
                     if ($RetryProbe.ExitCode -ne 0) {
                         Write-Warning "Docker Engine kembali tidak sehat. Beralih ke fallback build service-by-service..."
-                        $ServiceProbeArgs = @($ComposeArgs + @("config", "--services"))
+                        $ServiceProbeArgs = @($ComposeArgs + @("config", "--format", "json"))
                         $ServiceProbe = Invoke-DockerNative -Arguments $ServiceProbeArgs
                         if ($ServiceProbe.ExitCode -ne 0) {
-                            throw "Docker Compose gagal membaca daftar service untuk fallback build."
+                            throw "Docker Compose gagal membaca konfigurasi service untuk fallback build."
                         }
 
-                        $FallbackServices = @(
-                            $ServiceProbe.Output |
-                                ForEach-Object { [string]$_ } |
-                                Where-Object { $_ -match '^[a-zA-Z0-9][a-zA-Z0-9_-]*$' }
-                        )
+                        $FallbackServices = @()
+                        try {
+                            $ResolvedCompose = ($ServiceProbe.Output -join [Environment]::NewLine) | ConvertFrom-Json
+                            $FallbackServices = @(
+                                $ResolvedCompose.services.psobject.Properties |
+                                    Where-Object { $null -ne $_.Value.build } |
+                                    ForEach-Object { $_.Name }
+                            )
+                        }
+                        catch {
+                            throw "Konfigurasi Compose tidak dapat diparse untuk menentukan service build."
+                        }
                         if ($BuildTargets.Count -gt 0) {
                             $FallbackServices = @($BuildTargets)
                         }
