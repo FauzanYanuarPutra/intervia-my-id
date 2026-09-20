@@ -186,7 +186,7 @@ const CHAT_CONTROL_CLASS =
 const CHAT_TEXTAREA_CLASS =
   'mt-1.5 min-h-[96px] w-full resize-y rounded-[12px] border border-slate-300 bg-white px-3 py-2.5 text-[13px] font-medium leading-5 text-[color:var(--app-text)] shadow-none outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-[color:var(--app-accent)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--app-accent)_14%,transparent)] dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-slate-600 dark:focus:border-emerald-400';
 const CHAT_COMPOSER_SHELL_CLASS =
-  'flex min-w-0 flex-1 items-end gap-0.5 overflow-visible rounded-[20px] border border-slate-300 bg-white px-1 py-1 shadow-none transition focus-within:border-[#25d366] focus-within:ring-2 focus-within:ring-[#25d366]/14 dark:border-[#3b4a54] dark:bg-[#2a3942] dark:focus-within:border-[#25d366] sm:gap-1 sm:px-1.5';
+  'flex min-w-0 flex-1 items-end gap-0.5 overflow-visible rounded-[20px] border border-slate-300 bg-white px-0.5 py-0.5 shadow-none transition focus-within:border-[#25d366] focus-within:ring-2 focus-within:ring-[#25d366]/14 dark:border-[#3b4a54] dark:bg-[#2a3942] dark:focus-within:border-[#25d366] sm:gap-1 sm:px-1.5';
 
 const QUICK_EMOJIS = [
   '\u{1F600}',
@@ -6587,8 +6587,8 @@ export default function ChatRoomPage() {
 
                     const bubbleMaxWidthClass =
                       msg.message_type === 'transaction'
-                        ? 'max-w-[calc(100%-2.5rem)] sm:max-w-[560px]'
-                        : 'max-w-[82%] sm:max-w-[72%] lg:max-w-[640px]';
+                        ? 'w-fit max-w-[calc(100%-1rem)] sm:max-w-[560px]'
+                        : 'w-fit max-w-[92%] sm:max-w-[72%] lg:max-w-[640px]';
                     const bubbleClass = `relative ${bubbleMaxWidthClass} overflow-visible rounded-[18px] px-2.5 py-2 text-[13px] leading-[1.45] break-words whitespace-pre-wrap sm:px-3 sm:py-2.5 sm:text-sm ${
                       isOwn
                         ? 'rounded-br-[6px] bg-[#d9fdd3] text-[#111b21] shadow-[0_1px_1px_rgba(17,27,33,0.16)] dark:bg-[#005c4b] dark:text-[#e9edef]'
@@ -8021,9 +8021,9 @@ export default function ChatRoomPage() {
           )}
 
           {composerAction ? (
-            <div className="flex items-start gap-2 rounded-[18px] border-l-4 border-[#00a884] bg-white/90 px-3 py-2 text-left shadow-sm dark:bg-[#111b21]/88">
+            <div className="flex min-w-0 items-start gap-2 rounded-[16px] border-l-4 border-[#00a884] bg-white/90 px-2.5 py-2 text-left shadow-sm sm:px-3 dark:bg-[#111b21]/88">
               <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-bold text-[#008f72] dark:text-[#25d366]">
+                <p className="min-w-0 truncate text-[11px] font-bold text-[#008f72] dark:text-[#25d366]">
                   {composerAction.mode === 'reply'
                     ? chatLocale === 'id'
                       ? `Membalas ${getMessageSenderLabel(composerAction.message)}`
@@ -8032,7 +8032,7 @@ export default function ChatRoomPage() {
                       ? `Mengutip ${getMessageSenderLabel(composerAction.message)}`
                       : `Quoting ${getMessageSenderLabel(composerAction.message)}`}
                 </p>
-                <p className="mt-0.5 line-clamp-2 text-xs font-medium leading-5 text-[#54656f] dark:text-[#aebac1]">
+                <p className="mt-0.5 line-clamp-2 break-words text-xs font-medium leading-5 text-[#54656f] dark:text-[#aebac1]">
                   {summarizeMessageForAction(composerAction.message)}
                 </p>
               </div>
