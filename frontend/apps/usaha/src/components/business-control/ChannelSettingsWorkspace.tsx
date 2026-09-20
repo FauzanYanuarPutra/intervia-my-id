@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { AlertTriangle, ChevronDown, Loader2, Save } from 'lucide-react';
+import { RupiahInput } from '@/components/forms/RupiahInput';
 import { buildChannelBusinessSummary } from '@/lib/business-control/channel-ux';
 import { businessApiErrorMessage } from '@/lib/business-api-error';
 import { channelSimulationReadiness } from '@/lib/business-control/progressive-disclosure';
@@ -155,25 +156,23 @@ export function ChannelSettingsWorkspace({
           <div className={`grid gap-3 ${canViewCosting ? 'sm:grid-cols-2' : ''}`}>
             <label className="text-xs font-semibold text-portal-soft">
               Harga toko
-              <input
-                type="number"
-                min="0"
+              <RupiahInput
+                min={0}
+                value={price}
+                onValueChange={setPrice}
+                placeholder="10.000"
                 className={input}
-                value={price ?? ''}
-                placeholder="Contoh: 10000"
-                onChange={event => setPrice(nullableNumber(event.target.value))}
               />
             </label>
             {canViewCosting ? (
               <label className="text-xs font-semibold text-portal-soft">
                 HPP produk
-                <input
-                  type="number"
-                  min="0"
+                <RupiahInput
+                  min={0}
+                  value={hpp}
+                  onValueChange={setHpp}
+                  placeholder="10.000"
                   className={input}
-                  value={hpp ?? ''}
-                  placeholder="Modal per produk"
-                  onChange={event => setHpp(nullableNumber(event.target.value))}
                 />
               </label>
             ) : null}
@@ -337,11 +336,11 @@ function ChannelRow({
             <div className="mt-2 grid gap-3 sm:grid-cols-2">
               <label className="text-xs font-semibold text-portal-soft">
                 Biaya tetap
-                <input type="number" min="0" className={input} value={row.fixedFee} onChange={event => onPatch(row.key, 'fixedFee', Number(event.target.value) || 0)} />
+                <RupiahInput min={0} value={row.fixedFee} onValueChange={value => onPatch(row.key, 'fixedFee', value ?? 0)} className={input} />
               </label>
               <label className="text-xs font-semibold text-portal-soft">
                 Promo dari toko
-                <input type="number" min="0" className={input} value={row.merchantPromo} onChange={event => onPatch(row.key, 'merchantPromo', Number(event.target.value) || 0)} />
+                <RupiahInput min={0} value={row.merchantPromo} onValueChange={value => onPatch(row.key, 'merchantPromo', value ?? 0)} className={input} />
               </label>
             </div>
           </details>
