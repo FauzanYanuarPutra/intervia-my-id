@@ -376,7 +376,7 @@ async fn list_crm_businesses(
         FROM umkm_stores s
         LEFT JOIN LATERAL (
           SELECT status, current_action, current_reason_code, current_reason_note,
-                 severity, missing_fields, updated_at
+                 severity, missing_fields, updated_at, assigned_to, due_at
           FROM internal_moderation.business_moderation_cases
           WHERE business_id = s.id
           ORDER BY updated_at DESC
@@ -424,6 +424,7 @@ async fn list_crm_businesses(
         let lat: f64 = row.get("lat");
         let lng: f64 = row.get("lng");
         let images = collect_metadata_images(&metadata);
+        let source_type = public_business_source_type(&metadata);
         let missing = derive_missing_fields(
             &name,
             description.as_deref(),
@@ -457,7 +458,7 @@ async fn list_crm_businesses(
             is_active,
             online_order_enabled: row.get("online_order_enabled"),
             offline_order_enabled: row.get("offline_order_enabled"),
-            metadata,
+            metadata: metadata.clone(),
             created_at: row.get("created_at"),
             updated_at: row.get("updated_at"),
             review_state: review,
@@ -469,7 +470,7 @@ async fn list_crm_businesses(
             missing_fields: missing,
             completeness_percent: completeness_percent(&missing),
             image_urls: images,
-            source_type: public_business_source_type(&metadata),
+            source_type,
             report_count: row.get::<i64,_>("report_count"),
             latest_report_reason: row.get::<Option<String>,_>("latest_report_reason"),
             assigned_to: row.get::<Option<Uuid>,_>("assigned_to"),
@@ -553,6 +554,7 @@ async fn load_business(state: &AppState, business_id: Uuid) -> Result<CrmBusines
     .ok_or_else(|| err(StatusCode::NOT_FOUND, "business not found").into_response())?;
 
     let metadata: Value = row.get("metadata");
+    let source_type = public_business_source_type(&metadata);
     let name: String = row.get("name");
     let description: Option<String> = row.get("description");
     let city: String = row.get("city");
@@ -589,7 +591,7 @@ async fn load_business(state: &AppState, business_id: Uuid) -> Result<CrmBusines
         is_active,
         online_order_enabled: row.get("online_order_enabled"),
         offline_order_enabled: row.get("offline_order_enabled"),
-        metadata,
+        metadata: metadata.clone(),
         created_at: row.get("created_at"),
         updated_at: row.get("updated_at"),
         review_state: review_state(current_action.as_deref(), moderation_status.as_deref(), is_active),
@@ -600,8 +602,8 @@ async fn load_business(state: &AppState, business_id: Uuid) -> Result<CrmBusines
         moderation_severity: row.get("moderation_severity"),
         missing_fields: missing.clone(),
         completeness_percent: completeness_percent(&missing),
-        image_urls: collect_metadata_images(&row.get::<Value,_>("metadata")),
-        source_type: public_business_source_type(&metadata),
+        image_urls: collect_metadata_images(&metadata),
+        source_type,
         report_count: row.get::<i64,_>("report_count"),
         latest_report_reason: row.get::<Option<String>,_>("latest_report_reason"),
         assigned_to: row.get::<Option<Uuid>,_>("assigned_to"),
