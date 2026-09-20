@@ -1,4 +1,5 @@
 'use client';
+import { RupiahInput } from '@/components/forms/RupiahInput';
 
 import { useMemo, useState } from 'react';
 import { ChevronDown, Plus, Trash2, TriangleAlert } from 'lucide-react';
@@ -76,7 +77,7 @@ export function HppCalculator() {
             <p className="mt-1 text-3xl font-black text-portal-ink">{money.format(recipe.totalCost)}</p>
           </div>
           <label className="w-full text-xs font-semibold text-portal-soft sm:w-52">Harga jual
-            <input type="number" min="0" className={`${input} text-base font-bold`} value={sellingPrice} onChange={event => setSellingPrice(numeric(event.target.value))} />
+            <RupiahInput min={0} className={`${input} text-base font-bold`} value={sellingPrice} onValueChange={value => setSellingPrice(value ?? 0)} />
           </label>
         </div>
         <div className="mt-4 grid grid-cols-3 gap-2 border-t border-portal-line pt-3">
@@ -109,7 +110,7 @@ export function HppCalculator() {
                 <details className="group mt-2">
                   <summary className="flex cursor-pointer list-none items-center gap-1 text-[11px] font-bold text-portal-soft">Detail bahan <ChevronDown className="h-3.5 w-3.5 transition group-open:rotate-180" /></summary>
                   <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    <label className="text-xs font-semibold text-portal-soft">Harga beli<input type="number" min="0" className={input} value={row.purchasePrice} onChange={event => patch(row.id, 'purchasePrice', numeric(event.target.value))} /></label>
+                    <label className="text-xs font-semibold text-portal-soft">Harga beli<RupiahInput min={0} className={input} value={row.purchasePrice} onValueChange={value => patch(row.id, 'purchasePrice', value ?? 0)} /></label>
                     <label className="text-xs font-semibold text-portal-soft">Jumlah beli<input type="number" min="0.0001" step="any" className={input} value={row.purchaseQuantity} onChange={event => patch(row.id, 'purchaseQuantity', numeric(event.target.value))} /></label>
                     <label className="text-xs font-semibold text-portal-soft">Pakai / produk<input type="number" min="0" step="any" className={input} value={row.recipeQuantity} onChange={event => patch(row.id, 'recipeQuantity', numeric(event.target.value))} /></label>
                     <label className="text-xs font-semibold text-portal-soft">Stok<input type="number" min="0" step="any" className={input} value={row.availableQuantity} onChange={event => patch(row.id, 'availableQuantity', numeric(event.target.value))} /></label>
