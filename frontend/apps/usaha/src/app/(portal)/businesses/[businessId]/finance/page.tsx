@@ -8,7 +8,6 @@ import { PortalShell } from '@/components/portal/PortalShell';
 import { WorkspaceTabs } from '@/components/portal/WorkspaceTabs';
 import { getWave2FinancePlan, listWave2Obligations } from '@/lib/business-wave2-server';
 import { listControlChannels, listControlFinanceEntries, listControlSettlements } from '@/lib/business-control-server';
-import { shouldShowSettlementWorkspace } from '@/lib/business-control/progressive-disclosure';
 import { hasPermission } from '@/lib/portal-logic';
 import { resolvePortalBusinessPageState } from '@/lib/portal-server';
 
