@@ -1,6 +1,7 @@
 'use client';
 
 import { LajukanImage as Image } from '@/components/common/LajukanImage';
+import { RupiahInput } from '@/components/common/RupiahInput';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useLocale } from 'next-intl';
@@ -4161,15 +4162,14 @@ export default function TransactionsPage() {
                   ? `Nominal baru (${counterOfferTxn.currency || 'IDR'})`
                   : `New amount (${counterOfferTxn.currency || 'IDR'})`}
               </label>
-              <input
-                type="text"
-                inputMode="numeric"
+              <RupiahInput
                 value={counterOfferAmount}
-                onChange={event => setCounterOfferAmount(event.target.value)}
-                className="h-11 w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-sm focus:border-[color:var(--app-accent-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
-                placeholder={
-                  locale === 'id' ? 'Contoh: 250000' : 'Example: 250000'
+                onValueChange={value =>
+                  setCounterOfferAmount(value == null ? '' : String(value))
                 }
+                className="h-11 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-sm focus:border-[color:var(--app-accent-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
+                placeholder="250.000"
+                aria-label={locale === "id" ? "Nominal baru" : "New amount"}
               />
               <p className="mt-1 text-[11px] text-[color:var(--app-text-soft)]">
                 {locale === 'id'
