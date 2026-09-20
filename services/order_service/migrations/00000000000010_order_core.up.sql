@@ -5,7 +5,8 @@ DO $$ BEGIN CREATE TYPE order_payment_status AS ENUM ('UNPAID','PENDING','PAID',
 CREATE TABLE IF NOT EXISTS orders(
  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),order_number TEXT NOT NULL UNIQUE,user_id UUID NOT NULL,merchant_id UUID NOT NULL,category_type order_category_type NOT NULL,base_status order_base_status NOT NULL DEFAULT 'DRAFT',payment_status order_payment_status NOT NULL DEFAULT 'UNPAID',currency CHAR(3) NOT NULL DEFAULT 'IDR',subtotal_amount NUMERIC(18,2) NOT NULL DEFAULT 0,shipping_amount NUMERIC(18,2) NOT NULL DEFAULT 0,discount_amount NUMERIC(18,2) NOT NULL DEFAULT 0,tax_amount NUMERIC(18,2) NOT NULL DEFAULT 0,total_amount NUMERIC(18,2) NOT NULL DEFAULT 0,payment_provider TEXT,payment_reference TEXT,payment_due_at TIMESTAMPTZ,accepted_at TIMESTAMPTZ,paid_at TIMESTAMPTZ,completed_at TIMESTAMPTZ,cancelled_at TIMESTAMPTZ,expired_at TIMESTAMPTZ,refunded_at TIMESTAMPTZ,category_specific_metadata JSONB NOT NULL DEFAULT '{}'::jsonb,idempotency_key TEXT NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),version BIGINT NOT NULL DEFAULT 1,business_id UUID,source_type TEXT);
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS business_id UUID;
-ALTER TABLE orders ADD COLUMN IF NOT EXISTS source_type TEXT;\nCREATE UNIQUE INDEX IF NOT EXISTS idx_orders_idempotency_key ON orders(user_id,idempotency_key);
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS source_type TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_idempotency_key ON orders(user_id,idempotency_key);
 CREATE INDEX IF NOT EXISTS idx_orders_user_created_at ON orders(user_id,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_orders_merchant_created_at ON orders(merchant_id,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(base_status,created_at DESC);
