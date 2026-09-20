@@ -1022,14 +1022,37 @@ export default function CrmCommandCenter() {
 
           <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-[1540px] space-y-5">
-              {data.emptyCollections.length ? (
-                <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-800">
-                  Data real kosong untuk: {data.emptyCollections.join(", ")}. CRM tidak mengisi data palsu otomatis.
+              {data.failures.length ? (
+                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 shadow-sm">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-rose-600">Data source error</p>
+                      <p className="mt-1 text-sm font-black text-rose-950">
+                        Service tidak bisa dibaca: {data.failures.join(", ")}
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-rose-800">
+                        CRM tetap menampilkan data service lain yang sehat. Item yang gagal tidak diisi data palsu.
+                        Untuk <strong>users</strong>, penyebab umum adalah permission <code>user.read</code> atau sesi lama.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleRefresh}
+                      disabled={refreshing}
+                      className="shrink-0 rounded-xl bg-rose-700 px-3 py-2 text-[11px] font-black text-white disabled:opacity-50"
+                    >
+                      {refreshing ? "Memuat…" : "Coba lagi"}
+                    </button>
+                  </div>
                 </div>
               ) : null}
-              {data.failures.length && !data.sampleCollections.length ? (
-                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">
-                  Service gagal dibaca: {data.failures.join(", ")}. Cek token admin atau endpoint API.
+              {data.emptyCollections.length ? (
+                <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 shadow-sm">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-sky-600">Data source kosong</p>
+                  <p className="mt-1 text-sm font-black text-sky-950">Belum ada data real untuk: {data.emptyCollections.join(", ")}</p>
+                  <p className="mt-1 text-xs leading-5 text-sky-800">
+                    Ini bukan error. CRM sengaja tidak membuat data dummy; queue akan terisi saat service menghasilkan data nyata.
+                  </p>
                 </div>
               ) : null}
               {notice ? (
