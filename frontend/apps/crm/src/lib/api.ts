@@ -795,6 +795,7 @@ export const businessModerationApi = {
       appeals?: Array<JsonRecord>;
       reports?: Array<JsonRecord>;
       evidence?: Array<JsonRecord>;
+      verification?: JsonRecord | null;
     }>(
       `${MARKETPLACE_URL}/v1/crm/businesses/${encodeURIComponent(id)}/moderation/history`,
       { method: 'GET', token },
