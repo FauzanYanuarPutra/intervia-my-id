@@ -537,7 +537,7 @@ async fn load_business(state: &AppState, business_id: Uuid) -> Result<CrmBusines
         FROM umkm_stores s
         LEFT JOIN LATERAL (
           SELECT status, current_action, current_reason_code, current_reason_note,
-                 severity, missing_fields
+                 severity, missing_fields, assigned_to, due_at
           FROM internal_moderation.business_moderation_cases
           WHERE business_id = s.id
           ORDER BY updated_at DESC
@@ -1014,12 +1014,12 @@ pub struct BusinessModerationAssignmentRequest {
 }
 
 #[derive(Debug, Deserialize)]
-#[derive(Debug, Deserialize)]
 pub struct BusinessAppealReviewRequest {
     pub action: String,
     pub note: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
 pub struct BusinessModerationEvidenceRequest {
     pub evidence_type: String,
     pub label: String,
