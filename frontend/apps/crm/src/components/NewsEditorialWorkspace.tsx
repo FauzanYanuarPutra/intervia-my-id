@@ -511,6 +511,29 @@ export default function NewsEditorialWorkspace({
     (!needsSource || verifiedSources > 0) &&
     (sensitivity !== 'high' || hasIndependentSourceReview);
 
+  const approvalGates = [
+    {
+      label: 'Fact-check',
+      ok: kind === 'press_release' || factCheck === 'verified',
+      value: kind === 'press_release' ? 'Tidak perlu' : factCheck === 'verified' ? 'Verified' : 'Pending',
+    },
+    {
+      label: 'Sumber',
+      ok: kind === 'press_release' || verifiedSources > 0,
+      value: kind === 'press_release' ? 'Tidak perlu' : `${verifiedSources} verified`,
+    },
+    {
+      label: 'Legal',
+      ok: sensitivity !== 'high' || legalReview === 'approved',
+      value: sensitivity === 'high' ? legalReview : 'Tidak perlu',
+    },
+    {
+      label: 'Reviewer lain',
+      ok: sensitivity !== 'high' || hasIndependentSourceReview,
+      value: sensitivity === 'high' ? (hasIndependentSourceReview ? 'Sudah ada' : 'Belum ada') : 'Tidak perlu',
+    },
+  ] as const;
+
   const metricsCards = [
     ['Menunggu review', queueCount('pending_review'), 'border-sky-200 bg-sky-50'],
     ['Perlu revisi', queueCount('needs_revision'), 'border-amber-200 bg-amber-50'],
@@ -561,6 +584,33 @@ export default function NewsEditorialWorkspace({
           </div>
         ))}
       </section>
+
+      {selected ? (
+        <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Approval checklist</p>
+              <p className="mt-1 text-sm font-black text-slate-950">
+                {publicationReady ? 'Semua gate approval terpenuhi.' : 'Selesaikan gate yang masih berwarna amber.'}
+              </p>
+            </div>
+            <span className={'rounded-full border px-3 py-1.5 text-[10px] font-black ' + (publicationReady ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700')}>
+              {publicationReady ? 'READY' : 'BLOCKED'}
+            </span>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            {approvalGates.map(gate => (
+              <div key={gate.label} className={'rounded-2xl border p-3 ' + (gate.ok ? 'border-emerald-200 bg-emerald-50/70' : 'border-amber-200 bg-amber-50')}>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">{gate.label}</p>
+                  <span className={'text-xs font-black ' + (gate.ok ? 'text-emerald-700' : 'text-amber-700')}>{gate.ok ? '✓' : '!'}</span>
+                </div>
+                <p className="mt-1 text-xs font-bold text-slate-800">{gate.value}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null;
 
       {error ? (
         <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">
