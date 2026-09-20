@@ -170,6 +170,8 @@ export default function NewsEditorialWorkspace({
   onBack: () => void;
 }) {
   const [status, setStatus] = useState('pending_review');
+  const [queueOffset, setQueueOffset] = useState(0);
+  const [queueHasMore, setQueueHasMore] = useState(false);
   const [items, setItems] = useState<NewsItem[]>([]);
   const [selectedId, setSelectedId] = useState(() => readNewsIdFromUrl());
   const [query, setQuery] = useState('');
@@ -293,16 +295,22 @@ export default function NewsEditorialWorkspace({
   );
 
   const loadQueue = useCallback(
-    async (nextStatus: string, preserveId = '') => {
+    async (nextStatus: string, preserveId = '', nextOffset = 0) => {
       setLoading(true);
       setError('');
       try {
-        const payload = await newsApi.queue(accessToken, nextStatus);
+        const payload = await newsApi.queue(accessToken, nextStatus, {
+          limit: 40,
+          offset: nextOffset,
+        });
         const value = record(payload);
         const nextItems = Array.isArray(value.items) ? (value.items as NewsItem[]) : [];
         const nextSelected = nextItems.find(item => item.id === preserveId) || nextItems[0] || null;
+        setQueueOffset(nextOffset);
+        setQueueHasMore(value.has_more === true);
         setItems(nextItems);
         setSelectedId(nextSelected?.id || '');
+        writeNewsIdUrl(nextSelected?.id || '', 'replace');
         applySelected(nextSelected);
         if (nextSelected) void loadHistory(nextSelected.id);
       } catch (err) {
@@ -318,7 +326,8 @@ export default function NewsEditorialWorkspace({
   );
 
   useEffect(() => {
-    void loadQueue(status);
+    setQueueOffset(0);
+    void loadQueue(status, readNewsIdFromUrl(), 0);
   }, [loadQueue, status]);
 
   useEffect(() => {
@@ -513,7 +522,7 @@ export default function NewsEditorialWorkspace({
             <button
               type="button"
               onClick={() => {
-                void loadQueue(status, selectedId);
+                void loadQueue(status, selectedId, queueOffset);
                 void loadMetrics();
               }}
               className="rounded-xl bg-slate-950 px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50"
@@ -646,6 +655,29 @@ export default function NewsEditorialWorkspace({
                 </p>
               </div>
             )}
+          </div>
+          <div className="mt-3 flex items-center justify-between gap-2 border-t border-slate-100 pt-3">
+            <p className="text-[10px] font-semibold text-slate-400">
+              {items.length ? `Menampilkan ${queueOffset + 1}–${queueOffset + items.length}` : 'Tidak ada item'}
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={loading || acting || queueOffset === 0}
+                onClick={() => void loadQueue(status, '', Math.max(0, queueOffset - 40))}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-black text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                ← Sebelumnya
+              </button>
+              <button
+                type="button"
+                disabled={loading || acting || !queueHasMore}
+                onClick={() => void loadQueue(status, '', queueOffset + 40)}
+                className="rounded-xl bg-slate-950 px-3 py-2 text-[11px] font-black text-white disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Berikutnya →
+              </button>
+            </div>
           </div>
         </section>
 
