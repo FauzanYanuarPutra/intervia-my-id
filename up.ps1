@@ -85,23 +85,37 @@ try {
             [string[]]$ComposeArguments
         )
 
-        # Keep structured Compose JSON separate from status/diagnostic output.
-        # Compose's config command supports --output for this exact purpose.
-        $TempPath = [System.IO.Path]::GetTempFileName()
+        # Compose's config JSON must remain pure stdout. Invoke-DockerNative
+        # intentionally merges stderr into stdout for normal diagnostics, so use
+        # a dedicated stderr file here and parse stdout directly.
+        $StderrPath = [System.IO.Path]::GetTempFileName()
         try {
-            $ConfigProbe = Invoke-DockerNative -Arguments (@($ComposeArguments) + @("config", "--format", "json", "--output", $TempPath))
-            $JsonText = ""
-            if (Test-Path -LiteralPath $TempPath) {
-                $JsonText = Get-Content -Raw -LiteralPath $TempPath
+            $PreviousErrorActionPreference = $ErrorActionPreference
+            $Stdout = @()
+            $ExitCode = 1
+            try {
+                $ErrorActionPreference = "Continue"
+                $Stdout = @(& docker @ComposeArguments config --format json 2> $StderrPath)
+                $ExitCode = $LASTEXITCODE
             }
+            finally {
+                $ErrorActionPreference = $PreviousErrorActionPreference
+            }
+
+            $Stderr = ""
+            if (Test-Path -LiteralPath $StderrPath) {
+                $Stderr = Get-Content -Raw -LiteralPath $StderrPath
+            }
+
             [pscustomobject]@{
-                ExitCode = $ConfigProbe.ExitCode
-                Output = @($ConfigProbe.Output)
-                Json = $JsonText
+                ExitCode = $ExitCode
+                Json = ($Stdout -join [Environment]::NewLine)
+                Error = $Stderr
+                Output = @($Stdout) + @($Stderr)
             }
         }
         finally {
-            Remove-Item -LiteralPath $TempPath -Force -ErrorAction SilentlyContinue
+            Remove-Item -LiteralPath $StderrPath -Force -ErrorAction SilentlyContinue
         }
     }
 
@@ -350,8 +364,11 @@ try {
     }
 
     $ComposeModelProbe = Get-DockerComposeConfigJson -ComposeArguments $ComposeArgs
-    if ($ComposeModelProbe.ExitCode -ne 0) {
-        $ComposeModelError = ($ComposeModelProbe.Output -join [Environment]::NewLine).Trim()
+    if ($ComposeModelProbe.ExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($ComposeModelProbe.Json)) {
+        $ComposeModelError = ($ComposeModelProbe.Error -join " ").Trim()
+        if ($ComposeModelError.Length -gt 2000) {
+            $ComposeModelError = $ComposeModelError.Substring(0, 2000)
+        }
         throw "Gagal membuat model Docker Compose untuk validasi runtime. $ComposeModelError"
     }
     $ComposeModel = $ComposeModelProbe.Json
@@ -424,7 +441,14 @@ try {
                 throw "Docker Compose gagal membaca daftar service build sebelum build dimulai."
             }
             try {
+                if ([string]::IsNullOrWhiteSpace($ServiceProbe.Json)) {
+                    $Diagnostic = ($ServiceProbe.Error -join " ").Trim()
+                    throw "Compose menghasilkan JSON kosong. $Diagnostic"
+                }
                 $ResolvedCompose = $ServiceProbe.Json | ConvertFrom-Json
+                if ($null -eq $ResolvedCompose.services) {
+                    throw "Compose JSON tidak memiliki object services."
+                }
                 $BuildTargets = @(
                     $ResolvedCompose.services.psobject.Properties |
                         Where-Object { $null -ne $_.Value.build } |
@@ -432,7 +456,11 @@ try {
                 )
             }
             catch {
-                throw "Konfigurasi Compose tidak dapat diparse untuk menentukan service build."
+                $Diagnostic = ($ServiceProbe.Error -join " ").Trim()
+                if ($Diagnostic.Length -gt 1000) {
+                    $Diagnostic = $Diagnostic.Substring(0, 1000)
+                }
+                throw "Konfigurasi Compose tidak dapat diparse untuk menentukan service build. $($_.Exception.Message) $Diagnostic"
             }
         }
 
