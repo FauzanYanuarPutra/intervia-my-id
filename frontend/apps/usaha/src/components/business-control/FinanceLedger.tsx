@@ -645,6 +645,19 @@ export function FinanceLedger({ businessId, initialEntries, channels = [] }: Pro
       </section>
 
       <section className="portal-panel p-4 sm:p-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="font-black text-portal-ink">Usaha sudah jalan?</p>
+            <p className="mt-0.5 text-xs leading-5 text-portal-soft">Masukkan posisi uang sekarang dulu. Setelah itu Lajukan bisa mengikuti transaksi berikutnya.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => setOpeningBalanceOpen(true)} className="portal-button-secondary justify-center"><WalletCards className="h-4 w-4" /> Saldo awal</button>
+            <button type="button" onClick={() => setTransferOpen(true)} className="portal-button-primary justify-center"><ArrowLeftRight className="h-4 w-4" /> Transfer</button>
+          </div>
+        </div>
+      </section>
+
+      <section className="portal-panel p-4 sm:p-5">
         <div className="flex items-center gap-2"><WalletCards className="h-4 w-4 text-portal-forest" /><h2 className="font-black text-portal-ink">Kantong uang nyata</h2></div>
         <p className="mt-1 text-xs text-portal-soft">Saldo ini nominal. Mengubah persentase rencana tidak mengubah saldo kantong yang sudah ada.</p>
         <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
@@ -785,6 +798,53 @@ export function FinanceLedger({ businessId, initialEntries, channels = [] }: Pro
 
       {message ? <FeedbackNotice message={message} tone={messageTone} /> : null}
 
+      <ModalSurface
+        open={openingBalanceOpen}
+        onOpenChange={nextOpen => {
+          if (!nextOpen && !savingOpeningBalance) setOpeningBalanceOpen(false);
+        }}
+        ariaLabel="Saldo awal usaha"
+        size="md"
+        presentation="adaptive"
+        dismissible={!savingOpeningBalance}
+      >
+        <div className="p-4 sm:p-5">
+          <h2 className="text-base font-black text-portal-ink">Masukkan saldo awal</h2>
+          <p className="mt-1 text-xs leading-5 text-portal-soft">Cocok untuk usaha yang sudah lama berjalan. Saldo awal tidak dihitung sebagai omzet atau biaya.</p>
+          <div className="mt-4 grid gap-3">
+            <div><p className="text-xs font-semibold text-portal-soft">Akun</p><div className="mt-1.5"><ChoiceChips value={openingBalanceAccount} onChange={setOpeningBalanceAccount} ariaLabel="Akun saldo awal" options={openingBalanceAccountOptions} /></div></div>
+            <label className="text-xs font-semibold text-portal-soft">Saldo<RupiahInput min={1} value={openingBalanceAmount ? Number(openingBalanceAmount) : null} onValueChange={value => setOpeningBalanceAmount(value == null ? '' : String(value))} className="mt-1 min-h-11 w-full rounded-xl border border-portal-line bg-white px-3 text-base font-bold" placeholder="12.000.000" /></label>
+            <label className="text-xs font-semibold text-portal-soft">Tanggal posisi<input type="date" value={openingBalanceDate} onChange={event => setOpeningBalanceDate(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3 text-sm" /></label>
+            <label className="text-xs font-semibold text-portal-soft">Catatan <span className="font-normal">(opsional)</span><input value={openingBalanceNote} onChange={event => setOpeningBalanceNote(event.target.value)} placeholder="Contoh: saldo bank saat mulai memakai Lajukan" className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3 text-sm" /></label>
+            <p className="rounded-xl bg-amber-50 px-3 py-2 text-[11px] leading-5 text-amber-800">Catat tiap akun satu kali untuk posisi awal: Kas, Bank, E-wallet, Piutang, atau Utang.</p>
+            <button type="button" onClick={saveOpeningBalance} disabled={savingOpeningBalance} className="portal-button-primary min-h-11 justify-center disabled:opacity-60">{savingOpeningBalance ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Simpan saldo awal</button>
+          </div>
+        </div>
+      </ModalSurface>
+
+      <ModalSurface
+        open={transferOpen}
+        onOpenChange={nextOpen => {
+          if (!nextOpen && !transferring) setTransferOpen(false);
+        }}
+        ariaLabel="Transfer antar akun"
+        size="md"
+        presentation="adaptive"
+        dismissible={!transferring}
+      >
+        <div className="p-4 sm:p-5">
+          <h2 className="text-base font-black text-portal-ink">Transfer antar akun</h2>
+          <p className="mt-1 text-xs leading-5 text-portal-soft">Kas → Bank, Bank → E-wallet, dan perpindahan antar saldo tidak dihitung sebagai pemasukan atau biaya.</p>
+          <div className="mt-4 grid gap-3">
+            <div><p className="text-xs font-semibold text-portal-soft">Dari</p><div className="mt-1.5"><ChoiceChips value={transferFrom} onChange={setTransferFrom} ariaLabel="Akun sumber" options={liquidAccountOptions.filter(item => item.value !== transferTo)} /></div></div>
+            <div><p className="text-xs font-semibold text-portal-soft">Ke</p><div className="mt-1.5"><ChoiceChips value={transferTo} onChange={setTransferTo} ariaLabel="Akun tujuan" options={liquidAccountOptions.filter(item => item.value !== transferFrom)} /></div></div>
+            <label className="text-xs font-semibold text-portal-soft">Nominal<RupiahInput min={1} value={transferAmount ? Number(transferAmount) : null} onValueChange={value => setTransferAmount(value == null ? '' : String(value))} className="mt-1 min-h-11 w-full rounded-xl border border-portal-line bg-white px-3 text-base font-bold" placeholder="500.000" /></label>
+            <label className="text-xs font-semibold text-portal-soft">Tanggal<input type="date" value={transferDate} onChange={event => setTransferDate(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3 text-sm" /></label>
+            <label className="text-xs font-semibold text-portal-soft">Catatan <span className="font-normal">(opsional)</span><input value={transferNote} onChange={event => setTransferNote(event.target.value)} placeholder="Contoh: setor hasil penjualan ke bank" className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3 text-sm" /></label>
+            <button type="button" onClick={transferAccounts} disabled={transferring || transferFrom === transferTo} className="portal-button-primary min-h-11 justify-center disabled:opacity-60">{transferring ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowLeftRight className="h-4 w-4" />} Simpan transfer</button>
+          </div>
+        </div>
+      </ModalSurface>
       <section className="portal-panel overflow-hidden">
         <div className="flex items-center justify-between border-b border-portal-line px-4 py-3 sm:px-5"><div><h2 className="font-bold text-portal-ink">Riwayat transaksi</h2><p className="mt-0.5 text-[11px] text-portal-soft">Catatan asli tidak dihapus saat koreksi.</p></div><span className="text-xs font-semibold text-portal-soft">{entries.length} terbaru</span></div>
         <div className="divide-y divide-portal-line">
