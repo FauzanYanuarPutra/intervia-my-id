@@ -504,55 +504,127 @@ try {
             Write-Host "Tidak ada service build yang dipilih; melewati tahap image build." -ForegroundColor Yellow
         }
         else {
-            Write-Host "Building Docker images service-by-service (Bake disabled, deterministic mode)..." -ForegroundColor Cyan
+            Write-Host "Building Docker images in adaptive batches (Bake disabled, cache-friendly)..." -ForegroundColor Cyan
             $BuildOriginalParallelLimit = $env:COMPOSE_PARALLEL_LIMIT
-            $env:COMPOSE_PARALLEL_LIMIT = "1"
-            Write-Host "Compose build parallelism: 1" -ForegroundColor DarkGray
 
+            # Do not force every service through a separate Compose invocation.
+            # That is stable but unnecessarily slow when Docker/BuildKit already
+            # has warm cache layers. Build a bounded batch in one invocation so
+            # independent services can progress concurrently, while keeping a
+            # deterministic upper bound on Docker Engine pressure.
+            $AdaptiveLimit = $ParallelLimit
             try {
-                foreach ($ServiceName in $BuildTargets) {
-                    $ServiceBuilt = $false
-                    for ($ServiceAttempt = 1; $ServiceAttempt -le 3; $ServiceAttempt++) {
-                        $PreBuildProbe = Invoke-DockerNative -Arguments @("info", "--format", "{{json .ServerVersion}}")
-                        if ($PreBuildProbe.ExitCode -ne 0) {
-                            if (-not (Invoke-DockerEngineRecovery -Reason "pre-build $ServiceName")) {
-                                $Details = ($PreBuildProbe.Output -join " ").Trim()
-                                throw "Docker Engine tidak sehat sebelum build service '$ServiceName': $Details"
-                            }
+                $HostCpu = [Environment]::ProcessorCount
+                $HostRamGb = 0
+                try {
+                    $ComputerSystem = Get-CimInstance Win32_ComputerSystem -ErrorAction Stop
+                    $HostRamGb = [math]::Floor([double]$ComputerSystem.TotalPhysicalMemory / 1GB)
+                }
+                catch {
+                    $HostRamGb = 0
+                }
+
+                if ($ParallelLimit -eq 1) {
+                    $AdaptiveLimit = 1
+                }
+                elseif ($HostRamGb -gt 0 -and $HostRamGb -le 8) {
+                    $AdaptiveLimit = 1
+                }
+                elseif ($HostRamGb -gt 0 -and $HostRamGb -le 16) {
+                    $AdaptiveLimit = [math]::Min($ParallelLimit, 2)
+                }
+                elseif ($HostCpu -le 4) {
+                    $AdaptiveLimit = [math]::Min($ParallelLimit, 2)
+                }
+                else {
+                    $AdaptiveLimit = [math]::Min($ParallelLimit, 4)
+                }
+
+                $env:COMPOSE_PARALLEL_LIMIT = $AdaptiveLimit.ToString()
+                Write-Host "Adaptive build parallelism: $AdaptiveLimit (host CPU=$HostCpu, RAM=$HostRamGb GB, requested=$ParallelLimit)" -ForegroundColor DarkGray
+
+                for ($BatchStart = 0; $BatchStart -lt $BuildTargets.Count; $BatchStart += $AdaptiveLimit) {
+                    $Batch = @(
+                        $BuildTargets |
+                            Select-Object -Skip $BatchStart -First $AdaptiveLimit
+                    )
+                    $BatchLabel = $Batch -join ", "
+                    Write-Host "Building batch [$BatchLabel]..." -ForegroundColor Cyan
+
+                    $PreBuildProbe = Invoke-DockerNative -Arguments @("info", "--format", "{{json .ServerVersion}}")
+                    if ($PreBuildProbe.ExitCode -ne 0) {
+                        if (-not (Invoke-DockerEngineRecovery -Reason "pre-build batch [$BatchLabel]")) {
+                            $Details = ($PreBuildProbe.Output -join " ").Trim()
+                            throw "Docker Engine tidak sehat sebelum build batch [$BatchLabel]: $Details"
                         }
-
-                        Write-Host "Building service [$ServiceName] (attempt $ServiceAttempt/3)..." -ForegroundColor Cyan
-                        $ServiceBuildArgs = @("build", $ServiceName)
-                        $ServiceBuildProbe = Invoke-DockerNative -Arguments (@($ComposeArgs) + $ServiceBuildArgs)
-                        $ServiceBuildOutput = @($ServiceBuildProbe.Output)
-                        $ServiceBuildExitCode = $ServiceBuildProbe.ExitCode
-                        $ServiceBuildOutput | ForEach-Object { Write-Output $_ }
-
-                        if ($ServiceBuildExitCode -eq 0) {
-                            $ServiceBuilt = $true
-                            Write-Host "Service [$ServiceName] image build completed." -ForegroundColor Green
-                            break
-                        }
-
-                        $ServiceBuildText = ($ServiceBuildOutput -join [Environment]::NewLine)
-                        $EngineFailure = Test-DockerEngineFailure -OutputText $ServiceBuildText
-                        $PostBuildProbe = Invoke-DockerNative -Arguments @("info", "--format", "{{json .ServerVersion}}")
-                        if ($PostBuildProbe.ExitCode -ne 0) {
-                            $EngineFailure = $true
-                        }
-
-                        if ($EngineFailure -and $ServiceAttempt -lt 3) {
-                            if (Invoke-DockerEngineRecovery -Reason "build service $ServiceName") {
-                                Write-Warning "Docker Engine dipulihkan; mengulang build service [$ServiceName]..."
-                                continue
-                            }
-                        }
-
-                        throw "Docker Compose build gagal pada service '$ServiceName' (exit code $ServiceBuildExitCode). Periksa error build di atas."
                     }
 
-                    if (-not $ServiceBuilt) {
-                        throw "Service '$ServiceName' tidak berhasil dibangun setelah recovery attempts."
+                    $BatchBuildArgs = @("build") + $Batch
+                    $BatchBuildProbe = Invoke-DockerNative -Arguments (@($ComposeArgs) + $BatchBuildArgs)
+                    $BatchBuildOutput = @($BatchBuildProbe.Output)
+                    $BatchBuildOutput | ForEach-Object { Write-Output $_ }
+
+                    if ($BatchBuildProbe.ExitCode -eq 0) {
+                        Write-Host "Build batch completed: $BatchLabel" -ForegroundColor Green
+                        continue
+                    }
+
+                    $BatchBuildText = ($BatchBuildOutput -join [Environment]::NewLine)
+                    $EngineFailure = Test-DockerEngineFailure -OutputText $BatchBuildText
+                    $PostBuildProbe = Invoke-DockerNative -Arguments @("info", "--format", "{{json .ServerVersion}}")
+                    if ($PostBuildProbe.ExitCode -ne 0) {
+                        $EngineFailure = $true
+                    }
+
+                    if ($EngineFailure) {
+                        Write-Warning "Parallel build batch [$BatchLabel] hit a Docker Engine failure. Recovering and retrying this batch sequentially..."
+                        if (-not (Invoke-DockerEngineRecovery -Reason "parallel build batch [$BatchLabel]")) {
+                            throw "Docker Engine gagal saat build batch [$BatchLabel] dan recovery tidak berhasil."
+                        }
+
+                        # Recovery fallback is intentionally sequential. It isolates
+                        # the failing service and prevents a second concurrent storm.
+                        $env:COMPOSE_PARALLEL_LIMIT = "1"
+                        foreach ($ServiceName in $Batch) {
+                            $ServiceBuildSucceeded = $false
+                            for ($ServiceAttempt = 1; $ServiceAttempt -le 3; $ServiceAttempt++) {
+                                Write-Host "Retrying service [$ServiceName] (attempt $ServiceAttempt/3)..." -ForegroundColor Yellow
+                                $ServiceBuildProbe = Invoke-DockerNative -Arguments (@($ComposeArgs) + @("build", $ServiceName))
+                                $ServiceBuildProbe.Output | ForEach-Object { Write-Output $_ }
+
+                                if ($ServiceBuildProbe.ExitCode -eq 0) {
+                                    $ServiceBuildSucceeded = $true
+                                    Write-Host "Service [$ServiceName] image build completed." -ForegroundColor Green
+                                    break
+                                }
+
+                                $ServiceBuildText = ($ServiceBuildProbe.Output -join [Environment]::NewLine)
+                                $RetryEngineFailure = Test-DockerEngineFailure -OutputText $ServiceBuildText
+                                $RetryProbe = Invoke-DockerNative -Arguments @("info", "--format", "{{json .ServerVersion}}")
+                                if ($RetryProbe.ExitCode -ne 0) {
+                                    $RetryEngineFailure = $true
+                                }
+
+                                if ($RetryEngineFailure -and $ServiceAttempt -lt 3) {
+                                    if (Invoke-DockerEngineRecovery -Reason "retry build service $ServiceName") {
+                                        continue
+                                    }
+                                }
+
+                                throw "Docker Compose build gagal pada service '$ServiceName' (exit code $($ServiceBuildProbe.ExitCode)). Periksa error build di atas."
+                            }
+
+                            if (-not $ServiceBuildSucceeded) {
+                                throw "Service '$ServiceName' tidak berhasil dibangun setelah recovery attempts."
+                            }
+                        }
+
+                        $env:COMPOSE_PARALLEL_LIMIT = $AdaptiveLimit.ToString()
+                    }
+                    else {
+                        # A normal application/Dockerfile/package error should not
+                        # trigger a Docker Desktop restart or hide the real failure.
+                        throw "Docker Compose build gagal pada batch [$BatchLabel] (exit code $($BatchBuildProbe.ExitCode)). Periksa error build di atas."
                     }
                 }
             }
