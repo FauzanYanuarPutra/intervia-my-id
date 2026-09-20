@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Loader2, Plus, ShieldCheck, WalletCards } from 'lucide-react';
 import { ChoiceChips } from '@/components/interaction/ChoiceChips';
 import { FeedbackNotice, type FeedbackTone } from '@/components/interaction/FeedbackNotice';
+import { RupiahInput } from '@/components/forms/RupiahInput';
 import { resolveIdempotencyAttempt, type ClientIdempotencyAttempt } from '@/lib/client-idempotency';
 import { businessApiErrorMessage } from '@/lib/business-api-error';
 import type {
