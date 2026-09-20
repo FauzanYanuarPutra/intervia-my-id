@@ -2259,8 +2259,8 @@ async fn mark_all_crm_notifications_read(
         return err(StatusCode::FORBIDDEN, "crm notification permission required").into_response();
     }
     let actor_id = match Uuid::parse_str(claims.sub.trim()) {
-        Some(value) => value,
-        None => return err(StatusCode::UNAUTHORIZED, "invalid actor").into_response(),
+        Ok(value) => value,
+        Err(_) => return err(StatusCode::UNAUTHORIZED, "invalid actor").into_response(),
     };
     match sqlx::query(
         r#"
