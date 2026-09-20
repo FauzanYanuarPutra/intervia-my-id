@@ -2,8 +2,9 @@
 
 import { startTransition, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Archive, CheckCircle2, Save } from 'lucide-react';
+import { Archive, CheckCircle2, Save, X } from 'lucide-react';
 import { ChoiceChips } from '@/components/interaction/ChoiceChips';
+import { ModalSurface } from '@/components/interaction/ModalSurface';
 import { SensitiveActionConfirm } from '@/components/interaction/SensitiveActionConfirm';
 import { BusinessImageCropUpload } from '@/components/media/BusinessImageCropUpload';
 import { ProductModifierEditor } from '@/components/forms/ProductModifierEditor';
@@ -13,6 +14,7 @@ import { businessApiErrorMessage } from '@/lib/business-api-error';
 type Props = {
   businessId: string;
   product: ProductRecord;
+  closeHref: string;
 };
 
 type PendingAction = 'detail' | 'stock' | 'status' | null;
@@ -21,7 +23,7 @@ function rupiahNumber(priceLabel: string) {
   return priceLabel.replace(/\D/g, '');
 }
 
-export function ProductEditorWorkspace({ businessId, product }: Props) {
+export function ProductEditorWorkspace({ businessId, product, closeHref }: Props) {
   const router = useRouter();
   const [name, setName] = useState(product.name);
   const [category, setCategory] = useState(product.category);
@@ -34,7 +36,6 @@ export function ProductEditorWorkspace({ businessId, product }: Props) {
   const [success, setSuccess] = useState('');
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
-  const [statusReason, setStatusReason] = useState('Pembaruan status produk');
   const [changeReason, setChangeReason] = useState('Pembaruan data produk');
   const [stockReason, setStockReason] = useState('Penyesuaian stok');
   const busy = pendingAction !== null;
@@ -131,12 +132,10 @@ export function ProductEditorWorkspace({ businessId, product }: Props) {
   async function saveStatus() {
     begin('status');
     try {
-      const normalizedStatusReason = statusReason.trim() || (status === 'live' ? 'Pengaktifan kembali produk' : 'Pembaruan status produk');
       await request(`/api/businesses/${businessId}/products/${product.id}`, {
         status,
-        reason: normalizedStatusReason,
+        reason: status === 'live' ? 'Pengaktifan kembali produk' : 'Pengarsipan produk',
       });
-      setStatusReason('Pembaruan status produk');
       setSuccess(status === 'live' ? 'Produk kembali aktif.' : 'Produk diarsipkan.');
       refresh();
     } catch (value) {
@@ -149,7 +148,6 @@ export function ProductEditorWorkspace({ businessId, product }: Props) {
 
   function requestStatusSave() {
     if (status === 'draft' && product.status === 'live') {
-      setStatusReason('');
       setArchiveConfirmOpen(true);
       return;
     }
@@ -157,15 +155,37 @@ export function ProductEditorWorkspace({ businessId, product }: Props) {
   }
 
   return (
-    <section className="merchant-surface-bordered overflow-hidden">
-      <div className="border-b border-portal-line px-4 py-4 sm:px-5">
-        <p className="text-base font-black text-portal-ink">Kelola produk</p>
-        <p className="mt-0.5 text-xs leading-5 text-portal-soft">
-          Ubah detail, stok, foto, dan pilihan pembeli tanpa menutup daftar produk.
-        </p>
-      </div>
+    <ModalSurface
+      open
+      onOpenChange={nextOpen => {
+        if (!nextOpen && !busy) router.push(closeHref);
+      }}
+      ariaLabel="Kelola produk"
+      size="lg"
+      presentation="adaptive"
+      panelClassName="max-h-[92dvh] overflow-hidden"
+    >
+      <section className="flex max-h-[92dvh] min-h-0 flex-col overflow-hidden">
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-portal-line px-4 py-3.5 sm:px-5">
+          <div className="min-w-0">
+            <p className="text-base font-black text-portal-ink">Kelola produk</p>
+            <p className="mt-0.5 truncate text-xs leading-5 text-portal-soft">
+              {product.name}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => !busy && router.push(closeHref)}
+            disabled={busy}
+            aria-label="Tutup"
+            className="portal-button-ghost h-9 w-9 shrink-0 justify-center rounded-full p-0"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
 
-      <div className="space-y-5 p-4 sm:p-5">
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
+          <div className="space-y-5">
         <BusinessImageCropUpload
           businessId={businessId}
           productId={product.id}
@@ -288,26 +308,21 @@ export function ProductEditorWorkspace({ businessId, product }: Props) {
 
         {error ? <p role="alert" aria-live="assertive" className="rounded-xl bg-red-50 px-3 py-2.5 text-sm font-semibold text-portal-ember">{error}</p> : null}
         {success ? <p role="status" aria-live="polite" className="rounded-xl bg-emerald-50 px-3 py-2.5 text-sm font-semibold text-portal-forest">{success}</p> : null}
-      </div>
+          </div>
+        </div>
+      </section>
 
       <SensitiveActionConfirm
         open={archiveConfirmOpen}
-        title={status === 'draft' ? 'Arsipkan produk?' : 'Aktifkan kembali produk?'}
-        description={
-          status === 'draft'
-            ? `${product.name} akan disembunyikan dari penjualan baru. Riwayat transaksi dan data produk tetap tersimpan.`
-            : `${product.name} akan kembali tersedia untuk penjualan baru. Pastikan harga, stok, dan data produk sudah benar.`
-        }
-        confirmLabel={status === 'draft' ? 'Arsipkan produk' : 'Aktifkan kembali'}
+        title="Arsipkan produk?"
+        description="Produk akan disembunyikan dari penjualan baru. Data produk dan riwayat transaksi tetap tersimpan."
+        confirmLabel="Arsipkan produk"
         busy={pendingAction === 'status'}
-        requireText
-        value={statusReason}
-        onValueChange={setStatusReason}
         onCancel={() => {
           if (!busy) setArchiveConfirmOpen(false);
         }}
         onConfirm={() => void saveStatus()}
       />
-    </section>
+    </ModalSurface>
   );
 }
