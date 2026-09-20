@@ -573,6 +573,14 @@ async fn moderate_business(
         return err(StatusCode::CONFLICT, "business is already complete").into_response();
     }
 
+    if matches!(action, "approve" | "restore") && !business.missing_fields.is_empty() {
+        return err(
+            StatusCode::CONFLICT,
+            "business still has missing required data",
+        )
+        .into_response();
+    }
+
     let severity = normalize_severity(payload.severity.as_deref());
     let legal_hold = payload
         .legal_hold
