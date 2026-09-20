@@ -4,6 +4,7 @@ import { startTransition, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus } from 'lucide-react';
 import { ProductDetailsModal } from './ProductDetailsModal';
+import { RupiahInput } from './RupiahInput';
 import { ChoiceChips } from '@/components/interaction/ChoiceChips';
 import { BusinessImageCropUpload } from '@/components/media/BusinessImageCropUpload';
 import { businessApiErrorMessage } from '@/lib/business-api-error';
@@ -26,7 +27,7 @@ export function ProductQuickForm({ businessId }: ProductQuickFormProps) {
   const [name, setName] = useState('');
   const [category, setCategory] = useState<(typeof categoryOptions)[number]>(categoryOptions[0]);
   const [sourceType, setSourceType] = useState<'owned' | 'consignment'>('owned');
-  const [priceRupiah, setPriceRupiah] = useState('');
+  const [priceRupiah, setPriceRupiah] = useState<number | null>(null);
   const [ownerLabel, setOwnerLabel] = useState('');
   const [stockCount, setStockCount] = useState('');
   const [minStockAlert, setMinStockAlert] = useState('');
@@ -47,7 +48,7 @@ export function ProductQuickForm({ businessId }: ProductQuickFormProps) {
       setError('Isi nama produk minimal 2 huruf.');
       return;
     }
-    const normalizedPrice = Number(priceRupiah);
+    const normalizedPrice = priceRupiah ?? 0;
     if (!Number.isSafeInteger(normalizedPrice) || normalizedPrice <= 0) {
       setError('Isi harga jual dengan angka lebih dari 0.');
       return;
@@ -89,7 +90,7 @@ export function ProductQuickForm({ businessId }: ProductQuickFormProps) {
       setName('');
       setCategory(categoryOptions[0]);
       setSourceType('owned');
-      setPriceRupiah('');
+      setPriceRupiah(null);
       setOwnerLabel('');
       setStockCount('');
       setMinStockAlert('');
@@ -136,10 +137,14 @@ export function ProductQuickForm({ businessId }: ProductQuickFormProps) {
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="grid gap-2 text-sm font-semibold text-portal-ink">
           Harga jual
-          <div className="relative">
-            <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-portal-soft">Rp</span>
-            <input required type="number" inputMode="numeric" min="1" step="1" value={priceRupiah} onChange={event => setPriceRupiah(event.target.value)} placeholder="15000" className="portal-input h-12 w-full pl-10 text-base font-bold tabular-nums" />
-          </div>
+          <RupiahInput
+            required
+            min={1}
+            value={priceRupiah}
+            onValueChange={setPriceRupiah}
+            placeholder="15.000"
+            className="portal-input h-12 text-base font-bold tabular-nums"
+          />
         </label>
         <label className="grid gap-2 text-sm font-semibold text-portal-ink">
           <span>Stok saat ini <span className="font-normal text-portal-soft">(opsional)</span></span>
