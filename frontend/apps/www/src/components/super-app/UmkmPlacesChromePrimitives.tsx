@@ -297,40 +297,42 @@ export function MapQuickControls({
           : 'max-w-[min(84vw,250px)] items-start',
       )}
     >
-      <button
-        type="button"
-        data-testid="umkm-location-status"
-        onClick={() => runAction(onFocusViewer, 'FOCUS_VIEWER_STATUS')}
-        disabled={locating}
-        aria-busy={locating}
-        aria-live="polite"
-        className={cn(
-          statusChipClassName,
-          locationError
-            ? 'border-rose-200/90 bg-[linear-gradient(180deg,rgba(255,241,242,0.97),rgba(255,228,230,0.92))] text-rose-700'
-            : locationReady || locationState === 'ready'
-              ? 'border-blue-200/90 bg-[linear-gradient(180deg,rgba(239,246,255,0.98),rgba(219,234,254,0.94))] text-blue-700'
-              : 'border-white/90 bg-white/95 text-slate-700',
-          locating && 'cursor-wait opacity-90',
-        )}
-      >
-        {locating || locationState === 'locating' ? (
-          <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
-        ) : (
-          <LocateFixed className="h-3.5 w-3.5 shrink-0" />
-        )}
-        <span>{locationStatusLabel}</span>
-        {accuracyMeters !== null &&
-        !locationError &&
-        (locationReady || locationState === 'ready') ? (
-          <span
-            data-testid="umkm-location-accuracy"
-            className="shrink-0 font-bold"
-          >
-            ±{accuracyMeters} m
-          </span>
-        ) : null}
-      </button>
+      {!compact ? (
+        <button
+          type="button"
+          data-testid="umkm-location-status"
+          onClick={() => runAction(onFocusViewer, 'FOCUS_VIEWER_STATUS')}
+          disabled={locating}
+          aria-busy={locating}
+          aria-live="polite"
+          className={cn(
+            statusChipClassName,
+            locationError
+              ? 'border-rose-200/90 bg-[linear-gradient(180deg,rgba(255,241,242,0.97),rgba(255,228,230,0.92))] text-rose-700'
+              : locationReady || locationState === 'ready'
+                ? 'border-blue-200/90 bg-[linear-gradient(180deg,rgba(239,246,255,0.98),rgba(219,234,254,0.94))] text-blue-700'
+                : 'border-white/90 bg-white/95 text-slate-700',
+            locating && 'cursor-wait opacity-90',
+          )}
+        >
+          {locating || locationState === 'locating' ? (
+            <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+          ) : (
+            <LocateFixed className="h-3.5 w-3.5 shrink-0" />
+          )}
+          <span>{locationStatusLabel}</span>
+          {accuracyMeters !== null &&
+          !locationError &&
+          (locationReady || locationState === 'ready') ? (
+            <span
+              data-testid="umkm-location-accuracy"
+              className="shrink-0 font-bold"
+            >
+              ±{accuracyMeters} m
+            </span>
+          ) : null}
+        </button>
+      ) : null}
       {routeEnabled && distanceLabel ? (
         <span
           className={cn(
@@ -383,13 +385,29 @@ export function MapQuickControls({
           aria-pressed={locationReady || locationState === 'ready'}
           className={cn(
             iconButtonClassName,
-            locationReady || locationState === 'ready'
-              ? 'border-blue-200 bg-blue-600 text-white hover:bg-blue-700'
-              : 'border-white/80 bg-white/92 text-blue-600 hover:brightness-105',
+            locationError
+              ? 'border-rose-200 bg-white text-rose-600 hover:bg-rose-50'
+              : locationReady || locationState === 'ready'
+                ? 'border-blue-200 bg-blue-600 text-white hover:bg-blue-700'
+                : 'border-white/80 bg-white/92 text-blue-600 hover:brightness-105',
             locating && 'cursor-wait opacity-80',
           )}
-          title={isId ? 'Lokasi saya' : 'My location'}
-          aria-label={isId ? 'Lokasi saya' : 'My location'}
+          title={
+            locationError
+              ? locationError
+              : accuracyMeters !== null && (locationReady || locationState === 'ready')
+                ? `${isId ? 'Lokasi saya' : 'My location'} · ±${accuracyMeters} m`
+                : isId
+                  ? 'Lokasi saya'
+                  : 'My location'
+          }
+          aria-label={
+            locationError
+              ? locationError
+              : isId
+                ? 'Lokasi saya'
+                : 'My location'
+          }
         >
           {locating ? (
             <Loader2 className="h-4 w-4 animate-spin" />
