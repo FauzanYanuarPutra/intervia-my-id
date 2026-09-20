@@ -2426,42 +2426,67 @@ function GameProgressCard({
   }
 
   if (!isAuthenticated) {
+    if (compact) {
+      return (
+        <section
+          className="relative overflow-hidden rounded-[14px] border border-emerald-200/80 bg-white/95 px-2.5 py-2.5 text-[color:var(--app-text)] shadow-[0_8px_22px_-20px_rgba(15,23,42,0.24)] dark:border-emerald-900/70 dark:bg-zinc-950/95 dark:text-white"
+          data-layout="guest-compact"
+        >
+          <div className="relative flex min-w-0 items-center gap-2.5">
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] bg-emerald-600 text-white shadow-sm">
+              <LockKeyhole className="h-4 w-4" />
+            </span>
+
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-black leading-4 text-zinc-900 dark:text-white">
+                {isId ? 'Masuk untuk simpan progres' : 'Log in to save your progress'}
+              </p>
+              <p className="mt-0.5 truncate text-[10px] font-medium leading-4 text-zinc-500 dark:text-zinc-400">
+                {isId
+                  ? 'XP, streak, saldo, chat, dan transaksi akan tersimpan.'
+                  : 'XP, streak, wallet, chats, and transactions will be saved.'}
+              </p>
+            </div>
+
+            <Link
+              href="/login"
+              className="ui-pressable inline-flex h-8 shrink-0 items-center justify-center rounded-[9px] bg-emerald-600 px-3 text-[10px] font-extrabold text-white transition hover:bg-emerald-700 active:scale-95"
+            >
+              {isId ? 'Masuk' : 'Login'}
+            </Link>
+          </div>
+        </section>
+      );
+    }
+
     return (
       <section
         className={cn(
           'relative overflow-hidden rounded-[20px] border border-emerald-200/80 bg-[linear-gradient(135deg,#ffffff_0%,#f7fff9_58%,#ecfdf5_100%)] text-[color:var(--app-text)] shadow-[0_18px_34px_-30px_rgba(15,23,42,0.18)] dark:border-emerald-900/70 dark:bg-[linear-gradient(135deg,#07120f_0%,#0b1b16_62%,#10251e_100%)] dark:text-white',
-          compact ? 'p-2.5' : 'p-3',
+          'p-3',
         )}
       >
         <div className="pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full bg-emerald-200/55 blur-3xl dark:bg-emerald-500/10" />
-        <div className="relative flex min-w-0 items-start gap-2.5">
-          <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] bg-[linear-gradient(135deg,#059669,#047857)] text-white shadow-[0_14px_26px_-18px_rgba(4,120,87,0.85)]">
-            <LockKeyhole className="h-5 w-5" />
+        <div className="relative flex min-w-0 items-center gap-2.5">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px] bg-emerald-600 text-white">
+            <LockKeyhole className="h-4.5 w-4.5" />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-bold leading-5 text-[color:var(--app-text)] dark:text-white">
-              {isId ? 'Masuk untuk mulai level' : 'Login to start your level'}
+            <p className="truncate text-sm font-black text-[color:var(--app-text)] dark:text-white">
+              {isId ? 'Masuk untuk simpan progres' : 'Log in to save your progress'}
             </p>
-            <p className="mt-1 text-[12px] font-semibold leading-5 text-[color:var(--app-text-soft)] dark:text-white/64">
+            <p className="mt-0.5 truncate text-[11px] font-medium text-[color:var(--app-text-soft)] dark:text-white/65">
               {isId
-                ? 'Cari tetap bisa. XP, streak, saldo, chat, dan transaksi baru tersimpan setelah login.'
-                : 'Browsing stays open. XP, streak, wallet, chats, and deals are saved after login.'}
+                ? 'XP, streak, saldo, chat, dan transaksi akan tersimpan.'
+                : 'XP, streak, wallet, chats, and transactions will be saved.'}
             </p>
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              <Link
-                href="/login"
-                className="ui-pressable inline-flex min-h-9 items-center justify-center rounded-[12px] border border-emerald-200 bg-white px-3 text-[12px] font-bold text-emerald-800 transition hover:bg-emerald-50 dark:border-emerald-400/20 dark:bg-white/[0.08] dark:text-emerald-100 dark:hover:bg-white/[0.12]"
-              >
-                {isId ? 'Masuk' : 'Login'}
-              </Link>
-              <Link
-                href="/register"
-                className="ui-pressable inline-flex min-h-9 items-center justify-center rounded-[12px] bg-[color:var(--app-accent)] px-3 text-[12px] font-bold text-white shadow-[0_12px_22px_-17px_rgba(4,120,87,0.82)] transition hover:bg-[color:var(--app-accent-strong)]"
-              >
-                {isId ? 'Daftar Sekarang' : 'Register Now'}
-              </Link>
-            </div>
           </div>
+          <Link
+            href="/login"
+            className="ui-pressable inline-flex h-9 shrink-0 items-center justify-center rounded-[10px] bg-emerald-600 px-3.5 text-[11px] font-extrabold text-white transition hover:bg-emerald-700 active:scale-95"
+          >
+            {isId ? 'Masuk' : 'Login'}
+          </Link>
         </div>
       </section>
     );
