@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { ChevronDown, Info } from 'lucide-react';
+import { RupiahInput } from '@/components/forms/RupiahInput';
 import { summarizeBusinessDay } from '@/lib/business-control/finance';
 
 const money = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 });
@@ -14,7 +15,6 @@ export function ProfitExplainer() {
   const [otherIncome, setOtherIncome] = useState(0);
   const [capital, setCapital] = useState(0);
   const [drawing, setDrawing] = useState(50000);
-  const numeric = (value: string) => Math.max(0, Number(value) || 0);
 
   const summary = useMemo(() => summarizeBusinessDay({ revenue, cogs, operatingExpenses: expenses, otherIncome, ownerCapital: capital, ownerDrawing: drawing }), [revenue, cogs, expenses, otherIncome, capital, drawing]);
 
@@ -33,17 +33,17 @@ export function ProfitExplainer() {
       <section className="portal-panel p-4 sm:p-5">
         <h2 className="font-bold text-portal-ink">Kondisi hari ini</h2>
         <div className="mt-3 grid gap-3 sm:grid-cols-3">
-          <label className="text-xs font-semibold text-portal-soft">Omzet<input type="number" min="0" className={input} value={revenue} onChange={e => setRevenue(numeric(e.target.value))} /></label>
-          <label className="text-xs font-semibold text-portal-soft">HPP terjual<input type="number" min="0" className={input} value={cogs} onChange={e => setCogs(numeric(e.target.value))} /></label>
-          <label className="text-xs font-semibold text-portal-soft">Biaya operasional<input type="number" min="0" className={input} value={expenses} onChange={e => setExpenses(numeric(e.target.value))} /></label>
+          <label className="text-xs font-semibold text-portal-soft">Omzet<RupiahInput min={0} value={revenue} onValueChange={value => setRevenue(value ?? 0)} className={input} /></label>
+          <label className="text-xs font-semibold text-portal-soft">HPP terjual<RupiahInput min={0} value={cogs} onValueChange={value => setCogs(value ?? 0)} className={input} /></label>
+          <label className="text-xs font-semibold text-portal-soft">Biaya operasional<RupiahInput min={0} value={expenses} onValueChange={value => setExpenses(value ?? 0)} className={input} /></label>
         </div>
 
         <details className="group mt-4 border-t border-portal-line pt-3">
           <summary className="flex cursor-pointer list-none items-center justify-between text-xs font-bold text-portal-soft">Input tambahan <ChevronDown className="h-4 w-4 transition group-open:rotate-180" /></summary>
           <div className="mt-3 grid gap-3 sm:grid-cols-3">
-            <label className="text-xs font-semibold text-portal-soft">Pendapatan lain<input type="number" min="0" className={input} value={otherIncome} onChange={e => setOtherIncome(numeric(e.target.value))} /></label>
-            <label className="text-xs font-semibold text-portal-soft">Modal pemilik<input type="number" min="0" className={input} value={capital} onChange={e => setCapital(numeric(e.target.value))} /></label>
-            <label className="text-xs font-semibold text-portal-soft">Ambil pemilik<input type="number" min="0" className={input} value={drawing} onChange={e => setDrawing(numeric(e.target.value))} /></label>
+            <label className="text-xs font-semibold text-portal-soft">Pendapatan lain<RupiahInput min={0} value={otherIncome} onValueChange={value => setOtherIncome(value ?? 0)} className={input} /></label>
+            <label className="text-xs font-semibold text-portal-soft">Modal pemilik<RupiahInput min={0} value={capital} onValueChange={value => setCapital(value ?? 0)} className={input} /></label>
+            <label className="text-xs font-semibold text-portal-soft">Ambil pemilik<RupiahInput min={0} value={drawing} onValueChange={value => setDrawing(value ?? 0)} className={input} /></label>
           </div>
         </details>
       </section>
