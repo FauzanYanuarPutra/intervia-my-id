@@ -38,6 +38,17 @@ type EditorialEvent = {
   created_at: string;
 };
 
+type NewsSourceReview = {
+  id: string;
+  content_id: string;
+  source_id: string;
+  reviewer_id: string;
+  from_verification_status?: string | null;
+  to_verification_status?: string | null;
+  note?: string | null;
+  created_at: string;
+};
+
 type NewsVersion = {
   id: string;
   version_number: number;
@@ -134,14 +145,33 @@ function statusTone(value: string): string {
   return 'border-sky-200 bg-sky-50 text-sky-700';
 }
 
+function readNewsIdFromUrl(): string {
+  if (typeof window === 'undefined') return '';
+  return new URLSearchParams(window.location.search).get('news') || '';
+}
+
+function writeNewsIdUrl(id: string, mode: 'push' | 'replace' = 'push'): void {
+  if (typeof window === 'undefined') return;
+  const url = new URL(window.location.href);
+  if (id) url.searchParams.set('news', id);
+  else url.searchParams.delete('news');
+  const next = url.pathname + url.search + url.hash;
+  if (mode === 'replace') window.history.replaceState({ crmNews: id }, '', next);
+  else window.history.pushState({ crmNews: id }, '', next);
+}
+
 export default function NewsEditorialWorkspace({
   accessToken,
+  reviewerId,
+  onBack,
 }: {
   accessToken: string;
+  reviewerId: string;
+  onBack: () => void;
 }) {
   const [status, setStatus] = useState('pending_review');
   const [items, setItems] = useState<NewsItem[]>([]);
-  const [selectedId, setSelectedId] = useState('');
+  const [selectedId, setSelectedId] = useState(() => readNewsIdFromUrl());
   const [query, setQuery] = useState('');
   const [note, setNote] = useState('');
   const [businessImpact, setBusinessImpact] = useState('');
@@ -151,6 +181,7 @@ export default function NewsEditorialWorkspace({
   const [sensitivity, setSensitivity] = useState<'normal' | 'high'>('normal');
   const [publishAt, setPublishAt] = useState('');
   const [sources, setSources] = useState<NewsSource[]>([]);
+  const [sourceReviews, setSourceReviews] = useState<NewsSourceReview[]>([]);
   const [history, setHistory] = useState<EditorialEvent[]>([]);
   const [versions, setVersions] = useState<NewsVersion[]>([]);
   const [metrics, setMetrics] = useState<Metrics>({});
@@ -223,6 +254,7 @@ export default function NewsEditorialWorkspace({
     const scheduled = stringValue(meta.scheduled_for);
     setPublishAt(scheduled ? localDateTime(scheduled) : '');
     setSources([]);
+    setSourceReviews([]);
     setHistory([]);
     setVersions([]);
     setNote('');
@@ -247,10 +279,14 @@ export default function NewsEditorialWorkspace({
         setHistory(Array.isArray(value.items) ? (value.items as EditorialEvent[]) : []);
         setVersions(Array.isArray(value.versions) ? (value.versions as NewsVersion[]) : []);
         setSources(Array.isArray(value.sources) ? (value.sources as NewsSource[]) : []);
+        setSourceReviews(
+          Array.isArray(value.source_reviews) ? (value.source_reviews as NewsSourceReview[]) : [],
+        );
       } catch {
         setHistory([]);
         setVersions([]);
         setSources([]);
+        setSourceReviews([]);
       }
     },
     [accessToken],
@@ -290,6 +326,17 @@ export default function NewsEditorialWorkspace({
     const timer = window.setInterval(() => void loadMetrics(), 60_000);
     return () => window.clearInterval(timer);
   }, [loadMetrics]);
+
+  const selectNews = useCallback((id: string, mode: 'push' | 'replace' = 'push') => {
+    setSelectedId(id);
+    writeNewsIdUrl(id, mode);
+  }, []);
+
+  useEffect(() => {
+    const handlePopState = () => setSelectedId(readNewsIdFromUrl());
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   useEffect(() => {
     if (!selected) return;
@@ -343,6 +390,19 @@ export default function NewsEditorialWorkspace({
     const verifiedSource = sources.some(
       source => source.verification_status === 'verified' && isSafeUrl(source.source_url),
     );
+    const hasIndependentSourceReview =
+      sensitivity !== 'high' ||
+      sourceReviews.some(
+        review =>
+          review.to_verification_status === 'verified' &&
+          review.reviewer_id &&
+          review.reviewer_id !== reviewerId &&
+          sources.some(
+            source => source.id === review.source_id &&
+              source.verification_status === 'verified' &&
+              isSafeUrl(source.source_url),
+          ),
+      );
 
     if (action === 'approve' || action === 'correct') {
       if (kind !== 'press_release' && factCheck !== 'verified') {
@@ -355,6 +415,10 @@ export default function NewsEditorialWorkspace({
       }
       if (kind !== 'press_release' && !verifiedSource) {
         setError('Minimal satu sumber harus Verified sebelum publikasi.');
+        return;
+      }
+      if (sensitivity === 'high' && !hasIndependentSourceReview) {
+        setError('Konten high-sensitivity membutuhkan verifikasi sumber oleh reviewer/editor lain sebelum approval.');
         return;
       }
     }
@@ -400,10 +464,24 @@ export default function NewsEditorialWorkspace({
   const verifiedSources = sources.filter(
     source => source.verification_status === 'verified' && isSafeUrl(source.source_url),
   ).length;
+  const hasIndependentSourceReview =
+    sensitivity !== 'high' ||
+    sourceReviews.some(
+      review =>
+        review.to_verification_status === 'verified' &&
+        review.reviewer_id &&
+        review.reviewer_id !== reviewerId &&
+        sources.some(
+          source => source.id === review.source_id &&
+            source.verification_status === 'verified' &&
+            isSafeUrl(source.source_url),
+        ),
+    );
   const publicationReady =
     (kind === 'press_release' || factCheck === 'verified') &&
     (sensitivity !== 'high' || legalReview === 'approved') &&
-    (!needsSource || verifiedSources > 0);
+    (!needsSource || verifiedSources > 0) &&
+    (sensitivity !== 'high' || hasIndependentSourceReview);
 
   const metricsCards = [
     ['Menunggu review', queueCount('pending_review'), 'border-sky-200 bg-sky-50'],
@@ -504,7 +582,7 @@ export default function NewsEditorialWorkspace({
         </div>
       </section>
 
-      <div className="grid gap-5 xl:grid-cols-[360px_minmax(0,1fr)]">
+      <div className="grid gap-4 xl:grid-cols-[340px_minmax(0,1fr)]">
         <section className="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm">
           <div className="mb-3 flex items-center justify-between gap-3 px-2">
             <div>
@@ -571,7 +649,7 @@ export default function NewsEditorialWorkspace({
           </div>
         </section>
 
-        <section className="rounded-3xl border border-slate-200 bg-white shadow-sm">
+        <section className="rounded-3xl border border-slate-200 bg-white shadow-sm xl:sticky xl:top-4 xl:max-h-[calc(100vh-2rem)] xl:overflow-y-auto">
           {selected ? (
             <div className="space-y-5 p-4 sm:p-6">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
