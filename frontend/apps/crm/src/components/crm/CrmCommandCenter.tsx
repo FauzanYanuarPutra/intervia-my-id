@@ -1020,6 +1020,7 @@ function Sidebar({
   onSelect,
   onToggle,
   newsPendingCount,
+  businessPendingCount,
 }: {
   activePage: PageId;
   collapsed: boolean;
@@ -1160,7 +1161,7 @@ function TopBar({
           <input
             value={query}
             onChange={event => onQueryChange(event.target.value)}
-            placeholder="Cari user, listing, transaksi..."
+            placeholder="Cari user, usaha, listing, transaksi..."
             className="min-w-0 flex-1 bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400"
           />
         </label>
