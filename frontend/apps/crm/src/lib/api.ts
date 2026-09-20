@@ -936,11 +936,15 @@ export const contentApi = {
 };
 
 export const newsApi = {
-  queue: async (token: string, status = 'pending_review') => {
+  queue: async (
+    token: string,
+    status = 'pending_review',
+    options: { limit?: number; offset?: number } = {},
+  ) => {
     const query = new URLSearchParams({
       status,
-      limit: '100',
-      offset: '0',
+      limit: String(options.limit ?? 40),
+      offset: String(options.offset ?? 0),
     }).toString();
     return fetchJson(`${MARKETPLACE_URL}/v1/news/editorial/queue?${query}`, {
       method: 'GET',
