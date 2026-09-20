@@ -6,11 +6,11 @@ param(
     [string[]]$Profile = @(),
     [string[]]$Services = @(),
 
-    # Compatibility aliases: some Windows shells/users type "-Buildclear"
-    # as a single rebuild flag. It means the same thing as "-Build" and
-    # does not delete containers or database volumes.
-    [Alias("Buildclear")]
+    # Rebuild flag. "-Buildclear" is kept as an explicit compatibility
+    # parameter because PowerShell parameter binding can be ambiguous with
+    # shorthand/alias parsing on some Windows shells.
     [switch]$Build,
+    [switch]$Buildclear,
     [switch]$Pull,
     [switch]$Down,
     [switch]$Fresh,
@@ -24,6 +24,10 @@ param(
     [ValidateRange(1, 32)]
     [int]$ParallelLimit = 4
 )
+
+if ($Buildclear.IsPresent) {
+    $Build = $true
+}
 
 $ErrorActionPreference = "Stop"
 # Docker Compose writes normal progress/status to native stderr. PowerShell 7.4+ can
