@@ -167,6 +167,60 @@ fn has_role(roles: &[String], required: &str) -> bool {
     roles.iter().any(|role| role.eq_ignore_ascii_case(required))
 }
 
+async fn get_current_roles_permissions(
+    state: &Arc<AppState>,
+    user_id: Uuid,
+) -> (Option<Vec<String>>, Option<Vec<String>>) {
+    match sqlx::query_as::<_, (Vec<String>, Vec<String>)>(
+        r#"
+        SELECT
+          COALESCE(ARRAY_AGG(DISTINCT r.name) FILTER (WHERE r.name IS NOT NULL), '{}'),
+          COALESCE(ARRAY_AGG(DISTINCT p.name) FILTER (WHERE p.name IS NOT NULL), '{}')
+        FROM core.user_roles ur
+        LEFT JOIN roles r ON r.id = ur.role_id
+        LEFT JOIN role_permissions rp ON rp.role_id = r.id
+        LEFT JOIN permissions p ON p.id = rp.permission_id
+        WHERE ur.user_id = $1
+        GROUP BY ur.user_id
+        "#,
+    )
+    .bind(user_id)
+    .fetch_optional(&state.db)
+    .await
+    {
+        Ok(Some((roles, permissions))) => (Some(roles), Some(permissions)),
+        _ => (None, None),
+    }
+}
+
+async fn has_current_permission(
+    state: &Arc<AppState>,
+    user_id: Uuid,
+    required: &str,
+) -> Result<bool, sqlx::Error> {
+    sqlx::query_scalar(
+        r#"
+        SELECT EXISTS (
+          SELECT 1
+          FROM core.user_roles ur
+          JOIN roles r ON r.id = ur.role_id
+          JOIN role_permissions rp ON rp.role_id = r.id
+          JOIN permissions p ON p.id = rp.permission_id
+          JOIN core.users u ON u.id = ur.user_id
+          WHERE ur.user_id = $1
+            AND p.name = $2
+            AND u.deleted_at IS NULL
+            AND u.is_active = TRUE
+            AND u.status = 'active'
+        )
+        "#,
+    )
+    .bind(user_id)
+    .bind(required)
+    .fetch_one(&state.db)
+    .await
+}
+
 fn normalize_backoffice_email(raw: &str) -> Option<String> {
     let email = raw.trim().to_ascii_lowercase();
     let mut parts = email.split('@');
@@ -1538,10 +1592,25 @@ pub async fn list_users(
         }
     };
 
-    if !has_permission(&claims.perms, "user.read") {
+    let has_user_read = if has_permission(&claims.perms, "user.read") {
+        true
+    } else {
+        match has_current_permission(&state, Uuid::parse_str(&claims.sub).unwrap_or_default(), "user.read").await {
+            Ok(value) => value,
+            Err(error) => {
+                tracing::error!("list_users current permission check failed: {:?}", error);
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({"error":"permission check failed"})),
+                )
+                    .into_response();
+            }
+        }
+    };
+    if !has_user_read {
         return (
             StatusCode::FORBIDDEN,
-            Json(json!({"error":"insufficient permission"})),
+            Json(json!({"error":"insufficient permission: user.read"})),
         )
             .into_response();
     }
@@ -1678,11 +1747,24 @@ pub async fn get_user_detail(
 
     let is_self = claims.sub == user_id.to_string();
     if !is_self && !has_permission(&claims.perms, "user.read") {
-        return (
-            StatusCode::FORBIDDEN,
-            Json(json!({"error":"insufficient permission"})),
-        )
-            .into_response();
+        match has_current_permission(&state, Uuid::parse_str(&claims.sub).unwrap_or_default(), "user.read").await {
+            Ok(true) => {}
+            Ok(false) => {
+                return (
+                    StatusCode::FORBIDDEN,
+                    Json(json!({"error":"insufficient permission: user.read"})),
+                )
+                    .into_response();
+            }
+            Err(error) => {
+                tracing::error!("get_user current permission check failed: {:?}", error);
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({"error":"permission check failed"})),
+                )
+                    .into_response();
+            }
+        }
     }
 
     let row = match sqlx::query(
