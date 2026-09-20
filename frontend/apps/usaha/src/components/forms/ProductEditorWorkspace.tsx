@@ -20,10 +20,6 @@ type Props = {
 
 type PendingAction = 'detail' | 'stock' | 'status' | null;
 
-function rupiahNumber(priceLabel: string) {
-  return priceLabel.replace(/\D/g, '');
-}
-
 export function ProductEditorWorkspace({ businessId, product, closeHref }: Props) {
   const router = useRouter();
   const [name, setName] = useState(product.name);
