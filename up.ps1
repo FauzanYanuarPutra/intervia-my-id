@@ -445,14 +445,29 @@ try {
                     $Diagnostic = ($ServiceProbe.Error -join " ").Trim()
                     throw "Compose menghasilkan JSON kosong. $Diagnostic"
                 }
-                $ResolvedCompose = $ServiceProbe.Json | ConvertFrom-Json
-                if ($null -eq $ResolvedCompose.services) {
-                    throw "Compose JSON tidak memiliki object services."
+
+                # Do not parse the merged Compose JSON with ConvertFrom-Json here.
+                # Large Compose models are not reliably handled across the
+                # PowerShell/JSON runtime versions used by Windows developers.
+                # Python already owns the repository's JSON contract validation,
+                # so use the same runtime to extract build-capable services.
+                $BuildTargetOutput = @(
+                    $ServiceProbe.Json |
+                        & $PythonCommand.Source "scripts/config/compose_build_targets.py" 2>&1
+                )
+                $BuildTargetExitCode = $LASTEXITCODE
+                if ($BuildTargetExitCode -ne 0) {
+                    $Diagnostic = (($BuildTargetOutput | ForEach-Object { "$_" }) -join " ").Trim()
+                    if ($Diagnostic.Length -gt 1500) {
+                        $Diagnostic = $Diagnostic.Substring(0, 1500)
+                    }
+                    throw "Python gagal menentukan service build (exit $BuildTargetExitCode). $Diagnostic"
                 }
+
                 $BuildTargets = @(
-                    $ResolvedCompose.services.psobject.Properties |
-                        Where-Object { $null -ne $_.Value.build } |
-                        ForEach-Object { $_.Name }
+                    $BuildTargetOutput |
+                        ForEach-Object { "$_".Trim() } |
+                        Where-Object { $_ }
                 )
             }
             catch {
@@ -460,7 +475,7 @@ try {
                 if ($Diagnostic.Length -gt 1000) {
                     $Diagnostic = $Diagnostic.Substring(0, 1000)
                 }
-                throw "Konfigurasi Compose tidak dapat diparse untuk menentukan service build. $($_.Exception.Message) $Diagnostic"
+                throw "Konfigurasi Compose tidak dapat menentukan service build secara deterministik. $($_.Exception.Message) $Diagnostic"
             }
         }
 
