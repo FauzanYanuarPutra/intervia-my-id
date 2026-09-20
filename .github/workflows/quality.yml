@@ -94,9 +94,9 @@ jobs:
             "function Test-DockerEngineFailure",
             "function Invoke-DockerEngineRecovery",
             "finally {",
-            "$env:COMPOSE_PARALLEL_LIMIT = $ParallelLimit.ToString()",
-            "$BuildArgs = @(\"build\")",
-            "$UpArgs = @(\"up\", \"-d\", \"--remove-orphans\", \"--wait\", \"--wait-timeout\", \"420\")"
+            '$env:COMPOSE_PARALLEL_LIMIT = $ParallelLimit.ToString()',
+            '$BuildArgs = @("build")',
+            '$UpArgs = @("up", "-d", "--remove-orphans", "--wait", "--wait-timeout", "420")'
           )
           foreach ($pattern in $required) {
             if ($launcher -notmatch [regex]::Escape($pattern)) {
