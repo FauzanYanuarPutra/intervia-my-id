@@ -64,6 +64,13 @@ pub struct CrmBusinessRow {
     pub missing_fields: Vec<String>,
     pub completeness_percent: i32,
     pub image_urls: Vec<String>,
+    pub source_type: String,
+    pub report_count: i64,
+    pub latest_report_reason: Option<String>,
+    pub assigned_to: Option<Uuid>,
+    pub due_at: Option<DateTime<Utc>>,
+    pub verification_status: String,
+    pub verification_method: Option<String>,
 }
 
 fn has_business_moderation_access(claims: &AccessClaims) -> bool {
@@ -336,7 +343,36 @@ async fn list_crm_businesses(
           c.current_reason_note,
           c.severity AS moderation_severity,
           c.missing_fields,
-          c.updated_at AS moderation_updated_at
+          c.updated_at AS moderation_updated_at,
+          c.assigned_to,
+          c.due_at,
+          COALESCE((
+            SELECT COUNT(*)::BIGINT
+            FROM internal_moderation.business_reports br
+            WHERE br.business_id = s.id
+              AND br.status IN ('open','reviewing')
+          ), 0)::BIGINT AS report_count,
+          (
+            SELECT br.reason_code
+            FROM internal_moderation.business_reports br
+            WHERE br.business_id = s.id
+            ORDER BY br.created_at DESC
+            LIMIT 1
+          ) AS latest_report_reason,
+          COALESCE((
+            SELECT bv.status
+            FROM internal_moderation.business_verifications bv
+            WHERE bv.business_id = s.id
+            ORDER BY bv.updated_at DESC
+            LIMIT 1
+          ), 'unverified') AS verification_status,
+          (
+            SELECT bv.method
+            FROM internal_moderation.business_verifications bv
+            WHERE bv.business_id = s.id
+            ORDER BY bv.updated_at DESC
+            LIMIT 1
+          ) AS verification_method
         FROM umkm_stores s
         LEFT JOIN LATERAL (
           SELECT status, current_action, current_reason_code, current_reason_note,
@@ -433,6 +469,13 @@ async fn list_crm_businesses(
             missing_fields: missing,
             completeness_percent: completeness_percent(&missing),
             image_urls: images,
+            source_type: public_business_source_type(&metadata),
+            report_count: row.get::<i64,_>("report_count"),
+            latest_report_reason: row.get::<Option<String>,_>("latest_report_reason"),
+            assigned_to: row.get::<Option<Uuid>,_>("assigned_to"),
+            due_at: row.get::<Option<DateTime<Utc>>,_>("due_at"),
+            verification_status: row.get::<String,_>("verification_status"),
+            verification_method: row.get::<Option<String>,_>("verification_method"),
         });
     }
 
@@ -461,7 +504,36 @@ async fn load_business(state: &AppState, business_id: Uuid) -> Result<CrmBusines
           c.current_reason_code,
           c.current_reason_note,
           c.severity AS moderation_severity,
-          c.missing_fields
+          c.missing_fields,
+          c.assigned_to,
+          c.due_at,
+          COALESCE((
+            SELECT COUNT(*)::BIGINT
+            FROM internal_moderation.business_reports br
+            WHERE br.business_id = s.id
+              AND br.status IN ('open','reviewing')
+          ), 0)::BIGINT AS report_count,
+          (
+            SELECT br.reason_code
+            FROM internal_moderation.business_reports br
+            WHERE br.business_id = s.id
+            ORDER BY br.created_at DESC
+            LIMIT 1
+          ) AS latest_report_reason,
+          COALESCE((
+            SELECT bv.status
+            FROM internal_moderation.business_verifications bv
+            WHERE bv.business_id = s.id
+            ORDER BY bv.updated_at DESC
+            LIMIT 1
+          ), 'unverified') AS verification_status,
+          (
+            SELECT bv.method
+            FROM internal_moderation.business_verifications bv
+            WHERE bv.business_id = s.id
+            ORDER BY bv.updated_at DESC
+            LIMIT 1
+          ) AS verification_method
         FROM umkm_stores s
         LEFT JOIN LATERAL (
           SELECT status, current_action, current_reason_code, current_reason_note,
@@ -529,6 +601,13 @@ async fn load_business(state: &AppState, business_id: Uuid) -> Result<CrmBusines
         missing_fields: missing.clone(),
         completeness_percent: completeness_percent(&missing),
         image_urls: collect_metadata_images(&row.get::<Value,_>("metadata")),
+        source_type: public_business_source_type(&metadata),
+        report_count: row.get::<i64,_>("report_count"),
+        latest_report_reason: row.get::<Option<String>,_>("latest_report_reason"),
+        assigned_to: row.get::<Option<Uuid>,_>("assigned_to"),
+        due_at: row.get::<Option<DateTime<Utc>>,_>("due_at"),
+        verification_status: row.get::<String,_>("verification_status"),
+        verification_method: row.get::<Option<String>,_>("verification_method"),
     })
 }
 
