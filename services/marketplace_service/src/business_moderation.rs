@@ -512,6 +512,19 @@ async fn moderate_business_reference(
         "request_completion" => "needs_revision",
         other => other,
     };
+    let content_reason = match payload.reason_code.trim().to_ascii_lowercase().as_str() {
+        "inaccurate_information" | "inaccurate" => "quality",
+        "not_found" => "irrelevant",
+        "duplicate_business" => "duplicate",
+        "policy_violation" => "legal_violation",
+        "unverifiable_business" => "unverifiable_information",
+        "fraud_misleading" => "fraud_misleading",
+        "privacy_personal_data" => "privacy_personal_data",
+        "copyright" => "copyright",
+        "quality" => "quality",
+        "other" => "other",
+        _ => return err(StatusCode::BAD_REQUEST, "unsupported business reference moderation reason").into_response(),
+    };
 
     moderation::moderate_content(
         State(state),
@@ -519,7 +532,7 @@ async fn moderate_business_reference(
         Path(id.to_string()),
         Json(moderation::ContentModerationRequest {
             action: content_action.to_string(),
-            reason_code: payload.reason_code,
+            reason_code: content_reason.to_string(),
             reason_note: payload.reason_note,
             severity: payload.severity,
             legal_hold: payload.legal_hold,
@@ -2235,7 +2248,8 @@ async fn mark_crm_notification_read(
         "#,
     )
     .bind(id)
-    .bind(actor_id)    .fetch_optional(&state.db)
+    .bind(actor_id)
+    .fetch_optional(&state.db)
     .await;
     match updated {
         Ok(Some(row)) => (StatusCode::OK, Json(json!({
