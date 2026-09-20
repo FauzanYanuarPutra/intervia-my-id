@@ -45,6 +45,15 @@ describe('summarizeFinanceEntries', () => {
     expect(result.cashMovement).toBe(35_000);
   });
 
+  it('keeps opening balances out of cash-flow totals while showing account cash effect', () => {
+    const result = summarizeFinanceEntries([
+      { entry_type: 'opening_balance', account_key: 'cash', amount: 2_000_000 },
+      { entry_type: 'sale_income', account_key: 'cash', amount: 300_000 },
+    ]);
+
+    expect(result.cashMovement).toBe(300_000);
+  });
+
   it('ignores invalid negative amounts defensively', () => {
     const result = summarizeFinanceEntries([
       { entry_type: 'sale_income', account_key: 'cash', amount: -10_000 },
