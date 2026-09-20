@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { BadgeDollarSign, ChevronDown, CircleAlert } from 'lucide-react';
+import { RupiahInput } from '@/components/forms/RupiahInput';
 import { calculateChannelMargin, recommendChannelPrice } from '@/lib/business-control/costing';
 
 const money = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 });
@@ -27,8 +28,8 @@ export function ChannelPriceCalculator({ channel, defaultPrice = 15000, defaultH
       </div>
 
       <div className="grid gap-3 p-4 sm:grid-cols-3 sm:p-5">
-        <label className="text-xs font-semibold text-portal-soft">Harga toko<input className={input} type="number" min="0" value={price} onChange={e => setPrice(Number(e.target.value) || 0)} /></label>
-        <label className="text-xs font-semibold text-portal-soft">HPP<input className={input} type="number" min="0" value={hpp} onChange={e => setHpp(Number(e.target.value) || 0)} /></label>
+        <label className="text-xs font-semibold text-portal-soft">Harga toko<RupiahInput min={0} value={price} onValueChange={value => setPrice(value ?? 0)} className={input} /></label>
+        <label className="text-xs font-semibold text-portal-soft">HPP<RupiahInput min={0} value={hpp} onValueChange={value => setHpp(value ?? 0)} className={input} /></label>
         <label className="text-xs font-semibold text-portal-soft">Potongan aplikasi %<input className={input} type="number" min="0" max="100" value={fee} onChange={e => setFee(Number(e.target.value) || 0)} /></label>
       </div>
 
@@ -45,8 +46,8 @@ export function ChannelPriceCalculator({ channel, defaultPrice = 15000, defaultH
           Pengaturan lanjutan <ChevronDown className="h-4 w-4 transition group-open:rotate-180" />
         </summary>
         <div className="grid gap-3 border-t border-portal-line p-4 sm:grid-cols-3 sm:p-5">
-          <label className="text-xs font-semibold text-portal-soft">Promo dari toko<input className={input} type="number" min="0" value={promo} onChange={e => setPromo(Number(e.target.value) || 0)} /></label>
-          <label className="text-xs font-semibold text-portal-soft">Biaya tetap<input className={input} type="number" min="0" value={fixedFee} onChange={e => setFixedFee(Number(e.target.value) || 0)} /></label>
+          <label className="text-xs font-semibold text-portal-soft">Promo dari toko<RupiahInput min={0} value={promo} onValueChange={value => setPromo(value ?? 0)} className={input} /></label>
+          <label className="text-xs font-semibold text-portal-soft">Biaya tetap<RupiahInput min={0} value={fixedFee} onValueChange={value => setFixedFee(value ?? 0)} className={input} /></label>
           <label className="text-xs font-semibold text-portal-soft">Target margin %<input className={input} type="number" min="0" max="99" value={targetMargin} onChange={e => setTargetMargin(Number(e.target.value) || 0)} /></label>
         </div>
       </details>
