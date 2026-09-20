@@ -37,6 +37,8 @@ $RepoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $PreviousComposeParallelLimit = $env:COMPOSE_PARALLEL_LIMIT
 $PreviousComposeBake = $env:COMPOSE_BAKE
 $PreviousComposeProgress = $env:COMPOSE_PROGRESS
+$PreviousComposeStatusStdout = $env:COMPOSE_STATUS_STDOUT
+$PreviousComposeAnsi = $env:COMPOSE_ANSI
 Push-Location $RepoRoot
 
 try {
@@ -50,6 +52,9 @@ try {
     # Keep the launcher on the regular Compose builder and plain progress output.
     $env:COMPOSE_BAKE = "false"
     $env:COMPOSE_PROGRESS = "plain"
+    $PreviousComposeStatusStdout = $env:COMPOSE_STATUS_STDOUT
+    $env:COMPOSE_STATUS_STDOUT = "true"
+    $env:COMPOSE_ANSI = "never"
 
     function Invoke-DockerNative {
         param(
@@ -375,12 +380,14 @@ try {
             $BuildTargets = @($Services)
         }
 
-        $BuildArgs = @("build", "--parallel", "1", "--progress", "plain")
+        $BuildArgs = @("build")
         if ($BuildTargets.Count -gt 0) {
             $BuildArgs += $BuildTargets
         }
 
         Write-Host "Building Docker images with regular Compose builder (Bake disabled)..." -ForegroundColor Cyan
+        $BuildOriginalParallelLimit = $env:COMPOSE_PARALLEL_LIMIT
+        $env:COMPOSE_PARALLEL_LIMIT = "1"
         Write-Host "Compose build parallelism: 1" -ForegroundColor DarkGray
 
         $BuildPreviousErrorActionPreference = $ErrorActionPreference
@@ -450,7 +457,7 @@ try {
                             }
 
                             Write-Host "Fallback build: $ServiceName" -ForegroundColor Cyan
-                            $ServiceBuildArgs = @("build", "--parallel", "1", "--progress", "plain", $ServiceName)
+                            $ServiceBuildArgs = @("build", $ServiceName)
                             $ServicePreviousErrorActionPreference = $ErrorActionPreference
                             $ServiceExitCode = 1
                             try {
@@ -488,6 +495,8 @@ try {
                 }
             }
         }
+
+        $env:COMPOSE_PARALLEL_LIMIT = $BuildOriginalParallelLimit
 
         if ($BuildExitCode -ne 0) {
             throw "Docker Compose build gagal (exit code $BuildExitCode). Periksa error build di atas."
@@ -634,6 +643,18 @@ finally {
     }
     else {
         $env:COMPOSE_PROGRESS = $PreviousComposeProgress
+    }
+    if ($null -eq $PreviousComposeStatusStdout) {
+        Remove-Item Env:COMPOSE_STATUS_STDOUT -ErrorAction SilentlyContinue
+    }
+    else {
+        $env:COMPOSE_STATUS_STDOUT = $PreviousComposeStatusStdout
+    }
+    if ($null -eq $PreviousComposeAnsi) {
+        Remove-Item Env:COMPOSE_ANSI -ErrorAction SilentlyContinue
+    }
+    else {
+        $env:COMPOSE_ANSI = $PreviousComposeAnsi
     }
     if ($null -eq $PreviousComposeParallelLimit) {
         Remove-Item Env:COMPOSE_PARALLEL_LIMIT -ErrorAction SilentlyContinue
