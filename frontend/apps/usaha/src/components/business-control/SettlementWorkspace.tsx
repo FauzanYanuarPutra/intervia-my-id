@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { CheckCircle2, Loader2, Save, TriangleAlert } from 'lucide-react';
 import { ChoiceChips } from '@/components/interaction/ChoiceChips';
+import { RupiahInput } from '@/components/forms/RupiahInput';
 import { FeedbackNotice, type FeedbackTone } from '@/components/interaction/FeedbackNotice';
 import { resolveIdempotencyAttempt, type ClientIdempotencyAttempt } from '@/lib/client-idempotency';
 import { businessApiErrorMessage } from '@/lib/business-api-error';
@@ -180,22 +181,22 @@ export function SettlementWorkspace({ businessId, initialSettlements, initialCha
             <input className={inputClass} type="date" value={periodEnd} onChange={event => setPeriodEnd(event.target.value)} />
           </label>
           <label className="text-xs font-semibold text-portal-soft">Omzet kotor
-            <input className={inputClass} type="number" min="0" value={grossSales} onChange={event => setGrossSales(amount(event.target.value))} />
+            <RupiahInput min={0} value={grossSales} onValueChange={value => setGrossSales(value ?? 0)} className={inputClass} />
           </label>
           <label className="text-xs font-semibold text-portal-soft">Biaya platform
-            <input className={inputClass} type="number" min="0" value={platformFee} onChange={event => setPlatformFee(amount(event.target.value))} />
+            <RupiahInput min={0} value={platformFee} onValueChange={value => setPlatformFee(value ?? 0)} className={inputClass} />
           </label>
           <label className="text-xs font-semibold text-portal-soft">Promo ditanggung merchant
-            <input className={inputClass} type="number" min="0" value={merchantPromo} onChange={event => setMerchantPromo(amount(event.target.value))} />
+            <RupiahInput min={0} value={merchantPromo} onValueChange={value => setMerchantPromo(value ?? 0)} className={inputClass} />
           </label>
           <label className="text-xs font-semibold text-portal-soft">Refund
-            <input className={inputClass} type="number" min="0" value={refunds} onChange={event => setRefunds(amount(event.target.value))} />
+            <RupiahInput min={0} value={refunds} onValueChange={value => setRefunds(value ?? 0)} className={inputClass} />
           </label>
           <label className="text-xs font-semibold text-portal-soft">Potongan lain
-            <input className={inputClass} type="number" min="0" value={otherDeductions} onChange={event => setOtherDeductions(amount(event.target.value))} />
+            <RupiahInput min={0} value={otherDeductions} onValueChange={value => setOtherDeductions(value ?? 0)} className={inputClass} />
           </label>
           <label className="text-xs font-semibold text-portal-soft">Transfer aktual
-            <input className={inputClass} type="number" min="0" value={actualTransfer} onChange={event => setActualTransfer(amount(event.target.value))} />
+            <RupiahInput min={0} value={actualTransfer} onValueChange={value => setActualTransfer(value ?? 0)} className={inputClass} />
           </label>
           <label className="text-xs font-semibold text-portal-soft sm:col-span-2 lg:col-span-3">Catatan
             <input className={inputClass} maxLength={2000} value={note} onChange={event => setNote(event.target.value)} placeholder="Contoh: Settlement ShopeeFood 5 September" />
