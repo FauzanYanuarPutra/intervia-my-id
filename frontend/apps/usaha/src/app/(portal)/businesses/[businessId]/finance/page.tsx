@@ -35,13 +35,13 @@ export default async function BusinessFinancePage({ params, searchParams }: Page
       ])
     : [[], [], [], null, []];
   const enabledChannels = channels.filter(channel => channel.enabled);
-  const showSettlement = shouldShowSettlementWorkspace({ canViewFinance: canView, enabledChannelCount: enabledChannels.length });
+  const showSettlement = canView;
   const requested = query.view;
   const activeView = requested === 'plan' ? 'plan' : requested === 'transfers' && showSettlement ? 'transfers' : 'activity';
   const tabs = [
     { id: 'activity', label: 'Aktivitas', href: `/businesses/${business.id}/finance?view=activity` },
     { id: 'plan', label: 'Rencana', badge: obligations.filter(item => item.active).length, href: `/businesses/${business.id}/finance?view=plan` },
-    ...(showSettlement ? [{ id: 'transfers', label: 'Transfer aplikasi', badge: enabledChannels.length, href: `/businesses/${business.id}/finance?view=transfers` }] : []),
+    ...(showSettlement ? [{ id: 'transfers', label: 'Settlement & potongan', href: `/businesses/${business.id}/finance?view=transfers` }] : []),
   ];
 
   return (
@@ -49,7 +49,7 @@ export default async function BusinessFinancePage({ params, searchParams }: Page
       <PageHeader
         eyebrow="Uang"
         title={activeView === 'activity' ? 'Uang usaha' : activeView === 'plan' ? 'Rencana uang' : 'Transfer aplikasi'}
-        description={activeView === 'activity' ? 'Lihat uang masuk dan keluar. Penjualan dari Kasir masuk otomatis.' : activeView === 'plan' ? 'Lihat yang aman dipakai setelah tagihan dan cadangan.' : 'Cocokkan transfer dari aplikasi dengan catatan usaha.'}
+        description={activeView === 'activity' ? 'Lihat uang masuk dan keluar. Penjualan dari Kasir masuk otomatis.' : activeView === 'plan' ? 'Lihat yang aman dipakai setelah tagihan dan cadangan.' : 'Cocokkan omzet, potongan, refund, dan transfer bersih dari platform.'}
       />
 
       {canView ? (
