@@ -14,7 +14,7 @@ services:
       - /bin/sh
       - -ec
       - |
-        export PGPASSWORD="$POSTGRES_PASSWORD"
+        export PGPASSWORD="$$POSTGRES_PASSWORD"
         for db in profile_db media_db news_db order_db payment_db promotion_db crm_db communication_db trust_db audit_db support_db review_db; do
           if ! psql -h domain_db -U "$POSTGRES_USER" -d postgres -Atqc "SELECT 1 FROM pg_database WHERE datname='$db'" | grep -q 1; then
             psql -h domain_db -U "$POSTGRES_USER" -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE \"$db\""
