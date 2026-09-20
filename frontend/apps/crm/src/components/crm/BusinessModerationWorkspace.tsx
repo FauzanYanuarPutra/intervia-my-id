@@ -95,8 +95,20 @@ function formatTime(value: string) {
   }
 }
 
+function verificationLabel(status: string) {
+  return {
+    verified: "Terverifikasi",
+    pending: "Menunggu verifikasi",
+    rejected: "Verifikasi ditolak",
+  }[status] || "Belum diverifikasi";
+}
+
+function isOverdue(value: string | null) {
+  return Boolean(value && new Date(value).getTime() < Date.now());
+}
+
 export default function BusinessModerationWorkspace() {
-  const { accessToken } = useAuth();
+  const { accessToken, user } = useAuth();
   const [businesses, setBusinesses] = useState<CrmBusiness[]>([]);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
@@ -104,7 +116,13 @@ export default function BusinessModerationWorkspace() {
   const [notice, setNotice] = useState("");
   const [selected, setSelected] = useState<CrmBusiness | null>(null);
   const [history, setHistory] = useState<CrmBusinessModerationEvent[]>([]);
+  const [reports, setReports] = useState<Array<Record<string, unknown>>>([]);
+  const [appeals, setAppeals] = useState<Array<Record<string, unknown>>>([]);
+  const [evidence, setEvidence] = useState<Array<Record<string, unknown>>>([]);
+  const [verification, setVerification] = useState<Record<string, unknown> | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [verificationDraft, setVerificationDraft] = useState<CrmBusiness | null>(null);
+  const [verificationReason, setVerificationReason] = useState("");
   const [draft, setDraft] = useState<{ business: CrmBusiness; action: Action } | null>(null);
   const [reasonCode, setReasonCode] = useState<string>("quality");
   const [reasonNote, setReasonNote] = useState("");
@@ -148,9 +166,17 @@ export default function BusinessModerationWorkspace() {
     try {
       const response = await businessModerationApi.history(accessToken, business.id);
       setHistory(response.events || []);
+      setReports(response.reports || []);
+      setAppeals(response.appeals || []);
+      setEvidence(response.evidence || []);
+      setVerification(response.verification || null);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "History usaha gagal dimuat.");
       setHistory([]);
+      setReports([]);
+      setAppeals([]);
+      setEvidence([]);
+      setVerification(null);
     } finally {
       setHistoryLoading(false);
     }
@@ -281,6 +307,25 @@ export default function BusinessModerationWorkspace() {
                     </span>
                   </div>
 
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-bold text-slate-600">
+                      {business.source_type === "reference" ? "Data referensi" : "Data usaha"}
+                    </span>
+                    <span className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[11px] font-bold text-sky-700">
+                      {verificationLabel(business.verification_status)}
+                    </span>
+                    {business.report_count > 0 ? (
+                      <span className="rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-[11px] font-bold text-rose-700">
+                        {business.report_count} laporan
+                      </span>
+                    ) : null}
+                    {business.due_at ? (
+                      <span className={`rounded-full border px-2.5 py-1 text-[11px] font-bold ${isOverdue(business.due_at) ? "border-rose-200 bg-rose-50 text-rose-700" : "border-slate-200 bg-slate-50 text-slate-600"}`}>
+                        {isOverdue(business.due_at) ? "SLA lewat" : `SLA ${formatTime(business.due_at)}`}
+                      </span>
+                    ) : null}
+                  </div>
+
                   <div className="mt-4">
                     <div className="flex items-center justify-between text-xs font-bold text-slate-500">
                       <span>Kelengkapan profil</span>
@@ -305,6 +350,17 @@ export default function BusinessModerationWorkspace() {
                   )}
 
                   <div className="mt-4 flex flex-wrap gap-2">
+                    {business.verification_status === "pending" ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setVerificationDraft(business)}
+                          className="rounded-xl bg-sky-600 px-3 py-2 text-xs font-bold text-white"
+                        >
+                          Tinjau verifikasi
+                        </button>
+                      </>
+                    ) : null}
                     {(business.review_state === "unreviewed" || business.review_state === "needs_completion") ? (
                       <button type="button" onClick={() => openAction(business, "approve")} className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white">
                         Setujui
@@ -324,6 +380,24 @@ export default function BusinessModerationWorkspace() {
                         Sembunyikan
                       </button>
                     )}
+                    {business.review_state !== "approved" || business.assigned_to !== user?.id ? (
+                      <button
+                        type="button"
+                        onClick={() => void (accessToken && businessModerationApi.assign(accessToken, business.id, user?.id || null, 24).then(() => loadBusinesses()))}
+                        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700"
+                      >
+                        {business.assigned_to === user?.id ? "Saya pegang tugas" : "Ambil tugas"}
+                      </button>
+                    ) : null}
+                    {business.assigned_to === user?.id ? (
+                      <button
+                        type="button"
+                        onClick={() => void (accessToken && businessModerationApi.assign(accessToken, business.id, null).then(() => loadBusinesses()))}
+                        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700"
+                      >
+                        Lepas tugas
+                      </button>
+                    ) : null}
                     <button type="button" onClick={() => void openHistory(business)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700">
                       History
                     </button>
@@ -348,6 +422,78 @@ export default function BusinessModerationWorkspace() {
                 Tutup
               </button>
             </div>
+
+            {!historyLoading ? (
+              <div className="mt-5 grid gap-2 sm:grid-cols-3">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-[11px] font-bold text-slate-500">Laporan</p>
+                  <p className="mt-1 text-lg font-black text-slate-950">{reports.length}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-[11px] font-bold text-slate-500">Bukti</p>
+                  <p className="mt-1 text-lg font-black text-slate-950">{evidence.length}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-[11px] font-bold text-slate-500">Verifikasi</p>
+                  <p className="mt-1 text-sm font-black text-slate-950">{verificationLabel(String((verification || {}).status || selected.verification_status))}</p>
+                </div>
+              </div>
+            ) : null}
+
+            {reports.length ? (
+              <section className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 p-4">
+                <p className="text-xs font-black uppercase tracking-[0.12em] text-rose-700">Laporan terbaru</p>
+                <div className="mt-3 space-y-2">
+                  {reports.slice(0, 5).map(report => (
+                    <div key={String(report.id)} className="rounded-xl border border-rose-100 bg-white p-3">
+                      <p className="text-xs font-bold text-slate-900">{reasonLabel(String(report.reason_code || "other"))}</p>
+                      <p className="mt-1 text-xs text-slate-500">{String(report.status || "open")} · {formatTime(String(report.created_at || ""))}</p>
+                      {report.details ? <p className="mt-2 text-xs leading-5 text-slate-600">{String(report.details)}</p> : null}
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+
+            {evidence.length ? (
+              <section className="mt-5 rounded-2xl border border-sky-200 bg-sky-50 p-4">
+                <p className="text-xs font-black uppercase tracking-[0.12em] text-sky-700">Bukti kasus</p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {evidence.slice(0, 8).map(item => (
+                    <div key={String(item.id)} className="rounded-xl border border-sky-100 bg-white p-3">
+                      <p className="text-xs font-bold text-slate-900">{String(item.label || item.evidence_type || "Bukti")}</p>
+                      {item.source_url ? <a className="mt-1 block truncate text-xs font-semibold text-sky-700 underline" href={String(item.source_url)} target="_blank" rel="noreferrer">{String(item.source_url)}</a> : null}
+                      {item.note ? <p className="mt-2 text-xs leading-5 text-slate-600">{String(item.note)}</p> : null}
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+
+            {appeals.length ? (
+              <section className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                <p className="text-xs font-black uppercase tracking-[0.12em] text-amber-700">Banding</p>
+                <div className="mt-3 space-y-2">
+                  {appeals.slice(0, 5).map(appeal => (
+                    <div key={String(appeal.id)} className="rounded-xl border border-amber-100 bg-white p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-bold text-slate-900">{String(appeal.status || "pending")}</p>
+                          <p className="mt-1 text-xs text-slate-500">{formatTime(String(appeal.created_at || ""))}</p>
+                        </div>
+                        {["pending", "in_review"].includes(String(appeal.status)) ? (
+                          <div className="flex gap-2">
+                            <button type="button" onClick={() => void (accessToken && businessModerationApi.reviewAppeal(accessToken, String(appeal.id), { action: "overturn", note: "Keputusan dibatalkan setelah review banding." }).then(() => openHistory(selected!)))} className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[11px] font-bold text-white">Terima</button>
+                            <button type="button" onClick={() => void (accessToken && businessModerationApi.reviewAppeal(accessToken, String(appeal.id), { action: "uphold", note: "Keputusan sebelumnya tetap berlaku setelah review banding." }).then(() => openHistory(selected!)))} className="rounded-lg bg-slate-900 px-2.5 py-1.5 text-[11px] font-bold text-white">Pertahankan</button>
+                          </div>
+                        ) : null}
+                      </div>
+                      <p className="mt-2 text-xs leading-5 text-slate-600">{String(appeal.reason || "")}</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ) : null}
 
             {historyLoading ? (
               <p className="mt-6 text-sm font-semibold text-slate-500">Memuat history...</p>
