@@ -20,6 +20,7 @@ import { FeedbackNotice, type FeedbackTone } from '@/components/interaction/Feed
 import { resolveIdempotencyAttempt, type ClientIdempotencyAttempt } from '@/lib/client-idempotency';
 import { businessApiErrorMessage } from '@/lib/business-api-error';
 import { EffectPreview } from '@/components/interaction/EffectPreview';
+import { ModalSurface } from '@/components/interaction/ModalSurface';
 import {
   financeChannelOptions,
   financeEntryOptions,
@@ -121,6 +122,8 @@ const historyLabels: Record<string, string> = {
   owner_drawing: 'Ambil owner',
   payable_payment: 'Bayar utang usaha',
   other_expense: 'Pengeluaran lain',
+  opening_balance: 'Saldo awal usaha',
+  account_transfer: 'Transfer antar akun',
 };
 
 const allocationLabels: Record<Allocation['bucket'], string> = {
@@ -197,6 +200,33 @@ export function FinanceLedger({ businessId, initialEntries, channels = [] }: Pro
   const [correctionNote, setCorrectionNote] = useState('');
   const [correctionBucket, setCorrectionBucket] = useState('');
   const [correcting, setCorrecting] = useState(false);
+
+  const [openingBalanceOpen, setOpeningBalanceOpen] = useState(false);
+  const [openingBalanceAccount, setOpeningBalanceAccount] = useState('cash');
+  const [openingBalanceAmount, setOpeningBalanceAmount] = useState('');
+  const [openingBalanceDate, setOpeningBalanceDate] = useState(jakartaDateKey());
+  const [openingBalanceNote, setOpeningBalanceNote] = useState('');
+  const [savingOpeningBalance, setSavingOpeningBalance] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [transferFrom, setTransferFrom] = useState('cash');
+  const [transferTo, setTransferTo] = useState('bank');
+  const [transferAmount, setTransferAmount] = useState('');
+  const [transferDate, setTransferDate] = useState(jakartaDateKey());
+  const [transferNote, setTransferNote] = useState('');
+  const [transferring, setTransferring] = useState(false);
+  const openingBalanceAttemptRef = useRef<ClientIdempotencyAttempt | null>(null);
+  const transferAttemptRef = useRef<ClientIdempotencyAttempt | null>(null);
+
+  const liquidAccountOptions = [
+    { value: 'cash', label: 'Kas' },
+    { value: 'bank', label: 'Bank' },
+    { value: 'ewallet', label: 'E-wallet' },
+  ];
+  const openingBalanceAccountOptions = [
+    ...liquidAccountOptions,
+    { value: 'receivable', label: 'Piutang' },
+    { value: 'payable', label: 'Utang' },
+  ];
 
   const [allocationFrom, setAllocationFrom] = useState('unallocated');
   const [allocationTo, setAllocationTo] = useState('operations');
