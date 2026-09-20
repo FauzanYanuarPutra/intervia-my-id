@@ -38,8 +38,6 @@ pub struct BusinessModerationRequest {
 }
 
 #[derive(Debug, Serialize, Clone)]
-
-#[derive(Debug, Serialize, Clone)]
 pub struct CrmBusinessReferenceRow {
     pub id: Uuid,
     pub slug: Option<String>,
