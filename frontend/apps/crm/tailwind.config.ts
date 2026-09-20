@@ -4,7 +4,7 @@ const config: Config = {
   content: [
     './src/**/*.{ts,tsx}',
     '../../packages/index.ts',
-    '../../packages/ui/*.{ts,tsx}',
+    '../../packages/ui/**/*.{ts,tsx}',
     '../../packages/product-configuration/index.ts',
     '../../packages/utils/*.{ts,tsx}',
     './node_modules/lajukan-ui/**/*.{ts,tsx,js,jsx}',
