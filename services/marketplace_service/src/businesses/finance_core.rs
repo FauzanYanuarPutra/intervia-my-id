@@ -82,6 +82,8 @@ impl FinanceEntrySemantic {
             "payable_payment" => Self::new("payable_payment", -1, false, false, false),
             "other_expense" => Self::new("other_expense", -1, false, true, false),
             "sale_refund" => Self::new("sale_refund", -1, false, false, false),
+            "opening_balance" => Self::new("opening_balance", 1, false, false, false),
+            "account_transfer" => Self::new("account_transfer", 1, false, false, false),
             _ => {
                 return Err(FinanceCoreError::Validation(
                     "unsupported_finance_entry_type",
@@ -230,6 +232,16 @@ pub(crate) struct MoveAllocationRequest {
     pub(crate) reason: String,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub(crate) struct TransferFinanceCoreRequest {
+    pub(crate) from_account: String,
+    pub(crate) to_account: String,
+    pub(crate) amount: i64,
+    pub(crate) occurred_on: NaiveDate,
+    #[serde(default)]
+    pub(crate) note: String,
+}
+
 #[derive(Debug, Clone, Serialize, FromRow)]
 pub(crate) struct FinanceCoreEntryRecord {
     pub(crate) id: Uuid,
@@ -304,6 +316,13 @@ pub(crate) struct AllocationMoveOutcome {
     pub(crate) replayed: bool,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct TransferFinanceOutcome {
+    pub(crate) from_entry: FinanceCoreEntryRecord,
+    pub(crate) to_entry: FinanceCoreEntryRecord,
+    pub(crate) replayed: bool,
+}
+
 #[derive(Clone)]
 pub(crate) struct FinanceCoreRepository {
     db: PgPool,
@@ -364,7 +383,7 @@ impl FinanceCoreRepository {
         }
         if matches!(
             semantic.canonical_type,
-            "receivable_payment" | "payable_payment"
+            "receivable_payment" | "payable_payment" | "account_transfer"
         ) {
             return Err(FinanceCoreError::Validation(
                 "manual_document_payment_not_allowed",
@@ -457,6 +476,168 @@ impl FinanceCoreRepository {
         tx.commit().await?;
         Ok(CreateFinanceEntryOutcome {
             entry,
+            replayed: false,
+        })
+    }
+
+    pub(crate) async fn transfer_accounts(
+        &self,
+        actor_id: Uuid,
+        business_id: Uuid,
+        organization_id: Uuid,
+        idempotency_key: Uuid,
+        request: TransferFinanceCoreRequest,
+    ) -> Result<TransferFinanceOutcome, FinanceCoreError> {
+        validate_amount(request.amount)?;
+        let from_account = normalize_account(&request.from_account)?;
+        let to_account = normalize_account(&request.to_account)?;
+        if !is_liquid_account(&from_account) || !is_liquid_account(&to_account) {
+            return Err(FinanceCoreError::Validation(
+                "transfer_requires_liquid_accounts",
+            ));
+        }
+        if from_account == to_account {
+            return Err(FinanceCoreError::Validation(
+                "transfer_source_equals_destination",
+            ));
+        }
+        let note = normalized_note(&request.note)?;
+        let hash = request_hash(&request)?;
+        let mut tx = self.db.begin().await?;
+        lock_idempotency(&mut tx, business_id, idempotency_key).await?;
+
+        if let Some((existing_hash, result_entry_id)) =
+            load_command(&mut tx, business_id, idempotency_key).await?
+        {
+            if existing_hash != hash {
+                return Err(FinanceCoreError::Conflict);
+            }
+            let command_id = result_entry_id.ok_or(FinanceCoreError::Database)?;
+            let entries = load_transfer_entries_tx(
+                &mut tx,
+                business_id,
+                organization_id,
+                command_id,
+            )
+            .await?;
+            let from_entry = entries
+                .iter()
+                .find(|entry| entry.effect_multiplier == -1)
+                .cloned()
+                .ok_or(FinanceCoreError::Database)?;
+            let to_entry = entries
+                .iter()
+                .find(|entry| entry.effect_multiplier == 1)
+                .cloned()
+                .ok_or(FinanceCoreError::Database)?;
+            tx.commit().await?;
+            return Ok(TransferFinanceOutcome {
+                from_entry,
+                to_entry,
+                replayed: true,
+            });
+        }
+
+        assert_business_date_open_tx(
+            &mut tx,
+            business_id,
+            organization_id,
+            None,
+            request.occurred_on,
+        )
+        .await
+        .map_err(map_period_control_error)?;
+
+        let source_balance = account_balance_tx(
+            &mut tx,
+            business_id,
+            organization_id,
+            &from_account,
+        )
+        .await?;
+        if source_balance < request.amount {
+            return Err(FinanceCoreError::Validation(
+                "transfer_insufficient_source_balance",
+            ));
+        }
+
+        let command_id = Uuid::new_v4();
+        let from_entry_id = Uuid::new_v4();
+        let to_entry_id = Uuid::new_v4();
+        insert_command(
+            &mut tx,
+            command_id,
+            business_id,
+            organization_id,
+            idempotency_key,
+            &hash,
+            "transfer_accounts",
+            None,
+            Some(command_id),
+            actor_id,
+            "Transfer antar akun",
+            json!({
+                "from_account": from_account,
+                "to_account": to_account,
+                "amount": request.amount
+            }),
+        )
+        .await?;
+
+        let transfer_note = if note.is_empty() {
+            format!("Transfer {} → {}", from_account, to_account)
+        } else {
+            note
+        };
+
+        let from_entry = insert_transfer_entry(
+            &mut tx,
+            from_entry_id,
+            business_id,
+            organization_id,
+            &from_account,
+            request.amount,
+            request.occurred_on,
+            &transfer_note,
+            actor_id,
+            -1,
+            command_id,
+        )
+        .await?;
+        let to_entry = insert_transfer_entry(
+            &mut tx,
+            to_entry_id,
+            business_id,
+            organization_id,
+            &to_account,
+            request.amount,
+            request.occurred_on,
+            &transfer_note,
+            actor_id,
+            1,
+            command_id,
+        )
+        .await?;
+
+        insert_audit_event(
+            &mut tx,
+            organization_id,
+            business_id,
+            actor_id,
+            "finance.accounts.transferred",
+            command_id,
+            "Funds transferred between business accounts",
+            json!({
+                "from_entry": from_entry,
+                "to_entry": to_entry
+            }),
+        )
+        .await?;
+
+        tx.commit().await?;
+        Ok(TransferFinanceOutcome {
+            from_entry,
+            to_entry,
             replayed: false,
         })
     }
@@ -1004,6 +1185,84 @@ async fn insert_entry(
     .bind(finance_command_id)
     .bind(allocation_bucket)
     .fetch_one(&mut **tx)
+    .await
+    .map_err(Into::into)
+}
+
+fn is_liquid_account(account: &str) -> bool {
+    matches!(account, "cash" | "bank" | "ewallet")
+}
+
+async fn account_balance_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    business_id: Uuid,
+    organization_id: Uuid,
+    account_key: &str,
+) -> Result<i64, FinanceCoreError> {
+    sqlx::query_scalar(
+        "SELECT COALESCE((SELECT balance FROM business_finance_account_balances WHERE business_id=$1 AND organization_id=$2 AND account_key=$3),0)::bigint",
+    )
+    .bind(business_id)
+    .bind(organization_id)
+    .bind(account_key)
+    .fetch_one(&mut **tx)
+    .await
+    .map_err(Into::into)
+}
+
+async fn insert_transfer_entry(
+    tx: &mut Transaction<'_, Postgres>,
+    id: Uuid,
+    business_id: Uuid,
+    organization_id: Uuid,
+    account_key: &str,
+    amount: i64,
+    occurred_on: NaiveDate,
+    note: &str,
+    actor_id: Uuid,
+    effect_multiplier: i16,
+    command_id: Uuid,
+) -> Result<FinanceCoreEntryRecord, FinanceCoreError> {
+    sqlx::query_as::<_, FinanceCoreEntryRecord>(
+        r#"INSERT INTO business_finance_entries
+           (id,business_id,organization_id,entry_type,account_key,amount,occurred_on,note,channel_key,source_type,source_id,created_by_user_id,
+            effect_multiplier,reversal_of_entry_id,corrects_entry_id,correction_reason,finance_command_id,allocation_bucket)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NULL,$9,$10,$11,$12,NULL,NULL,NULL,$13,NULL)
+           RETURNING id,business_id,organization_id,entry_type,account_key,amount,occurred_on,note,channel_key,
+             source_type,source_id,created_by_user_id,effect_multiplier,reversal_of_entry_id,corrects_entry_id,
+             correction_reason,finance_command_id,allocation_bucket,created_at,updated_at"#,
+    )
+    .bind(id)
+    .bind(business_id)
+    .bind(organization_id)
+    .bind("account_transfer")
+    .bind(account_key)
+    .bind(amount)
+    .bind(occurred_on)
+    .bind(note)
+    .bind("account_transfer")
+    .bind(command_id)
+    .bind(actor_id)
+    .bind(effect_multiplier)
+    .bind(command_id)
+    .fetch_one(&mut **tx)
+    .await
+    .map_err(Into::into)
+}
+
+async fn load_transfer_entries_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    business_id: Uuid,
+    organization_id: Uuid,
+    command_id: Uuid,
+) -> Result<Vec<FinanceCoreEntryRecord>, FinanceCoreError> {
+    sqlx::query_as::<_, FinanceCoreEntryRecord>(
+        "SELECT id,business_id,organization_id,entry_type,account_key,amount,occurred_on,note,channel_key,source_type,source_id,created_by_user_id,effect_multiplier,reversal_of_entry_id,corrects_entry_id,correction_reason,finance_command_id,allocation_bucket,created_at,updated_at FROM business_finance_entries WHERE business_id=$1 AND organization_id=$2 AND finance_command_id=$3 ORDER BY effect_multiplier ASC, created_at ASC, id ASC",
+    )
+    .bind(business_id)
+    .bind(organization_id)
+    .bind(command_id)
+    .fetch_all(&mut **tx)
     .await
     .map_err(Into::into)
 }
