@@ -9,10 +9,11 @@ describe('CRM operations priority',()=>{
       chats:[{unread:3},{unread:0}],
       users:[{kyc:'Pending',risk:'low',manualHold:false},{kyc:'Verified',risk:'high',manualHold:true}],
       listings:[{reportCount:2},{reportCount:0}],
+      newsPendingCount:4,
     });
     expect(items.map(item=>[item.kind,item.count])).toEqual([
-      ['risk',2],['conversations',3],['support',1],['users',1],['listings',1],['pipeline',1],
+      ['risk',2],['news',4],['conversations',3],['support',1],['users',1],['listings',1],['pipeline',1],
     ]);
   });
-  it('returns no fake tasks when everything is clear',()=>expect(buildOperationsPriorities({leads:[],tickets:[],orders:[],chats:[],users:[],listings:[]})).toEqual([]));
+  it('returns no fake tasks when everything is clear',()=>expect(buildOperationsPriorities({leads:[],tickets:[],orders:[],chats:[],users:[],listings:[],newsPendingCount:0})).toEqual([]));
 });

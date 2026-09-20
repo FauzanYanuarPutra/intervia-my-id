@@ -871,7 +871,7 @@ export default function CrmCommandCenter() {
   );
 
   const transactions = useMemo(() => normalizeTransactions(data.orders), [data.orders]);
-  const operationPriorities = useMemo(() => buildOperationsPriorities({ leads: data.leads, tickets: data.tickets, orders: data.orders, chats: data.chats, users: data.users, listings: data.listings }), [data]);
+  const operationPriorities = useMemo(() => buildOperationsPriorities({ leads: data.leads, tickets: data.tickets, orders: data.orders, chats: data.chats, users: data.users, listings: data.listings, newsPendingCount }), [data]);
 
   const filteredData = useMemo(() => {
     const needle = query.trim().toLowerCase();

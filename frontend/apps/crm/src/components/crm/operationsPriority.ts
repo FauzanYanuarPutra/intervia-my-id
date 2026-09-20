@@ -1,6 +1,6 @@
-export type OperationsDestination='pipeline'|'users'|'listings'|'transactions'|'chat'|'disputes';
-export type OperationsPriority={kind:'risk'|'conversations'|'support'|'users'|'listings'|'pipeline';label:string;description:string;count:number;destination:OperationsDestination;priority:number};
-type Inputs={leads:Array<{stage?:string}>;tickets:Array<{status?:string}>;orders:Array<{status?:string;risk_score?:number}>;chats:Array<{unread?:number}>;users:Array<{kyc?:string;risk?:string;manualHold?:boolean}>;listings:Array<{reportCount?:number}>};
+export type OperationsDestination='pipeline'|'users'|'listings'|'transactions'|'chat'|'disputes'|'news';
+export type OperationsPriority={kind:'risk'|'news'|'conversations'|'support'|'users'|'listings'|'pipeline';label:string;description:string;count:number;destination:OperationsDestination;priority:number};
+type Inputs={leads:Array<{stage?:string}>;tickets:Array<{status?:string}>;orders:Array<{status?:string;risk_score?:number}>;chats:Array<{unread?:number}>;users:Array<{kyc?:string;risk?:string;manualHold?:boolean}>;listings:Array<{reportCount?:number}>;newsPendingCount?:number};
 export function buildOperationsPriorities(input:Inputs):OperationsPriority[]{
   const highRiskOrders=input.orders.filter(item=>(item.risk_score??0)>=70||item.status==='disputed').length;
   const heldOrHighRiskUsers=input.users.filter(item=>item.manualHold||item.risk==='high').length;
@@ -11,6 +11,7 @@ export function buildOperationsPriorities(input:Inputs):OperationsPriority[]{
   const openLeads=input.leads.filter(item=>!['won','lost','closed'].includes((item.stage??'').toLowerCase())).length;
   const items:OperationsPriority[]=[
     {kind:'risk',label:'Risiko & dispute',description:'Order berisiko tinggi atau user yang sedang ditahan/review.',count:highRiskOrders+heldOrHighRiskUsers,destination:'disputes',priority:100},
+    {kind:'news',label:'News perlu approve',description:'Kiriman News yang menunggu review editorial sebelum bisa tampil publik.',count:Math.max(0,input.newsPendingCount??0),destination:'news',priority:95},
     {kind:'conversations',label:'Percakapan belum dibaca',description:'Pesan prospek atau support yang menunggu respons.',count:unread,destination:'chat',priority:90},
     {kind:'support',label:'Support terbuka',description:'Tiket aktif yang masih perlu tindak lanjut.',count:openTickets,destination:'disputes',priority:80},
     {kind:'users',label:'KYC perlu review',description:'User dengan status KYC pending.',count:pendingKyc,destination:'users',priority:70},
