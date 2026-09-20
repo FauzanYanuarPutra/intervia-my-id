@@ -37,6 +37,7 @@ import {
 import { serializeJsonLd } from '@/lib/seo/jsonLd';
 import { StorefrontProductOrderAction } from './StorefrontProductOrderAction';
 import { resolveStorefrontBrandMedia } from '@/lib/super-app/storefront-brand-media';
+import { ReportBusinessButton } from '@/components/umkm/ReportBusinessButton';
 
 type PageProps = {
   params: Promise<{ locale: string; slug: string }>;
@@ -780,6 +781,10 @@ export default async function TokoPage({ params }: PageProps) {
                   Maps
                 </a>
               ) : null}
+
+              <div className="mt-4 flex justify-end">
+                <ReportBusinessButton locale={locale} storeRef={store.slug} />
+              </div>
             </div>
           </details>
         </div>
