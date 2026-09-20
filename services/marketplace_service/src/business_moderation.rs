@@ -3,7 +3,7 @@ use super::*;
 use axum::{
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
-    response::IntoResponse,
+    response::{IntoResponse, Response},
     routing::{get, post},
     Json, Router,
 };
@@ -65,6 +65,7 @@ pub struct ListCrmBusinessReferencesQuery {
     pub offset: Option<i64>,
 }
 
+#[derive(Debug, Serialize, Clone)]
 pub struct CrmBusinessRow {
     pub id: Uuid,
     pub owner_user_id: Uuid,
@@ -535,7 +536,9 @@ async fn moderate_business_reference(
             severity: payload.severity,
             legal_hold: payload.legal_hold,
         }),
-    ).await
+    )
+    .await
+    .into_response()
 }
 
 async fn list_crm_businesses(
@@ -1255,7 +1258,7 @@ async fn get_business_moderation_history(
         }
     };
 
-    let verification = sqlx::query(
+    let verification = match sqlx::query(
         r#"
         SELECT id, status, method, requested_at, reviewed_at, reviewed_by,
                review_reason, evidence, metadata, updated_at
@@ -1279,7 +1282,7 @@ async fn get_business_moderation_history(
             "review_reason": row.get::<Option<String>,_>("review_reason"),
             "evidence": row.get::<Value,_>("evidence"),
             "metadata": row.get::<Value,_>("metadata"),
-            "updated_at": row.get::<DateTime<Utc>,_>("updated_at")
+            "updated_at": row.get::<DateTime<Utc>>("updated_at")
         })),
         Err(error) => {
             tracing::error!("business verification history error: {:?}", error);
