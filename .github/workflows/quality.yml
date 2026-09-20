@@ -94,6 +94,7 @@ jobs:
             "function Test-DockerEngineFailure",
             "function Invoke-DockerEngineRecovery",
             "finally {",
+            'Set-Variable -Name PSNativeCommandUseErrorActionPreference -Value $false -Scope Local',
             '$env:COMPOSE_PARALLEL_LIMIT = $ParallelLimit.ToString()',
             '$BuildArgs = @("build")',
             '$UpArgs = @("up", "-d", "--remove-orphans", "--wait", "--wait-timeout", "420")'
