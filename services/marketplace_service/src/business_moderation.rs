@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sqlx::Row;
 use uuid::Uuid;
+use crate::moderation;
 
 const BUSINESS_MAX_QUERY_LEN: usize = 120;
 const BUSINESS_MAX_LIMIT: i64 = 100;
@@ -451,13 +452,19 @@ async fn moderate_business_reference(
     let Some(action) = action else {
         return err(StatusCode::BAD_REQUEST, "unsupported business reference moderation action").into_response();
     };
+    let content_action = match action {
+        "hide" => "restrict",
+        "reject" => "remove",
+        "request_completion" => "needs_revision",
+        other => other,
+    };
 
     moderation::moderate_content(
         State(state),
         headers,
         Path(id.to_string()),
         Json(moderation::ContentModerationRequest {
-            action: action.to_string(),
+            action: content_action.to_string(),
             reason_code: payload.reason_code,
             reason_note: payload.reason_note,
             severity: payload.severity,
