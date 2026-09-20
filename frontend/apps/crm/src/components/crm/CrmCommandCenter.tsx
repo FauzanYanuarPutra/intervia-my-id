@@ -503,6 +503,22 @@ function buildInitialData(): DashboardData {
   return createEmptyDashboardData();
 }
 
+function readCrmPageFromUrl(): PageId {
+  if (typeof window === "undefined") return "dashboard";
+  const value = new URLSearchParams(window.location.search).get("page");
+  return CRM_NAV_ITEMS.some(item => item.id === value) ? (value as PageId) : "dashboard";
+}
+
+function writeCrmPageUrl(page: PageId, mode: "push" | "replace" = "push"): void {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  url.searchParams.set("page", page);
+  if (page !== "news") url.searchParams.delete("news");
+  const next = url.pathname + url.search + url.hash;
+  if (mode === "replace") window.history.replaceState({ crmPage: page }, "", next);
+  else window.history.pushState({ crmPage: page }, "", next);
+}
+
 function resolveMediaUrl(src: string, wwwUrl: string): string {
   if (!src) return "";
   if (/^https?:\/\//i.test(src)) return src;
@@ -618,7 +634,7 @@ export default function CrmCommandCenter() {
   const { isAuthenticated, loading: authLoading } = useRequireAuth();
   const { accessToken, logout, user } = useAuth();
   const wwwUrl = process.env.NEXT_PUBLIC_WWW_URL || "http://localhost:3000";
-  const [activePage, setActivePage] = useState<PageId>("dashboard");
+  const [activePage, setActivePage] = useState<PageId>(() => readCrmPageFromUrl());
   const [collapsed, setCollapsed] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -735,6 +751,26 @@ export default function CrmCommandCenter() {
     }, 0);
     return () => window.clearTimeout(timeout);
   }, [accessToken, loadData]);
+
+  const navigatePage = useCallback((page: PageId, mode: "push" | "replace" = "push") => {
+    setActivePage(page);
+    setMobileNavOpen(false);
+    writeCrmPageUrl(page, mode);
+  }, []);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setActivePage(readCrmPageFromUrl());
+      setMobileNavOpen(false);
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  useEffect(() => {
+    const label = CRM_NAV_ITEMS.find(item => item.id === activePage)?.label || "CRM";
+    document.title = label + " · Lajukan CRM";
+  }, [activePage]);
 
   const handleRefresh = useCallback(() => {
     setNotice("");
@@ -943,10 +979,7 @@ export default function CrmCommandCenter() {
           collapsed={collapsed}
           mobileOpen={mobileNavOpen}
           onCloseMobile={() => setMobileNavOpen(false)}
-          onSelect={page => {
-            setActivePage(page);
-            setMobileNavOpen(false);
-          }}
+          onSelect={page => navigatePage(page)}
           onToggle={() => setCollapsed(current => !current)}
           newsPendingCount={newsPendingCount}
           businessPendingCount={businessPendingCount}
@@ -1003,7 +1036,7 @@ export default function CrmCommandCenter() {
               ) : null}
 
               {activePage === "dashboard" ? (
-                <OperationsPriorityPanel items={operationPriorities} onOpen={destination => setActivePage(destination)} />
+                <OperationsPriorityPanel items={operationPriorities} onOpen={destination => navigatePage(destination)} />
               ) : null}
 
               {activePage === "dashboard" ? <OperationsOverview data={filteredData} /> : null}
@@ -1024,7 +1057,13 @@ export default function CrmCommandCenter() {
               {activePage === "chat" ? <ConversationWorkspace chats={filteredData.chats} /> : null}
               {activePage === "analytics" ? <AnalyticsWorkspace users={filteredData.users} listings={filteredData.listings} transactions={transactions} openSupport={openIssues} /> : null}
               {activePage === "disputes" ? <SupportRiskWorkspace tickets={data.tickets} transactions={transactions} users={data.users} supportFailed={data.failures.includes("support") || data.failures.includes("tickets")} /> : null}
-              {activePage === "news" ? <NewsEditorialWorkspace accessToken={accessToken || ""} /> : null}
+              {activePage === "news" ? (
+                <NewsEditorialWorkspace
+                  accessToken={accessToken || ""}
+                  reviewerId={user?.id || ""}
+                  onBack={() => navigatePage("dashboard")}
+                />
+              ) : null}
               {activePage === "settings" ? <AdministrationWorkspace /> : null}
               <ModerationDecisionDialog
                 draft={moderationDraft}
