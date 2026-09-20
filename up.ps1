@@ -418,10 +418,6 @@ try {
             throw "Docker Compose build gagal (exit code $BuildExitCode). Periksa error build di atas."
         }
 
-        if ($BuildExitCode -ne 0) {
-            throw "Docker Compose build gagal (exit code $BuildExitCode). Periksa error build di atas."
-        }
-
         Write-Host "Docker image build completed successfully." -ForegroundColor Green
     }
 
