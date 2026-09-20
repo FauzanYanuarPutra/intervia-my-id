@@ -137,37 +137,21 @@ function setStoredPromptDismissed() {
 
 export function useViewerLocation(options: UseViewerLocationOptions = {}) {
   const { autoRequest = false, isId = true, watch = false } = options;
-  const [viewerLocation, setViewerLocation] = useState<LatLng | null>(() => {
-    if (!readStoredLocationEnabled()) return null;
-    const storedLocation = readStoredViewerLocation();
-    return storedLocation
-      ? { lat: storedLocation.lat, lng: storedLocation.lng }
-      : null;
-  });
-  const [viewerAccuracyMeters, setViewerAccuracyMeters] = useState<
-    number | null
-  >(null);
-  const [viewerLocationUpdatedAt, setViewerLocationUpdatedAt] = useState<
-    number | null
-  >(() =>
-    readStoredLocationEnabled()
-      ? (readStoredViewerLocation()?.updatedAt ?? null)
-      : null,
+  // Keep the first render identical on the server and client. Browser storage is
+  // intentionally hydrated in the effect below; reading localStorage in a
+  // useState initializer would make the initial client HTML differ from SSR.
+  const [viewerLocation, setViewerLocation] = useState<LatLng | null>(null);
+  const [viewerAccuracyMeters, setViewerAccuracyMeters] = useState<number | null>(
+    null,
+  );
+  const [viewerLocationUpdatedAt, setViewerLocationUpdatedAt] = useState<number | null>(
+    null,
   );
   const [locating, setLocating] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
-  const [locationState, setLocationState] = useState<ViewerLocationState>(() =>
-    readStoredLocationEnabled() && readStoredViewerLocation()
-      ? 'ready'
-      : 'idle',
-  );
-  const [locationEnabled, setLocationEnabled] = useState(() =>
-    readStoredLocationEnabled(),
-  );
-  const [locationPromptDismissed, setLocationPromptDismissed] = useState(() => {
-    const enabled = readStoredLocationEnabled();
-    return enabled || readStoredPromptDismissed();
-  });
+  const [locationState, setLocationState] = useState<ViewerLocationState>('idle');
+  const [locationEnabled, setLocationEnabled] = useState(false);
+  const [locationPromptDismissed, setLocationPromptDismissed] = useState(false);
   const requestedRef = useRef(false);
   const activeRequestRef = useRef<Promise<LatLng | null> | null>(null);
   const lastPersistedRef = useRef<{ key: string; at: number } | null>(null);
