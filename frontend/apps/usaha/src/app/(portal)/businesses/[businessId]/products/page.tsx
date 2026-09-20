@@ -89,6 +89,16 @@ export default async function BusinessProductsPage({ params, searchParams }: Pag
         action={canManage ? <ProductCreateModal businessId={business.id} /> : null}
       />
 
+      <details className="merchant-surface-bordered px-4 py-3 sm:px-5">
+        <summary className="cursor-pointer list-none text-sm font-black text-portal-ink [&::-webkit-details-marker]:hidden">
+          Cara mengelola produk
+        </summary>
+        <p className="mt-2 max-w-2xl text-xs leading-5 text-portal-soft">
+          Mulai dari foto, nama, harga, dan stok. Kategori, batas stok tipis, sumber barang,
+          dan catatan dibuka saat diperlukan supaya daftar produk tetap ringan.
+        </p>
+      </details>
+
       {primaryMode === 'add-product' ? (
         <section className="merchant-surface-bordered p-4 sm:p-5" id="tambah-produk">
           <h2 className="font-black text-portal-ink">Tambah produk pertama</h2>
