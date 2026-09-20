@@ -1,8 +1,9 @@
-const IDENTITY_API_URL =
-  process.env.NEXT_PUBLIC_IDENTITY_API_URL || '/api/identity';
-const CRM_AUTH_API_URL = process.env.NEXT_PUBLIC_CRM_AUTH_API_URL || '/api';
-const MARKETPLACE_URL =
-  process.env.NEXT_PUBLIC_MARKETPLACE_URL || 'http://localhost:8081';
+// CRM always talks through same-origin BFF proxies. This keeps HttpOnly
+// session cookies server-side and prevents the browser from bypassing the
+// authenticated proxy with a direct service URL.
+const IDENTITY_API_URL = '/api/identity';
+const CRM_AUTH_API_URL = '/api';
+const MARKETPLACE_URL = '/api/marketplace';
 
 type FetchOptions = RequestInit & {
   token?: string;
