@@ -6,8 +6,33 @@ import { useAuth, useRequireAuth } from '@/context/AuthContext';
 import { backofficeApi, moderationApi, newsApi } from '@/lib/api';
 import CmsDashboard from './CmsDashboard';
 
-type R = Record<string, any>;
+type R = Record<string, unknown>;
 type Workspace = 'overview' | 'news' | 'moderation' | 'studio' | 'team';
+type FactCheckStatus = 'pending' | 'verified' | 'not_required';
+type LegalReviewStatus = 'pending' | 'approved' | 'not_required';
+type EditorialPriority = 'low' | 'normal' | 'high' | 'urgent';
+type Sensitivity = 'normal' | 'high';
+type NewsForm = {
+  title: string;
+  slug: string;
+  summary: string;
+  body: string;
+  category: string;
+  article_kind: string;
+  location: string;
+  topics: string;
+  source_urls: string;
+  cover_image: string;
+  seo_title: string;
+  seo_description: string;
+  og_image: string;
+  note: string;
+  publish_at: string;
+  fact_check_status: FactCheckStatus;
+  legal_review_status: LegalReviewStatus;
+  editorial_priority: EditorialPriority;
+  sensitivity: Sensitivity;
+};
 
 const CATEGORIES = ['Ekonomi', 'Bisnis', 'UMKM', 'Teknologi', 'Keuangan', 'Regulasi', 'Industri', 'Daerah'];
 const KINDS = [['news', 'Berita'], ['analysis', 'Analisis'], ['press_release', 'Siaran pers']] as const;
@@ -15,6 +40,19 @@ const KINDS = [['news', 'Berita'], ['analysis', 'Analisis'], ['press_release', '
 const rec = (v: unknown): R => (v && typeof v === 'object' && !Array.isArray(v) ? v as R : {});
 const arr = (v: unknown): R[] => Array.isArray(v) ? v as R[] : ['items', 'data', 'results'].flatMap(k => Array.isArray(rec(v)[k]) ? rec(v)[k] as R[] : []);
 const str = (v: unknown, fallback = '') => typeof v === 'string' ? v : fallback;
+const factCheckStatus = (v: unknown): FactCheckStatus => {
+  const value = str(v);
+  return value === 'verified' || value === 'not_required' ? value : 'pending';
+};
+const legalReviewStatus = (v: unknown): LegalReviewStatus => {
+  const value = str(v);
+  return value === 'pending' || value === 'approved' ? value : 'not_required';
+};
+const editorialPriority = (v: unknown): EditorialPriority => {
+  const value = str(v);
+  return value === 'low' || value === 'high' || value === 'urgent' ? value : 'normal';
+};
+const sensitivity = (v: unknown): Sensitivity => str(v) === 'high' ? 'high' : 'normal';
 const num = (v: unknown) => typeof v === 'number' && Number.isFinite(v) ? v : Number(v || 0);
 const dateLabel = (v: unknown) => {
   if (!v) return '-';
@@ -44,7 +82,7 @@ const statusClass = (s: string) => {
   return 'bg-slate-500/10 text-slate-700 border-slate-500/20';
 };
 
-function initialNews(item: R | null) {
+function initialNews(item: R | null): NewsForm {
   if (!item) return {
     title: '', slug: '', summary: '', body: '', category: 'Ekonomi', article_kind: 'news', location: '',
     topics: '', source_urls: '', cover_image: '', seo_title: '', seo_description: '', og_image: '',
@@ -93,14 +131,27 @@ export default function CmsControlCenter() {
 
   const selectedNews = useMemo(() => newsItems.find(x => str(x.id) === selectedId) || null, [newsItems, selectedId]);
 
+  const loadHistory = useCallback(async (id: string) => {
+    if (!accessToken || !id) return;
+    try { setNewsHistory(rec(await newsApi.history(accessToken, id))); }
+    catch (e) { setError(e instanceof Error ? e.message : 'Gagal memuat riwayat'); }
+  }, [accessToken]);
+
+  const selectNews = useCallback((item: R | null) => {
+    const id = item ? str(item.id) : '';
+    setSelectedId(id);
+    setNewsForm(initialNews(item));
+    if (id) void loadHistory(id);
+  }, [loadHistory]);
+
   const refreshNews = useCallback(async () => {
     if (!accessToken) return;
     const [q, m] = await Promise.all([newsApi.queue(accessToken, newsStatus), newsApi.metrics(accessToken)]);
     const next = arr(q);
     setNewsItems(next);
     setNewsMetrics(rec(m));
-    if (!selectedId && next[0]?.id) setSelectedId(str(next[0].id));
-  }, [accessToken, newsStatus, selectedId]);
+    if (!selectedId && next[0]?.id) selectNews(next[0]);
+  }, [accessToken, newsStatus, selectedId, selectNews]);
 
   const refreshModeration = useCallback(async () => {
     if (!accessToken) return;
@@ -113,12 +164,6 @@ export default function CmsControlCenter() {
     setInvitations(arr(await backofficeApi.invitations(accessToken)));
   }, [accessToken, user?.roles]);
 
-  const loadHistory = useCallback(async (id: string) => {
-    if (!accessToken || !id) return;
-    try { setNewsHistory(rec(await newsApi.history(accessToken, id))); }
-    catch (e) { setError(e instanceof Error ? e.message : 'Gagal memuat riwayat'); }
-  }, [accessToken]);
-
   useEffect(() => {
     if (!accessToken) return;
     queueMicrotask(() => {
@@ -127,12 +172,6 @@ export default function CmsControlCenter() {
       void refreshTeam().catch(e => setError(e instanceof Error ? e.message : 'Gagal memuat tim'));
     });
   }, [accessToken, refreshNews, refreshModeration, refreshTeam]);
-
-  useEffect(() => {
-    if (!selectedNews) return;
-    setNewsForm(initialNews(selectedNews));
-    void loadHistory(str(selectedNews.id));
-  }, [selectedNews, loadHistory]);
 
   const uploadCover = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -191,10 +230,10 @@ export default function CmsControlCenter() {
         action,
         note: newsForm.note || undefined,
         publish_at: isoDate(newsForm.publish_at),
-        fact_check_status: newsForm.fact_check_status as any,
-        legal_review_status: newsForm.legal_review_status as any,
-        editorial_priority: newsForm.editorial_priority as any,
-        sensitivity: newsForm.sensitivity as any
+        fact_check_status: newsForm.fact_check_status,
+        legal_review_status: newsForm.legal_review_status,
+        editorial_priority: newsForm.editorial_priority,
+        sensitivity: newsForm.sensitivity
       });
       await Promise.all([refreshNews(), loadHistory(selectedId)]);
     } catch (e) { setError(e instanceof Error ? e.message : 'Gagal menjalankan aksi editorial'); }
@@ -327,7 +366,7 @@ export default function CmsControlCenter() {
               </section>
               <section className={card}>
                 <h2 className="text-lg font-bold">Top News 7 hari</h2>
-                <div className="mt-4 space-y-2">{top.map((x, i) => <button key={str(x.id)} onClick={() => { setWorkspace('news'); setNewsStatus('all'); setSelectedId(str(x.id)); }} className="flex w-full items-center gap-3 rounded-2xl border border-[color:var(--color-border)] p-3 text-left hover:bg-slate-50"><div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-slate-100 text-xs font-black">{i + 1}</div><div className="min-w-0 flex-1"><div className="truncate text-sm font-bold">{str(x.title, 'Tanpa judul')}</div><div className="text-xs text-slate-500">{num(x.opens)} open</div></div></button>)}{!top.length ? <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">Belum ada engagement.</div> : null}</div>
+                <div className="mt-4 space-y-2">{top.map((x, i) => <button key={str(x.id)} onClick={() => { setWorkspace('news'); setNewsStatus('all'); selectNews(x); }} className="flex w-full items-center gap-3 rounded-2xl border border-[color:var(--color-border)] p-3 text-left hover:bg-slate-50"><div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-slate-100 text-xs font-black">{i + 1}</div><div className="min-w-0 flex-1"><div className="truncate text-sm font-bold">{str(x.title, 'Tanpa judul')}</div><div className="text-xs text-slate-500">{num(x.opens)} open</div></div></button>)}{!top.length ? <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">Belum ada engagement.</div> : null}</div>
               </section>
             </div>
           </section>
@@ -339,7 +378,7 @@ export default function CmsControlCenter() {
               <div className={card}>
                 <div className="flex items-center justify-between gap-3"><div><h2 className="font-bold">Editorial queue</h2><p className="text-xs text-slate-500">Review sampai retract.</p></div><select value={newsStatus} onChange={e => setNewsStatus(e.target.value)} className="rounded-xl border border-[color:var(--color-border)] px-2.5 py-2 text-xs"><option value="pending_review">Review</option><option value="needs_revision">Revisi</option><option value="published">Published</option><option value="rejected">Rejected</option><option value="retracted">Retracted</option><option value="all">Semua</option></select></div>
               </div>
-              {newsItems.map(item => <button key={str(item.id)} onClick={() => setSelectedId(str(item.id))} className={str(item.id) === selectedId ? 'w-full rounded-2xl border border-[color:var(--color-primary)] bg-[color:var(--color-surface)] p-4 text-left shadow-md' : 'w-full rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-4 text-left hover:bg-slate-50'}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="line-clamp-2 text-sm font-bold">{str(item.title, 'Tanpa judul')}</div><div className="mt-1 text-xs text-slate-500">{dateLabel(item.updated_at)}</div></div><span className={'shrink-0 rounded-full border px-2 py-1 text-[10px] font-bold ' + statusClass(statusOf(item))}>{statusOf(item)}</span></div></button>)}
+              {newsItems.map(item => <button key={str(item.id)} onClick={() => selectNews(item)} className={str(item.id) === selectedId ? 'w-full rounded-2xl border border-[color:var(--color-primary)] bg-[color:var(--color-surface)] p-4 text-left shadow-md' : 'w-full rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-4 text-left hover:bg-slate-50'}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="line-clamp-2 text-sm font-bold">{str(item.title, 'Tanpa judul')}</div><div className="mt-1 text-xs text-slate-500">{dateLabel(item.updated_at)}</div></div><span className={'shrink-0 rounded-full border px-2 py-1 text-[10px] font-bold ' + statusClass(statusOf(item))}>{statusOf(item)}</span></div></button>)}
               {!newsItems.length ? <div className="rounded-2xl border border-dashed border-[color:var(--color-border)] p-6 text-sm text-slate-500">Antrean kosong.</div> : null}
             </aside>
 
