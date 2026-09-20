@@ -22,6 +22,11 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+# Docker Compose writes normal progress/status to native stderr. PowerShell 7.4+ can
+# promote native non-zero exits through this preference, which would turn redirected
+# Compose progress into NativeCommandError under ErrorActionPreference=Stop. Keep
+# native command exit codes under explicit launcher control instead.
+Set-Variable -Name PSNativeCommandUseErrorActionPreference -Value $false -Scope Local
 Set-StrictMode -Version Latest
 
 if ($Down -and ($Build -or $Pull -or $Fresh)) {
@@ -360,18 +365,11 @@ try {
         }
 
         Write-Host "Building Docker images..." -ForegroundColor Cyan
-        $BuildPreviousErrorActionPreference = $ErrorActionPreference
-        $BuildExitCode = 1
         $BuildLogPath = Join-Path ([System.IO.Path]::GetTempPath()) "lajukan-up-build-$PID.log"
-        try {
-            $ErrorActionPreference = "Continue"
-            Remove-Item -LiteralPath $BuildLogPath -Force -ErrorAction SilentlyContinue
-            & docker @ComposeArgs @BuildArgs 2>&1 | Tee-Object -FilePath $BuildLogPath
-            $BuildExitCode = $LASTEXITCODE
-        }
-        finally {
-            $ErrorActionPreference = $BuildPreviousErrorActionPreference
-        }
+        $BuildCommandArgs = @($ComposeArgs + $BuildArgs)
+        Remove-Item -LiteralPath $BuildLogPath -Force -ErrorAction SilentlyContinue
+        & docker @BuildCommandArgs 2>&1 | Tee-Object -FilePath $BuildLogPath
+        $BuildExitCode = $LASTEXITCODE
 
         $BuildOutputText = ""
         if (Test-Path -LiteralPath $BuildLogPath) {
@@ -385,14 +383,12 @@ try {
             if (Invoke-DockerEngineRecovery -Reason "Compose build") {
                 Write-Warning "Mengulangi Compose build dengan paralelisme 1 untuk mengurangi beban Docker Desktop..."
                 $env:COMPOSE_PARALLEL_LIMIT = "1"
-                $RetryPreviousErrorActionPreference = $ErrorActionPreference
                 try {
-                    $ErrorActionPreference = "Continue"
-                    & docker @ComposeArgs @BuildArgs 2>&1 | Tee-Object -FilePath $BuildLogPath
+                    $RetryCommandArgs = @($ComposeArgs + $BuildArgs)
+                    & docker @RetryCommandArgs 2>&1 | Tee-Object -FilePath $BuildLogPath
                     $BuildExitCode = $LASTEXITCODE
                 }
                 finally {
-                    $ErrorActionPreference = $RetryPreviousErrorActionPreference
                     $env:COMPOSE_PARALLEL_LIMIT = $OriginalParallelLimit
                 }
             }
@@ -417,18 +413,11 @@ try {
     }
 
     Write-Host "Starting Docker Compose services..." -ForegroundColor Cyan
-    $UpPreviousErrorActionPreference = $ErrorActionPreference
-    $UpExitCode = 1
     $UpLogPath = Join-Path ([System.IO.Path]::GetTempPath()) "lajukan-up-start-$PID.log"
-    try {
-        $ErrorActionPreference = "Continue"
-        Remove-Item -LiteralPath $UpLogPath -Force -ErrorAction SilentlyContinue
-        & docker @ComposeArgs @UpArgs 2>&1 | Tee-Object -FilePath $UpLogPath
-        $UpExitCode = $LASTEXITCODE
-    }
-    finally {
-        $ErrorActionPreference = $UpPreviousErrorActionPreference
-    }
+    $UpCommandArgs = @($ComposeArgs + $UpArgs)
+    Remove-Item -LiteralPath $UpLogPath -Force -ErrorAction SilentlyContinue
+    & docker @UpCommandArgs 2>&1 | Tee-Object -FilePath $UpLogPath
+    $UpExitCode = $LASTEXITCODE
 
     $UpOutputText = ""
     if (Test-Path -LiteralPath $UpLogPath) {
@@ -442,14 +431,12 @@ try {
             Write-Warning "Mengulangi Compose up dengan paralelisme 1 setelah recovery Docker Engine..."
             $OriginalParallelLimit = $env:COMPOSE_PARALLEL_LIMIT
             $env:COMPOSE_PARALLEL_LIMIT = "1"
-            $RetryPreviousErrorActionPreference = $ErrorActionPreference
             try {
-                $ErrorActionPreference = "Continue"
-                & docker @ComposeArgs @UpArgs 2>&1 | Tee-Object -FilePath $UpLogPath
+                $RetryCommandArgs = @($ComposeArgs + $UpArgs)
+                & docker @RetryCommandArgs 2>&1 | Tee-Object -FilePath $UpLogPath
                 $UpExitCode = $LASTEXITCODE
             }
             finally {
-                $ErrorActionPreference = $RetryPreviousErrorActionPreference
                 $env:COMPOSE_PARALLEL_LIMIT = $OriginalParallelLimit
             }
         }
