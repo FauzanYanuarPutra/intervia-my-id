@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { OperationsPriorityPanel } from "./OperationsPriorityPanel";
+import BusinessModerationWorkspace from "./BusinessModerationWorkspace";
 import { PipelineWorkspace } from "./PipelineWorkspace";
 import { ContactWorkspace } from "./ContactWorkspace";
 import { ConversationWorkspace } from "./ConversationWorkspace";
@@ -19,6 +20,7 @@ import type { IconName, PageId } from "./types";
 import { useAuth, useRequireAuth } from "@/context/AuthContext";
 import {
   activityApi,
+  businessModerationApi,
   contentApi,
   newsApi,
   leadApi,
@@ -26,6 +28,7 @@ import {
   supportApi,
   usersApi,
   type CrmActivity,
+  type CrmBusiness,
   type CrmContentItem,
   type CrmLead,
   type SuperAppOrder,
@@ -625,12 +628,13 @@ export default function CrmCommandCenter() {
   } | null>(null);
   const [moderationBusy, setModerationBusy] = useState(false);
   const [newsPendingCount, setNewsPendingCount] = useState(0);
+  const [businessPendingCount, setBusinessPendingCount] = useState(0);
 
   const loadData = useCallback(async () => {
     if (!accessToken) return;
     setRefreshing(true);
     const failures: string[] = [];
-    const [leadRes, activityRes, ticketRes, orderRes, trustRes, contentRes, userRes, newsMetricsRes] =
+    const [leadRes, activityRes, ticketRes, orderRes, trustRes, contentRes, userRes, businessRes, newsMetricsRes] =
       await Promise.allSettled([
         leadApi.list(accessToken, { limit: "120" }),
         activityApi.list(accessToken, { limit: "60" }),
@@ -639,6 +643,7 @@ export default function CrmCommandCenter() {
         superAppApi.listTrustProfiles(accessToken, { limit: "120" }),
         contentApi.list(accessToken, { limit: "160", offset: "0" }),
         usersApi.list(accessToken),
+        businessModerationApi.list(accessToken, { limit: "100" }),
         newsApi.metrics(accessToken),
       ]);
 
@@ -652,6 +657,15 @@ export default function CrmCommandCenter() {
       userRes.status === "fulfilled"
         ? readItems<UnknownRecord>(userRes.value)
         : (failures.push("users"), []);
+    const liveBusinesses: CrmBusiness[] =
+      businessRes.status === "fulfilled"
+        ? businessRes.value.items || []
+        : (failures.push("businesses"), []);
+    setBusinessPendingCount(
+      liveBusinesses.filter(item =>
+        ["unreviewed", "under_review", "needs_completion", "escalated"].includes(item.review_state),
+      ).length,
+    );
 
     if (newsMetricsRes.status === "fulfilled") {
       const metrics = asRecord(newsMetricsRes.value);
@@ -681,6 +695,7 @@ export default function CrmCommandCenter() {
       !liveTrust.length ? "trustProfiles" : "",
       !liveContent.length ? "listings" : "",
       !liveUsers.length ? "users" : "",
+      !liveBusinesses.length ? "businesses" : "",
     ].filter(Boolean);
     const sampleCollections: string[] = [];
 
@@ -692,6 +707,7 @@ export default function CrmCommandCenter() {
       trustProfiles,
       users: safeUsers,
       listings,
+      businesses: liveBusinesses,
       chats,
       sampleCollections,
       emptyCollections,
@@ -884,6 +900,9 @@ export default function CrmCommandCenter() {
       listings: data.listings.filter(item =>
         `${item.title} ${item.category} ${item.location} ${item.rawStatus}`.toLowerCase().includes(needle),
       ),
+      businesses: data.businesses.filter(item =>
+        `${item.name} ${item.city} ${item.address} ${item.review_state}`.toLowerCase().includes(needle),
+      ),
       chats: data.chats.filter(item =>
         `${item.name} ${item.lastMessage} ${item.listingTitle}`.toLowerCase().includes(needle),
       ),
@@ -919,6 +938,7 @@ export default function CrmCommandCenter() {
           }}
           onToggle={() => setCollapsed(current => !current)}
           newsPendingCount={newsPendingCount}
+          businessPendingCount={businessPendingCount}
         />
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -927,7 +947,7 @@ export default function CrmCommandCenter() {
             query={query}
             userLabel={user?.username || user?.email || "Admin"}
             refreshing={refreshing}
-            notificationCount={openIssues + highRiskOrders + newsPendingCount}
+            notificationCount={openIssues + highRiskOrders + newsPendingCount + businessPendingCount}
             profileOpen={profileOpen}
             onQueryChange={setQuery}
             onRefresh={handleRefresh}
@@ -963,6 +983,7 @@ export default function CrmCommandCenter() {
               {activePage === "users" ? (
                 <ContactWorkspace users={filteredData.users} listings={filteredData.listings} orders={data.orders} tickets={data.tickets} trustProfiles={data.trustProfiles} onTrustAction={handleUserTrustAction} />
               ) : null}
+              {activePage === "businesses" ? <BusinessModerationWorkspace /> : null}
               {activePage === "listings" ? (
                 <ListingsPage
                   listings={filteredData.listings}
@@ -1007,6 +1028,7 @@ function Sidebar({
   onSelect: (page: PageId) => void;
   onToggle: () => void;
   newsPendingCount: number;
+  businessPendingCount: number;
 }) {
   return (
     <>
@@ -1058,9 +1080,9 @@ function Sidebar({
                   title={item.label}
                 >
                   <Icon name={item.icon} className="h-5 w-5 shrink-0" />
-                  {item.id === "news" && newsPendingCount ? (
+                  {((item.id === "news" && newsPendingCount) || (item.id === "businesses" && businessPendingCount)) ? (
                     <span className={`${collapsed ? "absolute right-1 top-1" : "ml-auto"} min-w-5 rounded-full bg-rose-500 px-1.5 py-0.5 text-center text-[10px] font-black text-white`}>
-                      {newsPendingCount > 99 ? "99+" : newsPendingCount}
+                      {item.id === "news" ? (newsPendingCount > 99 ? "99+" : newsPendingCount) : (businessPendingCount > 99 ? "99+" : businessPendingCount)}
                     </span>
                   ) : null}
                   {!collapsed ? (
