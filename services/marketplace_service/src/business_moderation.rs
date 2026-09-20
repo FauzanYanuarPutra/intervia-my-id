@@ -360,7 +360,9 @@ async fn list_crm_business_references(
 
     let q = normalize_text(query.q, BUSINESS_MAX_QUERY_LEN);
     let city = normalize_text(query.city, 80);
-    let status = normalize_text(query.status, 30);
+    let status = normalize_text(query.status, 30).and_then(|value| {
+        if value.eq_ignore_ascii_case("all") { None } else { Some(value) }
+    });
     let limit = query.limit.unwrap_or(50).clamp(1, BUSINESS_MAX_LIMIT);
     let offset = query.offset.unwrap_or(0).max(0);
 
