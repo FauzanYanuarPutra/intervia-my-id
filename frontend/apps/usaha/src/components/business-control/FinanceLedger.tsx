@@ -449,6 +449,133 @@ export function FinanceLedger({ businessId, initialEntries, channels = [] }: Pro
     }
   }
 
+  async function saveOpeningBalance() {
+    const parsedAmount = Math.round(Number(openingBalanceAmount));
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      setMessageTone('error');
+      setMessage('Isi saldo awal lebih dari Rp0.');
+      return;
+    }
+
+    const requestBody = {
+      entry_type: 'opening_balance',
+      account_key: openingBalanceAccount,
+      amount: parsedAmount,
+      occurred_on: openingBalanceDate,
+      note: openingBalanceNote.trim() || 'Saldo awal saat mulai memakai Lajukan',
+      channel_key: null,
+      allocation_bucket: null,
+    };
+    const attempt = resolveIdempotencyAttempt(
+      openingBalanceAttemptRef.current,
+      requestBody,
+    );
+    openingBalanceAttemptRef.current = attempt;
+
+    setSavingOpeningBalance(true);
+    setMessage('');
+    try {
+      const response = await fetch(
+        `/api/businesses/${businessId}/finance-core/entries`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Idempotency-Key': attempt.key,
+          },
+          body: JSON.stringify(requestBody),
+        },
+      );
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(
+          businessApiErrorMessage(
+            payload,
+            'Gagal menyimpan saldo awal.',
+            response.status,
+          ),
+        );
+      }
+      await reloadAll(true);
+      openingBalanceAttemptRef.current = null;
+      setOpeningBalanceAmount('');
+      setOpeningBalanceNote('');
+      setOpeningBalanceOpen(false);
+      setMessageTone('success');
+      setMessage('Saldo awal tersimpan. Nominal ini tidak dianggap omzet atau biaya.');
+    } catch (error) {
+      setMessageTone('error');
+      setMessage(error instanceof Error ? error.message : 'Gagal menyimpan saldo awal.');
+    } finally {
+      setSavingOpeningBalance(false);
+    }
+  }
+
+  async function transferAccounts() {
+    const parsedAmount = Math.round(Number(transferAmount));
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      setMessageTone('error');
+      setMessage('Isi nominal transfer lebih dari Rp0.');
+      return;
+    }
+    if (transferFrom === transferTo) {
+      setMessageTone('error');
+      setMessage('Akun sumber dan tujuan harus berbeda.');
+      return;
+    }
+
+    const requestBody = {
+      from_account: transferFrom,
+      to_account: transferTo,
+      amount: parsedAmount,
+      occurred_on: transferDate,
+      note: transferNote.trim() || `Transfer ${transferFrom} ke ${transferTo}`,
+    };
+    const attempt = resolveIdempotencyAttempt(
+      transferAttemptRef.current,
+      requestBody,
+    );
+    transferAttemptRef.current = attempt;
+
+    setTransferring(true);
+    setMessage('');
+    try {
+      const response = await fetch(
+        `/api/businesses/${businessId}/finance-core/transfers`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Idempotency-Key': attempt.key,
+          },
+          body: JSON.stringify(requestBody),
+        },
+      );
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(
+          businessApiErrorMessage(
+            payload,
+            'Gagal memindahkan uang antar akun.',
+            response.status,
+          ),
+        );
+      }
+      await reloadAll(true);
+      transferAttemptRef.current = null;
+      setTransferAmount('');
+      setTransferNote('');
+      setTransferOpen(false);
+      setMessageTone('success');
+      setMessage('Transfer tersimpan. Saldo total usaha tidak berubah; hanya pindah akun.');
+    } catch (error) {
+      setMessageTone('error');
+      setMessage(error instanceof Error ? error.message : 'Gagal memindahkan uang antar akun.');
+    } finally {
+      setTransferring(false);
+    }
+  }
+
   async function moveAllocation() {
     const parsedAmount = Math.round(Number(allocationAmount));
     if (!Number.isFinite(parsedAmount) || parsedAmount <= 0 || allocationReason.trim().length < 3) {
