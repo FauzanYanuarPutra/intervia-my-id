@@ -98,8 +98,8 @@ export default async function BusinessProductsPage({ params, searchParams }: Pag
       ) : null}
 
       {business.products.length ? (
-        <div className={selectedProduct ? 'grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(380px,520px)]' : 'space-y-4'}>
-          <div className={selectedProduct ? 'hidden min-w-0 space-y-4 lg:block' : 'space-y-4'}>
+        <div className="space-y-4">
+          <div className="space-y-4">
             <form className="flex flex-col gap-2 sm:flex-row" action={`/businesses/${business.id}/products`} method="get">
               <label className="relative min-w-0 flex-1">
                 <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-portal-soft" />
@@ -178,10 +178,12 @@ export default async function BusinessProductsPage({ params, searchParams }: Pag
           </div>
 
           {selectedProduct ? (
-            <div className="min-w-0">
-              <Link href={listHref} className="portal-button-ghost mb-3 lg:hidden">← Kembali ke produk</Link>
-              <ProductEditorWorkspace key={selectedProduct.id} businessId={business.id} product={selectedProduct} />
-            </div>
+            <ProductEditorWorkspace
+              key={selectedProduct.id}
+              businessId={business.id}
+              product={selectedProduct}
+              closeHref={listHref}
+            />
           ) : null}
         </div>
       ) : primaryMode === 'view-only' ? (
