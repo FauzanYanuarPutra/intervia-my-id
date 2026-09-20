@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useRef, useState } from 'react';
+import { RupiahInput } from '@/components/forms/RupiahInput';
 import { Loader2, PackagePlus, Scale } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { ChoiceChips } from '@/components/interaction/ChoiceChips';
@@ -296,7 +297,14 @@ export function StockPurchaseYieldWorkspace({
               <input
                 type="number"
                 min="1"
-                value={totalAmount}
+                <RupiahInput
+                  min={1}
+                  value={totalAmount ? Number(totalAmount) : null}
+                  onValueChange={value => setTotalAmount(value == null ? ''' : '' : String(value))}
+                  disabled={!canManage}
+                  className="mt-1 w-full rounded-xl border border-portal-line px-3 py-2.5 text-sm text-portal-ink"
+                  placeholder="70.000"
+                />
                 onChange={event => setTotalAmount(event.target.value)}
                 disabled={!canManage}
                 className="mt-1 w-full rounded-xl border border-portal-line px-3 py-2.5 text-sm text-portal-ink"
