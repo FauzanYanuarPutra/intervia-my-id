@@ -7991,6 +7991,13 @@ async fn find_public_umkm_store_row(
               AND location.public_visibility = TRUE
               AND location.status = 'active'
           )
+          AND COALESCE((
+            SELECT latest.current_action
+            FROM internal_moderation.business_moderation_cases latest
+            WHERE latest.business_id = s.id
+            ORDER BY latest.updated_at DESC
+            LIMIT 1
+          ), 'approve') NOT IN ('hide', 'reject')
         LIMIT 1
         "#,
     )
@@ -8325,6 +8332,13 @@ async fn list_umkm_stores(
           AND location.public_visibility = TRUE
           AND location.status = 'active'
       )
+      AND COALESCE((
+        SELECT latest.current_action
+        FROM internal_moderation.business_moderation_cases latest
+        WHERE latest.business_id = umkm_stores.id
+        ORDER BY latest.updated_at DESC
+        LIMIT 1
+      ), 'approve') NOT IN ('hide', 'reject')
     "#;
     let ranking_order = if use_nearest_index {
         // Keep KNN distance as the complete ORDER BY expression. Adding
