@@ -536,8 +536,8 @@ async fn list_crm_businesses(
         Some(value) => value,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
-    if !has_business_moderation_access(&claims) {
-        return err(StatusCode::FORBIDDEN, "business moderation permission required").into_response();
+    if !has_business_read_access(&claims) {
+        return err(StatusCode::FORBIDDEN, "business read permission required").into_response();
     }
 
     let q = normalize_text(query.q, BUSINESS_MAX_QUERY_LEN);
@@ -1094,8 +1094,8 @@ async fn get_business_moderation_history(
         Some(value) => value,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
-    if !has_business_moderation_access(&claims) {
-        return err(StatusCode::FORBIDDEN, "business moderation permission required").into_response();
+    if !has_business_read_access(&claims) {
+        return err(StatusCode::FORBIDDEN, "business read permission required").into_response();
     }
 
     if let Err(response) = load_business(&state, id).await {
@@ -2201,7 +2201,7 @@ async fn mark_crm_notification_read(
         Some(value) => value,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
-    if !has_business_moderation_access(&claims) {
+    if !has_business_notification_access(&claims) {
         return err(StatusCode::FORBIDDEN, "crm notification permission required").into_response();
     }
     let actor_id = match Uuid::parse_str(claims.sub.trim()) {
@@ -2239,7 +2239,7 @@ async fn mark_all_crm_notifications_read(
         Some(value) => value,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
-    if !has_business_moderation_access(&claims) {
+    if !has_business_notification_access(&claims) {
         return err(StatusCode::FORBIDDEN, "crm notification permission required").into_response();
     }
     let actor_id = match Uuid::parse_str(claims.sub.trim()) {
