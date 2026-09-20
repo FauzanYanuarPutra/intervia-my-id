@@ -2226,15 +2226,16 @@ async fn mark_crm_notification_read(
     };
     let updated = sqlx::query(
         r#"
-        UPDATE internal_moderation.crm_notifications
-        SET is_read=TRUE, read_by=$2, read_at=COALESCE(read_at,NOW()), updated_at=NOW()
-        WHERE id=$1
-        RETURNING id, is_read, read_at
+        INSERT INTO internal_moderation.crm_notification_reads
+          (notification_id, user_id, read_at)
+        VALUES ($1,$2,NOW())
+        ON CONFLICT (notification_id, user_id)
+        DO UPDATE SET read_at=EXCLUDED.read_at
+        RETURNING notification_id AS id, TRUE AS is_read, read_at
         "#,
     )
     .bind(id)
-    .bind(actor_id)
-    .fetch_optional(&state.db)
+    .bind(actor_id)    .fetch_optional(&state.db)
     .await;
     match updated {
         Ok(Some(row)) => (StatusCode::OK, Json(json!({
