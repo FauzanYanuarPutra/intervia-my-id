@@ -2148,20 +2148,36 @@ async fn list_crm_notifications(
     if !has_business_notification_access(&claims) {
         return err(StatusCode::FORBIDDEN, "crm notification permission required").into_response();
     }
+    let actor_id = match Uuid::parse_str(claims.sub.trim()) {
+        Ok(value) => value,
+        Err(_) => return err(StatusCode::UNAUTHORIZED, "invalid actor").into_response(),
+    };
     let limit = query.limit.unwrap_or(50).clamp(1, 200);
     let unread_only = query.unread_only.unwrap_or(false);
     let rows = sqlx::query(
         r#"
-        SELECT id, category, event_type, business_id, title, message, data,
-               is_read, read_by, read_at, created_at
-        FROM internal_moderation.crm_notifications
-        WHERE ($1::bool = FALSE OR is_read = FALSE)
-        ORDER BY created_at DESC
+        SELECT n.id, n.category, n.event_type, n.business_id, n.title, n.message, n.data,
+               NOT EXISTS (
+                 SELECT 1
+                 FROM internal_moderation.crm_notification_reads r
+                 WHERE r.notification_id = n.id
+                   AND r.user_id = $3
+               ) AS is_read,
+               n.read_by, n.read_at, n.created_at
+        FROM internal_moderation.crm_notifications n
+        WHERE ($1::bool = FALSE OR NOT EXISTS (
+                 SELECT 1
+                 FROM internal_moderation.crm_notification_reads r
+                 WHERE r.notification_id = n.id
+                   AND r.user_id = $3
+               ))
+        ORDER BY n.created_at DESC
         LIMIT $2
         "#,
     )
     .bind(unread_only)
     .bind(limit)
+    .bind(actor_id)
     .fetch_all(&state.db)
     .await;
 
@@ -2248,10 +2264,17 @@ async fn mark_all_crm_notifications_read(
     };
     match sqlx::query(
         r#"
-        UPDATE internal_moderation.crm_notifications
-        SET is_read=TRUE, read_by=$1, read_at=COALESCE(read_at,NOW()), updated_at=NOW()
-        WHERE is_read=FALSE
-        "#,
+        INSERT INTO internal_moderation.crm_notification_reads
+          (notification_id, user_id, read_at)
+        SELECT n.id, $1, NOW()
+        FROM internal_moderation.crm_notifications n
+        WHERE NOT EXISTS (
+          SELECT 1
+          FROM internal_moderation.crm_notification_reads r
+          WHERE r.notification_id = n.id
+            AND r.user_id = $1
+        )
+        "#
     )
     .bind(actor_id)
     .execute(&state.db)
@@ -2261,7 +2284,6 @@ async fn mark_all_crm_notifications_read(
         Err(_) => err(StatusCode::INTERNAL_SERVER_ERROR, "failed to mark CRM notifications read").into_response(),
     }
 }
-
 async fn review_business_appeal(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
