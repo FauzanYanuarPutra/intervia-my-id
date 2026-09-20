@@ -5,6 +5,7 @@ import {
   businessModerationApi,
   type CrmBusiness,
   type CrmBusinessModerationEvent,
+  type CrmBusinessReference,
 } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 
@@ -110,6 +111,13 @@ function isOverdue(value: string | null) {
 export default function BusinessModerationWorkspace() {
   const { accessToken, user } = useAuth();
   const [businesses, setBusinesses] = useState<CrmBusiness[]>([]);
+  const [references, setReferences] = useState<CrmBusinessReference[]>([]);
+  const [activeTab, setActiveTab] = useState<"businesses" | "references">("businesses");
+  const [referenceStatus, setReferenceStatus] = useState("active");
+  const [referenceDraft, setReferenceDraft] = useState<{
+    reference: CrmBusinessReference;
+    action: "hide" | "restore";
+  } | null>(null);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
   const [loading, setLoading] = useState(true);
@@ -134,8 +142,16 @@ export default function BusinessModerationWorkspace() {
     if (!accessToken) return;
     setLoading(true);
     try {
-      const response = await businessModerationApi.list(accessToken, { limit: "100", q: query });
+      const [response, referenceResponse] = await Promise.all([
+        businessModerationApi.list(accessToken, { limit: "100", q: query }),
+        businessModerationApi.references(accessToken, {
+          limit: "100",
+          q: query,
+          status: referenceStatus,
+        }),
+      ]);
       setBusinesses(response.items || []);
+      setReferences(referenceResponse.items || []);
       setNotice("");
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Data usaha gagal dimuat.");
@@ -146,7 +162,7 @@ export default function BusinessModerationWorkspace() {
 
   useEffect(() => {
     void loadBusinesses();
-  }, [accessToken]);
+  }, [accessToken, referenceStatus]);
 
   const filtered = useMemo(
     () =>
