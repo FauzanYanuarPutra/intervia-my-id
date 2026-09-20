@@ -127,7 +127,7 @@ try {
             return $false
         }
 
-        if ($DockerRecoveryState.AttemptCount -ge 2) {
+        if ($DockerRecoveryState.AttemptCount -ge 4) {
             return $false
         }
 
@@ -139,7 +139,7 @@ try {
         $DockerRecoveryState.Attempted = $true
         $DockerRecoveryState.AttemptCount++
         $DockerRecoveryState.Reason = $Reason
-        Write-Warning "Docker Engine gagal pada saat $Reason. Mencoba satu kali recovery Docker Desktop..."
+        Write-Warning "Docker Engine gagal pada saat $Reason. Mencoba bounded recovery Docker Desktop (attempt $($DockerRecoveryState.AttemptCount)/4)..."
 
         $RestartProbe = Invoke-DockerNative -Arguments @("desktop", "restart", "--timeout", "120")
         if ($RestartProbe.ExitCode -ne 0) {
