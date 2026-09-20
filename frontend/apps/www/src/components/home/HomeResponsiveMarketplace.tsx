@@ -4751,16 +4751,6 @@ function RightRail({
         className="lajukan-home-right-rail-scroll flex h-full max-h-full min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto overflow-x-hidden px-2.5 py-3 overscroll-contain"
         data-auto-scrollbar
       >
-        <GameProgressCard
-          isId={isId}
-          isAuthenticated={isAuthenticated}
-          summary={summary}
-          walletAmountLabel={walletAmountLabel}
-          walletModeLabel={walletModeLabel}
-          walletLoading={walletLoading}
-          compact
-        />
-        <DailyLoginRewardCard locale={locale} compact />
         <section className="lajukan-home-pulse-card flex min-w-0 flex-col overflow-hidden rounded-[20px] border border-[color:var(--app-border)] bg-[linear-gradient(180deg,#ffffff_0%,#f8fffb_100%)] p-3 shadow-[0_18px_36px_-32px_rgba(15,23,42,0.14)] dark:bg-[color:var(--app-surface)]">
           <div className="flex min-w-0 items-start justify-between gap-3">
             <div className="min-w-0">
@@ -5708,7 +5698,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
                 onOpenFilters={openSearchFilters}
               />
               <QuickCategoriesSection isId={isId} />
-              <div className="xl:hidden grid gap-1.5">
+              <div className="grid gap-1.5">
                 <GameProgressCard
                   isId={isId}
                   isAuthenticated={isAuthenticated}
