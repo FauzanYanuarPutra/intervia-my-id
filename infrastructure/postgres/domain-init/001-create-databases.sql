@@ -1,12 +1,23 @@
-CREATE DATABASE profile_db;
-CREATE DATABASE media_db;
-CREATE DATABASE news_db;
-CREATE DATABASE order_db;
-CREATE DATABASE payment_db;
-CREATE DATABASE promotion_db;
-CREATE DATABASE crm_db;
-CREATE DATABASE communication_db;
-CREATE DATABASE trust_db;
-CREATE DATABASE audit_db;
-CREATE DATABASE support_db;
-CREATE DATABASE review_db;
+-- Idempotent domain database provisioning.
+-- profile_db is also POSTGRES_DB, so it already exists on a fresh volume.
+-- psql \gexec executes only the CREATE DATABASE statements that are needed.
+
+SELECT format('CREATE DATABASE %I', db_name)
+FROM (VALUES
+  ('profile_db'),
+  ('media_db'),
+  ('news_db'),
+  ('order_db'),
+  ('payment_db'),
+  ('promotion_db'),
+  ('crm_db'),
+  ('communication_db'),
+  ('trust_db'),
+  ('audit_db'),
+  ('support_db'),
+  ('review_db')
+) AS databases(db_name)
+WHERE NOT EXISTS (
+  SELECT 1 FROM pg_database WHERE datname = databases.db_name
+);
+\gexec
