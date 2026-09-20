@@ -150,14 +150,28 @@ function readNewsIdFromUrl(): string {
   return new URLSearchParams(window.location.search).get('news') || '';
 }
 
-function writeNewsIdUrl(id: string, mode: 'push' | 'replace' = 'push'): void {
+function readNewsStatusFromUrl(): string {
+  if (typeof window === 'undefined') return 'pending_review';
+  const value = new URLSearchParams(window.location.search).get('status') || 'pending_review';
+  return ['pending_review', 'needs_revision', 'published', 'rejected', 'retracted', 'all'].includes(value)
+    ? value
+    : 'pending_review';
+}
+
+function writeNewsUrl(
+  id: string,
+  status: string,
+  mode: 'push' | 'replace' = 'push',
+): void {
   if (typeof window === 'undefined') return;
   const url = new URL(window.location.href);
+  url.searchParams.set('page', 'news');
   if (id) url.searchParams.set('news', id);
   else url.searchParams.delete('news');
+  url.searchParams.set('status', status);
   const next = url.pathname + url.search + url.hash;
-  if (mode === 'replace') window.history.replaceState({ crmNews: id }, '', next);
-  else window.history.pushState({ crmNews: id }, '', next);
+  if (mode === 'replace') window.history.replaceState({ crmNews: id, crmNewsStatus: status }, '', next);
+  else window.history.pushState({ crmNews: id, crmNewsStatus: status }, '', next);
 }
 
 export default function NewsEditorialWorkspace({
@@ -169,7 +183,7 @@ export default function NewsEditorialWorkspace({
   reviewerId: string;
   onBack: () => void;
 }) {
-  const [status, setStatus] = useState('pending_review');
+  const [status, setStatus] = useState(() => readNewsStatusFromUrl());
   const [queueOffset, setQueueOffset] = useState(0);
   const [queueHasMore, setQueueHasMore] = useState(false);
   const [items, setItems] = useState<NewsItem[]>([]);
@@ -327,7 +341,9 @@ export default function NewsEditorialWorkspace({
 
   useEffect(() => {
     setQueueOffset(0);
-    void loadQueue(status, readNewsIdFromUrl(), 0);
+    const id = readNewsIdFromUrl();
+    writeNewsUrl(id, status, 'replace');
+    void loadQueue(status, id, 0);
   }, [loadQueue, status]);
 
   useEffect(() => {
@@ -338,11 +354,14 @@ export default function NewsEditorialWorkspace({
 
   const selectNews = useCallback((id: string, mode: 'push' | 'replace' = 'push') => {
     setSelectedId(id);
-    writeNewsIdUrl(id, mode);
-  }, []);
+    writeNewsUrl(id, status, mode);
+  }, [status]);
 
   useEffect(() => {
-    const handlePopState = () => setSelectedId(readNewsIdFromUrl());
+    const handlePopState = () => {
+      setSelectedId(readNewsIdFromUrl());
+      setStatus(readNewsStatusFromUrl());
+    };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
@@ -567,7 +586,10 @@ export default function NewsEditorialWorkspace({
             <button
               key={value}
               type="button"
-              onClick={() => setStatus(value)}
+              onClick={() => {
+                setStatus(value);
+                writeNewsUrl('', value, 'push');
+              }}
               className={
                 status === value
                   ? 'rounded-full bg-emerald-700 px-4 py-2 text-xs font-black text-white'
