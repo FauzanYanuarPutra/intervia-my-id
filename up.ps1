@@ -378,130 +378,99 @@ try {
         if ($Services.Count -gt 0) {
             $BuildTargets = @($Services)
         }
-
-        $BuildArgs = @("build")
-        if ($BuildTargets.Count -gt 0) {
-            $BuildArgs += $BuildTargets
-        }
-
-        Write-Host "Building Docker images with regular Compose builder (Bake disabled)..." -ForegroundColor Cyan
-        $BuildOriginalParallelLimit = $env:COMPOSE_PARALLEL_LIMIT
-        $env:COMPOSE_PARALLEL_LIMIT = "1"
-        Write-Host "Compose build parallelism: 1" -ForegroundColor DarkGray
-
-        $BuildPreviousErrorActionPreference = $ErrorActionPreference
-        $BuildExitCode = 1
-        try {
-            $ErrorActionPreference = "Continue"
-            & docker @ComposeArgs @BuildArgs
-            $BuildExitCode = $LASTEXITCODE
-        }
-        finally {
-            $ErrorActionPreference = $BuildPreviousErrorActionPreference
-        }
-
-        if ($BuildExitCode -ne 0) {
-            $BuildProbe = Invoke-DockerNative -Arguments @("info", "--format", "{{json .ServerVersion}}")
-            $DockerEngineFailure = $BuildProbe.ExitCode -ne 0
-
-            if ($DockerEngineFailure -and (Invoke-DockerEngineRecovery -Reason "Compose build")) {
-                Write-Warning "Mengulangi Compose build setelah Docker Engine recovery..."
-                $RetryPreviousErrorActionPreference = $ErrorActionPreference
-                try {
-                    $ErrorActionPreference = "Continue"
-                    & docker @ComposeArgs @BuildArgs
-                    $BuildExitCode = $LASTEXITCODE
-                }
-                finally {
-                    $ErrorActionPreference = $RetryPreviousErrorActionPreference
-                }
-
-                # If the engine fell over again, switch from one full-stack
-                # invocation to a deterministic one-service-at-a-time build.
-                if ($BuildExitCode -ne 0) {
-                    $RetryProbe = Invoke-DockerNative -Arguments @("info", "--format", "{{json .ServerVersion}}")
-                    if ($RetryProbe.ExitCode -ne 0) {
-                        Write-Warning "Docker Engine kembali tidak sehat. Beralih ke fallback build service-by-service..."
-                        $ServiceProbeArgs = @($ComposeArgs + @("config", "--format", "json"))
-                        $ServiceProbe = Invoke-DockerNative -Arguments $ServiceProbeArgs
-                        if ($ServiceProbe.ExitCode -ne 0) {
-                            throw "Docker Compose gagal membaca konfigurasi service untuk fallback build."
-                        }
-
-                        $FallbackServices = @()
-                        try {
-                            $ResolvedCompose = ($ServiceProbe.Output -join [Environment]::NewLine) | ConvertFrom-Json
-                            $FallbackServices = @(
-                                $ResolvedCompose.services.psobject.Properties |
-                                    Where-Object { $null -ne $_.Value.build } |
-                                    ForEach-Object { $_.Name }
-                            )
-                        }
-                        catch {
-                            throw "Konfigurasi Compose tidak dapat diparse untuk menentukan service build."
-                        }
-                        if ($BuildTargets.Count -gt 0) {
-                            $FallbackServices = @($BuildTargets)
-                        }
-                        if ($FallbackServices.Count -eq 0) {
-                            throw "Tidak ada service build yang dapat digunakan sebagai fallback."
-                        }
-
-                        foreach ($ServiceName in $FallbackServices) {
-                            $PreServiceProbe = Invoke-DockerNative -Arguments @("info", "--format", "{{json .ServerVersion}}")
-                            if ($PreServiceProbe.ExitCode -ne 0) {
-                                if (-not (Invoke-DockerEngineRecovery -Reason "fallback build $ServiceName")) {
-                                    throw "Docker Engine tidak sehat sebelum fallback build service '$ServiceName'."
-                                }
-                            }
-
-                            Write-Host "Fallback build: $ServiceName" -ForegroundColor Cyan
-                            $ServiceBuildArgs = @("build", $ServiceName)
-                            $ServicePreviousErrorActionPreference = $ErrorActionPreference
-                            $ServiceExitCode = 1
-                            try {
-                                $ErrorActionPreference = "Continue"
-                                & docker @ComposeArgs @ServiceBuildArgs
-                                $ServiceExitCode = $LASTEXITCODE
-                            }
-                            finally {
-                                $ErrorActionPreference = $ServicePreviousErrorActionPreference
-                            }
-
-                            if ($ServiceExitCode -ne 0) {
-                                $ServiceProbe = Invoke-DockerNative -Arguments @("info", "--format", "{{json .ServerVersion}}")
-                                if ($ServiceProbe.ExitCode -ne 0) {
-                                    if (Invoke-DockerEngineRecovery -Reason "retry fallback build $ServiceName") {
-                                        try {
-                                            $ErrorActionPreference = "Continue"
-                                            & docker @ComposeArgs @ServiceBuildArgs
-                                            $ServiceExitCode = $LASTEXITCODE
-                                        }
-                                        finally {
-                                            $ErrorActionPreference = $ServicePreviousErrorActionPreference
-                                        }
-                                    }
-                                }
-
-                                if ($ServiceExitCode -ne 0) {
-                                    throw "Fallback Docker Compose build gagal pada service '$ServiceName' (exit code $ServiceExitCode)."
-                                }
-                            }
-                        }
-
-                        $BuildExitCode = 0
+        else {
+            # Resolve only services that define build sections. Building one
+            # service per Compose invocation avoids opening the entire BuildKit
+            # graph against Docker Desktop at once.
+            $ServiceProbeArgs = @($ComposeArgs + @("config", "--format", "json"))
+            $ServiceProbe = Invoke-DockerNative -Arguments $ServiceProbeArgs
+            if ($ServiceProbe.ExitCode -ne 0) {
+                $ServiceProbeText = ($ServiceProbe.Output -join [Environment]::NewLine)
+                if (Test-DockerEngineFailure -OutputText $ServiceProbeText) {
+                    if (-not (Invoke-DockerEngineRecovery -Reason "resolve build services")) {
+                        throw "Docker Engine tidak sehat saat menentukan service build."
                     }
+                    $ServiceProbe = Invoke-DockerNative -Arguments $ServiceProbeArgs
                 }
+            }
+            if ($ServiceProbe.ExitCode -ne 0) {
+                throw "Docker Compose gagal membaca daftar service build sebelum build dimulai."
+            }
+            try {
+                $ResolvedCompose = ($ServiceProbe.Output -join [Environment]::NewLine) | ConvertFrom-Json
+                $BuildTargets = @(
+                    $ResolvedCompose.services.psobject.Properties |
+                        Where-Object { $null -ne $_.Value.build } |
+                        ForEach-Object { $_.Name }
+                )
+            }
+            catch {
+                throw "Konfigurasi Compose tidak dapat diparse untuk menentukan service build."
             }
         }
 
-        $env:COMPOSE_PARALLEL_LIMIT = $BuildOriginalParallelLimit
-
-        if ($BuildExitCode -ne 0) {
-            throw "Docker Compose build gagal (exit code $BuildExitCode). Periksa error build di atas."
+        if ($BuildTargets.Count -eq 0) {
+            Write-Host "Tidak ada service build yang dipilih; melewati tahap image build." -ForegroundColor Yellow
         }
+        else {
+            Write-Host "Building Docker images service-by-service (Bake disabled, deterministic mode)..." -ForegroundColor Cyan
+            $BuildOriginalParallelLimit = $env:COMPOSE_PARALLEL_LIMIT
+            $env:COMPOSE_PARALLEL_LIMIT = "1"
+            Write-Host "Compose build parallelism: 1" -ForegroundColor DarkGray
 
-        Write-Host "Docker image build completed successfully." -ForegroundColor Green
+            try {
+                foreach ($ServiceName in $BuildTargets) {
+                    $ServiceBuilt = $false
+                    for ($ServiceAttempt = 1; $ServiceAttempt -le 3; $ServiceAttempt++) {
+                        $PreBuildProbe = Invoke-DockerNative -Arguments @("info", "--format", "{{json .ServerVersion}}")
+                        if ($PreBuildProbe.ExitCode -ne 0) {
+                            if (-not (Invoke-DockerEngineRecovery -Reason "pre-build $ServiceName")) {
+                                $Details = ($PreBuildProbe.Output -join " ").Trim()
+                                throw "Docker Engine tidak sehat sebelum build service '$ServiceName': $Details"
+                            }
+                        }
+
+                        Write-Host "Building service [$ServiceName] (attempt $ServiceAttempt/3)..." -ForegroundColor Cyan
+                        $ServiceBuildArgs = @("build", $ServiceName)
+                        $ServiceBuildProbe = Invoke-DockerNative -Arguments (@($ComposeArgs) + $ServiceBuildArgs)
+                        $ServiceBuildOutput = @($ServiceBuildProbe.Output)
+                        $ServiceBuildExitCode = $ServiceBuildProbe.ExitCode
+                        $ServiceBuildOutput | ForEach-Object { Write-Output $_ }
+
+                        if ($ServiceBuildExitCode -eq 0) {
+                            $ServiceBuilt = $true
+                            Write-Host "Service [$ServiceName] image build completed." -ForegroundColor Green
+                            break
+                        }
+
+                        $ServiceBuildText = ($ServiceBuildOutput -join [Environment]::NewLine)
+                        $EngineFailure = Test-DockerEngineFailure -OutputText $ServiceBuildText
+                        $PostBuildProbe = Invoke-DockerNative -Arguments @("info", "--format", "{{json .ServerVersion}}")
+                        if ($PostBuildProbe.ExitCode -ne 0) {
+                            $EngineFailure = $true
+                        }
+
+                        if ($EngineFailure -and $ServiceAttempt -lt 3) {
+                            if (Invoke-DockerEngineRecovery -Reason "build service $ServiceName") {
+                                Write-Warning "Docker Engine dipulihkan; mengulang build service [$ServiceName]..."
+                                continue
+                            }
+                        }
+
+                        throw "Docker Compose build gagal pada service '$ServiceName' (exit code $ServiceBuildExitCode). Periksa error build di atas."
+                    }
+
+                    if (-not $ServiceBuilt) {
+                        throw "Service '$ServiceName' tidak berhasil dibangun setelah recovery attempts."
+                    }
+                }
+            }
+            finally {
+                $env:COMPOSE_PARALLEL_LIMIT = $BuildOriginalParallelLimit
+            }
+
+            Write-Host "Docker image build completed successfully for $($BuildTargets.Count) services." -ForegroundColor Green
+        }
     }
 
     $UpArgs = @("up", "-d", "--remove-orphans", "--wait", "--wait-timeout", "420")
