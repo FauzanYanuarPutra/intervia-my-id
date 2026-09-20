@@ -925,6 +925,140 @@ async fn get_business_moderation_history(
         }
     };
 
+    let reports = match sqlx::query(
+        r#"
+        SELECT id, reporter_user_id, reason_code, details, status, created_at, updated_at
+        FROM internal_moderation.business_reports
+        WHERE business_id = $1
+        ORDER BY created_at DESC
+        LIMIT 100
+        "#,
+    )
+    .bind(id)
+    .fetch_all(&state.db)
+    .await
+    {
+        Ok(rows) => rows
+            .into_iter()
+            .map(|row| json!({
+                "id": row.get::<Uuid,_>("id"),
+                "reporter_user_id": row.get::<Uuid,_>("reporter_user_id"),
+                "reason_code": row.get::<String,_>("reason_code"),
+                "details": row.get::<Option<String>,_>("details"),
+                "status": row.get::<String,_>("status"),
+                "created_at": row.get::<DateTime<Utc>,_>("created_at"),
+                "updated_at": row.get::<DateTime<Utc>,_>("updated_at")
+            }))
+            .collect::<Vec<_>>(),
+        Err(error) => {
+            tracing::error!("business reports history error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load business reports").into_response();
+        }
+    };
+
+    let appeals = match sqlx::query(
+        r#"
+        SELECT id, case_id, appellant_user_id, reason, evidence, status,
+               reviewer_id, reviewer_note, created_at, updated_at, resolved_at
+        FROM internal_moderation.business_appeals
+        WHERE business_id = $1
+        ORDER BY created_at DESC
+        LIMIT 100
+        "#,
+    )
+    .bind(id)
+    .fetch_all(&state.db)
+    .await
+    {
+        Ok(rows) => rows
+            .into_iter()
+            .map(|row| json!({
+                "id": row.get::<Uuid,_>("id"),
+                "case_id": row.get::<Uuid,_>("case_id"),
+                "appellant_user_id": row.get::<Uuid,_>("appellant_user_id"),
+                "reason": row.get::<String,_>("reason"),
+                "evidence": row.get::<Value,_>("evidence"),
+                "status": row.get::<String,_>("status"),
+                "reviewer_id": row.get::<Option<Uuid>,_>("reviewer_id"),
+                "reviewer_note": row.get::<Option<String>,_>("reviewer_note"),
+                "created_at": row.get::<DateTime<Utc>,_>("created_at"),
+                "updated_at": row.get::<DateTime<Utc>,_>("updated_at"),
+                "resolved_at": row.get::<Option<DateTime<Utc>>,_>("resolved_at")
+            }))
+            .collect::<Vec<_>>(),
+        Err(error) => {
+            tracing::error!("business appeals history error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load business appeals").into_response();
+        }
+    };
+
+    let evidence = match sqlx::query(
+        r#"
+        SELECT e.id, e.case_id, e.added_by, e.evidence_type, e.label,
+               e.source_url, e.note, e.metadata, e.created_at
+        FROM internal_moderation.business_moderation_evidence e
+        JOIN internal_moderation.business_moderation_cases c ON c.id=e.case_id
+        WHERE c.business_id = $1
+        ORDER BY e.created_at DESC
+        LIMIT 200
+        "#,
+    )
+    .bind(id)
+    .fetch_all(&state.db)
+    .await
+    {
+        Ok(rows) => rows
+            .into_iter()
+            .map(|row| json!({
+                "id": row.get::<Uuid,_>("id"),
+                "case_id": row.get::<Uuid,_>("case_id"),
+                "added_by": row.get::<Uuid,_>("added_by"),
+                "evidence_type": row.get::<String,_>("evidence_type"),
+                "label": row.get::<String,_>("label"),
+                "source_url": row.get::<Option<String>,_>("source_url"),
+                "note": row.get::<Option<String>,_>("note"),
+                "metadata": row.get::<Value,_>("metadata"),
+                "created_at": row.get::<DateTime<Utc>,_>("created_at")
+            }))
+            .collect::<Vec<_>>(),
+        Err(error) => {
+            tracing::error!("business evidence history error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load business evidence").into_response();
+        }
+    };
+
+    let verification = sqlx::query(
+        r#"
+        SELECT id, status, method, requested_at, reviewed_at, reviewed_by,
+               review_reason, evidence, metadata, updated_at
+        FROM internal_moderation.business_verifications
+        WHERE business_id=$1
+        ORDER BY updated_at DESC
+        LIMIT 1
+        "#,
+    )
+    .bind(id)
+    .fetch_optional(&state.db)
+    .await
+    {
+        Ok(row) => row.map(|row| json!({
+            "id": row.get::<Uuid,_>("id"),
+            "status": row.get::<String,_>("status"),
+            "method": row.get::<Option<String>,_>("method"),
+            "requested_at": row.get::<Option<DateTime<Utc>>,_>("requested_at"),
+            "reviewed_at": row.get::<Option<DateTime<Utc>>,_>("reviewed_at"),
+            "reviewed_by": row.get::<Option<Uuid>,_>("reviewed_by"),
+            "review_reason": row.get::<Option<String>,_>("review_reason"),
+            "evidence": row.get::<Value,_>("evidence"),
+            "metadata": row.get::<Value,_>("metadata"),
+            "updated_at": row.get::<DateTime<Utc>,_>("updated_at")
+        })),
+        Err(error) => {
+            tracing::error!("business verification history error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load business verification").into_response();
+        }
+    };
+
     let events = match sqlx::query(
         r#"
         SELECT id, case_id, actor_id, action, reason_code, reason_note, severity,
@@ -974,7 +1108,11 @@ async fn get_business_moderation_history(
         StatusCode::OK,
         Json(json!({
             "cases": cases,
-            "events": events
+            "events": events,
+            "reports": reports,
+            "appeals": appeals,
+            "evidence": evidence,
+            "verification": verification
         })),
     )
         .into_response()
