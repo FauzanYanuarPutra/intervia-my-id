@@ -184,6 +184,52 @@ export type SuperAppOrderDetail = {
   }>;
 };
 
+export type CrmBusiness = {
+  id: string;
+  owner_user_id: string;
+  organization_id: string | null;
+  name: string;
+  slug: string;
+  description: string | null;
+  city: string;
+  address: string;
+  lat: number;
+  lng: number;
+  phone: string | null;
+  is_active: boolean;
+  online_order_enabled: boolean;
+  offline_order_enabled: boolean;
+  metadata: JsonRecord;
+  created_at: string;
+  updated_at: string;
+  review_state: 'unreviewed' | 'approved' | 'needs_completion' | 'hidden' | 'under_review' | 'escalated' | string;
+  current_action: string | null;
+  current_reason_code: string | null;
+  current_reason_note: string | null;
+  moderation_status: string | null;
+  moderation_severity: string | null;
+  missing_fields: string[];
+  completeness_percent: number;
+  image_urls: string[];
+};
+
+export type CrmBusinessModerationEvent = {
+  id: string;
+  case_id: string;
+  actor_id: string | null;
+  action: string;
+  reason_code: string;
+  reason_note: string | null;
+  severity: string;
+  previous_status: string | null;
+  new_status: string | null;
+  missing_fields: string[];
+  business_snapshot: JsonRecord;
+  legal_hold: boolean;
+  created_at: string;
+};
+
+
 export type IdentityPublicProfile = {
   id: string;
   username?: string | null;
@@ -654,6 +700,49 @@ export const superAppApi = {
         token,
         body: JSON.stringify(data),
       },
+    );
+  },
+};
+
+export const businessModerationApi = {
+  list: async (
+    token: string,
+    params: { q?: string; city?: string; limit?: string; offset?: string } = {},
+  ) => {
+    const query = new URLSearchParams(
+      Object.fromEntries(Object.entries(params).filter(([, value]) => value)),
+    ).toString();
+    return fetchJson<{ items: CrmBusiness[]; limit: number; offset: number; has_more: boolean }>(
+      `${MARKETPLACE_URL}/v1/crm/businesses${query ? `?${query}` : ''}`,
+      { method: 'GET', token },
+    );
+  },
+
+  history: async (token: string, id: string) => {
+    return fetchJson<{
+      cases: Array<JsonRecord>;
+      events: CrmBusinessModerationEvent[];
+    }>(
+      `${MARKETPLACE_URL}/v1/crm/businesses/${encodeURIComponent(id)}/moderation/history`,
+      { method: 'GET', token },
+    );
+  },
+
+  moderate: async (
+    token: string,
+    id: string,
+    data: {
+      action: 'approve' | 'restore' | 'request_completion' | 'hide' | 'reject' | 'escalate';
+      reason_code: string;
+      reason_note?: string;
+      missing_fields?: string[];
+      severity?: 'low' | 'medium' | 'high' | 'critical';
+      legal_hold?: boolean;
+    },
+  ) => {
+    return fetchJson(
+      `${MARKETPLACE_URL}/v1/crm/businesses/${encodeURIComponent(id)}/moderate`,
+      { method: 'POST', token, body: JSON.stringify(data) },
     );
   },
 };
