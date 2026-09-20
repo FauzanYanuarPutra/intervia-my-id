@@ -101,6 +101,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }> = [
     { path: '/home', priority: 1.0, changeFrequency: 'daily' },
     { path: '/explore', priority: 0.96, changeFrequency: 'daily' },
+    { path: '/umkm', priority: 0.94, changeFrequency: 'daily' },
     ...LAJUKAN_EXPLORE_CATEGORIES.map(category => ({
       path: `/explore/${category.slug}`,
       priority: 0.9,
