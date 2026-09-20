@@ -9,7 +9,8 @@ export type PageId =
   | 'chat'
   | 'analytics'
   | 'disputes'
-  | 'settings';
+  | 'settings'
+  | 'guide';
 
 export type IconName =
   | 'analytics'
@@ -27,7 +28,8 @@ export type IconName =
   | 'transactions'
   | 'users'
   | 'businesses'
-  | 'news';
+  | 'news'
+  | 'guide';
 
 export type CrmNavItem = {
   id: PageId;
