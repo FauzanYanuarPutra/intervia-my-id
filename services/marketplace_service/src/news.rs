@@ -1536,7 +1536,10 @@ async fn update_news_submission(
         Some(value) => {
             let value = value.trim().to_string();
             if value.is_empty() || value.len() > 60_000 {
-                return response_error(StatusCode::BAD_REQUEST, "rich body must be 1-60000 characters");
+                return response_error(
+                    StatusCode::BAD_REQUEST,
+                    "rich body must be 1-60000 characters",
+                );
             }
             Some(value)
         }
@@ -1861,7 +1864,10 @@ async fn edit_news_editorial(
     };
 
     let current_status = editorial_status(&current.content_status, &current.metadata);
-    if !matches!(current_status.as_str(), "pending_review" | "needs_revision" | "published") {
+    if !matches!(
+        current_status.as_str(),
+        "pending_review" | "needs_revision" | "published"
+    ) {
         return response_error(
             StatusCode::CONFLICT,
             "this editorial status cannot be edited from CMS",
@@ -1880,10 +1886,7 @@ async fn edit_news_editorial(
         );
     }
     if action == "correct" && note.is_none() {
-        return response_error(
-            StatusCode::BAD_REQUEST,
-            "correction note is required",
-        );
+        return response_error(StatusCode::BAD_REQUEST, "correction note is required");
     }
 
     let title = trimmed(payload.title).unwrap_or_else(|| current.title.clone());
@@ -1906,10 +1909,7 @@ async fn edit_news_editorial(
     }
     let body = trimmed(payload.body).unwrap_or_else(|| current.body.clone());
     if body.len() < 120 || body.len() > 20_000 {
-        return response_error(
-            StatusCode::BAD_REQUEST,
-            "body must be 120-20000 characters",
-        );
+        return response_error(StatusCode::BAD_REQUEST, "body must be 120-20000 characters");
     }
 
     let requested_topics = match payload.topics {
@@ -2080,12 +2080,8 @@ async fn edit_news_editorial(
             "news and analysis require at least one valid public source URL",
         );
     }
-    if let Err(message) = validate_submission_payload(
-        &title,
-        summary.as_deref(),
-        &body,
-        &metadata,
-    ) {
+    if let Err(message) = validate_submission_payload(&title, summary.as_deref(), &body, &metadata)
+    {
         return response_error(StatusCode::BAD_REQUEST, message);
     }
 
