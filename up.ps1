@@ -414,7 +414,9 @@ try {
 
     if ($UpExitCode -ne 0 -and $DockerEngineFailure) {
         if (Invoke-DockerEngineRecovery -Reason "Compose up") {
-            Write-Warning "Mengulangi Compose up setelah recovery Docker Engine..."
+            Write-Warning "Mengulangi Compose up dengan paralelisme 1 setelah recovery Docker Engine..."
+            $OriginalParallelLimit = $env:COMPOSE_PARALLEL_LIMIT
+            $env:COMPOSE_PARALLEL_LIMIT = "1"
             $RetryPreviousErrorActionPreference = $ErrorActionPreference
             try {
                 $ErrorActionPreference = "Continue"
@@ -423,6 +425,7 @@ try {
             }
             finally {
                 $ErrorActionPreference = $RetryPreviousErrorActionPreference
+                $env:COMPOSE_PARALLEL_LIMIT = $OriginalParallelLimit
             }
         }
     }
