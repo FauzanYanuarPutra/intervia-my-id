@@ -1,4 +1,4 @@
-import type { CrmLead, SuperAppOrder, SuperAppTrustProfile, SupportTicket } from '@/lib/api';
+import type { CrmBusiness, CrmLead, SuperAppOrder, SuperAppTrustProfile, SupportTicket } from '@/lib/api';
 export type UnknownRecord = Record<string, unknown>;
 export type CrmKpi={label:string;value:string;note:string;trend:string;tone:'green'|'blue'|'amber'|'rose'};
 export type ChartPoint={label:string;value:number};
@@ -8,4 +8,4 @@ export type CrmTransactionRow={id:string;buyer:string;seller:string;amountCents:
 export type CrmChatRow={id:string;name:string;lastMessage:string;stage:'Hot'|'Warm'|'Cold';source:string;listingTitle:string;updatedAt:string;unread:number};
 export type CrmActivityRow={id:string;title:string;body:string;type:'user'|'listing'|'chat'|'transaction'|'dispute'|'done';at:string};
 export type CrmInsight={title:string;body:string;tone:'green'|'blue'|'amber'};
-export type DashboardData={leads:CrmLead[];activities:CrmActivityRow[];tickets:SupportTicket[];orders:SuperAppOrder[];trustProfiles:SuperAppTrustProfile[];users:CrmUserRow[];listings:CrmListingRow[];chats:CrmChatRow[];sampleCollections:string[];emptyCollections:string[];failures:string[]};
+export type DashboardData={leads:CrmLead[];activities:CrmActivityRow[];tickets:SupportTicket[];orders:SuperAppOrder[];trustProfiles:SuperAppTrustProfile[];users:CrmUserRow[];listings:CrmListingRow[];businesses:CrmBusiness[];chats:CrmChatRow[];sampleCollections:string[];emptyCollections:string[];failures:string[]};
