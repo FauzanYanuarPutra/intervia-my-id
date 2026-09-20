@@ -64,6 +64,9 @@ export function financeEntrySignedCashEffect(entry: FinanceEntryLike) {
   if (!liquidAccounts.has(accountKey)) return 0;
 
   const effectSign = entry.effect_sign === -1 ? -1 : 1;
+  if (entry.entry_type === 'opening_balance' || entry.entry_type === 'account_transfer') {
+    return amount * effectSign;
+  }
   if (cashInTypes.has(entry.entry_type)) return amount * effectSign;
   if (cashOutTypes.has(entry.entry_type)) return -amount * effectSign;
   return 0;
@@ -91,7 +94,9 @@ export function summarizeFinanceEntries(entries: FinanceEntryLike[]) {
     else if (inventoryPurchaseTypes.has(entry.entry_type)) inventoryPurchases += signedAmount;
     else if (operatingExpenseTypes.has(entry.entry_type)) operatingExpenses += signedAmount;
 
-    cashMovement += financeEntrySignedCashEffect(entry);
+    if (entry.entry_type !== 'opening_balance') {
+      cashMovement += financeEntrySignedCashEffect(entry);
+    }
   }
 
   const operatingProfitBeforeCogs = revenue + otherIncome - operatingExpenses;
