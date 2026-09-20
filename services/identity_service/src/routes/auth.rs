@@ -49,6 +49,7 @@ use cookie::time::Duration as CookieDuration;
 const MAX_LOGIN_ATTEMPTS: i16 = 5;
 const LOCKOUT_DURATION_MINUTES: i64 = 15;
 const ACCESS_TOKEN_EXP_HOURS: i64 = 1; // short lived
+#[allow(dead_code)]
 const CACHE_TTL_SECONDS: u64 = 600; // 10 minutes roles cache (u64 to match redis set_ex expectation)
 const REFRESH_TOKEN_LENGTH: usize = 64; // chars for opaque token
 const REFRESH_TOKEN_MIN_BYTES: usize = 32;
@@ -614,6 +615,7 @@ async fn get_roles_permissions_from_db(
     })
 }
 
+#[allow(dead_code)]
 async fn get_roles_permissions_cached(
     state: &Arc<AppState>,
     user_id: Uuid,
