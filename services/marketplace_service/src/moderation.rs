@@ -697,7 +697,8 @@ pub async fn moderate_content(
         Ok(value) => value,
         Err(error) => {
             tracing::error!("moderate_content case create error: {:?}", error);
-            return err(                StatusCode::INTERNAL_SERVER_ERROR,
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
                 "failed to create moderation case",
             )
             .into_response();
