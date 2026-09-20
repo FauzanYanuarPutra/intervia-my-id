@@ -899,6 +899,7 @@ pub async fn get_me_profile(
         phone_verified,
     );
     let verification = merged_verification_payload(Some(&metadata), &verification_state);
+    let current_roles_permissions = get_current_roles_permissions(&state, id).await;
 
     (
         StatusCode::OK,
@@ -923,8 +924,8 @@ pub async fn get_me_profile(
             "created_at": created_at,
             "has_password": has_password,
             "hasPassword": has_password,
-            "roles": claims.roles,
-            "permissions": claims.perms
+            "roles": current_roles_permissions.0.unwrap_or_else(|| claims.roles.clone()),
+            "permissions": current_roles_permissions.1.unwrap_or_else(|| claims.perms.clone())
         })),
     )
         .into_response()
