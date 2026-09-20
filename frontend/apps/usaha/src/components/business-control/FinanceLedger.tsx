@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { RupiahInput } from '@/components/forms/RupiahInput';
 import {
   ArrowDownLeft,
   ArrowLeftRight,
@@ -520,7 +521,12 @@ export function FinanceLedger({ businessId, initialEntries, channels = [] }: Pro
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="text-xs font-semibold text-portal-soft">
                 Nominal
-                <input type="number" min="1" inputMode="numeric" value={allocationAmount} onChange={event => setAllocationAmount(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3" />
+                  <RupiahInput
+                    min={1}
+                    value={allocationAmount ? Number(allocationAmount) : null}
+                    onValueChange={value => setAllocationAmount(value == null ? '' : String(value))}
+                    className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3"
+                  />
               </label>
               <label className="text-xs font-semibold text-portal-soft">
                 Alasan
@@ -565,7 +571,13 @@ export function FinanceLedger({ businessId, initialEntries, channels = [] }: Pro
             </div>
             <label className="text-xs font-semibold text-portal-soft">
               Nominal
-              <input inputMode="numeric" type="number" min="1" className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-base font-bold text-portal-ink" placeholder="Contoh: 120000" value={entryAmount} onChange={event => setEntryAmount(event.target.value)} />
+              <RupiahInput
+                min={1}
+                value={entryAmount ? Number(entryAmount) : null}
+                onValueChange={value => setEntryAmount(value == null ? '' : String(value))}
+                className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-base font-bold text-portal-ink"
+                placeholder="120.000"
+              />
             </label>
             <div>
               <p className="mb-1.5 text-xs font-semibold text-portal-soft">Kantong</p>
@@ -640,7 +652,7 @@ export function FinanceLedger({ businessId, initialEntries, channels = [] }: Pro
                     <div className="flex items-center justify-between"><div className="flex items-center gap-2"><History className="h-4 w-4 text-portal-forest" /><p className="text-xs font-black text-portal-ink">Koreksi tanpa menghapus histori</p></div><button type="button" onClick={() => setCorrectingId(null)} className="p-1 text-portal-soft"><X className="h-4 w-4" /></button></div>
                     <div className="mt-3 grid grid-cols-2 gap-2"><button type="button" onClick={() => setCorrectionMode('correct')} className={correctionMode === 'correct' ? 'portal-button-primary justify-center' : 'portal-button-secondary justify-center'}><PencilLine className="h-4 w-4" /> Perbaiki</button><button type="button" onClick={() => setCorrectionMode('void')} className={correctionMode === 'void' ? 'portal-button-primary justify-center' : 'portal-button-secondary justify-center'}><RotateCcw className="h-4 w-4" /> Batalkan</button></div>
                     <label className="mt-3 block text-xs font-semibold text-portal-soft">Alasan wajib<input value={correctionReason} onChange={event => setCorrectionReason(event.target.value)} placeholder="Contoh: nominal salah input" className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3" /></label>
-                    {correctionMode === 'correct' ? <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3"><label className="text-xs font-semibold text-portal-soft">Kategori<select value={correctionType} onChange={event => setCorrectionType(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3">{[...financeEntryOptions('in'), ...financeEntryOptions('out')].filter((choice, index, all) => all.findIndex(item => item.value === choice.value) === index).map(choice => <option key={choice.value} value={choice.value}>{choice.label}</option>)}</select></label><label className="text-xs font-semibold text-portal-soft">Nominal<input type="number" min="1" value={correctionAmount} onChange={event => setCorrectionAmount(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3" /></label><div className="text-xs font-semibold text-portal-soft">Akun<div className="mt-1"><ChoiceChips value={correctionAccount} onChange={setCorrectionAccount} ariaLabel="Akun pengganti" options={accountOptions} /></div></div><label className="text-xs font-semibold text-portal-soft">Tanggal<input type="date" value={correctionDate} onChange={event => setCorrectionDate(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3" /></label><div className="text-xs font-semibold text-portal-soft">Kantong<div className="mt-1"><ChoiceChips value={correctionBucket} onChange={setCorrectionBucket} ariaLabel="Kantong pengganti" options={allocationOptions} /></div></div><label className="text-xs font-semibold text-portal-soft">Catatan<input value={correctionNote} onChange={event => setCorrectionNote(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3" /></label></div> : <p className="mt-3 text-xs leading-5 text-portal-soft">Sistem membuat reversal penuh. Baris asli tetap ada dan ditandai dibatalkan.</p>}
+<RupiahInput min={1} value={correctionAmount ? Number(correctionAmount) : null} onValueChange={value => setCorrectionAmount(value == null ? '' : String(value))} className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3" />
                     <div className="mt-3">
                       <EffectPreview
                         ariaLabel="Dampak koreksi"
