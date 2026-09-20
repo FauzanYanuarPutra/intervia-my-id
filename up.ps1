@@ -226,8 +226,8 @@ try {
     # stable concurrency budget without changing repository Compose semantics.
     $env:COMPOSE_PARALLEL_LIMIT = $ParallelLimit.ToString()
 
-    & docker compose version *> $null
-    if ($LASTEXITCODE -ne 0) {
+    $ComposeVersionProbe = Invoke-DockerNative -Arguments @("compose", "version")
+    if ($ComposeVersionProbe.ExitCode -ne 0) {
         throw "Docker Compose v2 ('docker compose') tidak tersedia."
     }
 
@@ -365,41 +365,45 @@ try {
         }
 
         Write-Host "Building Docker images..." -ForegroundColor Cyan
-        $BuildLogPath = Join-Path ([System.IO.Path]::GetTempPath()) "lajukan-up-build-$PID.log"
-        $BuildCommandArgs = @($ComposeArgs + $BuildArgs)
-        Remove-Item -LiteralPath $BuildLogPath -Force -ErrorAction SilentlyContinue
-        & docker @BuildCommandArgs 2>&1 | Tee-Object -FilePath $BuildLogPath
-        $BuildExitCode = $LASTEXITCODE
-
-        $BuildOutputText = ""
-        if (Test-Path -LiteralPath $BuildLogPath) {
-            $BuildOutputText = Get-Content -LiteralPath $BuildLogPath -Raw -ErrorAction SilentlyContinue
+        $BuildPreviousErrorActionPreference = $ErrorActionPreference
+        $BuildExitCode = 1
+        try {
+            $ErrorActionPreference = "Continue"
+            & docker @ComposeArgs @BuildArgs
+            $BuildExitCode = $LASTEXITCODE
         }
-        $DockerEngineFailure =
-            $BuildExitCode -ne 0 -and (Test-DockerEngineFailure -OutputText $BuildOutputText)
+        finally {
+            $ErrorActionPreference = $BuildPreviousErrorActionPreference
+        }
 
-        if ($BuildExitCode -ne 0 -and $DockerEngineFailure) {
-            $OriginalParallelLimit = $env:COMPOSE_PARALLEL_LIMIT
-            if (Invoke-DockerEngineRecovery -Reason "Compose build") {
-                Write-Warning "Mengulangi Compose build dengan paralelisme 1 untuk mengurangi beban Docker Desktop..."
-                $env:COMPOSE_PARALLEL_LIMIT = "1"
-                try {
-                    $RetryCommandArgs = @($ComposeArgs + $BuildArgs)
-                    & docker @RetryCommandArgs 2>&1 | Tee-Object -FilePath $BuildLogPath
-                    $BuildExitCode = $LASTEXITCODE
-                }
-                finally {
-                    $env:COMPOSE_PARALLEL_LIMIT = $OriginalParallelLimit
+        if ($BuildExitCode -ne 0) {
+            $BuildProbe = Invoke-DockerNative -Arguments @("info", "--format", "{{json .ServerVersion}}")
+            $DockerEngineFailure = $BuildProbe.ExitCode -ne 0
+
+            if ($DockerEngineFailure) {
+                $OriginalParallelLimit = $env:COMPOSE_PARALLEL_LIMIT
+                if (Invoke-DockerEngineRecovery -Reason "Compose build") {
+                    Write-Warning "Mengulangi Compose build dengan paralelisme 1 setelah Docker Engine recovery..."
+                    $env:COMPOSE_PARALLEL_LIMIT = "1"
+                    $RetryPreviousErrorActionPreference = $ErrorActionPreference
+                    try {
+                        $ErrorActionPreference = "Continue"
+                        & docker @ComposeArgs @BuildArgs
+                        $BuildExitCode = $LASTEXITCODE
+                    }
+                    finally {
+                        $ErrorActionPreference = $RetryPreviousErrorActionPreference
+                        $env:COMPOSE_PARALLEL_LIMIT = $OriginalParallelLimit
+                    }
                 }
             }
         }
 
         if ($BuildExitCode -ne 0) {
-            Write-Error "Docker Compose build gagal (exit code $BuildExitCode). Log: $BuildLogPath"
-            exit $BuildExitCode
+            throw "Docker Compose build gagal (exit code $BuildExitCode). Periksa error build di atas."
         }
+
         Write-Host "Docker image build completed successfully." -ForegroundColor Green
-        Remove-Item -LiteralPath $BuildLogPath -Force -ErrorAction SilentlyContinue
     }
 
     $UpArgs = @("up", "-d", "--remove-orphans", "--wait", "--wait-timeout", "420")
@@ -413,38 +417,42 @@ try {
     }
 
     Write-Host "Starting Docker Compose services..." -ForegroundColor Cyan
-    $UpLogPath = Join-Path ([System.IO.Path]::GetTempPath()) "lajukan-up-start-$PID.log"
-    $UpCommandArgs = @($ComposeArgs + $UpArgs)
-    Remove-Item -LiteralPath $UpLogPath -Force -ErrorAction SilentlyContinue
-    & docker @UpCommandArgs 2>&1 | Tee-Object -FilePath $UpLogPath
-    $UpExitCode = $LASTEXITCODE
-
-    $UpOutputText = ""
-    if (Test-Path -LiteralPath $UpLogPath) {
-        $UpOutputText = Get-Content -LiteralPath $UpLogPath -Raw -ErrorAction SilentlyContinue
+    $UpPreviousErrorActionPreference = $ErrorActionPreference
+    $UpExitCode = 1
+    try {
+        $ErrorActionPreference = "Continue"
+        & docker @ComposeArgs @UpArgs
+        $UpExitCode = $LASTEXITCODE
     }
-    $DockerEngineFailure =
-        $UpExitCode -ne 0 -and (Test-DockerEngineFailure -OutputText $UpOutputText)
+    finally {
+        $ErrorActionPreference = $UpPreviousErrorActionPreference
+    }
 
-    if ($UpExitCode -ne 0 -and $DockerEngineFailure) {
-        if (Invoke-DockerEngineRecovery -Reason "Compose up") {
-            Write-Warning "Mengulangi Compose up dengan paralelisme 1 setelah recovery Docker Engine..."
+    if ($UpExitCode -ne 0) {
+        $UpProbe = Invoke-DockerNative -Arguments @("info", "--format", "{{json .ServerVersion}}")
+        $DockerEngineFailure = $UpProbe.ExitCode -ne 0
+
+        if ($DockerEngineFailure) {
             $OriginalParallelLimit = $env:COMPOSE_PARALLEL_LIMIT
-            $env:COMPOSE_PARALLEL_LIMIT = "1"
-            try {
-                $RetryCommandArgs = @($ComposeArgs + $UpArgs)
-                & docker @RetryCommandArgs 2>&1 | Tee-Object -FilePath $UpLogPath
-                $UpExitCode = $LASTEXITCODE
-            }
-            finally {
-                $env:COMPOSE_PARALLEL_LIMIT = $OriginalParallelLimit
+            if (Invoke-DockerEngineRecovery -Reason "Compose up") {
+                Write-Warning "Mengulangi Compose up dengan paralelisme 1 setelah Docker Engine recovery..."
+                $env:COMPOSE_PARALLEL_LIMIT = "1"
+                $RetryPreviousErrorActionPreference = $ErrorActionPreference
+                try {
+                    $ErrorActionPreference = "Continue"
+                    & docker @ComposeArgs @UpArgs
+                    $UpExitCode = $LASTEXITCODE
+                }
+                finally {
+                    $ErrorActionPreference = $RetryPreviousErrorActionPreference
+                    $env:COMPOSE_PARALLEL_LIMIT = $OriginalParallelLimit
+                }
             }
         }
     }
 
     if ($UpExitCode -ne 0) {
-        Write-Warning "Docker Compose startup gagal (exit code $UpExitCode). Log: $UpLogPath"
-        Write-Warning "Runtime gagal menjadi healthy. Menampilkan status dan log core service untuk diagnosis."
+        Write-Warning "Docker Compose startup gagal (exit code $UpExitCode). Menampilkan status dan log core service."
         & docker @ComposeArgs ps -a
         & docker @ComposeArgs logs --no-color --tail 120 marketplace_service chat_service identity_service community_service
         exit $UpExitCode
