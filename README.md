@@ -99,9 +99,13 @@ To rebuild images:
 .\up.ps1 -Build
 ```
 
+For compatibility, Windows also accepts `.\up.ps1 -Buildclear` as an alias of `-Build`; it does not delete containers or database volumes.
+
 ```bash
 ./up.sh --build
 ```
+
+`--buildclear` is accepted as a compatibility alias of `--build`; it does not remove containers or volumes.
 
 To stop the development stack without deleting volumes:
 
