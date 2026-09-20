@@ -3,6 +3,8 @@ import { buildContentHref } from '@/lib/content/routes';
 import { BLOG_ARTICLES, isBlogArticleIndexable } from '@/lib/seo/blog';
 import { LAJUKAN_EXPLORE_CATEGORIES } from '@/lib/discovery/lajukanCategories';
 import { buildNewsFacetUrl, buildNewsUrl, getNewsForSitemap } from '@/lib/news';
+import { listUmkmStores } from '@/lib/super-app/umkm-commerce.service';
+import { isPublicUmkmStoreVisible } from '@/lib/super-app/umkm-public-discovery';
 
 // Dynamic content comes from marketplace_service, which is a runtime dependency.
 // Never make `next build` wait for that service: generate sitemap.xml on request.
@@ -187,6 +189,33 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       }),
     );
   });
+
+  // Public business storefronts are the durable SEO targets; the map is discovery,
+  // while each /toko/:slug page contains the LocalBusiness entity details.
+  const umkmStores = await listUmkmStores({
+    activeOnly: true,
+    limit: 500,
+  }).catch(() => []);
+  umkmStores
+    .filter(isPublicUmkmStoreVisible)
+    .forEach(store => {
+      const lastModified = safeDate(store.updated_at || store.created_at);
+      locales.forEach(lang => {
+        sitemapEntries.push({
+          url: `${baseUrl}/${lang}/toko/${encodeURIComponent(store.slug)}`,
+          lastModified,
+          changeFrequency: 'daily',
+          priority: 0.88,
+          alternates: {
+            languages: {
+              id: `${baseUrl}/id/toko/${encodeURIComponent(store.slug)}`,
+              en: `${baseUrl}/en/toko/${encodeURIComponent(store.slug)}`,
+              'x-default': `${baseUrl}/id/toko/${encodeURIComponent(store.slug)}`,
+            },
+          },
+        });
+      });
+    });
 
   const newsItems = await getNewsForSitemap(1000);
   newsItems.forEach(article => {
