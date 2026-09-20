@@ -37,6 +37,35 @@ pub struct BusinessModerationRequest {
 }
 
 #[derive(Debug, Serialize, Clone)]
+
+#[derive(Debug, Serialize, Clone)]
+pub struct CrmBusinessReferenceRow {
+    pub id: Uuid,
+    pub slug: Option<String>,
+    pub title: String,
+    pub summary: Option<String>,
+    pub cover_image: Option<String>,
+    pub city: Option<String>,
+    pub address: Option<String>,
+    pub source_url: Option<String>,
+    pub source_dataset: Option<String>,
+    pub source_title: Option<String>,
+    pub source_license: Option<String>,
+    pub source_license_url: Option<String>,
+    pub source_accessed_at: Option<String>,
+    pub content_status: String,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+pub struct ListCrmBusinessReferencesQuery {
+    pub q: Option<String>,
+    pub city: Option<String>,
+    pub status: Option<String>,
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
+}
+
 pub struct CrmBusinessRow {
     pub id: Uuid,
     pub owner_user_id: Uuid,
@@ -298,6 +327,8 @@ fn business_snapshot(row: &CrmBusinessRow) -> Value {
 pub(crate) fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/v1/crm/businesses", get(list_crm_businesses))
+        .route("/v1/crm/business-references", get(list_crm_business_references))
+        .route("/v1/crm/business-references/{id}/moderate", post(moderate_business_reference))
         .route("/v1/crm/businesses/{id}/moderation/history", get(get_business_moderation_history))
         .route("/v1/crm/businesses/{id}/moderate", post(moderate_business))
         .route("/v1/crm/businesses/{id}/moderation/assign", post(assign_business_case))
@@ -310,6 +341,129 @@ pub(crate) fn router() -> Router<Arc<AppState>> {
         .route("/v1/umkm/stores/{store_ref}/report", post(report_business))
         .route("/v1/umkm/stores/{store_ref}/appeal", post(request_business_appeal))
         .route("/v1/umkm/stores/{store_ref}/verification/request", post(request_business_verification))
+}
+
+
+async fn list_crm_business_references(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<ListCrmBusinessReferencesQuery>,
+) -> impl IntoResponse {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+        Some(value) => value,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    if !has_business_moderation_access(&claims) {
+        return err(StatusCode::FORBIDDEN, "business reference moderation permission required").into_response();
+    }
+
+    let q = normalize_text(query.q, BUSINESS_MAX_QUERY_LEN);
+    let city = normalize_text(query.city, 80);
+    let status = normalize_text(query.status, 30);
+    let limit = query.limit.unwrap_or(50).clamp(1, BUSINESS_MAX_LIMIT);
+    let offset = query.offset.unwrap_or(0).max(0);
+
+    let rows = match sqlx::query(
+        r#"
+        SELECT
+          id,
+          slug,
+          title,
+          summary,
+          cover_image,
+          content_status,
+          updated_at,
+          metadata->>'city' AS city,
+          metadata->>'address' AS address,
+          metadata->>'source_url' AS source_url,
+          metadata->>'source_dataset' AS source_dataset,
+          metadata->>'source_title' AS source_title,
+          metadata->>'source_license' AS source_license,
+          metadata->>'source_license_url' AS source_license_url,
+          metadata->>'source_accessed_at' AS source_accessed_at
+        FROM content_items
+        WHERE metadata->>'record_kind' = 'real_openstreetmap_reference'
+          AND metadata->>'source_dataset' = 'openstreetmap'
+          AND lower(COALESCE(metadata->>'market_side', '')) = 'reference'
+          AND ($1::text IS NULL OR content_status = $1)
+          AND (
+            $2::text IS NULL OR
+            title ILIKE '%' || $2 || '%' OR
+            COALESCE(metadata->>'city','') ILIKE '%' || $2 || '%' OR
+            COALESCE(metadata->>'address','') ILIKE '%' || $2 || '%'
+          )
+          AND ($3::text IS NULL OR COALESCE(metadata->>'city','') ILIKE '%' || $3 || '%')
+        ORDER BY updated_at DESC, id ASC
+        LIMIT $4 OFFSET $5
+        "#,
+    )
+    .bind(&status)
+    .bind(&q)
+    .bind(&city)
+    .bind(limit)
+    .bind(offset)
+    .fetch_all(&state.db)
+    .await
+    {
+        Ok(rows) => rows,
+        Err(error) => {
+            tracing::error!("list_crm_business_references error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load business references").into_response();
+        }
+    };
+
+    let items = rows.into_iter().map(|row| CrmBusinessReferenceRow {
+        id: row.get("id"),
+        slug: row.get("slug"),
+        title: row.get("title"),
+        summary: row.get("summary"),
+        cover_image: row.get("cover_image"),
+        city: row.get("city"),
+        address: row.get("address"),
+        source_url: row.get("source_url"),
+        source_dataset: row.get("source_dataset"),
+        source_title: row.get("source_title"),
+        source_license: row.get("source_license"),
+        source_license_url: row.get("source_license_url"),
+        source_accessed_at: row.get("source_accessed_at"),
+        content_status: row.get("content_status"),
+        updated_at: row.get("updated_at"),
+    }).collect::<Vec<_>>();
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "items": items,
+            "limit": limit,
+            "offset": offset,
+            "has_more": items.len() as i64 == limit
+        })),
+    ).into_response()
+}
+
+async fn moderate_business_reference(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<BusinessModerationRequest>,
+) -> impl IntoResponse {
+    let action = normalize_action(&payload.action);
+    let Some(action) = action else {
+        return err(StatusCode::BAD_REQUEST, "unsupported business reference moderation action").into_response();
+    };
+
+    moderation::moderate_content(
+        State(state),
+        headers,
+        Path(id.to_string()),
+        Json(moderation::ContentModerationRequest {
+            action: action.to_string(),
+            reason_code: payload.reason_code,
+            reason_note: payload.reason_note,
+            severity: payload.severity,
+            legal_hold: payload.legal_hold,
+        }),
+    ).await
 }
 
 async fn list_crm_businesses(
