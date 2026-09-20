@@ -31,6 +31,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use uuid::Uuid;
 
 mod auth;
+mod business_moderation;
 mod businesses;
 mod content_projection;
 mod health;
@@ -2127,6 +2128,7 @@ async fn main() -> anyhow::Result<()> {
 
     let app = Router::new()
         .merge(businesses::router())
+        .merge(business_moderation::router())
         .merge(news::router())
         .route("/health", get(health))
         .route("/ready", get(ready))
