@@ -168,27 +168,7 @@ export function ProductEditorWorkspace({ businessId, product, closeHref }: Props
             <X className="h-4 w-4" />
           </button>
         </div>
-        <div className="max-h-[calc(100dvh-10rem)] overflow-y-auto">
-          <section className="min-h-0 p-4 sm:p-5">
-        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-portal-line px-4 py-3.5 sm:px-5">
-          <div className="min-w-0">
-            <p className="text-base font-black text-portal-ink">Kelola produk</p>
-            <p className="mt-0.5 truncate text-xs leading-5 text-portal-soft">
-              {product.name}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => !busy && router.push(closeHref)}
-            disabled={busy}
-            aria-label="Tutup"
-            className="portal-button-ghost h-9 w-9 shrink-0 justify-center rounded-full p-0"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
+        <div className="max-h-[calc(100dvh-10rem)] overflow-y-auto p-4 sm:p-5">
           <div className="space-y-5">
         <BusinessImageCropUpload
           businessId={businessId}
@@ -316,10 +296,9 @@ export function ProductEditorWorkspace({ businessId, product, closeHref }: Props
 
         {error ? <p role="alert" aria-live="assertive" className="rounded-xl bg-red-50 px-3 py-2.5 text-sm font-semibold text-portal-ember">{error}</p> : null}
         {success ? <p role="status" aria-live="polite" className="rounded-xl bg-emerald-50 px-3 py-2.5 text-sm font-semibold text-portal-forest">{success}</p> : null}
-          </section>
+          </div>
         </div>
       </section>
-
       <SensitiveActionConfirm
         open={archiveConfirmOpen}
         title="Arsipkan produk?"
