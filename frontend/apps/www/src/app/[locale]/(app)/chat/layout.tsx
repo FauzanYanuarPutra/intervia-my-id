@@ -1038,7 +1038,7 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
       {!activeRoomId ? (
         <button
           onClick={() => setShowNewChat(true)}
-          className="fixed bottom-[calc(14px+env(safe-area-inset-bottom))] right-[max(0.875rem,env(safe-area-inset-right))] z-30 flex h-12 w-12 items-center justify-center rounded-full bg-[#25d366] text-[#111b21] shadow-xl shadow-[rgba(37,211,102,0.28)] transition hover:bg-[#22c55e] active:scale-[0.96] min-[420px]:bottom-[calc(16px+env(safe-area-inset-bottom))] min-[420px]:right-[max(1rem,env(safe-area-inset-right))] lg:hidden"
+          className="fixed bottom-[calc(82px+env(safe-area-inset-bottom))] right-[max(0.875rem,env(safe-area-inset-right))] z-40 flex h-12 w-12 items-center justify-center rounded-full bg-[#25d366] text-[#111b21] shadow-xl shadow-[rgba(37,211,102,0.28)] ring-4 ring-[#f7f5f3]/80 transition hover:bg-[#22c55e] active:scale-[0.96] min-[420px]:bottom-[calc(88px+env(safe-area-inset-bottom))] min-[420px]:right-[max(1rem,env(safe-area-inset-right))] dark:ring-[#111b21]/80 lg:hidden"
           aria-label={isId ? 'Chat baru' : 'New chat'}
         >
           <Plus className="h-5 w-5" />
