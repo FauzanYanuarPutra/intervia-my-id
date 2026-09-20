@@ -672,6 +672,7 @@ async fn list_crm_businesses(
             moderation_status.as_deref(),
             is_active,
         );
+        let completeness = completeness_percent(&missing);
         items.push(CrmBusinessRow {
             id: row.get("id"),
             owner_user_id: row.get("owner_user_id"),
@@ -697,7 +698,7 @@ async fn list_crm_businesses(
             moderation_status,
             moderation_severity: row.get("moderation_severity"),
             missing_fields: missing,
-            completeness_percent: completeness_percent(&missing),
+            completeness_percent: completeness,
             image_urls: images,
             source_type,
             report_count: row.get::<i64,_>("report_count"),
@@ -915,7 +916,6 @@ async fn moderate_business(
         .legal_hold
         .unwrap_or(matches!(severity, "high" | "critical"));
 
-    let previous_action = business.current_action.clone().unwrap_or_else(|| "none".to_string());
     let previous_status = business
         .moderation_status
         .clone()
@@ -1282,7 +1282,7 @@ async fn get_business_moderation_history(
             "review_reason": row.get::<Option<String>,_>("review_reason"),
             "evidence": row.get::<Value,_>("evidence"),
             "metadata": row.get::<Value,_>("metadata"),
-            "updated_at": row.get::<DateTime<Utc>>("updated_at")
+            "updated_at": row.get::<DateTime<Utc>, _>("updated_at")
         })),
         Err(error) => {
             tracing::error!("business verification history error: {:?}", error);
