@@ -52,7 +52,6 @@ try {
     # Keep the launcher on the regular Compose builder and plain progress output.
     $env:COMPOSE_BAKE = "false"
     $env:COMPOSE_PROGRESS = "plain"
-    $PreviousComposeStatusStdout = $env:COMPOSE_STATUS_STDOUT
     $env:COMPOSE_STATUS_STDOUT = "true"
     $env:COMPOSE_ANSI = "never"
 
