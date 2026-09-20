@@ -96,7 +96,7 @@ jobs:
             "finally {",
             'Set-Variable -Name PSNativeCommandUseErrorActionPreference -Value $false -Scope Local',
             '$env:COMPOSE_PARALLEL_LIMIT = $ParallelLimit.ToString()',
-            '$BuildArgs = @("build", "--parallel", "1", "--progress", "plain")',
+            '$BuildArgs = @("build")',
             '$env:COMPOSE_BAKE = "false"',
             '$env:COMPOSE_PROGRESS = "plain"',
             '& docker @ComposeArgs @BuildArgs',
