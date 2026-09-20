@@ -1,6 +1,7 @@
 'use client';
 
 import { FeedbackNotice, type FeedbackTone } from '@/components/interaction/FeedbackNotice';
+import { RupiahInput } from '@/components/forms/RupiahInput';
 import { businessApiErrorMessage } from '@/lib/business-api-error';
 import {
   resolveIdempotencyAttempt,
@@ -133,7 +134,7 @@ export function CashShiftWorkspace({ businessId, initialShift }: Props) {
 
           <label className="mt-4 block text-xs font-semibold text-portal-soft">
             Kas fisik saat tutup
-            <input type="number" min="0" inputMode="numeric" value={actualCash} onChange={event => setActualCash(event.target.value)} className={`${inputClass} text-base font-bold`} placeholder="Hitung uang di laci" />
+            <RupiahInput min={0} value={actualCash ? Number(actualCash) : null} onValueChange={value => setActualCash(value == null ? '' : String(value))} className={inputClass + ' text-base font-bold'} placeholder="150.000" />
           </label>
 
           <details className="group mt-3">
@@ -154,7 +155,7 @@ export function CashShiftWorkspace({ businessId, initialShift }: Props) {
         <div className="p-4 sm:p-5">
           <label className="block text-xs font-semibold text-portal-soft">
             Kas awal
-            <input type="number" min="0" inputMode="numeric" value={openingCash} onChange={event => setOpeningCash(event.target.value)} className={`${inputClass} text-base font-bold`} placeholder="Contoh: 200000" />
+            <RupiahInput min={0} value={openingCash ? Number(openingCash) : null} onValueChange={value => setOpeningCash(value == null ? '' : String(value))} className={inputClass + ' text-base font-bold'} placeholder="200.000" />
           </label>
           <details className="group mt-3">
             <summary className="flex cursor-pointer list-none items-center gap-1 text-xs font-semibold text-portal-soft">
