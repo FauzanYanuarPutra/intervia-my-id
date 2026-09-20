@@ -222,6 +222,79 @@ def main() -> int:
     require('frontend/apps/usaha/src/app/(portal)/businesses/[businessId]/inventory/page.tsx', 'IngredientWorkspace', 'listControlIngredients', "hasPermission(business, 'viewCosting')")
     for compose in ['docker-compose.dev.yml', 'docker-compose.staging.yml', 'docker-compose.prod.yml']:
         require(compose, 'USAHA_GOOGLE_REDIRECT_URI', 'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'INTERNAL_API_URL')
+    require(
+        'services/marketplace_service/migrations/20260919070000_document_approval_kernel_v1.up.sql',
+        'business_documents', 'business_document_lines', 'business_document_links',
+        'business_approval_rules', 'business_approval_requests', 'business_approval_decisions',
+    )
+    require(
+        'services/marketplace_service/src/businesses/documents.rs',
+        'DocumentRepository', 'request_approval', 'maker_cannot_approve_own_request',
+        'role_based', 'marketplace.business.document_transitioned',
+        'marketplace.business.approval_decided',
+    )
+    require(
+        'services/marketplace_service/src/businesses/document_routes.rs',
+        '/v1/businesses/{business_id}/documents',
+        '/v1/businesses/{business_id}/approval-rules',
+        '/v1/businesses/{business_id}/approval-requests/{approval_id}/decisions',
+        'document_approval_required',
+    )
+    require(
+        'docs/architecture/document-approval-kernel.md',
+        'Commercial Document and Approval Kernel V1',
+        'draft -> issued -> posted', 'maker', 'checker', 'role_based',
+    )
+
+    require(
+        'services/marketplace_service/migrations/20260919080000_period_control_v1.up.sql',
+        'business_accounting_periods', 'business_day_closes',
+        'business_close_commands', 'business_close_events',
+    )
+    require(
+        'services/marketplace_service/src/businesses/period_control.rs',
+        'assert_business_date_open_tx', 'PeriodClosed', 'DayClosed',
+        'close_period', 'reopen_period', 'close_day', 'reopen_day',
+        'marketplace.business.period_control_changed',
+    )
+    require(
+        'services/marketplace_service/src/businesses/period_control_routes.rs',
+        '/v1/businesses/{business_id}/period-controls/periods',
+        '/v1/businesses/{business_id}/period-controls/days',
+        'business_period_control_access_denied',
+    )
+    require(
+        'services/marketplace_service/src/businesses/sales.rs',
+        'assert_business_date_open_tx', 'business_period_closed', 'business_day_closed',
+    )
+    require(
+        'services/marketplace_service/src/businesses/wave2.rs',
+        'assert_business_date_open_tx', 'business_period_closed',
+    )
+    require(
+        'services/marketplace_service/src/businesses/commercial_core.rs',
+        'assert_business_date_open_tx', 'business_period_closed',
+    )
+    require(
+        'services/marketplace_service/src/businesses/documents.rs',
+        'assert_business_date_open_tx', 'business_period_closed',
+    )
+    require(
+        'services/marketplace_service/src/businesses/finance_core.rs',
+        'assert_business_date_open_tx', 'business_period_closed',
+    )
+    require(
+        'docs/architecture/period-control.md',
+        'Period Control V1', 'Accounting periods', 'Business day close',
+        'assert_business_date_open_tx',
+    )
+
+    if ERRORS:
+        print('Usaha Business OS contract FAILED:', file=sys.stderr)
+        for item in ERRORS: print(f' - {item}', file=sys.stderr)
+        return 1
+    print('Usaha Business OS contract is valid.')
+    return 0
     if ERRORS:
         print('Usaha Business OS contract FAILED:', file=sys.stderr)
         for item in ERRORS: print(f' - {item}', file=sys.stderr)
