@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { History, RefreshCw, X } from 'lucide-react';
 import { ModalSurface } from '@/components/interaction/ModalSurface';
 
@@ -128,10 +128,6 @@ export function ChangeHistoryDrawer({ businessId, compact = false }: Props) {
     }
   }
 
-  useEffect(() => {
-    if (open) void load();
-  }, [open]);
-
   const grouped = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase('id-ID');
     return items
@@ -168,7 +164,10 @@ export function ChangeHistoryDrawer({ businessId, compact = false }: Props) {
 
       <ModalSurface
         open={open}
-        onOpenChange={setOpen}
+        onOpenChange={nextOpen => {
+          setOpen(nextOpen);
+          if (nextOpen) void load();
+        }}
         ariaLabel="Riwayat perubahan usaha"
         presentation="sheet"
         size="md"
