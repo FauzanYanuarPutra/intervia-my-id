@@ -735,7 +735,7 @@ try {
     if ($UpExitCode -ne 0) {
         Write-Warning "Docker Compose startup gagal (exit code $UpExitCode). Menampilkan status dan log core service."
         & docker @ComposeArgs ps -a
-        & docker @ComposeArgs logs --no-color --tail 120 marketplace_service chat_service identity_service community_service
+        & docker @ComposeArgs logs --no-color --tail 120 domain_db_bootstrap domain_db marketplace_service chat_service identity_service community_service
         exit $UpExitCode
     }
 
