@@ -10,6 +10,7 @@ import { TransactionWorkspace } from "./TransactionWorkspace";
 import { AnalyticsWorkspace } from "./AnalyticsWorkspace";
 import { AdministrationWorkspace } from "./AdministrationWorkspace";
 import ModerationDecisionDialog from "./ModerationDecisionDialog";
+import NewsEditorialWorkspace from "./NewsEditorialWorkspace";
 import { OperationsOverview } from "./OperationsOverview";
 import { createEmptyDashboardData } from "./dashboardData";
 import { buildOperationsPriorities } from "./operationsPriority";
@@ -19,6 +20,7 @@ import { useAuth, useRequireAuth } from "@/context/AuthContext";
 import {
   activityApi,
   contentApi,
+  newsApi,
   leadApi,
   superAppApi,
   supportApi,
@@ -520,6 +522,8 @@ function iconPaths(name: IconName): string[] {
       return ["M12 3l8 4v5c0 5-3.4 8-8 9-4.6-1-8-4-8-9V7l8-4Z", "M12 8v5", "M12 17h.01"];
     case "listings":
       return ["M5 4h14v16H5V4Z", "M8 8h8", "M8 12h8", "M8 16h5"];
+    case "news":
+      return ["M4 5h16v14H4V5Z", "M7 9h10", "M7 12h7", "M7 15h5"];
     case "logout":
       return ["M10 5H5v14h5", "M14 8l4 4-4 4", "M8 12h10"];
     case "menu":
@@ -620,12 +624,13 @@ export default function CrmCommandCenter() {
     action: "restore" | "review" | "hide" | "ban";
   } | null>(null);
   const [moderationBusy, setModerationBusy] = useState(false);
+  const [newsPendingCount, setNewsPendingCount] = useState(0);
 
   const loadData = useCallback(async () => {
     if (!accessToken) return;
     setRefreshing(true);
     const failures: string[] = [];
-    const [leadRes, activityRes, ticketRes, orderRes, trustRes, contentRes, userRes] =
+    const [leadRes, activityRes, ticketRes, orderRes, trustRes, contentRes, userRes, newsMetricsRes] =
       await Promise.allSettled([
         leadApi.list(accessToken, { limit: "120" }),
         activityApi.list(accessToken, { limit: "60" }),
@@ -634,6 +639,7 @@ export default function CrmCommandCenter() {
         superAppApi.listTrustProfiles(accessToken, { limit: "120" }),
         contentApi.list(accessToken, { limit: "160", offset: "0" }),
         usersApi.list(accessToken),
+        newsApi.metrics(accessToken),
       ]);
 
     const liveLeads = settledItems<CrmLead>(leadRes, "leads", failures);
@@ -646,6 +652,15 @@ export default function CrmCommandCenter() {
       userRes.status === "fulfilled"
         ? readItems<UnknownRecord>(userRes.value)
         : (failures.push("users"), []);
+
+    if (newsMetricsRes.status === "fulfilled") {
+      const metrics = asRecord(newsMetricsRes.value);
+      const queue = Array.isArray(metrics.queue) ? metrics.queue : [];
+      const pending = queue.find(item => asString(asRecord(item).key) === "pending_review");
+      setNewsPendingCount(Math.max(0, asNumber(asRecord(pending).value)));
+    } else {
+      setNewsPendingCount(0);
+    }
 
     const leads = liveLeads;
     const activitiesSource = liveActivities;
@@ -903,6 +918,7 @@ export default function CrmCommandCenter() {
             setMobileNavOpen(false);
           }}
           onToggle={() => setCollapsed(current => !current)}
+          newsPendingCount={newsPendingCount}
         />
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -911,7 +927,7 @@ export default function CrmCommandCenter() {
             query={query}
             userLabel={user?.username || user?.email || "Admin"}
             refreshing={refreshing}
-            notificationCount={openIssues + highRiskOrders}
+            notificationCount={openIssues + highRiskOrders + newsPendingCount}
             profileOpen={profileOpen}
             onQueryChange={setQuery}
             onRefresh={handleRefresh}
@@ -959,6 +975,7 @@ export default function CrmCommandCenter() {
               {activePage === "chat" ? <ConversationWorkspace chats={filteredData.chats} /> : null}
               {activePage === "analytics" ? <AnalyticsWorkspace users={filteredData.users} listings={filteredData.listings} transactions={transactions} openSupport={openIssues} /> : null}
               {activePage === "disputes" ? <SupportRiskWorkspace tickets={data.tickets} transactions={transactions} users={data.users} supportFailed={data.failures.includes("support") || data.failures.includes("tickets")} /> : null}
+              {activePage === "news" ? <NewsEditorialWorkspace accessToken={accessToken || ""} /> : null}
               {activePage === "settings" ? <AdministrationWorkspace /> : null}
               <ModerationDecisionDialog
                 draft={moderationDraft}
@@ -981,6 +998,7 @@ function Sidebar({
   onCloseMobile,
   onSelect,
   onToggle,
+  newsPendingCount,
 }: {
   activePage: PageId;
   collapsed: boolean;
@@ -988,6 +1006,7 @@ function Sidebar({
   onCloseMobile: () => void;
   onSelect: (page: PageId) => void;
   onToggle: () => void;
+  newsPendingCount: number;
 }) {
   return (
     <>
@@ -1032,13 +1051,18 @@ function Sidebar({
                   key={item.id}
                   type="button"
                   onClick={() => onSelect(item.id)}
-                  className={`flex min-h-12 w-full items-center gap-3 rounded-2xl px-3 text-left transition ${active
+                  className={`relative flex min-h-12 w-full items-center gap-3 rounded-2xl px-3 text-left transition ${active
                     ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100"
                     : "text-slate-600 hover:bg-slate-50 hover:text-slate-950"
                     } ${collapsed ? "justify-center" : ""}`}
                   title={item.label}
                 >
                   <Icon name={item.icon} className="h-5 w-5 shrink-0" />
+                  {item.id === "news" && newsPendingCount ? (
+                    <span className={`${collapsed ? "absolute right-1 top-1" : "ml-auto"} min-w-5 rounded-full bg-rose-500 px-1.5 py-0.5 text-center text-[10px] font-black text-white`}>
+                      {newsPendingCount > 99 ? "99+" : newsPendingCount}
+                    </span>
+                  ) : null}
                   {!collapsed ? (
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-bold">{item.label}</span>

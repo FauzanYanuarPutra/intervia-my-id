@@ -257,7 +257,7 @@ export default function NewsEditorialWorkspace({
   );
 
   const loadQueue = useCallback(
-    async (nextStatus = status, preserveId = selectedId) => {
+    async (nextStatus: string, preserveId = '') => {
       setLoading(true);
       setError('');
       try {
@@ -278,12 +278,12 @@ export default function NewsEditorialWorkspace({
         setLoading(false);
       }
     },
-    [accessToken, applySelected, loadHistory, selectedId, status],
+    [accessToken, applySelected, loadHistory],
   );
 
   useEffect(() => {
-    void loadQueue(status, selectedId);
-  }, [status]);
+    void loadQueue(status);
+  }, [loadQueue, status]);
 
   useEffect(() => {
     void loadMetrics();

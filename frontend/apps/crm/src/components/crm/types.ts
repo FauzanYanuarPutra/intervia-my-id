@@ -3,6 +3,7 @@ export type PageId =
   | 'pipeline'
   | 'users'
   | 'listings'
+  | 'news'
   | 'transactions'
   | 'chat'
   | 'analytics'
