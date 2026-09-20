@@ -236,6 +236,24 @@ export type CrmBusinessModerationEvent = {
   created_at: string;
 };
 
+export type CrmBusinessReference = {
+  id: string;
+  slug: string | null;
+  title: string;
+  summary: string | null;
+  cover_image: string | null;
+  city: string | null;
+  address: string | null;
+  source_url: string | null;
+  source_dataset: string | null;
+  source_title: string | null;
+  source_license: string | null;
+  source_license_url: string | null;
+  source_accessed_at: string | null;
+  content_status: string;
+  updated_at: string;
+};
+
 export type CrmNotification = {
   id: string;
   category: string;
@@ -726,6 +744,37 @@ export const superAppApi = {
 };
 
 export const businessModerationApi = {
+  references: async (
+    token: string,
+    params: { q?: string; city?: string; status?: string; limit?: string; offset?: string } = {},
+  ) => {
+    const query = new URLSearchParams(
+      Object.fromEntries(Object.entries(params).filter(([, value]) => value)),
+    ).toString();
+    return fetchJson<{ items: CrmBusinessReference[]; limit: number; offset: number; has_more: boolean }>(
+      `${MARKETPLACE_URL}/v1/crm/business-references${query ? `?${query}` : ''}`,
+      { method: 'GET', token },
+    );
+  },
+
+  moderateReference: async (
+    token: string,
+    id: string,
+    data: {
+      action: 'approve' | 'request_completion' | 'hide' | 'reject' | 'restore' | 'escalate';
+      reason_code: string;
+      reason_note?: string;
+      severity?: 'low' | 'medium' | 'high' | 'critical';
+      legal_hold?: boolean;
+    },
+  ) => {
+    return fetchJson(
+      `${MARKETPLACE_URL}/v1/crm/business-references/${encodeURIComponent(id)}/moderate`,
+      { method: 'POST', token, body: JSON.stringify(data) },
+    );
+  },
+
+
   list: async (
     token: string,
     params: { q?: string; city?: string; limit?: string; offset?: string } = {},
