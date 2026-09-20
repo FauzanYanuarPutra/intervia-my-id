@@ -8,11 +8,11 @@ pub struct ContentReportRequest {
 
 #[derive(Debug, Deserialize)]
 pub struct ContentModerationRequest {
-    action: String,
-    reason_code: String,
-    reason_note: Option<String>,
-    severity: Option<String>,
-    legal_hold: Option<bool>,
+    pub action: String,
+    pub reason_code: String,
+    pub reason_note: Option<String>,
+    pub severity: Option<String>,
+    pub legal_hold: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
