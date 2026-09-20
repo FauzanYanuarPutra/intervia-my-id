@@ -137,6 +137,14 @@ jobs:
             frontend/apps/*/package-lock.json
             frontend/packages/package-lock.json
             frontend/packages/*/package-lock.json
+      - name: Reject malformed JSX template escaping
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -RIn --include='*.tsx' --include='*.jsx' -E 'className=\{\\`|className=\{\\\\`' frontend/apps; then
+            echo "Found malformed escaped JSX template literals. Use a real backtick inside className={...}, not an escaped backtick."
+            exit 1
+          fi
       - name: Install, lint, test and build
         shell: bash
         run: |
