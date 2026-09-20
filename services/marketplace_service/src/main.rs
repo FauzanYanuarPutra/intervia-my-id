@@ -8612,6 +8612,32 @@ async fn update_umkm_store(
         existing.metadata.clone()
     };
 
+    let requested_is_active = payload.is_active.unwrap_or(existing.is_active);
+    if requested_is_active && !existing.is_active {
+        let blocked_by_moderation: Option<String> = sqlx::query_scalar(
+            r#"
+            SELECT current_action
+            FROM internal_moderation.business_moderation_cases
+            WHERE business_id = $1
+              AND current_action IN ('hide','reject')
+              AND status = 'resolved'
+            ORDER BY updated_at DESC
+            LIMIT 1
+            "#,
+        )
+        .bind(existing.id)
+        .fetch_optional(&state.db)
+        .await
+        .unwrap_or(None);
+        if blocked_by_moderation.is_some() {
+            return err(
+                StatusCode::CONFLICT,
+                "business visibility requires CRM restore or an approved appeal",
+            )
+            .into_response();
+        }
+    }
+
     let lat = payload.lat.unwrap_or(existing.lat);
     let lng = payload.lng.unwrap_or(existing.lng);
     if !(-90.0..=90.0).contains(&lat) || !(-180.0..=180.0).contains(&lng) {
@@ -8648,7 +8674,7 @@ async fn update_umkm_store(
     .bind(lat)
     .bind(lng)
     .bind(phone)
-    .bind(payload.is_active.unwrap_or(existing.is_active))
+    .bind(requested_is_active)
     .bind(
         payload
             .online_order_enabled
