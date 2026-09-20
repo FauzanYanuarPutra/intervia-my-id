@@ -19,10 +19,7 @@ fn cutoff(retention_days: i32, now: DateTime<Utc>) -> DateTime<Utc> {
     now - chrono::Duration::days(i64::from(retention_days))
 }
 
-async fn policy_days(
-    tx: &mut Transaction<'_, Postgres>,
-    key: &str,
-) -> Result<Option<i32>> {
+async fn policy_days(tx: &mut Transaction<'_, Postgres>, key: &str) -> Result<Option<i32>> {
     let row = sqlx::query_scalar::<_, i32>(
         r#"
         SELECT retention_days
@@ -46,9 +43,8 @@ async fn delete_batch(
     let cutoff = cutoff(retention_days, now);
 
     let deleted: i64 = match policy_key {
-        "privacy_requests_closed" => {
-            sqlx::query_scalar::<_, i32>(
-                r#"
+        "privacy_requests_closed" => sqlx::query_scalar::<_, i32>(
+            r#"
                 WITH victims AS (
                   SELECT id
                   FROM core.privacy_requests
@@ -63,16 +59,14 @@ async fn delete_batch(
                 WHERE target.id = victims.id
                 RETURNING 1
                 "#,
-            )
-            .bind(cutoff)
-            .bind(BATCH_SIZE)
-            .fetch_all(&mut **tx)
-            .await?
-            .len() as i64
-        }
-        "security_incidents_closed" => {
-            sqlx::query_scalar::<_, i32>(
-                r#"
+        )
+        .bind(cutoff)
+        .bind(BATCH_SIZE)
+        .fetch_all(&mut **tx)
+        .await?
+        .len() as i64,
+        "security_incidents_closed" => sqlx::query_scalar::<_, i32>(
+            r#"
                 WITH victims AS (
                   SELECT id
                   FROM core.security_incidents
@@ -87,16 +81,14 @@ async fn delete_batch(
                 WHERE target.id = victims.id
                 RETURNING 1
                 "#,
-            )
-            .bind(cutoff)
-            .bind(BATCH_SIZE)
-            .fetch_all(&mut **tx)
-            .await?
-            .len() as i64
-        }
-        "user_moderation_actions" => {
-            sqlx::query_scalar::<_, i32>(
-                r#"
+        )
+        .bind(cutoff)
+        .bind(BATCH_SIZE)
+        .fetch_all(&mut **tx)
+        .await?
+        .len() as i64,
+        "user_moderation_actions" => sqlx::query_scalar::<_, i32>(
+            r#"
                 WITH victims AS (
                   SELECT id
                   FROM core.user_moderation_actions
@@ -109,13 +101,12 @@ async fn delete_batch(
                 WHERE target.id = victims.id
                 RETURNING 1
                 "#,
-            )
-            .bind(cutoff)
-            .bind(BATCH_SIZE)
-            .fetch_all(&mut **tx)
-            .await?
-            .len() as i64
-        }
+        )
+        .bind(cutoff)
+        .bind(BATCH_SIZE)
+        .fetch_all(&mut **tx)
+        .await?
+        .len() as i64,
         _ => 0,
     };
 
@@ -126,12 +117,11 @@ async fn run_policy(db: &PgPool, policy_key: &str) -> Result<i64> {
     let mut tx = db.begin().await?;
 
     let lock_key = format!("lajukan:retention:{policy_key}");
-    let acquired: bool = sqlx::query_scalar(
-        "SELECT pg_try_advisory_xact_lock(hashtextextended($1, 0))",
-    )
-    .bind(&lock_key)
-    .fetch_one(&mut *tx)
-    .await?;
+    let acquired: bool =
+        sqlx::query_scalar("SELECT pg_try_advisory_xact_lock(hashtextextended($1, 0))")
+            .bind(&lock_key)
+            .fetch_one(&mut *tx)
+            .await?;
 
     if !acquired {
         tx.rollback().await?;
