@@ -1163,8 +1163,15 @@ function Sidebar({
           <nav className="mt-6 min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
             {CRM_NAV_ITEMS.map(item => {
               const active = activePage === item.id;
+              const showSecondaryHeading = item.id === "analytics" && !collapsed;
               return (
-                <button
+                <React.Fragment key={item.id}>
+                  {showSecondaryHeading ? (
+                    <p className="px-3 pb-2 pt-5 text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">
+                      Insight & administrasi
+                    </p>
+                  ) : null}
+                  <button
                   key={item.id}
                   type="button"
                   onClick={() => onSelect(item.id)}
