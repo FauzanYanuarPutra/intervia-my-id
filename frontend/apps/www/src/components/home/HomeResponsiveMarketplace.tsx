@@ -2566,12 +2566,11 @@ function GameProgressCard({
                 <ActiveQuestIcon className="h-3 w-3 shrink-0" />
                 +{activeQuest.xp} XP
               </p>
+              <p className="mt-0.5 truncate text-[8px] font-semibold text-emerald-600/75 dark:text-emerald-400/70">
+                {activeQuest.label}
+              </p>
             </Link>
           </div>
-
-          <p className="mt-1.5 truncate px-0.5 text-[9px] font-semibold text-emerald-600/80 dark:text-emerald-400/70">
-            {activeQuest.label}
-          </p>
         </div>
       </section>
     );
