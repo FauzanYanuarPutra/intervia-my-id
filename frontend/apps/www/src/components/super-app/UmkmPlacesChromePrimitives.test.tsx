@@ -64,6 +64,17 @@ describe('MapQuickControls location state', () => {
     expect(html).toContain(locationError);
   });
 
+  it('keeps the compact map rail free of the wide location status chip', () => {
+    const html = renderControls({
+      compact: true,
+      locationError: 'Lokasi saya belum bisa dibaca. Coba lagi.',
+      locationState: 'error',
+    });
+
+    expect(html).toContain('data-testid="umkm-locate-me"');
+    expect(html).not.toContain('data-testid="umkm-location-status"');
+  });
+
   it('shows that location is ready together with its accuracy', () => {
     const html = renderControls({
       locationReady: true,
