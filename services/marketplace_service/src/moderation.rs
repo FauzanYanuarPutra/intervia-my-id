@@ -47,6 +47,30 @@ fn has_content_admin_access(claims: &AccessClaims) -> bool {
     })
 }
 
+fn has_business_reference_moderation_access(claims: &AccessClaims) -> bool {
+    claims.perms.iter().any(|permission| {
+        permission.eq_ignore_ascii_case("business:moderate")
+    })
+}
+
+fn is_business_reference_content(content: &ContentRow) -> bool {
+    content
+        .metadata
+        .get("record_kind")
+        .and_then(Value::as_str)
+        .is_some_and(|value| value.eq_ignore_ascii_case("real_openstreetmap_reference"))
+        && content
+            .metadata
+            .get("source_dataset")
+            .and_then(Value::as_str)
+            .is_some_and(|value| value.eq_ignore_ascii_case("openstreetmap"))
+        && content
+            .metadata
+            .get("market_side")
+            .and_then(Value::as_str)
+            .is_some_and(|value| value.eq_ignore_ascii_case("reference"))
+}
+
 fn normalize_content_report_reason(raw: &str) -> Option<&'static str> {
     match raw.trim().to_ascii_lowercase().as_str() {
         "spam" => Some("spam"),
@@ -584,10 +608,6 @@ pub async fn moderate_content(
         Some(value) => value,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
-    if !has_content_moderation_access(&claims) {
-        return err(StatusCode::FORBIDDEN, "moderation permission required").into_response();
-    }
-
     let actor_id = match Uuid::parse_str(claims.sub.trim()) {
         Ok(value) => value,
         Err(_) => return err(StatusCode::UNAUTHORIZED, "invalid actor").into_response(),
@@ -641,6 +661,13 @@ pub async fn moderate_content(
         }
     };
 
+    let is_business_reference = is_business_reference_content(&existing);
+    let can_moderate = has_content_moderation_access(&claims)
+        || (is_business_reference && has_business_reference_moderation_access(&claims));
+    if !can_moderate {
+        return err(StatusCode::FORBIDDEN, "moderation permission required").into_response();
+    }
+
     if existing.content_type.eq_ignore_ascii_case("news") {
         return err(
             StatusCode::CONFLICT,
@@ -649,7 +676,10 @@ pub async fn moderate_content(
         .into_response();
     }
 
-    if action == "restore" && !has_content_admin_access(&claims) {
+    if action == "restore"
+        && !has_content_admin_access(&claims)
+        && !is_business_reference
+    {
         return err(
             StatusCode::FORBIDDEN,
             "only admin can restore restricted content",
