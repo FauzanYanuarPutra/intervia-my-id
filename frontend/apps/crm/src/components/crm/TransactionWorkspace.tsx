@@ -1,5 +1,69 @@
+'use client';
+
+import { useState } from 'react';
 import { Card, EmptyState, PageHeader, StatusBadge } from 'lajukan-ui';
+import { useAuth } from '@/context/AuthContext';
+import { superAppApi, type SuperAppOrderDetail } from '@/lib/api';
 import type { CrmTransactionRow } from './models';
 import { rankRiskTransactions } from './queues';
+
 const money=(c:number)=>new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(Math.max(0,c)/100);
-export function TransactionWorkspace({transactions}:{transactions:CrmTransactionRow[]}){const items=rankRiskTransactions(transactions);return <div className="space-y-5"><PageHeader title="Transactions" description="Order bermasalah dan berisiko tampil lebih dulu; nilai berasal langsung dari order yang dimuat."/><div className="grid gap-3 lg:grid-cols-2">{items.map(tx=><Card key={tx.id} className="p-4"><div className="flex items-start justify-between gap-3"><div><p className="font-bold">{tx.id}</p><p className="mt-1 text-xs text-[color:var(--color-text-soft)]">{tx.buyer} → {tx.seller} · {tx.serviceType}</p></div><StatusBadge tone={tx.status==='disputed'||tx.riskScore>=70?'danger':tx.status==='completed'?'success':'warning'}>{tx.status}</StatusBadge></div><p className="mt-4 text-xl font-bold">{money(tx.amountCents)}</p></Card>)}{!items.length?<EmptyState title="Belum ada transaksi" description="Transaksi real akan muncul saat order tersedia."/>:null}</div></div>}
+
+export function TransactionWorkspace({transactions}:{transactions:CrmTransactionRow[]}) {
+  const { accessToken } = useAuth();
+  const items=rankRiskTransactions(transactions);
+  const [selectedId,setSelectedId]=useState('');
+  const [detail,setDetail]=useState<SuperAppOrderDetail|null>(null);
+  const [busy,setBusy]=useState(false);
+  const [error,setError]=useState('');
+
+  async function openOrder(id:string) {
+    if (!accessToken) return;
+    setSelectedId(id);
+    setBusy(true);
+    setError('');
+    try {
+      setDetail(await superAppApi.getOrder(accessToken,id));
+    } catch (value) {
+      setDetail(null);
+      setError(value instanceof Error ? value.message : 'Detail order gagal dimuat.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return <div className="space-y-5">
+    <PageHeader title="Transactions" description="Order bermasalah dan berisiko tampil lebih dulu; detail dan event berasal langsung dari order yang dimuat."/>
+    {error?<div className="rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-800">{error}</div>:null}
+    <div className="grid gap-3 lg:grid-cols-2">
+      {items.map(tx=><Card key={tx.id} className="p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div><p className="font-bold">{tx.id}</p><p className="mt-1 text-xs text-[color:var(--color-text-soft)]">{tx.buyer} → {tx.seller} · {tx.serviceType}</p></div>
+          <StatusBadge tone={tx.status==='disputed'||tx.riskScore>=70?'danger':tx.status==='completed'?'success':'warning'}>{tx.status}</StatusBadge>
+        </div>
+        <p className="mt-4 text-xl font-bold">{money(tx.amountCents)}</p>
+        <button type="button" onClick={()=>void openOrder(tx.id)} className="mt-3 rounded-xl border border-[color:var(--color-border)] px-3 py-2 text-xs font-bold">Lihat detail & event</button>
+        {selectedId===tx.id ? (
+          <div className="mt-3 rounded-2xl bg-[color:var(--color-surface-muted)] p-3">
+            {busy ? <p className="text-sm font-semibold">Memuat detail...</p> : detail ? <>
+              <dl className="grid gap-2 text-xs sm:grid-cols-2">
+                <div><dt className="text-[color:var(--color-text-soft)]">Payment</dt><dd className="font-bold">{detail.order.payment_mode}</dd></div>
+                <div><dt className="text-[color:var(--color-text-soft)]">Risk</dt><dd className="font-bold">{detail.order.risk_score}</dd></div>
+                <div><dt className="text-[color:var(--color-text-soft)]">Dibuat</dt><dd className="font-bold">{new Date(detail.order.created_at).toLocaleString('id-ID')}</dd></div>
+                <div><dt className="text-[color:var(--color-text-soft)]">Diperbarui</dt><dd className="font-bold">{new Date(detail.order.updated_at).toLocaleString('id-ID')}</dd></div>
+              </dl>
+              <div className="mt-3 space-y-2">
+                {(detail.events || []).map(event=><div key={event.id} className="rounded-xl border border-[color:var(--color-border)] bg-white p-3 text-xs">
+                  <div className="flex justify-between gap-2"><span className="font-bold">{event.event_type}</span><span className="text-[color:var(--color-text-soft)]">{new Date(event.created_at).toLocaleString('id-ID')}</span></div>
+                  <pre className="mt-2 max-h-32 overflow-auto whitespace-pre-wrap break-words text-[10px] text-[color:var(--color-text-soft)]">{JSON.stringify(event.payload,null,2)}</pre>
+                </div>)}
+                {!detail.events?.length?<p className="text-xs text-[color:var(--color-text-soft)]">Belum ada event order.</p>:null}
+              </div>
+            </> : <p className="text-sm font-semibold">Detail order tidak tersedia.</p>}
+          </div>
+        ) : null}
+      </Card>)}
+      {!items.length?<EmptyState title="Belum ada transaksi" description="Transaksi real akan muncul saat order tersedia."/>:null}
+    </div>
+  </div>;
+}
