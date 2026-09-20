@@ -143,6 +143,7 @@ export function ProductQuickForm({ businessId }: ProductQuickFormProps) {
             value={priceRupiah}
             onValueChange={setPriceRupiah}
             placeholder="15.000"
+            inputMode="numeric"
             className="portal-input h-12 text-base font-bold tabular-nums"
           />
         </label>
@@ -173,17 +174,21 @@ export function ProductQuickForm({ businessId }: ProductQuickFormProps) {
         onNotesChange={setNotes}
       />
 
-      <button
-        type="button"
-        onClick={() => setDetailsOpen(true)}
-        className="flex w-full items-center justify-between gap-3 rounded-2xl border border-portal-line bg-white px-4 py-3.5 text-left transition hover:border-portal-forest/40"
-      >
-        <span>
-          <span className="block text-sm font-bold text-portal-ink">Detail lainnya</span>
-          <span className="mt-0.5 block text-xs font-normal text-portal-soft">Kategori, stok, titipan, dan catatan</span>
-        </span>
-        <span className="shrink-0 rounded-full bg-portal-mist px-3 py-1 text-xs font-bold text-portal-forest">Atur</span>
-      </button>
+      <details className="rounded-2xl border border-portal-line bg-white">
+        <summary className="cursor-pointer list-none px-4 py-3.5 text-sm font-bold text-portal-ink [&::-webkit-details-marker]:hidden">
+          <span className="block">Detail lainnya</span>
+          <span className="mt-0.5 block text-xs font-normal text-portal-soft">Kategori produk, stok, titipan, dan catatan</span>
+        </summary>
+        <div className="border-t border-portal-line px-4 py-3">
+          <button
+            type="button"
+            onClick={() => setDetailsOpen(true)}
+            className="w-full rounded-xl bg-portal-mist px-3 py-2.5 text-left text-xs font-bold text-portal-forest transition hover:bg-portal-mist/70"
+          >
+            Atur detail produk lengkap
+          </button>
+        </div>
+      </details>
 
       {error ? <p role="alert" className="rounded-xl bg-red-50 px-3 py-2.5 text-sm font-semibold text-portal-ember">{error}</p> : null}
       {success ? <p role="status" className="rounded-xl bg-emerald-50 px-3 py-2.5 text-sm font-semibold text-portal-forest">{success}</p> : null}
