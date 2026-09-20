@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LajukanImage as Image } from '@/components/common/LajukanImage';
+import { RupiahInput } from '@/components/common/RupiahInput';
 import { useAuth } from '@/context/AuthContext';
 import { createIdempotencyKey } from '@/lib/clientIdempotency';
 import { Modal } from '@/components/common/Modal';
@@ -1901,17 +1902,12 @@ export default function PaymentsPage() {
 
           <p className={`mt-3 ${PAYMENT_FIELD_LABEL_CLASS}`}>Nominal</p>
           <div className={PAYMENT_AMOUNT_FIELD_CLASS}>
-            <span className="text-sm font-bold text-[color:var(--app-accent)]">
-              Rp
-            </span>
-            <input
-              type="number"
+            <RupiahInput
               min={1}
-              inputMode="numeric"
               value={amountMajor}
-              onChange={event => setAmountMajor(event.target.value)}
+              onValueChange={value => setAmountMajor(value == null ? '' : String(value))}
               className={PAYMENT_AMOUNT_INPUT_CLASS}
-              placeholder="50000"
+              placeholder="50.000"
               aria-label="Nominal top up"
             />
           </div>
@@ -2008,17 +2004,12 @@ export default function PaymentsPage() {
             <label>
               <span className={PAYMENT_FIELD_LABEL_CLASS}>Nominal</span>
               <div className={PAYMENT_AMOUNT_FIELD_CLASS}>
-                <span className="text-sm font-bold text-[color:var(--app-accent)]">
-                  Rp
-                </span>
-                <input
-                  type="number"
+                <RupiahInput
                   min={1}
-                  inputMode="numeric"
                   value={withdrawAmountMajor}
-                  onChange={event => setWithdrawAmountMajor(event.target.value)}
+                  onValueChange={value => setWithdrawAmountMajor(value == null ? '' : String(value))}
                   className={PAYMENT_AMOUNT_INPUT_CLASS}
-                  placeholder="50000"
+                  placeholder="50.000"
                   aria-label="Nominal tarik dana"
                 />
               </div>
@@ -2284,20 +2275,13 @@ export default function PaymentsPage() {
                       ? moneyFromCents(estimatedTopupCents, selectedCurrency)
                       : 'Masukkan nominal'}
                   </p>
-                  <div
-                    className={`${PAYMENT_AMOUNT_FIELD_CLASS} sm:min-h-[62px] sm:px-2`}
-                  >
-                    <span className="text-lg font-bold text-[color:var(--app-accent)]">
-                      Rp
-                    </span>
-                    <input
-                      type="number"
+                  <div className={PAYMENT_AMOUNT_FIELD_CLASS}>
+                    <RupiahInput
                       min={1}
-                      inputMode="numeric"
                       value={amountMajor}
-                      onChange={event => setAmountMajor(event.target.value)}
-                      className={`${PAYMENT_AMOUNT_INPUT_CLASS} sm:text-[1.9rem]`}
-                      placeholder="100000"
+                      onValueChange={value => setAmountMajor(value == null ? '' : String(value))}
+                      className={PAYMENT_AMOUNT_INPUT_CLASS}
+                      placeholder="100.000"
                       aria-label="Nominal top up"
                     />
                     <span className="inline-flex rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
@@ -2566,23 +2550,16 @@ export default function PaymentsPage() {
             <div className="mt-3 grid grid-cols-2 gap-2">
               <label className="col-span-2">
                 <span className={PAYMENT_FIELD_LABEL_CLASS}>Nominal</span>
-                <div className={PAYMENT_AMOUNT_FIELD_CLASS}>
-                  <span className="text-sm font-bold text-[color:var(--app-accent)]">
-                    Rp
-                  </span>
-                  <input
-                    type="number"
-                    min={1}
-                    inputMode="numeric"
-                    value={withdrawAmountMajor}
-                    onChange={event =>
-                      setWithdrawAmountMajor(event.target.value)
-                    }
-                    className={PAYMENT_AMOUNT_INPUT_CLASS}
-                    placeholder="50000"
-                    aria-label="Nominal tarik dana"
-                  />
-                </div>
+              <div className={PAYMENT_AMOUNT_FIELD_CLASS}>
+                <RupiahInput
+                  min={1}
+                  value={withdrawAmountMajor}
+                  onValueChange={value => setWithdrawAmountMajor(value == null ? '' : String(value))}
+                  className={PAYMENT_AMOUNT_INPUT_CLASS}
+                  placeholder="50.000"
+                  aria-label="Nominal tarik dana"
+                />
+              </div>
               </label>
               <label>
                 <span className={PAYMENT_FIELD_LABEL_CLASS}>Bank</span>
