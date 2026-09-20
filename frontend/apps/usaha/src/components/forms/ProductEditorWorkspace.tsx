@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Archive, CheckCircle2, Save, X } from 'lucide-react';
 import { ChoiceChips } from '@/components/interaction/ChoiceChips';
 import { ModalSurface } from '@/components/interaction/ModalSurface';
+import { RupiahInput, parseRupiahInput } from './RupiahInput';
 import { SensitiveActionConfirm } from '@/components/interaction/SensitiveActionConfirm';
 import { BusinessImageCropUpload } from '@/components/media/BusinessImageCropUpload';
 import { ProductModifierEditor } from '@/components/forms/ProductModifierEditor';
@@ -27,7 +28,7 @@ export function ProductEditorWorkspace({ businessId, product, closeHref }: Props
   const router = useRouter();
   const [name, setName] = useState(product.name);
   const [category, setCategory] = useState(product.category);
-  const [priceRupiah, setPriceRupiah] = useState(rupiahNumber(product.priceLabel));
+  const [priceRupiah, setPriceRupiah] = useState<number | null>(() => parseRupiahInput(product.priceLabel));
   const [status, setStatus] = useState<'live' | 'draft'>(product.status);
   const [stockCount, setStockCount] = useState(product.stockCount?.toString() ?? '');
   const [minStockAlert, setMinStockAlert] = useState(product.minStockAlert?.toString() ?? '');
@@ -62,7 +63,7 @@ export function ProductEditorWorkspace({ businessId, product, closeHref }: Props
 
   async function saveProduct(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const normalizedPrice = Number(priceRupiah);
+    const normalizedPrice = priceRupiah ?? 0;
     const normalizedThreshold = minStockAlert.trim() ? Number(minStockAlert) : null;
 
     if (name.trim().length < 2 || !Number.isSafeInteger(normalizedPrice) || normalizedPrice <= 0) {
@@ -203,10 +204,14 @@ export function ProductEditorWorkspace({ businessId, product, closeHref }: Props
             </label>
             <label className="grid gap-1.5 text-sm font-semibold text-portal-ink">
               Harga jual
-              <div className="relative">
-                <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-portal-soft">Rp</span>
-                <input inputMode="numeric" className="portal-input h-12 w-full pl-10 text-base font-bold tabular-nums" type="number" min="1" step="1" value={priceRupiah} onChange={event => setPriceRupiah(event.target.value)} required />
-              </div>
+              <RupiahInput
+                required
+                min={1}
+                value={priceRupiah}
+                onValueChange={setPriceRupiah}
+                placeholder="15.000"
+                className="portal-input h-12 text-base font-bold tabular-nums"
+              />
             </label>
           </div>
 
