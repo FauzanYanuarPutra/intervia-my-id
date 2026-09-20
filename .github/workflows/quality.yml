@@ -97,7 +97,8 @@ jobs:
             'Set-Variable -Name PSNativeCommandUseErrorActionPreference -Value $false -Scope Local',
             '$env:COMPOSE_PARALLEL_LIMIT = $ParallelLimit.ToString()',
             '$BuildArgs = @("build")',
-            '$UpArgs = @("up", "-d", "--remove-orphans", "--wait", "--wait-timeout", "420")'
+            '& docker @ComposeArgs @BuildArgs',
+            '& docker @ComposeArgs @UpArgs'
           )
           foreach ($pattern in $required) {
             if ($launcher -notmatch [regex]::Escape($pattern)) {
