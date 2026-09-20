@@ -43,7 +43,7 @@ use identity_service::routes::{
     reset_password, respond_backoffice_invitation, revoke_backoffice_invitation,
     search_backoffice_candidates, service_metrics, transition_privacy_request,
     transition_security_incident, update_me_profile, upsert_backoffice_google_access,
-}
+};
 use identity_service::runtime_metrics;
 mod retention;
 use retention::run_retention_sweep;
