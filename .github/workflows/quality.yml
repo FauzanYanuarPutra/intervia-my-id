@@ -98,6 +98,8 @@ jobs:
             '$env:COMPOSE_PARALLEL_LIMIT = $ParallelLimit.ToString()',
             '$env:COMPOSE_BAKE = "false"',
             '$env:COMPOSE_PROGRESS = "plain"',
+            '$env:COMPOSE_STATUS_STDOUT = "false"',
+            'function Get-DockerComposeConfigJson',
             'Building Docker images service-by-service',
             'foreach ($ServiceName in $BuildTargets)',
             'Invoke-DockerEngineRecovery -Reason "build service $ServiceName"',
