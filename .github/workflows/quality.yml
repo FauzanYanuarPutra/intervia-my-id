@@ -66,20 +66,44 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $errors = $null
-          $tokens = $null
-          [System.Management.Automation.Language.Parser]::ParseFile(
-              (Join-Path $PWD "up.ps1"),
-              [ref]$tokens,
-              [ref]$errors
-          ) | Out-Null
-          if ($errors.Count -gt 0) {
+          $files = Get-ChildItem -Path $PWD -Recurse -Filter *.ps1 |
+            Where-Object {
+              $_.FullName -notmatch "[\\/]node_modules[\\/]" -and
+              $_.FullName -notmatch "[\\/]\.git[\\/]" -and
+              $_.FullName -notmatch "[\\/]\.venv[\\/]"
+            }
+          foreach ($file in $files) {
+            $errors = $null
+            $tokens = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+                $file.FullName,
+                [ref]$tokens,
+                [ref]$errors
+            ) | Out-Null
+            if ($errors.Count -gt 0) {
               $errors | ForEach-Object {
-                  Write-Error "$($_.Message) at line $($_.Extent.StartLineNumber), column $($_.Extent.StartColumnNumber)."
+                Write-Error "$($file.FullName): $($_.Message) at line $($_.Extent.StartLineNumber), column $($_.Extent.StartColumnNumber)."
               }
               exit 1
+            }
           }
-          Write-Host "up.ps1 PowerShell syntax is valid."
+
+          $launcher = Get-Content -Raw -LiteralPath (Join-Path $PWD "up.ps1")
+          $required = @(
+            "function Invoke-DockerNative",
+            "function Test-DockerEngineFailure",
+            "function Invoke-DockerEngineRecovery",
+            "finally {",
+            "$env:COMPOSE_PARALLEL_LIMIT = $ParallelLimit.ToString()",
+            "$BuildArgs = @(\"build\")",
+            "$UpArgs = @(\"up\", \"-d\", \"--remove-orphans\", \"--wait\", \"--wait-timeout\", \"420\")"
+          )
+          foreach ($pattern in $required) {
+            if ($launcher -notmatch [regex]::Escape($pattern)) {
+              throw "up.ps1 launcher contract missing: $pattern"
+            }
+          }
+          Write-Host "All PowerShell syntax and launcher contract checks passed."
 
   frontend:
     name: Frontend
