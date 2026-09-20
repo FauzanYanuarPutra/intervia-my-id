@@ -5660,17 +5660,19 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
           onOpenFilters={openSearchFilters}
         />
         {/* <MobileAppDownloadSection isId={isId} /> */}
-        <GameProgressCard
-          isId={isId}
-          isAuthenticated={isAuthenticated}
-          summary={summary}
-          walletAmountLabel={walletAmountLabel}
-          walletModeLabel={walletModeLabel}
-          walletLoading={walletLoading}
-          compact
-        />
-        <DailyLoginRewardCard locale={locale} compact />
         <QuickCategoriesSection isId={isId} />
+        <div className="grid gap-1.5">
+          <GameProgressCard
+            isId={isId}
+            isAuthenticated={isAuthenticated}
+            summary={summary}
+            walletAmountLabel={walletAmountLabel}
+            walletModeLabel={walletModeLabel}
+            walletLoading={walletLoading}
+            compact
+          />
+          <DailyLoginRewardCard locale={locale} compact />
+        </div>
         <TrendingSearchSection isId={isId} />
 
         <HomeUmkmMapPreview
@@ -5745,7 +5747,8 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
                 onSubmit={handleSearchSubmit}
                 onOpenFilters={openSearchFilters}
               />
-              <div className="xl:hidden">
+              <QuickCategoriesSection isId={isId} />
+              <div className="xl:hidden grid gap-1.5">
                 <GameProgressCard
                   isId={isId}
                   isAuthenticated={isAuthenticated}
@@ -5753,12 +5756,10 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
                   walletAmountLabel={walletAmountLabel}
                   walletModeLabel={walletModeLabel}
                   walletLoading={walletLoading}
+                  compact
                 />
-                <div className="mt-4">
-                  <DailyLoginRewardCard locale={locale} />
-                </div>
+                <DailyLoginRewardCard locale={locale} compact />
               </div>
-              <QuickCategoriesSection isId={isId} />
               <TrendingSearchSection isId={isId} />
 
               <HomeUmkmMapPreview
