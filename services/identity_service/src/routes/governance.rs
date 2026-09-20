@@ -234,6 +234,7 @@ fn valid_incident_transition(current: &str, next: &str) -> bool {
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn audit_governance_event(
     state: &AppState,
     actor_id: Option<Uuid>,
