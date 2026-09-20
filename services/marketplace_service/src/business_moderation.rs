@@ -103,16 +103,68 @@ pub struct CrmBusinessRow {
     pub verification_method: Option<String>,
 }
 
+fn has_business_read_access(claims: &AccessClaims) -> bool {
+    claims.roles.iter().any(|role| {
+        matches!(
+            role.trim().to_ascii_lowercase().as_str(),
+            "moderator" | "admin" | "super_admin"
+        )
+    }) || claims.perms.iter().any(|permission| {
+        permission.eq_ignore_ascii_case("business:read")
+            || permission.eq_ignore_ascii_case("business:moderate")
+            || permission.eq_ignore_ascii_case("content:moderate")
+    })
+}
+
 fn has_business_moderation_access(claims: &AccessClaims) -> bool {
     claims.roles.iter().any(|role| {
         matches!(
             role.trim().to_ascii_lowercase().as_str(),
             "moderator" | "admin" | "super_admin"
         )
-    }) || claims
-        .perms
-        .iter()
-        .any(|permission| permission.eq_ignore_ascii_case("content:moderate"))
+    }) || claims.perms.iter().any(|permission| {
+        permission.eq_ignore_ascii_case("business:moderate")
+            || permission.eq_ignore_ascii_case("content:moderate")
+    })
+}
+
+fn has_business_case_access(claims: &AccessClaims) -> bool {
+    has_business_moderation_access(claims)
+        || claims
+            .perms
+            .iter()
+            .any(|permission| permission.eq_ignore_ascii_case("business:case:manage"))
+}
+
+fn has_business_report_read_access(claims: &AccessClaims) -> bool {
+    has_business_read_access(claims)
+        || claims
+            .perms
+            .iter()
+            .any(|permission| permission.eq_ignore_ascii_case("business:report:read"))
+}
+
+fn has_business_verification_access(claims: &AccessClaims) -> bool {
+    has_business_moderation_access(claims)
+        || claims
+            .perms
+            .iter()
+            .any(|permission| permission.eq_ignore_ascii_case("business:verify"))
+}
+
+fn has_business_appeal_access(claims: &AccessClaims) -> bool {
+    has_business_moderation_access(claims)
+        || claims
+            .perms
+            .iter()
+            .any(|permission| permission.eq_ignore_ascii_case("business:appeal:review"))
+}
+
+fn has_business_notification_access(claims: &AccessClaims) -> bool {
+    has_business_read_access(claims)
+        || claims.perms.iter().any(|permission| {
+            permission.eq_ignore_ascii_case("business:notifications:read")
+        })
 }
 
 fn normalize_text(value: Option<String>, max_len: usize) -> Option<String> {
@@ -354,7 +406,7 @@ async fn list_crm_business_references(
         Some(value) => value,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
-    if !has_business_moderation_access(&claims) {
+    if !has_business_read_access(&claims) {
         return err(StatusCode::FORBIDDEN, "business reference moderation permission required").into_response();
     }
 
@@ -1812,7 +1864,7 @@ async fn review_business_verification(
         Some(value) => value,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
-    if !has_business_moderation_access(&claims) {
+    if !has_business_verification_access(&claims) {
         return err(StatusCode::FORBIDDEN, "business verification permission required").into_response();
     }
     let actor_id = match Uuid::parse_str(claims.sub.trim()) {
@@ -1912,8 +1964,8 @@ async fn assign_business_case(
         Some(value) => value,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
-    if !has_business_moderation_access(&claims) {
-        return err(StatusCode::FORBIDDEN, "business moderation permission required").into_response();
+    if !has_business_case_access(&claims) {
+        return err(StatusCode::FORBIDDEN, "business case management permission required").into_response();
     }
     let actor_id = match Uuid::parse_str(claims.sub.trim()) {
         Ok(value) => value,
@@ -2006,8 +2058,8 @@ async fn add_business_evidence(
         Some(value) => value,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
-    if !has_business_moderation_access(&claims) {
-        return err(StatusCode::FORBIDDEN, "business moderation permission required").into_response();
+    if !has_business_case_access(&claims) {
+        return err(StatusCode::FORBIDDEN, "business case management permission required").into_response();
     }
     let actor_id = match Uuid::parse_str(claims.sub.trim()) {
         Ok(value) => value,
@@ -2093,7 +2145,7 @@ async fn list_crm_notifications(
         Some(value) => value,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
-    if !has_business_moderation_access(&claims) {
+    if !has_business_notification_access(&claims) {
         return err(StatusCode::FORBIDDEN, "crm notification permission required").into_response();
     }
     let limit = query.limit.unwrap_or(50).clamp(1, 200);
@@ -2220,7 +2272,7 @@ async fn review_business_appeal(
         Some(value) => value,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
-    if !has_business_moderation_access(&claims) {
+    if !has_business_appeal_access(&claims) {
         return err(StatusCode::FORBIDDEN, "business appeal permission required").into_response();
     }
     let actor_id = match Uuid::parse_str(claims.sub.trim()) {
