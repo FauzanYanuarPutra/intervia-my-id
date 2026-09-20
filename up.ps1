@@ -35,12 +35,21 @@ if ($Down -and ($Build -or $Pull -or $Fresh)) {
 
 $RepoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $PreviousComposeParallelLimit = $env:COMPOSE_PARALLEL_LIMIT
+$PreviousComposeBake = $env:COMPOSE_BAKE
+$PreviousComposeProgress = $env:COMPOSE_PROGRESS
 Push-Location $RepoRoot
 
 try {
     if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
         throw "Docker CLI tidak ditemukan. Install/start Docker Desktop atau Docker Engine terlebih dahulu."
     }
+
+    # Docker Compose can delegate multi-service builds to Buildx Bake. Bake
+    # intentionally runs targets concurrently, which is exactly what causes
+    # Docker Desktop's Linux engine to become unstable on this 22-image stack.
+    # Keep the launcher on the regular Compose builder and plain progress output.
+    $env:COMPOSE_BAKE = "false"
+    $env:COMPOSE_PROGRESS = "plain"
 
     function Invoke-DockerNative {
         param(
@@ -359,68 +368,107 @@ try {
     }
 
     if ($Build.IsPresent) {
-        $BuildArgs = @("build")
+        $BuildTargets = @()
         if ($Services.Count -gt 0) {
-            $BuildArgs += $Services
+            $BuildTargets = @($Services)
         }
 
-        Write-Host "Building Docker images..." -ForegroundColor Cyan
-        $BuildParallelLimit = 1
-        $BuildOriginalParallelLimit = $env:COMPOSE_PARALLEL_LIMIT
-        $env:COMPOSE_PARALLEL_LIMIT = $BuildParallelLimit.ToString()
-        Write-Host "Compose build parallelism forced to 1 for Docker Desktop stability." -ForegroundColor DarkGray
-
-        $BuildDiagnostics = [pscustomobject]@{
-            DockerEngineFailureDetected = $false
+        $BuildArgs = @("build", "--parallel", "1", "--progress", "plain")
+        if ($BuildTargets.Count -gt 0) {
+            $BuildArgs += $BuildTargets
         }
+
+        Write-Host "Building Docker images with regular Compose builder (Bake disabled)..." -ForegroundColor Cyan
+        Write-Host "Compose build parallelism: 1" -ForegroundColor DarkGray
+
         $BuildPreviousErrorActionPreference = $ErrorActionPreference
         $BuildExitCode = 1
-        $BuildOutput = @()
         try {
             $ErrorActionPreference = "Continue"
-            # Capture native stderr as data instead of piping it through PowerShell's
-            # Error stream. Docker Compose legitimately writes progress to stderr,
-            # and turning those records into pipeline errors makes a healthy build
-            # look like a PowerShell failure.
-            $BuildOutput = @(& docker @ComposeArgs @BuildArgs 2>&1)
+            & docker @ComposeArgs @BuildArgs
             $BuildExitCode = $LASTEXITCODE
         }
         finally {
             $ErrorActionPreference = $BuildPreviousErrorActionPreference
         }
 
-        foreach ($OutputItem in $BuildOutput) {
-            $Line = [string]$OutputItem
-            Write-Host $Line
-            if (-not $BuildDiagnostics.DockerEngineFailureDetected -and (Test-DockerEngineFailure -OutputText $Line)) {
-                $BuildDiagnostics.DockerEngineFailureDetected = $true
-            }
-        }
-
-        if ($BuildExitCode -ne 0 -or $BuildDiagnostics.DockerEngineFailureDetected) {
+        if ($BuildExitCode -ne 0) {
             $BuildProbe = Invoke-DockerNative -Arguments @("info", "--format", "{{json .ServerVersion}}")
-            $DockerEngineFailure = $BuildDiagnostics.DockerEngineFailureDetected -or ($BuildProbe.ExitCode -ne 0)
+            $DockerEngineFailure = $BuildProbe.ExitCode -ne 0
 
-            if ($DockerEngineFailure) {
-                if (Invoke-DockerEngineRecovery -Reason "Compose build") {
-                    Write-Warning "Mengulangi Compose build setelah Docker Engine recovery dengan paralelisme 1..."
-                    $RetryPreviousErrorActionPreference = $ErrorActionPreference
-                    try {
-                        $ErrorActionPreference = "Continue"
-                        $RetryBuildOutput = @(& docker @ComposeArgs @BuildArgs 2>&1)
-                        $BuildExitCode = $LASTEXITCODE
-                        foreach ($OutputItem in $RetryBuildOutput) {
-                            Write-Host ([string]$OutputItem)
+            if ($DockerEngineFailure -and (Invoke-DockerEngineRecovery -Reason "Compose build")) {
+                Write-Warning "Mengulangi Compose build setelah Docker Engine recovery..."
+                $RetryPreviousErrorActionPreference = $ErrorActionPreference
+                try {
+                    $ErrorActionPreference = "Continue"
+                    & docker @ComposeArgs @BuildArgs
+                    $BuildExitCode = $LASTEXITCODE
+                }
+                finally {
+                    $ErrorActionPreference = $RetryPreviousErrorActionPreference
+                }
+
+                # If the engine fell over again, switch from one full-stack
+                # invocation to a deterministic one-service-at-a-time build.
+                if ($BuildExitCode -ne 0) {
+                    $RetryProbe = Invoke-DockerNative -Arguments @("info", "--format", "{{json .ServerVersion}}")
+                    if ($RetryProbe.ExitCode -ne 0) {
+                        Write-Warning "Docker Engine kembali tidak sehat. Beralih ke fallback build service-by-service..."
+                        $ServiceProbeArgs = @($ComposeArgs + @("config", "--services"))
+                        $ServiceProbe = Invoke-DockerNative -Arguments $ServiceProbeArgs
+                        if ($ServiceProbe.ExitCode -ne 0) {
+                            throw "Docker Compose gagal membaca daftar service untuk fallback build."
                         }
-                    }
-                    finally {
-                        $ErrorActionPreference = $RetryPreviousErrorActionPreference
+
+                        $FallbackServices = @(
+                            $ServiceProbe.Output |
+                                ForEach-Object { [string]$_ } |
+                                Where-Object { $_ -match '^[a-zA-Z0-9][a-zA-Z0-9_-]*$' }
+                        )
+                        if ($BuildTargets.Count -gt 0) {
+                            $FallbackServices = @($BuildTargets)
+                        }
+                        if ($FallbackServices.Count -eq 0) {
+                            throw "Tidak ada service build yang dapat digunakan sebagai fallback."
+                        }
+
+                        foreach ($ServiceName in $FallbackServices) {
+                            if (-not $DockerRecoveryState.Succeeded) {
+                                $PreServiceProbe = Invoke-DockerNative -Arguments @("info", "--format", "{{json .ServerVersion}}")
+                                if ($PreServiceProbe.ExitCode -ne 0) {
+                                    if (-not (Invoke-DockerEngineRecovery -Reason "fallback build $ServiceName")) {
+                                        throw "Docker Engine tidak sehat sebelum fallback build service '$ServiceName'."
+                                    }
+                                }
+                            }
+
+                            Write-Host "Fallback build: $ServiceName" -ForegroundColor Cyan
+                            $ServiceBuildArgs = @("build", "--parallel", "1", "--progress", "plain", $ServiceName)
+                            $ServicePreviousErrorActionPreference = $ErrorActionPreference
+                            $ServiceExitCode = 1
+                            try {
+                                $ErrorActionPreference = "Continue"
+                                & docker @ComposeArgs @ServiceBuildArgs
+                                $ServiceExitCode = $LASTEXITCODE
+                            }
+                            finally {
+                                $ErrorActionPreference = $ServicePreviousErrorActionPreference
+                            }
+
+                            if ($ServiceExitCode -ne 0) {
+                                $ServiceProbe = Invoke-DockerNative -Arguments @("info", "--format", "{{json .ServerVersion}}")
+                                if ($ServiceProbe.ExitCode -ne 0) {
+                                    throw "Docker Engine gagal saat fallback build service '$ServiceName'."
+                                }
+                                throw "Fallback Docker Compose build gagal pada service '$ServiceName' (exit code $ServiceExitCode)."
+                            }
+                        }
+
+                        $BuildExitCode = 0
                     }
                 }
             }
         }
-
-        $env:COMPOSE_PARALLEL_LIMIT = $BuildOriginalParallelLimit
 
         if ($BuildExitCode -ne 0) {
             throw "Docker Compose build gagal (exit code $BuildExitCode). Periksa error build di atas."
@@ -434,6 +482,7 @@ try {
         # A freshly built image must never keep running behind a stale container
         # health state. Volumes remain preserved; only service containers are recreated.
         $UpArgs += "--force-recreate"
+        $UpArgs += "--no-build"
     }
     if ($Services.Count -gt 0) {
         $UpArgs += $Services
@@ -555,6 +604,18 @@ try {
     exit $LASTEXITCODE
 }
 finally {
+    if ($null -eq $PreviousComposeBake) {
+        Remove-Item Env:COMPOSE_BAKE -ErrorAction SilentlyContinue
+    }
+    else {
+        $env:COMPOSE_BAKE = $PreviousComposeBake
+    }
+    if ($null -eq $PreviousComposeProgress) {
+        Remove-Item Env:COMPOSE_PROGRESS -ErrorAction SilentlyContinue
+    }
+    else {
+        $env:COMPOSE_PROGRESS = $PreviousComposeProgress
+    }
     if ($null -eq $PreviousComposeParallelLimit) {
         Remove-Item Env:COMPOSE_PARALLEL_LIMIT -ErrorAction SilentlyContinue
     }
