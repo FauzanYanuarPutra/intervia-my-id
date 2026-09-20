@@ -12,6 +12,7 @@ import { AnalyticsWorkspace } from "./AnalyticsWorkspace";
 import { AdministrationWorkspace } from "./AdministrationWorkspace";
 import ModerationDecisionDialog from "./ModerationDecisionDialog";
 import NewsEditorialWorkspace from "../NewsEditorialWorkspace";
+import CrmGuideWorkspace from "./CrmGuideWorkspace";
 import { OperationsOverview } from "./OperationsOverview";
 import { createEmptyDashboardData } from "./dashboardData";
 import { buildOperationsPriorities } from "./operationsPriority";
@@ -546,6 +547,8 @@ function iconPaths(name: IconName): string[] {
       return ["M5 4h14v16H5V4Z", "M8 8h8", "M8 12h8", "M8 16h5"];
     case "news":
       return ["M4 5h16v14H4V5Z", "M7 9h10", "M7 12h7", "M7 15h5"];
+    case "guide":
+      return ["M12 4a8 8 0 1 0 8 8", "M12 8v5l3 2", "M12 2v2"];
     case "logout":
       return ["M10 5H5v14h5", "M14 8l4 4-4 4", "M8 12h10"];
     case "menu":
@@ -1065,6 +1068,7 @@ export default function CrmCommandCenter() {
                 />
               ) : null}
               {activePage === "settings" ? <AdministrationWorkspace /> : null}
+              {activePage === "guide" ? <CrmGuideWorkspace onOpen={destination => navigatePage(destination)} /> : null}
               <ModerationDecisionDialog
                 draft={moderationDraft}
                 busy={moderationBusy}
