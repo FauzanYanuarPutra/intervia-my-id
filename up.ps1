@@ -375,19 +375,26 @@ try {
         }
         $BuildPreviousErrorActionPreference = $ErrorActionPreference
         $BuildExitCode = 1
+        $BuildOutput = @()
         try {
             $ErrorActionPreference = "Continue"
-            & docker @ComposeArgs @BuildArgs 2>&1 | ForEach-Object {
-                $Line = [string]$_
-                Write-Output $_
-                if (-not $BuildDiagnostics.DockerEngineFailureDetected -and (Test-DockerEngineFailure -OutputText $Line)) {
-                    $BuildDiagnostics.DockerEngineFailureDetected = $true
-                }
-            }
+            # Capture native stderr as data instead of piping it through PowerShell's
+            # Error stream. Docker Compose legitimately writes progress to stderr,
+            # and turning those records into pipeline errors makes a healthy build
+            # look like a PowerShell failure.
+            $BuildOutput = @(& docker @ComposeArgs @BuildArgs 2>&1)
             $BuildExitCode = $LASTEXITCODE
         }
         finally {
             $ErrorActionPreference = $BuildPreviousErrorActionPreference
+        }
+
+        foreach ($OutputItem in $BuildOutput) {
+            $Line = [string]$OutputItem
+            Write-Host $Line
+            if (-not $BuildDiagnostics.DockerEngineFailureDetected -and (Test-DockerEngineFailure -OutputText $Line)) {
+                $BuildDiagnostics.DockerEngineFailureDetected = $true
+            }
         }
 
         if ($BuildExitCode -ne 0 -or $BuildDiagnostics.DockerEngineFailureDetected) {
@@ -400,10 +407,11 @@ try {
                     $RetryPreviousErrorActionPreference = $ErrorActionPreference
                     try {
                         $ErrorActionPreference = "Continue"
-                        & docker @ComposeArgs @BuildArgs 2>&1 | ForEach-Object {
-                            Write-Output $_
-                        }
+                        $RetryBuildOutput = @(& docker @ComposeArgs @BuildArgs 2>&1)
                         $BuildExitCode = $LASTEXITCODE
+                        foreach ($OutputItem in $RetryBuildOutput) {
+                            Write-Host ([string]$OutputItem)
+                        }
                     }
                     finally {
                         $ErrorActionPreference = $RetryPreviousErrorActionPreference
