@@ -281,9 +281,6 @@ export default function BusinessModerationWorkspace() {
       <div className="rounded-2xl border border-slate-200 bg-white p-3">
         <div className="flex flex-col gap-2 lg:flex-row">
           <input
-      <div className="rounded-2xl border border-slate-200 bg-white p-3">
-        <div className="flex flex-col gap-2 lg:flex-row">
-          <input
             value={query}
             onChange={event => setQuery(event.target.value)}
             onKeyDown={event => {
@@ -740,7 +737,7 @@ export default function BusinessModerationWorkspace() {
                     setNotice(error instanceof Error ? error.message : "Keputusan data referensi gagal.");
                   }).finally(() => setBusy(false));
                 }}
-                className={\`rounded-xl px-4 py-2 text-sm font-bold text-white \${referenceDraft.action === "hide" ? "bg-rose-600" : "bg-emerald-600"} disabled:opacity-50\`}
+                className={`rounded-xl px-4 py-2 text-sm font-bold text-white ${referenceDraft.action === "hide" ? "bg-rose-600" : "bg-emerald-600"} disabled:opacity-50`}
               >
                 {busy ? "Menyimpan..." : referenceDraft.action === "hide" ? "Sembunyikan" : "Pulihkan"}
               </button>
