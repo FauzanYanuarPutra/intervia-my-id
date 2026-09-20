@@ -18,7 +18,7 @@ param(
     # Docker Desktop before BuildKit gets a chance to recover. Keep it
     # configurable while defaulting to a stable local-development value.
     [ValidateRange(1, 32)]
-    [int]$ParallelLimit = 1
+    [int]$ParallelLimit = 4
 )
 
 $ErrorActionPreference = "Stop"
@@ -174,6 +174,22 @@ try {
             $OutputText -match "(?i)is the docker daemon running" -or
             $OutputText -match "(?i)error during connect" -or
             $OutputText -match "(?i)error response from daemon"
+        )
+    }
+
+    function Test-DockerResourceFailure {
+        param(
+            [Parameter(Mandatory = $true)]
+            [string]$OutputText
+        )
+
+        return (
+            $OutputText -match "(?i)out of memory" -or
+            $OutputText -match "(?i)cannot allocate memory" -or
+            $OutputText -match "(?i)no space left on device" -or
+            $OutputText -match "(?i)signal: killed" -or
+            $OutputText -match "(?i)process .* killed" -or
+            $OutputText -match "(?i)ENOSPC"
         )
     }
 
@@ -620,6 +636,40 @@ try {
                         }
 
                         $env:COMPOSE_PARALLEL_LIMIT = $AdaptiveLimit.ToString()
+                    }
+                    elseif (Test-DockerResourceFailure -OutputText $BatchBuildText -and $AdaptiveLimit -gt 1) {
+                        # Resource exhaustion is different from a broken Dockerfile.
+                        # Do not restart Desktop; reduce concurrency and retry only
+                        # the same batch. This keeps the fast path fast while giving
+                        # smaller machines a deterministic safety valve.
+                        $ReducedLimit = [math]::Max(1, [math]::Floor($AdaptiveLimit / 2))
+                        Write-Warning "Build batch [$BatchLabel] terlihat kehabisan resource. Menurunkan paralelisme $AdaptiveLimit -> $ReducedLimit dan mengulang batch..."
+                        $AdaptiveLimit = $ReducedLimit
+                        $env:COMPOSE_PARALLEL_LIMIT = $AdaptiveLimit.ToString()
+
+                        $RetryBatchArgs = @("build") + $Batch
+                        $RetryBatchProbe = Invoke-DockerNative -Arguments (@($ComposeArgs) + $RetryBatchArgs)
+                        $RetryBatchProbe.Output | ForEach-Object { Write-Output $_ }
+
+                        if ($RetryBatchProbe.ExitCode -ne 0) {
+                            $RetryText = ($RetryBatchProbe.Output -join [Environment]::NewLine)
+                            if (Test-DockerResourceFailure -OutputText $RetryText -and $AdaptiveLimit -gt 1) {
+                                $AdaptiveLimit = 1
+                                $env:COMPOSE_PARALLEL_LIMIT = "1"
+                                Write-Warning "Resource masih penuh; retry terakhir batch [$BatchLabel] dengan paralelisme 1..."
+                                $FinalRetryProbe = Invoke-DockerNative -Arguments (@($ComposeArgs) + $RetryBatchArgs)
+                                $FinalRetryProbe.Output | ForEach-Object { Write-Output $_ }
+                                if ($FinalRetryProbe.ExitCode -ne 0) {
+                                    throw "Docker Compose build gagal pada batch [$BatchLabel] setelah fallback resource-safe ke paralelisme 1."
+                                }
+                            }
+                            else {
+                                throw "Docker Compose build gagal pada batch [$BatchLabel] setelah penurunan paralelisme. Periksa error build di atas."
+                            }
+                        }
+                        else {
+                            Write-Host "Build batch completed after resource-safe fallback: $BatchLabel" -ForegroundColor Green
+                        }
                     }
                     else {
                         # A normal application/Dockerfile/package error should not
