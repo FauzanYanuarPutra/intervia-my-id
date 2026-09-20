@@ -5,8 +5,8 @@ const config: Config = {
     './src/**/*.{ts,tsx}',
     '../../packages/index.ts',
     '../../packages/ui/**/*.{ts,tsx}',
-    '../../packages/product-configuration/index.ts',
-    '../../packages/utils/*.{ts,tsx}',
+    '../../packages/product-configuration/**/*.{ts,tsx}',
+    '../../packages/utils/**/*.{ts,tsx}',
     './node_modules/lajukan-ui/**/*.{ts,tsx,js,jsx}',
   ],
   theme: {
