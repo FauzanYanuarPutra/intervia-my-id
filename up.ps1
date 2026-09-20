@@ -6,6 +6,10 @@ param(
     [string[]]$Profile = @(),
     [string[]]$Services = @(),
 
+    # Compatibility aliases: some Windows shells/users type "-Buildclear"
+    # as a single rebuild flag. It means the same thing as "-Build" and
+    # does not delete containers or database volumes.
+    [Alias("Buildclear", "BuildClear")]
     [switch]$Build,
     [switch]$Pull,
     [switch]$Down,
