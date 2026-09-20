@@ -742,7 +742,24 @@ export function IngredientWorkspace({
                           <div className="mt-2 grid gap-3 sm:grid-cols-3">
                             <label className="text-xs font-semibold text-portal-soft">Jumlah<input type="number" min="0.0001" step="any" value={editDraft.purchaseQuantity} onChange={event => setEditDraft(current => current ? { ...current, purchaseQuantity: event.target.value } : current)} className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm" /></label>
                             <label className="text-xs font-semibold text-portal-soft">Satuan beli<input list="ingredient-common-units" value={editDraft.purchaseUnit} onChange={event => setEditDraft(current => current ? { ...current, purchaseUnit: event.target.value } : current)} onBlur={() => suggestUnitsForPurchaseUnit(editDraft.purchaseUnit, 'edit')} className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm" /></label>
-                            <label className="text-xs font-semibold text-portal-soft">Harga total (Rp)<input type="number" min="0" value={editDraft.purchasePrice} onChange={event => setEditDraft(current => current ? { ...current, purchasePrice: event.target.value } : current)} className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm" /></label>
+                            <label className="text-xs font-semibold text-portal-soft">Harga total
+                              <RupiahInput
+                                min={0}
+                                value={editDraft.purchasePrice ? Number(editDraft.purchasePrice) : null}
+                                onValueChange={value =>
+                                  setEditDraft(current =>
+                                    current
+                                      ? {
+                                          ...current,
+                                          purchasePrice: value == null ? '' : String(value),
+                                        }
+                                      : current,
+                                  )
+                                }
+                                placeholder="30.000"
+                                className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm"
+                              />
+                            </label>
                           </div>
                         </div>
                         <div className="grid gap-3 rounded-xl border border-portal-line bg-white p-4 sm:grid-cols-2">
