@@ -31,6 +31,8 @@ When a Business Profile uses `role_based` approval, issue/post/void/reverse acti
 must consume an approved request. Rules match document type, action and minimum
 amount, then snapshot the required role and approval count into the request.
 
+The approval model follows a maker/checker separation: the maker initiates or submits the document action, while the checker is an eligible approver under the rule snapshot.
+
 Approvers cannot approve their own request. Decisions are append-only. A rejection
 ends the request. Once the required number of distinct approvals is reached, the
 request becomes approved and can be consumed exactly once by the matching document
