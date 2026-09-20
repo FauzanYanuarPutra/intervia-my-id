@@ -57,3 +57,6 @@ Base evidence: `services/chat_service/lib/chat_service_web/router.ex`.
 - AI, auth, chat, community, content, CRM, events, forum, home trending searches, learning, notifications, reels, rewards, super-app, support, transactions, user, users, wallet, webhooks.
 
 Treat these as product-facing API surfaces. Check the route implementation before changing response shape.
+
+
+- CRM business moderation validation: the `main` branch now includes owner-managed business review, map-reference review, reports, verification, appeals, evidence, assignment/SLA, and internal CRM notifications.
