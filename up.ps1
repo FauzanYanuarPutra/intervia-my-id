@@ -359,22 +359,27 @@ try {
             $BuildArgs += $Services
         }
 
+        Write-Host "Building Docker images..." -ForegroundColor Cyan
         $BuildPreviousErrorActionPreference = $ErrorActionPreference
-        $BuildOutput = @()
-        $BuildCapturedOutput = @()
+        $BuildCapturedOutput = [System.Collections.Generic.List[string]]::new()
         $BuildExitCode = 1
         try {
-            # Compose progress is streamed while we also retain enough output to
-            # distinguish an application build failure from a dead Docker daemon.
             $ErrorActionPreference = "Continue"
-            $BuildOutput = @(& docker @ComposeArgs @BuildArgs 2>&1 | Tee-Object -Variable BuildCapturedOutput)
+            & docker @ComposeArgs @BuildArgs 2>&1 | ForEach-Object {
+                $line = $_.ToString()
+                Write-Host $line
+                $BuildCapturedOutput.Add($line)
+                if ($BuildCapturedOutput.Count -gt 200) {
+                    $BuildCapturedOutput.RemoveAt(0)
+                }
+            }
             $BuildExitCode = $LASTEXITCODE
         }
         finally {
             $ErrorActionPreference = $BuildPreviousErrorActionPreference
         }
 
-        $BuildOutputText = ($BuildOutput + @($BuildCapturedOutput) | ForEach-Object { $_.ToString() }) -join [Environment]::NewLine
+        $BuildOutputText = $BuildCapturedOutput -join [Environment]::NewLine
         $DockerEngineFailure =
             $BuildExitCode -ne 0 -and (Test-DockerEngineFailure -OutputText $BuildOutputText)
 
@@ -386,7 +391,9 @@ try {
                 $RetryPreviousErrorActionPreference = $ErrorActionPreference
                 try {
                     $ErrorActionPreference = "Continue"
-                    & docker @ComposeArgs @BuildArgs
+                    & docker @ComposeArgs @BuildArgs 2>&1 | ForEach-Object {
+                        Write-Host $_.ToString()
+                    }
                     $BuildExitCode = $LASTEXITCODE
                 }
                 finally {
@@ -411,20 +418,27 @@ try {
         $UpArgs += $Services
     }
 
+    Write-Host "Starting Docker Compose services..." -ForegroundColor Cyan
     $UpPreviousErrorActionPreference = $ErrorActionPreference
-    $UpOutput = @()
-    $UpCapturedOutput = @()
+    $UpCapturedOutput = [System.Collections.Generic.List[string]]::new()
     $UpExitCode = 1
     try {
         $ErrorActionPreference = "Continue"
-        $UpOutput = @(& docker @ComposeArgs @UpArgs 2>&1 | Tee-Object -Variable UpCapturedOutput)
+        & docker @ComposeArgs @UpArgs 2>&1 | ForEach-Object {
+            $line = $_.ToString()
+            Write-Host $line
+            $UpCapturedOutput.Add($line)
+            if ($UpCapturedOutput.Count -gt 200) {
+                $UpCapturedOutput.RemoveAt(0)
+            }
+        }
         $UpExitCode = $LASTEXITCODE
     }
     finally {
         $ErrorActionPreference = $UpPreviousErrorActionPreference
     }
 
-    $UpOutputText = ($UpOutput + @($UpCapturedOutput) | ForEach-Object { $_.ToString() }) -join [Environment]::NewLine
+    $UpOutputText = $UpCapturedOutput -join [Environment]::NewLine
     $DockerEngineFailure =
         $UpExitCode -ne 0 -and (Test-DockerEngineFailure -OutputText $UpOutputText)
 
@@ -436,7 +450,9 @@ try {
             $RetryPreviousErrorActionPreference = $ErrorActionPreference
             try {
                 $ErrorActionPreference = "Continue"
-                & docker @ComposeArgs @UpArgs
+                & docker @ComposeArgs @UpArgs 2>&1 | ForEach-Object {
+                    Write-Host $_.ToString()
+                }
                 $UpExitCode = $LASTEXITCODE
             }
             finally {
