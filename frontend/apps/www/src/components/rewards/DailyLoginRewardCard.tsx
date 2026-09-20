@@ -288,153 +288,75 @@ export function DailyLoginRewardCard({ locale, compact = false }: Props) {
       <section
         className={cn(
           rewardCardShellClass,
-          'lajukan-daily-reward-card-compact p-2.5',
+          'lajukan-daily-reward-card-compact rounded-[14px] p-2',
         )}
         data-testid="daily-login-reward-card"
         data-layout="compact"
       >
-        <div className="pointer-events-none absolute -right-10 -top-10 h-20 w-20 rounded-full bg-amber-200/45 blur-2xl" />
-        <div className="pointer-events-none absolute -bottom-10 -left-10 h-20 w-20 rounded-full bg-orange-200/30 blur-2xl" />
+        <div className="relative flex min-w-0 items-center gap-2">
+          <span
+            className={cn(
+              'grid h-7 w-7 shrink-0 place-items-center rounded-[9px] text-white',
+              claimedToday ? 'bg-amber-600' : 'bg-orange-500',
+            )}
+          >
+            {claimedToday ? (
+              <CheckCircle2 className="h-3.5 w-3.5" />
+            ) : (
+              <CalendarCheck className="h-3.5 w-3.5" />
+            )}
+          </span>
 
-        <div className="relative">
-          <div className="flex min-w-0 items-center gap-2">
-            <span
-              className={cn(
-                'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] text-white shadow-sm',
-                claimedToday ? 'bg-amber-600' : 'bg-orange-500',
-              )}
-            >
-              {claimedToday ? (
-                <CheckCircle2 className="h-4 w-4" />
-              ) : (
-                <CalendarCheck className="h-4 w-4" />
-              )}
-            </span>
-
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[11px] font-bold leading-4 tracking-tight text-[color:var(--app-text)]">
-                {effectiveStatus === 'loading'
-                  ? isId
-                    ? 'Mengecek reward...'
-                    : 'Checking reward...'
-                  : effectiveStatus === 'claiming'
-                    ? isId
-                      ? 'Mengambil koin...'
-                      : 'Claiming coins...'
-                    : claimedToday
-                      ? isId
-                        ? `Hari ${streak}/7 masuk`
-                        : `Day ${streak}/7 claimed`
-                      : isId
-                        ? `Claim H${nextStreakDay}: +${todayCoin} koin`
-                        : `Claim D${nextStreakDay}: +${todayCoin} coins`}
+          <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 items-center gap-1.5">
+              <p className="truncate text-[10px] font-bold text-[color:var(--app-text)]">
+                {claimedToday
+                  ? (isId ? `Hari ${streak}/7 masuk` : `Day ${streak}/7 claimed`)
+                  : (isId ? `Hari ${nextStreakDay}/7` : `Day ${nextStreakDay}/7`)}
               </p>
-              <p className="truncate text-[9px] leading-3.5 text-[color:var(--app-text-soft)]">
-                {isId
-                  ? `1 koin = Rp${coinValueRupiah.toLocaleString('id-ID')} · Reset ${resetLabel}`
-                  : `1 coin = IDR ${coinValueRupiah.toLocaleString('id-ID')} · Reset ${resetLabel}`}
-              </p>
+              <span className="shrink-0 text-[9px] font-bold text-orange-600 dark:text-orange-300">
+                +{todayCoin} coin
+              </span>
+              <span className="hidden shrink-0 text-[9px] text-zinc-400 sm:inline">
+                +{todayXp} XP
+              </span>
             </div>
-
-            <button
-              type="button"
-              onClick={() => void handleClaim()}
-              disabled={!canClaimToday || effectiveStatus === 'claiming'}
-              className={cn(
-                'inline-flex h-8 shrink-0 items-center justify-center gap-1 rounded-lg px-2.5 text-[10px] font-bold transition',
-                canClaimToday
-                  ? 'bg-amber-500 text-white hover:bg-amber-600'
-                  : 'border border-amber-200 bg-white text-amber-700',
-                effectiveStatus === 'claiming'
-                  ? 'cursor-wait opacity-80'
-                  : 'disabled:cursor-not-allowed disabled:opacity-80',
-              )}
-            >
-              {canClaimToday ? 'Claim' : isId ? 'Sudah' : 'Done'}
-            </button>
-          </div>
-
-          <div className="mt-1.5 grid grid-cols-3 gap-1">
-            <div className="rounded-[9px] border border-orange-100 bg-white/80 px-1.5 py-1 text-center">
-              <p className="text-[10px] font-bold text-[color:var(--app-text)]">
-                <Flame className="mr-0.5 inline h-3 w-3 text-orange-500" />
-                {streak}/7
-              </p>
-              <p className="text-[7px] font-bold uppercase text-orange-700/70">streak</p>
-            </div>
-            <div className="rounded-[9px] border border-amber-100 bg-amber-50/80 px-1.5 py-1 text-center">
-              <p className="text-[10px] font-bold text-[color:var(--app-text)]">
-                <Coins className="mr-0.5 inline h-3 w-3 text-amber-600" />
-                {coins}
-              </p>
-              <p className="text-[7px] font-bold uppercase text-amber-700/70">coin</p>
-            </div>
-            <div className="rounded-[9px] border border-sky-100 bg-white/80 px-1.5 py-1 text-center">
-              <p className="text-[10px] font-bold text-[color:var(--app-text)]">
-                <Sparkles className="mr-0.5 inline h-3 w-3 text-amber-600" />
-                {xp}
-              </p>
-              <p className="text-[7px] font-bold uppercase text-sky-700/70">XP</p>
-            </div>
-          </div>
-
-          <div className="mt-1.5 grid grid-cols-7 gap-0.5">
-            {schedule.map(day => {
-              const isNext = !day.claimed && day.day === nextStreakDay;
-              return (
-                <div
-                  key={day.day}
-                  className={cn(
-                    'min-w-0 rounded-[7px] border px-0.5 py-1 text-center',
-                    day.claimed
-                      ? 'border-amber-200 bg-amber-50 text-amber-800'
-                      : day.voucher
-                        ? 'border-amber-200 bg-amber-50 text-amber-800'
-                        : 'border-slate-200/80 bg-white/82 text-[color:var(--app-text-soft)]',
-                    isNext ? 'ring-1 ring-amber-400/60' : '',
-                  )}
-                  title={day.voucher ? (isId ? 'Hari voucher' : 'Voucher day') : `+${day.coin_amount} coin`}
-                >
-                  <p className="text-[7px] font-bold leading-3">
-                    {isId ? 'H' : 'D'}{day.day}
-                  </p>
-                  <p className="mt-0.5 truncate text-[7px] font-bold leading-3">
-                    {day.voucher ? 'V' : `+${day.coin_amount}`}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="mt-1.5 flex min-w-0 items-center gap-1.5">
-            <p className="min-w-0 flex-1 truncate px-0.5 text-[8px] font-semibold text-amber-700 dark:text-amber-300">
-              {claimedToday
-                ? `+${todayCoin} koin · +${todayXp} XP`
-                : isId
-                  ? `Belum claim · +${todayCoin} koin sebelum reset`
-                  : `Not claimed · +${todayCoin} coins before reset`}
+            <p className="truncate text-[8px] text-[color:var(--app-text-soft)]">
+              {isId
+                ? `Reset ${resetLabel} · 1 koin = Rp${coinValueRupiah.toLocaleString('id-ID')}`
+                : `Reset ${resetLabel} · 1 coin = IDR ${coinValueRupiah.toLocaleString('id-ID')}`}
             </p>
-            <Link
-              href={'/' + locale + '/transactions'}
-              className="inline-flex h-7 shrink-0 items-center justify-center rounded-lg border border-sky-200 bg-sky-50 px-2 text-[9px] font-bold text-sky-700 transition hover:bg-sky-100"
-            >
-              {isId ? 'Pakai' : 'Use'}
-            </Link>
           </div>
 
-          {status === 'error' || errorMessage ? (
-            <p className="mt-1 rounded-lg bg-red-50 px-2 py-1 text-[8px] font-semibold text-red-700">
-              {errorMessage ??
-                (isId
-                  ? 'Reward belum bisa dicek. Coba lagi nanti.'
-                  : 'Reward is unavailable. Try again later.')}
-            </p>
-          ) : null}
+          <button
+            type="button"
+            onClick={() => void handleClaim()}
+            disabled={!canClaimToday || effectiveStatus === 'claiming'}
+            className={cn(
+              'inline-flex h-7 shrink-0 items-center justify-center rounded-lg px-2.5 text-[9px] font-bold',
+              canClaimToday
+                ? 'bg-amber-500 text-white hover:bg-amber-600'
+                : 'border border-amber-200 bg-white text-amber-700',
+              effectiveStatus === 'claiming'
+                ? 'cursor-wait opacity-80'
+                : 'disabled:cursor-not-allowed disabled:opacity-80',
+            )}
+          >
+            {canClaimToday ? 'Claim' : isId ? 'Sudah' : 'Done'}
+          </button>
         </div>
+
+        {status === 'error' || errorMessage ? (
+          <p className="relative mt-1 truncate rounded-lg bg-red-50 px-2 py-1 text-[8px] font-semibold text-red-700">
+            {errorMessage ??
+              (isId
+                ? 'Reward belum bisa dicek. Coba lagi nanti.'
+                : 'Reward is unavailable. Try again later.')}
+          </p>
+        ) : null}
       </section>
     );
   }
-
   return (
     <section
       className={cn(
