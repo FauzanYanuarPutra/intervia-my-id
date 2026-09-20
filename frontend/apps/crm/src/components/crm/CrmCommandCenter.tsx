@@ -517,6 +517,8 @@ function iconPaths(name: IconName): string[] {
       return ["M18 16v-5a6 6 0 0 0-12 0v5l-2 2h16l-2-2", "M10 20h4"];
     case "chat":
       return ["M5 6h14v9H8l-3 3V6Z", "M8 9h8", "M8 12h5"];
+    case "businesses":
+      return ["M4 20V7l8-4 8 4v13", "M8 10h2", "M14 10h2", "M8 14h2", "M14 14h2", "M10 20v-3h4v3"];
     case "chevron":
       return ["M9 6l6 6-6 6"];
     case "dashboard":
@@ -541,6 +543,8 @@ function iconPaths(name: IconName): string[] {
       return ["M5 7h14v10H5V7Z", "M8 11h4", "M16 13h.01", "M8 15h8"];
     case "users":
       return ["M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z", "M3 20a6 6 0 0 1 12 0", "M17 11a2.5 2.5 0 1 0 0-5", "M16 15a5 5 0 0 1 5 5"];
+    default:
+      return [];
   }
 }
 
