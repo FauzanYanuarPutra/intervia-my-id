@@ -2473,6 +2473,110 @@ function GameProgressCard({
   const ActiveQuestIcon = activeQuest.icon;
   const amountLabel = walletAmountLabel || formatCurrencyFromCents(0, 'IDR');
 
+  if (compact) {
+    return (
+      <section
+        className="lajukan-game-progress-card relative overflow-hidden rounded-2xl border border-slate-100 bg-white p-2.5 text-[color:var(--app-text)] shadow-[0_8px_24px_-18px_rgba(15,23,42,0.18)] dark:border-zinc-800/80 dark:bg-zinc-950 dark:text-zinc-50"
+        data-layout="compact"
+      >
+        <div className="pointer-events-none absolute -right-10 -top-10 h-20 w-20 rounded-full bg-emerald-400/10 blur-2xl dark:bg-emerald-500/5" />
+        <div className="pointer-events-none absolute -bottom-10 -left-10 h-20 w-20 rounded-full bg-amber-400/10 blur-2xl dark:bg-amber-500/5" />
+
+        <div className="relative min-w-0">
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px] bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-sm shadow-emerald-500/20">
+              <span className="text-sm font-bold leading-none">{snapshot.level}</span>
+              <span className="absolute -bottom-1 -right-1 grid h-4 w-4 place-items-center rounded-[5px] bg-amber-400">
+                <Trophy className="h-2.5 w-2.5 text-emerald-950" />
+              </span>
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <p className="truncate text-[9px] font-bold uppercase tracking-[0.13em] text-zinc-400 dark:text-zinc-500">
+                  {isId ? 'Arena Level' : 'Arena Level'}
+                </p>
+                <span className="shrink-0 rounded-full bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
+                  {snapshot.rank}
+                </span>
+              </div>
+              <div className="mt-1 flex items-center gap-1.5">
+                <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-emerald-500 via-teal-400 to-amber-400 transition-all duration-500"
+                    style={{ width: `${snapshot.xpPercent}%` }}
+                  />
+                </div>
+                <span className="shrink-0 font-mono text-[9px] font-bold leading-none text-zinc-500 dark:text-zinc-400">
+                  {snapshot.xp}/{snapshot.xpGoal}
+                </span>
+              </div>
+            </div>
+
+            <div className="hidden shrink-0 text-right sm:block">
+              <p className="text-[8px] font-bold uppercase tracking-[0.12em] text-zinc-400 dark:text-zinc-500">
+                {isId ? 'Saldo' : 'Balance'}
+              </p>
+              {walletLoading ? (
+                <div className="mt-1 ml-auto h-3 w-12 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+              ) : (
+                <p className="mt-0.5 text-[11px] font-bold leading-none text-zinc-800 dark:text-zinc-200">
+                  {amountLabel}
+                </p>
+              )}
+            </div>
+
+            <Link
+              href="/payments"
+              className="inline-flex h-7 shrink-0 items-center justify-center rounded-lg bg-zinc-900 px-2.5 text-[10px] font-bold text-white transition hover:bg-zinc-800 active:scale-95 dark:bg-zinc-50 dark:text-zinc-950 dark:hover:bg-zinc-200"
+            >
+              {isId ? 'Top up' : 'Top up'}
+            </Link>
+          </div>
+
+          <div className="mt-2 grid grid-cols-3 gap-1.5">
+            <div className="min-w-0 rounded-lg border border-zinc-100 bg-zinc-50/75 px-2 py-1.5 dark:border-zinc-900 dark:bg-zinc-900/35">
+              <p className="text-[8px] font-bold uppercase tracking-[0.1em] text-zinc-400 dark:text-zinc-500">
+                {isId ? 'Streak' : 'Streak'}
+              </p>
+              <p className="mt-0.5 flex items-center gap-1 truncate text-[11px] font-bold text-orange-600 dark:text-orange-400">
+                <Flame className="h-3 w-3 shrink-0 fill-orange-500/10" />
+                {snapshot.streak}x
+              </p>
+            </div>
+
+            <div className="min-w-0 rounded-lg border border-zinc-100 bg-zinc-50/75 px-2 py-1.5 dark:border-zinc-900 dark:bg-zinc-900/35">
+              <p className="text-[8px] font-bold uppercase tracking-[0.1em] text-zinc-400 dark:text-zinc-500">
+                {isId ? 'Next Reward' : 'Next Reward'}
+              </p>
+              <p className="mt-0.5 flex items-center gap-1 truncate text-[11px] font-bold text-amber-600 dark:text-amber-500">
+                <Zap className="h-3 w-3 shrink-0 fill-amber-500/10" />
+                {snapshot.nextReward}
+              </p>
+            </div>
+
+            <Link
+              href={activeQuest.href}
+              className="group min-w-0 rounded-lg border border-emerald-100 bg-emerald-50/55 px-2 py-1.5 transition hover:bg-emerald-50 dark:border-emerald-500/10 dark:bg-emerald-500/5 dark:hover:bg-emerald-500/10"
+            >
+              <p className="truncate text-[8px] font-bold uppercase tracking-[0.1em] text-emerald-600/80 dark:text-emerald-400/70">
+                Quest
+              </p>
+              <p className="mt-0.5 flex items-center gap-1 truncate text-[11px] font-bold text-emerald-800 dark:text-emerald-300">
+                <ActiveQuestIcon className="h-3 w-3 shrink-0" />
+                +{activeQuest.xp} XP
+              </p>
+            </Link>
+          </div>
+
+          <p className="mt-1.5 truncate px-0.5 text-[9px] font-semibold text-emerald-600/80 dark:text-emerald-400/70">
+            {activeQuest.label}
+          </p>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section
       className={cn(
