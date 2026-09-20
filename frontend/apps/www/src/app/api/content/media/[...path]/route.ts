@@ -124,6 +124,8 @@ async function handlePublicMedia(
     // Keep public cards free of broken-image 404s while preserving the warning
     // for operators; authenticated chat media remains on its protected proxy.
     if (parsed.key.startsWith('content/')) {
+      const local = await localFallback(parsed.key, headOnly);
+      if (local.status === 200) return local;
       return missingContentMediaResponse(headOnly);
     }
     return errorResponse('Not found', 404);
