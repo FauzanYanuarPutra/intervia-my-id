@@ -295,7 +295,7 @@ try {
     }
 
     $KycRequested = $RequestedProfiles -contains "kyc"
-    if ($Environment -eq "development" -and $KycRequested -and -not $Down) {
+    if ($Environment -eq "development" -and $KycRequested -and -not $Down.IsPresent) {
         Write-Host "Verifying local KYC liveness models..." -ForegroundColor Cyan
         & $PythonCommand.Source "scripts/config/provision_kyc_models.py" "--env-file" $EnvFile
         if ($LASTEXITCODE -ne 0) {
@@ -316,28 +316,44 @@ try {
     foreach ($RequestedProfile in $RequestedProfiles) {
         $ValidatorArgs += @("--profile", $RequestedProfile)
     }
-    $ComposeModel | & $PythonCommand.Source @ValidatorArgs
-    if ($LASTEXITCODE -ne 0) {
-        throw "Kontrak konfigurasi runtime tidak valid. Tidak ada container yang diubah."
+    $ValidatorPreviousErrorActionPreference = $ErrorActionPreference
+    $ValidatorOutput = @()
+    $ValidatorExitCode = 1
+    try {
+        $ErrorActionPreference = "Continue"
+        $ValidatorOutput = @(
+            $ComposeModel | & $PythonCommand.Source @ValidatorArgs 2>&1
+        )
+        $ValidatorExitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $ValidatorPreviousErrorActionPreference
     }
 
-    if ($Fresh) {
+    $ValidatorOutput | ForEach-Object { Write-Output $_ }
+    if ($ValidatorExitCode -ne 0) {
+        throw "Kontrak konfigurasi runtime tidak valid. Tidak ada container yang diubah."
+    }
+    Write-Host "Runtime configuration contract passed; continuing launcher lifecycle..." -ForegroundColor Green
+    Write-Host "Launcher actions: Build=$($Build.IsPresent) Pull=$($Pull.IsPresent) Fresh=$($Fresh.IsPresent) Down=$($Down.IsPresent) Services=$($Services -join ",")" -ForegroundColor DarkCyan
+
+    if ($Fresh.IsPresent) {
         Write-Host "Recreating containers for $Environment (volumes are preserved)..." -ForegroundColor Yellow
         & docker @ComposeArgs down --remove-orphans
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     }
 
-    if ($Down) {
+    if ($Down.IsPresent) {
         & docker @ComposeArgs down --remove-orphans
         exit $LASTEXITCODE
     }
 
-    if ($Pull) {
+    if ($Pull.IsPresent) {
         & docker @ComposeArgs pull
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     }
 
-    if ($Build) {
+    if ($Build.IsPresent) {
         $BuildArgs = @("build")
         if ($Services.Count -gt 0) {
             $BuildArgs += $Services
@@ -386,7 +402,7 @@ try {
     }
 
     $UpArgs = @("up", "-d", "--remove-orphans", "--wait", "--wait-timeout", "420")
-    if ($Build) {
+    if ($Build.IsPresent) {
         # A freshly built image must never keep running behind a stale container
         # health state. Volumes remain preserved; only service containers are recreated.
         $UpArgs += "--force-recreate"
