@@ -365,38 +365,57 @@ try {
         }
 
         Write-Host "Building Docker images..." -ForegroundColor Cyan
+        $BuildParallelLimit = 1
+        $BuildOriginalParallelLimit = $env:COMPOSE_PARALLEL_LIMIT
+        $env:COMPOSE_PARALLEL_LIMIT = $BuildParallelLimit.ToString()
+        Write-Host "Compose build parallelism forced to 1 for Docker Desktop stability." -ForegroundColor DarkGray
+
+        $BuildDiagnostics = [pscustomobject]@{
+            DockerEngineFailureDetected = $false
+        }
         $BuildPreviousErrorActionPreference = $ErrorActionPreference
         $BuildExitCode = 1
         try {
             $ErrorActionPreference = "Continue"
-            & docker @ComposeArgs @BuildArgs
+            & docker @ComposeArgs @BuildArgs 2>&1 | ForEach-Object {
+                $Line = [string]$_
+                Write-Output $_
+                if (-not $BuildDiagnostics.DockerEngineFailureDetected -and (Test-DockerEngineFailure -OutputText $Line)) {
+                    $BuildDiagnostics.DockerEngineFailureDetected = $true
+                }
+            }
             $BuildExitCode = $LASTEXITCODE
         }
         finally {
             $ErrorActionPreference = $BuildPreviousErrorActionPreference
         }
 
-        if ($BuildExitCode -ne 0) {
+        if ($BuildExitCode -ne 0 -or $BuildDiagnostics.DockerEngineFailureDetected) {
             $BuildProbe = Invoke-DockerNative -Arguments @("info", "--format", "{{json .ServerVersion}}")
-            $DockerEngineFailure = $BuildProbe.ExitCode -ne 0
+            $DockerEngineFailure = $BuildDiagnostics.DockerEngineFailureDetected -or ($BuildProbe.ExitCode -ne 0)
 
             if ($DockerEngineFailure) {
-                $OriginalParallelLimit = $env:COMPOSE_PARALLEL_LIMIT
                 if (Invoke-DockerEngineRecovery -Reason "Compose build") {
-                    Write-Warning "Mengulangi Compose build dengan paralelisme 1 setelah Docker Engine recovery..."
-                    $env:COMPOSE_PARALLEL_LIMIT = "1"
+                    Write-Warning "Mengulangi Compose build setelah Docker Engine recovery dengan paralelisme 1..."
                     $RetryPreviousErrorActionPreference = $ErrorActionPreference
                     try {
                         $ErrorActionPreference = "Continue"
-                        & docker @ComposeArgs @BuildArgs
+                        & docker @ComposeArgs @BuildArgs 2>&1 | ForEach-Object {
+                            Write-Output $_
+                        }
                         $BuildExitCode = $LASTEXITCODE
                     }
                     finally {
                         $ErrorActionPreference = $RetryPreviousErrorActionPreference
-                        $env:COMPOSE_PARALLEL_LIMIT = $OriginalParallelLimit
                     }
                 }
             }
+        }
+
+        $env:COMPOSE_PARALLEL_LIMIT = $BuildOriginalParallelLimit
+
+        if ($BuildExitCode -ne 0) {
+            throw "Docker Compose build gagal (exit code $BuildExitCode). Periksa error build di atas."
         }
 
         if ($BuildExitCode -ne 0) {
