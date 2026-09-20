@@ -1248,7 +1248,7 @@ function TopBar({
                     key={item.id}
                     type="button"
                     onClick={() => onMarkCrmNotificationRead(item.id)}
-                    className={\`block w-full border-b border-slate-100 px-4 py-3 text-left transition hover:bg-slate-50 \${item.is_read ? "bg-white" : "bg-emerald-50/50"}\`}
+                    className={`block w-full border-b border-slate-100 px-4 py-3 text-left transition hover:bg-slate-50 ${item.is_read ? "bg-white" : "bg-emerald-50/50"}`}
                   >
                     <div className="flex items-start gap-3">
                       <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
