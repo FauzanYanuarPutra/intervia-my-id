@@ -1,31 +1,75 @@
 services:
+  # Ensure every target-domain database exists even when domain_db uses an
+  # already-initialized Docker volume. The postgres init directory only runs on
+  # first volume creation, so this idempotent bootstrap is required for upgrades.
+  domain_db_bootstrap:
+    image: postgres:16-alpine
+    restart: "no"
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+    depends_on:
+      domain_db: { condition: service_healthy }
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        export PGPASSWORD="$POSTGRES_PASSWORD"
+        for db in profile_db media_db news_db order_db payment_db promotion_db crm_db communication_db trust_db audit_db support_db review_db; do
+          if ! psql -h domain_db -U "$POSTGRES_USER" -d postgres -Atqc "SELECT 1 FROM pg_database WHERE datname='$db'" | grep -q 1; then
+            psql -h domain_db -U "$POSTGRES_USER" -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE \"$db\""
+          fi
+        done
+    networks: [data]
   # Development publishes only loopback ports. Caddy is opt-in through profile edge.
   domain_db:
     ports:
       - "127.0.0.1:${PORT_DOMAIN_DB:-5435}:5432"
 
   profile_service:
+    depends_on:
+      domain_db_bootstrap: { condition: service_completed_successfully }
     ports: ["127.0.0.1:${PORT_PROFILE:-8091}:8091"]
   media_service:
+    depends_on:
+      domain_db_bootstrap: { condition: service_completed_successfully }
     ports: ["127.0.0.1:${PORT_MEDIA:-8092}:8092"]
   news_service:
+    depends_on:
+      domain_db_bootstrap: { condition: service_completed_successfully }
     ports: ["127.0.0.1:${PORT_NEWS:-8093}:8093"]
   order_service:
+    depends_on:
+      domain_db_bootstrap: { condition: service_completed_successfully }
     ports: ["127.0.0.1:${PORT_ORDER:-8094}:8094"]
   payment_service:
+    depends_on:
+      domain_db_bootstrap: { condition: service_completed_successfully }
     ports: ["127.0.0.1:${PORT_PAYMENT:-8095}:8095"]
   promotion_service:
+    depends_on:
+      domain_db_bootstrap: { condition: service_completed_successfully }
     ports: ["127.0.0.1:${PORT_PROMOTION:-8096}:8096"]
   crm_service:
+    depends_on:
+      domain_db_bootstrap: { condition: service_completed_successfully }
     ports: ["127.0.0.1:${PORT_CRM_SERVICE:-8097}:8097"]
   communication_service:
+    depends_on:
+      domain_db_bootstrap: { condition: service_completed_successfully }
     ports: ["127.0.0.1:${PORT_COMMUNICATION:-8098}:8098"]
   trust_service:
+    depends_on:
+      domain_db_bootstrap: { condition: service_completed_successfully }
     ports: ["127.0.0.1:${PORT_TRUST:-8099}:8099"]
 
   support_service:
+    depends_on:
+      domain_db_bootstrap: { condition: service_completed_successfully }
     ports: ["127.0.0.1:${PORT_SUPPORT:-8100}:8100"]
   review_service:
+    depends_on:
+      domain_db_bootstrap: { condition: service_completed_successfully }
     ports: ["127.0.0.1:${PORT_REVIEW:-8101}:8101"]
 
   identity_db:
@@ -71,6 +115,8 @@ services:
       - "127.0.0.1:${PORT_MINIO_UI:-9005}:9001"
 
   identity_service:
+    depends_on:
+      rabbitmq: { condition: service_healthy }
     environment:
       ENV: development
       RUST_LOG: ${RUST_LOG:-info}
@@ -78,6 +124,8 @@ services:
       - "127.0.0.1:${PORT_IDENTITY:-8080}:8080"
 
   marketplace_service:
+    depends_on:
+      rabbitmq: { condition: service_healthy }
     environment:
       ENV: development
       RUST_LOG: ${RUST_LOG:-info}
@@ -92,6 +140,8 @@ services:
       - "127.0.0.1:${PORT_MARKETPLACE:-8081}:8081"
 
   community_service:
+    depends_on:
+      rabbitmq: { condition: service_healthy }
     environment:
       ENV: development
       RUST_LOG: ${RUST_LOG:-info}
