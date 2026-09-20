@@ -696,6 +696,81 @@ export const contentApi = {
   },
 };
 
+export const newsApi = {
+  queue: async (token: string, status = 'pending_review') => {
+    const query = new URLSearchParams({
+      status,
+      limit: '100',
+      offset: '0',
+    }).toString();
+    return fetchJson(`${MARKETPLACE_URL}/v1/news/editorial/queue?${query}`, {
+      method: 'GET',
+      token,
+    });
+  },
+
+  history: async (token: string, id: string) => {
+    return fetchJson(
+      `${MARKETPLACE_URL}/v1/news/${encodeURIComponent(id)}/editorial`,
+      {
+        method: 'GET',
+        token,
+      },
+    );
+  },
+
+  metrics: async (token: string) => {
+    return fetchJson(`${MARKETPLACE_URL}/v1/news/editorial/metrics`, {
+      method: 'GET',
+      token,
+    });
+  },
+
+  updateSource: async (
+    token: string,
+    contentId: string,
+    sourceId: string,
+    data: {
+      source_kind?: 'user_supplied' | 'primary' | 'secondary' | 'official' | 'business';
+      verification_status?: 'unverified' | 'verified' | 'broken' | 'rejected';
+      note?: string;
+    },
+  ) => {
+    return fetchJson(
+      `${MARKETPLACE_URL}/v1/news/${encodeURIComponent(contentId)}/sources/${encodeURIComponent(sourceId)}`,
+      {
+        method: 'PATCH',
+        token,
+        body: JSON.stringify(data),
+      },
+    );
+  },
+
+  moderate: async (
+    token: string,
+    id: string,
+    data: {
+      action: 'approve' | 'needs_revision' | 'reject' | 'retract' | 'correct';
+      note?: string;
+      business_impact?: string;
+      publish_at?: string;
+      fact_check_status?: 'pending' | 'verified' | 'not_required';
+      legal_review_status?: 'pending' | 'approved' | 'not_required';
+      editorial_priority?: 'low' | 'normal' | 'high' | 'urgent';
+      sensitivity?: 'normal' | 'high';
+    },
+  ) => {
+    return fetchJson(
+      `${MARKETPLACE_URL}/v1/news/${encodeURIComponent(id)}/moderate`,
+      {
+        method: 'PATCH',
+        token,
+        body: JSON.stringify(data),
+      },
+    );
+  },
+};
+
 export const usersApi = {
   list: async (token: string) => {
     return fetchJson(`${IDENTITY_API_URL}/users`, {
