@@ -543,13 +543,18 @@ export async function PUT(
     setNestedString(forwardPayload, candidate.field, safety.sanitizedText);
   }
 
-  const creatorBudget = await enforceCreatorBudget({
-    userId: auth.ctx.userId,
-    action: 'edit_listing',
-    cost: 10,
-    dailyLimit: 40,
-  });
-  if (!creatorBudget.ok) return creatorBudget.response;
+  const isWizardAutosave =
+    req.headers.get('x-lajukan-autosave') === '1';
+
+  if (!isWizardAutosave) {
+    const creatorBudget = await enforceCreatorBudget({
+      userId: auth.ctx.userId,
+      action: 'edit_listing',
+      cost: 10,
+      dailyLimit: 40,
+    });
+    if (!creatorBudget.ok) return creatorBudget.response;
+  }
 
   const backendRes = await fetch(
     `${marketplaceBase}/v1/content/${resolvedContentId || resolvedParams.id}`,
@@ -568,7 +573,11 @@ export async function PUT(
   );
 
   const data = await readUpstreamPayload(backendRes);
-  if (!backendRes.ok && backendRes.status >= 500) {
+  if (
+    !isWizardAutosave &&
+    !backendRes.ok &&
+    backendRes.status >= 500
+  ) {
     await refundCreatorBudget({
       userId: auth.ctx.userId,
       action: 'edit_listing',
