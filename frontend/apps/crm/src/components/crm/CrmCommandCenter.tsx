@@ -1061,7 +1061,16 @@ export default function CrmCommandCenter() {
         `${item.name} ${item.city} ${item.address} ${item.review_state}`.toLowerCase().includes(needle),
       ),
       chats: data.chats.filter(item =>
-        `${item.name} ${item.lastMessage} ${item.listingTitle}`.toLowerCase().includes(needle),
+        `${item.name} ${item.lastMessage} ${item.listingTitle} ${item.stage} ${item.source}`.toLowerCase().includes(needle),
+      ),
+      leads: data.leads.filter(item =>
+        `${item.name || ""} ${item.requester_name || ""} ${item.requester_email || ""} ${item.stage || ""} ${asString(item.metadata?.listing_title)}`.toLowerCase().includes(needle),
+      ),
+      orders: data.orders.filter(item =>
+        `${item.id || ""} ${item.status || ""} ${item.payment_mode || ""} ${item.requester_id || ""} ${item.partner_id || ""} ${item.merchant_id || ""} ${item.provider_id || ""}`.toLowerCase().includes(needle),
+      ),
+      tickets: data.tickets.filter(item =>
+        `${item.subject || ""} ${item.requester_name || ""} ${item.requester_email || ""} ${item.status || ""} ${item.category || ""} ${item.priority || ""}`.toLowerCase().includes(needle),
       ),
     };
   }, [data, query]);
@@ -1111,7 +1120,6 @@ export default function CrmCommandCenter() {
             query={query}
             userLabel={user?.username || user?.email || "Admin"}
             refreshing={refreshing}
-            notificationCount={openIssues + highRiskOrders + newsPendingCount + businessPendingCount + crmNotifications.filter(item => !item.is_read).length}
             crmNotifications={crmNotifications}
             crmNotificationOpen={crmNotificationOpen}
             onToggleCrmNotifications={() => setCrmNotificationOpen(current => !current)}
@@ -1147,9 +1155,7 @@ export default function CrmCommandCenter() {
                       <p className="mt-1 text-sm font-black text-rose-950">
                         Service gagal dibaca: {pageDiagnostics.failures.join(", ")}
                       </p>
-                      <p className="mt-1 text-xs leading-5 text-rose-800">
-                        Hanya masalah yang relevan dengan workspace ini yang ditampilkan. CRM tidak mengganti data service yang gagal dengan data palsu.
-                      </p>
+                      <p className="mt-1 text-xs leading-5 text-rose-800">Workspace ini memakai data live. Tidak ada data pengganti.</p>
                     </div>
                     <button
                       type="button"
@@ -1168,9 +1174,7 @@ export default function CrmCommandCenter() {
                   <p className="mt-1 text-sm font-black text-sky-950">
                     Belum ada data real untuk: {pageDiagnostics.emptyCollections.join(", ")}
                   </p>
-                  <p className="mt-1 text-xs leading-5 text-sky-800">
-                    Ini bukan error. CRM sengaja tidak membuat data dummy; workspace akan terisi saat service menghasilkan data nyata.
-                  </p>
+                  <p className="mt-1 text-xs leading-5 text-sky-800">Ini bukan error. Data akan muncul saat service menghasilkan data nyata.</p>
                 </div>
               ) : null}
               {notice ? (
@@ -1233,6 +1237,7 @@ function Sidebar({
   onToggle,
   newsPendingCount,
   businessPendingCount,
+  navBadges,
 }: {
   activePage: PageId;
   collapsed: boolean;
@@ -1242,6 +1247,7 @@ function Sidebar({
   onToggle: () => void;
   newsPendingCount: number;
   businessPendingCount: number;
+  navBadges: Record<string, number>;
 }) {
   return (
     <>
@@ -1322,7 +1328,6 @@ function TopBar({
   query,
   userLabel,
   refreshing,
-  notificationCount,
   crmNotifications,
   crmNotificationOpen,
   onToggleCrmNotifications,
@@ -1339,7 +1344,6 @@ function TopBar({
   query: string;
   userLabel: string;
   refreshing: boolean;
-  notificationCount: number;
   crmNotifications: CrmNotification[];
   crmNotificationOpen: boolean;
   onToggleCrmNotifications: () => void;
@@ -1373,7 +1377,7 @@ function TopBar({
           <input
             value={query}
             onChange={event => onQueryChange(event.target.value)}
-            placeholder="Cari user, usaha, listing..."
+            placeholder="Cari user, usaha, listing, order, tiket..."
             className="min-w-0 flex-1 bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400"
           />
         </label>
