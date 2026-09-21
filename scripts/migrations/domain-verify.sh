@@ -84,6 +84,16 @@ verify_trust() {
 verify_promotion() {
   compare "promotion banners" promotion_db     "SELECT count(*) FROM banners"     "SELECT count(*) FROM banners"
 }
+verify_support() {
+  compare "support tickets" support_db     "SELECT count(*) FROM support_tickets"     "SELECT count(*) FROM support_tickets"
+  compare "support replies" support_db     "SELECT count(*) FROM support_ticket_replies"     "SELECT count(*) FROM support_ticket_replies"
+  compare "support resolved invariant" support_db     "SELECT count(*), count(resolved_at) FROM support_tickets"     "SELECT count(*), count(resolved_at) FROM support_tickets"
+}
+
+verify_review() {
+  compare "reviews" review_db     "SELECT count(*) FROM reviews"     "SELECT count(*) FROM reviews"
+  compare "review rating invariant" review_db     "SELECT count(*), COALESCE(sum(rating),0) FROM reviews"     "SELECT count(*), COALESCE(sum(rating),0) FROM reviews"
+}
 
 run_domain() {
   case "$1" in
