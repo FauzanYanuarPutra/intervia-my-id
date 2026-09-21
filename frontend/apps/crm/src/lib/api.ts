@@ -804,6 +804,21 @@ export const businessModerationApi = {
     );
   },
 
+  requestIndependentReview: async (
+    token: string,
+    id: string,
+    data: { requested_reviewer_id: string; note?: string },
+  ) => {
+    return fetchJson(
+      `${MARKETPLACE_URL}/v1/news/${encodeURIComponent(id)}/source-review-requests`,
+      {
+        method: 'POST',
+        token,
+        body: JSON.stringify(data),
+      },
+    );
+  },
+
   moderate: async (
     token: string,
     id: string,
@@ -1017,8 +1032,26 @@ export const newsApi = {
 };
 
 export const usersApi = {
-  list: async (token: string) => {
-    return fetchJson(`${IDENTITY_API_URL}/users`, {
+  list: async (
+    token: string,
+    params: { page?: number; limit?: number; q?: string } = {},
+  ) => {
+    const query = new URLSearchParams({
+      page: String(params.page ?? 1),
+      limit: String(params.limit ?? 100),
+      ...(params.q ? { q: params.q } : {}),
+    }).toString();
+    return fetchJson<{
+      data: Array<{
+        id: string;
+        email: string;
+        username?: string | null;
+        full_name?: string | null;
+        is_active: boolean;
+        roles: string[];
+      }>;
+      meta?: { page: number; limit: number; total: number };
+    }>(`${IDENTITY_API_URL}/users?${query}`, {
       method: 'GET',
       token,
     });
