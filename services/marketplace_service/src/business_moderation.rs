@@ -2598,3 +2598,28 @@ async fn review_business_appeal(
 
     (StatusCode::OK, Json(json!({"appeal_id": appeal_id, "status": status, "reason_note": note}))).into_response()
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn moderation_reads_canonical_public_category_and_business_media() {
+        let metadata = json!({
+            "public": {
+                "category": "Minuman",
+                "logo_url": "/api/forum/media/lajukan-juice.webp",
+            }
+        });
+
+        assert_eq!(
+            metadata_text(&metadata, &["category", "category_label"]),
+            Some("Minuman".to_string())
+        );
+        assert_eq!(
+            collect_metadata_images(&metadata),
+            vec!["/api/forum/media/lajukan-juice.webp".to_string()]
+        );
+    }
+}
