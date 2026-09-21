@@ -27,6 +27,8 @@ The catalog above describes the currently deployed service boundaries. The activ
 
 Marketplace is the current owner of several legacy domains that are being extracted. New work must not add another unrelated source-of-truth to Marketplace merely because its public UI happens to live in the marketplace surface.
 
-Target source-of-truth services include `news_service`, `order_service`, `payment_service`, `profile_service`, `media_service`, `promotion_service`, `crm_service`, `communication_service`, `trust_service`, `support_service`, and `review_service`. Search remains a rebuildable projection, not a transactional owner.
+Target source-of-truth services include `news_service`, `order_service`, `payment_service`, `profile_service`, `media_service`, `promotion_service`, `crm_service`, `communication_service`, `trust_service`, `support_service`, and `review_service`.
+
+As of 2026-09-21, these target services are **compatibility-mode extraction scaffolds**: business traffic still proxies to `marketplace_service` and native mode is guarded by the runtime contract. See `architecture/domain-extraction-status-2026-09-21.md` for the cutover evidence required per domain. Search remains a rebuildable projection, not a transactional owner.
 
 Target services are staged behind explicit runtime modes. A target is not considered fully cut over until its schema exists, backfill/reconciliation passes, write/read ownership is switched, rollback is observed, and legacy access is removed.
