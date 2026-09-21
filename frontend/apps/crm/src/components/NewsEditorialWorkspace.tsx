@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { newsApi } from '@/lib/api';
+import { newsApi, usersApi } from '@/lib/api';
 
 type NewsItem = {
   id: string;
@@ -345,10 +345,10 @@ export default function NewsEditorialWorkspace({
   const loadReviewers = useCallback(async () => {
     setReviewersLoading(true);
     try {
-      const payload = await newsApi.reviewers(accessToken);
+      const payload = await usersApi.list(accessToken, { limit: 100 });
       const eligible = (payload.data || []).filter(user => {
         if (!user.is_active || user.id === reviewerId) return false;
-        return user.roles.some(role =>
+        return user.roles.some((role: string) =>
           ['admin', 'content_admin', 'super_admin'].includes(role.trim().toLowerCase()),
         );
       });
@@ -404,11 +404,16 @@ export default function NewsEditorialWorkspace({
     sourceReviewRequests,
   ]);
 
+  const selectedArticleKind =
+    selected
+      ? stringValue(record(record(selected.metadata).news).article_kind) || 'news'
+      : 'news';
+
   useEffect(() => {
-    if (sensitivity === 'high' && kind !== 'press_release') {
+    if (sensitivity === 'high' && selectedArticleKind !== 'press_release') {
       void loadReviewers();
     }
-  }, [kind, loadReviewers, sensitivity]);
+  }, [loadReviewers, selectedArticleKind, sensitivity]);
 
   const loadQueue = useCallback(
     async (nextStatus: string, preserveId = '', nextOffset = 0) => {
