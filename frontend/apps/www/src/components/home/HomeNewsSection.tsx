@@ -1,6 +1,6 @@
-import { ArrowRight, Clock3, Newspaper } from 'lucide-react';
+import { ArrowRight, Clock3, Newspaper, MapPin } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
-import type { LajukanNewsArticle } from '@/lib/news';
+import { buildNewsPath, type LajukanNewsArticle } from '@/lib/news';
 
 function formatNewsDate(value: string, locale: string) {
   const date = new Date(value);
@@ -11,6 +11,73 @@ function formatNewsDate(value: string, locale: string) {
     month: 'short',
     year: 'numeric',
   }).format(date);
+}
+
+function articleKindLabel(
+  articleKind: LajukanNewsArticle['articleKind'],
+  isId: boolean,
+) {
+  if (articleKind === 'analysis') return isId ? 'Analisis' : 'Analysis';
+  if (articleKind === 'press_release') {
+    return isId ? 'Rilis' : 'Press release';
+  }
+  return isId ? 'Berita' : 'News';
+}
+
+function NewsImage({
+  item,
+  priority = false,
+  className = '',
+}: {
+  item: LajukanNewsArticle;
+  priority?: boolean;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`relative overflow-hidden bg-[color:var(--app-surface-muted)] ${className}`}
+    >
+      {item.coverImage ? (
+        <img
+          src={item.coverImage}
+          alt={item.title}
+          loading={priority ? 'eager' : 'lazy'}
+          fetchPriority={priority ? 'high' : 'auto'}
+          decoding="async"
+          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.035]"
+          onError={event => {
+            event.currentTarget.style.display = 'none';
+            const fallback =
+              event.currentTarget.parentElement?.querySelector(
+                '[data-news-image-fallback]',
+              );
+            if (fallback instanceof HTMLElement) {
+              fallback.classList.remove('hidden');
+            }
+          }}
+        />
+      ) : null}
+
+      <div
+        data-news-image-fallback
+        className={`absolute inset-0 items-center justify-center bg-[linear-gradient(135deg,#ecfdf5_0%,#f8fafc_100%)] dark:bg-[linear-gradient(135deg,#092016_0%,#0f172a_100%)] ${item.coverImage ? 'hidden' : 'flex'}`}
+        aria-hidden="true"
+      >
+        <Newspaper className="h-9 w-9 text-emerald-700/35 dark:text-emerald-300/35" />
+      </div>
+
+      <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/45 to-transparent" />
+
+      <div className="absolute left-3 top-3 flex min-w-0 items-center gap-1.5">
+        <span className="max-w-[48%] truncate rounded-full bg-white/92 px-2 py-1 text-[9px] font-extrabold text-emerald-800 shadow-sm backdrop-blur dark:bg-slate-950/90 dark:text-emerald-300">
+          {item.category}
+        </span>
+        <span className="max-w-[45%] truncate rounded-full bg-black/50 px-2 py-1 text-[9px] font-bold text-white backdrop-blur">
+          {articleKindLabel(item.articleKind, item.language === 'id')}
+        </span>
+      </div>
+    </div>
+  );
 }
 
 export function HomeNewsSection({
@@ -25,131 +92,171 @@ export function HomeNewsSection({
 
   return (
     <section
-      className="w-full py-2"
+      className="w-full overflow-hidden rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] py-3 shadow-[0_16px_34px_-30px_rgba(15,23,42,0.22)]"
       aria-labelledby="home-news-title"
       data-testid="home-news-section"
     >
-      <div className="flex min-h-9 items-center justify-between gap-3 px-1 sm:px-3 md:px-6">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[11px] bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 dark:ring-emerald-900/60">
+      <div className="flex min-h-9 items-center justify-between gap-3 px-3 sm:px-4 md:px-5">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[12px] bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 dark:ring-emerald-900/60">
             <Newspaper className="h-4 w-4" />
           </span>
           <div className="min-w-0">
-            <h2
-              id="home-news-title"
-              className="truncate text-[13px] font-bold tracking-[-0.025em] text-[color:var(--app-text)] sm:text-sm"
-            >
-              Lajukan News
-            </h2>
+            <div className="flex min-w-0 items-center gap-2">
+              <h2
+                id="home-news-title"
+                className="truncate text-[13px] font-black tracking-[-0.025em] text-[color:var(--app-text)] sm:text-[14px]"
+              >
+                Lajukan News
+              </h2>
+              {visibleItems.length > 0 ? (
+                <span className="hidden rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-bold text-emerald-700 sm:inline dark:bg-emerald-950/60 dark:text-emerald-300">
+                  {isId ? 'Terbaru' : 'Latest'}
+                </span>
+              ) : null}
+            </div>
             <p className="hidden truncate text-[10px] font-medium text-[color:var(--app-text-soft)] sm:block">
               {isId
-                ? 'Berita ekonomi, bisnis, UMKM, dan perkembangan daerah.'
-                : 'Economy, business, SME, and local developments.'}
+                ? 'Berita ekonomi, bisnis, UMKM, teknologi, dan daerah yang relevan untuk usaha.'
+                : 'Economy, business, SME, technology, and local news relevant to businesses.'}
             </p>
           </div>
         </div>
 
         <Link
           href="/news"
-          className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-[10px] px-2 text-[10px] font-bold text-[color:var(--app-accent)] transition hover:bg-[color:var(--app-accent-soft)]"
+          className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-[10px] px-2 text-[10px] font-extrabold text-[color:var(--app-accent)] transition hover:bg-[color:var(--app-accent-soft)]"
         >
-          {isId ? 'Lihat semua' : 'See all'}
+          {isId ? 'Semua berita' : 'All news'}
           <ArrowRight className="h-3.5 w-3.5" />
         </Link>
       </div>
 
       {visibleItems.length > 0 ? (
-        <div className="mt-2 flex gap-2.5 overflow-x-auto px-1 pb-1 sm:gap-3 sm:px-3 md:px-6 lg:grid lg:grid-cols-4 lg:overflow-visible">
-          {visibleItems.map((item, index) => {
-            const dateLabel = formatNewsDate(item.publishedAt, locale);
-
-            return (
+        <>
+          <div className="mt-3 grid gap-2.5 px-3 sm:gap-3 sm:px-4 md:px-5 lg:grid-cols-2">
+            {visibleItems.slice(0, 1).map(item => (
               <Link
                 key={item.id}
-                href={`/news/${encodeURIComponent(item.slug)}`}
-                className="group flex w-[min(78vw,290px)] shrink-0 flex-col overflow-hidden rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] transition duration-200 hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:shadow-[0_16px_32px_-26px_rgba(15,23,42,0.28)] lg:w-auto"
-                data-testid="home-news-card"
+                href={buildNewsPath(item.slug)}
+                className="group relative min-w-0 overflow-hidden rounded-[18px] border border-[color:var(--app-border)] bg-black text-left"
+                data-testid="home-news-headline-card"
               >
-                <div className="relative aspect-[16/9] overflow-hidden bg-[color:var(--app-surface-muted)]">
-                  {item.coverImage ? (
-                    <img
-                      src={item.coverImage}
-                      alt={item.title}
-                      loading={index === 0 ? 'eager' : 'lazy'}
-                      decoding="async"
-                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
-                      onError={event => {
-                        event.currentTarget.style.display = 'none';
-                        const fallback =
-                          event.currentTarget.parentElement?.querySelector(
-                            '[data-news-image-fallback]',
-                          );
-                        if (fallback instanceof HTMLElement) {
-                          fallback.classList.remove('hidden');
-                        }
-                      }}
-                    />
-                  ) : null}
-
-                  <div
-                    data-news-image-fallback
-                    className={`absolute inset-0 items-center justify-center bg-[linear-gradient(135deg,#ecfdf5_0%,#f8fafc_100%)] dark:bg-[linear-gradient(135deg,#092016_0%,#0f172a_100%)] ${item.coverImage ? 'hidden' : 'flex'}`}
-                    aria-hidden="true"
-                  >
-                    <Newspaper className="h-8 w-8 text-emerald-700/35 dark:text-emerald-300/35" />
-                  </div>
-
-                  <span className="absolute left-2.5 top-2.5 max-w-[calc(100%-20px)] truncate rounded-full bg-white/92 px-2 py-1 text-[9px] font-bold text-emerald-800 shadow-sm backdrop-blur dark:bg-slate-950/88 dark:text-emerald-300">
-                    {item.category}
-                  </span>
+                <div className="aspect-[16/9] sm:aspect-[16/8.7] lg:aspect-[16/10]">
+                  <NewsImage item={item} priority className="h-full w-full" />
                 </div>
 
-                <div className="flex min-h-[136px] flex-1 flex-col p-3">
-                  <h3 className="line-clamp-2 text-[13px] font-bold leading-[18px] tracking-[-0.02em] text-[color:var(--app-text)] transition-colors group-hover:text-emerald-700 dark:group-hover:text-emerald-300">
+                <div className="absolute inset-x-0 bottom-0 p-3.5 sm:p-4">
+                  <p className="line-clamp-1 text-[9px] font-bold uppercase tracking-[0.12em] text-white/70">
+                    {item.byline}
+                  </p>
+                  <h3 className="mt-1 line-clamp-3 text-[17px] font-black leading-[21px] tracking-[-0.035em] text-white sm:text-[20px] sm:leading-[24px]">
                     {item.title}
                   </h3>
-
                   {item.summary ? (
-                    <p className="mt-1.5 line-clamp-2 text-[10.5px] leading-[16px] text-[color:var(--app-text-soft)]">
+                    <p className="mt-1.5 hidden line-clamp-2 text-[11px] leading-[17px] text-white/78 sm:block">
                       {item.summary}
                     </p>
                   ) : null}
-
-                  <div className="mt-auto flex min-w-0 items-center gap-1.5 pt-3 text-[9px] font-semibold text-[color:var(--app-text-soft)]">
-                    <Clock3 className="h-3 w-3 shrink-0" />
-                    <span className="truncate">
-                      {dateLabel || (isId ? 'Terbaru' : 'Latest')}
+                  <div className="mt-2.5 flex min-w-0 items-center gap-2 text-[9px] font-semibold text-white/70">
+                    <span className="inline-flex items-center gap-1 shrink-0">
+                      <Clock3 className="h-3 w-3" />
+                      {formatNewsDate(item.publishedAt, locale) ||
+                        (isId ? 'Terbaru' : 'Latest')}
                     </span>
                     {item.location ? (
-                      <>
-                        <span aria-hidden="true">·</span>
+                      <span className="inline-flex min-w-0 items-center gap-1 truncate">
+                        <MapPin className="h-3 w-3 shrink-0" />
                         <span className="truncate">{item.location}</span>
-                      </>
+                      </span>
                     ) : null}
                   </div>
                 </div>
               </Link>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="mt-2 px-1 sm:px-3 md:px-6">
-          <div className="flex items-center justify-between gap-3 rounded-[16px] border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-3">
-            <div className="flex min-w-0 items-center gap-2">
-              <Newspaper className="h-4 w-4 shrink-0 text-[color:var(--app-accent)]" />
-              <p className="min-w-0 text-[10px] font-semibold leading-4 text-[color:var(--app-text-soft)]">
-                {isId
-                  ? 'Belum ada berita terbaru yang terbit.'
-                  : 'No published news yet.'}
-              </p>
+            ))}
+
+            <div className="grid min-w-0 gap-2.5 sm:gap-3">
+              {visibleItems.slice(1).map((item, index) => (
+                <Link
+                  key={item.id}
+                  href={buildNewsPath(item.slug)}
+                  className="group grid min-w-0 grid-cols-[112px_minmax(0,1fr)] gap-3 rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] p-2.5 text-left transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface-muted)] sm:grid-cols-[132px_minmax(0,1fr)] sm:p-3"
+                  data-testid="home-news-card"
+                >
+                  <NewsImage
+                    item={item}
+                    className="aspect-[4/3] w-full rounded-[12px]"
+                  />
+
+                  <div className="min-w-0 py-0.5">
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <span className="max-w-[48%] truncate text-[9px] font-extrabold text-emerald-700 dark:text-emerald-300">
+                        {item.category}
+                      </span>
+                      <span className="truncate text-[9px] font-semibold text-[color:var(--app-text-soft)]">
+                        {formatNewsDate(item.publishedAt, locale) ||
+                          (isId ? 'Terbaru' : 'Latest')}
+                      </span>
+                    </div>
+                    <h3 className="mt-1 line-clamp-2 text-[12px] font-extrabold leading-[17px] tracking-[-0.018em] text-[color:var(--app-text)] transition-colors group-hover:text-emerald-700 dark:group-hover:text-emerald-300 sm:text-[13px]">
+                      {item.title}
+                    </h3>
+                    {item.summary ? (
+                      <p className="mt-1 line-clamp-2 text-[10px] leading-[15px] text-[color:var(--app-text-soft)]">
+                        {item.summary}
+                      </p>
+                    ) : null}
+                    {item.location ? (
+                      <p className="mt-1.5 flex items-center gap-1 truncate text-[9px] font-semibold text-[color:var(--app-text-soft)]">
+                        <MapPin className="h-3 w-3 shrink-0" />
+                        <span className="truncate">{item.location}</span>
+                      </p>
+                    ) : null}
+                  </div>
+                </Link>
+              ))}
             </div>
-            <Link
-              href="/news"
-              className="inline-flex min-h-8 shrink-0 items-center rounded-[10px] border border-[color:var(--app-accent-border)] px-2.5 text-[10px] font-bold text-[color:var(--app-accent)]"
-            >
-              {isId ? 'Buka News' : 'Open News'}
-            </Link>
           </div>
+
+          <div className="mt-2.5 flex gap-2 overflow-x-auto px-3 pb-0.5 sm:hidden">
+            {visibleItems.map(item => (
+              <Link
+                key={`mobile-${item.id}`}
+                href={buildNewsPath(item.slug)}
+                className="group min-w-[76vw] max-w-[310px] shrink-0 overflow-hidden rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)]"
+                data-testid="home-news-mobile-card"
+              >
+                <div className="aspect-[16/9]">
+                  <NewsImage item={item} className="h-full w-full" />
+                </div>
+                <div className="p-3">
+                  <p className="text-[9px] font-bold text-emerald-700 dark:text-emerald-300">
+                    {item.category}
+                  </p>
+                  <h3 className="mt-1 line-clamp-2 text-[13px] font-extrabold leading-[18px] text-[color:var(--app-text)]">
+                    {item.title}
+                  </h3>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </>
+      ) : (
+        <div className="mx-3 mt-3 flex items-center justify-between gap-3 rounded-[16px] border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-3 sm:mx-4 md:mx-5">
+          <div className="flex min-w-0 items-center gap-2">
+            <Newspaper className="h-4 w-4 shrink-0 text-[color:var(--app-accent)]" />
+            <p className="min-w-0 text-[10px] font-semibold leading-4 text-[color:var(--app-text-soft)]">
+              {isId
+                ? 'Belum ada berita terbaru yang terbit.'
+                : 'No published news yet.'}
+            </p>
+          </div>
+          <Link
+            href="/news"
+            className="inline-flex min-h-8 shrink-0 items-center rounded-[10px] border border-[color:var(--app-accent-border)] px-2.5 text-[10px] font-bold text-[color:var(--app-accent)]"
+          >
+            {isId ? 'Buka News' : 'Open News'}
+          </Link>
         </div>
       )}
     </section>
