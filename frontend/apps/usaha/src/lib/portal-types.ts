@@ -137,6 +137,8 @@ export type BusinessRecord = {
   description: string;
   logoUrl?: string;
   bannerUrl?: string;
+  /** Canonical public business media discovered from the same metadata used by WWW/CRM. */
+  imageUrls?: string[];
   schedule: string;
   infoComplete: boolean;
   productsCount: number;
