@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   businessModerationApi,
   type CrmBusiness,
@@ -108,8 +109,24 @@ function isOverdue(value: string | null) {
   return Boolean(value && new Date(value).getTime() < Date.now());
 }
 
+function isPublishReady(business: CrmBusiness) {
+  return business.verification_status === "verified" && business.missing_fields.length === 0 && business.image_urls.length > 0;
+}
+
+function decisionReasons(action: Action) {
+  const allowed: Partial<Record<Action, string[]>> = {
+    request_completion: ["missing_required_info", "missing_image", "missing_contact"],
+    hide: ["policy_violation", "unverifiable_business", "duplicate_business", "fraud_misleading", "inaccurate_information", "privacy_personal_data", "not_eligible", "other"],
+    reject: ["policy_violation", "unverifiable_business", "duplicate_business", "fraud_misleading", "inaccurate_information", "privacy_personal_data", "not_eligible", "other"],
+    escalate: ["unverifiable_business", "duplicate_business", "fraud_misleading", "inaccurate_information", "policy_violation", "other"],
+  };
+  const allowedValues = new Set(allowed[action] || []);
+  return REASONS.filter(([value]) => allowedValues.has(value));
+}
+
 export default function BusinessModerationWorkspace() {
   const { accessToken, user } = useAuth();
+  const searchParams = useSearchParams();
   const [businesses, setBusinesses] = useState<CrmBusiness[]>([]);
   const [references, setReferences] = useState<CrmBusinessReference[]>([]);
   const [activeTab, setActiveTab] = useState<"businesses" | "references">("businesses");
@@ -164,6 +181,12 @@ export default function BusinessModerationWorkspace() {
     void loadBusinesses();
   }, [accessToken, referenceStatus]);
 
+  useEffect(() => {
+    const requested = searchParams.get("status")?.trim().toLowerCase();
+    if (requested === "pending_review" || requested === "under_review") setStatus("needs_review");
+    else if (["all", "needs_review", "needs_completion", "approved", "hidden", "escalated"].includes(requested || "")) setStatus(requested || "all");
+  }, [searchParams]);
+
   const filtered = useMemo(
     () =>
       businesses.filter(item =>
@@ -176,17 +199,22 @@ export default function BusinessModerationWorkspace() {
     [businesses, status],
   );
 
+  async function openReviewData(business: CrmBusiness) {
+    if (!accessToken) return;
+    const response = await businessModerationApi.history(accessToken, business.id);
+    setHistory(response.events || []);
+    setReports(response.reports || []);
+    setAppeals(response.appeals || []);
+    setEvidence(response.evidence || []);
+    setVerification(response.verification || null);
+  }
+
   async function openHistory(business: CrmBusiness) {
     if (!accessToken) return;
     setSelected(business);
     setHistoryLoading(true);
     try {
-      const response = await businessModerationApi.history(accessToken, business.id);
-      setHistory(response.events || []);
-      setReports(response.reports || []);
-      setAppeals(response.appeals || []);
-      setEvidence(response.evidence || []);
-      setVerification(response.verification || null);
+      await openReviewData(business);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "History usaha gagal dimuat.");
       setHistory([]);
@@ -199,15 +227,45 @@ export default function BusinessModerationWorkspace() {
     }
   }
 
+  async function openVerificationReview(business: CrmBusiness) {
+    if (!accessToken) return;
+    setVerificationDraft(business);
+    setVerificationReason("");
+    setHistoryLoading(true);
+    try {
+      await openReviewData(business);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Data verifikasi gagal dimuat.");
+      setVerification(null);
+      setEvidence([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
   function openAction(business: CrmBusiness, action: Action) {
     setDraft({ business, action });
-    setReasonCode(action === "request_completion" ? "missing_required_info" : "quality");
+    setReasonCode(
+      action === "approve"
+        ? "verification_complete"
+        : action === "restore"
+          ? "restored_after_review"
+          : action === "request_completion"
+            ? "missing_required_info"
+            : action === "escalate"
+              ? "unverifiable_business"
+              : "policy_violation",
+    );
     setReasonNote("");
     setSeverity(action === "hide" || action === "reject" ? "high" : "medium");
   }
 
   async function confirmAction() {
     if (!draft || !accessToken) return;
+    if (["approve", "restore"].includes(draft.action) && !isPublishReady(draft.business)) {
+      setNotice("Publikasi terkunci. Verifikasi usaha, foto, dan kelengkapan profil harus selesai terlebih dahulu.");
+      return;
+    }
     const requiresNote = ["request_completion", "hide", "reject", "escalate"].includes(draft.action);
     if (requiresNote && !reasonNote.trim()) {
       setNotice("Catatan alasan wajib diisi untuk tindakan ini.");
@@ -461,20 +519,24 @@ export default function BusinessModerationWorkspace() {
                   )}
 
                   <div className="mt-4 flex flex-wrap gap-2">
-                    {business.verification_status === "pending" ? (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => setVerificationDraft(business)}
-                          className="rounded-xl bg-sky-600 px-3 py-2 text-xs font-bold text-white"
-                        >
-                          Tinjau verifikasi
-                        </button>
-                      </>
+                    {business.verification_status !== "verified" || business.missing_fields.length > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => void openVerificationReview(business)}
+                        className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-bold text-sky-700"
+                      >
+                        Periksa verifikasi
+                      </button>
                     ) : null}
                     {(business.review_state === "unreviewed" || business.review_state === "needs_completion") ? (
-                      <button type="button" onClick={() => openAction(business, "approve")} className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white">
-                        Setujui
+                      <button
+                        type="button"
+                        disabled={!isPublishReady(business)}
+                        onClick={() => openAction(business, "approve")}
+                        title={!isPublishReady(business) ? "Lengkapi profil dan selesaikan verifikasi usaha terlebih dahulu." : "Setujui & tampilkan"}
+                        className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-300"
+                      >
+                        {isPublishReady(business) ? "Setujui & tampilkan" : "Setujui terkunci"}
                       </button>
                     ) : null}
                     {business.missing_fields.length ? (
