@@ -812,82 +812,174 @@ export default function BusinessModerationWorkspace() {
 
       {verificationDraft ? (
         <div className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/35 p-4">
-          <div className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl">
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.14em] text-sky-700">Verifikasi usaha</p>
                 <h2 className="mt-1 text-lg font-bold text-slate-950">{verificationDraft.name}</h2>
                 <p className="mt-1 text-xs leading-5 text-slate-500">
-                  Verifikasi ini adalah status verifikasi di platform Lajukan, bukan klaim bahwa seluruh izin pemerintah sudah diverifikasi.
+                  Ini adalah <b>Verifikasi Lajukan</b>: tim memeriksa profil dan bukti usaha yang tersedia. Ini bukan pernyataan bahwa seluruh izin pemerintah telah diverifikasi.
                 </p>
               </div>
-              <button type="button" onClick={() => setVerificationDraft(null)} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600">
-                Tutup
-              </button>
+              <button type="button" onClick={() => setVerificationDraft(null)} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600">Tutup</button>
             </div>
-            <label className="mt-5 block text-sm font-bold text-slate-950">
-              Catatan keputusan
+
+            <div className="mt-5 grid gap-3 md:grid-cols-4">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                <p className="text-[11px] font-bold text-slate-500">Status</p>
+                <p className="mt-1 text-sm font-black text-slate-950">{verificationLabel(String((verification || {}).status || verificationDraft.verification_status))}</p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                <p className="text-[11px] font-bold text-slate-500">Kelengkapan</p>
+                <p className="mt-1 text-sm font-black text-slate-950">{verificationDraft.completeness_percent}%</p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                <p className="text-[11px] font-bold text-slate-500">Foto</p>
+                <p className="mt-1 text-sm font-black text-slate-950">{verificationDraft.image_urls.length} media</p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                <p className="text-[11px] font-bold text-slate-500">Metode</p>
+                <p className="mt-1 text-sm font-black text-slate-950">{verificationDraft.verification_method || "Belum ada"}</p>
+              </div>
+            </div>
+
+            <section className="mt-5 rounded-2xl border border-slate-200 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-black text-slate-950">Foto usaha</h3>
+                  <p className="mt-1 text-xs text-slate-500">Periksa apakah foto benar-benar mewakili usaha yang sedang ditinjau.</p>
+                </div>
+                <span className={verificationDraft.image_urls.length ? "rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700" : "rounded-full bg-rose-50 px-2.5 py-1 text-[11px] font-bold text-rose-700"}>
+                  {verificationDraft.image_urls.length ? "Ada foto" : "Belum ada foto"}
+                </span>
+              </div>
+              {verificationDraft.image_urls.length ? (
+                <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {verificationDraft.image_urls.slice(0, 8).map((url, index) => (
+                    <a key={url + index} href={url} target="_blank" rel="noreferrer" className="group aspect-square overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
+                      <img src={url} alt={verificationDraft.name} className="h-full w-full object-cover transition group-hover:scale-105" />
+                    </a>
+                  ))}
+                </div>
+              ) : (
+                <div className="mt-3 rounded-xl border border-dashed border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700">
+                  Foto/logo usaha wajib tersedia sebelum Verifikasi Lajukan.
+                </div>
+              )}
+            </section>
+
+            <section className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <h3 className="text-sm font-black text-slate-950">Checklist pemeriksaan</h3>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {[
+                  ["Profil lengkap", verificationDraft.missing_fields.length === 0, verificationDraft.missing_fields.length ? verificationDraft.missing_fields.join(" · ") : "Semua data dasar tersedia."],
+                  ["Foto usaha tersedia", verificationDraft.image_urls.length > 0, verificationDraft.image_urls.length ? "Ada media untuk diperiksa." : "Tambahkan foto/logo usaha."],
+                  ["Kontak tersedia", !verificationDraft.missing_fields.includes("Nomor kontak"), verificationDraft.phone || "Nomor kontak belum tersedia."],
+                  ["Lokasi tersedia", !verificationDraft.missing_fields.includes("Lokasi peta"), (verificationDraft.address || "-") + " · " + (verificationDraft.city || "-")],
+                ].map(([label, ok, detail]) => (
+                  <div key={String(label)} className="rounded-xl border border-slate-200 bg-white p-3">
+                    <div className="flex items-center gap-2">
+                      <span className={ok ? "flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-emerald-700" : "flex h-6 w-6 items-center justify-center rounded-full bg-rose-100 text-rose-700"}>{ok ? "✓" : "!"}</span>
+                      <p className="text-xs font-black text-slate-900">{label}</p>
+                    </div>
+                    <p className="mt-2 text-[11px] leading-5 text-slate-500">{String(detail)}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {verification?.evidence && Array.isArray(verification.evidence) && verification.evidence.length ? (
+              <section className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 p-4">
+                <h3 className="text-sm font-black text-sky-900">Bukti yang diajukan pemilik</h3>
+                <div className="mt-3 space-y-2">
+                  {(verification.evidence as unknown[]).slice(0, 8).map((item, index) => (
+                    <div key={index} className="rounded-xl border border-sky-100 bg-white p-3 text-xs">
+                      <pre className="whitespace-pre-wrap break-words font-sans leading-5 text-slate-600">{typeof item === "string" ? item : JSON.stringify(item, null, 2)}</pre>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+
+            {evidence.length ? (
+              <section className="mt-4 rounded-2xl border border-violet-200 bg-violet-50 p-4">
+                <h3 className="text-sm font-black text-violet-900">Bukti kasus internal</h3>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {evidence.slice(0, 6).map(item => (
+                    <div key={String(item.id)} className="rounded-xl border border-violet-100 bg-white p-3 text-xs">
+                      <p className="font-bold text-slate-900">{String(item.label || item.evidence_type || "Bukti")}</p>
+                      {item.source_url ? <a className="mt-1 block truncate font-semibold text-violet-700 underline" href={String(item.source_url)} target="_blank" rel="noreferrer">{String(item.source_url)}</a> : null}
+                      {item.note ? <p className="mt-1 leading-5 text-slate-600">{String(item.note)}</p> : null}
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+
+            <label className="mt-4 block text-sm font-bold text-slate-950">
+              Catatan pemeriksaan (wajib)
               <textarea
                 value={verificationReason}
                 onChange={event => setVerificationReason(event.target.value)}
                 rows={4}
                 maxLength={4000}
-                placeholder="Catatan dapat menjelaskan bukti yang diperiksa atau alasan penolakan."
+                placeholder="Tulis apa yang sudah diperiksa, misalnya profil, foto usaha, kontak, lokasi, dan bukti yang tersedia."
                 className="mt-2 w-full rounded-2xl border border-slate-200 p-3 text-sm outline-none focus:border-sky-400"
               />
             </label>
+
             <div className="mt-5 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setVerificationDraft(null)}
-                className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-600"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                disabled={!verificationReason.trim() || busy}
-                onClick={() => {
-                  if (!accessToken || !verificationDraft) return;
-                  setBusy(true);
-                  void businessModerationApi.reviewVerification(accessToken, verificationDraft.id, {
-                    status: "rejected",
-                    reason_note: verificationReason.trim(),
-                  }).then(async () => {
-                    setNotice("Verifikasi usaha ditolak dan alasannya tersimpan.");
-                    setVerificationDraft(null);
-                    setVerificationReason("");
-                    await loadBusinesses();
-                    if (selected?.id === verificationDraft.id) await openHistory(verificationDraft);
-                  }).catch(error => setNotice(error instanceof Error ? error.message : "Keputusan verifikasi gagal."))
-                    .finally(() => setBusy(false));
-                }}
-                className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
-              >
-                Tolak verifikasi
-              </button>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => {
-                  if (!accessToken || !verificationDraft) return;
-                  setBusy(true);
-                  void businessModerationApi.reviewVerification(accessToken, verificationDraft.id, {
-                    status: "verified",
-                    reason_note: verificationReason.trim() || "Bukti verifikasi diperiksa dan dinyatakan cukup.",
-                  }).then(async () => {
-                    setNotice("Usaha berhasil diverifikasi.");
-                    setVerificationDraft(null);
-                    setVerificationReason("");
-                    await loadBusinesses();
-                    if (selected?.id === verificationDraft.id) await openHistory(verificationDraft);
-                  }).catch(error => setNotice(error instanceof Error ? error.message : "Keputusan verifikasi gagal."))
-                    .finally(() => setBusy(false));
-                }}
-                className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
-              >
-                Verifikasi
-              </button>
+              <button type="button" onClick={() => setVerificationDraft(null)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-600">Batal</button>
+              {String((verification || {}).status || verificationDraft.verification_status) === "pending" ? (
+                <>
+                  <button
+                    type="button"
+                    disabled={busy || !verificationReason.trim()}
+                    onClick={() => {
+                      if (!accessToken || !verificationDraft) return;
+                      setBusy(true);
+                      void businessModerationApi.reviewVerification(accessToken, verificationDraft.id, {
+                        status: "rejected",
+                        reason_note: verificationReason.trim(),
+                      }).then(async () => {
+                        setNotice("Verifikasi ditolak. Catatan pemeriksaan tersimpan.");
+                        setVerificationDraft(null);
+                        setVerificationReason("");
+                        await loadBusinesses();
+                      }).catch(error => setNotice(error instanceof Error ? error.message : "Keputusan verifikasi gagal."))
+                        .finally(() => setBusy(false));
+                    }}
+                    className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+                  >
+                    Tolak verifikasi
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy || !verificationReason.trim() || verificationDraft.missing_fields.length > 0 || verificationDraft.image_urls.length === 0}
+                    onClick={() => {
+                      if (!accessToken || !verificationDraft) return;
+                      setBusy(true);
+                      void businessModerationApi.reviewVerification(accessToken, verificationDraft.id, {
+                        status: "verified",
+                        reason_note: verificationReason.trim(),
+                      }).then(async () => {
+                        setNotice("Usaha berhasil diverifikasi di Lajukan. Sekarang keputusan penayangan bisa diproses.");
+                        setVerificationDraft(null);
+                        setVerificationReason("");
+                        await loadBusinesses();
+                      }).catch(error => setNotice(error instanceof Error ? error.message : "Keputusan verifikasi gagal."))
+                        .finally(() => setBusy(false));
+                    }}
+                    className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Verifikasi usaha
+                  </button>
+                </>
+              ) : (
+                <span className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-bold text-slate-600">
+                  Tidak ada keputusan verifikasi yang menunggu.
+                </span>
+              )}
             </div>
           </div>
         </div>
