@@ -2091,6 +2091,7 @@ export default function CreateListingWizard({
 
       setEditingContentId(null);
       setEditingContentMetadata(null);
+      setEditingContentType(null);
 
       const prefill =
         mapCreationDraftToListingPrefill(
