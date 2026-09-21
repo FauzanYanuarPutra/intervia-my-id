@@ -479,6 +479,7 @@ function mapStore(
 
   return {
     id: canonicalBusinessId || stringValue(store.id),
+    storeId: stringValue(store.id) || undefined,
     version: canonicalVersion,
     capabilityKey,
     slug: stringValue(store.slug),
