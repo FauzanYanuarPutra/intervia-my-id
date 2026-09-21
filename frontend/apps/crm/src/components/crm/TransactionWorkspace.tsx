@@ -69,7 +69,7 @@ export function TransactionWorkspace({transactions}:{transactions:CrmTransaction
   }, [accessToken, busy, detail, items, selectedId]);
 
   return <div className="space-y-4">
-    <PageHeader label="Transaksi" title="Order & risiko" description="Pantau status, nominal, dan event transaksi."/>
+    <PageHeader title="Order & risiko" description="Pantau status, nominal, dan event transaksi."/>
     {error?<div className="rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-800">{error}</div>:null}
     <div className="grid gap-2 xl:grid-cols-2">
       {items.map(tx=><Card key={tx.id} className="p-3.5">
