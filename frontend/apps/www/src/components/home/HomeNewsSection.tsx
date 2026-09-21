@@ -136,7 +136,7 @@ export function HomeNewsSection({
 
       {visibleItems.length > 0 ? (
         <>
-          <div className="mt-3 grid gap-2.5 px-3 sm:gap-3 sm:px-4 md:px-5 lg:grid-cols-2">
+          <div className="mt-3 hidden gap-2.5 px-3 sm:grid sm:gap-3 sm:px-4 md:px-5 lg:grid-cols-2">
             {visibleItems.slice(0, 1).map(item => (
               <Link
                 key={item.id}
@@ -178,7 +178,7 @@ export function HomeNewsSection({
             ))}
 
             <div className="grid min-w-0 gap-2.5 sm:gap-3">
-              {visibleItems.slice(1).map((item, index) => (
+              {visibleItems.slice(1).map(item => (
                 <Link
                   key={item.id}
                   href={buildNewsPath(item.slug)}
