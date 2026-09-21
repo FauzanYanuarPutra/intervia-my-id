@@ -8,6 +8,8 @@ import { normalizeBusinessApiError } from '@/lib/business-api-error';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+// CI verification marker: keep this route response explicitly typed.
+
 export async function GET(
   _request: Request,
   context: { params: Promise<{ businessId: string }> },
