@@ -6,7 +6,7 @@ import { Card, PageHeader } from 'lajukan-ui';
 type Candidate = {
   id: string; email: string; username?: string | null; full_name?: string | null;
   status: string; email_verified: boolean; phone_verified: boolean;
-  identity_verified: boolean; eligible: boolean;
+  identity_verified: boolean; eligible: boolean; eligibility_reason?: string | null;
 };
 type Invitation = {
   id: string; application: string; role_names: string[]; status: string;
