@@ -1075,6 +1075,11 @@ export default function CrmCommandCenter() {
     };
   }, [data, query]);
 
+  const filteredTransactions = useMemo(
+    () => normalizeTransactions(filteredData.orders),
+    [filteredData.orders],
+  );
+
   const pageDiagnostics = useMemo(
     () => pageDataDiagnostics(activePage, data.failures, data.emptyCollections),
     [activePage, data.failures, data.emptyCollections],
@@ -1201,10 +1206,10 @@ export default function CrmCommandCenter() {
                   onModerationAction={handleListingModeration}
                 />
               ) : null}
-              {activePage === "transactions" ? <TransactionWorkspace transactions={transactions} /> : null}
+              {activePage === "transactions" ? <TransactionWorkspace transactions={filteredTransactions} /> : null}
               {activePage === "chat" ? <ConversationWorkspace chats={filteredData.chats} /> : null}
-              {activePage === "analytics" ? <AnalyticsWorkspace users={filteredData.users} listings={filteredData.listings} transactions={transactions} openSupport={openIssues} /> : null}
-              {activePage === "disputes" ? <SupportRiskWorkspace tickets={data.tickets} transactions={transactions} users={data.users} supportFailed={data.failures.includes("support") || data.failures.includes("tickets")} /> : null}
+              {activePage === "analytics" ? <AnalyticsWorkspace users={filteredData.users} listings={filteredData.listings} transactions={filteredTransactions} openSupport={openIssues} /> : null}
+              {activePage === "disputes" ? <SupportRiskWorkspace tickets={filteredData.tickets} transactions={filteredTransactions} users={filteredData.users} supportFailed={data.failures.includes("support") || data.failures.includes("tickets")} /> : null}
               {activePage === "news" ? (
                 <NewsEditorialWorkspace
                   accessToken={accessToken || ""}
@@ -1510,7 +1515,7 @@ function ListingsPage({
     return statusOk && reportOk;
   });
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <PageHeader
         label="Moderasi Listing"
         title="Tinjau laporan, listing nakal, dan tindakan ke pemilik."
@@ -1522,83 +1527,43 @@ function ListingsPage({
           { label: "Laporan", value: reportFilter, onChange: setReportFilter, options: ["all", "reported", "high"] },
         ]}
       />
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {filtered.slice(0, 8).map(listing => (
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:hidden">
+        {filtered.map(listing => (
           <ShellCard key={listing.id} className="overflow-hidden">
-            <div
-              className="h-36 bg-gradient-to-br from-slate-100 to-slate-200 bg-cover bg-center"
-              style={
-                listing.image
-                  ? { backgroundImage: 'url("' + resolveMediaUrl(listing.image, wwwUrl) + '")' }
-                  : undefined
-              }
-            >
-              {!listing.image ? (
-                <div className="flex h-full items-center justify-center text-xs font-bold text-slate-400">
-                  Preview listing
-                </div>
-              ) : null}
+            <div className="h-24 bg-slate-100">
+              {listing.image ? (
+                <img src={resolveMediaUrl(listing.image, wwwUrl)} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <div className="grid h-full place-items-center text-[11px] font-bold text-slate-400">Tidak ada foto</div>
+              )}
             </div>
-            <div className="p-4">
+            <div className="p-3">
               <div className="flex items-start justify-between gap-2">
-                <p className="line-clamp-2 text-sm font-bold text-slate-950">{listing.title}</p>
+                <div className="min-w-0">
+                  <p className="line-clamp-2 text-sm font-black text-slate-950">{listing.title}</p>
+                  <p className="mt-1 truncate text-[11px] font-semibold text-slate-500">{listing.category} · {listing.location}</p>
+                </div>
                 <Badge tone={toneForStatus(listing.rawStatus)}>{statusLabel(listing.rawStatus)}</Badge>
               </div>
               <div className="mt-2 flex flex-wrap gap-1.5">
-                <Badge tone={listing.reportCount >= 3 ? "danger" : listing.reportCount > 0 ? "warning" : "success"}>
-                  {listing.reportCount ? `${listing.reportCount} laporan` : "Belum dilaporkan"}
-                </Badge>
-                <Badge tone={listing.moderationStatus === "normal" ? "neutral" : "warning"}>
-                  {listing.moderationStatus.replaceAll("_", " ")}
-                </Badge>
+                <Badge tone={listing.reportCount >= 3 ? "danger" : listing.reportCount > 0 ? "warning" : "neutral"}>{listing.reportCount ? `${listing.reportCount} report` : "0 report"}</Badge>
+                {listing.moderationStatus !== "normal" ? <Badge tone="warning">{listing.moderationStatus.replaceAll("_", " ")}</Badge> : null}
               </div>
-              <p className="mt-2 text-xs font-semibold text-slate-500">
-                {listing.category} - {listing.location}
-              </p>
-              <p className="mt-3 text-lg font-bold text-emerald-700">
-                {listing.priceCents ? formatCurrency(listing.priceCents, listing.currency) : "Harga tanya admin"}
-              </p>
-              <div className="mt-4 grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setSelectedListing(listing)}
-                  className="rounded-xl bg-[#6cd698] px-3 py-2 text-xs font-bold text-white"
-                >
-                  Detail report
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onModerationAction(listing, "review")}
-                  className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700"
-                >
-                  Tinjau
-                </button>
-              </div>
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => onModerationAction(listing, "hide")}
-                  className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600"
-                >
-                  Sembunyikan
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onModerationAction(listing, "ban")}
-                  className="rounded-xl border border-slate-200 bg-slate-950 px-3 py-2 text-xs font-bold text-white"
-                >
-                  Tindakan berat
+              <p className="mt-2 text-base font-black text-emerald-700">{listing.priceCents ? formatCurrency(listing.priceCents, listing.currency) : "Harga tanya"}</p>
+              <div className="mt-3 grid grid-cols-2 gap-1.5">
+                <button type="button" onClick={() => setSelectedListing(listing)} className="rounded-lg bg-[#6cd698] px-2.5 py-2 text-[11px] font-bold text-white">Review</button>
+                <button type="button" onClick={() => onModerationAction(listing, listing.status === "active" ? "hide" : "review")} className="rounded-lg border border-slate-200 px-2.5 py-2 text-[11px] font-bold text-slate-700">
+                  {listing.status === "active" ? "Sembunyikan" : "Tinjau"}
                 </button>
               </div>
             </div>
           </ShellCard>
         ))}
-      </div>
-      {!filtered.length ? (
+      </div>      {!filtered.length ? (
         <EmptyState title="Belum ada listing" body="Data listing atau laporan belum masuk dari API real." />
       ) : null}
       {selectedListing ? (
-        <ShellCard className="p-5">
+        <ShellCard className="p-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0">
               <Badge tone={selectedListing.reportCount >= 3 ? "danger" : selectedListing.reportCount ? "warning" : "neutral"}>
@@ -1619,7 +1584,7 @@ function ListingsPage({
               Tutup detail
             </button>
           </div>
-          <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_0.85fr]">
+          <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_0.85fr]">
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <p className="text-sm font-bold text-slate-950">Siapa yang report?</p>
               <div className="mt-3 grid gap-2">
@@ -1681,7 +1646,7 @@ function ListingsPage({
           </div>
         </ShellCard>
       ) : null}
-      <ShellCard className="overflow-hidden">
+      <ShellCard className="hidden overflow-hidden xl:block">
         <div className="overflow-x-auto">
           <table className="min-w-[1120px] w-full text-left text-sm">
             <thead className="bg-slate-50 text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
