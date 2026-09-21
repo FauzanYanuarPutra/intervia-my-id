@@ -38,10 +38,11 @@ export default async function BusinessInfoPage({ params }: PageProps) {
     location: business.latitude !== null && business.longitude !== null,
   };
   const verificationReady = Object.values(verificationChecks).every(Boolean);
+  const verificationStoreRef = business.storeId || business.id;
   let verificationStatus = null;
   if (canManage) {
     try {
-      verificationStatus = await getBusinessVerificationStatus(business.id);
+      verificationStatus = await getBusinessVerificationStatus(verificationStoreRef);
     } catch {
       verificationStatus = null;
     }
@@ -114,7 +115,7 @@ export default async function BusinessInfoPage({ params }: PageProps) {
 
       {canManage ? (
         <BusinessVerificationPanel
-          businessId={business.id}
+          businessId={verificationStoreRef}
           checks={verificationChecks}
           ready={verificationReady}
           status={verificationStatus?.status ?? 'unverified'}
