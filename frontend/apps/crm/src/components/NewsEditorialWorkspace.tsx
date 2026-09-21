@@ -1254,7 +1254,7 @@ export default function NewsEditorialWorkspace({
               </div>
             </div>
           ) : (
-            <div className="grid min-h-[680px] place-items-center p-8 text-center">
+            <div className="grid min-h-[280px] place-items-center p-6 text-center sm:min-h-[420px]">
               <div>
                 <p className="text-lg font-black text-slate-950">Pilih News dari antrean</p>
                 <p className="mt-1 max-w-md text-sm leading-6 text-slate-500">
