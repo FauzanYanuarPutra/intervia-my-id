@@ -1408,6 +1408,12 @@ export default function CreateListingWizard({
       null,
     );
 
+  const [editingContentId, setEditingContentId] =
+    useState<string | null>(null);
+
+  const [editingContentMetadata, setEditingContentMetadata] =
+    useState<Record<string, unknown> | null>(null);
+
   const [pendingStoredDraft, setPendingStoredDraft] =
     useState<TemporaryCreateDraft | null>(
       null,
@@ -1944,6 +1950,9 @@ export default function CreateListingWizard({
             draft.id,
           )
         ) {
+          setEditingContentId(null);
+          setEditingContentMetadata(null);
+
           await applyLoadedDraft(
             buildDraftFromListingPayload(
               draft as unknown as ListingDraftPayload,
@@ -1982,6 +1991,28 @@ export default function CreateListingWizard({
         if (
           content?.id
         ) {
+          const contentStatus =
+            valueAsString(
+              content.content_status,
+            ).toLowerCase();
+
+          if (
+            contentStatus === 'active' ||
+            contentStatus === 'published'
+          ) {
+            setEditingContentId(
+              content.id,
+            );
+            setEditingContentMetadata(
+              valueAsRecord(
+                content.metadata,
+              ) || {},
+            );
+          } else {
+            setEditingContentId(null);
+            setEditingContentMetadata(null);
+          }
+
           if (
             user?.id &&
             content.owner_id &&
@@ -2043,6 +2074,9 @@ export default function CreateListingWizard({
           ),
         );
       }
+
+      setEditingContentId(null);
+      setEditingContentMetadata(null);
 
       const prefill =
         mapCreationDraftToListingPrefill(
