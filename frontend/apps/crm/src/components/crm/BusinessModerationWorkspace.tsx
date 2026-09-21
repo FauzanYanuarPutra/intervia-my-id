@@ -483,6 +483,15 @@ export default function BusinessModerationWorkspace() {
                     <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-bold text-slate-600">
                       {business.source_type === "reference" ? "Data referensi" : "Data usaha"}
                     </span>
+                    <span
+                      className={`rounded-full border px-2.5 py-1 text-[11px] font-bold ${
+                        business.canonical_business_id
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                          : "border-amber-200 bg-amber-50 text-amber-700"
+                      }`}
+                    >
+                      {business.canonical_business_id ? "Terhubung Business OS" : "Belum terhubung Business OS"}
+                    </span>
                     <span className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[11px] font-bold text-sky-700">
                       {verificationLabel(business.verification_status)}
                     </span>
