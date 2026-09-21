@@ -232,7 +232,8 @@ fn collect_metadata_images(metadata: &Value) -> Vec<String> {
                     || lower.starts_with("https://")
                     || lower.starts_with("/uploads/")
                     || lower.starts_with("/media/")
-                    || lower.starts_with("/images/");
+                    || lower.starts_with("/images/")
+                    || lower.starts_with("/api/forum/media/");
                 if likely && seen.insert(candidate.to_string()) {
                     urls.push(candidate.to_string());
                 }
@@ -290,12 +291,21 @@ fn collect_metadata_images(metadata: &Value) -> Vec<String> {
 }
 
 fn metadata_text(metadata: &Value, keys: &[&str]) -> Option<String> {
-    let object = metadata.as_object()?;
-    for key in keys {
-        if let Some(value) = object.get(*key).and_then(Value::as_str) {
-            let value = value.trim();
-            if !value.is_empty() {
-                return Some(value.to_string());
+    let sources = [
+        metadata.as_object(),
+        metadata.get("public").and_then(Value::as_object),
+        metadata.get("storefront").and_then(Value::as_object),
+        metadata.get("profile").and_then(Value::as_object),
+        metadata.get("presentation").and_then(Value::as_object),
+        metadata.get("business_media").and_then(Value::as_object),
+    ];
+    for object in sources.into_iter().flatten() {
+        for key in keys {
+            if let Some(value) = object.get(*key).and_then(Value::as_str) {
+                let value = value.trim();
+                if !value.is_empty() {
+                    return Some(value.to_string());
+                }
             }
         }
     }
