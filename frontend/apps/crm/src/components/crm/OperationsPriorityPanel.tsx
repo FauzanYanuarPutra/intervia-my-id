@@ -1,9 +1,60 @@
 'use client';
+
 import { StatusBadge } from 'lajukan-ui';
-import type { OperationsDestination,OperationsPriority } from './operationsPriority';
-export function OperationsPriorityPanel({items,onOpen}:{items:OperationsPriority[];onOpen:(destination:OperationsDestination)=>void}){
-  return <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_12px_34px_-28px_rgba(15,23,42,0.55)] sm:p-5">
-    <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Hari ini</p><h2 className="mt-1 text-xl font-bold tracking-[-0.03em] text-slate-950">Prioritas operasional</h2><p className="mt-1 text-sm text-slate-500">Hanya pekerjaan yang berasal dari data CRM yang benar-benar dimuat.</p></div><StatusBadge tone={items.length?'warning':'success'}>{items.length?`${items.length} jenis tindakan`:'Tidak ada antrean mendesak'}</StatusBadge></div>
-    {items.length?<div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{items.slice(0,6).map(item=><button key={item.kind} type="button" onClick={()=>onOpen(item.destination)} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left transition hover:border-emerald-200 hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"><div className="flex items-center justify-between gap-3"><p className="font-bold text-slate-950">{item.label}</p><StatusBadge tone={item.priority>=80?'danger':item.priority>=60?'warning':'info'}>{item.count}</StatusBadge></div><p className="mt-2 text-sm leading-6 text-slate-500">{item.description}</p></button>)}</div>:<div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">Tidak ada dispute, News pending, pesan belum dibaca, tiket, KYC pending, report listing, atau lead aktif yang perlu ditampilkan sebagai antrean sekarang.</div>}
-  </section>;
+import type { OperationsDestination, OperationsPriority } from './operationsPriority';
+
+export function OperationsPriorityPanel({
+  items,
+  onOpen,
+}: {
+  items: OperationsPriority[];
+  onOpen: (destination: OperationsDestination) => void;
+}) {
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white">
+      <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 sm:px-5">
+        <div>
+          <p className="text-base font-black text-slate-950">Yang perlu dikerjakan</p>
+          <p className="mt-0.5 text-xs text-slate-400">Antrean real dari CRM.</p>
+        </div>
+        <StatusBadge tone={items.length ? 'warning' : 'success'}>
+          {items.length ? items.length : 'Aman'}
+        </StatusBadge>
+      </div>
+
+      {items.length ? (
+        <div className="divide-y divide-slate-100">
+          {items.slice(0, 6).map(item => (
+            <button
+              key={item.kind}
+              type="button"
+              onClick={() => onOpen(item.destination)}
+              className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-slate-50 sm:px-5"
+            >
+              <span
+                className={
+                  item.priority >= 80
+                    ? 'h-2 w-2 shrink-0 rounded-full bg-rose-500'
+                    : item.priority >= 60
+                      ? 'h-2 w-2 shrink-0 rounded-full bg-amber-500'
+                      : 'h-2 w-2 shrink-0 rounded-full bg-emerald-500'
+                }
+              />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-bold text-slate-900">{item.label}</span>
+                <span className="mt-0.5 block truncate text-xs text-slate-400">{item.description}</span>
+              </span>
+              <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-black text-slate-700">
+                {item.count}
+              </span>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="px-4 py-7 text-center text-sm font-semibold text-slate-400 sm:px-5">
+          Tidak ada antrean mendesak.
+        </div>
+      )}
+    </section>
+  );
 }
