@@ -247,6 +247,14 @@ fn collect_metadata_images(metadata: &Value) -> Vec<String> {
                 for key in [
                     "cover_image",
                     "coverImage",
+                    "cover_image_url",
+                    "coverImageUrl",
+                    "cover_url",
+                    "coverUrl",
+                    "banner_url",
+                    "bannerUrl",
+                    "store_photo_url",
+                    "storePhotoUrl",
                     "image",
                     "image_url",
                     "imageUrl",
@@ -2610,6 +2618,7 @@ mod tests {
             "public": {
                 "category": "Minuman",
                 "logo_url": "/api/forum/media/lajukan-juice.webp",
+                "banner_url": "/api/forum/media/lajukan-juice-banner.webp",
             }
         });
 
@@ -2619,7 +2628,10 @@ mod tests {
         );
         assert_eq!(
             collect_metadata_images(&metadata),
-            vec!["/api/forum/media/lajukan-juice.webp".to_string()]
+            vec![
+                "/api/forum/media/lajukan-juice.webp".to_string(),
+                "/api/forum/media/lajukan-juice-banner.webp".to_string(),
+            ]
         );
     }
 }
