@@ -43,7 +43,7 @@ import {
 
 import { ImageCropModal } from '@/components/common/ImageCropModal';
 
-import { ProfileRail, ProfileRailItem } from '@/components/profile/ProfileRail';
+import { ProfileFilterStrip } from '@/components/profile/ProfileFilterStrip';
 import { OwnerProfileSkeleton } from '@/components/system/feedback/RouteSkeletons';
 import { LocalizedLink } from '@/components/ui-kit';
 import { useAuth } from '@/context/AuthContext';
@@ -885,43 +885,40 @@ function ProfileTabRail({
 }) {
   return (
     <div className="px-2.5 pt-2.5 sm:px-2 sm:pt-4">
-      <div className="rounded-xl bg-[color:var(--app-surface-muted)] p-1 dark:bg-[color:var(--app-surface)]">
-        <ProfileRail
-          activeIndex={items.findIndex(item => item.key === activeTab)}
-          ariaLabel="Profile content status"
-          trackClassName="gap-1"
-        >
-          {items.map(item => {
-            const active = item.key === activeTab;
-            return (
-              <ProfileRailItem key={item.key}>
-                <button
-                  type="button"
-                  onClick={() => onChange(item.key)}
-                  aria-pressed={active}
-                  className={cn(
-                    'flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-xs font-black transition',
-                    active
-                      ? 'bg-[color:var(--app-surface-strong)] text-emerald-700 shadow-sm dark:text-emerald-300'
-                      : 'text-[color:var(--app-text-soft)] hover:text-[color:var(--app-text)]',
-                  )}
-                >
-                  <span>{item.label}</span>
-                  <span
-                    className={cn(
-                      'rounded-full px-2 py-0.5 text-[10px]',
-                      active
-                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300'
-                        : 'bg-black/5 text-[color:var(--app-text-soft)] dark:bg-white/10',
-                    )}
-                  >
-                    {item.count}
-                  </span>
-                </button>
-              </ProfileRailItem>
-            );
-          })}
-        </ProfileRail>
+      <div
+        role="group"
+        aria-label="Profile content status"
+        className="grid grid-cols-2 rounded-xl bg-[color:var(--app-surface-muted)] p-1 dark:bg-[color:var(--app-surface)]"
+      >
+        {items.map(item => {
+          const active = item.key === activeTab;
+          return (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => onChange(item.key)}
+              aria-pressed={active}
+              className={cn(
+                'flex min-h-9 min-w-0 items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-black transition',
+                active
+                  ? 'bg-[color:var(--app-surface-strong)] text-emerald-700 shadow-sm dark:text-emerald-300'
+                  : 'text-[color:var(--app-text-soft)] hover:text-[color:var(--app-text)]',
+              )}
+            >
+              <span className="truncate">{item.label}</span>
+              <span
+                className={cn(
+                  'shrink-0 rounded-full px-2 py-0.5 text-[10px]',
+                  active
+                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300'
+                    : 'bg-black/5 text-[color:var(--app-text-soft)] dark:bg-white/10',
+                )}
+              >
+                {item.count}
+              </span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -937,32 +934,13 @@ function FilterRail({
   onChange: (filter: ListingFilter) => void;
 }) {
   return (
-    <ProfileRail
-      activeIndex={items.findIndex(item => item.key === activeFilter)}
+    <ProfileFilterStrip
+      activeKey={activeFilter}
       ariaLabel="Listing filters"
-      className="min-w-0 flex-1"
-    >
-      {items.map(item => {
-        const active = item.key === activeFilter;
-        return (
-          <ProfileRailItem key={item.key}>
-            <button
-              type="button"
-              onClick={() => onChange(item.key)}
-              aria-pressed={active}
-              className={cn(
-                'min-h-9 whitespace-nowrap rounded-full border px-4 text-xs font-bold transition',
-                active
-                  ? 'border-emerald-600 bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'
-                  : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text-soft)] hover:border-emerald-300 hover:text-[color:var(--app-text)]',
-              )}
-            >
-              {item.label}
-            </button>
-          </ProfileRailItem>
-        );
-      })}
-    </ProfileRail>
+      className="flex-1"
+      items={items}
+      onChange={onChange}
+    />
   );
 }
 
@@ -2426,15 +2404,15 @@ export default function SuperProfile() {
               }}
             />
 
-            <div className="flex min-w-0 items-center gap-2 border-b border-[color:var(--app-border)]/70 px-3 py-2.5 sm:px-5">
+            <div className="flex min-w-0 flex-wrap items-center gap-2 border-b border-[color:var(--app-border)]/70 bg-[color:var(--app-surface-strong)] px-3 py-2.5 sm:flex-nowrap sm:px-5">
               <FilterRail activeFilter={activeFilter} items={filterItems} onChange={setActiveFilter} />
-              <label className="flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-2.5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                <Settings2 className="h-3.5 w-3.5 shrink-0 text-[color:var(--app-text-soft)]" />
+              <label className="flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-transparent bg-[color:var(--app-surface-muted)] px-3 text-[color:var(--app-text)] transition hover:bg-emerald-50 dark:bg-white/5 dark:text-[color:var(--app-text-inverse)] dark:hover:bg-emerald-500/10">
+                <Settings2 className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-300" />
                 <span className="sr-only">{isId ? 'Urutkan berdasarkan' : 'Sort by'}</span>
                 <select
                   value={sortMode}
                   onChange={event => setSortMode(event.target.value as SortMode)}
-                  className="max-w-28 bg-transparent text-[10px] font-bold outline-none sm:max-w-none sm:text-xs"
+                  className="max-w-32 bg-transparent text-[11px] font-black outline-none sm:max-w-none sm:text-xs"
                 >
                   {sortOptions.map(option => (
                     <option key={option.value} value={option.value}>

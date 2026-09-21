@@ -35,7 +35,7 @@ import {
 
 import { LajukanImage as Image } from '@/components/common/LajukanImage';
 import { DetailMobileTopBar } from '@/components/layout/DetailMobileTopBar';
-import { ProfileRail, ProfileRailItem } from '@/components/profile/ProfileRail';
+import { ProfileFilterStrip } from '@/components/profile/ProfileFilterStrip';
 import { ProfileViewSkeleton } from '@/components/system/feedback/RouteSkeletons';
 import { useAuth } from '@/context/AuthContext';
 import { Link, useRouter } from '@/i18n/navigation';
@@ -2367,55 +2367,46 @@ export default function PublicProfileClient({
 
           <section className="mt-3 overflow-hidden border-y border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] sm:rounded-[24px] sm:border sm:shadow-sm">
             <div className="sticky top-0 z-20 border-b border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)]/96 backdrop-blur">
-              <ProfileRail activeIndex={Math.max(0, profileTabs.findIndex(tab => tab.key === activeProfileTab))} ariaLabel={localeCode === 'id' ? 'Navigasi profil' : 'Profile navigation'} trackClassName="gap-0" viewportClassName="px-1 py-0">
+              <div
+                role="tablist"
+                aria-label={localeCode === 'id' ? 'Navigasi profil' : 'Profile navigation'}
+                className="flex min-w-0 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              >
                 {profileTabs.map(tab => {
                   const active = activeProfileTab === tab.key;
                   return (
-                    <ProfileRailItem key={tab.key}>
-                      <button
-                        type="button"
-                        onClick={() => setActiveProfileTab(tab.key)}
-                        aria-current={active ? 'page' : undefined}
-                        className={`relative min-h-12 whitespace-nowrap px-4 text-[12px] font-bold transition sm:min-h-14 sm:text-sm ${
-                          active
-                            ? 'text-emerald-700 dark:text-emerald-300'
-                            : 'text-[color:var(--app-text-soft)] hover:text-[color:var(--app-text)]'
-                        }`}
-                      >
-                        {tab.label}
-                        {active ? <span className="absolute inset-x-4 bottom-0 h-0.5 rounded-full bg-emerald-600" /> : null}
-                      </button>
-                    </ProfileRailItem>
+                    <button
+                      key={tab.key}
+                      type="button"
+                      role="tab"
+                      onClick={() => setActiveProfileTab(tab.key)}
+                      aria-selected={active}
+                      className={`relative min-h-12 shrink-0 whitespace-nowrap px-4 text-[12px] font-bold transition sm:min-h-14 sm:text-sm ${
+                        active
+                          ? 'text-emerald-700 dark:text-emerald-300'
+                          : 'text-[color:var(--app-text-soft)] hover:text-[color:var(--app-text)]'
+                      }`}
+                    >
+                      {tab.label}
+                      {active ? <span className="absolute inset-x-4 bottom-0 h-0.5 rounded-full bg-emerald-600" /> : null}
+                    </button>
                   );
                 })}
-              </ProfileRail>
+              </div>
             </div>
 
             {activeProfileTab === 'posts' ? (
               <div className="p-3 sm:p-5">
-                <div className="-mx-1 overflow-x-auto pb-1 sm:mx-0">
-                  <ProfileRail activeIndex={availableContentTabs.indexOf(resolvedContentTab)} ariaLabel={localeCode === 'id' ? 'Filter etalase' : 'Storefront filter'} trackClassName="gap-2" viewportClassName="px-1 py-0.5">
-                    {availableContentTabs.map(tab => {
-                      const active = resolvedContentTab === tab;
-                      return (
-                        <ProfileRailItem key={tab}>
-                          <button
-                            type="button"
-                            onClick={() => setActiveContentTab(tab)}
-                            aria-pressed={active}
-                            className={`min-h-9 whitespace-nowrap rounded-full border px-3 text-[11px] font-bold transition sm:text-xs ${
-                              active
-                                ? 'border-emerald-600 bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'
-                                : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text-soft)] hover:border-emerald-300 hover:text-[color:var(--app-text)]'
-                            }`}
-                          >
-                            {tab === 'all' ? copy.all : getProfileContentTabLabel(tab, localeCode)}
-                          </button>
-                        </ProfileRailItem>
-                      );
-                    })}
-                  </ProfileRail>
-                </div>
+                <ProfileFilterStrip
+                  activeKey={resolvedContentTab}
+                  ariaLabel={localeCode === 'id' ? 'Filter etalase' : 'Storefront filter'}
+                  className="-mx-1 px-1 pb-1 sm:mx-0 sm:px-0"
+                  items={availableContentTabs.map(tab => ({
+                    key: tab,
+                    label: tab === 'all' ? copy.all : getProfileContentTabLabel(tab, localeCode),
+                  }))}
+                  onChange={setActiveContentTab}
+                />
 
                 {visibleListings.length > 0 ? (
                   <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
