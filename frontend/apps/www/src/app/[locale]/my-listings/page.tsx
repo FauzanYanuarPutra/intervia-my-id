@@ -57,6 +57,11 @@ type ListingItem = {
   image_url?: string | null;
   image_urls?: unknown;
   images?: unknown;
+  media?: unknown;
+  photos?: unknown;
+  attachments?: unknown;
+  gallery?: unknown;
+  gallery_images?: unknown;
   content_status?: string | null;
   status?: string | null;
   updated_at?: string;
@@ -309,6 +314,11 @@ function resolveListingImage(item: ListingItem): string {
   const collections = [
     item.image_urls,
     item.images,
+    item.media,
+    item.photos,
+    item.attachments,
+    item.gallery,
+    item.gallery_images,
     meta.images,
     meta.image_urls,
     meta.photos,
