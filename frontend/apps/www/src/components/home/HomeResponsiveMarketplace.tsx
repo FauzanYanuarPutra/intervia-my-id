@@ -1714,8 +1714,8 @@ function DesktopSidebar({
   inviteHref: string;
 }) {
   const currentPath = normalizePathname(pathname);
-  const primaryItems = items.primary.slice(0, 5);
-  const secondaryItems = items.secondary.slice(0, 2);
+  const primaryItems = items.primary.slice(0, 6);
+  const secondaryItems = items.secondary.slice(0, 3);
 
   const isItemActive = (item: SidebarItem) => {
     const itemPath = item.href.split('?')[0];
