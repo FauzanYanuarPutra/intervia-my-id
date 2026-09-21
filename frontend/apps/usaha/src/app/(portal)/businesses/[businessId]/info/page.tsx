@@ -9,6 +9,7 @@ import { PageHeader } from '@/components/portal/PageHeader';
 import { PortalShell } from '@/components/portal/PortalShell';
 import { StatusBadge } from '@/components/portal/StatusBadge';
 import { hasPermission } from '@/lib/portal-logic';
+import { getBusinessVerificationStatus } from '@/lib/business-server';
 import { buildBusinessLocationQuery } from '@/lib/portal-links';
 import { toLatLng } from '@/lib/maps';
 import { resolvePortalBusinessPageState } from '@/lib/portal-server';
@@ -37,6 +38,14 @@ export default async function BusinessInfoPage({ params }: PageProps) {
     location: business.latitude !== null && business.longitude !== null,
   };
   const verificationReady = Object.values(verificationChecks).every(Boolean);
+  let verificationStatus = null;
+  if (canManage) {
+    try {
+      verificationStatus = await getBusinessVerificationStatus(business.id);
+    } catch {
+      verificationStatus = null;
+    }
+  }
 
   return (
     <PortalShell activeBusiness={business} availableBusinesses={businesses} viewerName={account?.name ?? null} currentSection="info">
@@ -108,6 +117,8 @@ export default async function BusinessInfoPage({ params }: PageProps) {
           businessId={business.id}
           checks={verificationChecks}
           ready={verificationReady}
+          status={verificationStatus?.status ?? 'unverified'}
+          reviewReason={verificationStatus?.review_reason ?? null}
         />
       ) : null}
     </PortalShell>
