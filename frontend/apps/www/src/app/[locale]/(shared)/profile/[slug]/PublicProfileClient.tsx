@@ -168,14 +168,20 @@ type ProfileSocialTab = 'followers' | 'following';
 const PUBLIC_PROFILE_SAVE_KEY = 'lajukan.public-profile.saved.v2';
 
 const PROFILE_LEAF_TABS: ProfileLeafTab[] = [
-  'job',
-  'freelancer',
   'product',
   'service',
+  'supplier',
+  'business_place',
+  'news',
+  'community',
+  'reels',
+  'job',
+  'freelancer',
   'tool_rental',
   'business_transfer',
   'property',
   'umkm',
+  'other',
 ];
 
 function asRecord(value: unknown): ProfileRecord | null {
@@ -723,13 +729,22 @@ function formatCompactNumber(value: number, localeCode: 'id' | 'en'): string {
 
 function getTabTone(tab: ProfileContentTab): string {
   switch (tab) {
+    case 'news':
+      return 'bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300';
+    case 'community':
+      return 'bg-teal-50 text-teal-700 dark:bg-teal-500/15 dark:text-teal-300';
+    case 'reels':
+      return 'bg-fuchsia-50 text-fuchsia-700 dark:bg-fuchsia-500/15 dark:text-fuchsia-300';
     case 'service':
     case 'freelancer':
       return 'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300';
+    case 'supplier':
+      return 'bg-rose-50 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300';
     case 'tool_rental':
       return 'bg-violet-50 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300';
     case 'property':
     case 'business_transfer':
+    case 'business_place':
       return 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300';
     case 'job':
       return 'bg-rose-50 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300';

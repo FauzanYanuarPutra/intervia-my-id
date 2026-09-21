@@ -19,6 +19,8 @@ describe('ProfileFilterStrip', () => {
     );
 
     expect(html).toContain('overflow-x-auto');
+    expect(html).toContain('min-h-8');
+    expect(html).toContain('data-filter-strip-fade');
     expect(html).toContain('aria-pressed="true"');
     expect(html).toContain('Semua');
     expect(html).not.toContain('Geser sebelumnya');

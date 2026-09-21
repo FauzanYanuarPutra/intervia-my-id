@@ -24,8 +24,9 @@ export function ProfileFilterStrip<T extends string>({
     <div
       role="group"
       aria-label={ariaLabel}
+      data-filter-strip-fade
       className={cn(
-        'min-w-0 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+        'relative min-w-0 overflow-x-auto overscroll-x-contain pr-3 [scrollbar-width:none] after:pointer-events-none after:absolute after:inset-y-0 after:right-0 after:w-5 after:bg-gradient-to-l after:from-[color:var(--app-surface-strong)] after:to-transparent [&::-webkit-scrollbar]:hidden',
         className,
       )}
     >
@@ -40,7 +41,7 @@ export function ProfileFilterStrip<T extends string>({
               onClick={() => onChange(item.key)}
               aria-pressed={active}
               className={cn(
-                'inline-flex min-h-9 shrink-0 items-center rounded-full border px-3.5 text-xs font-bold transition',
+                'inline-flex min-h-8 shrink-0 items-center rounded-full border px-3 text-[11px] font-bold transition sm:min-h-9 sm:px-3.5 sm:text-xs',
                 active
                   ? 'border-emerald-600 bg-emerald-600 text-white shadow-sm shadow-emerald-600/15'
                   : 'border-transparent bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] hover:bg-emerald-50 hover:text-emerald-700 dark:bg-white/5 dark:hover:bg-emerald-500/10 dark:hover:text-emerald-300',

@@ -66,12 +66,22 @@ import {
 } from '@/lib/profile/publicProfileLink';
 import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 import { cn } from '@/lib/utils';
+import { normalizeProfileContentTab } from '@/lib/profile/profileContentTabs';
 import { OwnerProfileEditModal, OwnerProfileEditSection } from './OwnerProfileEditModal';
 
 type MetaRecord = Record<string, unknown>;
 
 type OwnerTab = 'posts' | 'drafts';
-type ListingFilter = 'all' | 'product' | 'service' | 'supplier' | 'place';
+type ListingFilter =
+  | 'all'
+  | 'product'
+  | 'service'
+  | 'supplier'
+  | 'place'
+  | 'news'
+  | 'community'
+  | 'reels'
+  | 'other';
 type SortMode = 'newest' | 'oldest' | 'most_viewed';
 
 type UserDetail = {
@@ -334,6 +344,10 @@ function buildCopy(isId: boolean) {
         services: 'Jasa',
         suppliers: 'Supplier',
         places: 'Tempat Usaha',
+        news: 'News',
+        community: 'Komunitas',
+        reelsFilter: 'Reels',
+        others: 'Lainnya',
         newest: 'Paling baru',
         oldest: 'Paling lama',
         mostViewed: 'Paling banyak dilihat',
@@ -430,6 +444,10 @@ function buildCopy(isId: boolean) {
         services: 'Services',
         suppliers: 'Suppliers',
         places: 'Business Places',
+        news: 'News',
+        community: 'Community',
+        reelsFilter: 'Reels',
+        others: 'Other',
         newest: 'Newest',
         oldest: 'Oldest',
         mostViewed: 'Most Viewed',
@@ -622,42 +640,28 @@ function normalizeStatus(item: OwnerListing): string {
 }
 
 function normalizeListingType(item: OwnerListing): ListingFilter {
-  const value = firstString(
-    item.content_type,
-    item.type,
-    item.category,
-    asRecord(item.metadata)?.content_type,
-    asRecord(item.metadata)?.category,
-  ).toLowerCase();
+  const metadata = asRecord(item.metadata);
+  const tab = normalizeProfileContentTab({
+    type: firstString(item.content_type, item.type),
+    category: item.category || null,
+    metadata,
+  });
 
+  if (tab === 'service' || tab === 'freelancer') return 'service';
+  if (tab === 'supplier') return 'supplier';
   if (
-    value.includes('service') ||
-    value.includes('jasa') ||
-    value.includes('freelancer') ||
-    value.includes('talent')
-  ) {
-    return 'service';
-  }
-
-  if (
-    value.includes('supplier') ||
-    value.includes('material') ||
-    value.includes('bahan')
-  ) {
-    return 'supplier';
-  }
-
-  if (
-    value.includes('place') ||
-    value.includes('property') ||
-    value.includes('location') ||
-    value.includes('tempat') ||
-    value.includes('ruko')
+    tab === 'business_place' ||
+    tab === 'umkm' ||
+    tab === 'property' ||
+    tab === 'business_transfer'
   ) {
     return 'place';
   }
-
-  return 'product';
+  if (tab === 'news') return 'news';
+  if (tab === 'community') return 'community';
+  if (tab === 'reels') return 'reels';
+  if (tab === 'product') return 'product';
+  return 'other';
 }
 
 function readListingMetric(item: OwnerListing, keys: string[]): number {
@@ -859,11 +863,35 @@ function getTypePresentation(type: ListingFilter, isId: boolean) {
         className:
           'bg-rose-50 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300',
       };
+    case 'news':
+      return {
+        label: 'NEWS',
+        className:
+          'bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300',
+      };
+    case 'community':
+      return {
+        label: isId ? 'KOMUNITAS' : 'COMMUNITY',
+        className:
+          'bg-teal-50 text-teal-700 dark:bg-teal-500/15 dark:text-teal-300',
+      };
+    case 'reels':
+      return {
+        label: 'REELS',
+        className:
+          'bg-fuchsia-50 text-fuchsia-700 dark:bg-fuchsia-500/15 dark:text-fuchsia-300',
+      };
     case 'place':
       return {
         label: isId ? 'TEMPAT USAHA' : 'BUSINESS PLACE',
         className:
           'bg-violet-50 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300',
+      };
+    case 'other':
+      return {
+        label: isId ? 'LAINNYA' : 'OTHER',
+        className:
+          'bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300',
       };
     default:
       return {
@@ -2063,6 +2091,10 @@ export default function SuperProfile() {
     { key: 'service', label: copy.services },
     { key: 'supplier', label: copy.suppliers },
     { key: 'place', label: copy.places },
+    { key: 'news', label: copy.news },
+    { key: 'community', label: copy.community },
+    { key: 'reels', label: copy.reelsFilter },
+    { key: 'other', label: copy.others },
   ];
 
   const sortOptions: Array<{ value: SortMode; label: string }> = [
@@ -2404,15 +2436,16 @@ export default function SuperProfile() {
               }}
             />
 
-            <div className="flex min-w-0 flex-wrap items-center gap-2 border-b border-[color:var(--app-border)]/70 bg-[color:var(--app-surface-strong)] px-3 py-2.5 sm:flex-nowrap sm:px-5">
+            <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5 border-b border-[color:var(--app-border)]/70 bg-[color:var(--app-surface-strong)] px-2.5 py-2 sm:px-5 sm:py-2.5">
               <FilterRail activeFilter={activeFilter} items={filterItems} onChange={setActiveFilter} />
-              <label className="flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-transparent bg-[color:var(--app-surface-muted)] px-3 text-[color:var(--app-text)] transition hover:bg-emerald-50 dark:bg-white/5 dark:text-[color:var(--app-text-inverse)] dark:hover:bg-emerald-500/10">
+              <label className="flex h-8 shrink-0 items-center gap-1 rounded-full border border-transparent bg-[color:var(--app-surface-muted)] px-2 text-[color:var(--app-text)] transition hover:bg-emerald-50 dark:bg-white/5 dark:text-[color:var(--app-text-inverse)] dark:hover:bg-emerald-500/10 sm:h-9 sm:px-2.5">
                 <Settings2 className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-300" />
                 <span className="sr-only">{isId ? 'Urutkan berdasarkan' : 'Sort by'}</span>
                 <select
                   value={sortMode}
                   onChange={event => setSortMode(event.target.value as SortMode)}
-                  className="max-w-32 bg-transparent text-[11px] font-black outline-none sm:max-w-none sm:text-xs"
+                  className="max-w-[5.8rem] bg-transparent text-[10px] font-black outline-none sm:max-w-36 sm:text-xs"
+                  aria-label={isId ? 'Urutkan postingan' : 'Sort posts'}
                 >
                   {sortOptions.map(option => (
                     <option key={option.value} value={option.value}>

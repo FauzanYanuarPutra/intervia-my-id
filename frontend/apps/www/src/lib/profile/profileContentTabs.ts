@@ -1,13 +1,19 @@
 export type ProfileContentTab =
   | 'all'
+  | 'news'
+  | 'community'
+  | 'reels'
   | 'job'
   | 'freelancer'
   | 'product'
   | 'service'
+  | 'supplier'
   | 'tool_rental'
   | 'business_transfer'
+  | 'business_place'
   | 'property'
-  | 'umkm';
+  | 'umkm'
+  | 'other';
 
 export type ProfileLeafTab = Exclude<ProfileContentTab, 'all'>;
 
@@ -26,6 +32,51 @@ export type ProfileContentTabDefinition = {
 };
 
 export const PROFILE_CONTENT_TABS: ProfileContentTabDefinition[] = [
+  {
+    key: 'news',
+    labelId: 'News',
+    labelEn: 'News',
+    emptyTitleId: 'Belum ada news',
+    emptyTitleEn: 'No news yet',
+    emptyDescriptionId:
+      'Berita, analisis, dan rilis usaha yang sudah melewati alur editorial akan tampil di sini.',
+    emptyDescriptionEn:
+      'News, analysis, and business releases that have passed editorial flow appear here.',
+    addLabelId: 'Kirim news',
+    addLabelEn: 'Submit news',
+    createHref: '/news/submit',
+    browseHref: '/news',
+  },
+  {
+    key: 'community',
+    labelId: 'Komunitas',
+    labelEn: 'Community',
+    emptyTitleId: 'Belum ada postingan komunitas',
+    emptyTitleEn: 'No community posts yet',
+    emptyDescriptionId:
+      'Diskusi, pertanyaan, dan update komunitas dari profil ini akan tampil terpisah dari produk.',
+    emptyDescriptionEn:
+      'Discussions, questions, and community updates from this profile stay separate from products.',
+    addLabelId: 'Posting komunitas',
+    addLabelEn: 'Post to community',
+    createHref: '/community?compose=post',
+    browseHref: '/community',
+  },
+  {
+    key: 'reels',
+    labelId: 'Reels',
+    labelEn: 'Reels',
+    emptyTitleId: 'Belum ada reels',
+    emptyTitleEn: 'No reels yet',
+    emptyDescriptionId:
+      'Video pendek dan konten promosi visual akan tampil di tab ini.',
+    emptyDescriptionEn:
+      'Short videos and visual promotion content appear in this tab.',
+    addLabelId: 'Upload reels',
+    addLabelEn: 'Upload reels',
+    createHref: '/reels?upload=1',
+    browseHref: '/reels',
+  },
   {
     key: 'job',
     labelId: 'Jobs',
@@ -55,6 +106,21 @@ export const PROFILE_CONTENT_TABS: ProfileContentTabDefinition[] = [
     addLabelEn: 'Add product',
     createHref: '/create/jual/produk',
     browseHref: '/explore?type=product',
+  },
+  {
+    key: 'supplier',
+    labelId: 'Supplier',
+    labelEn: 'Suppliers',
+    emptyTitleId: 'Belum ada supplier',
+    emptyTitleEn: 'No suppliers yet',
+    emptyDescriptionId:
+      'Supplier bahan, stok, atau mitra pasokan akan tampil di sini.',
+    emptyDescriptionEn:
+      'Material, stock, or supply partner listings appear here.',
+    addLabelId: 'Tambah supplier',
+    addLabelEn: 'Add supplier',
+    createHref: '/create/jual/supplier',
+    browseHref: '/explore?type=supplier',
   },
   {
     key: 'service',
@@ -102,6 +168,21 @@ export const PROFILE_CONTENT_TABS: ProfileContentTabDefinition[] = [
     browseHref: '/explore?type=business_transfer',
   },
   {
+    key: 'business_place',
+    labelId: 'Tempat Usaha',
+    labelEn: 'Business Places',
+    emptyTitleId: 'Belum ada tempat usaha',
+    emptyTitleEn: 'No business places yet',
+    emptyDescriptionId:
+      'Profil toko, outlet, tempat jualan, atau lokasi usaha akan tampil di sini.',
+    emptyDescriptionEn:
+      'Store, outlet, selling spot, or business location profiles appear here.',
+    addLabelId: 'Tambah tempat usaha',
+    addLabelEn: 'Add business place',
+    createHref: '/usaha',
+    browseHref: '/umkm',
+  },
+  {
     key: 'property',
     labelId: 'Properti',
     labelEn: 'Property',
@@ -131,10 +212,30 @@ export const PROFILE_CONTENT_TABS: ProfileContentTabDefinition[] = [
     createHref: '/usaha',
     browseHref: '/umkm',
   },
+  {
+    key: 'other',
+    labelId: 'Lainnya',
+    labelEn: 'Other',
+    emptyTitleId: 'Belum ada konten lain',
+    emptyTitleEn: 'No other content yet',
+    emptyDescriptionId:
+      'Konten yang belum masuk kategori utama akan ditampilkan di sini agar tidak bercampur dengan produk.',
+    emptyDescriptionEn:
+      'Content that does not fit the main categories appears here instead of mixing with products.',
+    addLabelId: 'Buat konten',
+    addLabelEn: 'Create content',
+    createHref: '/create',
+    browseHref: '/explore',
+  },
 ];
 
 function normalizeToken(value: unknown): string {
   return typeof value === 'string' ? value.trim().toLowerCase() : '';
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
 }
 
 function collectMetadataTokens(
@@ -150,9 +251,15 @@ function collectMetadataTokens(
     metadata.business_type,
     metadata.store_type,
     metadata.entity_kind,
+    metadata.content_kind,
+    metadata.module,
+    metadata.surface,
+    metadata.channel,
     metadata.publish_service,
     metadata.publish_services,
     metadata.tags,
+    asRecord(metadata.news)?.article_kind,
+    asRecord(metadata.news)?.category,
   ];
 
   return rawValues.flatMap(value => {
@@ -176,7 +283,22 @@ export function normalizeProfileContentTab(input: {
   ].filter(Boolean);
   const joined = tokens.join(' ');
 
-  if (/(freelancer|talent|creator|profile)/.test(joined)) return 'freelancer';
+  if (/(news|berita|analysis|analisis|press release|press_release|rilis bisnis|editorial)/.test(joined))
+    return 'news';
+  if (/(community|komunitas|forum|thread|discussion|diskusi|question|tanya)/.test(joined))
+    return 'community';
+  if (/(reels|reel|short video|video pendek|clips?)/.test(joined))
+    return 'reels';
+  if (
+    /(business_profile|business profile|company|tempat usaha|outlet|merchant|warung|storefront|toko|profil usaha)/.test(
+      joined,
+    )
+  )
+    return 'business_place';
+  if (/(supplier|pasokan|bahan baku|material|stockist|distributor)/.test(joined))
+    return 'supplier';
+  if (/(freelancer|talent|creator|worker|professional)/.test(joined))
+    return 'freelancer';
   if (/(job|career|hiring|recruit|loker|vacancy)/.test(joined)) return 'job';
   if (
     /(business_transfer|business-transfer|business transfer|oper usaha|jual usaha|usaha berjalan|handover|takeover)/.test(
@@ -188,10 +310,11 @@ export function normalizeProfileContentTab(input: {
     return 'tool_rental';
   if (/(property|real estate|apartment|house|ruko|kios|lapak)/.test(joined))
     return 'property';
-  if (/(umkm|merchant|warung|kuliner|storefront)/.test(joined)) return 'umkm';
+  if (/(umkm|kuliner)/.test(joined)) return 'umkm';
   if (/(service|jasa|agency|consult)/.test(joined)) return 'service';
   if (/(product|produk|shop|store|marketplace|commerce)/.test(joined))
     return 'product';
+  if (joined) return 'other';
   return 'product';
 }
 
