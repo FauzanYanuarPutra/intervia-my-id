@@ -170,26 +170,28 @@ export function AdministrationWorkspace() {
   );
 
   return <div className="space-y-5">
-    <PageHeader label="Administrasi" title="Tim & akses" description="Cari akun Lajukan → pilih CMS / Content Admin → kirim undangan." />
+    <PageHeader label="Administrasi" title="Tim & akses" description="Cari akun Lajukan yang terdaftar di WWW → pilih CMS / Content Admin → kirim undangan." />
     <Card className="p-5">
       <div className="flex flex-col gap-3 sm:flex-row">
         <input value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') void search(); }}
-          placeholder="Cari username, nama, atau email…" className="min-w-0 flex-1 rounded-xl border px-3 py-2 text-sm" />
-        <button disabled={busy || q.trim().length < 2} onClick={() => void search()} className="rounded-xl px-4 py-2 text-sm font-semibold bg-[color:var(--color-primary)] text-white disabled:opacity-50">Cari</button>
+          placeholder="Cari nama, @username, email, atau nomor HP…" className="min-w-0 flex-1 rounded-xl border px-3 py-2 text-sm" />
+        <button disabled={busy || q.trim().length < 2} onClick={() => void search()} className="rounded-xl px-4 py-2 text-sm font-semibold bg-[color:var(--color-primary)] text-white disabled:opacity-50">{busy ? 'Mencari…' : 'Cari'}</button>
       </div>
       {message ? <p className="mt-3 rounded-xl border px-3 py-2 text-sm">{message}</p> : null}
       <div className="mt-4 space-y-2">
         {candidates.map(candidate => <button key={candidate.id} onClick={() => setSelected(candidate)}
           className={`w-full rounded-xl border p-3 text-left ${selected?.id === candidate.id ? 'border-[color:var(--color-primary)]' : ''}`}>
           <div className="flex items-center justify-between gap-3">
-            <div><div className="font-semibold">{candidate.username ? '@' + candidate.username : candidate.full_name || candidate.email}</div>
-              <div className="text-xs opacity-70">{candidate.full_name || candidate.email}</div></div>
-            <span className={candidate.eligible ? 'text-xs font-semibold' : 'text-xs opacity-60'}>{candidate.eligible ? 'Siap diundang' : 'Belum eligible'}</span>
+            <div className="min-w-0"><div className="truncate font-semibold">{candidate.username ? '@' + candidate.username : candidate.full_name || candidate.email}</div>
+              <div className="truncate text-xs opacity-70">{candidate.full_name || candidate.email}</div>
+              <div className="truncate text-[11px] text-slate-400">{candidate.email}</div></div>
+            <span className={candidate.eligible ? 'text-xs font-semibold text-emerald-700' : 'text-xs font-semibold text-amber-700'}>{candidate.eligible ? 'Bisa diundang' : 'Perlu verifikasi'}</span>
           </div>
           <div className="mt-2 flex flex-wrap gap-2 text-[11px] opacity-75">
-            <span>Email {candidate.email_verified ? '✓' : '—'}</span><span>Phone {candidate.phone_verified ? '✓' : '—'}</span><span>Identity {candidate.identity_verified ? '✓' : '—'}</span>
+            <span>Email {candidate.email_verified ? '✓ terverifikasi' : 'belum terverifikasi'}</span><span>HP {candidate.phone_verified ? '✓ terverifikasi' : 'belum terverifikasi'}</span>{candidate.identity_verified ? <span>Identitas ✓</span> : null}
           </div>
         </button>)}
+      {!candidates.length && q.trim().length >= 2 && !busy ? <div className="rounded-xl border border-dashed p-4 text-sm text-slate-500">Akun Lajukan tidak ditemukan. Coba email lengkap, @username, nama, atau nomor HP.</div> : null}
       </div>
     </Card>
     {selected ? <Card className="p-5">
@@ -202,7 +204,7 @@ export function AdministrationWorkspace() {
           <input type="checkbox" checked={roles.includes(role)} onChange={() => toggleRole(role)} /> <span>{label}</span>
         </label>)}
       </div>
-      <button disabled={busy || !selected.eligible || !roles.length} onClick={() => void invite()} className="mt-4 rounded-xl bg-[color:var(--color-primary)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Kirim undangan 7 hari</button>
+      <button disabled={busy || !selected.eligible || !roles.length} onClick={() => void invite()} className="mt-4 rounded-xl bg-[color:var(--color-primary)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Kirim undangan</button>
     </Card> : null}
     <details className="rounded-2xl border border-slate-200 bg-white">
       <summary className="cursor-pointer list-none px-5 py-4 text-sm font-bold text-slate-900">Governance & keamanan</summary>
