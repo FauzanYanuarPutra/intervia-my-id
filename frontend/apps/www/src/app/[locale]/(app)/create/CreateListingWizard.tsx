@@ -3398,6 +3398,21 @@ export default function CreateListingWizard({
 
         if (
           step === 6 &&
+          media.some(
+            item =>
+              item.status ===
+              'uploading',
+          )
+        ) {
+          return text(
+            locale,
+            'Tunggu semua foto selesai diunggah sebelum lanjut.',
+            'Wait for all photo uploads to finish before continuing.',
+          );
+        }
+
+        if (
+          step === 6 &&
           requiresPrimaryImage &&
           media.filter(
             item =>
@@ -4415,6 +4430,8 @@ export default function CreateListingWizard({
         publishInFlightRef.current = true;
         setPublishing(true);
 
+        let publishDraftId: string | null = null;
+
         try {
         setError('');
 
@@ -4471,6 +4488,8 @@ export default function CreateListingWizard({
             values,
             media,
           );
+
+          publishDraftId = draft.id;
 
           const response =
             await authFetch(
@@ -4586,12 +4605,75 @@ export default function CreateListingWizard({
         } catch (
           caught
         ) {
+          if (publishDraftId) {
+            try {
+              const reconcile =
+                await authFetch(
+                  '/api/content/' +
+                    encodeURIComponent(
+                      publishDraftId,
+                    ),
+                  {
+                    cache: 'no-store',
+                  },
+                );
+
+              if (reconcile.ok) {
+                const reconciled =
+                  await reconcile
+                    .json()
+                    .catch(
+                      () => null,
+                    );
+
+                const reconciledStatus =
+                  valueAsString(
+                    reconciled?.content_status,
+                  ) ||
+                  valueAsString(
+                    reconciled?.status,
+                  );
+
+                const reconciledSlug =
+                  valueAsString(
+                    reconciled?.slug,
+                  ) ||
+                  publishDraftId;
+
+                if (
+                  reconciledStatus ===
+                    'active' ||
+                  reconciledStatus ===
+                    'published'
+                ) {
+                  const resourceUrl =
+                    '/' +
+                    locale +
+                    '/content/' +
+                    encodeURIComponent(
+                      reconciledSlug,
+                    );
+
+                  clearTemporaryCreateDraft(
+                    draftOwnerId,
+                  );
+                  router.push(
+                    resourceUrl,
+                  );
+                  return;
+                }
+              }
+            } catch {
+              // Keep the local draft when the publish state cannot be checked.
+            }
+          }
+
           setError(
             safeErrorMessage(
               caught,
               locale,
-              'Postingan belum berhasil diterbitkan.',
-              'The post could not be published.',
+              'Postingan belum berhasil diterbitkan. Data tetap tersimpan; coba lagi setelah koneksi stabil.',
+              'The post was not confirmed as published. Your data is still saved; try again when the connection is stable.',
             ),
           );
         }
