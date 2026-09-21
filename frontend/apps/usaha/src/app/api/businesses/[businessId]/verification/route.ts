@@ -32,7 +32,7 @@ export async function POST(
   const { businessId } = await context.params;
   try {
     const verification = await requestBusinessVerification(businessId);
-    return NextResponse.json({ ok: true, ...verification });
+    return NextResponse.json({ ok: true, verification });
   } catch (error) {
     const normalized = normalizeBusinessApiError(error, 'Pengajuan verifikasi gagal.');
     return NextResponse.json(
