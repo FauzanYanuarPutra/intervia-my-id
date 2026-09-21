@@ -1596,7 +1596,13 @@ pub async fn list_users(
     let has_user_read = if has_permission(&claims.perms, "user.read") {
         true
     } else {
-        match has_current_permission(&state, Uuid::parse_str(&claims.sub).unwrap_or_default(), "user.read").await {
+        match has_current_permission(
+            &state,
+            Uuid::parse_str(&claims.sub).unwrap_or_default(),
+            "user.read",
+        )
+        .await
+        {
             Ok(value) => value,
             Err(error) => {
                 tracing::error!("list_users current permission check failed: {:?}", error);
@@ -1748,7 +1754,13 @@ pub async fn get_user_detail(
 
     let is_self = claims.sub == user_id.to_string();
     if !is_self && !has_permission(&claims.perms, "user.read") {
-        match has_current_permission(&state, Uuid::parse_str(&claims.sub).unwrap_or_default(), "user.read").await {
+        match has_current_permission(
+            &state,
+            Uuid::parse_str(&claims.sub).unwrap_or_default(),
+            "user.read",
+        )
+        .await
+        {
             Ok(true) => {}
             Ok(false) => {
                 return (

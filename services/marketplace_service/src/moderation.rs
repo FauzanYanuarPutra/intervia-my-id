@@ -48,9 +48,10 @@ fn has_content_admin_access(claims: &AccessClaims) -> bool {
 }
 
 fn has_business_reference_moderation_access(claims: &AccessClaims) -> bool {
-    claims.perms.iter().any(|permission| {
-        permission.eq_ignore_ascii_case("business:moderate")
-    })
+    claims
+        .perms
+        .iter()
+        .any(|permission| permission.eq_ignore_ascii_case("business:moderate"))
 }
 
 fn is_business_reference_content(content: &ContentRow) -> bool {
@@ -676,10 +677,7 @@ pub async fn moderate_content(
         .into_response();
     }
 
-    if action == "restore"
-        && !has_content_admin_access(&claims)
-        && !is_business_reference
-    {
+    if action == "restore" && !has_content_admin_access(&claims) && !is_business_reference {
         return err(
             StatusCode::FORBIDDEN,
             "only admin can restore restricted content",

@@ -191,13 +191,7 @@ async fn transfer_accounts(
         Err(code) => return api_error(StatusCode::BAD_REQUEST, code),
     };
     match FinanceCoreRepository::new(state.db.clone())
-        .transfer_accounts(
-            actor_id,
-            business_id,
-            organization_id,
-            key,
-            payload,
-        )
+        .transfer_accounts(actor_id, business_id, organization_id, key, payload)
         .await
     {
         Ok(outcome) => (
