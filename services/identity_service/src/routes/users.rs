@@ -2222,8 +2222,20 @@ pub async fn search_backoffice_candidates(
             OR lower(COALESCE(u.email::text, '')) ILIKE '%' || lower($1) || '%'
             OR (
               regexp_replace($1, '[^0-9]', '', 'g') <> ''
-              AND regexp_replace(COALESCE(u.phone, ''), '[^0-9]', '', 'g')
+              AND (
+                regexp_replace(COALESCE(u.phone, ''), '[^0-9]', '', 'g')
                   ILIKE '%' || regexp_replace($1, '[^0-9]', '', 'g') || '%'
+                OR (
+                  regexp_replace($1, '[^0-9]', '', 'g') LIKE '0%'
+                  AND regexp_replace(COALESCE(u.phone, ''), '[^0-9]', '', 'g')
+                    ILIKE '%' || ('62' || substring(regexp_replace($1, '[^0-9]', '', 'g') FROM 2)) || '%'
+                )
+                OR (
+                  regexp_replace($1, '[^0-9]', '', 'g') LIKE '62%'
+                  AND regexp_replace(COALESCE(u.phone, ''), '[^0-9]', '', 'g')
+                    ILIKE '%' || ('0' || substring(regexp_replace($1, '[^0-9]', '', 'g') FROM 3)) || '%'
+                )
+              )
             )
           )
         ORDER BY
