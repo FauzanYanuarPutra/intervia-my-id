@@ -75,14 +75,14 @@ export function SupportWorkspace({tickets,failed=false}:{tickets:SupportTicket[]
     }
   }
 
-  return <div className="space-y-4">
-    <PageHeader title="Support" description="Tiket urgent dan yang masih terbuka muncul lebih dulu. Detail, status, dan balasan tersedia dari sumber support real."/>
+  return <div className="space-y-3">
+    <PageHeader label="Support" title="Tiket support" description="Urgent dan tiket terbuka muncul lebih dulu."/>
     {failed?<div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-800">Sumber support gagal dibaca. Data kosong tidak dianggap sukses.</div>:null}
     {notice ? <div className="rounded-2xl border border-sky-200 bg-sky-50 p-3 text-sm font-semibold text-sky-800">{notice}</div> : null}
-    <div className="grid gap-4 xl:grid-cols-[380px_minmax(0,1fr)]">
+    <div className="grid min-h-0 gap-3 xl:grid-cols-[320px_minmax(0,1fr)]">
       <Card className="p-3">
         <div className="space-y-2">
-          {ranked.map(t=><button key={t.id} type="button" onClick={()=>void openTicket(t)} className={`w-full rounded-2xl border p-3 text-left ${selectedId===t.id?'border-emerald-300 bg-emerald-50':'border-[color:var(--color-border)]'}`}>
+          {ranked.map(t=><button key={t.id} type="button" onClick={()=>void openTicket(t)} className={`w-full rounded-xl border p-2.5 text-left ${selectedId===t.id?'border-emerald-300 bg-emerald-50':'border-[color:var(--color-border)]'}`}>
             <div className="flex items-start justify-between gap-3">
               <p className="font-bold">{t.subject}</p>
               <StatusBadge tone={t.priority==='urgent'?'danger':t.priority==='high'?'warning':'neutral'}>{t.priority}</StatusBadge>
@@ -94,7 +94,7 @@ export function SupportWorkspace({tickets,failed=false}:{tickets:SupportTicket[]
         </div>
       </Card>
 
-      <Card className="p-5">
+      <Card className="p-4 sm:p-5">
         {!selectedId ? <EmptyState title="Pilih tiket" description="Pilih tiket di kiri untuk melihat detail, riwayat balasan, dan tindakan."/> :
         loadingDetail ? <div className="rounded-2xl bg-[color:var(--color-surface-muted)] p-6 text-sm font-semibold">Memuat detail tiket...</div> :
         detail ? <div>
@@ -108,7 +108,7 @@ export function SupportWorkspace({tickets,failed=false}:{tickets:SupportTicket[]
             </select>
           </div>
 
-          <div className="mt-4 max-h-[420px] space-y-2 overflow-y-auto rounded-2xl bg-[color:var(--color-surface-muted)] p-3">
+          <div className="mt-4 max-h-[48vh] space-y-2 overflow-y-auto rounded-2xl bg-[color:var(--color-surface-muted)] p-3">
             {(detail.replies || []).map((item: SupportReply)=><div key={item.id} className={`rounded-2xl border p-3 ${item.is_internal?'border-amber-200 bg-amber-50':'border-[color:var(--color-border)] bg-white'}`}>
               <div className="flex items-center justify-between gap-2 text-[11px] font-bold">
                 <span>{item.author_role}</span><span className="text-[color:var(--color-text-soft)]">{new Date(item.created_at).toLocaleString('id-ID')}</span>
