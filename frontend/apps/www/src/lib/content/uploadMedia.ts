@@ -52,50 +52,43 @@ export function extractUploadedContentImages(
   payload: unknown,
 ): UploadedContentImage[] {
   const body = asObject(payload) || {};
-  const data = asObject(body.data);
-  const entries = [
+  const dataRecord = asObject(body.data);
+
+  const structuredEntries = [
     ...(Array.isArray(body.files) ? body.files : []),
     ...(Array.isArray(body.data) ? body.data : []),
-    ...(data ? [data] : []),
+    ...(dataRecord ? [dataRecord] : []),
   ];
 
-  const result: UploadedContentImage[] = [];
-  const seen = new Set<string>();
-
-  for (const entry of entries) {
+  const structured: UploadedContentImage[] = [];
+  for (const entry of structuredEntries) {
     if (typeof entry === 'string') {
       const url = normalizeUploadedContentMediaUrl(entry);
-      if (!url || seen.has(url)) continue;
-      seen.add(url);
-      result.push({ url });
+      if (url) structured.push({ url });
       continue;
     }
 
     const record = asObject(entry);
     const url = normalizeUploadedContentMediaUrl(record?.url);
-    if (!url || seen.has(url)) continue;
-    seen.add(url);
-    result.push({
+    if (!url) continue;
+
+    structured.push({
       url,
       name: asString(record?.name) || undefined,
     });
   }
 
-  for (const rawUrl of normalizeMediaList(body.urls)) {
-    if (!rawUrl || seen.has(rawUrl)) continue;
-    seen.add(rawUrl);
-    result.push({ url: rawUrl });
+  if (structured.length > 0) {
+    return structured;
   }
 
-  for (const rawUrl of normalizeMediaList(body.image_urls)) {
-    if (!rawUrl || seen.has(rawUrl)) continue;
-    seen.add(rawUrl);
-    result.push({ url: rawUrl });
-  }
+  const fallbackUrls = [
+    ...normalizeMediaList(body.urls),
+    ...normalizeMediaList(body.image_urls),
+  ];
 
-  return result;
+  return fallbackUrls.map(url => ({ url }));
 }
-
 export function extractUploadedContentImageUrls(payload: unknown): string[] {
   return extractUploadedContentImages(payload).map(item => item.url);
 }
