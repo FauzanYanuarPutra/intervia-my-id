@@ -2265,23 +2265,37 @@ pub async fn search_backoffice_candidates(
                 .pointer("/verification/identity_verified")
                 .and_then(Value::as_bool)
                 .unwrap_or(false);
+            let is_active: bool = row.get("is_active");
+            let status: String = row.get("status");
+            let email_verified: bool = row.get("email_verified");
+            let phone_verified: bool = row.get("phone_verified");
             let eligible = is_backoffice_eligible(
-                row.get("is_active"),
-                row.get::<String, _>("status") == "banned",
-                row.get("email_verified"),
-                row.get("phone_verified"),
+                is_active,
+                status == "banned",
+                email_verified,
+                phone_verified,
             );
+            let eligibility_reason = if eligible {
+                None
+            } else if !is_active {
+                Some("Akun tidak aktif")
+            } else if status == "banned" {
+                Some("Akun diblokir")
+            } else {
+                Some("Verifikasi email atau HP diperlukan")
+            };
             json!({
                 "id": row.get::<Uuid,_>("id"),
                 "email": row.get::<String,_>("email"),
                 "username": row.get::<Option<String>,_>("username"),
                 "full_name": row.get::<Option<String>,_>("full_name"),
-                "status": row.get::<String,_>("status"),
-                "email_verified": row.get::<bool,_>("email_verified"),
-                "phone_verified": row.get::<bool,_>("phone_verified"),
-                "has_phone": row.get::<Option<String>,_>("phone").is_some(),
+                "status": status,
+                "email_verified": email_verified,
+                "phone_verified": phone_verified,
+                "has_phone": row.get::<Option<String>, _>("phone").is_some(),
                 "identity_verified": identity_verified,
-                "eligible": eligible
+                "eligible": eligible,
+                "eligibility_reason": eligibility_reason
             })
         })
         .collect();
