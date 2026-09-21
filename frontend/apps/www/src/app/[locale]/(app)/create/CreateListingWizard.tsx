@@ -3869,14 +3869,15 @@ export default function CreateListingWizard({
           return;
         }
 
-        let payload:
-          Record<string, unknown> = {};
-        let response:
-          Response | null = null;
-        let lastUploadError:
-          unknown = null;
+        try {
+          let payload:
+            Record<string, unknown> = {};
+          let response:
+            Response | null = null;
+          let lastUploadError:
+            unknown = null;
 
-        for (
+          for (
           let attempt = 0;
           attempt < 3;
           attempt += 1
