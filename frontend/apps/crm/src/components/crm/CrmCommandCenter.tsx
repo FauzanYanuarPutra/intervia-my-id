@@ -672,6 +672,74 @@ function EmptyState({ title, body }: { title: string; body: string }) {
   );
 }
 
+function CrmLoadingSkeleton() {
+  return (
+    <div className="dashboard-shell bg-[#F9FAFB] text-slate-950" aria-busy="true" data-skeleton-route="true">
+      <div className="flex h-full min-h-0">
+        <aside className="hidden w-[240px] shrink-0 border-r border-slate-200 bg-white p-4 lg:block">
+          <div className="h-9 w-32 animate-pulse rounded-xl bg-slate-200" />
+          <div className="mt-6 space-y-2">
+            {Array.from({ length: 8 }).map((_, index) => (
+              <div key={index} className="h-10 animate-pulse rounded-xl bg-slate-100" />
+            ))}
+          </div>
+        </aside>
+
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <header className="flex min-h-[64px] items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 sm:px-6">
+            <div className="space-y-2">
+              <div className="h-3 w-20 animate-pulse rounded-full bg-slate-200" />
+              <div className="h-5 w-44 animate-pulse rounded-lg bg-slate-200" />
+            </div>
+            <div className="flex gap-2">
+              <div className="h-9 w-32 animate-pulse rounded-xl bg-slate-100" />
+              <div className="h-9 w-9 animate-pulse rounded-xl bg-slate-200" />
+            </div>
+          </header>
+
+          <main className="min-h-0 flex-1 overflow-auto p-4 sm:p-6">
+            <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="h-3 w-24 animate-pulse rounded-full bg-slate-200" />
+              <div className="mt-3 h-8 w-64 animate-pulse rounded-xl bg-slate-200" />
+              <div className="mt-2 h-4 w-full max-w-2xl animate-pulse rounded bg-slate-100" />
+            </section>
+
+            <section className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <article key={index} className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <div className="h-3 w-24 animate-pulse rounded-full bg-slate-200" />
+                  <div className="mt-3 h-7 w-20 animate-pulse rounded-lg bg-slate-200" />
+                  <div className="mt-2 h-3 w-32 animate-pulse rounded-full bg-slate-100" />
+                </article>
+              ))}
+            </section>
+
+            <section className="mt-4 grid gap-4 xl:grid-cols-2">
+              <div className="rounded-3xl border border-slate-200 bg-white p-5">
+                <div className="h-5 w-36 animate-pulse rounded-lg bg-slate-200" />
+                <div className="mt-4 space-y-3">
+                  {Array.from({ length: 5 }).map((_, index) => <div key={index} className="h-14 animate-pulse rounded-2xl bg-slate-50 ring-1 ring-slate-100" />)}
+                </div>
+              </div>
+              <div className="rounded-3xl border border-slate-200 bg-white p-5">
+                <div className="h-5 w-32 animate-pulse rounded-lg bg-slate-200" />
+                <div className="mt-4 space-y-3">
+                  {Array.from({ length: 5 }).map((_, index) => <div key={index} className="h-14 animate-pulse rounded-2xl bg-slate-50 ring-1 ring-slate-100" />)}
+                </div>
+              </div>
+            </section>
+
+            <div className="mt-4 overflow-hidden rounded-3xl border border-slate-200 bg-white">
+              <div className="h-11 animate-pulse bg-slate-50" />
+              {Array.from({ length: 5 }).map((_, index) => <div key={index} className="h-14 animate-pulse border-t border-slate-100 bg-white" />)}
+            </div>
+          </main>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function CrmCommandCenter() {
   const { isAuthenticated, loading: authLoading } = useRequireAuth();
   const { accessToken, logout, user } = useAuth();
@@ -1008,13 +1076,7 @@ export default function CrmCommandCenter() {
   ).length;
   const highRiskOrders = data.orders.filter(order => order.risk_score >= 70 || order.status === "disputed").length;
 
-  if (authLoading || loading) {
-    return (
-      <div className="flex h-[100dvh] items-center justify-center bg-[#F9FAFB] text-sm font-semibold text-slate-600">
-        Memuat dashboard CRM...
-      </div>
-    );
-  }
+  if (authLoading || loading) return <CrmLoadingSkeleton />;
 
   if (!isAuthenticated) return null;
 

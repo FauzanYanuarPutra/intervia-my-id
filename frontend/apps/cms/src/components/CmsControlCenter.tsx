@@ -105,6 +105,65 @@ function initialNews(item: R | null): NewsForm {
   };
 }
 
+function CmsLoadingSkeleton() {
+  const nav = Array.from({ length: 5 });
+  const cards = Array.from({ length: 5 });
+  const rows = Array.from({ length: 4 });
+  return (
+    <main className="min-h-screen bg-[color:var(--color-background)] text-[color:var(--color-text)]" aria-busy="true" data-skeleton-route="true">
+      <div className="mx-auto max-w-[1600px] px-4 py-4 md:px-6 lg:px-8">
+        <header className="sticky top-3 z-30 rounded-3xl border border-[color:var(--color-border)] bg-[color:var(--color-background)]/90 p-4 shadow-lg backdrop-blur-xl">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="h-11 w-11 animate-pulse rounded-2xl bg-slate-200" />
+              <div className="space-y-2">
+                <div className="h-2.5 w-24 animate-pulse rounded-full bg-slate-200" />
+                <div className="h-5 w-48 animate-pulse rounded-lg bg-slate-200" />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <div className="h-9 w-20 animate-pulse rounded-xl bg-slate-200" />
+              <div className="h-9 w-36 animate-pulse rounded-xl bg-slate-100" />
+            </div>
+          </div>
+          <div className="mt-4 flex gap-2 overflow-hidden pb-1">
+            {nav.map((_, index) => <div key={index} className="h-12 w-36 shrink-0 animate-pulse rounded-2xl bg-slate-100 ring-1 ring-slate-200" />)}
+          </div>
+        </header>
+
+        <section className="mt-6 space-y-6">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+            {cards.map((_, index) => (
+              <article key={index} className="rounded-3xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-5">
+                <div className="h-3 w-28 animate-pulse rounded-full bg-slate-200" />
+                <div className="mt-3 h-8 w-16 animate-pulse rounded-lg bg-slate-200" />
+              </article>
+            ))}
+          </div>
+          <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+            <section className="rounded-3xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-5">
+              <div className="h-5 w-40 animate-pulse rounded-lg bg-slate-200" />
+              <div className="mt-1.5 h-3 w-64 animate-pulse rounded-full bg-slate-100" />
+              <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                {Array.from({ length: 4 }).map((_, index) => <div key={index} className="h-20 animate-pulse rounded-2xl bg-slate-50 ring-1 ring-slate-100" />)}
+              </div>
+              <div className="mt-6 flex flex-wrap gap-2">
+                {Array.from({ length: 6 }).map((_, index) => <div key={index} className="h-8 w-24 animate-pulse rounded-xl bg-slate-100" />)}
+              </div>
+            </section>
+            <section className="rounded-3xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-5">
+              <div className="h-5 w-36 animate-pulse rounded-lg bg-slate-200" />
+              <div className="mt-4 space-y-2">
+                {rows.map((_, index) => <div key={index} className="h-14 animate-pulse rounded-2xl bg-slate-50 ring-1 ring-slate-100" />)}
+              </div>
+            </section>
+          </div>
+        </section>
+      </div>
+    </main>
+  );
+}
+
 export default function CmsControlCenter() {
   const { isAuthenticated, loading: authLoading } = useRequireAuth();
   const { user, accessToken } = useAuth();
@@ -294,7 +353,7 @@ export default function CmsControlCenter() {
     finally { setBusy(false); }
   };
 
-  if (authLoading) return <div className="min-h-screen grid place-items-center text-sm text-slate-600">Memuat CMS...</div>;
+  if (authLoading) return <CmsLoadingSkeleton />;
   if (!isAuthenticated) return null;
 
   const buckets = Array.isArray(newsMetrics.queue) ? newsMetrics.queue as R[] : [];

@@ -9,8 +9,9 @@ export function Skeleton({
 }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
+      data-skeleton="true"
       className={cn(
-        'animate-pulse rounded-xl bg-[color:color-mix(in_srgb,_var(--color-surface)_90%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--color-surface)_80%,_transparent)]',
+        'animate-pulse motion-reduce:animate-none rounded-xl bg-[color:color-mix(in_srgb,_var(--color-surface)_90%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--color-surface)_80%,_transparent)]',
         className,
       )}
       aria-hidden="true"
