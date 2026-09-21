@@ -471,7 +471,7 @@ function getManagedPresenceStatus(
   );
 
   if (!presence.hasPresenceControls) {
-    const configuredOpenHours = readMetaText(place, 'open_hours');
+    const configuredOpenHours = readMetaText(place, 'open_hours', 'schedule');
     const openStatus = getOpenStatusLabel(configuredOpenHours, isId);
     return {
       openHours:
