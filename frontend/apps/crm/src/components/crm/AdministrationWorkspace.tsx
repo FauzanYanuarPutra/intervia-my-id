@@ -186,11 +186,14 @@ export function AdministrationWorkspace() {
             <div className="min-w-0"><div className="truncate font-semibold">{candidate.username ? '@' + candidate.username : candidate.full_name || candidate.email}</div>
               <div className="truncate text-xs opacity-70">{candidate.full_name || candidate.email}</div>
               <div className="truncate text-[11px] text-slate-400">{candidate.email}</div></div>
-            <span className={candidate.eligible ? 'text-xs font-semibold text-emerald-700' : 'text-xs font-semibold text-amber-700'}>{candidate.eligible ? 'Bisa diundang' : 'Perlu verifikasi'}</span>
+            <span className={candidate.eligible ? 'text-xs font-semibold text-emerald-700' : 'text-xs font-semibold text-amber-700'}>{candidate.eligible ? 'Bisa diundang' : candidate.eligibility_reason || 'Belum siap'}</span>
           </div>
           <div className="mt-2 flex flex-wrap gap-2 text-[11px] opacity-75">
             <span>Email {candidate.email_verified ? '✓ terverifikasi' : 'belum terverifikasi'}</span><span>HP {candidate.phone_verified ? '✓ terverifikasi' : 'belum terverifikasi'}</span>{candidate.identity_verified ? <span>Identitas ✓</span> : null}
           </div>
+          {!candidate.eligible && candidate.eligibility_reason ? (
+            <p className="mt-1 text-[11px] text-amber-700">{candidate.eligibility_reason}</p>
+          ) : null}
         </button>)}
       {!candidates.length && q.trim().length >= 2 && !busy ? <div className="rounded-xl border border-dashed p-4 text-sm text-slate-500">Akun Lajukan tidak ditemukan. Coba email lengkap, @username, nama, atau nomor HP.</div> : null}
       </div>
