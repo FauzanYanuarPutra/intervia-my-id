@@ -3951,6 +3951,188 @@ export default function CreateListingWizard({
       ],
     );
 
+  const retryMediaUpload =
+    useCallback(
+      async (mediaId: string) => {
+        const file =
+          pendingUploadFilesRef.current.get(
+            mediaId,
+          );
+
+        if (!file || !isAuthenticated) {
+          setError(
+            text(
+              locale,
+              'Foto ini perlu dipilih ulang karena file aslinya sudah tidak tersedia.',
+              'Choose this photo again because its original file is no longer available.',
+            ),
+          );
+          return;
+        }
+
+        const form = new FormData();
+        form.append(
+          'images',
+          file,
+          file.name,
+        );
+
+        setMedia(
+          previous =>
+            previous.map(
+              item =>
+                item.id === mediaId
+                  ? {
+                      ...item,
+                      status: 'uploading',
+                      error: undefined,
+                    }
+                  : item,
+            ),
+        );
+
+        let payload:
+          Record<string, unknown> = {};
+        let response:
+          Response | null = null;
+        let lastError:
+          unknown = null;
+
+        for (
+          let attempt = 0;
+          attempt < 3;
+          attempt += 1
+        ) {
+          try {
+            response =
+              await authFetch(
+                '/api/content/upload-images',
+                {
+                  method: 'POST',
+                  body: form,
+                },
+              );
+            payload =
+              (await readResponseJson(
+                response,
+              )) as Record<string, unknown>;
+
+            if (response.ok) break;
+
+            lastError =
+              new Error(
+                responseErrorMessage(
+                  payload,
+                  text(
+                    locale,
+                    'Upload foto gagal.',
+                    'Photo upload failed.',
+                  ),
+                ),
+              );
+
+            const retryable =
+              response.status === 408 ||
+              response.status === 425 ||
+              response.status === 429 ||
+              response.status >= 500;
+
+            if (!retryable) break;
+          } catch (caught) {
+            lastError = caught;
+          }
+
+          if (attempt < 2) {
+            await new Promise(resolve =>
+              window.setTimeout(
+                resolve,
+                700 * (attempt + 1),
+              ),
+            );
+          }
+        }
+
+        if (!response?.ok) {
+          setMedia(
+            previous =>
+              previous.map(
+                item =>
+                  item.id === mediaId
+                    ? {
+                        ...item,
+                        status: 'failed',
+                        error: safeErrorMessage(
+                          lastError,
+                          locale,
+                          'Foto belum tersimpan. Coba lagi.',
+                          'The photo was not saved. Try again.',
+                        ),
+                      }
+                    : item,
+              ),
+          );
+          setSaveStatus(
+            navigator.onLine
+              ? 'error'
+              : 'offline',
+          );
+          return;
+        }
+
+        const uploaded =
+          extractUploadedContentImages(
+            payload,
+          );
+        const matched =
+          matchUploadedContentImages(
+            [{ id: mediaId, name: file.name }],
+            uploaded,
+          ).get(mediaId);
+
+        if (!matched?.url) {
+          setMedia(
+            previous =>
+              previous.map(
+                item =>
+                  item.id === mediaId
+                    ? {
+                        ...item,
+                        status: 'failed',
+                        error: text(
+                          locale,
+                          'Server menerima upload, tetapi URL media tidak ditemukan.',
+                          'The server accepted the upload, but no media URL was returned.',
+                        ),
+                      }
+                    : item,
+              ),
+          );
+          return;
+        }
+
+        pendingUploadFilesRef.current.delete(
+          mediaId,
+        );
+        setMedia(
+          previous =>
+            previous.map(
+              item =>
+                item.id === mediaId
+                  ? {
+                      ...item,
+                      url: matched.url,
+                      preview: matched.url,
+                      status: 'uploaded',
+                      error: undefined,
+                    }
+                  : item,
+            ),
+        );
+        setSaveStatus('dirty');
+        setError('');
+      },
+      [authFetch, isAuthenticated, locale],
+    );
   const removeMedia =
     useCallback(
       (mediaId: string) => {
