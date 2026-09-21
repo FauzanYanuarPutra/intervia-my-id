@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { accessTokenFromCookieHeader } from '@/lib/sessionProxy';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -29,7 +30,15 @@ export async function GET(req: NextRequest, context: RouteContext) {
   }
 
   const headers = new Headers({ Accept: 'application/json' });
-  for (const name of ['authorization', 'user-agent', 'x-device-id']) {
+  const sessionAccessToken = accessTokenFromCookieHeader(req.headers.get('cookie'));
+  if (sessionAccessToken) headers.set('Authorization', `Bearer ${sessionAccessToken}`);
+  else {
+    const authorization = req.headers.get('authorization');
+    if (authorization && authorization !== 'Bearer cookie-session') {
+      headers.set('Authorization', authorization);
+    }
+  }
+  for (const name of ['user-agent', 'x-device-id']) {
     const value = req.headers.get(name);
     if (value) headers.set(name, value);
   }
