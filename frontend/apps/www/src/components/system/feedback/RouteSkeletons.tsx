@@ -8,7 +8,7 @@ function Pulse({ className }: { className?: string }) {
 
 function ShellFrame({ children }: { children: React.ReactNode }) {
   return (
-    <div className="page-shell page-rhythm py-6" data-skeleton-route="true">
+    <div className="page-shell page-rhythm py-6" data-skeleton-route="true" aria-busy="true" aria-label="Memuat halaman">
       {children}
     </div>
   );
@@ -98,7 +98,7 @@ export function SharedPageSkeleton() {
 export function AppPageSkeleton() {
   return (
     <div
-      className="min-h-[100svh] bg-[color:var(--app-surface-muted)] dark:bg-[color:var(--app-surface-strong)]"
+      className="min-h-[100svh] bg-[color:var(--app-surface-muted)] dark:bg-[color:var(--app-surface-strong)]" aria-busy="true" aria-label="Memuat halaman"
       data-skeleton-route="true"
     >
       <div className="mx-auto w-full max-w-6xl space-y-4 px-3 py-4 sm:px-5 sm:py-5">
