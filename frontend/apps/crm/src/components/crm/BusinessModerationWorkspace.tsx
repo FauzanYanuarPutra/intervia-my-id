@@ -24,11 +24,13 @@ const REASONS = [
   ["owner_request", "Permintaan dari pemilik usaha"],
   ["quality", "Kualitas data/profil belum memadai"],
   ["not_eligible", "Belum memenuhi syarat penayangan"],
+  ["verification_complete", "Verifikasi Lajukan sudah selesai"],
+  ["restored_after_review", "Dipulihkan setelah ditinjau"],
   ["other", "Lainnya"],
 ] as const;
 
 const ACTIONS: Record<Action, { label: string; confirmLabel: string; tone: string; destructive?: boolean }> = {
-  approve: { label: "Setujui penayangan", confirmLabel: "Setujui", tone: "bg-emerald-600 text-white" },
+  approve: { label: "Setujui & tampilkan", confirmLabel: "Setujui & tampilkan", tone: "bg-emerald-600 text-white" },
   restore: { label: "Pulihkan penayangan", confirmLabel: "Pulihkan", tone: "bg-emerald-600 text-white" },
   request_completion: { label: "Minta dilengkapi", confirmLabel: "Kirim permintaan", tone: "bg-amber-500 text-white" },
   hide: { label: "Sembunyikan dari publik", confirmLabel: "Sembunyikan", tone: "bg-rose-600 text-white", destructive: true },
