@@ -112,23 +112,23 @@ const FLOW = [
 
 export default function CrmGuideWorkspace({ onOpen }: { onOpen: (page: PageId) => void }) {
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <section className="rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-white p-5 shadow-sm">
         <p className="text-[11px] font-black uppercase tracking-[0.22em] text-emerald-700">CRM • Panduan</p>
-        <h1 className="mt-2 text-2xl font-black tracking-[-0.05em] text-slate-950 sm:text-3xl">CRM itu buat apa?</h1>
+        <h1 className="mt-1 text-2xl font-black tracking-[-0.05em] text-slate-950 sm:text-3xl">CRM itu buat apa?</h1>
         <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
           CRM adalah pusat operasi internal Lajukan. Bukan tempat membuat data palsu, dan bukan sekadar dashboard. Setiap halaman menerima data dari service nyata, menjelaskan masalah yang perlu ditangani, lalu menyediakan action yang mengubah state bisnis melalui API.
         </p>
       </section>
 
-      <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Flow utama</p>
           <h2 className="mt-1 text-xl font-black text-slate-950">Dari data masuk sampai efeknya</h2>
         </div>
-        <div className="mt-4 grid gap-3 lg:grid-cols-5">
+        <div className="mt-3 grid gap-2 lg:grid-cols-5">
           {FLOW.map(([title, body]) => (
-            <div key={title} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div key={title} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
               <p className="text-sm font-black text-slate-950">{title}</p>
               <p className="mt-2 text-xs leading-5 text-slate-600">{body}</p>
             </div>
@@ -136,7 +136,7 @@ export default function CrmGuideWorkspace({ onOpen }: { onOpen: (page: PageId) =
         </div>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-2">
+      <section className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
         {GUIDE.map(item => (
           <article key={item.id} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -153,8 +153,8 @@ export default function CrmGuideWorkspace({ onOpen }: { onOpen: (page: PageId) =
               </button>
             </div>
             <p className="mt-3 text-sm font-semibold leading-6 text-slate-700">{item.purpose}</p>
-            <div className="mt-4 grid gap-2">
-              <div className="rounded-2xl bg-slate-50 p-3">
+            <div className="mt-3 grid gap-2">
+              <div className="rounded-xl bg-slate-50 p-2.5">
                 <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-400">Data yang masuk</p>
                 <p className="mt-1 text-xs leading-5 text-slate-600">{item.input}</p>
               </div>
@@ -162,7 +162,7 @@ export default function CrmGuideWorkspace({ onOpen }: { onOpen: (page: PageId) =
                 <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-400">Yang dilakukan operator</p>
                 <p className="mt-1 text-xs leading-5 text-slate-600">{item.action}</p>
               </div>
-              <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-3">
+              <div className="rounded-xl border border-emerald-100 bg-emerald-50/70 p-2.5">
                 <p className="text-[10px] font-black uppercase tracking-[0.15em] text-emerald-700">Efek ke sistem</p>
                 <p className="mt-1 text-xs leading-5 text-emerald-900">{item.effect}</p>
               </div>
