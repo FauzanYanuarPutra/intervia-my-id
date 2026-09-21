@@ -725,7 +725,7 @@ export default function NewsEditorialWorkspace({
         </div>
       ) : null}
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+      <section className={`order-${selected ? "2" : "1"} rounded-2xl border border-slate-200 bg-white p-2 shadow-sm lg:order-1`}>
         <div className="flex flex-wrap gap-2">
           {[
             ['pending_review', 'Menunggu'],
