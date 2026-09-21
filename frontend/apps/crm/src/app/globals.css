@@ -87,3 +87,46 @@ body {
 .animate-delay-3 {
   animation-delay: 0.24s;
 }
+
+
+/* CRM base: keep dense admin surfaces readable on touch and small screens. */
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  overflow-x: hidden;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.crm-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.crm-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.crm-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.crm-scroll::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+}
+
+@media (max-width: 640px) {
+  .dashboard-shell main {
+    overscroll-behavior-x: none;
+  }
+}
