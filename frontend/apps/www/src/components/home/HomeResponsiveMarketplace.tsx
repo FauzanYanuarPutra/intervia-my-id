@@ -38,6 +38,7 @@ import {
   MapPin,
   MessageCircle,
   MoreHorizontal,
+  Newspaper,
   Package,
   PlayCircle,
   Pin,
@@ -4912,7 +4913,46 @@ function RightRail({
   );
 }
 
-export function HomeLoadingState({ isId = true }: { isId?: boolean } = {}) {
+export function HomeNewsLoadingSkeleton() {
+  return (
+    <section
+      className="overflow-hidden rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 sm:p-4"
+      aria-busy="true"
+      data-skeleton-card="home-news"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <Skeleton className="h-9 w-9 rounded-[12px]" />
+          <div>
+            <Skeleton variant="line" className="h-4 w-28" />
+            <Skeleton variant="line" className="mt-2 h-3 w-52 max-w-[50vw]" />
+          </div>
+        </div>
+        <Skeleton variant="chip" className="w-20" />
+      </div>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <Skeleton variant="media" className="aspect-[16/9] rounded-[18px]" />
+        <div className="grid gap-3">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div
+              key={index}
+              className="grid grid-cols-[96px_minmax(0,1fr)] gap-3 rounded-[16px] border border-[color:var(--app-border)] p-2.5"
+            >
+              <Skeleton className="aspect-[4/3] w-full rounded-[12px]" />
+              <div className="min-w-0 py-0.5">
+                <Skeleton variant="line" className="h-3 w-20" />
+                <Skeleton variant="line" className="mt-2 h-4 w-full" />
+                <Skeleton variant="line" className="mt-2 h-4 w-4/5" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function HomeLoadingState({ isId = true }: { isId?: boolean } = {}) {
   return (
     <MarketplacePageFrame loading>
       <div
@@ -5004,6 +5044,7 @@ export function HomeLoadingState({ isId = true }: { isId?: boolean } = {}) {
               ))}
             </div>
           </section>
+          <HomeNewsLoadingSkeleton />
           <section className="rounded-[24px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4">
             <Skeleton variant="line" className="h-5 w-44" />
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
