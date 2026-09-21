@@ -594,6 +594,46 @@ export async function createBusiness(input: {
   return { businessId, organizationId, name: input.name };
 }
 
+export type BusinessVerificationStatus = {
+  id: string;
+  status: 'unverified' | 'pending' | 'verified' | 'rejected' | string;
+  method: string;
+  requested_at: string;
+  reviewed_at?: string | null;
+  reviewed_by?: string | null;
+  review_reason?: string | null;
+  evidence: unknown;
+  updated_at: string;
+};
+
+export async function getBusinessVerificationStatus(
+  businessId: string,
+): Promise<BusinessVerificationStatus | null> {
+  const { token } = await requireAuthenticatedActor();
+  const payload = await requestJson(
+    `${MARKETPLACE_URL}/v1/umkm/stores/${encodeURIComponent(businessId)}/verification`,
+    {
+      headers: authHeaders(token),
+    },
+  );
+  const root = nestedRecord(payload);
+  const verification = record(root.verification);
+  if (!verification) return null;
+  const id = stringValue(verification.id);
+  if (!id) return null;
+  return {
+    id,
+    status: stringValue(verification.status) || 'unverified',
+    method: stringValue(verification.method) || 'owner_claim',
+    requested_at: stringValue(verification.requested_at),
+    reviewed_at: stringValue(verification.reviewed_at) || null,
+    reviewed_by: stringValue(verification.reviewed_by) || null,
+    review_reason: stringValue(verification.review_reason) || null,
+    evidence: verification.evidence ?? [],
+    updated_at: stringValue(verification.updated_at),
+  };
+}
+
 export async function requestBusinessVerification(businessId: string) {
   const { token } = await requireAuthenticatedActor();
   return requestJson(
