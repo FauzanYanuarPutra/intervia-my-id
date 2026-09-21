@@ -404,6 +404,7 @@ pub(crate) fn router() -> Router<Arc<AppState>> {
         .route("/v1/crm/notifications/read-all", post(mark_all_crm_notifications_read))
         .route("/v1/umkm/stores/{store_ref}/report", post(report_business))
         .route("/v1/umkm/stores/{store_ref}/appeal", post(request_business_appeal))
+        .route("/v1/umkm/stores/{store_ref}/verification", get(get_business_verification))
         .route("/v1/umkm/stores/{store_ref}/verification/request", post(request_business_verification))
 }
 
@@ -1820,6 +1821,66 @@ async fn request_business_appeal(
         Json(json!({"appeal_id": appeal_id, "case_id": case_id, "status": "pending"})),
     )
         .into_response()
+}
+
+async fn get_business_verification(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(store_ref): Path<String>,
+) -> impl IntoResponse {
+    let owner_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let store = match find_umkm_store_row(&state.db, store_ref.as_str()).await {
+        Ok(Some(value)) => value,
+        Ok(None) => return err(StatusCode::NOT_FOUND, "umkm store not found").into_response(),
+        Err(_) => return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load business").into_response(),
+    };
+    if store.owner_user_id != owner_id {
+        return err(StatusCode::FORBIDDEN, "only the business owner can view verification").into_response();
+    }
+
+    let row = match sqlx::query(
+        r#"
+        SELECT id, status, method, requested_at, reviewed_at, reviewed_by, review_reason, evidence, updated_at
+        FROM internal_moderation.business_verifications
+        WHERE business_id=$1
+        ORDER BY updated_at DESC
+        LIMIT 1
+        "#,
+    )
+    .bind(store.id)
+    .fetch_optional(&state.db)
+    .await {
+        Ok(value) => value,
+        Err(_) => return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load verification").into_response(),
+    };
+
+    match row {
+        Some(row) => (
+            StatusCode::OK,
+            Json(json!({
+                "verification": {
+                    "id": row.get::<Uuid, _>("id"),
+                    "status": row.get::<String, _>("status"),
+                    "method": row.get::<String, _>("method"),
+                    "requested_at": row.get::<DateTime<Utc>, _>("requested_at"),
+                    "reviewed_at": row.get::<Option<DateTime<Utc>>, _>("reviewed_at"),
+                    "reviewed_by": row.get::<Option<Uuid>, _>("reviewed_by"),
+                    "review_reason": row.get::<Option<String>, _>("review_reason"),
+                    "evidence": row.get::<Value, _>("evidence"),
+                    "updated_at": row.get::<DateTime<Utc>, _>("updated_at")
+                }
+            })),
+        )
+            .into_response(),
+        None => (
+            StatusCode::OK,
+            Json(json!({ "verification": null })),
+        )
+            .into_response(),
+    }
 }
 
 async fn request_business_verification(
