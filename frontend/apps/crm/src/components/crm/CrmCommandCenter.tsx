@@ -1194,6 +1194,7 @@ function Sidebar({
                     </span>
                   ) : null}
                 </button>
+                </React.Fragment>
               );
             })}
           </nav>
