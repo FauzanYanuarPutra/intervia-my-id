@@ -79,6 +79,18 @@ export function ContactWorkspace({
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
+  useEffect(() => {
+    if (!selectedId) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setSelectedId('');
+        writeUserUrl('', 'push');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedId]);
+
   const selectUser = (id: string) => {
     setSelectedId(id);
     writeUserUrl(id);
@@ -138,7 +150,42 @@ export function ContactWorkspace({
         />
       ) : null}
 
-      {model ? <ContactDetail model={model} /> : null}
+      {model ? (
+        <div
+          className="fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/35 p-0 sm:items-center sm:p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Customer 360 ${model.user.name}`}
+          onMouseDown={event => {
+            if (event.target === event.currentTarget) {
+              setSelectedId('');
+              writeUserUrl('', 'push');
+            }
+          }}
+        >
+          <div className="flex max-h-[96dvh] w-full max-w-4xl flex-col overflow-hidden rounded-t-3xl border border-slate-200 bg-white shadow-2xl sm:max-h-[90dvh] sm:rounded-3xl">
+            <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 sm:px-5">
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">Customer 360</p>
+                <p className="truncate text-sm font-black text-slate-950">{model.user.name}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedId('');
+                  writeUserUrl('', 'push');
+                }}
+                className="shrink-0 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
+              >
+                Tutup
+              </button>
+            </div>
+            <div className="min-h-0 overflow-y-auto p-3 sm:p-4">
+              <ContactDetail model={model} />
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
