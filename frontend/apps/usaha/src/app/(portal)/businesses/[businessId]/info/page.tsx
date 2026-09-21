@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { Clock3, ExternalLink, ImageIcon, MapPinned, Store, UsersRound } from 'lucide-react';
 import { BusinessInfoQuickForm } from '@/components/forms/BusinessInfoQuickForm';
 import { BusinessImageCropUpload } from '@/components/media/BusinessImageCropUpload';
+import { BusinessVerificationPanel } from '@/components/forms/BusinessVerificationPanel';
 import { BusinessLocationMap } from '@/components/maps/BusinessLocationMap';
 import { PageHeader } from '@/components/portal/PageHeader';
 import { PortalShell } from '@/components/portal/PortalShell';
@@ -24,6 +25,13 @@ export default async function BusinessInfoPage({ params }: PageProps) {
   const canViewTeam = hasPermission(business, 'viewTeam');
   const businessPoint = toLatLng(business.latitude, business.longitude);
   const businessLocationQuery = buildBusinessLocationQuery({ name: business.name, address: business.address, city: business.city, locationQuery: business.locationQuery });
+  const verificationChecks = {
+    profile: business.infoComplete,
+    image: Boolean(business.logoUrl),
+    contact: Boolean(business.phone),
+    location: business.latitude !== null && business.longitude !== null,
+  };
+  const verificationReady = Object.values(verificationChecks).every(Boolean);
 
   return (
     <PortalShell activeBusiness={business} availableBusinesses={businesses} viewerName={account?.name ?? null} currentSection="info">
@@ -89,6 +97,14 @@ export default async function BusinessInfoPage({ params }: PageProps) {
           </Link>
         ) : null}
       </section>
+
+      {canManage ? (
+        <BusinessVerificationPanel
+          businessId={business.id}
+          checks={verificationChecks}
+          ready={verificationReady}
+        />
+      ) : null}
     </PortalShell>
   );
 }
