@@ -5394,11 +5394,17 @@ export default function CreateListingWizard({
                         'Bagaimana orang menghubungimu?',
                         'How should people contact you?',
                       )
-                    : text(
-                        locale,
-                        'Sudah siap ditayangkan?',
-                        'Ready to publish?',
-                      );
+                    : editingContentId
+                      ? text(
+                          locale,
+                          'Sudah siap disimpan?',
+                          'Ready to save changes?',
+                        )
+                      : text(
+                          locale,
+                          'Sudah siap ditayangkan?',
+                          'Ready to publish?',
+                        );
 
   const friendlyStepDescription =
     currentStep === 1
