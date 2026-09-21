@@ -4,10 +4,12 @@ import { createContext, useContext, type ReactNode } from 'react';
 import type { LajukanNewsArticle } from '@/lib/news';
 
 type HomeNewsContextValue = {
+  enabled: boolean;
   items: LajukanNewsArticle[];
 };
 
 const HomeNewsContext = createContext<HomeNewsContextValue>({
+  enabled: false,
   items: [],
 });
 
@@ -19,7 +21,7 @@ export function HomeNewsProvider({
   children: ReactNode;
 }) {
   return (
-    <HomeNewsContext.Provider value={{ items }}>
+    <HomeNewsContext.Provider value={{ enabled: true, items }}>
       {children}
     </HomeNewsContext.Provider>
   );
