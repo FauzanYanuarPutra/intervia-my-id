@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import {
   businessModerationApi,
   type CrmBusiness,
@@ -126,7 +125,6 @@ function decisionReasons(action: Action) {
 
 export default function BusinessModerationWorkspace() {
   const { accessToken, user } = useAuth();
-  const searchParams = useSearchParams();
   const [businesses, setBusinesses] = useState<CrmBusiness[]>([]);
   const [references, setReferences] = useState<CrmBusinessReference[]>([]);
   const [activeTab, setActiveTab] = useState<"businesses" | "references">("businesses");
@@ -182,10 +180,13 @@ export default function BusinessModerationWorkspace() {
   }, [accessToken, referenceStatus]);
 
   useEffect(() => {
-    const requested = searchParams.get("status")?.trim().toLowerCase();
+    const requested =
+      typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search).get("status")?.trim().toLowerCase()
+        : undefined;
     if (requested === "pending_review" || requested === "under_review") setStatus("needs_review");
     else if (["all", "needs_review", "needs_completion", "approved", "hidden", "escalated"].includes(requested || "")) setStatus(requested || "all");
-  }, [searchParams]);
+  }, []);
 
   const filtered = useMemo(
     () =>
