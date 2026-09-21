@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { Plus } from 'lucide-react';
 import { ProductDetailsModal } from './ProductDetailsModal';
 import { RupiahInput } from './RupiahInput';
-import { ChoiceChips } from '@/components/interaction/ChoiceChips';
 import { BusinessImageCropUpload } from '@/components/media/BusinessImageCropUpload';
 import { businessApiErrorMessage } from '@/lib/business-api-error';
 import type { BusinessImageValue } from '@/lib/media-crop';
@@ -13,15 +12,6 @@ import type { BusinessImageValue } from '@/lib/media-crop';
 type ProductQuickFormProps = { businessId: string };
 
 const categoryOptions = ['Makanan', 'Minuman', 'Paket', 'Layanan', 'Lainnya'] as const;
-const sourceTypeOptions = [
-  { value: 'owned', label: 'Milik usaha sendiri' },
-  { value: 'consignment', label: 'Barang titipan' },
-] as const;
-const stockModeOptions = [
-  { value: 'manual', label: 'Sudah dihitung' },
-  { value: 'estimated', label: 'Masih perkiraan' },
-] as const;
-
 export function ProductQuickForm({ businessId }: ProductQuickFormProps) {
   const router = useRouter();
   const [name, setName] = useState('');
