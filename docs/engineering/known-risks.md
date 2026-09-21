@@ -1,6 +1,6 @@
 # Known Risks
 
-Status: repo audit updated 2026-08-13.
+Status: repo audit updated 2026-09-21.
 
 ## Product/Architecture Risks
 
@@ -9,6 +9,7 @@ Status: repo audit updated 2026-08-13.
 | Taxonomy drift across home/search/create/DB/index | High | High | Multiple frontend surfaces plus metadata indexes | Maintain canonical taxonomy registry |
 | Payment/escrow/refund overclaim | Medium | High | Code/migrations exist but E2E readiness not verified | Use beta/support-led wording until tested |
 | Duplicate owner surfaces | Medium | Medium | `frontend/usaha` and `/usaha/*` in `www` | Decide canonical owner UX |
+| Domain extraction can be mistaken for completed cutover | Medium | High | 11 target services are currently compatibility proxies over Marketplace | Keep runtime-contract guardrails, explicit production compatibility mode, and per-domain cutover evidence |
 | Chat vs WhatsApp measurement gap | Medium | High | Separate chat and WhatsApp surfaces | Track both CTAs and outcomes |
 | Meilisearch/Postgres sync uncertainty | Medium | High | Meili configured; sync worker not fully audited | Document index lifecycle and fallback |
 | AI hallucination in create/search | Medium | High | AI routes and local models exist | Use allowlists, confidence thresholds, DB-backed candidates |
@@ -40,3 +41,7 @@ Status: repo audit updated 2026-08-13.
 - Local AI can overload laptops if warmup/model settings are too aggressive.
 - Authenticated create, contact, report, and CRM lead paths still need seeded end-to-end QA. Current stabilization smoke uses mocked API data for route coverage.
 - Repo-wide frontend lint is not clean yet, so CI should distinguish changed-file cleanliness from legacy lint debt until the backlog is resolved.
+
+## Current extraction constraint
+
+The 2026 domain-service tree is a staged strangler migration. The target services have separate runtime boundaries and target databases, but their current business traffic still uses compatibility proxying through `marketplace_service`. Native mode is intentionally rejected by the runtime contract until the corresponding domain has native handlers, reconciliation evidence, rollback coverage, and targeted E2E verification.
