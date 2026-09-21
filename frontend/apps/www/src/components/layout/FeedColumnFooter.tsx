@@ -9,7 +9,7 @@ type FeedColumnFooterProps = {
 };
 
 export function FeedColumnFooter({ isId }: FeedColumnFooterProps) {
-  const { items: newsItems } = useHomeNews();
+  const { enabled: homeNewsEnabled, items: newsItems } = useHomeNews();
 
   const links = [
     { href: '/about', label: isId ? 'Tentang' : 'About' },
@@ -21,7 +21,9 @@ export function FeedColumnFooter({ isId }: FeedColumnFooterProps) {
 
   return (
     <>
-      <HomeNewsSection locale={isId ? 'id' : 'en'} items={newsItems} />
+      {homeNewsEnabled ? (
+        <HomeNewsSection locale={isId ? 'id' : 'en'} items={newsItems} />
+      ) : null}
 
       <footer
         data-testid="feed-column-footer"
