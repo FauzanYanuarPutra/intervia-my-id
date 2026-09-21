@@ -12,11 +12,19 @@ type Props = {
     contact: boolean;
     location: boolean;
   };
+  status: string;
+  reviewReason: string | null;
 };
 
-export function BusinessVerificationPanel({ businessId, ready, checks }: Props) {
+export function BusinessVerificationPanel({
+  businessId,
+  ready,
+  checks,
+  status,
+  reviewReason,
+}: Props) {
   const [busy, setBusy] = useState(false);
-  const [requested, setRequested] = useState(false);
+  const [requested, setRequested] = useState(status === 'pending');
   const [error, setError] = useState('');
 
   async function requestVerification() {
@@ -76,10 +84,30 @@ export function BusinessVerificationPanel({ businessId, ready, checks }: Props) 
         </div>
       ) : null}
 
-      {requested ? (
+      {status === 'verified' ? (
         <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-semibold leading-5 text-emerald-800">
-          Pengajuan verifikasi sudah dikirim. Tim Lajukan akan memeriksa profil dan bukti yang tersedia di CRM.
+          Usaha sudah terverifikasi oleh tim Lajukan.
         </div>
+      ) : requested || status === 'pending' ? (
+        <div className="mt-3 rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs font-semibold leading-5 text-sky-800">
+          Pengajuan verifikasi sedang menunggu pemeriksaan tim Lajukan.
+        </div>
+      ) : status === 'rejected' ? (
+        <>
+          <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold leading-5 text-amber-800">
+            Verifikasi sebelumnya belum disetujui. Perbaiki data atau bukti yang diminta, lalu ajukan kembali.
+            {reviewReason ? <span className="mt-1 block font-medium">Catatan pemeriksaan: {reviewReason}</span> : null}
+          </div>
+          <button
+            type="button"
+            onClick={() => void requestVerification()}
+            disabled={!ready || busy}
+            className="portal-button-primary mt-4 w-full sm:w-fit disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            <ShieldCheck className="h-4 w-4" />
+            {busy ? 'Mengirim pengajuan...' : 'Ajukan ulang verifikasi'}
+          </button>
+        </>
       ) : (
         <button
           type="button"
