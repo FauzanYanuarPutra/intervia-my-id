@@ -1,0 +1,62 @@
+name: Mobile iOS Smoke Build
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "frontend/apps/mobile/lajukan_webview/**"
+      - ".github/workflows/mobile-ios-smoke.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  ios-simulator:
+    name: Flutter iOS simulator build
+    runs-on: macos-26
+    defaults:
+      run:
+        working-directory: frontend/apps/mobile/lajukan_webview
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Generate launcher icons
+        run: dart run flutter_launcher_icons
+
+      - name: Check Xcode
+        run: |
+          set -e
+          xcodebuild -version
+          XCODE_MAJOR=$(xcodebuild -version | awk '/^Xcode / {print int($2)}')
+          if [ "$XCODE_MAJOR" -lt 26 ]; then
+            echo "Xcode 26 or newer is required for the current App Store submission baseline."
+            exit 1
+          fi
+
+      - name: Build unsigned iOS simulator app
+        run: flutter build ios --simulator --no-codesign
+
+      - name: Package simulator app
+        run: |
+          set -e
+          rm -f /tmp/Lajukan-iOS-Simulator.zip
+          ditto -c -k --sequesterRsrc --keepParent             build/ios/iphonesimulator/Runner.app             /tmp/Lajukan-iOS-Simulator.zip
+
+      - name: Upload iOS simulator artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lajukan-ios-simulator
+          path: /tmp/Lajukan-iOS-Simulator.zip
+          if-no-files-found: error
+          retention-days: 14
