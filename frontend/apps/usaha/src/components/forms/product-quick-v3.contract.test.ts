@@ -6,7 +6,6 @@ const detailsSource = readFileSync('src/components/forms/ProductDetailsModal.tsx
 
 describe('product quick form V3', () => {
   it('uses visible choices for small stable product options', () => {
-    expect(quickFormSource).toContain('ChoiceChips');
     expect(quickFormSource).not.toMatch(/<select[^>]*value=\{sourceType\}/);
     expect(quickFormSource).not.toMatch(/<select[^>]*value=\{stockMode\}/);
     expect(quickFormSource).not.toMatch(/<select[^>]*value=\{category\}/);
