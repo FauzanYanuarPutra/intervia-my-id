@@ -33,7 +33,7 @@ export default async function BusinessInfoPage({ params }: PageProps) {
       Boolean(business.description) &&
       Boolean(business.city) &&
       Boolean(business.address),
-    image: Boolean(business.logoUrl),
+    image: (business.imageUrls?.length ?? 0) > 0,
     contact: Boolean(business.phone),
     location: business.latitude !== null && business.longitude !== null,
   };
@@ -72,7 +72,7 @@ export default async function BusinessInfoPage({ params }: PageProps) {
         <details className="group border-b border-portal-line/70">
           <summary className="merchant-action-row cursor-pointer list-none">
             <span className="portal-icon-tile"><ImageIcon className="h-4 w-4" /></span>
-            <span className="min-w-0 flex-1"><span className="block text-sm font-black text-portal-ink">Foto & logo</span><span className="mt-0.5 block text-xs text-portal-soft">Logo dan banner tampilan toko</span></span>
+            <span className="min-w-0 flex-1"><span className="block text-sm font-black text-portal-ink">Foto & logo</span><span className="mt-0.5 block text-xs text-portal-soft">{business.imageUrls?.length ?? 0} media usaha terhubung · logo dan banner tampilan toko</span></span>
             <span className="text-xs font-black text-portal-forest">{canManage ? 'Atur' : 'Lihat'}</span>
           </summary>
           <div className="grid gap-6 border-t border-portal-line/70 p-4 sm:p-5 lg:grid-cols-[220px_minmax(0,1fr)]">
