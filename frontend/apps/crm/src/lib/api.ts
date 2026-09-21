@@ -186,6 +186,8 @@ export type SuperAppOrderDetail = {
 
 export type CrmBusiness = {
   id: string;
+  store_id: string;
+  canonical_business_id: string | null;
   owner_user_id: string;
   organization_id: string | null;
   name: string;
