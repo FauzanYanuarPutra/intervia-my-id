@@ -7270,7 +7270,7 @@ export default function CreateListingWizard({
               <Check className="h-4 w-4 text-emerald-600" />
             ) : null}
 
-            <span>
+            <span className="min-w-0 flex-1">
               {saveStatus ===
               'saving'
                 ? text(
@@ -7304,6 +7304,27 @@ export default function CreateListingWizard({
                           'Saved on this device',
                         )}
             </span>
+
+            {saveStatus === 'error' ? (
+              <button
+                type="button"
+                onClick={() =>
+                  void saveServerDraft(
+                    currentStep,
+                    values,
+                    media,
+                  ).catch(() => undefined)
+                }
+                className="inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 text-[10px] font-extrabold text-amber-800 transition hover:bg-amber-100 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300"
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                {text(
+                  locale,
+                  'Coba simpan lagi',
+                  'Retry save',
+                )}
+              </button>
+            ) : null}
             </div>
           ) : null}
         </section>
