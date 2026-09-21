@@ -2242,25 +2242,6 @@ export function ExploreCategoryClient({
 
 
 
-                    {faqConfig &&
-                    payload.faq
-                      .length ? (
-                      <FaqSection
-                        config={
-                          faqConfig
-                        }
-                        items={
-                          payload.faq
-                        }
-                        locale={
-                          locale
-                        }
-                      />
-                    ) : null}
-                  </div>
-                </details>
-              </ExploreSurface>
-            ) : null}
           </>
         ) : null}
 
