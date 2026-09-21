@@ -20,6 +20,7 @@ import {
   Images,
   Loader2,
   MapPin,
+  RefreshCw,
   Plus,
   Save,
   Search,
@@ -88,6 +89,11 @@ import {
 
 import type { GlobalSearchItem } from '@/lib/search/globalSearch';
 import { normalizeContentMediaUrl } from '@/lib/content/catalog';
+import {
+  extractUploadedContentImages,
+  matchUploadedContentImages,
+  type UploadedContentImage,
+} from '@/lib/content/uploadMedia';
 import { activeListingNeedsPrimaryImage } from '@/lib/content/listingFlowRules';
 import { trackLajukanEvent } from '@/lib/analytics/lajukanEvents';
 
@@ -1053,9 +1059,28 @@ function buildDraftFromContentItem(
     currentStep,
     formValues: values,
     media: normalizeDraftMedia(
-      metadata.media ||
-        metadata.image_urls,
-      item.cover_image,
+      (() => {
+        const candidates = [
+          metadata.media,
+          metadata.image_urls,
+          metadata.images,
+          metadata.gallery,
+          metadata.gallery_images,
+          item.image_urls,
+          item.images,
+          item.gallery,
+          item.gallery_images,
+        ];
+        return (
+          candidates.find(
+            candidate =>
+              Array.isArray(candidate) && candidate.length > 0,
+          ) ||
+          candidates.find(candidate => candidate != null) ||
+          []
+        );
+      })(),
+      item.cover_image || item.image_url,
     ),
     updatedAt:
       new Date().toISOString(),
@@ -1478,6 +1503,11 @@ export default function CreateListingWizard({
   const localPreviewUrlsRef =
     useRef<Set<string>>(
       new Set(),
+    );
+
+  const pendingUploadFilesRef =
+    useRef<Map<string, File>>(
+      new Map(),
     );
 
   const category = useMemo(() => {
@@ -3352,6 +3382,17 @@ export default function CreateListingWizard({
             locale,
             'Pilih lokasi dari hasil pencarian supaya alamat dan titik peta tersimpan dengan benar.',
             'Choose a location from the search results so the address and map point are saved correctly.',
+          );
+        }
+
+        if (
+          step === 6 &&
+          media.some(item => item.status === 'uploading')
+        ) {
+          return text(
+            locale,
+            'Tunggu semua foto selesai diunggah sebelum lanjut.',
+            'Wait for all photo uploads to finish before continuing.',
           );
         }
 
