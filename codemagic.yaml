@@ -1,0 +1,177 @@
+workflows:
+  android-preview:
+    name: Lajukan Android Preview
+    max_build_duration: 45
+    working_directory: frontend/apps/mobile/lajukan_webview
+    environment:
+      flutter: stable
+    scripts:
+      - name: Install dependencies
+        script: flutter pub get
+      - name: Generate Lajukan app icon
+        script: dart run flutter_launcher_icons
+      - name: Analyze
+        script: flutter analyze
+      - name: Build installable APK
+        script: flutter build apk --release --build-number="$BUILD_NUMBER"
+    artifacts:
+      - build/app/outputs/flutter-apk/*.apk
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+      cancel_previous_builds: true
+
+  android-play-internal:
+    name: Lajukan Android Play Internal
+    max_build_duration: 45
+    working_directory: frontend/apps/mobile/lajukan_webview
+    environment:
+      flutter: stable
+      android_signing:
+        - lajukan_playstore
+      groups:
+        - google_play_credentials
+      vars:
+        PACKAGE_NAME: com.lajukan.app
+    scripts:
+      - name: Install dependencies
+        script: flutter pub get
+      - name: Generate Lajukan app icon
+        script: dart run flutter_launcher_icons
+      - name: Analyze
+        script: flutter analyze
+      - name: Resolve Android build number
+        script: |
+          set -e
+          LATEST=$(google-play get-latest-build-number --package-name "$PACKAGE_NAME" 2>/dev/null || true)
+          if [[ "$LATEST" =~ ^[0-9]+$ ]]; then
+            export MOBILE_BUILD_NUMBER=$((LATEST + 1))
+          else
+            export MOBILE_BUILD_NUMBER="$BUILD_NUMBER"
+          fi
+          echo "MOBILE_BUILD_NUMBER=$MOBILE_BUILD_NUMBER" >> "$CM_ENV"
+      - name: Build signed Play bundle
+        script: flutter build appbundle --release --build-number="$MOBILE_BUILD_NUMBER"
+    artifacts:
+      - build/app/outputs/bundle/release/*.aab
+    publishing:
+      google_play:
+        credentials: $GOOGLE_PLAY_SERVICE_ACCOUNT_CREDENTIALS
+        track: internal
+
+  ios-testflight:
+    name: Lajukan iOS TestFlight
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    working_directory: frontend/apps/mobile/lajukan_webview
+    integrations:
+      app_store_connect: lajukan_appstore_connect
+    environment:
+      flutter: stable
+      xcode: latest
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.lajukan.app
+      groups:
+        - appstore_credentials
+      vars:
+        BUNDLE_ID: com.lajukan.app
+        APP_STORE_APPLE_ID: "REPLACE_WITH_APPLE_ID"
+    scripts:
+      - name: Verify Xcode version
+        script: |
+          set -e
+          XCODE_MAJOR=$(xcodebuild -version | awk '/^Xcode / {print int($2)}')
+          echo "Using Xcode major: $XCODE_MAJOR"
+          if [ "$XCODE_MAJOR" -lt 26 ]; then
+            echo "Xcode 26 or newer is required for current App Store submissions."
+            exit 1
+          fi
+      - name: Install dependencies
+        script: flutter pub get
+      - name: Generate Lajukan app icon
+        script: dart run flutter_launcher_icons
+      - name: Set up iOS code signing
+        script: xcode-project use-profiles
+      - name: Resolve iOS build number
+        script: |
+          set -e
+          if [ "${APP_STORE_APPLE_ID}" != "REPLACE_WITH_APPLE_ID" ]; then
+            LATEST=$(app-store-connect get-latest-app-store-build-number "$APP_STORE_APPLE_ID" 2>/dev/null || true)
+          else
+            LATEST=""
+          fi
+          if [[ "$LATEST" =~ ^[0-9]+$ ]]; then
+            export MOBILE_BUILD_NUMBER=$((LATEST + 1))
+          else
+            export MOBILE_BUILD_NUMBER="$BUILD_NUMBER"
+          fi
+          echo "MOBILE_BUILD_NUMBER=$MOBILE_BUILD_NUMBER" >> "$CM_ENV"
+      - name: Build signed IPA
+        script: flutter build ipa --release --build-number="$MOBILE_BUILD_NUMBER"
+    artifacts:
+      - build/ios/ipa/*.ipa
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+
+  ios-app-store:
+    name: Lajukan iOS App Store
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    working_directory: frontend/apps/mobile/lajukan_webview
+    integrations:
+      app_store_connect: lajukan_appstore_connect
+    environment:
+      flutter: stable
+      xcode: latest
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.lajukan.app
+      groups:
+        - appstore_credentials
+      vars:
+        BUNDLE_ID: com.lajukan.app
+        APP_STORE_APPLE_ID: "REPLACE_WITH_APPLE_ID"
+    scripts:
+      - name: Verify Xcode version
+        script: |
+          set -e
+          XCODE_MAJOR=$(xcodebuild -version | awk '/^Xcode / {print int($2)}')
+          echo "Using Xcode major: $XCODE_MAJOR"
+          if [ "$XCODE_MAJOR" -lt 26 ]; then
+            echo "Xcode 26 or newer is required for current App Store submissions."
+            exit 1
+          fi
+      - name: Install dependencies
+        script: flutter pub get
+      - name: Generate Lajukan app icon
+        script: dart run flutter_launcher_icons
+      - name: Set up iOS code signing
+        script: xcode-project use-profiles
+      - name: Resolve iOS build number
+        script: |
+          set -e
+          if [ "${APP_STORE_APPLE_ID}" != "REPLACE_WITH_APPLE_ID" ]; then
+            LATEST=$(app-store-connect get-latest-app-store-build-number "$APP_STORE_APPLE_ID" 2>/dev/null || true)
+          else
+            LATEST=""
+          fi
+          if [[ "$LATEST" =~ ^[0-9]+$ ]]; then
+            export MOBILE_BUILD_NUMBER=$((LATEST + 1))
+          else
+            export MOBILE_BUILD_NUMBER="$BUILD_NUMBER"
+          fi
+          echo "MOBILE_BUILD_NUMBER=$MOBILE_BUILD_NUMBER" >> "$CM_ENV"
+      - name: Build signed IPA
+        script: flutter build ipa --release --build-number="$MOBILE_BUILD_NUMBER"
+    artifacts:
+      - build/ios/ipa/*.ipa
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_app_store: true

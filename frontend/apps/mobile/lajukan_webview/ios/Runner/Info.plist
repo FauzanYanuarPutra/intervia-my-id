@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Lajukan Webview</string>
+	<string>Lajukan</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -13,7 +13,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>lajukan_webview</string>
+	<string>Lajukan</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -25,13 +25,13 @@
 	<key>NSCameraUsageDescription</key>
 	<string>Kamera diperlukan untuk panggilan video dan unggah foto.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Mikrofon diperlukan untuk panggilan suara.</string>
+	<string>Mikrofon diperlukan untuk panggilan suara dan video.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Galeri diperlukan untuk memilih foto atau video reels.</string>
+	<string>Galeri diperlukan untuk memilih foto atau video.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Lokasi diperlukan untuk fitur driver, tracker, dan matching.</string>
+	<string>Lokasi digunakan untuk fitur yang membutuhkan posisi Anda.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Lokasi diperlukan untuk fitur driver, tracker, dan matching.</string>
+	<string>Lokasi digunakan untuk fitur yang membutuhkan posisi Anda saat aplikasi berjalan.</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

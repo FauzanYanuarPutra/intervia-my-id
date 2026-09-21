@@ -1,0 +1,47 @@
+name: Mobile Flutter CI
+
+on:
+  push:
+    paths:
+      - "frontend/apps/mobile/lajukan_webview/**"
+      - ".github/workflows/mobile-flutter.yml"
+  pull_request:
+    paths:
+      - "frontend/apps/mobile/lajukan_webview/**"
+      - ".github/workflows/mobile-flutter.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    name: Flutter analyze + Android debug build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend/apps/mobile/lajukan_webview
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Generate launcher icons
+        run: dart run flutter_launcher_icons
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test
+
+      - name: Build Android debug APK
+        run: flutter build apk --debug
