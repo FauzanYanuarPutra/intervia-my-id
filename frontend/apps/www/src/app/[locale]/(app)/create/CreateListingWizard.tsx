@@ -3723,48 +3723,117 @@ export default function CreateListingWizard({
           return;
         }
 
-        const form =
-          new FormData();
+        let payload:
+          Record<string, unknown> = {};
+        let response:
+          Response | null = null;
+        let lastUploadError:
+          unknown = null;
 
         for (
-          const item of incoming
+          let attempt = 0;
+          attempt < 3;
+          attempt += 1
         ) {
-          form.append(
-            'images',
-            item.file,
-          );
-        }
+          try {
+            const form =
+              new FormData();
 
-        try {
-          const response =
-            await authFetch(
-              '/api/content/upload-images',
-              {
-                method:
-                  'POST',
-                body: form,
-              },
-            );
+            for (
+              const item of incoming
+            ) {
+              form.append(
+                'images',
+                item.file,
+                item.file.name,
+              );
+            }
 
-          const payload =
-            await readResponseJson(
-              response,
-            );
+            response =
+              await authFetch(
+                '/api/content/upload-images',
+                {
+                  method:
+                    'POST',
+                  body: form,
+                },
+              );
+
+            payload =
+              (await readResponseJson(
+                response,
+              )) as Record<string, unknown>;
+
+            if (
+              response.ok
+            ) {
+              lastUploadError = null;
+              break;
+            }
+
+            const retryable =
+              response.status ===
+                408 ||
+              response.status ===
+                425 ||
+              response.status ===
+                429 ||
+              response.status >=
+                500;
+
+            lastUploadError =
+              new Error(
+                responseErrorMessage(
+                  payload,
+                  text(
+                    locale,
+                    retryable
+                      ? 'Server sedang sibuk. Upload akan dicoba lagi.'
+                      : 'Upload foto gagal.',
+                    retryable
+                      ? 'The server is busy. The upload will be retried.'
+                      : 'Photo upload failed.',
+                  ),
+                ),
+              );
+
+            if (!retryable) {
+              break;
+            }
+          } catch (caught) {
+            lastUploadError =
+              caught;
+          }
 
           if (
-            !response.ok
+            attempt < 2
           ) {
-            throw new Error(
-              responseErrorMessage(
-                payload,
-                text(
-                  locale,
-                  'Upload foto gagal.',
-                  'Photo upload failed.',
+            await new Promise(
+              resolve =>
+                window.setTimeout(
+                  resolve,
+                  700 *
+                    (attempt + 1),
                 ),
-              ),
             );
           }
+        }
+
+        if (
+          !response?.ok
+        ) {
+          throw (
+            lastUploadError instanceof Error
+              ? lastUploadError
+              : new Error(
+                  text(
+                    locale,
+                    'Upload foto gagal.',
+                    'Photo upload failed.',
+                  ),
+                )
+          );
+        }
 
           const uploadedImages =
             extractUploadedContentImages(
