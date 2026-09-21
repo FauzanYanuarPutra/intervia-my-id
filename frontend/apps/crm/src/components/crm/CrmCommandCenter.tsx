@@ -1706,6 +1706,22 @@ function PageHeader({ label, title, body }: { label: string; title: string; body
   );
 }
 
+function filterOptionLabel(option: string): string {
+  const labels: Record<string, string> = {
+    all: "Semua",
+    active: "Aktif",
+    pending: "Menunggu",
+    draft: "Draft",
+    paused: "Dijeda",
+    archived: "Diarsipkan",
+    rejected: "Ditolak",
+    reported: "Ada laporan",
+    high: "3+ laporan",
+    risk: "Risiko saja",
+  };
+  return labels[option] || option.replaceAll("_", " ");
+}
+
 function FilterBar({
   filters,
 }: {
@@ -1717,19 +1733,19 @@ function FilterBar({
   }>;
 }) {
   return (
-    <ShellCard className="p-3">
-      <div className="flex flex-wrap gap-2">
+    <ShellCard className="p-2">
+      <div className="grid gap-2 sm:flex sm:flex-wrap">
         {filters.map(filter => (
-          <label key={filter.label} className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600">
-            {filter.label}
+          <label key={filter.label} className="flex min-w-0 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600 sm:min-w-[170px]">
+            <span>{filter.label}</span>
             <select
               value={filter.value}
               onChange={event => filter.onChange(event.target.value)}
-              className="bg-transparent text-sm font-bold text-slate-900 outline-none"
+              className="min-w-0 max-w-[68%] bg-transparent text-xs font-bold text-slate-900 outline-none"
             >
               {filter.options.map(option => (
                 <option key={option} value={option}>
-                  {option === "all" ? "Semua" : option === "risk" ? "Risiko saja" : option}
+                  {filterOptionLabel(option)}
                 </option>
               ))}
             </select>
