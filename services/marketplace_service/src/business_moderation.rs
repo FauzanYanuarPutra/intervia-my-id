@@ -67,7 +67,12 @@ pub struct ListCrmBusinessReferencesQuery {
 
 #[derive(Debug, Serialize, Clone)]
 pub struct CrmBusinessRow {
+    /// The moderation identity is the legacy/public-store UUID. Keep this stable because
+    /// moderation cases, reports and verification rows reference umkm_stores(id).
     pub id: Uuid,
+    pub store_id: Uuid,
+    /// Canonical Business OS identity for this store, when the store is linked.
+    pub canonical_business_id: Option<Uuid>,
     pub owner_user_id: Uuid,
     pub organization_id: Option<Uuid>,
     pub name: String,
@@ -379,6 +384,8 @@ fn review_state(current_action: Option<&str>, status: Option<&str>, is_active: b
 fn business_snapshot(row: &CrmBusinessRow) -> Value {
     json!({
         "id": row.id,
+        "store_id": row.store_id,
+        "canonical_business_id": row.canonical_business_id,
         "owner_user_id": row.owner_user_id,
         "organization_id": row.organization_id,
         "name": row.name,
@@ -583,7 +590,8 @@ async fn list_crm_businesses(
     let rows = match sqlx::query(
         r#"
         SELECT
-          s.id, s.owner_user_id, s.organization_id, s.name, s.slug, s.description,
+          s.id, s.id AS store_id, canonical.business_id AS canonical_business_id,
+          s.owner_user_id, s.organization_id, s.name, s.slug, s.description,
           s.city, s.address, s.lat, s.lng, s.phone, s.is_active,
           s.online_order_enabled, s.offline_order_enabled, s.metadata,
           s.created_at, s.updated_at,
@@ -624,6 +632,15 @@ async fn list_crm_businesses(
             LIMIT 1
           ) AS verification_method
         FROM umkm_stores s
+        LEFT JOIN LATERAL (
+          SELECT l.business_id
+          FROM business_store_links l
+          JOIN businesses b ON b.id = l.business_id AND b.status <> 'archived'
+          WHERE l.store_id = s.id
+            AND l.link_type = 'primary'
+          ORDER BY b.updated_at DESC
+          LIMIT 1
+        ) canonical ON TRUE
         LEFT JOIN LATERAL (
           SELECT status, current_action, current_reason_code, current_reason_note,
                  severity, missing_fields, updated_at, assigned_to, due_at
@@ -747,7 +764,8 @@ async fn load_business(state: &AppState, business_id: Uuid) -> Result<CrmBusines
     let row = sqlx::query(
         r#"
         SELECT
-          s.id, s.owner_user_id, s.organization_id, s.name, s.slug, s.description,
+          s.id, s.id AS store_id, canonical.business_id AS canonical_business_id,
+          s.owner_user_id, s.organization_id, s.name, s.slug, s.description,
           s.city, s.address, s.lat, s.lng, s.phone, s.is_active,
           s.online_order_enabled, s.offline_order_enabled, s.metadata,
           s.created_at, s.updated_at,
@@ -787,6 +805,15 @@ async fn load_business(state: &AppState, business_id: Uuid) -> Result<CrmBusines
             LIMIT 1
           ) AS verification_method
         FROM umkm_stores s
+        LEFT JOIN LATERAL (
+          SELECT l.business_id
+          FROM business_store_links l
+          JOIN businesses b ON b.id = l.business_id AND b.status <> 'archived'
+          WHERE l.store_id = s.id
+            AND l.link_type = 'primary'
+          ORDER BY b.updated_at DESC
+          LIMIT 1
+        ) canonical ON TRUE
         LEFT JOIN LATERAL (
           SELECT status, current_action, current_reason_code, current_reason_note,
                  severity, missing_fields, assigned_to, due_at
@@ -829,6 +856,8 @@ async fn load_business(state: &AppState, business_id: Uuid) -> Result<CrmBusines
 
     Ok(CrmBusinessRow {
         id: row.get("id"),
+        store_id: row.get("store_id"),
+        canonical_business_id: row.get("canonical_business_id"),
         owner_user_id: row.get("owner_user_id"),
         organization_id: row.get("organization_id"),
         name,
