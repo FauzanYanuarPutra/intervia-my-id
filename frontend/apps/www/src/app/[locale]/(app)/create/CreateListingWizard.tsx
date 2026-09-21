@@ -3591,10 +3591,27 @@ export default function CreateListingWizard({
           return;
         }
 
+        const activeMediaCount = media.filter(
+          item => item.status !== 'deleted',
+        ).length;
+        const remainingSlots = Math.max(
+          0,
+          MAX_UPLOAD_FILES - activeMediaCount,
+        );
+
+        if (remainingSlots === 0) {
+          setError(
+            text(
+              locale,
+              'Maksimal 8 foto sudah tercapai. Hapus foto lama dulu kalau mau mengganti.',
+              'The 8-photo limit is already reached. Remove an existing photo before adding another.',
+            ),
+          );
+          return;
+        }
+
         const selected =
-          Array.from(
-            files,
-          )
+          Array.from(files)
             .filter(
               file =>
                 ALLOWED_IMAGE_TYPES.has(
@@ -3608,7 +3625,7 @@ export default function CreateListingWizard({
             )
             .slice(
               0,
-              MAX_UPLOAD_FILES,
+              remainingSlots,
             );
 
         if (
@@ -3655,9 +3672,16 @@ export default function CreateListingWizard({
                 preview,
               );
 
+              const id =
+                crypto.randomUUID();
+
+              pendingUploadFilesRef.current.set(
+                id,
+                file,
+              );
+
               return {
-                id:
-                  crypto.randomUUID(),
+                id,
                 name:
                   file.name,
                 preview,
@@ -3742,103 +3766,79 @@ export default function CreateListingWizard({
             );
           }
 
-          const rawUrls =
-            Array.isArray(
-              payload.urls,
-            )
-              ? payload.urls
-              : Array.isArray(
-                    payload.image_urls,
-                  )
-                ? payload.image_urls
-                : Array.isArray(
-                      payload.files,
-                    )
-                  ? payload.files
-                      .map(
-                        file =>
-                          valueAsString(
-                            valueAsRecord(
-                              file,
-                            ).url,
-                          ),
-                      )
-                      .filter(
-                        Boolean,
-                      )
-                  : [];
+          const uploadedImages =
+            extractUploadedContentImages(
+              payload,
+            );
 
-          const urls =
-            rawUrls
-              .map(
-                value =>
-                  normalizeContentMediaUrl(
-                    value,
-                  ),
-              )
-              .filter(
-                (
-                  value,
-                ): value is string =>
-                  Boolean(
-                    value,
-                  ),
-              );
+          const matchedUploads =
+            matchUploadedContentImages(
+              incoming,
+              uploadedImages,
+            );
 
           setMedia(
             previous =>
               previous.map(
                 item => {
-                  const index =
-                    incoming.findIndex(
+                  const matched =
+                    matchedUploads.get(
+                      item.id,
+                    );
+
+                  if (!matched) {
+                    return incoming.some(
                       upload =>
                         upload.id ===
                         item.id,
-                    );
-
-                  if (
-                    index < 0
-                  ) {
-                    return item;
+                    )
+                      ? {
+                          ...item,
+                          status:
+                            'failed',
+                          error:
+                            text(
+                              locale,
+                              'Foto belum tersimpan. Tekan coba lagi.',
+                              'The photo was not saved. Retry the upload.',
+                            ),
+                        }
+                      : item;
                   }
 
-                  const uploadedUrl =
-                    urls[index];
-
-                  if (
-                    uploadedUrl
-                  ) {
-                    return {
-                      ...item,
-                      url:
-                        uploadedUrl,
-                      preview:
-                        uploadedUrl,
-                      status:
-                        'uploaded',
-                      error:
-                        undefined,
-                    };
-                  }
+                  pendingUploadFilesRef.current.delete(
+                    item.id,
+                  );
 
                   return {
                     ...item,
+                    url:
+                      matched.url,
+                    preview:
+                      matched.url,
                     status:
-                      'failed',
+                      'uploaded',
                     error:
-                      text(
-                        locale,
-                        'Foto gagal diunggah.',
-                        'Photo upload failed.',
-                      ),
+                      undefined,
                   };
                 },
               ),
           );
 
-          setSaveStatus(
-            'dirty',
-          );
+          if (matchedUploads.size < incoming.length) {
+            setSaveStatus('error');
+            setError(
+              text(
+                locale,
+                matchedUploads.size + ' dari ' + incoming.length + ' foto berhasil disimpan. Foto lain bisa dicoba lagi.',
+                matchedUploads.size + ' of ' + incoming.length + ' photos were saved. You can retry the others.',
+              ),
+            );
+          } else {
+            setSaveStatus(
+              'dirty',
+            );
+          }
         } catch (
           caught
         ) {
@@ -3878,6 +3878,7 @@ export default function CreateListingWizard({
         authFetch,
         isAuthenticated,
         locale,
+        media,
       ],
     );
 
@@ -3892,6 +3893,10 @@ export default function CreateListingWizard({
                   item.id ===
                   mediaId,
               );
+
+            pendingUploadFilesRef.current.delete(
+              mediaId,
+            );
 
             if (
               target?.preview &&
