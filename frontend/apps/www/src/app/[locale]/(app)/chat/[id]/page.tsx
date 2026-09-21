@@ -8792,8 +8792,8 @@ export default function ChatRoomPage() {
             {isSupportRoom ? (
               <div className="mt-3 rounded-2xl border border-[#b7e4cf] bg-[#effdf5] p-3 text-[#134e3a] dark:border-[#214f3b] dark:bg-[#0f241d] dark:text-[#d8fbe7]">
                 <div className="flex items-start gap-2">
-                  <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl bg-[#d9fdd3] text-[#008f72] dark:bg-[#103529] dark:text-[#25d366]">
-                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#e8ddff] text-[#7048b8] dark:bg-[#35264f] dark:text-[#c7aaff]"><Sparkles className="h-4 w-4" /></span>
+                  <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl bg-[#e8ddff] text-[#7048b8] dark:bg-[#35264f] dark:text-[#c7aaff]">
+                    <Sparkles className="h-4 w-4" />
                   </span>
                   <div className="min-w-0">
                     <p className="text-xs font-bold">
@@ -10533,7 +10533,10 @@ export default function ChatRoomPage() {
           open
           locale={chatLocale}
           onClose={() => setShowCameraModal(false)}
-          onPickFile={handleChooseFile}
+          onPickFile={() => {
+            setShowCameraModal(false);
+            handleChooseFile();
+          }}
           onCapture={file => {
             handleFilesSelected([file]);
           }}
