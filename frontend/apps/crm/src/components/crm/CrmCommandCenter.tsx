@@ -504,6 +504,45 @@ function buildInitialData(): DashboardData {
   return createEmptyDashboardData();
 }
 
+function relevantDataSources(page: PageId): string[] {
+  switch (page) {
+    case "dashboard":
+      return ["leads", "activities", "tickets", "orders", "trustProfiles", "listings", "users", "businesses"];
+    case "pipeline":
+      return ["leads"];
+    case "users":
+      return ["users", "trustProfiles", "orders", "tickets", "leads"];
+    case "businesses":
+      return ["businesses"];
+    case "listings":
+      return ["listings", "tickets"];
+    case "transactions":
+      return ["orders"];
+    case "chat":
+      return ["tickets", "leads"];
+    case "disputes":
+      return ["tickets", "orders", "users"];
+    case "analytics":
+      return ["users", "listings", "orders", "tickets", "leads"];
+    case "news":
+    case "settings":
+    case "guide":
+      return [];
+  }
+}
+
+function pageDataDiagnostics(
+  page: PageId,
+  failures: string[],
+  emptyCollections: string[],
+) {
+  const relevant = new Set(relevantDataSources(page));
+  return {
+    failures: failures.filter(item => relevant.has(item)),
+    emptyCollections: emptyCollections.filter(item => relevant.has(item)),
+  };
+}
+
 function readCrmPageFromUrl(): PageId {
   if (typeof window === "undefined") return "dashboard";
   const value = new URLSearchParams(window.location.search).get("page");
@@ -959,6 +998,11 @@ export default function CrmCommandCenter() {
     };
   }, [data, query]);
 
+  const pageDiagnostics = useMemo(
+    () => pageDataDiagnostics(activePage, data.failures, data.emptyCollections),
+    [activePage, data.failures, data.emptyCollections],
+  );
+
   const openIssues = data.tickets.filter(ticket =>
     ["open", "in_progress", "pending_customer"].includes(ticket.status),
   ).length;
@@ -1022,17 +1066,16 @@ export default function CrmCommandCenter() {
 
           <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-[1540px] space-y-5">
-              {data.failures.length ? (
+              {pageDiagnostics.failures.length ? (
                 <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 shadow-sm">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0">
                       <p className="text-[10px] font-black uppercase tracking-[0.18em] text-rose-600">Data source error</p>
                       <p className="mt-1 text-sm font-black text-rose-950">
-                        Service tidak bisa dibaca: {data.failures.join(", ")}
+                        Service gagal dibaca: {pageDiagnostics.failures.join(", ")}
                       </p>
                       <p className="mt-1 text-xs leading-5 text-rose-800">
-                        CRM tetap menampilkan data service lain yang sehat. Item yang gagal tidak diisi data palsu.
-                        Untuk <strong>users</strong>, penyebab umum adalah permission <code>user.read</code> atau sesi lama.
+                        Hanya masalah yang relevan dengan workspace ini yang ditampilkan. CRM tidak mengganti data service yang gagal dengan data palsu.
                       </p>
                     </div>
                     <button
@@ -1046,12 +1089,14 @@ export default function CrmCommandCenter() {
                   </div>
                 </div>
               ) : null}
-              {data.emptyCollections.length ? (
+              {pageDiagnostics.emptyCollections.length ? (
                 <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 shadow-sm">
                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-sky-600">Data source kosong</p>
-                  <p className="mt-1 text-sm font-black text-sky-950">Belum ada data real untuk: {data.emptyCollections.join(", ")}</p>
+                  <p className="mt-1 text-sm font-black text-sky-950">
+                    Belum ada data real untuk: {pageDiagnostics.emptyCollections.join(", ")}
+                  </p>
                   <p className="mt-1 text-xs leading-5 text-sky-800">
-                    Ini bukan error. CRM sengaja tidak membuat data dummy; queue akan terisi saat service menghasilkan data nyata.
+                    Ini bukan error. CRM sengaja tidak membuat data dummy; workspace akan terisi saat service menghasilkan data nyata.
                   </p>
                 </div>
               ) : null}
