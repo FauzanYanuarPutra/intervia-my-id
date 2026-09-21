@@ -18,7 +18,9 @@ val hasLocalSigning = keystorePropertiesFile.exists()
 
 android {
     namespace = "com.lajukan.app"
-    compileSdk = flutter.compileSdkVersion
+    // Google Play requires Android 16 / API 36 for new apps and updates
+    // starting August 31, 2026.
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -33,7 +35,7 @@ android {
     defaultConfig {
         applicationId = "com.lajukan.app"
         minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
