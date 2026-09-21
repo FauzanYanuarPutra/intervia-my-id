@@ -49,11 +49,12 @@ export function IncomingCall({
   };
 
   return (
-    <div className="ui-layer-modal fixed inset-0 flex h-[var(--app-visual-viewport-height)] items-center justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_50%,_transparent)] p-4">
-      <div className="max-h-[calc(var(--app-visual-viewport-height)-2rem)] w-full max-w-md overflow-y-auto rounded-2xl bg-[color:var(--app-surface-strong)] p-8 shadow-2xl animate-in fade-in zoom-in duration-300 dark:bg-[color:var(--app-surface-strong)]">
-        <div className="text-center space-y-6">
-          {/* Avatar */}
-          <div className="flex justify-center">
+    <div className="ui-layer-modal fixed inset-0 z-[10050] flex h-[100dvh] items-center justify-center overflow-hidden bg-[#0b141a] px-4 py-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(37,211,102,0.18),transparent_28%),radial-gradient(circle_at_50%_80%,rgba(0,168,132,0.10),transparent_34%)]" />
+      <div className="relative z-10 w-full max-w-[420px] rounded-[30px] border border-white/8 bg-[#111b21]/96 p-6 text-white shadow-[0_30px_90px_rgba(0,0,0,0.46)] backdrop-blur-xl sm:p-8">
+        <div className="flex flex-col items-center text-center">
+          <div className="relative">
+            <span className="absolute inset-[-12px] animate-pulse rounded-full bg-[#25d366]/10 blur-xl" aria-hidden="true" />
             <img
               src={profileAvatarSrc(
                 callerAvatar,
@@ -61,52 +62,44 @@ export function IncomingCall({
                 callerName,
               )}
               alt={callerName}
-              className="w-24 h-24 rounded-full object-cover border-4 border-[color:var(--app-accent-border)]"
+              className="relative h-28 w-28 rounded-full border-4 border-[#25d366]/55 object-cover shadow-[0_14px_40px_rgba(0,0,0,0.28)] sm:h-32 sm:w-32"
             />
           </div>
 
-          {/* Caller name */}
-          <div>
-            <h2 className="text-2xl font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-              {callerName}
-            </h2>
-            <p className="text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)] mt-2">
-              {callType === 'video'
-                ? 'Incoming video call'
-                : 'Incoming voice call'}
-            </p>
-          </div>
+          <h2 className="mt-7 max-w-full truncate px-2 text-[clamp(1.35rem,5vw,1.75rem)] font-bold tracking-[-0.02em]">
+            {callerName}
+          </h2>
+          <p className="mt-2 inline-flex items-center gap-2 text-sm font-medium text-white/55">
+            <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-[#202c33]">
+              {callType === 'video' ? <Video className="h-3.5 w-3.5 text-[#25d366]" /> : <Phone className="h-3.5 w-3.5 text-[#25d366]" />}
+            </span>
+            {callType === 'video' ? 'Panggilan video masuk' : 'Panggilan suara masuk'}
+          </p>
 
-          {/* Call icon animation */}
-          <div className="flex justify-center">
-            {callType === 'video' ? (
-              <Video className="w-16 h-16 text-[color:var(--app-accent)] animate-pulse" />
-            ) : (
-              <Phone className="w-16 h-16 text-[color:var(--app-accent)] animate-pulse" />
-            )}
-          </div>
-
-          {/* Action buttons */}
-          <div className="flex items-center justify-center gap-4 pt-4">
+          <div className="mt-9 grid w-full grid-cols-2 gap-3">
             <button
+              type="button"
               onClick={handleReject}
-              className="p-4 rounded-full bg-[color:var(--app-danger)] hover:bg-[color:var(--app-danger)] text-[color:var(--app-text-inverse)] transition-colors shadow-lg"
+              className="inline-flex min-h-14 items-center justify-center gap-2 rounded-full bg-[#d14343] px-5 text-sm font-bold text-white shadow-[0_10px_24px_rgba(209,67,67,0.24)] transition hover:bg-[#c63737] active:scale-[0.98]"
               aria-label="Reject call"
             >
-              <X className="w-6 h-6" />
+              <X className="h-5 w-5" />
+              Tolak
             </button>
             <button
+              type="button"
               onClick={handleAccept}
-              className="p-4 rounded-full bg-[color:var(--app-accent)] hover:bg-[color:var(--app-accent-strong)] text-[color:var(--app-text-inverse)] transition-colors shadow-lg"
+              className="inline-flex min-h-14 items-center justify-center gap-2 rounded-full bg-[#25d366] px-5 text-sm font-bold text-[#071c14] shadow-[0_10px_26px_rgba(37,211,102,0.24)] transition hover:bg-[#22c55e] active:scale-[0.98]"
               aria-label="Accept call"
             >
-              {callType === 'video' ? (
-                <Video className="w-6 h-6" />
-              ) : (
-                <Phone className="w-6 h-6" />
-              )}
+              {callType === 'video' ? <Video className="h-5 w-5" /> : <Phone className="h-5 w-5" />}
+              Jawab
             </button>
           </div>
+
+          <p className="mt-4 text-[11px] font-medium text-white/30">
+            Lajukan
+          </p>
         </div>
       </div>
     </div>

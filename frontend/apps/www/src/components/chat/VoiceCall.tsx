@@ -421,7 +421,7 @@ export function VoiceCall({ roomId, userId, callId, channel, isCaller = false, u
       aria-modal="true"
       aria-labelledby="voice-call-title"
       aria-describedby="voice-call-status"
-      className="fixed inset-0 z-50 bg-gradient-to-br from-[color:var(--app-accent)] to-[color:var(--app-accent-strong)] flex flex-col items-center justify-center"
+      className="fixed inset-0 z-[10040] flex h-[100dvh] flex-col items-center justify-center overflow-hidden bg-[#0b141a] px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] text-white"
     >
       <MediaPermissionGate
         enabled={!permissionGranted}
@@ -435,58 +435,70 @@ export function VoiceCall({ roomId, userId, callId, channel, isCaller = false, u
         onDenied={handlePermissionDenied}
       />
       <audio ref={remoteAudioRef} autoPlay playsInline className="hidden" />
-      <div className="text-center text-[color:var(--app-text-inverse)] space-y-6">
-        {/* Avatar */}
-        <div className="flex justify-center">
-          <div className="w-32 h-32 bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_20%,_transparent)] rounded-full flex items-center justify-center ">
-            <User className="w-16 h-16 text-[color:var(--app-text-inverse)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_22%,rgba(37,211,102,0.16),transparent_24%),radial-gradient(circle_at_50%_78%,rgba(0,168,132,0.10),transparent_34%)]" />
+      <div className="relative z-10 flex w-full max-w-md flex-1 flex-col items-center justify-center text-center">
+        <div className="relative">
+          {connectionStatus === 'connected' ? (
+            <span className="absolute inset-0 rounded-full bg-[#25d366]/20 blur-2xl" aria-hidden="true" />
+          ) : null}
+          <div className="relative inline-flex h-32 w-32 items-center justify-center rounded-full border-4 border-white/10 bg-[#202c33] shadow-[0_18px_48px_rgba(0,0,0,0.35)] sm:h-36 sm:w-36">
+            <User className="h-16 w-16 text-white/80 sm:h-[72px] sm:w-[72px]" />
           </div>
+          {connectionStatus === 'connected' ? (
+            <span className="absolute bottom-1 right-1 inline-flex h-8 w-8 items-center justify-center rounded-full border-4 border-[#0b141a] bg-[#25d366]" aria-hidden="true">
+              <span className="h-2.5 w-2.5 rounded-full bg-[#0b141a]" />
+            </span>
+          ) : null}
         </div>
 
-        {/* User name */}
-        <div>
-          <h2 id="voice-call-title" className="text-2xl font-semibold">
-            {userName || 'Calling...'}
+        <div className="mt-8">
+          <h2 id="voice-call-title" className="text-[clamp(1.5rem,5vw,2rem)] font-bold tracking-[-0.02em]">
+            {userName || (isId ? 'Memanggil…' : 'Calling…')}
           </h2>
           <p
             id="voice-call-status"
             role="status"
             aria-live="polite"
-            className="text-[color:color-mix(in_srgb,_var(--app-text-inverse)_80%,_transparent)] mt-2"
+            className="mt-2 text-sm font-medium text-white/60"
           >
             {isRemoteAudioEnabled
-              ? 'Connected'
+              ? isId ? 'Terhubung' : 'Connected'
               : connectionStatus === 'failed'
-                ? 'Connection failed'
+                ? isId ? 'Koneksi gagal' : 'Connection failed'
                 : connectionStatus === 'disconnected'
-                  ? 'Reconnecting...'
-                  : 'Connecting...'}
+                  ? isId ? 'Menyambungkan lagi…' : 'Reconnecting…'
+                  : isId ? 'Memanggil…' : 'Connecting…'}
           </p>
         </div>
 
-        {/* Controls */}
-        <div className="flex items-center justify-center gap-4 pt-8">
+        <div className="mt-auto flex items-center justify-center gap-5 pt-12">
           <button
+            type="button"
             onClick={toggleAudio}
             disabled={!hasLocalAudioTrack}
-            className={`p-4 rounded-full transition-colors ${
+            className={`inline-flex h-14 w-14 items-center justify-center rounded-full border border-white/8 transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 ${
               isAudioEnabled
-                ? 'bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_20%,_transparent)] hover:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_30%,_transparent)] text-[color:var(--app-text-inverse)]'
-                : 'bg-[color:var(--app-danger)] hover:bg-[color:var(--app-danger)] text-[color:var(--app-text-inverse)]'
-            } ${!hasLocalAudioTrack ? 'opacity-50 cursor-not-allowed' : ''}`}
-            aria-label={isAudioEnabled ? 'Mute microphone' : 'Unmute microphone'}
+                ? 'bg-[#202c33] text-white hover:bg-[#2a3942]'
+                : 'bg-[#d14343] text-white hover:bg-[#c63737]'
+            }`}
+            aria-label={isAudioEnabled ? (isId ? 'Matikan mikrofon' : 'Mute microphone') : (isId ? 'Nyalakan mikrofon' : 'Unmute microphone')}
           >
-            {isAudioEnabled ? <Mic className="w-6 h-6" /> : <MicOff className="w-6 h-6" />}
+            {isAudioEnabled ? <Mic className="h-6 w-6" /> : <MicOff className="h-6 w-6" />}
           </button>
 
           <button
+            type="button"
             onClick={endCall}
-            className="p-4 rounded-full bg-[color:var(--app-danger)] hover:bg-[color:var(--app-danger)] text-[color:var(--app-text-inverse)] transition-colors"
-            aria-label="End call"
+            className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-[#d14343] text-white shadow-[0_12px_30px_rgba(209,67,67,0.28)] transition hover:bg-[#c63737] active:scale-95"
+            aria-label={isId ? 'Akhiri panggilan' : 'End call'}
           >
-            <PhoneOff className="w-6 h-6" />
+            <PhoneOff className="h-7 w-7" />
           </button>
         </div>
+
+        <p className="mt-6 text-[11px] font-medium text-white/34">
+          {isId ? 'Panggilan terenkripsi melalui koneksi aman.' : 'Calls use the secure Lajukan connection.'}
+        </p>
       </div>
     </div>
   );
