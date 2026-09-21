@@ -111,6 +111,8 @@ import {
   MarketplacePageFrame,
 } from '@/components/layout/MarketplacePageFrame';
 import { FeedColumnFooter } from '@/components/layout/FeedColumnFooter';
+import { HomeNewsSection } from '@/components/home/HomeNewsSection';
+import { useHomeNews } from '@/components/home/HomeNewsContext';
 import type {
   CommunityFeedItem,
   CommunityFeedResponse,
@@ -5041,6 +5043,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { isAuthenticated, user, loading: authLoading, authFetch } = useAuth();
+  const { items: homeNewsItems } = useHomeNews();
   const userId = typeof user?.id === 'string' ? user.id : null;
   const viewerLocationState = useViewerLocation({
     isId,
@@ -5547,6 +5550,13 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
             icon: Sparkles,
           },
           {
+            id: 'news',
+            label: 'News',
+            caption: isId ? 'Berita usaha terbaru' : 'Latest business news',
+            href: '/news',
+            icon: Newspaper,
+          },
+          {
             id: 'reels',
             label: isId ? 'Reels Bisnis' : 'Business Reels',
             caption: isId ? 'Tips singkat' : 'Short inspiration and tips',
@@ -5663,6 +5673,13 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
             icon: Sparkles,
           },
           {
+            id: 'news',
+            label: 'News',
+            caption: isId ? 'Berita usaha terbaru' : 'Latest business news',
+            href: '/news',
+            icon: Newspaper,
+          },
+          {
             id: 'reels',
             label: isId ? 'Reels' : 'Business Reels',
             caption: isId ? 'Tips singkat' : 'Short inspiration and tips',
@@ -5746,6 +5763,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
         {recommendations.length > 0 ? (
           <RecommendationsSection isId={isId} items={recommendations} />
         ) : null}
+        <HomeNewsSection locale={locale} items={homeNewsItems} />
         <ReelsPanel isId={isId} items={reels} />
         <CommunityPanel
           isId={isId}
@@ -5852,6 +5870,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
               {recommendations.length > 0 ? (
                 <RecommendationsSection isId={isId} items={recommendations} />
               ) : null}
+              <HomeNewsSection locale={locale} items={homeNewsItems} />
               <div className="grid gap-4">
                 <ReelsPanel isId={isId} items={reels} />
                 <CommunityPanel
