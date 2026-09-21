@@ -382,8 +382,22 @@ export default function BusinessModerationWorkspace() {
       </div>
 
       {loading ? (
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm font-semibold text-slate-500">
-          Memuat data usaha...
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <article key={index} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+              <div className="h-32 animate-pulse bg-slate-100" />
+              <div className="space-y-3 p-4">
+                <div className="h-4 w-2/3 animate-pulse rounded bg-slate-200" />
+                <div className="h-3 w-4/5 animate-pulse rounded bg-slate-100" />
+                <div className="flex gap-2">
+                  <div className="h-6 w-20 animate-pulse rounded-full bg-slate-100" />
+                  <div className="h-6 w-24 animate-pulse rounded-full bg-slate-100" />
+                </div>
+                <div className="h-2 w-full animate-pulse rounded-full bg-slate-100" />
+                <div className="h-9 w-full animate-pulse rounded-xl bg-slate-100" />
+              </div>
+            </article>
+          ))}
         </div>
       ) : activeTab === "references" ? (
         !references.length ? (
