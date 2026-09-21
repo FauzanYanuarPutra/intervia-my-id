@@ -6,9 +6,15 @@ import { BadgeCheck, CheckCircle2, ShieldCheck } from 'lucide-react';
 type Props = {
   businessId: string;
   ready: boolean;
+  checks: {
+    profile: boolean;
+    image: boolean;
+    contact: boolean;
+    location: boolean;
+  };
 };
 
-export function BusinessVerificationPanel({ businessId, ready }: Props) {
+export function BusinessVerificationPanel({ businessId, ready, checks }: Props) {
   const [busy, setBusy] = useState(false);
   const [requested, setRequested] = useState(false);
   const [error, setError] = useState('');
@@ -50,10 +56,10 @@ export function BusinessVerificationPanel({ businessId, ready }: Props) {
 
       <div className="mt-4 grid gap-2 sm:grid-cols-4">
         {[
-          ['Profil', ready],
-          ['Foto/logo', ready],
-          ['Kontak', ready],
-          ['Lokasi', ready],
+          ['Profil', checks.profile],
+          ['Foto/logo', checks.image],
+          ['Kontak', checks.contact],
+          ['Lokasi', checks.location],
         ].map(([label, done]) => (
           <div key={String(label)} className="rounded-xl border border-sky-100 bg-white px-3 py-2.5">
             <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
