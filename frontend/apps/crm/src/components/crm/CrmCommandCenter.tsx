@@ -1705,7 +1705,7 @@ function ListingsPage({
 
 function PageHeader({ label, title, body }: { label: string; title: string; body: string }) {
   return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <Badge tone="success">{label}</Badge>
       <h1 className="mt-1 text-xl font-black tracking-[-0.04em] text-slate-950 sm:text-2xl">{title}</h1>
       <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-500">{body}</p>
