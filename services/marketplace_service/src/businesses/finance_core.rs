@@ -513,13 +513,8 @@ impl FinanceCoreRepository {
                 return Err(FinanceCoreError::Conflict);
             }
             let command_id = result_entry_id.ok_or(FinanceCoreError::Database)?;
-            let entries = load_transfer_entries_tx(
-                &mut tx,
-                business_id,
-                organization_id,
-                command_id,
-            )
-            .await?;
+            let entries =
+                load_transfer_entries_tx(&mut tx, business_id, organization_id, command_id).await?;
             let from_entry = entries
                 .iter()
                 .find(|entry| entry.effect_multiplier == -1)
@@ -548,13 +543,8 @@ impl FinanceCoreRepository {
         .await
         .map_err(map_period_control_error)?;
 
-        let source_balance = account_balance_tx(
-            &mut tx,
-            business_id,
-            organization_id,
-            &from_account,
-        )
-        .await?;
+        let source_balance =
+            account_balance_tx(&mut tx, business_id, organization_id, &from_account).await?;
         if source_balance < request.amount {
             return Err(FinanceCoreError::Validation(
                 "transfer_insufficient_source_balance",

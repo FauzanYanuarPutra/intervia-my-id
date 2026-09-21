@@ -44,8 +44,14 @@ fn opening_balance_has_cash_semantics_without_revenue_or_expense() {
     let semantic = FinanceEntrySemantic::for_entry("opening_balance").unwrap();
     assert!(!semantic.is_revenue);
     assert!(!semantic.is_operating_expense);
-    assert_eq!(cash_effect_for("opening_balance", "cash", 2_000_000).unwrap(), 2_000_000);
-    assert_eq!(cash_effect_for("opening_balance", "receivable", 2_000_000).unwrap(), 0);
+    assert_eq!(
+        cash_effect_for("opening_balance", "cash", 2_000_000).unwrap(),
+        2_000_000
+    );
+    assert_eq!(
+        cash_effect_for("opening_balance", "receivable", 2_000_000).unwrap(),
+        0
+    );
 }
 
 #[test]
@@ -53,7 +59,10 @@ fn account_transfer_is_cash_neutral_at_business_level() {
     let semantic = FinanceEntrySemantic::for_entry("account_transfer").unwrap();
     assert!(!semantic.is_revenue);
     assert!(!semantic.is_operating_expense);
-    assert_eq!(cash_effect_for("account_transfer", "bank", 500_000).unwrap(), 500_000);
+    assert_eq!(
+        cash_effect_for("account_transfer", "bank", 500_000).unwrap(),
+        500_000
+    );
 }
 
 #[test]

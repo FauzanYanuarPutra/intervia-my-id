@@ -305,10 +305,6 @@ function DataSection({
   const sectionRef = useRef<HTMLElement | null>(null);
   const [page, setPage] = useState(1);
 
-  useEffect(() => {
-    setPage(1);
-  }, [category.slug, config.key, items.length]);
-
   if (items.length === 0) return null;
 
   const isNeedSection = config.key === 'latest-needs';
@@ -2039,9 +2035,7 @@ export function ExploreCategoryClient({
                     ) {
                       return (
                         <DataSection
-                          key={
-                            section.key
-                          }
+                          key={`${category.slug}-${section.key}`}
                           config={
                             section
                           }
@@ -2065,9 +2059,7 @@ export function ExploreCategoryClient({
                     ) {
                       return (
                         <DataSection
-                          key={
-                            section.key
-                          }
+                          key={`${category.slug}-${section.key}`}
                           config={
                             section
                           }
@@ -2091,9 +2083,7 @@ export function ExploreCategoryClient({
                     ) {
                       return (
                         <DataSection
-                          key={
-                            section.key
-                          }
+                          key={`${category.slug}-${section.key}`}
                           config={
                             section
                           }
@@ -2134,9 +2124,7 @@ export function ExploreCategoryClient({
                     ) {
                       return (
                         <DataSection
-                          key={
-                            section.key
-                          }
+                          key={`${category.slug}-${section.key}`}
                           config={
                             section
                           }
@@ -2160,9 +2148,7 @@ export function ExploreCategoryClient({
                     ) {
                       return (
                         <DataSection
-                          key={
-                            section.key
-                          }
+                          key={`${category.slug}-${section.key}`}
                           config={
                             section
                           }

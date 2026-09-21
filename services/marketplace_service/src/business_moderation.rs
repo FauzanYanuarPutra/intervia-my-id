@@ -1,5 +1,6 @@
 use super::*;
 
+use crate::moderation;
 use axum::{
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
@@ -12,7 +13,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sqlx::Row;
 use uuid::Uuid;
-use crate::moderation;
 
 const BUSINESS_MAX_QUERY_LEN: usize = 120;
 const BUSINESS_MAX_LIMIT: i64 = 100;
@@ -166,9 +166,10 @@ fn has_business_appeal_access(claims: &AccessClaims) -> bool {
 
 fn has_business_notification_access(claims: &AccessClaims) -> bool {
     has_business_read_access(claims)
-        || claims.perms.iter().any(|permission| {
-            permission.eq_ignore_ascii_case("business:notifications:read")
-        })
+        || claims
+            .perms
+            .iter()
+            .any(|permission| permission.eq_ignore_ascii_case("business:notifications:read"))
 }
 
 fn normalize_text(value: Option<String>, max_len: usize) -> Option<String> {
@@ -225,7 +226,11 @@ fn collect_metadata_images(metadata: &Value) -> Vec<String> {
     let mut urls = Vec::new();
     let mut seen = std::collections::HashSet::new();
 
-    fn collect(value: &Value, urls: &mut Vec<String>, seen: &mut std::collections::HashSet<String>) {
+    fn collect(
+        value: &Value,
+        urls: &mut Vec<String>,
+        seen: &mut std::collections::HashSet<String>,
+    ) {
         match value {
             Value::String(raw) => {
                 let candidate = raw.trim();
@@ -288,7 +293,13 @@ fn collect_metadata_images(metadata: &Value) -> Vec<String> {
                 // objects such as metadata.public. Recurse only into known
                 // presentation containers so unrelated website/social URLs
                 // are not misclassified as business photos.
-                for key in ["public", "storefront", "profile", "presentation", "business_media"] {
+                for key in [
+                    "public",
+                    "storefront",
+                    "profile",
+                    "presentation",
+                    "business_media",
+                ] {
                     if let Some(value) = map.get(key) {
                         collect(value, urls, seen);
                     }
@@ -339,10 +350,19 @@ fn derive_missing_fields(
     if name.trim().is_empty() {
         missing.push("Nama usaha".to_string());
     }
-    if metadata_text(metadata, &["category", "category_label", "business_category"]).is_none() {
+    if metadata_text(
+        metadata,
+        &["category", "category_label", "business_category"],
+    )
+    .is_none()
+    {
         missing.push("Kategori usaha".to_string());
     }
-    if description.map(str::trim).filter(|v| !v.is_empty()).is_none() {
+    if description
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+        .is_none()
+    {
         missing.push("Deskripsi usaha".to_string());
     }
     if city.trim().is_empty() {
@@ -373,7 +393,9 @@ fn review_state(current_action: Option<&str>, status: Option<&str>, is_active: b
     match (current_action, status) {
         (Some("hide") | Some("reject"), _) => "hidden".to_string(),
         (Some("request_completion"), Some("awaiting_owner")) => "needs_completion".to_string(),
-        (Some("approve") | Some("restore"), Some("resolved")) if is_active => "approved".to_string(),
+        (Some("approve") | Some("restore"), Some("resolved")) if is_active => {
+            "approved".to_string()
+        }
         (Some("escalate"), Some("escalated")) => "escalated".to_string(),
         (None, _) => "unreviewed".to_string(),
         _ if !is_active => "hidden".to_string(),
@@ -406,23 +428,58 @@ fn business_snapshot(row: &CrmBusinessRow) -> Value {
 pub(crate) fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/v1/crm/businesses", get(list_crm_businesses))
-        .route("/v1/crm/business-references", get(list_crm_business_references))
-        .route("/v1/crm/business-references/{id}/moderate", post(moderate_business_reference))
-        .route("/v1/crm/businesses/{id}/moderation/history", get(get_business_moderation_history))
+        .route(
+            "/v1/crm/business-references",
+            get(list_crm_business_references),
+        )
+        .route(
+            "/v1/crm/business-references/{id}/moderate",
+            post(moderate_business_reference),
+        )
+        .route(
+            "/v1/crm/businesses/{id}/moderation/history",
+            get(get_business_moderation_history),
+        )
         .route("/v1/crm/businesses/{id}/moderate", post(moderate_business))
-        .route("/v1/crm/businesses/{id}/moderation/assign", post(assign_business_case))
-        .route("/v1/crm/businesses/{id}/moderation/evidence", post(add_business_evidence))
-        .route("/v1/crm/businesses/{id}/verification/review", post(review_business_verification))
-        .route("/v1/crm/appeals/{appeal_id}/review", post(review_business_appeal))
+        .route(
+            "/v1/crm/businesses/{id}/moderation/assign",
+            post(assign_business_case),
+        )
+        .route(
+            "/v1/crm/businesses/{id}/moderation/evidence",
+            post(add_business_evidence),
+        )
+        .route(
+            "/v1/crm/businesses/{id}/verification/review",
+            post(review_business_verification),
+        )
+        .route(
+            "/v1/crm/appeals/{appeal_id}/review",
+            post(review_business_appeal),
+        )
         .route("/v1/crm/notifications", get(list_crm_notifications))
-        .route("/v1/crm/notifications/{id}/read", post(mark_crm_notification_read))
-        .route("/v1/crm/notifications/read-all", post(mark_all_crm_notifications_read))
+        .route(
+            "/v1/crm/notifications/{id}/read",
+            post(mark_crm_notification_read),
+        )
+        .route(
+            "/v1/crm/notifications/read-all",
+            post(mark_all_crm_notifications_read),
+        )
         .route("/v1/umkm/stores/{store_ref}/report", post(report_business))
-        .route("/v1/umkm/stores/{store_ref}/appeal", post(request_business_appeal))
-        .route("/v1/umkm/stores/{store_ref}/verification", get(get_business_verification))
-        .route("/v1/umkm/stores/{store_ref}/verification/request", post(request_business_verification))
+        .route(
+            "/v1/umkm/stores/{store_ref}/appeal",
+            post(request_business_appeal),
+        )
+        .route(
+            "/v1/umkm/stores/{store_ref}/verification",
+            get(get_business_verification),
+        )
+        .route(
+            "/v1/umkm/stores/{store_ref}/verification/request",
+            post(request_business_verification),
+        )
 }
-
 
 async fn list_crm_business_references(
     State(state): State<Arc<AppState>>,
@@ -434,13 +491,21 @@ async fn list_crm_business_references(
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
     if !has_business_read_access(&claims) {
-        return err(StatusCode::FORBIDDEN, "business reference moderation permission required").into_response();
+        return err(
+            StatusCode::FORBIDDEN,
+            "business reference moderation permission required",
+        )
+        .into_response();
     }
 
     let q = normalize_text(query.q, BUSINESS_MAX_QUERY_LEN);
     let city = normalize_text(query.city, 80);
     let status = normalize_text(query.status, 30).and_then(|value| {
-        if value.eq_ignore_ascii_case("all") { None } else { Some(value) }
+        if value.eq_ignore_ascii_case("all") {
+            None
+        } else {
+            Some(value)
+        }
     });
     let limit = query.limit.unwrap_or(50).clamp(1, BUSINESS_MAX_LIMIT);
     let offset = query.offset.unwrap_or(0).max(0);
@@ -490,27 +555,34 @@ async fn list_crm_business_references(
         Ok(rows) => rows,
         Err(error) => {
             tracing::error!("list_crm_business_references error: {:?}", error);
-            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load business references").into_response();
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load business references",
+            )
+            .into_response();
         }
     };
 
-    let items = rows.into_iter().map(|row| CrmBusinessReferenceRow {
-        id: row.get("id"),
-        slug: row.get("slug"),
-        title: row.get("title"),
-        summary: row.get("summary"),
-        cover_image: row.get("cover_image"),
-        city: row.get("city"),
-        address: row.get("address"),
-        source_url: row.get("source_url"),
-        source_dataset: row.get("source_dataset"),
-        source_title: row.get("source_title"),
-        source_license: row.get("source_license"),
-        source_license_url: row.get("source_license_url"),
-        source_accessed_at: row.get("source_accessed_at"),
-        content_status: row.get("content_status"),
-        updated_at: row.get("updated_at"),
-    }).collect::<Vec<_>>();
+    let items = rows
+        .into_iter()
+        .map(|row| CrmBusinessReferenceRow {
+            id: row.get("id"),
+            slug: row.get("slug"),
+            title: row.get("title"),
+            summary: row.get("summary"),
+            cover_image: row.get("cover_image"),
+            city: row.get("city"),
+            address: row.get("address"),
+            source_url: row.get("source_url"),
+            source_dataset: row.get("source_dataset"),
+            source_title: row.get("source_title"),
+            source_license: row.get("source_license"),
+            source_license_url: row.get("source_license_url"),
+            source_accessed_at: row.get("source_accessed_at"),
+            content_status: row.get("content_status"),
+            updated_at: row.get("updated_at"),
+        })
+        .collect::<Vec<_>>();
 
     (
         StatusCode::OK,
@@ -520,7 +592,8 @@ async fn list_crm_business_references(
             "offset": offset,
             "has_more": items.len() as i64 == limit
         })),
-    ).into_response()
+    )
+        .into_response()
 }
 
 async fn moderate_business_reference(
@@ -531,7 +604,11 @@ async fn moderate_business_reference(
 ) -> impl IntoResponse {
     let action = normalize_action(&payload.action);
     let Some(action) = action else {
-        return err(StatusCode::BAD_REQUEST, "unsupported business reference moderation action").into_response();
+        return err(
+            StatusCode::BAD_REQUEST,
+            "unsupported business reference moderation action",
+        )
+        .into_response();
     };
     let content_action = match action {
         "hide" => "restrict",
@@ -550,7 +627,13 @@ async fn moderate_business_reference(
         "copyright" => "copyright",
         "quality" => "quality",
         "other" => "other",
-        _ => return err(StatusCode::BAD_REQUEST, "unsupported business reference moderation reason").into_response(),
+        _ => {
+            return err(
+                StatusCode::BAD_REQUEST,
+                "unsupported business reference moderation reason",
+            )
+            .into_response()
+        }
     };
 
     moderation::moderate_content(
@@ -676,7 +759,11 @@ async fn list_crm_businesses(
         Ok(rows) => rows,
         Err(error) => {
             tracing::error!("list_crm_businesses error: {:?}", error);
-            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load businesses").into_response();
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load businesses",
+            )
+            .into_response();
         }
     };
 
@@ -741,12 +828,12 @@ async fn list_crm_businesses(
             completeness_percent: completeness,
             image_urls: images,
             source_type,
-            report_count: row.get::<i64,_>("report_count"),
-            latest_report_reason: row.get::<Option<String>,_>("latest_report_reason"),
-            assigned_to: row.get::<Option<Uuid>,_>("assigned_to"),
-            due_at: row.get::<Option<DateTime<Utc>>,_>("due_at"),
-            verification_status: row.get::<String,_>("verification_status"),
-            verification_method: row.get::<Option<String>,_>("verification_method"),
+            report_count: row.get::<i64, _>("report_count"),
+            latest_report_reason: row.get::<Option<String>, _>("latest_report_reason"),
+            assigned_to: row.get::<Option<Uuid>, _>("assigned_to"),
+            due_at: row.get::<Option<DateTime<Utc>>, _>("due_at"),
+            verification_status: row.get::<String, _>("verification_status"),
+            verification_method: row.get::<Option<String>, _>("verification_method"),
         });
     }
 
@@ -876,7 +963,11 @@ async fn load_business(state: &AppState, business_id: Uuid) -> Result<CrmBusines
         metadata: metadata.clone(),
         created_at: row.get("created_at"),
         updated_at: row.get("updated_at"),
-        review_state: review_state(current_action.as_deref(), moderation_status.as_deref(), is_active),
+        review_state: review_state(
+            current_action.as_deref(),
+            moderation_status.as_deref(),
+            is_active,
+        ),
         current_action,
         current_reason_code: row.get("current_reason_code"),
         current_reason_note: row.get("current_reason_note"),
@@ -886,12 +977,12 @@ async fn load_business(state: &AppState, business_id: Uuid) -> Result<CrmBusines
         completeness_percent: completeness_percent(&missing),
         image_urls: collect_metadata_images(&metadata),
         source_type,
-        report_count: row.get::<i64,_>("report_count"),
-        latest_report_reason: row.get::<Option<String>,_>("latest_report_reason"),
-        assigned_to: row.get::<Option<Uuid>,_>("assigned_to"),
-        due_at: row.get::<Option<DateTime<Utc>>,_>("due_at"),
-        verification_status: row.get::<String,_>("verification_status"),
-        verification_method: row.get::<Option<String>,_>("verification_method"),
+        report_count: row.get::<i64, _>("report_count"),
+        latest_report_reason: row.get::<Option<String>, _>("latest_report_reason"),
+        assigned_to: row.get::<Option<Uuid>, _>("assigned_to"),
+        due_at: row.get::<Option<DateTime<Utc>>, _>("due_at"),
+        verification_status: row.get::<String, _>("verification_status"),
+        verification_method: row.get::<Option<String>, _>("verification_method"),
     })
 }
 
@@ -906,7 +997,11 @@ async fn moderate_business(
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
     if !has_business_moderation_access(&claims) {
-        return err(StatusCode::FORBIDDEN, "business moderation permission required").into_response();
+        return err(
+            StatusCode::FORBIDDEN,
+            "business moderation permission required",
+        )
+        .into_response();
     }
     let actor_id = match Uuid::parse_str(claims.sub.trim()) {
         Ok(value) => value,
@@ -915,20 +1010,42 @@ async fn moderate_business(
 
     let action = match normalize_action(&payload.action) {
         Some(value) => value,
-        None => return err(StatusCode::BAD_REQUEST, "unsupported business moderation action").into_response(),
+        None => {
+            return err(
+                StatusCode::BAD_REQUEST,
+                "unsupported business moderation action",
+            )
+            .into_response()
+        }
     };
     let reason_code = match normalize_reason(&payload.reason_code) {
         Some(value) => value,
-        None => return err(StatusCode::BAD_REQUEST, "unsupported business moderation reason").into_response(),
+        None => {
+            return err(
+                StatusCode::BAD_REQUEST,
+                "unsupported business moderation reason",
+            )
+            .into_response()
+        }
     };
     let reason_note = normalize_text(payload.reason_note, BUSINESS_MAX_REASON_LEN);
-    if matches!(action, "request_completion" | "hide" | "reject" | "escalate")
-        && reason_note.is_none()
+    if matches!(
+        action,
+        "request_completion" | "hide" | "reject" | "escalate"
+    ) && reason_note.is_none()
     {
-        return err(StatusCode::BAD_REQUEST, "reason note is required for this action").into_response();
+        return err(
+            StatusCode::BAD_REQUEST,
+            "reason note is required for this action",
+        )
+        .into_response();
     }
     if reason_code == "other" && reason_note.is_none() {
-        return err(StatusCode::BAD_REQUEST, "reason note is required when reason is other").into_response();
+        return err(
+            StatusCode::BAD_REQUEST,
+            "reason note is required when reason is other",
+        )
+        .into_response();
     }
 
     let mut business = match load_business(&state, id).await {
@@ -940,7 +1057,8 @@ async fn moderate_business(
         if payload.missing_fields.is_empty() {
             business.missing_fields.clone()
         } else {
-            payload.missing_fields
+            payload
+                .missing_fields
                 .into_iter()
                 .map(|value| value.trim().to_string())
                 .filter(|value| !value.is_empty())
@@ -992,7 +1110,13 @@ async fn moderate_business(
 
     let mut tx = match state.db.begin().await {
         Ok(value) => value,
-        Err(_) => return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to open transaction").into_response(),
+        Err(_) => {
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to open transaction",
+            )
+            .into_response()
+        }
     };
 
     let new_status = match action {
@@ -1008,17 +1132,19 @@ async fn moderate_business(
     };
 
     if new_is_active != business.is_active {
-        if sqlx::query(
-            "UPDATE umkm_stores SET is_active = $2, updated_at = NOW() WHERE id = $1",
-        )
-        .bind(id)
-        .bind(new_is_active)
-        .execute(&mut *tx)
-        .await
-        .is_err()
+        if sqlx::query("UPDATE umkm_stores SET is_active = $2, updated_at = NOW() WHERE id = $1")
+            .bind(id)
+            .bind(new_is_active)
+            .execute(&mut *tx)
+            .await
+            .is_err()
         {
             let _ = tx.rollback().await;
-            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update business visibility").into_response();
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to update business visibility",
+            )
+            .into_response();
         }
         business.is_active = new_is_active;
     }
@@ -1051,7 +1177,11 @@ async fn moderate_business(
         Err(error) => {
             let _ = tx.rollback().await;
             tracing::error!("create business moderation case error: {:?}", error);
-            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to create business moderation case").into_response();
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to create business moderation case",
+            )
+            .into_response();
         }
     };
 
@@ -1081,11 +1211,19 @@ async fn moderate_business(
     .is_err()
     {
         let _ = tx.rollback().await;
-        return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to write business moderation history").into_response();
+        return err(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to write business moderation history",
+        )
+        .into_response();
     }
 
     if tx.commit().await.is_err() {
-        return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to commit business moderation").into_response();
+        return err(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to commit business moderation",
+        )
+        .into_response();
     }
 
     let (title, message) = match action {
@@ -1221,7 +1359,11 @@ async fn get_business_moderation_history(
             .collect::<Vec<_>>(),
         Err(error) => {
             tracing::error!("business moderation cases history error: {:?}", error);
-            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load business history").into_response();
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load business history",
+            )
+            .into_response();
         }
     };
 
@@ -1240,19 +1382,25 @@ async fn get_business_moderation_history(
     {
         Ok(rows) => rows
             .into_iter()
-            .map(|row| json!({
-                "id": row.get::<Uuid,_>("id"),
-                "reporter_user_id": row.get::<Uuid,_>("reporter_user_id"),
-                "reason_code": row.get::<String,_>("reason_code"),
-                "details": row.get::<Option<String>,_>("details"),
-                "status": row.get::<String,_>("status"),
-                "created_at": row.get::<DateTime<Utc>,_>("created_at"),
-                "updated_at": row.get::<DateTime<Utc>,_>("updated_at")
-            }))
+            .map(|row| {
+                json!({
+                    "id": row.get::<Uuid,_>("id"),
+                    "reporter_user_id": row.get::<Uuid,_>("reporter_user_id"),
+                    "reason_code": row.get::<String,_>("reason_code"),
+                    "details": row.get::<Option<String>,_>("details"),
+                    "status": row.get::<String,_>("status"),
+                    "created_at": row.get::<DateTime<Utc>,_>("created_at"),
+                    "updated_at": row.get::<DateTime<Utc>,_>("updated_at")
+                })
+            })
             .collect::<Vec<_>>(),
         Err(error) => {
             tracing::error!("business reports history error: {:?}", error);
-            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load business reports").into_response();
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load business reports",
+            )
+            .into_response();
         }
     };
 
@@ -1272,23 +1420,29 @@ async fn get_business_moderation_history(
     {
         Ok(rows) => rows
             .into_iter()
-            .map(|row| json!({
-                "id": row.get::<Uuid,_>("id"),
-                "case_id": row.get::<Uuid,_>("case_id"),
-                "appellant_user_id": row.get::<Uuid,_>("appellant_user_id"),
-                "reason": row.get::<String,_>("reason"),
-                "evidence": row.get::<Value,_>("evidence"),
-                "status": row.get::<String,_>("status"),
-                "reviewer_id": row.get::<Option<Uuid>,_>("reviewer_id"),
-                "reviewer_note": row.get::<Option<String>,_>("reviewer_note"),
-                "created_at": row.get::<DateTime<Utc>,_>("created_at"),
-                "updated_at": row.get::<DateTime<Utc>,_>("updated_at"),
-                "resolved_at": row.get::<Option<DateTime<Utc>>,_>("resolved_at")
-            }))
+            .map(|row| {
+                json!({
+                    "id": row.get::<Uuid,_>("id"),
+                    "case_id": row.get::<Uuid,_>("case_id"),
+                    "appellant_user_id": row.get::<Uuid,_>("appellant_user_id"),
+                    "reason": row.get::<String,_>("reason"),
+                    "evidence": row.get::<Value,_>("evidence"),
+                    "status": row.get::<String,_>("status"),
+                    "reviewer_id": row.get::<Option<Uuid>,_>("reviewer_id"),
+                    "reviewer_note": row.get::<Option<String>,_>("reviewer_note"),
+                    "created_at": row.get::<DateTime<Utc>,_>("created_at"),
+                    "updated_at": row.get::<DateTime<Utc>,_>("updated_at"),
+                    "resolved_at": row.get::<Option<DateTime<Utc>>,_>("resolved_at")
+                })
+            })
             .collect::<Vec<_>>(),
         Err(error) => {
             tracing::error!("business appeals history error: {:?}", error);
-            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load business appeals").into_response();
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load business appeals",
+            )
+            .into_response();
         }
     };
 
@@ -1309,21 +1463,27 @@ async fn get_business_moderation_history(
     {
         Ok(rows) => rows
             .into_iter()
-            .map(|row| json!({
-                "id": row.get::<Uuid,_>("id"),
-                "case_id": row.get::<Uuid,_>("case_id"),
-                "added_by": row.get::<Uuid,_>("added_by"),
-                "evidence_type": row.get::<String,_>("evidence_type"),
-                "label": row.get::<String,_>("label"),
-                "source_url": row.get::<Option<String>,_>("source_url"),
-                "note": row.get::<Option<String>,_>("note"),
-                "metadata": row.get::<Value,_>("metadata"),
-                "created_at": row.get::<DateTime<Utc>,_>("created_at")
-            }))
+            .map(|row| {
+                json!({
+                    "id": row.get::<Uuid,_>("id"),
+                    "case_id": row.get::<Uuid,_>("case_id"),
+                    "added_by": row.get::<Uuid,_>("added_by"),
+                    "evidence_type": row.get::<String,_>("evidence_type"),
+                    "label": row.get::<String,_>("label"),
+                    "source_url": row.get::<Option<String>,_>("source_url"),
+                    "note": row.get::<Option<String>,_>("note"),
+                    "metadata": row.get::<Value,_>("metadata"),
+                    "created_at": row.get::<DateTime<Utc>,_>("created_at")
+                })
+            })
             .collect::<Vec<_>>(),
         Err(error) => {
             tracing::error!("business evidence history error: {:?}", error);
-            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load business evidence").into_response();
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load business evidence",
+            )
+            .into_response();
         }
     };
 
@@ -1341,21 +1501,27 @@ async fn get_business_moderation_history(
     .fetch_optional(&state.db)
     .await
     {
-        Ok(row) => row.map(|row| json!({
-            "id": row.get::<Uuid,_>("id"),
-            "status": row.get::<String,_>("status"),
-            "method": row.get::<Option<String>,_>("method"),
-            "requested_at": row.get::<Option<DateTime<Utc>>,_>("requested_at"),
-            "reviewed_at": row.get::<Option<DateTime<Utc>>,_>("reviewed_at"),
-            "reviewed_by": row.get::<Option<Uuid>,_>("reviewed_by"),
-            "review_reason": row.get::<Option<String>,_>("review_reason"),
-            "evidence": row.get::<Value,_>("evidence"),
-            "metadata": row.get::<Value,_>("metadata"),
-            "updated_at": row.get::<DateTime<Utc>, _>("updated_at")
-        })),
+        Ok(row) => row.map(|row| {
+            json!({
+                "id": row.get::<Uuid,_>("id"),
+                "status": row.get::<String,_>("status"),
+                "method": row.get::<Option<String>,_>("method"),
+                "requested_at": row.get::<Option<DateTime<Utc>>,_>("requested_at"),
+                "reviewed_at": row.get::<Option<DateTime<Utc>>,_>("reviewed_at"),
+                "reviewed_by": row.get::<Option<Uuid>,_>("reviewed_by"),
+                "review_reason": row.get::<Option<String>,_>("review_reason"),
+                "evidence": row.get::<Value,_>("evidence"),
+                "metadata": row.get::<Value,_>("metadata"),
+                "updated_at": row.get::<DateTime<Utc>, _>("updated_at")
+            })
+        }),
         Err(error) => {
             tracing::error!("business verification history error: {:?}", error);
-            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load business verification").into_response();
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load business verification",
+            )
+            .into_response();
         }
     };
 
@@ -1400,7 +1566,11 @@ async fn get_business_moderation_history(
             .collect::<Vec<_>>(),
         Err(error) => {
             tracing::error!("business moderation events history error: {:?}", error);
-            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load business history events").into_response();
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load business history events",
+            )
+            .into_response();
         }
     };
 
@@ -1474,7 +1644,12 @@ pub struct ListCrmNotificationsQuery {
 }
 
 fn normalize_business_report_reason(raw: &str) -> Option<&'static str> {
-    match raw.trim().to_ascii_lowercase().replace(['-', ' '], "_").as_str() {
+    match raw
+        .trim()
+        .to_ascii_lowercase()
+        .replace(['-', ' '], "_")
+        .as_str()
+    {
         "inaccurate_information" | "inaccurate" => Some("inaccurate_information"),
         "not_found" | "closed" | "no_longer_exists" => Some("not_found"),
         "duplicate_business" | "duplicate" => Some("duplicate_business"),
@@ -1488,7 +1663,13 @@ fn normalize_business_report_reason(raw: &str) -> Option<&'static str> {
 }
 
 fn normalize_business_verification_method(raw: Option<&str>) -> Option<&'static str> {
-    match raw.unwrap_or("owner_claim").trim().to_ascii_lowercase().replace(['-', ' '], "_").as_str() {
+    match raw
+        .unwrap_or("owner_claim")
+        .trim()
+        .to_ascii_lowercase()
+        .replace(['-', ' '], "_")
+        .as_str()
+    {
         "owner_claim" | "claim" => Some("owner_claim"),
         "manual" => Some("manual"),
         "document" | "documents" => Some("document"),
@@ -1498,7 +1679,12 @@ fn normalize_business_verification_method(raw: Option<&str>) -> Option<&'static 
 }
 
 fn normalize_business_evidence_type(raw: &str) -> Option<&'static str> {
-    match raw.trim().to_ascii_lowercase().replace(['-', ' '], "_").as_str() {
+    match raw
+        .trim()
+        .to_ascii_lowercase()
+        .replace(['-', ' '], "_")
+        .as_str()
+    {
         "photo" | "image" => Some("photo"),
         "document" | "file" => Some("document"),
         "url" | "link" => Some("url"),
@@ -1599,12 +1785,19 @@ async fn report_business(
         Ok(None) => return err(StatusCode::NOT_FOUND, "umkm store not found").into_response(),
         Err(error) => {
             tracing::error!("report_business store load error: {:?}", error);
-            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load business").into_response();
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load business")
+                .into_response();
         }
     };
     let reason_code = match normalize_business_report_reason(&payload.reason_code) {
         Some(value) => value,
-        None => return err(StatusCode::BAD_REQUEST, "unsupported business report reason").into_response(),
+        None => {
+            return err(
+                StatusCode::BAD_REQUEST,
+                "unsupported business report reason",
+            )
+            .into_response()
+        }
     };
     let details = normalize_text(payload.details, 4000);
     let report_id: Uuid = match sqlx::query(
@@ -1628,7 +1821,11 @@ async fn report_business(
         Ok(row) => row.get("id"),
         Err(error) => {
             tracing::error!("report_business insert error: {:?}", error);
-            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to submit business report").into_response();
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to submit business report",
+            )
+            .into_response();
         }
     };
 
@@ -1647,10 +1844,14 @@ async fn report_business(
     .fetch_optional(&state.db)
     .await
     {
-        Ok(row) => row.map(|value| value.get::<Uuid,_>("id")),
+        Ok(row) => row.map(|value| value.get::<Uuid, _>("id")),
         Err(error) => {
             tracing::error!("report_business case lookup error: {:?}", error);
-            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to open business review case").into_response();
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to open business review case",
+            )
+            .into_response();
         }
     };
 
@@ -1715,7 +1916,11 @@ async fn report_business(
             }
             Err(error) => {
                 tracing::error!("report_business case create error: {:?}", error);
-                return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to open business review case").into_response();
+                return err(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to open business review case",
+                )
+                .into_response();
             }
         }
     };
@@ -1760,7 +1965,10 @@ async fn request_business_appeal(
     let store = match find_umkm_store_row(&state.db, store_ref.as_str()).await {
         Ok(Some(value)) => value,
         Ok(None) => return err(StatusCode::NOT_FOUND, "umkm store not found").into_response(),
-        Err(_) => return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load business").into_response(),
+        Err(_) => {
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load business")
+                .into_response()
+        }
     };
     if store.owner_user_id != appellant_id {
         return err(StatusCode::FORBIDDEN, "only the business owner can appeal").into_response();
@@ -1784,15 +1992,35 @@ async fn request_business_appeal(
     .await
     {
         Ok(Some(row)) => row,
-        Ok(None) => return err(StatusCode::CONFLICT, "there is no appealable moderation decision").into_response(),
-        Err(_) => return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load moderation case").into_response(),
+        Ok(None) => {
+            return err(
+                StatusCode::CONFLICT,
+                "there is no appealable moderation decision",
+            )
+            .into_response()
+        }
+        Err(_) => {
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load moderation case",
+            )
+            .into_response()
+        }
     };
     let case_id: Uuid = case.get("id");
-    if case.get::<String,_>("status") != "resolved" {
-        return err(StatusCode::CONFLICT, "moderation case is not ready for appeal").into_response();
+    if case.get::<String, _>("status") != "resolved" {
+        return err(
+            StatusCode::CONFLICT,
+            "moderation case is not ready for appeal",
+        )
+        .into_response();
     }
 
-    let evidence = if payload.evidence.is_array() { payload.evidence } else { json!([]) };
+    let evidence = if payload.evidence.is_array() {
+        payload.evidence
+    } else {
+        json!([])
+    };
     let appeal_id: Uuid = match sqlx::query(
         r#"
         INSERT INTO internal_moderation.business_appeals
@@ -1807,7 +2035,14 @@ async fn request_business_appeal(
     .bind(appellant_id)
     .bind(&reason)
     .bind(evidence)
-    .bind(headers.get("x-real-ip").or_else(|| headers.get("x-forwarded-for")).and_then(|v| v.to_str().ok()).and_then(|v| v.split(',').next()).map(str::trim))
+    .bind(
+        headers
+            .get("x-real-ip")
+            .or_else(|| headers.get("x-forwarded-for"))
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.split(',').next())
+            .map(str::trim),
+    )
     .bind(headers.get("user-agent").and_then(|v| v.to_str().ok()))
     .fetch_one(&state.db)
     .await
@@ -1850,7 +2085,10 @@ async fn request_business_appeal(
         "business_appeal_received",
         Some(store.id),
         "Banding usaha baru",
-        &format!("{} mengajukan banding atas keputusan penayangan.", store.name),
+        &format!(
+            "{} mengajukan banding atas keputusan penayangan.",
+            store.name
+        ),
         json!({"business_id": store.id, "case_id": case_id, "appeal_id": appeal_id}),
     )
     .await;
@@ -1874,10 +2112,17 @@ async fn get_business_verification(
     let store = match find_umkm_store_row(&state.db, store_ref.as_str()).await {
         Ok(Some(value)) => value,
         Ok(None) => return err(StatusCode::NOT_FOUND, "umkm store not found").into_response(),
-        Err(_) => return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load business").into_response(),
+        Err(_) => {
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load business")
+                .into_response()
+        }
     };
     if store.owner_user_id != owner_id {
-        return err(StatusCode::FORBIDDEN, "only the business owner can view verification").into_response();
+        return err(
+            StatusCode::FORBIDDEN,
+            "only the business owner can view verification",
+        )
+        .into_response();
     }
 
     let row = match sqlx::query(
@@ -1914,11 +2159,7 @@ async fn get_business_verification(
             })),
         )
             .into_response(),
-        None => (
-            StatusCode::OK,
-            Json(json!({ "verification": null })),
-        )
-            .into_response(),
+        None => (StatusCode::OK, Json(json!({ "verification": null }))).into_response(),
     }
 }
 
@@ -1935,16 +2176,29 @@ async fn request_business_verification(
     let store = match find_umkm_store_row(&state.db, store_ref.as_str()).await {
         Ok(Some(value)) => value,
         Ok(None) => return err(StatusCode::NOT_FOUND, "umkm store not found").into_response(),
-        Err(_) => return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load business").into_response(),
+        Err(_) => {
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load business")
+                .into_response()
+        }
     };
     if store.owner_user_id != owner_id {
-        return err(StatusCode::FORBIDDEN, "only the business owner can request verification").into_response();
+        return err(
+            StatusCode::FORBIDDEN,
+            "only the business owner can request verification",
+        )
+        .into_response();
     }
     let method = match normalize_business_verification_method(payload.method.as_deref()) {
         Some(value) => value,
-        None => return err(StatusCode::BAD_REQUEST, "unsupported verification method").into_response(),
+        None => {
+            return err(StatusCode::BAD_REQUEST, "unsupported verification method").into_response()
+        }
     };
-    let evidence = if payload.evidence.is_array() { payload.evidence } else { json!([]) };
+    let evidence = if payload.evidence.is_array() {
+        payload.evidence
+    } else {
+        json!([])
+    };
 
     let row = sqlx::query(
         r#"
@@ -1976,7 +2230,11 @@ async fn request_business_verification(
         Ok(row) => row.get("id"),
         Err(error) => {
             tracing::error!("request_business_verification error: {:?}", error);
-            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to request verification").into_response();
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to request verification",
+            )
+            .into_response();
         }
     };
 
@@ -2008,7 +2266,11 @@ async fn review_business_verification(
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
     if !has_business_verification_access(&claims) {
-        return err(StatusCode::FORBIDDEN, "business verification permission required").into_response();
+        return err(
+            StatusCode::FORBIDDEN,
+            "business verification permission required",
+        )
+        .into_response();
     }
     let actor_id = match Uuid::parse_str(claims.sub.trim()) {
         Ok(value) => value,
@@ -2017,11 +2279,21 @@ async fn review_business_verification(
     let status = match payload.status.trim().to_ascii_lowercase().as_str() {
         "verified" => "verified",
         "rejected" => "rejected",
-        _ => return err(StatusCode::BAD_REQUEST, "verification status must be verified or rejected").into_response(),
+        _ => {
+            return err(
+                StatusCode::BAD_REQUEST,
+                "verification status must be verified or rejected",
+            )
+            .into_response()
+        }
     };
     let note = normalize_text(payload.reason_note, 4000);
     if note.is_none() {
-        return err(StatusCode::BAD_REQUEST, "verification review note is required").into_response();
+        return err(
+            StatusCode::BAD_REQUEST,
+            "verification review note is required",
+        )
+        .into_response();
     }
 
     if status == "verified" {
@@ -2059,10 +2331,18 @@ async fn review_business_verification(
     .await
     {
         Ok(Some(row)) => row,
-        Ok(None) => return err(StatusCode::NOT_FOUND, "verification request not found").into_response(),
-        Err(_) => return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load verification").into_response(),
+        Ok(None) => {
+            return err(StatusCode::NOT_FOUND, "verification request not found").into_response()
+        }
+        Err(_) => {
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load verification",
+            )
+            .into_response()
+        }
     };
-    if row.get::<String,_>("status") != "pending" {
+    if row.get::<String, _>("status") != "pending" {
         return err(StatusCode::CONFLICT, "verification request is not pending").into_response();
     }
     let verification_id: Uuid = row.get("id");
@@ -2083,7 +2363,11 @@ async fn review_business_verification(
     .await
     .is_err()
     {
-        return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to save verification decision").into_response();
+        return err(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to save verification decision",
+        )
+        .into_response();
     }
 
     push_notification_best_effort(
@@ -2129,7 +2413,11 @@ async fn assign_business_case(
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
     if !has_business_case_access(&claims) {
-        return err(StatusCode::FORBIDDEN, "business case management permission required").into_response();
+        return err(
+            StatusCode::FORBIDDEN,
+            "business case management permission required",
+        )
+        .into_response();
     }
     let actor_id = match Uuid::parse_str(claims.sub.trim()) {
         Ok(value) => value,
@@ -2148,16 +2436,24 @@ async fn assign_business_case(
     .fetch_optional(&state.db)
     .await
     {
-        Ok(row) => row.and_then(|value| value.get::<Option<DateTime<Utc>>,_>("due_at")),
+        Ok(row) => row.and_then(|value| value.get::<Option<DateTime<Utc>>, _>("due_at")),
         Err(error) => {
             tracing::error!("assign_business_case current SLA lookup error: {:?}", error);
-            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load moderation SLA").into_response();
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load moderation SLA",
+            )
+            .into_response();
         }
     };
     let due_at = match (payload.assigned_to, payload.due_hours, current_due_at) {
         (None, _, _) => None,
-        (Some(_), Some(hours), _) => Some(Utc::now() + chrono::Duration::hours(hours.clamp(1, 168))),
-        (Some(_), None, existing) => existing.or_else(|| Some(Utc::now() + chrono::Duration::hours(24))),
+        (Some(_), Some(hours), _) => {
+            Some(Utc::now() + chrono::Duration::hours(hours.clamp(1, 168)))
+        }
+        (Some(_), None, existing) => {
+            existing.or_else(|| Some(Utc::now() + chrono::Duration::hours(24)))
+        }
     };
 
     let updated = sqlx::query(
@@ -2182,10 +2478,16 @@ async fn assign_business_case(
 
     let row = match updated {
         Ok(Some(row)) => row,
-        Ok(None) => return err(StatusCode::NOT_FOUND, "business moderation case not found").into_response(),
+        Ok(None) => {
+            return err(StatusCode::NOT_FOUND, "business moderation case not found").into_response()
+        }
         Err(error) => {
             tracing::error!("assign_business_case error: {:?}", error);
-            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to assign moderation case").into_response();
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to assign moderation case",
+            )
+            .into_response();
         }
     };
     let case_id: Uuid = row.get("id");
@@ -2203,7 +2505,11 @@ async fn assign_business_case(
     )
     .bind(id)
     .bind(actor_id)
-    .bind(if payload.assigned_to.is_some() { "Case assigned by CRM" } else { "Case unassigned by CRM" })
+    .bind(if payload.assigned_to.is_some() {
+        "Case assigned by CRM"
+    } else {
+        "Case unassigned by CRM"
+    })
     .bind(payload.assigned_to)
     .bind(due_at)
     .bind(case_id)
@@ -2243,7 +2549,11 @@ async fn add_business_evidence(
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
     if !has_business_case_access(&claims) {
-        return err(StatusCode::FORBIDDEN, "business case management permission required").into_response();
+        return err(
+            StatusCode::FORBIDDEN,
+            "business case management permission required",
+        )
+        .into_response();
     }
     let actor_id = match Uuid::parse_str(claims.sub.trim()) {
         Ok(value) => value,
@@ -2262,7 +2572,11 @@ async fn add_business_evidence(
         return err(StatusCode::BAD_REQUEST, "evidence source URL is required").into_response();
     }
     let note = normalize_text(payload.note, 4000);
-    let metadata = if payload.metadata.is_object() { payload.metadata } else { json!({}) };
+    let metadata = if payload.metadata.is_object() {
+        payload.metadata
+    } else {
+        json!({})
+    };
 
     let case_id: Uuid = match sqlx::query(
         r#"
@@ -2278,8 +2592,16 @@ async fn add_business_evidence(
     .await
     {
         Ok(Some(row)) => row.get("id"),
-        Ok(None) => return err(StatusCode::NOT_FOUND, "business moderation case not found").into_response(),
-        Err(_) => return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load moderation case").into_response(),
+        Ok(None) => {
+            return err(StatusCode::NOT_FOUND, "business moderation case not found").into_response()
+        }
+        Err(_) => {
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load moderation case",
+            )
+            .into_response()
+        }
     };
 
     let evidence_id: Uuid = match sqlx::query(
@@ -2303,7 +2625,8 @@ async fn add_business_evidence(
         Ok(row) => row.get("id"),
         Err(error) => {
             tracing::error!("add_business_evidence error: {:?}", error);
-            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to save evidence").into_response();
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to save evidence")
+                .into_response();
         }
     };
 
@@ -2317,7 +2640,11 @@ async fn add_business_evidence(
     )
     .await;
 
-    (StatusCode::CREATED, Json(json!({"evidence_id": evidence_id, "case_id": case_id}))).into_response()
+    (
+        StatusCode::CREATED,
+        Json(json!({"evidence_id": evidence_id, "case_id": case_id})),
+    )
+        .into_response()
 }
 
 async fn list_crm_notifications(
@@ -2330,7 +2657,11 @@ async fn list_crm_notifications(
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
     if !has_business_notification_access(&claims) {
-        return err(StatusCode::FORBIDDEN, "crm notification permission required").into_response();
+        return err(
+            StatusCode::FORBIDDEN,
+            "crm notification permission required",
+        )
+        .into_response();
     }
     let actor_id = match Uuid::parse_str(claims.sub.trim()) {
         Ok(value) => value,
@@ -2387,7 +2718,11 @@ async fn list_crm_notifications(
             .into_response(),
         Err(error) => {
             tracing::error!("list_crm_notifications error: {:?}", error);
-            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load CRM notifications").into_response()
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load CRM notifications",
+            )
+            .into_response()
         }
     }
 }
@@ -2402,7 +2737,11 @@ async fn mark_crm_notification_read(
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
     if !has_business_notification_access(&claims) {
-        return err(StatusCode::FORBIDDEN, "crm notification permission required").into_response();
+        return err(
+            StatusCode::FORBIDDEN,
+            "crm notification permission required",
+        )
+        .into_response();
     }
     let actor_id = match Uuid::parse_str(claims.sub.trim()) {
         Ok(value) => value,
@@ -2423,13 +2762,21 @@ async fn mark_crm_notification_read(
     .fetch_optional(&state.db)
     .await;
     match updated {
-        Ok(Some(row)) => (StatusCode::OK, Json(json!({
-            "id": row.get::<Uuid,_>("id"),
-            "is_read": row.get::<bool,_>("is_read"),
-            "read_at": row.get::<Option<DateTime<Utc>>,_>("read_at")
-        }))).into_response(),
+        Ok(Some(row)) => (
+            StatusCode::OK,
+            Json(json!({
+                "id": row.get::<Uuid,_>("id"),
+                "is_read": row.get::<bool,_>("is_read"),
+                "read_at": row.get::<Option<DateTime<Utc>>,_>("read_at")
+            })),
+        )
+            .into_response(),
         Ok(None) => err(StatusCode::NOT_FOUND, "crm notification not found").into_response(),
-        Err(_) => err(StatusCode::INTERNAL_SERVER_ERROR, "failed to mark CRM notification read").into_response(),
+        Err(_) => err(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to mark CRM notification read",
+        )
+        .into_response(),
     }
 }
 
@@ -2442,7 +2789,11 @@ async fn mark_all_crm_notifications_read(
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
     if !has_business_notification_access(&claims) {
-        return err(StatusCode::FORBIDDEN, "crm notification permission required").into_response();
+        return err(
+            StatusCode::FORBIDDEN,
+            "crm notification permission required",
+        )
+        .into_response();
     }
     let actor_id = match Uuid::parse_str(claims.sub.trim()) {
         Ok(value) => value,
@@ -2460,14 +2811,22 @@ async fn mark_all_crm_notifications_read(
           WHERE r.notification_id = n.id
             AND r.user_id = $1
         )
-        "#
+        "#,
     )
     .bind(actor_id)
     .execute(&state.db)
     .await
     {
-        Ok(result) => (StatusCode::OK, Json(json!({"updated_count": result.rows_affected()}))).into_response(),
-        Err(_) => err(StatusCode::INTERNAL_SERVER_ERROR, "failed to mark CRM notifications read").into_response(),
+        Ok(result) => (
+            StatusCode::OK,
+            Json(json!({"updated_count": result.rows_affected()})),
+        )
+            .into_response(),
+        Err(_) => err(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to mark CRM notifications read",
+        )
+        .into_response(),
     }
 }
 async fn review_business_appeal(
@@ -2514,9 +2873,14 @@ async fn review_business_appeal(
     {
         Ok(Some(row)) => row,
         Ok(None) => return err(StatusCode::NOT_FOUND, "appeal not found").into_response(),
-        Err(_) => return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load appeal").into_response(),
+        Err(_) => {
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load appeal").into_response()
+        }
     };
-    if !matches!(row.get::<String,_>("status").as_str(), "pending" | "in_review") {
+    if !matches!(
+        row.get::<String, _>("status").as_str(),
+        "pending" | "in_review"
+    ) {
         return err(StatusCode::CONFLICT, "appeal is already resolved").into_response();
     }
     let case_id: Uuid = row.get("case_id");
@@ -2525,7 +2889,13 @@ async fn review_business_appeal(
 
     let mut tx = match state.db.begin().await {
         Ok(tx) => tx,
-        Err(_) => return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to open appeal transaction").into_response(),
+        Err(_) => {
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to open appeal transaction",
+            )
+            .into_response()
+        }
     };
 
     let new_active = status == "overturned";
@@ -2567,7 +2937,11 @@ async fn review_business_appeal(
             .is_err()
         {
             let _ = tx.rollback().await;
-            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to apply appeal decision").into_response();
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to apply appeal decision",
+            )
+            .into_response();
         }
         if sqlx::query("UPDATE internal_moderation.business_moderation_cases SET status='resolved', updated_at=NOW(), resolved_at=NOW() WHERE id=$1")
             .bind(case_id)
@@ -2602,11 +2976,19 @@ async fn review_business_appeal(
     .is_err()
     {
         let _ = tx.rollback().await;
-        return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to write appeal history").into_response();
+        return err(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to write appeal history",
+        )
+        .into_response();
     }
 
     if tx.commit().await.is_err() {
-        return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to commit appeal decision").into_response();
+        return err(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to commit appeal decision",
+        )
+        .into_response();
     }
 
     push_notification_best_effort(
@@ -2630,14 +3012,21 @@ async fn review_business_appeal(
         "business_appeal_reviewed",
         Some(business_id),
         "Banding usaha diproses",
-        &format!("Banding usaha untuk {} diproses: {}.", row.get::<String,_>("name"), status),
+        &format!(
+            "Banding usaha untuk {} diproses: {}.",
+            row.get::<String, _>("name"),
+            status
+        ),
         json!({"business_id": business_id, "appeal_id": appeal_id, "status": status}),
     )
     .await;
 
-    (StatusCode::OK, Json(json!({"appeal_id": appeal_id, "status": status, "reason_note": note}))).into_response()
+    (
+        StatusCode::OK,
+        Json(json!({"appeal_id": appeal_id, "status": status, "reason_note": note})),
+    )
+        .into_response()
 }
-
 
 #[cfg(test)]
 mod tests {
