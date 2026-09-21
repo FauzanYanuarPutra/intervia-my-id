@@ -6,6 +6,7 @@ import { Link, useRouter } from '@/i18n/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useLocale } from 'next-intl';
 import { usePathname, useSearchParams } from 'next/navigation';
+import { normalizeContentMediaUrl } from '@/lib/content/catalog';
 import { EmptyState } from '@/components/system/feedback/EmptyState';
 import { useDialog } from '@/components/system/feedback/DialogProvider';
 import {
@@ -53,6 +54,9 @@ type ListingItem = {
   content_type?: string | null;
   type?: string | null;
   cover_image?: string | null;
+  image_url?: string | null;
+  image_urls?: unknown;
+  images?: unknown;
   content_status?: string | null;
   status?: string | null;
   updated_at?: string;
@@ -282,22 +286,48 @@ function readImageCandidate(value: unknown): string {
 }
 
 function resolveListingImage(item: ListingItem): string {
-  const meta = (item.metadata || {}) as Record<string, unknown>;
-  const direct =
-    readString(item.cover_image) ||
-    readString(meta.cover_image) ||
-    readString(meta.thumbnail) ||
-    readString(meta.image) ||
-    readString(meta.image_url) ||
-    readString(meta.photo_url);
-  if (direct) return direct;
+  const meta =
+    (item.metadata || {}) as Record<string, unknown>;
 
-  for (const key of ['images', 'photos', 'media', 'attachments']) {
-    const collection = meta[key];
+  const directCandidates = [
+    item.cover_image,
+    item.image_url,
+    meta.cover_image,
+    meta.thumbnail,
+    meta.image,
+    meta.image_url,
+    meta.photo_url,
+  ];
+
+  for (const raw of directCandidates) {
+    const normalized = normalizeContentMediaUrl(
+      readString(raw),
+    );
+    if (normalized) return normalized;
+  }
+
+  const collections = [
+    item.image_urls,
+    item.images,
+    meta.images,
+    meta.image_urls,
+    meta.photos,
+    meta.media,
+    meta.attachments,
+    meta.gallery,
+    meta.gallery_images,
+  ];
+
+  for (const collection of collections) {
     if (!Array.isArray(collection)) continue;
     for (const entry of collection) {
-      const candidate = readImageCandidate(entry);
-      if (candidate) return candidate;
+      const candidate =
+        typeof entry === 'string'
+          ? entry
+          : readImageCandidate(entry);
+      const normalized =
+        normalizeContentMediaUrl(candidate);
+      if (normalized) return normalized;
     }
   }
 
