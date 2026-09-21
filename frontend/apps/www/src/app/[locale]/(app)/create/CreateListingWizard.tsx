@@ -1414,6 +1414,9 @@ export default function CreateListingWizard({
   const [editingContentMetadata, setEditingContentMetadata] =
     useState<Record<string, unknown> | null>(null);
 
+  const [editingContentType, setEditingContentType] =
+    useState<string | null>(null);
+
   const [pendingStoredDraft, setPendingStoredDraft] =
     useState<TemporaryCreateDraft | null>(
       null,
@@ -1952,6 +1955,7 @@ export default function CreateListingWizard({
         ) {
           setEditingContentId(null);
           setEditingContentMetadata(null);
+          setEditingContentType(null);
 
           await applyLoadedDraft(
             buildDraftFromListingPayload(
@@ -2008,9 +2012,19 @@ export default function CreateListingWizard({
                 content.metadata,
               ) || {},
             );
+            setEditingContentType(
+              valueAsString(
+                content.content_type,
+              ) ||
+                valueAsString(
+                  content.type,
+                ) ||
+                null,
+            );
           } else {
             setEditingContentId(null);
             setEditingContentMetadata(null);
+            setEditingContentType(null);
           }
 
           if (
