@@ -405,8 +405,10 @@ export default function NewsEditorialWorkspace({
   ]);
 
   useEffect(() => {
-    void loadReviewers();
-  }, [loadReviewers]);
+    if (sensitivity === 'high' && kind !== 'press_release') {
+      void loadReviewers();
+    }
+  }, [kind, loadReviewers, sensitivity]);
 
   const loadQueue = useCallback(
     async (nextStatus: string, preserveId = '', nextOffset = 0) => {
