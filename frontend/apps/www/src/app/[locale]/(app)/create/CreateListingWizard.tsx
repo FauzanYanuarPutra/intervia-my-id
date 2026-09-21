@@ -4588,6 +4588,21 @@ export default function CreateListingWizard({
 
           publishDraftId = draft.id;
 
+          if (editingContentId) {
+            const resourceUrl =
+              `/${locale}/content/${encodeURIComponent(
+                editingContentId,
+              )}`;
+
+            clearTemporaryCreateDraft(
+              draftOwnerId,
+            );
+            router.push(
+              resourceUrl,
+            );
+            return;
+          }
+
           const response =
             await authFetch(
               `/api/listing-drafts/${encodeURIComponent(
@@ -4802,6 +4817,7 @@ export default function CreateListingWizard({
         categorySlug,
         creationDraftId,
         draftOwnerId,
+        editingContentId,
         ensureServerDraftForEditing,
         isAuthenticated,
         locale,
@@ -5460,7 +5476,15 @@ export default function CreateListingWizard({
     currentStep === 9
       ? publishing
         ? text(locale, 'Menerbitkan...', 'Publishing...')
-        : text(locale, 'Terbitkan', 'Publish')
+        : text(
+              locale,
+              editingContentId
+                ? 'Simpan perubahan'
+                : 'Terbitkan',
+              editingContentId
+                ? 'Save changes'
+                : 'Publish',
+            )
       : currentStep === 6 && intent === 'request' && media.length === 0
         ? text(locale, 'Lewati foto', 'Skip photo')
         : currentStep === 8
