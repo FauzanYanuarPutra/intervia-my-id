@@ -172,7 +172,7 @@ export function AdministrationWorkspace() {
 
   return <div className="space-y-5">
     <PageHeader label="Administrasi" title="Tim & akses" description="Cari akun Lajukan yang terdaftar di WWW → pilih CMS / Content Admin → kirim undangan." />
-    <Card className="p-5">
+    <Card className="p-4">
       <div className="flex flex-col gap-3 sm:flex-row">
         <input value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') void search(); }}
           placeholder="Cari nama, @username, email, atau nomor HP…" className="min-w-0 flex-1 rounded-xl border px-3 py-2 text-sm" />
@@ -211,9 +211,9 @@ export function AdministrationWorkspace() {
       <button disabled={busy || !selected.eligible || !roles.length} onClick={() => void invite()} className="mt-4 rounded-xl bg-[color:var(--color-primary)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Kirim undangan</button>
     </Card> : null}
     <details className="rounded-2xl border border-slate-200 bg-white">
-      <summary className="cursor-pointer list-none px-5 py-4 text-sm font-bold text-slate-900">Governance & keamanan</summary>
+      <summary className="cursor-pointer list-none px-4 py-3 text-sm font-bold text-slate-900">Governance & keamanan</summary>
       <div className="border-t border-slate-100 p-4 sm:p-5">
-        <div className="grid gap-5 lg:grid-cols-2">
+        <div className="grid gap-3 lg:grid-cols-2">
           <Card className="p-5">
             <div className="flex items-center justify-between gap-3">
               <div>
