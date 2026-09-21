@@ -1,6 +1,7 @@
 name: Mobile Flutter CI
 
 on:
+  workflow_dispatch:
   push:
     paths:
       - "frontend/apps/mobile/lajukan_webview/**"
@@ -15,7 +16,7 @@ permissions:
 
 jobs:
   android:
-    name: Flutter analyze + Android debug build
+    name: Flutter analyze + test + shareable Android APK
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -43,5 +44,13 @@ jobs:
       - name: Test
         run: flutter test
 
-      - name: Build Android debug APK
-        run: flutter build apk --debug
+      - name: Build release APK
+        run: flutter build apk --release
+
+      - name: Upload shareable APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: lajukan-android-release-apk
+          path: frontend/apps/mobile/lajukan_webview/build/app/outputs/flutter-apk/*.apk
+          if-no-files-found: error
+          retention-days: 14
