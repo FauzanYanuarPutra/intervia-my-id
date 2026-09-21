@@ -6663,7 +6663,7 @@ export default function ChatRoomPage() {
                               setOpenMessageActionsId(null);
                             }
                           }}
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-black/5 bg-white/92 text-[#54656f] shadow-sm transition hover:bg-[#f0f2f5] hover:text-[#008f72] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#25d366]/40 dark:border-white/10 dark:bg-[#202c33]/95 dark:text-[#aebac1] dark:hover:bg-[#2a3942] dark:hover:text-[#25d366] sm:h-10 sm:w-10"
+                          className="inline-flex h-8.5 w-8.5 items-center justify-center rounded-full border border-black/[0.08] bg-white/95 text-[#54656f] shadow-[0_1px_3px_rgba(17,27,33,0.18)] backdrop-blur-sm transition-[background-color,color,box-shadow,transform] duration-150 hover:bg-[#f0f2f5] hover:text-[#008f72] active:scale-[0.96] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#25d366]/35 focus-visible:ring-offset-1 focus-visible:ring-offset-white dark:border-white/[0.10] dark:bg-[#202c33]/96 dark:text-[#aebac1] dark:shadow-[0_1px_3px_rgba(0,0,0,0.28)] dark:hover:bg-[#2a3942] dark:hover:text-[#25d366] dark:focus-visible:ring-offset-[#111b21] sm:h-9 sm:w-9"
                           title={
                             chatLocale === 'id'
                               ? 'Aksi pesan'
@@ -6676,14 +6676,17 @@ export default function ChatRoomPage() {
                           }
                           aria-haspopup="menu"
                           aria-expanded={openMessageActionsId === msg.id}
+                          aria-controls={`message-actions-${msg.id}`}
                         >
                           <ChevronDown className="h-4 w-4" />
                         </button>
 
                         {openMessageActionsId === msg.id ? (
                           <div
+                            id={`message-actions-${msg.id}`}
                             role="menu"
-                            className={`absolute bottom-full z-30 mb-1 min-w-[156px] max-w-[calc(100vw-1rem)] overflow-hidden rounded-xl border border-black/10 bg-white py-1 shadow-xl dark:border-white/10 dark:bg-[#233138] ${isOwn ? 'left-0' : 'right-0'}`}
+                            aria-orientation="vertical"
+                            className={`absolute bottom-full z-50 mb-2 w-[184px] max-w-[calc(100vw-1.25rem)] overflow-hidden rounded-[14px] border border-black/[0.08] bg-white/98 p-1 shadow-[0_10px_34px_rgba(17,27,33,0.22),0_2px_8px_rgba(17,27,33,0.10)] backdrop-blur-xl dark:border-white/[0.08] dark:bg-[#233138]/98 dark:shadow-[0_12px_36px_rgba(0,0,0,0.42)] ${isOwn ? 'left-0' : 'right-0'}`}
                           >
                             {isOwn && status === 'failed' ? (
                               <button
@@ -6691,9 +6694,9 @@ export default function ChatRoomPage() {
                                 role="menuitem"
                                 onClick={() => handleRetryMessage(msg)}
                                 disabled={sending}
-                                className="flex min-h-11 w-full items-center gap-3 px-3 text-left text-sm font-semibold text-[#008f72] transition hover:bg-[#f0f2f5] focus:bg-[#f0f2f5] focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 dark:text-[#25d366] dark:hover:bg-[#2a3942] dark:focus:bg-[#2a3942]"
+                                className="flex min-h-10 w-full items-center gap-3 rounded-[10px] px-3 text-left text-[13px] font-semibold text-[#008f72] transition-[background-color,color] duration-150 hover:bg-[#f0f2f5] focus:bg-[#f0f2f5] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#25d366]/25 disabled:cursor-not-allowed disabled:opacity-50 dark:text-[#25d366] dark:hover:bg-[#2a3942] dark:focus:bg-[#2a3942]"
                               >
-                                <Send className="h-4 w-4" />
+                                <Send className="h-[17px] w-[17px] shrink-0" aria-hidden="true" />
                                 {chatLocale === 'id'
                                   ? 'Kirim ulang'
                                   : 'Send again'}
@@ -6706,9 +6709,9 @@ export default function ChatRoomPage() {
                                 setOpenMessageActionsId(null);
                                 handleReplyToMessage(msg);
                               }}
-                              className="flex min-h-11 w-full items-center gap-3 px-3 text-left text-sm font-semibold text-[#111b21] transition hover:bg-[#f0f2f5] focus:bg-[#f0f2f5] focus:outline-none dark:text-[#e9edef] dark:hover:bg-[#2a3942] dark:focus:bg-[#2a3942]"
+                              className="flex min-h-10 w-full items-center gap-3 rounded-[10px] px-3 text-left text-[13px] font-medium text-[#111b21] transition-[background-color,color] duration-150 hover:bg-[#f0f2f5] focus:bg-[#f0f2f5] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#25d366]/20 dark:text-[#e9edef] dark:hover:bg-[#2a3942] dark:focus:bg-[#2a3942]"
                             >
-                              <Reply className="h-4 w-4" />
+                              <Reply className="h-[17px] w-[17px] shrink-0" aria-hidden="true" />
                               {chatLocale === 'id' ? 'Balas' : 'Reply'}
                             </button>
                             <button
@@ -6718,9 +6721,9 @@ export default function ChatRoomPage() {
                                 setOpenMessageActionsId(null);
                                 handleQuoteMessage(msg);
                               }}
-                              className="flex min-h-11 w-full items-center gap-3 px-3 text-left text-sm font-semibold text-[#111b21] transition hover:bg-[#f0f2f5] focus:bg-[#f0f2f5] focus:outline-none dark:text-[#e9edef] dark:hover:bg-[#2a3942] dark:focus:bg-[#2a3942]"
+                              className="flex min-h-10 w-full items-center gap-3 rounded-[10px] px-3 text-left text-[13px] font-medium text-[#111b21] transition-[background-color,color] duration-150 hover:bg-[#f0f2f5] focus:bg-[#f0f2f5] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#25d366]/20 dark:text-[#e9edef] dark:hover:bg-[#2a3942] dark:focus:bg-[#2a3942]"
                             >
-                              <Quote className="h-4 w-4" />
+                              <Quote className="h-[17px] w-[17px] shrink-0" aria-hidden="true" />
                               {chatLocale === 'id' ? 'Kutip' : 'Quote'}
                             </button>
                             <button
@@ -6730,9 +6733,9 @@ export default function ChatRoomPage() {
                                 setOpenMessageActionsId(null);
                                 void handleCopyMessage(msg);
                               }}
-                              className="flex min-h-11 w-full items-center gap-3 px-3 text-left text-sm font-semibold text-[#111b21] transition hover:bg-[#f0f2f5] focus:bg-[#f0f2f5] focus:outline-none dark:text-[#e9edef] dark:hover:bg-[#2a3942] dark:focus:bg-[#2a3942]"
+                              className="flex min-h-10 w-full items-center gap-3 rounded-[10px] px-3 text-left text-[13px] font-medium text-[#111b21] transition-[background-color,color] duration-150 hover:bg-[#f0f2f5] focus:bg-[#f0f2f5] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#25d366]/20 dark:text-[#e9edef] dark:hover:bg-[#2a3942] dark:focus:bg-[#2a3942]"
                             >
-                              <Copy className="h-4 w-4" />
+                              <Copy className="h-[17px] w-[17px] shrink-0" aria-hidden="true" />
                               {chatLocale === 'id' ? 'Salin' : 'Copy'}
                             </button>
                           </div>
