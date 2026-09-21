@@ -10,7 +10,7 @@ import {
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import path from 'node:path';
 
 const endpoint = process.env.MINIO_ENDPOINT;
@@ -105,9 +105,14 @@ export async function uploadToMinIO(
   const personalAiUserId = roomId.startsWith('personal-ai/')
     ? safeRoomKey(roomId.slice('personal-ai/'.length))
     : '';
+  const contentHash =
+    roomId === 'content'
+      ? createHash('sha256').update(buffer).digest('hex')
+      : '';
+
   const key =
     roomId === 'content'
-      ? `content/${randomUUID()}${ext}`
+      ? `content/${contentHash}${ext}`
       : roomId === 'forum'
         ? `forum/${randomUUID()}${ext}`
         : personalAiUserId
