@@ -5,7 +5,7 @@ const MARKETPLACE_URL =
   process.env.INTERNAL_MARKETPLACE_URL ||
   process.env.MARKETPLACE_URL ||
   'http://localhost:8081';
-const LISTING_DRAFT_TIMEOUT_MS = 8_000;
+const LISTING_DRAFT_TIMEOUT_MS = 20_000;
 
 function authHeaders(req: NextRequest): Headers {
   const headers = new Headers({ 'Content-Type': 'application/json' });
