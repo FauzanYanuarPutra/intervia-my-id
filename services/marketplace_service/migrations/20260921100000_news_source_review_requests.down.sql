@@ -1,0 +1,2 @@
+DROP INDEX IF EXISTS uq_news_source_review_requests_pending_reviewer;
+DROP TABLE IF EXISTS news_source_review_requests;
