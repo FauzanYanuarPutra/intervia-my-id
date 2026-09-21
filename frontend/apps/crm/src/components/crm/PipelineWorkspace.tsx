@@ -40,25 +40,22 @@ export function PipelineWorkspace({leads}:{leads:CrmLead[]}) {
     }
   }
 
-  return <div className="space-y-5">
-    <div className="space-y-2">
-      <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-700">CRM Pipeline</p>
-      <PageHeader title="Follow-up prospek sampai jadi deal." description="Stage bisa diperbarui langsung; perubahan tetap lewat API CRM dan tidak dibuat sebagai data contoh." />
-    </div>
+  return <div className="space-y-4">
+    <PageHeader label="Pipeline" title="Follow-up prospek sampai deal." description="Pilih stage langsung dari kartu lead." />
     {notice ? <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">{notice}</div> : null}
-    <div className="grid gap-4 xl:grid-cols-5">
+    <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-2 xl:mx-0 xl:grid xl:grid-cols-5 xl:overflow-visible xl:px-0">
       {PIPELINE_COLUMNS.map(column=> {
         const columnItems=items.filter(lead=>groupPipelineStage(lead.stage)===column.id);
-        return <Card key={column.id} className="min-h-[420px] p-3">
-          <div className="mb-3 rounded-2xl bg-[color:var(--color-surface-muted)] p-3">
+        return <Card key={column.id} className="min-w-[285px] shrink-0 p-3 xl:min-w-0">
+          <div className="mb-2 rounded-xl bg-[color:var(--color-surface-muted)] p-2.5">
             <div className="flex items-center justify-between">
               <p className="text-sm font-bold">{column.label}</p>
               <StatusBadge tone={column.id==='completed'?'success':'neutral'}>{columnItems.length}</StatusBadge>
             </div>
             <p className="mt-1 text-xs text-[color:var(--color-text-soft)]">{column.help}</p>
           </div>
-          <div className="space-y-3">
-            {columnItems.map(lead=><div key={lead.id} className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-3 shadow-sm">
+          <div className="space-y-2">
+            {columnItems.map(lead=><div key={lead.id} className="rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-3">
               <div className="flex items-start justify-between gap-2">
                 <p className="line-clamp-2 text-sm font-bold">{lead.requester_name||lead.name}</p>
                 {column.id==='negotiation'||column.id==='locked'?<StatusBadge tone="warning">Hot Lead</StatusBadge>:null}
