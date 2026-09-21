@@ -3133,9 +3133,12 @@ export default function CreateListingWizard({
 
     autosaveTimer.current =
       setTimeout(() => {
-        void saveServerDraft().catch(
-          () => undefined,
-        );
+        void saveServerDraft(
+          currentStep,
+          values,
+          media,
+          { autosave: true },
+        ).catch(() => undefined);
       }, 900);
 
     return () => {
