@@ -35,37 +35,53 @@ export function CrmLoadingSkeleton() {
 
           <main className="min-h-0 flex-1 overflow-hidden px-3 py-4 sm:px-5 sm:py-5 lg:px-6">
             <div className="mx-auto max-w-[1360px] space-y-4">
-              <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <div className="h-3 w-24 animate-pulse rounded-full bg-slate-200" />
-                <div className="mt-2 h-7 w-56 animate-pulse rounded-lg bg-slate-200" />
-                <div className="mt-2 h-3.5 w-full max-w-2xl animate-pulse rounded bg-slate-100" />
-              </section>
-
               <section className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
-                <div className="border-b border-slate-100 px-4 py-3">
-                  <div className="h-4 w-40 animate-pulse rounded bg-slate-200" />
-                  <div className="mt-1.5 h-3 w-56 animate-pulse rounded bg-slate-100" />
+                <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
+                  <div>
+                    <div className="h-4 w-44 animate-pulse rounded bg-slate-200" />
+                    <div className="mt-1.5 h-3 w-28 animate-pulse rounded bg-slate-100" />
+                  </div>
+                  <div className="h-6 w-12 animate-pulse rounded-full bg-slate-100" />
                 </div>
                 <div className="divide-y divide-slate-100">
-                  {Array.from({ length: 5 }).map((_, index) => (
-                    <div key={index} className="flex items-center gap-3 px-4 py-3.5">
+                  {Array.from({ length: 6 }).map((_, index) => (
+                    <div key={index} className="flex items-center gap-3 px-4 py-3">
                       <div className="h-2 w-2 animate-pulse rounded-full bg-slate-200" />
                       <div className="min-w-0 flex-1">
-                        <div className="h-3.5 w-40 max-w-[70%] animate-pulse rounded bg-slate-200" />
-                        <div className="mt-1.5 h-3 w-64 max-w-[90%] animate-pulse rounded bg-slate-100" />
+                        <div className="h-3.5 w-40 max-w-[72%] animate-pulse rounded bg-slate-200" />
+                        <div className="mt-1.5 h-3 w-56 max-w-[88%] animate-pulse rounded bg-slate-100" />
                       </div>
-                      <div className="h-6 w-10 animate-pulse rounded-full bg-slate-100" />
+                      <div className="h-6 w-8 animate-pulse rounded-full bg-slate-100" />
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section>
+                <div className="mb-2">
+                  <div className="h-5 w-36 animate-pulse rounded bg-slate-200" />
+                  <div className="mt-1.5 h-3 w-60 animate-pulse rounded bg-slate-100" />
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                  {Array.from({ length: 4 }).map((_, index) => (
+                    <div key={index} className="rounded-2xl border border-slate-200 bg-white p-4">
+                      <div className="h-3 w-20 animate-pulse rounded bg-slate-100" />
+                      <div className="mt-2 h-7 w-12 animate-pulse rounded-lg bg-slate-200" />
+                      <div className="mt-2 h-2.5 w-24 animate-pulse rounded bg-slate-100" />
                     </div>
                   ))}
                 </div>
               </section>
 
               <section className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
-                <div className="grid gap-3 p-3 sm:grid-cols-2 xl:grid-cols-4">
-                  {Array.from({ length: 4 }).map((_, index) => (
-                    <div key={index} className="rounded-xl border border-slate-100 bg-white p-3.5">
-                      <div className="h-3 w-20 animate-pulse rounded bg-slate-100" />
-                      <div className="mt-2 h-7 w-16 animate-pulse rounded-lg bg-slate-200" />
+                <div className="border-b border-slate-100 px-4 py-3">
+                  <div className="h-4 w-20 animate-pulse rounded bg-slate-200" />
+                </div>
+                <div className="divide-y divide-slate-100">
+                  {Array.from({ length: 5 }).map((_, index) => (
+                    <div key={index} className="px-4 py-3">
+                      <div className="h-3.5 w-44 max-w-[70%] animate-pulse rounded bg-slate-200" />
+                      <div className="mt-1.5 h-3 w-72 max-w-[92%] animate-pulse rounded bg-slate-100" />
                     </div>
                   ))}
                 </div>
