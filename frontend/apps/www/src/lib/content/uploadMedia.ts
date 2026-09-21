@@ -140,22 +140,22 @@ export function matchUploadedContentImages<
     if (next) matched.set(item.id, next);
   }
 
-  // Fallback only for responses that did not carry filenames. Because the
-  // server returns successful files in completion/input order, consume any
-  // still-unmatched URLs in their remaining order rather than assuming every
-  // selected file succeeded.
-  const matchedUrls = new Set(
-    Array.from(matched.values()).map(item => item.url),
+  const hasAnyNamedUpload = remaining.some(
+    item => Boolean(item.name?.trim()),
   );
-  const unnamed = remaining.filter(item => !matchedUrls.has(item.url));
 
-  let unnamedIndex = 0;
-  for (const item of selected) {
-    if (matched.has(item.id)) continue;
-    const next = unnamed[unnamedIndex];
-    if (!next) break;
-    unnamedIndex += 1;
-    matched.set(item.id, next);
+  // Only use positional fallback when the entire response is legacy/unnamed.
+  // A mixed response is intentionally left unmatched to avoid assigning a
+  // successful URL to the wrong selected file.
+  if (!hasAnyNamedUpload) {
+    let unnamedIndex = 0;
+    for (const item of selected) {
+      if (matched.has(item.id)) continue;
+      const next = remaining[unnamedIndex];
+      if (!next) break;
+      unnamedIndex += 1;
+      matched.set(item.id, next);
+    }
   }
 
   return matched;
