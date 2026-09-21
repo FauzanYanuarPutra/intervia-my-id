@@ -49,6 +49,8 @@ jobs:
           exit "$failed"
       - name: Validate domain/database ownership
         run: python scripts/ci/check_domain_boundaries.py
+      - name: Validate domain cutover contract
+        run: python scripts/ci/check_domain_cutover_contract.py
       - name: Validate domain cutover scripts
         shell: bash
         run: |
