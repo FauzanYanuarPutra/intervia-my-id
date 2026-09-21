@@ -3510,6 +3510,40 @@ export default function CreateListingWizard({
       ],
     );
 
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const handleOnline = () => {
+      if (
+        currentStep >= 4 &&
+        serverDraftRef.current?.id
+      ) {
+        void saveServerDraft(
+          currentStep,
+          values,
+          media,
+        ).catch(() => undefined);
+      }
+    };
+
+    window.addEventListener(
+      'online',
+      handleOnline,
+    );
+
+    return () =>
+      window.removeEventListener(
+        'online',
+        handleOnline,
+      );
+  }, [
+    currentStep,
+    isAuthenticated,
+    media,
+    saveServerDraft,
+    values,
+  ]);
+
   const publishInFlightRef =
     useRef(false);
 
@@ -6765,6 +6799,25 @@ export default function CreateListingWizard({
                                     : item.status)}
                             </p>
                           </div>
+
+                          {item.status === 'failed' ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void retryMediaUpload(
+                                  item.id,
+                                )
+                              }
+                              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300"
+                              aria-label={text(
+                                locale,
+                                'Coba upload lagi',
+                                'Retry upload',
+                              )}
+                            >
+                              <RefreshCw className="h-4 w-4" />
+                            </button>
+                          ) : null}
 
                           <button
                             type="button"
