@@ -594,6 +594,24 @@ export async function createBusiness(input: {
   return { businessId, organizationId, name: input.name };
 }
 
+export async function requestBusinessVerification(businessId: string) {
+  const { token } = await requireAuthenticatedActor();
+  return requestJson(
+    `${MARKETPLACE_URL}/v1/umkm/stores/${encodeURIComponent(businessId)}/verification/request`,
+    {
+      method: 'POST',
+      headers: {
+        ...authHeaders(token),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        method: 'owner_claim',
+        evidence: [],
+      }),
+    },
+  );
+}
+
 export async function reconcileBusiness(input: {
   storeId?: string | null;
   idempotencyKey: string;
