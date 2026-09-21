@@ -713,6 +713,8 @@ async fn list_crm_businesses(
         let completeness = completeness_percent(&missing);
         items.push(CrmBusinessRow {
             id: row.get("id"),
+            store_id: row.get("store_id"),
+            canonical_business_id: row.get("canonical_business_id"),
             owner_user_id: row.get("owner_user_id"),
             organization_id: row.get("organization_id"),
             name,
