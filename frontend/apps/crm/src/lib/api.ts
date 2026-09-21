@@ -804,6 +804,31 @@ export const businessModerationApi = {
     );
   },
 
+  reviewers: async (
+    token: string,
+    params: { page?: number; limit?: number; q?: string } = {},
+  ) => {
+    const query = new URLSearchParams({
+      page: String(params.page ?? 1),
+      limit: String(params.limit ?? 100),
+      ...(params.q ? { q: params.q } : {}),
+    }).toString();
+    return fetchJson<{
+      data: Array<{
+        id: string;
+        email: string;
+        username?: string | null;
+        full_name?: string | null;
+        is_active: boolean;
+        roles: string[];
+      }>;
+      meta?: { page: number; limit: number; total: number };
+    }>(`${IDENTITY_API_URL}/users?${query}`, {
+      method: 'GET',
+      token,
+    });
+  },
+
   requestIndependentReview: async (
     token: string,
     id: string,
