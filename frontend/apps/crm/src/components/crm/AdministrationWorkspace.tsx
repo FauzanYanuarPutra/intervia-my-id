@@ -49,8 +49,8 @@ export function AdministrationWorkspace() {
   const [q, setQ] = useState('');
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [selected, setSelected] = useState<Candidate | null>(null);
-  const [application, setApplication] = useState<'crm' | 'cms'>('crm');
-  const [roles, setRoles] = useState<string[]>(['moderator']);
+  const [application, setApplication] = useState<'crm' | 'cms'>('cms');
+  const [roles, setRoles] = useState<string[]>(['content_admin']);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [privacyRequests, setPrivacyRequests] = useState<PrivacyRequest[]>([]);
   const [securityIncidents, setSecurityIncidents] = useState<SecurityIncident[]>([]);
@@ -137,7 +137,12 @@ export function AdministrationWorkspace() {
     try {
       const data = await json<{data: Candidate[]}>(`/api/backoffice/candidates?q=${encodeURIComponent(q.trim())}`);
       setCandidates(data.data || []);
-    } catch (e) { setMessage(e instanceof Error ? e.message : 'Pencarian gagal.'); }
+    } catch (e) {
+      const error = e instanceof Error ? e.message : 'Pencarian gagal.';
+      setMessage(error === 'backoffice owner access required'
+        ? 'Akun kamu belum punya akses Admin untuk mengelola anggota backoffice.'
+        : error);
+    }
     finally { setBusy(false); }
   };
 
@@ -157,7 +162,7 @@ export function AdministrationWorkspace() {
 
   const changeApplication = (value: 'crm' | 'cms') => {
     setApplication(value);
-    setRoles(value === 'crm' ? ['moderator'] : ['content_admin']);
+    setRoles(value === 'cms' ? ['content_admin'] : ['moderator']);
   };
 
   const toggleRole = (role: string) => setRoles(current =>
@@ -165,7 +170,7 @@ export function AdministrationWorkspace() {
   );
 
   return <div className="space-y-5">
-    <PageHeader title="Administrasi & Akses Tim" description="Platform Owner mengundang akun Lajukan yang sudah terdaftar. Akses backoffice aktif setelah pengguna menerima undangan." />
+    <PageHeader label="Administrasi" title="Tim & akses" description="Cari akun Lajukan → pilih CMS / Content Admin → kirim undangan." />
     <Card className="p-5">
       <div className="flex flex-col gap-3 sm:flex-row">
         <input value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') void search(); }}
@@ -199,108 +204,113 @@ export function AdministrationWorkspace() {
       </div>
       <button disabled={busy || !selected.eligible || !roles.length} onClick={() => void invite()} className="mt-4 rounded-xl bg-[color:var(--color-primary)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Kirim undangan 7 hari</button>
     </Card> : null}
-    <div className="grid gap-5 lg:grid-cols-2">
-      <Card className="p-5">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="font-bold">Privacy requests</h2>
-            <p className="text-xs opacity-70">Queue permintaan akses, koreksi, export, deletion, dan kontrol data.</p>
-          </div>
-          <span className="rounded-full border px-2.5 py-1 text-xs font-bold">{privacyRequests.filter(x => ['open','in_review','waiting_user'].includes(x.status)).length} aktif</span>
-        </div>
-        <div className="mt-3 space-y-2">
-          {privacyRequests.slice(0, 8).map(item => (
-            <div key={item.id} className="rounded-xl border p-3">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="font-semibold">{item.request_type}</div>
-                  <div className="mt-0.5 text-[11px] opacity-65">#{item.id} · user {item.subject_user_id}</div>
-                </div>
-                <select
-                  value={item.status}
-                  disabled={governanceBusy}
-                  onChange={event => void transitionGovernance('privacy', item.id, event.target.value)}
-                  className="rounded-lg border bg-transparent px-2 py-1 text-xs"
-                >
-                  <option value="open">open</option>
-                  <option value="in_review">in_review</option>
-                  <option value="waiting_user">waiting_user</option>
-                  <option value="completed">completed</option>
-                  <option value="rejected">rejected</option>
-                  <option value="cancelled">cancelled</option>
-                </select>
+    <details className="rounded-2xl border border-slate-200 bg-white">
+      <summary className="cursor-pointer list-none px-5 py-4 text-sm font-bold text-slate-900">Governance & keamanan</summary>
+      <div className="border-t border-slate-100 p-4 sm:p-5">
+        <div className="grid gap-5 lg:grid-cols-2">
+          <Card className="p-5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="font-bold">Privacy requests</h2>
+                <p className="text-xs opacity-70">Queue permintaan akses, koreksi, export, deletion, dan kontrol data.</p>
               </div>
-              {item.due_at ? <div className="mt-2 text-[11px] opacity-65">Target {new Date(item.due_at).toLocaleString('id-ID')}</div> : null}
-              {item.decision_note ? <div className="mt-2 rounded-lg bg-black/5 px-2.5 py-2 text-xs">{item.decision_note}</div> : null}
+              <span className="rounded-full border px-2.5 py-1 text-xs font-bold">{privacyRequests.filter(x => ['open','in_review','waiting_user'].includes(x.status)).length} aktif</span>
             </div>
-          ))}
-          {privacyRequests.length === 0 ? <div className="rounded-xl border border-dashed p-4 text-xs opacity-65">Tidak ada privacy request.</div> : null}
-        </div>
-      </Card>
-
-      <Card className="p-5">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="font-bold">Security incidents</h2>
-            <p className="text-xs opacity-70">Severity, containment, remediation, dan status notifikasi.</p>
-          </div>
-          <span className="rounded-full border px-2.5 py-1 text-xs font-bold">{securityIncidents.filter(x => x.status !== 'closed').length} terbuka</span>
-        </div>
-        <div className="mt-4 rounded-xl border p-3">
-          <div className="grid gap-2 sm:grid-cols-[140px_1fr_auto]">
-            <select value={incidentSeverity} onChange={e => setIncidentSeverity(e.target.value)} className="rounded-lg border bg-transparent px-2 py-2 text-xs">
-              <option value="low">low</option>
-              <option value="medium">medium</option>
-              <option value="high">high</option>
-              <option value="critical">critical</option>
-            </select>
-            <input
-              value={incidentSummary}
-              onChange={e => setIncidentSummary(e.target.value.slice(0, 10000))}
-              placeholder="Ringkasan incident…"
-              className="rounded-lg border px-3 py-2 text-xs"
-            />
-            <button
-              disabled={governanceBusy || incidentSummary.trim().length < 3}
-              onClick={() => void createIncident()}
-              className="rounded-lg bg-[color:var(--color-primary)] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
-            >
-              Catat
-            </button>
-          </div>
-        </div>
-        <div className="mt-3 space-y-2">
-          {securityIncidents.slice(0, 8).map(item => (
-            <div key={item.id} className="rounded-xl border p-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold">{item.severity.toUpperCase()}</span>
-                    {item.legal_hold ? <span className="rounded-full border px-2 py-0.5 text-[10px] font-bold">LEGAL HOLD</span> : null}
+            <div className="mt-3 space-y-2">
+              {privacyRequests.slice(0, 8).map(item => (
+                <div key={item.id} className="rounded-xl border p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="font-semibold">{item.request_type}</div>
+                      <div className="mt-0.5 text-[11px] opacity-65">#{item.id} · user {item.subject_user_id}</div>
+                    </div>
+                    <select
+                      value={item.status}
+                      disabled={governanceBusy}
+                      onChange={event => void transitionGovernance('privacy', item.id, event.target.value)}
+                      className="rounded-lg border bg-transparent px-2 py-1 text-xs"
+                    >
+                      <option value="open">open</option>
+                      <option value="in_review">in_review</option>
+                      <option value="waiting_user">waiting_user</option>
+                      <option value="completed">completed</option>
+                      <option value="rejected">rejected</option>
+                      <option value="cancelled">cancelled</option>
+                    </select>
                   </div>
-                  <div className="mt-1 line-clamp-2 text-xs opacity-80">{item.summary}</div>
-                  <div className="mt-1 text-[11px] opacity-65">#{item.id}</div>
+                  {item.due_at ? <div className="mt-2 text-[11px] opacity-65">Target {new Date(item.due_at).toLocaleString('id-ID')}</div> : null}
+                  {item.decision_note ? <div className="mt-2 rounded-lg bg-black/5 px-2.5 py-2 text-xs">{item.decision_note}</div> : null}
                 </div>
-                <select
-                  value={item.status}
-                  disabled={governanceBusy}
-                  onChange={event => void transitionGovernance('security', item.id, event.target.value)}
-                  className="rounded-lg border bg-transparent px-2 py-1 text-xs"
-                >
-                  <option value="open">open</option>
-                  <option value="contained">contained</option>
-                  <option value="investigating">investigating</option>
-                  <option value="remediated">remediated</option>
-                  <option value="closed">closed</option>
-                </select>
-              </div>
-              {item.notification_due_at ? <div className="mt-2 text-[11px] opacity-65">Target notifikasi {new Date(item.notification_due_at).toLocaleString('id-ID')}</div> : null}
+              ))}
+              {privacyRequests.length === 0 ? <div className="rounded-xl border border-dashed p-4 text-xs opacity-65">Tidak ada privacy request.</div> : null}
             </div>
-          ))}
-          {securityIncidents.length === 0 ? <div className="rounded-xl border border-dashed p-4 text-xs opacity-65">Tidak ada incident.</div> : null}
+          </Card>
+
+          <Card className="p-5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="font-bold">Security incidents</h2>
+                <p className="text-xs opacity-70">Severity, containment, remediation, dan status notifikasi.</p>
+              </div>
+              <span className="rounded-full border px-2.5 py-1 text-xs font-bold">{securityIncidents.filter(x => x.status !== 'closed').length} terbuka</span>
+            </div>
+            <div className="mt-4 rounded-xl border p-3">
+              <div className="grid gap-2 sm:grid-cols-[140px_1fr_auto]">
+                <select value={incidentSeverity} onChange={e => setIncidentSeverity(e.target.value)} className="rounded-lg border bg-transparent px-2 py-2 text-xs">
+                  <option value="low">low</option>
+                  <option value="medium">medium</option>
+                  <option value="high">high</option>
+                  <option value="critical">critical</option>
+                </select>
+                <input
+                  value={incidentSummary}
+                  onChange={e => setIncidentSummary(e.target.value.slice(0, 10000))}
+                  placeholder="Ringkasan incident…"
+                  className="rounded-lg border px-3 py-2 text-xs"
+                />
+                <button
+                  disabled={governanceBusy || incidentSummary.trim().length < 3}
+                  onClick={() => void createIncident()}
+                  className="rounded-lg bg-[color:var(--color-primary)] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                >
+                  Catat
+                </button>
+              </div>
+            </div>
+            <div className="mt-3 space-y-2">
+              {securityIncidents.slice(0, 8).map(item => (
+                <div key={item.id} className="rounded-xl border p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-semibold">{item.severity.toUpperCase()}</span>
+                        {item.legal_hold ? <span className="rounded-full border px-2 py-0.5 text-[10px] font-bold">LEGAL HOLD</span> : null}
+                      </div>
+                      <div className="mt-1 line-clamp-2 text-xs opacity-80">{item.summary}</div>
+                      <div className="mt-1 text-[11px] opacity-65">#{item.id}</div>
+                    </div>
+                    <select
+                      value={item.status}
+                      disabled={governanceBusy}
+                      onChange={event => void transitionGovernance('security', item.id, event.target.value)}
+                      className="rounded-lg border bg-transparent px-2 py-1 text-xs"
+                    >
+                      <option value="open">open</option>
+                      <option value="contained">contained</option>
+                      <option value="investigating">investigating</option>
+                      <option value="remediated">remediated</option>
+                      <option value="closed">closed</option>
+                    </select>
+                  </div>
+                  {item.notification_due_at ? <div className="mt-2 text-[11px] opacity-65">Target notifikasi {new Date(item.notification_due_at).toLocaleString('id-ID')}</div> : null}
+                </div>
+              ))}
+              {securityIncidents.length === 0 ? <div className="rounded-xl border border-dashed p-4 text-xs opacity-65">Tidak ada incident.</div> : null}
+            </div>
+          </Card>
         </div>
-      </Card>
-    </div>
+      </div>
+    </details>
     <Card className="p-5">
       <h2 className="font-bold">Riwayat undangan</h2>
       <div className="mt-3 space-y-2">{invitations.map(inv => <div key={inv.id} className="rounded-xl border p-3 text-sm">
