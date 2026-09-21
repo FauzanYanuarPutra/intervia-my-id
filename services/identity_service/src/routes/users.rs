@@ -306,11 +306,7 @@ async fn require_super_admin(
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    let has_claimed_owner_role = claims.roles.iter().any(|role| {
-        matches!(role.trim().to_ascii_lowercase().as_str(), "super_admin" | "admin")
-    });
-
-    if !has_owner_role || !has_claimed_owner_role {
+    if !has_owner_role {
         return Err(StatusCode::FORBIDDEN);
     }
     Ok(claims)
@@ -2207,19 +2203,35 @@ pub async fn search_backoffice_candidates(
     let rows = match sqlx::query(
         r#"
         SELECT
-          u.id, u.email::text AS email, u.email_verified, u.phone_verified,
-          u.status::text AS status, u.is_active, up.username::text AS username,
-          up.full_name, up.metadata
+          u.id,
+          u.email::text AS email,
+          u.phone,
+          u.email_verified,
+          u.phone_verified,
+          u.status::text AS status,
+          u.is_active,
+          up.username::text AS username,
+          up.full_name,
+          up.metadata
         FROM core.users u
         LEFT JOIN core.user_profiles up ON up.user_id = u.id
         WHERE u.deleted_at IS NULL
           AND (
-            lower(COALESCE(up.username::text,'')) LIKE '%' || lower($1) || '%'
-            OR lower(COALESCE(up.full_name,'')) LIKE '%' || lower($1) || '%'
-            OR lower(u.email::text) LIKE '%' || lower($1) || '%'
+            lower(COALESCE(up.username::text, '')) ILIKE '%' || lower($1) || '%'
+            OR lower(COALESCE(up.full_name, '')) ILIKE '%' || lower($1) || '%'
+            OR lower(COALESCE(u.email::text, '')) ILIKE '%' || lower($1) || '%'
+            OR regexp_replace(COALESCE(u.phone, ''), '[^0-9]', '', 'g')
+               ILIKE '%' || regexp_replace($1, '[^0-9]', '', 'g') || '%'
           )
         ORDER BY
-          CASE WHEN lower(COALESCE(up.username::text,'')) = lower($1) THEN 0 ELSE 1 END,
+          CASE
+            WHEN lower(COALESCE(up.username::text, '')) = lower($1) THEN 0
+            WHEN lower(COALESCE(u.email::text, '')) = lower($1) THEN 1
+            WHEN lower(COALESCE(up.username::text, '')) LIKE lower($1) || '%' THEN 2
+            WHEN lower(COALESCE(up.full_name, '')) LIKE lower($1) || '%' THEN 3
+            WHEN lower(COALESCE(u.email::text, '')) LIKE lower($1) || '%' THEN 4
+            ELSE 5
+          END,
           u.created_at DESC
         LIMIT $2
         "#,
@@ -2264,6 +2276,7 @@ pub async fn search_backoffice_candidates(
                 "status": row.get::<String,_>("status"),
                 "email_verified": row.get::<bool,_>("email_verified"),
                 "phone_verified": row.get::<bool,_>("phone_verified"),
+                "has_phone": row.get::<Option<String>,_>("phone").is_some(),
                 "identity_verified": identity_verified,
                 "eligible": eligible
             })
