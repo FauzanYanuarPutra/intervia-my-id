@@ -204,6 +204,89 @@ function metadataOf(store: JsonRecord): JsonRecord {
   return record(store.metadata) ?? {};
 }
 
+const BUSINESS_MEDIA_KEYS = [
+  'cover_image',
+  'coverImage',
+  'cover_image_url',
+  'coverImageUrl',
+  'cover_url',
+  'coverUrl',
+  'banner_url',
+  'bannerUrl',
+  'store_photo_url',
+  'storePhotoUrl',
+  'image',
+  'image_url',
+  'imageUrl',
+  'image_urls',
+  'imageUrls',
+  'images',
+  'gallery',
+  'gallery_images',
+  'galleryImages',
+  'media',
+  'media_urls',
+  'mediaUrls',
+  'photos',
+  'logo',
+  'logo_url',
+  'logoUrl',
+  'thumbnail',
+  'thumbnail_url',
+  'thumbnailUrl',
+] as const;
+
+const BUSINESS_MEDIA_CONTAINERS = [
+  'public',
+  'storefront',
+  'profile',
+  'presentation',
+  'business_media',
+] as const;
+
+function isBusinessMediaUrl(value: string): boolean {
+  const lower = value.toLowerCase();
+  return (
+    lower.startsWith('http://') ||
+    lower.startsWith('https://') ||
+    lower.startsWith('/uploads/') ||
+    lower.startsWith('/media/') ||
+    lower.startsWith('/images/') ||
+    lower.startsWith('/api/forum/media/')
+  );
+}
+
+function collectBusinessImageUrls(metadata: JsonRecord): string[] {
+  const urls: string[] = [];
+  const seen = new Set<string>();
+
+  const collect = (value: unknown) => {
+    if (typeof value === 'string') {
+      const candidate = value.trim();
+      if (candidate && isBusinessMediaUrl(candidate) && !seen.has(candidate)) {
+        seen.add(candidate);
+        urls.push(candidate);
+      }
+      return;
+    }
+    if (Array.isArray(value)) {
+      for (const item of value.slice(0, 24)) collect(item);
+      return;
+    }
+    const object = record(value);
+    if (!object) return;
+    for (const key of BUSINESS_MEDIA_KEYS) {
+      if (key in object) collect(object[key]);
+    }
+    for (const key of BUSINESS_MEDIA_CONTAINERS) {
+      if (key in object) collect(object[key]);
+    }
+  };
+
+  collect(metadata);
+  return urls.slice(0, 12);
+}
+
 function parseLocations(store: JsonRecord): BusinessLocation[] {
   const metadata = metadataOf(store);
   const configured = arrayValue<JsonRecord>(metadata.locations)
@@ -392,6 +475,7 @@ function mapStore(
   const reservations = arrayValue<ReservationRecord>(metadata.reservations);
   const teamMembers = arrayValue<TeamMember>(metadata.teamMembers ?? metadata.team_members);
   const locations = parseLocations(store);
+  const imageUrls = collectBusinessImageUrls(metadata);
 
   return {
     id: canonicalBusinessId || stringValue(store.id),
@@ -423,7 +507,8 @@ function mapStore(
     bannerUrl: stringValue(
       metadata.banner_url ?? metadata.cover_image_url ?? metadata.cover_url,
     ) || undefined,
-    schedule: stringValue(metadata.schedule) || 'Belum diatur',
+    imageUrls,
+    schedule: stringValue(metadata.schedule ?? metadata.open_hours) || 'Belum diatur',
     infoComplete: Boolean(name && city && stringValue(store.phone)),
     productsCount: products.length,
     ownedProductsCount: products.filter(item => item.sourceType !== 'consignment').length,
