@@ -644,12 +644,12 @@ export default function NewsEditorialWorkspace({
   ] as const;
 
   return (
-    <div className="space-y-5">
-      <section className="rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-white p-5 shadow-sm">
+    <div className="space-y-4">
+      <section className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-white p-4 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="text-[11px] font-black uppercase tracking-[0.22em] text-emerald-700">CRM • News Editorial</p>
-            <h1 className="mt-2 text-2xl font-black tracking-[-0.05em] text-slate-950 sm:text-3xl">
+            <h1 className="mt-2 text-xl font-black tracking-[-0.04em] text-slate-950 sm:text-2xl">
               Approve News di sini
             </h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
@@ -678,9 +678,9 @@ export default function NewsEditorialWorkspace({
         </div>
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
         {metricsCards.map(([label, value, tone]) => (
-          <div key={label} className={'rounded-2xl border p-4 ' + tone}>
+          <div key={label} className={'rounded-xl border p-3 ' + tone}>
             <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">{label}</p>
             <p className="mt-2 text-2xl font-black text-slate-950">{loading ? '…' : value}</p>
           </div>
@@ -725,7 +725,7 @@ export default function NewsEditorialWorkspace({
         </div>
       ) : null}
 
-      <section className="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm">
+      <section className="rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
         <div className="flex flex-wrap gap-2">
           {[
             ['pending_review', 'Menunggu'],
@@ -744,8 +744,8 @@ export default function NewsEditorialWorkspace({
               }}
               className={
                 status === value
-                  ? 'rounded-full bg-emerald-700 px-4 py-2 text-xs font-black text-white'
-                  : 'rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50'
+                  ? 'rounded-full bg-emerald-700 px-3 py-1.5 text-xs font-black text-white'
+                  : 'rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50'
               }
             >
               {label}
@@ -754,7 +754,7 @@ export default function NewsEditorialWorkspace({
                 : ''}
             </button>
           ))}
-          <label className="ml-auto flex min-w-[260px] flex-1 items-center rounded-2xl border border-slate-200 bg-slate-50 px-3">
+          <label className="ml-auto flex min-w-[180px] flex-1 items-center rounded-2xl border border-slate-200 bg-slate-50 px-3">
             <input
               value={query}
               onChange={event => setQuery(event.target.value)}
@@ -765,8 +765,8 @@ export default function NewsEditorialWorkspace({
         </div>
       </section>
 
-      <div className="grid gap-4 xl:grid-cols-[340px_minmax(0,1fr)]">
-        <section className="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm">
+      <div className="grid gap-3 lg:grid-cols-[320px_minmax(0,1fr)]">
+        <section className="rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
           <div className="mb-3 flex items-center justify-between gap-3 px-2">
             <div>
               <p className="text-sm font-black text-slate-950">Antrean editorial</p>
@@ -776,7 +776,7 @@ export default function NewsEditorialWorkspace({
               {statusLabel(status)}
             </span>
           </div>
-          <div className="max-h-[760px] space-y-2 overflow-y-auto pr-1">
+          <div className="max-h-[52vh] space-y-1.5 overflow-y-auto pr-1 lg:max-h-[calc(100vh-300px)]">
             {loading ? (
               <div className="space-y-2">
                 {[1, 2, 3, 4].map(item => (
@@ -794,7 +794,7 @@ export default function NewsEditorialWorkspace({
                     type="button"
                     onClick={() => setSelectedId(item.id)}
                     className={
-                      'w-full rounded-2xl border p-3 text-left transition ' +
+                      'w-full rounded-xl border p-2.5 text-left transition ' +
                       (active
                         ? 'border-emerald-300 bg-emerald-50/70 shadow-sm'
                         : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50')
@@ -855,9 +855,9 @@ export default function NewsEditorialWorkspace({
           </div>
         </section>
 
-        <section className="rounded-3xl border border-slate-200 bg-white shadow-sm xl:sticky xl:top-4 xl:max-h-[calc(100vh-2rem)] xl:overflow-y-auto">
+        <section className="rounded-3xl border border-slate-200 bg-white shadow-sm lg:sticky lg:top-3 lg:max-h-[calc(100vh-170px)] lg:overflow-y-auto">
           {selected ? (
-            <div className="space-y-5 p-4 sm:p-6">
+            <div className="space-y-4 p-4 sm:p-5">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0">
                   <div className="flex flex-wrap gap-2">
@@ -871,7 +871,7 @@ export default function NewsEditorialWorkspace({
                       {category}
                     </span>
                   </div>
-                  <h2 className="mt-3 text-2xl font-black tracking-[-0.04em] text-slate-950">{selected.title}</h2>
+                  <h2 className="mt-3 text-xl font-black tracking-[-0.04em] text-slate-950 sm:text-2xl">{selected.title}</h2>
                   <p className="mt-2 text-xs font-semibold text-slate-500">
                     Owner: {selected.owner_id} • Lokasi: {location} • Dikirim: {formatDate(selected.created_at)}
                   </p>
