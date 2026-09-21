@@ -49,6 +49,26 @@ type NewsSourceReview = {
   created_at: string;
 };
 
+type NewsSourceReviewRequest = {
+  id: string;
+  content_id: string;
+  requested_by: string;
+  requested_reviewer_id: string;
+  status: 'pending' | 'completed' | 'cancelled';
+  note?: string | null;
+  created_at: string;
+  completed_at?: string | null;
+};
+
+type NewsReviewer = {
+  id: string;
+  email: string;
+  username?: string | null;
+  full_name?: string | null;
+  is_active: boolean;
+  roles: string[];
+};
+
 type NewsVersion = {
   id: string;
   version_number: number;
@@ -198,6 +218,12 @@ export default function NewsEditorialWorkspace({
   const [publishAt, setPublishAt] = useState('');
   const [sources, setSources] = useState<NewsSource[]>([]);
   const [sourceReviews, setSourceReviews] = useState<NewsSourceReview[]>([]);
+  const [sourceReviewRequests, setSourceReviewRequests] = useState<NewsSourceReviewRequest[]>([]);
+  const [reviewers, setReviewers] = useState<NewsReviewer[]>([]);
+  const [selectedReviewerId, setSelectedReviewerId] = useState('');
+  const [reviewRequestNote, setReviewRequestNote] = useState('');
+  const [reviewersLoading, setReviewersLoading] = useState(false);
+  const [reviewRequestBusy, setReviewRequestBusy] = useState(false);
   const [history, setHistory] = useState<EditorialEvent[]>([]);
   const [versions, setVersions] = useState<NewsVersion[]>([]);
   const [metrics, setMetrics] = useState<Metrics>({});
@@ -271,6 +297,9 @@ export default function NewsEditorialWorkspace({
     setPublishAt(scheduled ? localDateTime(scheduled) : '');
     setSources([]);
     setSourceReviews([]);
+    setSourceReviewRequests([]);
+    setSelectedReviewerId('');
+    setReviewRequestNote('');
     setHistory([]);
     setVersions([]);
     setNote('');
@@ -298,6 +327,11 @@ export default function NewsEditorialWorkspace({
         setSourceReviews(
           Array.isArray(value.source_reviews) ? (value.source_reviews as NewsSourceReview[]) : [],
         );
+        setSourceReviewRequests(
+          Array.isArray(value.source_review_requests)
+            ? (value.source_review_requests as NewsSourceReviewRequest[])
+            : [],
+        );
       } catch {
         setHistory([]);
         setVersions([]);
@@ -307,6 +341,72 @@ export default function NewsEditorialWorkspace({
     },
     [accessToken],
   );
+
+  const loadReviewers = useCallback(async () => {
+    setReviewersLoading(true);
+    try {
+      const payload = await newsApi.reviewers(accessToken);
+      const eligible = (payload.data || []).filter(user => {
+        if (!user.is_active || user.id === reviewerId) return false;
+        return user.roles.some(role =>
+          ['admin', 'content_admin', 'super_admin'].includes(role.trim().toLowerCase()),
+        );
+      });
+      setReviewers(eligible);
+      setSelectedReviewerId(current =>
+        eligible.some(user => user.id === current) ? current : eligible[0]?.id || '',
+      );
+    } catch {
+      setReviewers([]);
+      setSelectedReviewerId('');
+    } finally {
+      setReviewersLoading(false);
+    }
+  }, [accessToken, reviewerId]);
+
+  const requestIndependentReview = useCallback(async () => {
+    if (!selected || !selectedReviewerId) {
+      setError('Pilih reviewer lain terlebih dahulu.');
+      return;
+    }
+    if (
+      sourceReviewRequests.some(
+        request =>
+          request.status === 'pending' &&
+          request.requested_reviewer_id === selectedReviewerId,
+      )
+    ) {
+      setError('Reviewer tersebut sudah memiliki permintaan review yang masih menunggu.');
+      return;
+    }
+    setReviewRequestBusy(true);
+    setError('');
+    setSuccess('');
+    try {
+      await newsApi.requestIndependentReview(accessToken, selected.id, {
+        requested_reviewer_id: selectedReviewerId,
+        note: reviewRequestNote.trim() || undefined,
+      });
+      setSuccess('Permintaan independent source review sudah dikirim ke reviewer lain.');
+      setReviewRequestNote('');
+      await loadHistory(selected.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Gagal meminta independent source review.');
+    } finally {
+      setReviewRequestBusy(false);
+    }
+  }, [
+    accessToken,
+    loadHistory,
+    reviewRequestNote,
+    selected,
+    selectedReviewerId,
+    sourceReviewRequests,
+  ]);
+
+  useEffect(() => {
+    void loadReviewers();
+  }, [loadReviewers]);
 
   const loadQueue = useCallback(
     async (nextStatus: string, preserveId = '', nextOffset = 0) => {
@@ -870,6 +970,112 @@ export default function NewsEditorialWorkspace({
                   )}
                 </div>
               </section>
+
+              {sensitivity === 'high' && kind !== 'press_release' ? (
+                <section className="rounded-2xl border border-sky-200 bg-sky-50/60 p-4">
+                  <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                    <div>
+                      <h3 className="text-sm font-black text-slate-950">Independent source review</h3>
+                      <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">
+                        Konten sensitivitas tinggi harus direview oleh reviewer/editor lain. Reviewer tersebut perlu membuka item ini dan melakukan verifikasi source sendiri.
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-white px-3 py-1 text-[10px] font-black text-sky-700">
+                      {hasIndependentSourceReview ? 'SELESAI' : 'DIBUTUHKAN'}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 grid gap-2 lg:grid-cols-[1fr_auto]">
+                    <select
+                      value={selectedReviewerId}
+                      onChange={event => setSelectedReviewerId(event.target.value)}
+                      disabled={reviewersLoading || reviewRequestBusy || hasIndependentSourceReview}
+                      className="min-h-10 rounded-xl border border-sky-200 bg-white px-3 text-sm font-bold text-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <option value="">
+                        {reviewersLoading
+                          ? 'Memuat reviewer…'
+                          : reviewers.length
+                            ? 'Pilih reviewer lain'
+                            : 'Tidak ada reviewer lain'}
+                      </option>
+                      {reviewers.map(user => (
+                        <option key={user.id} value={user.id}>
+                          {(user.full_name || user.username || user.email) + ' • ' + user.roles.join(', ')}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => void requestIndependentReview()}
+                      disabled={
+                        reviewRequestBusy ||
+                        reviewersLoading ||
+                        !selectedReviewerId ||
+                        hasIndependentSourceReview ||
+                        Boolean(
+                          sourceReviewRequests.some(
+                            request =>
+                              request.status === 'pending' &&
+                              request.requested_reviewer_id === selectedReviewerId,
+                          ),
+                        )
+                      }
+                      className="min-h-10 rounded-xl bg-sky-700 px-4 py-2.5 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {reviewRequestBusy ? 'Mengirim…' : 'Minta review'}
+                    </button>
+                  </div>
+
+                  <textarea
+                    value={reviewRequestNote}
+                    onChange={event => setReviewRequestNote(event.target.value)}
+                    disabled={reviewRequestBusy || hasIndependentSourceReview}
+                    maxLength={4000}
+                    rows={2}
+                    placeholder="Catatan untuk reviewer lain (opsional)"
+                    className="mt-2 w-full rounded-xl border border-sky-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+
+                  {sourceReviewRequests.length ? (
+                    <div className="mt-3 space-y-2">
+                      {sourceReviewRequests.slice(0, 5).map(request => {
+                        const reviewer = reviewers.find(user => user.id === request.requested_reviewer_id);
+                        return (
+                          <div key={request.id} className="rounded-xl border border-white bg-white p-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <p className="text-xs font-black text-slate-800">
+                                {reviewer?.full_name || reviewer?.username || reviewer?.email || request.requested_reviewer_id}
+                              </p>
+                              <span className={
+                                'rounded-full px-2.5 py-1 text-[10px] font-black ' +
+                                (request.status === 'completed'
+                                  ? 'bg-emerald-50 text-emerald-700'
+                                  : request.status === 'cancelled'
+                                    ? 'bg-slate-100 text-slate-500'
+                                    : 'bg-amber-50 text-amber-700')
+                              }>
+                                {request.status === 'completed'
+                                  ? 'completed'
+                                  : request.status === 'cancelled'
+                                    ? 'cancelled'
+                                    : 'pending'}
+                              </span>
+                            </div>
+                            {request.note ? (
+                              <p className="mt-1 text-[11px] leading-5 text-slate-600">{request.note}</p>
+                            ) : null}
+                            <p className="mt-1 text-[10px] font-semibold text-slate-400">
+                              {formatDate(request.created_at)}
+                              {request.completed_at ? ' • selesai ' + formatDate(request.completed_at) : ''}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </section>
+              ) : null}
 
               <section className="rounded-2xl border border-slate-200 p-4">
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
