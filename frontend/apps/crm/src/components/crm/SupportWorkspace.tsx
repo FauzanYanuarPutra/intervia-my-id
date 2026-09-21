@@ -76,7 +76,7 @@ export function SupportWorkspace({tickets,failed=false}:{tickets:SupportTicket[]
   }
 
   return <div className="space-y-3">
-    <PageHeader label="Support" title="Tiket support" description="Urgent dan tiket terbuka muncul lebih dulu."/>
+    <PageHeader title="Tiket support" description="Urgent dan tiket terbuka muncul lebih dulu."/>
     {failed?<div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-800">Sumber support gagal dibaca. Data kosong tidak dianggap sukses.</div>:null}
     {notice ? <div className="rounded-2xl border border-sky-200 bg-sky-50 p-3 text-sm font-semibold text-sky-800">{notice}</div> : null}
     <div className="grid min-h-0 gap-3 xl:grid-cols-[320px_minmax(0,1fr)]">
