@@ -7590,7 +7590,7 @@ export default function ChatRoomPage() {
                                           ? `Image ${index + 1}`
                                           : 'Image'
                                       }
-                                      className="max-w-full rounded-lg border border-[color:color-mix(in_srgb,_var(--app-border-strong)_5%,_transparent)] dark:border-[color:color-mix(in_srgb,_var(--app-text-inverse)_10%,_transparent)]"
+                                      className="block max-h-[min(58dvh,520px)] w-full rounded-[14px] border border-black/[0.06] bg-black/95 object-contain shadow-sm dark:border-white/[0.08] sm:max-h-[560px]"
                                       loading="lazy"
                                     />
                                   );
@@ -7612,7 +7612,7 @@ export default function ChatRoomPage() {
                                       src={videoUrl}
                                       controls
                                       preload="metadata"
-                                      className="max-w-full rounded-lg"
+                                      className="block max-h-[min(58dvh,520px)] w-full rounded-[14px] bg-black shadow-sm sm:max-h-[560px]"
                                     />
                                   );
                                 })}
@@ -7633,7 +7633,7 @@ export default function ChatRoomPage() {
                                       src={audioUrl}
                                       controls
                                       preload="metadata"
-                                      className="max-w-full"
+                                      className="h-10 w-full max-w-[420px] rounded-full"
                                     />
                                   );
                                 })}
@@ -7771,7 +7771,7 @@ export default function ChatRoomPage() {
           ) : null}
 
           {activeDraftAttachment && (
-            <div className="overflow-hidden rounded-[22px] border border-black/5 bg-white/90 p-2 shadow-sm dark:border-white/8 dark:bg-[#111b21]/90">
+            <div className="overflow-hidden rounded-[24px] border border-black/[0.06] bg-white/92 p-2 shadow-[0_14px_34px_-24px_rgba(17,27,33,0.42)] backdrop-blur-sm dark:border-white/[0.08] dark:bg-[#111b21]/94 sm:p-2.5">
               <div className="mb-2 flex items-center justify-between gap-2 px-1">
                 <div className="min-w-0">
                   <p className="truncate text-[12px] font-bold text-[#111b21] dark:text-[#e9edef]">
@@ -7805,7 +7805,7 @@ export default function ChatRoomPage() {
               </div>
 
               <div
-                className="relative overflow-hidden rounded-[20px] bg-[#0b141a]"
+                className="relative overflow-hidden rounded-[20px] bg-[#0b141a] shadow-inner sm:rounded-[22px]"
                 onTouchStart={event => {
                   if (draftAttachments.length < 2) return;
                   attachmentTouchStartXRef.current =
@@ -7822,19 +7822,19 @@ export default function ChatRoomPage() {
                   showDraftAttachmentAtOffset(deltaX < 0 ? 1 : -1);
                 }}
               >
-                <div className="flex min-h-[clamp(120px,26dvh,210px)] items-center justify-center sm:min-h-[clamp(160px,30dvh,280px)] lg:min-h-[clamp(180px,32dvh,320px)]">
+                <div className="flex min-h-[clamp(140px,30dvh,250px)] items-center justify-center sm:min-h-[clamp(180px,34dvh,320px)] lg:min-h-[clamp(220px,38dvh,380px)]">
                   {activeDraftAttachment.type === 'image' &&
                   activeDraftAttachment.previewUrl ? (
                     <img
                       src={activeDraftAttachment.previewUrl}
                       alt={activeDraftAttachment.name}
-                      className="max-h-[min(calc(var(--app-viewport-height)-14rem),520px)] w-full object-contain"
+                      className="max-h-[min(calc(var(--app-viewport-height)-13rem),560px)] w-full object-contain"
                     />
                   ) : activeDraftAttachment.type === 'video' &&
                     activeDraftAttachment.previewUrl ? (
                     <video
                       src={activeDraftAttachment.previewUrl}
-                      className="max-h-[min(calc(var(--app-viewport-height)-14rem),520px)] w-full object-contain"
+                      className="max-h-[min(calc(var(--app-viewport-height)-13rem),560px)] w-full object-contain"
                       muted
                       loop
                       playsInline
@@ -8066,7 +8066,7 @@ export default function ChatRoomPage() {
 
           {showAttachmentActions ? (
             <div
-              className="grid grid-cols-4 gap-2 rounded-[18px] border border-black/5 bg-white p-2 shadow-sm dark:border-white/8 dark:bg-[#111b21] min-[421px]:hidden"
+              className="grid grid-cols-2 gap-2 rounded-[20px] border border-black/[0.06] bg-white/95 p-2.5 shadow-[0_14px_34px_-24px_rgba(17,27,33,0.45)] backdrop-blur-sm dark:border-white/[0.08] dark:bg-[#111b21]/96 min-[421px]:hidden"
               role="menu"
               aria-label={
                 chatLocale === 'id' ? 'Pilihan lampiran' : 'Attachment options'
@@ -8080,9 +8080,9 @@ export default function ChatRoomPage() {
                   setShowAttachmentActions(false);
                   setShowCameraModal(true);
                 }}
-                className="inline-flex min-h-12 flex-col items-center justify-center gap-1 rounded-[14px] bg-[#f0f2f5] px-2 text-[11px] font-bold text-[#54656f] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-[#202c33] dark:text-[#aebac1]"
+                className="group inline-flex min-h-[68px] flex-col items-center justify-center gap-1.5 rounded-[16px] border border-black/[0.04] bg-[#f7f9f8] px-2.5 text-[11px] font-bold text-[#54656f] transition hover:bg-[#eef3f1] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/[0.05] dark:bg-[#202c33] dark:text-[#aebac1] dark:hover:bg-[#2a3942]"
               >
-                <Camera className="h-4 w-4" />
+                <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#e0f6eb] text-[#128c7e] dark:bg-[#19493d] dark:text-[#25d366]"><Camera className="h-4 w-4" /></span>
                 {chatLocale === 'id' ? 'Kamera' : 'Camera'}
               </button>
               <button
@@ -8090,9 +8090,9 @@ export default function ChatRoomPage() {
                 role="menuitem"
                 disabled={roomReadOnly}
                 onClick={handleChooseFile}
-                className="inline-flex min-h-12 flex-col items-center justify-center gap-1 rounded-[14px] bg-[#f0f2f5] px-2 text-[11px] font-bold text-[#54656f] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-[#202c33] dark:text-[#aebac1]"
+                className="group inline-flex min-h-[68px] flex-col items-center justify-center gap-1.5 rounded-[16px] border border-black/[0.04] bg-[#f7f9f8] px-2.5 text-[11px] font-bold text-[#54656f] transition hover:bg-[#eef3f1] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/[0.05] dark:bg-[#202c33] dark:text-[#aebac1] dark:hover:bg-[#2a3942]"
               >
-                <Paperclip className="h-4 w-4" />
+                <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#e8eefc] text-[#4f6fd8] dark:bg-[#25345a] dark:text-[#9db2ff]"><Paperclip className="h-4 w-4" /></span>
                 {chatLocale === 'id' ? 'Berkas' : 'File'}
               </button>
               <button
@@ -8103,9 +8103,9 @@ export default function ChatRoomPage() {
                   setShowAttachmentActions(false);
                   setShowStickerPanel(true);
                 }}
-                className="inline-flex min-h-12 flex-col items-center justify-center gap-1 rounded-[14px] bg-[#f0f2f5] px-2 text-[11px] font-bold text-[#54656f] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-[#202c33] dark:text-[#aebac1]"
+                className="group inline-flex min-h-[68px] flex-col items-center justify-center gap-1.5 rounded-[16px] border border-black/[0.04] bg-[#f7f9f8] px-2.5 text-[11px] font-bold text-[#54656f] transition hover:bg-[#eef3f1] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/[0.05] dark:bg-[#202c33] dark:text-[#aebac1] dark:hover:bg-[#2a3942]"
               >
-                <Sticker className="h-4 w-4" />
+                <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#fff0c7] text-[#a66a00] dark:bg-[#4a3920] dark:text-[#f7d48a]"><Sticker className="h-4 w-4" /></span>
                 {chatLocale === 'id' ? 'Stiker' : 'Sticker'}
               </button>
               <button
@@ -8116,9 +8116,9 @@ export default function ChatRoomPage() {
                   setShowAttachmentActions(false);
                   openAiWorkspace('reply');
                 }}
-                className="inline-flex min-h-12 flex-col items-center justify-center gap-1 rounded-[14px] bg-[#e7f8ef] px-2 text-[11px] font-bold text-[#128c7e] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-[#123d32] dark:text-[#25d366]"
+                className="group inline-flex min-h-[68px] flex-col items-center justify-center gap-1.5 rounded-[16px] border border-[#d7eee3] bg-[#eefaf4] px-2.5 text-[11px] font-bold text-[#128c7e] transition hover:bg-[#e3f7ed] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 dark:border-[#1d5143] dark:bg-[#123d32] dark:text-[#25d366] dark:hover:bg-[#16483d]"
               >
-                <Sparkles className="h-4 w-4" />
+                <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#e8ddff] text-[#7048b8] dark:bg-[#35264f] dark:text-[#c7aaff]"><Sparkles className="h-4 w-4" /></span>
                 AI
               </button>
             </div>
@@ -8333,7 +8333,7 @@ export default function ChatRoomPage() {
                     title={chatLocale === 'id' ? 'Stiker' : 'Stickers'}
                     aria-label={chatLocale === 'id' ? 'Stiker' : 'Stickers'}
                   >
-                    <Sticker className="h-4 w-4" />
+                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#fff0c7] text-[#a66a00] dark:bg-[#4a3920] dark:text-[#f7d48a]"><Sticker className="h-4 w-4" /></span>
                   </button>
 
                   <button
@@ -8349,7 +8349,7 @@ export default function ChatRoomPage() {
                     title={chatLocale === 'id' ? 'Kamera' : 'Camera'}
                     aria-label={chatLocale === 'id' ? 'Kamera' : 'Camera'}
                   >
-                    <Camera className="h-4 w-4" />
+                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#e0f6eb] text-[#128c7e] dark:bg-[#19493d] dark:text-[#25d366]"><Camera className="h-4 w-4" /></span>
                   </button>
 
                   <button
@@ -8360,7 +8360,7 @@ export default function ChatRoomPage() {
                     title={chatLocale === 'id' ? 'Draf AI' : 'AI draft'}
                     aria-label={chatLocale === 'id' ? 'Draf AI' : 'AI draft'}
                   >
-                    <Sparkles className="h-4 w-4" />
+                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#e8ddff] text-[#7048b8] dark:bg-[#35264f] dark:text-[#c7aaff]"><Sparkles className="h-4 w-4" /></span>
                   </button>
 
                   <button
@@ -8380,7 +8380,7 @@ export default function ChatRoomPage() {
                     {isUploadingAttachments ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
-                      <Paperclip className="h-4 w-4" />
+                      <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#e8eefc] text-[#4f6fd8] dark:bg-[#25345a] dark:text-[#9db2ff]"><Paperclip className="h-4 w-4" /></span>
                     )}
                   </button>
                 </div>
@@ -8793,7 +8793,7 @@ export default function ChatRoomPage() {
               <div className="mt-3 rounded-2xl border border-[#b7e4cf] bg-[#effdf5] p-3 text-[#134e3a] dark:border-[#214f3b] dark:bg-[#0f241d] dark:text-[#d8fbe7]">
                 <div className="flex items-start gap-2">
                   <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl bg-[#d9fdd3] text-[#008f72] dark:bg-[#103529] dark:text-[#25d366]">
-                    <Sparkles className="h-4 w-4" />
+                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#e8ddff] text-[#7048b8] dark:bg-[#35264f] dark:text-[#c7aaff]"><Sparkles className="h-4 w-4" /></span>
                   </span>
                   <div className="min-w-0">
                     <p className="text-xs font-bold">
@@ -10531,7 +10531,9 @@ export default function ChatRoomPage() {
       {showCameraModal ? (
         <CameraCaptureModal
           open
+          locale={chatLocale}
           onClose={() => setShowCameraModal(false)}
+          onPickFile={handleChooseFile}
           onCapture={file => {
             handleFilesSelected([file]);
           }}
