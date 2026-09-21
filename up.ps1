@@ -185,6 +185,31 @@ try {
         )
     }
 
+    function Test-DockerRegistryFailure {
+        param(
+            [Parameter(Mandatory = $true)]
+            [string]$OutputText
+        )
+
+        # Registry/network failures are transient infrastructure errors, not
+        # application/Dockerfile failures. Keep them out of engine restart logic
+        # and retry with lower build concurrency before giving up.
+        return (
+            $OutputText -match "(?i)TLS handshake timeout" -or
+            $OutputText -match "(?i)context deadline exceeded" -or
+            $OutputText -match "(?i)i/o timeout" -or
+            $OutputText -match "(?i)connection (?:reset|closed) by peer" -or
+            $OutputText -match "(?i)unexpected EOF" -or
+            $OutputText -match "(?i)temporary failure in name resolution" -or
+            $OutputText -match "(?i)network is unreachable" -or
+            $OutputText -match "(?i)registry-1\.docker\.io" -or
+            $OutputText -match "(?i)failed to resolve source metadata" -or
+            $OutputText -match "(?i)too many requests" -or
+            $OutputText -match "(?i)HTTP (?:502|503|504)" -or
+            $OutputText -match "(?i)received unexpected HTTP status"
+        )
+    }
+
     function Test-DockerResourceFailure {
         param(
             [Parameter(Mandatory = $true)]
@@ -644,6 +669,39 @@ try {
                         }
 
                         $env:COMPOSE_PARALLEL_LIMIT = $AdaptiveLimit.ToString()
+                    }
+                    elseif (Test-DockerRegistryFailure -OutputText $BatchBuildText) {
+                        # Docker Hub/registry outages and TLS timeouts are transient.
+                        # Retry the same batch without restarting Docker Desktop.
+                        # Reduce concurrency progressively so registry connection
+                        # pressure drops on flaky/slow networks.
+                        $RegistryRetrySucceeded = $false
+                        for ($RegistryAttempt = 1; $RegistryAttempt -le 3; $RegistryAttempt++) {
+                            if ($RegistryAttempt -gt 1 -and $AdaptiveLimit -gt 1) {
+                                $AdaptiveLimit = [math]::Max(1, [math]::Ceiling($AdaptiveLimit / 2))
+                            }
+                            $env:COMPOSE_PARALLEL_LIMIT = $AdaptiveLimit.ToString()
+                            Write-Warning "Docker registry/network transient detected for batch [$BatchLabel]. Retry $RegistryAttempt/3 dengan paralelisme $AdaptiveLimit..."
+
+                            Start-Sleep -Seconds ([math]::Min(20, $RegistryAttempt * 5))
+                            $RegistryRetryProbe = Invoke-DockerNative -Arguments (@($ComposeArgs) + $BatchBuildArgs)
+                            $RegistryRetryProbe.Output | ForEach-Object { Write-Output $_ }
+
+                            if ($RegistryRetryProbe.ExitCode -eq 0) {
+                                $RegistryRetrySucceeded = $true
+                                Write-Host "Build batch completed after registry/network retry: $BatchLabel" -ForegroundColor Green
+                                break
+                            }
+
+                            $RegistryRetryText = ($RegistryRetryProbe.Output -join [Environment]::NewLine)
+                            if (-not (Test-DockerRegistryFailure -OutputText $RegistryRetryText)) {
+                                throw "Docker Compose build gagal pada batch [$BatchLabel] setelah registry retry karena error non-network. Periksa error build di atas."
+                            }
+                        }
+
+                        if (-not $RegistryRetrySucceeded) {
+                            throw "Docker Compose build gagal pada batch [$BatchLabel] karena Docker registry/network tetap tidak tersedia setelah 3 retry bertahap. Periksa koneksi internet/Docker Hub lalu ulangi launcher."
+                        }
                     }
                     elseif ((Test-DockerResourceFailure -OutputText $BatchBuildText) -and ($AdaptiveLimit -gt 1)) {
                         # Resource exhaustion is different from a broken Dockerfile.
