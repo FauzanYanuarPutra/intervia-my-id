@@ -30,6 +30,10 @@ pub(crate) fn router() -> Router<Arc<AppState>> {
         .route("/v1/news/editorial/metrics", get(get_editorial_metrics))
         .route("/v1/news/{id}/editorial", get(list_editorial_history))
         .route(
+            "/v1/news/{id}/source-review-requests",
+            get(list_source_review_requests).post(create_source_review_request),
+        )
+        .route(
             "/v1/news/{id}/sources/{source_id}",
             patch(update_news_source),
         )
@@ -200,6 +204,24 @@ struct NewsSourceReviewEventRow {
     to_verification_status: String,
     note: Option<String>,
     created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, FromRow)]
+struct NewsSourceReviewRequestRow {
+    id: Uuid,
+    content_id: Uuid,
+    requested_by: Uuid,
+    requested_reviewer_id: Uuid,
+    status: String,
+    note: Option<String>,
+    created_at: DateTime<Utc>,
+    completed_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CreateNewsSourceReviewRequest {
+    requested_reviewer_id: String,
+    note: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -2890,6 +2912,203 @@ async fn get_editorial_metrics(
         .into_response()
 }
 
+async fn list_source_review_requests(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    let reviewer_id = match cms_reviewer_id(&headers, &state) {
+        Some(id) => id,
+        None => return response_error(StatusCode::FORBIDDEN, "cms access required"),
+    };
+    let content_id = match Uuid::parse_str(id.trim()) {
+        Ok(id) => id,
+        Err(_) => return response_error(StatusCode::BAD_REQUEST, "invalid news id"),
+    };
+
+    let rows = match sqlx::query_as::<_, NewsSourceReviewRequestRow>(
+        r#"
+        SELECT
+          id, content_id, requested_by, requested_reviewer_id,
+          status, note, created_at, completed_at
+        FROM news_source_review_requests
+        WHERE content_id = $1
+          AND (
+            requested_by = $2
+            OR requested_reviewer_id = $2
+          )
+        ORDER BY created_at DESC, id DESC
+        LIMIT 100
+        "#,
+    )
+    .bind(content_id)
+    .bind(reviewer_id)
+    .fetch_all(&state.db)
+    .await
+    {
+        Ok(rows) => rows,
+        Err(error) => {
+            tracing::error!("list_source_review_requests query error: {:?}", error);
+            return response_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load source review requests",
+            );
+        }
+    };
+
+    (StatusCode::OK, Json(json!({ "items": rows }))).into_response()
+}
+
+async fn create_source_review_request(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    Json(payload): Json<CreateNewsSourceReviewRequest>,
+) -> impl IntoResponse {
+    let requester_id = match cms_reviewer_id(&headers, &state) {
+        Some(id) => id,
+        None => return response_error(StatusCode::FORBIDDEN, "cms access required"),
+    };
+    let content_id = match Uuid::parse_str(id.trim()) {
+        Ok(id) => id,
+        Err(_) => return response_error(StatusCode::BAD_REQUEST, "invalid news id"),
+    };
+    let requested_reviewer_id = match Uuid::parse_str(payload.requested_reviewer_id.trim()) {
+        Ok(id) => id,
+        Err(_) => return response_error(StatusCode::BAD_REQUEST, "invalid reviewer id"),
+    };
+    if requester_id == requested_reviewer_id {
+        return response_error(StatusCode::CONFLICT, "reviewer must be different from requester");
+    }
+    let note = trimmed(payload.note);
+    if note.as_ref().is_some_and(|value| value.len() > NEWS_MAX_REVIEW_NOTE_LEN) {
+        return response_error(StatusCode::BAD_REQUEST, "review request note is too long");
+    }
+
+    let mut tx = match state.db.begin().await {
+        Ok(tx) => tx,
+        Err(error) => {
+            tracing::error!("create_source_review_request begin transaction error: {:?}", error);
+            return response_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to create source review request",
+            );
+        }
+    };
+
+    let article = match load_news_for_review(&mut tx, content_id).await {
+        Ok(Some(article)) => article,
+        Ok(None) => return response_error(StatusCode::NOT_FOUND, "news article not found"),
+        Err(error) => {
+            tracing::error!("create_source_review_request article lock error: {:?}", error);
+            return response_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to lock news article",
+            );
+        }
+    };
+
+    let current_status = editorial_status(&article.content_status, &article.metadata);
+    if !matches!(current_status.as_str(), "pending_review" | "needs_revision") {
+        return response_error(
+            StatusCode::CONFLICT,
+            "source review requests are only allowed before publication",
+        );
+    }
+
+    let has_verified_source = match has_verified_source_tx(&mut tx, content_id).await {
+        Ok(value) => value,
+        Err(error) => {
+            tracing::error!("create_source_review_request source check error: {:?}", error);
+            return response_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to validate news sources",
+            );
+        }
+    };
+    if !has_verified_source {
+        return response_error(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "verify at least one source before requesting independent review",
+        );
+    }
+
+    let inserted = match sqlx::query_as::<_, NewsSourceReviewRequestRow>(
+        r#"
+        INSERT INTO news_source_review_requests (
+          content_id, requested_by, requested_reviewer_id, status, note
+        )
+        VALUES ($1, $2, $3, 'pending', $4)
+        ON CONFLICT (content_id, requested_reviewer_id)
+          WHERE status = 'pending'
+        DO UPDATE SET note = EXCLUDED.note
+        RETURNING
+          id, content_id, requested_by, requested_reviewer_id,
+          status, note, created_at, completed_at
+        "#,
+    )
+    .bind(content_id)
+    .bind(requester_id)
+    .bind(requested_reviewer_id)
+    .bind(&note)
+    .fetch_one(&mut *tx)
+    .await
+    {
+        Ok(row) => row,
+        Err(error) => {
+            tracing::error!("create_source_review_request insert error: {:?}", error);
+            return response_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to create source review request",
+            );
+        }
+    };
+
+    if let Err(error) = enqueue_news_outbox_tx(
+        &mut tx,
+        &article,
+        Some(requester_id),
+        "news.source.review_requested",
+        "news.editorial.changed",
+    )
+    .await
+    {
+        tracing::error!("create_source_review_request outbox error: {:?}", error);
+        return response_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to enqueue source review request",
+        );
+    }
+
+    if let Err(error) = tx.commit().await {
+        tracing::error!("create_source_review_request commit error: {:?}", error);
+        return response_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to create source review request",
+        );
+    }
+
+    push_notification_best_effort(
+        &state,
+        requested_reviewer_id,
+        "news",
+        "news.source_review.requested",
+        "Review sumber News diperlukan",
+        &format!(
+            "Ada permintaan independent source review untuk "{}".",
+            article.title
+        ),
+        json!({
+            "news_id": content_id,
+            "source_review_request_id": inserted.id,
+            "href": format!("/crm?page=news&news={}&status=pending_review", content_id),
+        }),
+    )
+    .await;
+
+    (StatusCode::CREATED, Json(inserted)).into_response()
+}
+
 async fn update_news_source(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -3101,6 +3320,29 @@ async fn update_news_source(
         );
     }
 
+    if updated.verification_status == "verified" {
+        if let Err(error) = sqlx::query(
+            r#"
+            UPDATE news_source_review_requests
+            SET status = 'completed', completed_at = NOW()
+            WHERE content_id = $1
+              AND requested_reviewer_id = $2
+              AND status = 'pending'
+            "#,
+        )
+        .bind(content_id)
+        .bind(reviewer_id)
+        .execute(&mut *tx)
+        .await
+        {
+            tracing::error!("update_news_source review request completion error: {:?}", error);
+            return response_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to complete source review request",
+            );
+        }
+    }
+
     if let Err(error) = enqueue_news_outbox_tx(
         &mut tx,
         &article,
@@ -3185,6 +3427,21 @@ async fn list_editorial_history(
             .fetch_all(&state.db)
             .await
             .unwrap_or_default();
+            let source_review_requests = sqlx::query_as::<_, NewsSourceReviewRequestRow>(
+                r#"
+                SELECT
+                  id, content_id, requested_by, requested_reviewer_id,
+                  status, note, created_at, completed_at
+                FROM news_source_review_requests
+                WHERE content_id = $1
+                ORDER BY created_at DESC, id DESC
+                LIMIT 100
+                "#,
+            )
+            .bind(content_id)
+            .fetch_all(&state.db)
+            .await
+            .unwrap_or_default();
             let source_reviews = sqlx::query_as::<_, NewsSourceReviewEventRow>(
                 r#"
                 SELECT
@@ -3208,7 +3465,8 @@ async fn list_editorial_history(
                     "items": items,
                     "versions": versions,
                     "sources": sources,
-                    "source_reviews": source_reviews
+                    "source_reviews": source_reviews,
+                    "source_review_requests": source_review_requests
                 })),
             )
                 .into_response()
