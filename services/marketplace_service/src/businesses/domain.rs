@@ -900,6 +900,7 @@ mod tests {
                 "banner_url": "/api/forum/media/banner.webp",
                 "cover_image_url": "/api/forum/media/banner.webp",
                 "store_photo_url": "/api/forum/media/banner.webp",
+                "schedule": "Senin-Minggu 08.00-20.00",
                 "private_note": "never expose this either"
             }
         }));
@@ -908,6 +909,7 @@ mod tests {
         assert_eq!(projected["banner_url"], "/api/forum/media/banner.webp");
         assert_eq!(projected["cover_image_url"], "/api/forum/media/banner.webp");
         assert_eq!(projected["store_photo_url"], "/api/forum/media/banner.webp");
+        assert_eq!(projected["schedule"], "Senin-Minggu 08.00-20.00");
         assert!(!projected.contains_key("private_note"));
     }
 
