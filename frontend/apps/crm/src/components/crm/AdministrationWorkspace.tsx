@@ -171,7 +171,7 @@ export function AdministrationWorkspace() {
   );
 
   return <div className="space-y-5">
-    <PageHeader label="Administrasi" title="Tim & akses" description="Cari akun Lajukan yang terdaftar di WWW → pilih CMS / Content Admin → kirim undangan." />
+    <PageHeader title="Tim & akses" description="Cari akun Lajukan yang terdaftar di WWW → pilih CMS / Content Admin → kirim undangan." />
     <Card className="p-4">
       <div className="flex flex-col gap-3 sm:flex-row">
         <input value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') void search(); }}
