@@ -698,7 +698,7 @@ function CrmLoadingSkeleton() {
           </header>
 
           <main className="min-h-0 flex-1 overflow-auto p-4 sm:p-6">
-            <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <div className="h-3 w-24 animate-pulse rounded-full bg-slate-200" />
               <div className="mt-3 h-8 w-64 animate-pulse rounded-xl bg-slate-200" />
               <div className="mt-2 h-4 w-full max-w-2xl animate-pulse rounded bg-slate-100" />
@@ -1288,7 +1288,7 @@ function Sidebar({
                     } ${collapsed ? "justify-center" : ""}`}
                   title={item.label}
                 >
-                  <Icon name={item.icon} className="h-4.5 w-4.5 shrink-0" />
+                  <Icon name={item.icon} className="h-5 w-5 shrink-0" />
                   {((item.id === "news" && newsPendingCount) || (item.id === "businesses" && businessPendingCount)) ? (
                     <span className={`${collapsed ? "absolute right-1 top-1" : "ml-auto"} min-w-5 rounded-full bg-rose-500 px-1.5 py-0.5 text-center text-[10px] font-black text-white`}>
                       {item.id === "news" ? (newsPendingCount > 99 ? "99+" : newsPendingCount) : (businessPendingCount > 99 ? "99+" : businessPendingCount)}
@@ -1724,8 +1724,8 @@ function PageHeader({ label, title, body }: { label: string; title: string; body
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
       <Badge tone="success">{label}</Badge>
-      <h1 className="mt-3 text-2xl font-bold tracking-[-0.05em] text-slate-950 sm:text-3xl">{title}</h1>
-      <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">{body}</p>
+      <h1 className="mt-1 text-xl font-black tracking-[-0.04em] text-slate-950 sm:text-2xl">{title}</h1>
+      <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-500">{body}</p>
     </section>
   );
 }
