@@ -102,28 +102,114 @@ function PublicReferenceCard({ item, locale }: { item: GlobalSearchItem; locale:
 }
 
 function EntitySkeletonCard({ kind }: { kind: GlobalSearchGroupKey }) {
-  const isWide =
-    kind === 'businesses' || kind === 'references' || kind === 'communities';
-  return (
-    <article
-      className="min-w-0 rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-2.5"
-      data-skeleton-kind={kind}
-    >
-      <Skeleton
-        variant="media"
-        className={cn(
-          'w-full',
-          kind === 'videos' ? 'aspect-[9/16]' : 'aspect-[4/3]',
-        )}
-      />
-      <div className="mt-3 space-y-2">
-        <Skeleton variant="line" className="h-3 w-20" />
-        <Skeleton variant="line" className="h-4 w-4/5" />
-        {isWide ? <SkeletonStack lines={2} /> : null}
-        <div className="flex items-center gap-2 pt-1">
+  const base =
+    'min-w-0 overflow-hidden rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)]';
+
+  if (kind === 'needs') {
+    return (
+      <article className={cn(base, 'flex min-h-[164px] flex-col p-3')} data-skeleton-kind={kind}>
+        <Skeleton variant="line" className="h-3 w-28" />
+        <Skeleton variant="line" className="mt-2 h-4 w-4/5" />
+        <SkeletonStack lines={2} className="mt-2" />
+        <div className="mt-2 flex flex-wrap gap-1.5 border-t border-[color:var(--app-border)] pt-2">
           <Skeleton variant="chip" className="h-7 w-20" />
+          <Skeleton variant="chip" className="h-7 w-24" />
           <Skeleton variant="chip" className="h-7 w-16" />
         </div>
+        <Skeleton variant="line" className="mt-auto pt-2 w-20" />
+      </article>
+    );
+  }
+
+  if (kind === 'communities') {
+    return (
+      <article className={cn(base, 'flex min-h-[168px] flex-col p-3')} data-skeleton-kind={kind}>
+        <Skeleton variant="line" className="h-3 w-24" />
+        <Skeleton variant="line" className="mt-2 h-4 w-4/5" />
+        <Skeleton variant="line" className="mt-2 h-3 w-full" />
+        <div className="mt-3 flex items-center gap-3 border-t border-[color:var(--app-border)] pt-2">
+          <Skeleton variant="line" className="w-10" />
+          <Skeleton variant="line" className="w-12" />
+        </div>
+        <Skeleton variant="chip" className="mt-auto h-8 w-28" />
+      </article>
+    );
+  }
+
+  if (kind === 'users') {
+    return (
+      <article className={cn(base, 'flex min-h-[154px] gap-3 p-3')} data-skeleton-kind={kind}>
+        <Skeleton variant="circle" className="h-16 w-16 shrink-0" />
+        <div className="min-w-0 flex-1">
+          <Skeleton variant="line" className="h-3 w-20" />
+          <Skeleton variant="line" className="mt-2 h-4 w-4/5" />
+          <SkeletonStack lines={2} className="mt-2" />
+          <Skeleton variant="chip" className="mt-2 h-8 w-24" />
+        </div>
+      </article>
+    );
+  }
+
+  if (kind === 'businesses') {
+    return (
+      <article className={cn(base, 'flex min-h-[126px]')} data-skeleton-kind={kind}>
+        <Skeleton variant="block" className="h-auto min-h-full w-[96px] shrink-0 rounded-none" />
+        <div className="flex min-w-0 flex-1 flex-col p-2.5">
+          <Skeleton variant="line" className="h-3 w-24" />
+          <Skeleton variant="line" className="mt-2 h-4 w-4/5" />
+          <Skeleton variant="line" className="mt-2 h-3 w-full" />
+          <Skeleton variant="line" className="mt-2 h-3 w-28" />
+          <Skeleton variant="line" className="mt-auto pt-2 w-20" />
+        </div>
+      </article>
+    );
+  }
+
+  if (kind === 'videos') {
+    return (
+      <article className={cn(base, 'flex h-full flex-col')} data-skeleton-kind={kind}>
+        <Skeleton variant="block" className="aspect-[16/9] w-full rounded-none" />
+        <div className="p-2.5">
+          <Skeleton variant="line" className="h-4 w-4/5" />
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <Skeleton variant="line" className="w-20" />
+            <Skeleton variant="line" className="w-10" />
+          </div>
+        </div>
+      </article>
+    );
+  }
+
+  if (kind === 'references') {
+    return (
+      <article className={cn(base, 'flex h-full flex-col')} data-skeleton-kind={kind}>
+        <Skeleton variant="block" className="aspect-[16/9] w-full rounded-none" />
+        <div className="flex flex-1 flex-col p-3">
+          <Skeleton variant="line" className="h-3 w-28" />
+          <Skeleton variant="line" className="mt-2 h-4 w-4/5" />
+          <Skeleton variant="line" className="mt-2 h-3 w-2/3" />
+          <SkeletonStack lines={2} className="mt-2" />
+          <div className="mt-auto space-y-1.5 pt-3">
+            <Skeleton variant="chip" className="h-8 w-full" />
+            <Skeleton variant="chip" className="h-8 w-4/5" />
+          </div>
+        </div>
+      </article>
+    );
+  }
+
+  return (
+    <article className={cn(base, 'flex h-full flex-col')} data-skeleton-kind={kind}>
+      <Skeleton
+        variant="block"
+        className="aspect-[4/3] w-full rounded-none sm:aspect-[16/10]"
+      />
+      <div className="flex flex-1 flex-col p-2.5 sm:p-3">
+        <Skeleton variant="line" className="h-3 w-24" />
+        <Skeleton variant="line" className="mt-2 h-4 w-4/5" />
+        <Skeleton variant="line" className="mt-2 h-4 w-24" />
+        <SkeletonStack lines={2} className="mt-2" />
+        <Skeleton variant="chip" className="mt-auto h-8 w-24 pt-2" />
       </div>
     </article>
   );
@@ -132,16 +218,26 @@ function EntitySkeletonCard({ kind }: { kind: GlobalSearchGroupKey }) {
 function SkeletonSection({
   kind,
   locale,
+  compact = true,
 }: {
   kind: GlobalSearchGroupKey;
   locale: LajukanLocale;
+  compact?: boolean;
 }) {
   const isId = locale === 'id';
   const copy = SEARCH_GROUP_COPY[kind];
-  const gridClass =
-    kind === 'businesses'
-      ? 'sm:grid-cols-2 lg:grid-cols-3'
-      : 'grid-cols-2 md:grid-cols-3 xl:grid-cols-4';
+  const compactSlideClass =
+    kind === 'videos' || kind === 'products' || kind === 'services'
+      ? 'flex-[0_0_47%] sm:flex-[0_0_31%] lg:flex-[0_0_24%]'
+      : 'flex-[0_0_88%] sm:flex-[0_0_48%] lg:flex-[0_0_32%]';
+  const fullGridClass =
+    kind === 'videos'
+      ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4'
+      : kind === 'products' || kind === 'services'
+        ? 'grid-cols-2 md:grid-cols-3 xl:grid-cols-4'
+        : kind === 'needs'
+          ? 'sm:grid-cols-2 xl:grid-cols-3'
+          : 'sm:grid-cols-2 lg:grid-cols-3';
 
   return (
     <section className="mt-3 rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3.5 sm:p-4">
@@ -153,18 +249,42 @@ function SkeletonSection({
         </div>
         <Skeleton variant="chip" className="h-8 w-20" />
       </div>
-      <div className={`mt-4 grid gap-3 ${gridClass}`}>
-        {Array.from({ length: kind === 'businesses' ? 3 : 4 }).map(
-          (_, index) => (
-            <EntitySkeletonCard key={index} kind={kind} />
-          ),
-        )}
-      </div>
+
+      {compact ? (
+        <div className="mt-4 overflow-hidden">
+          <div className="flex gap-3">
+            {Array.from({ length: kind === 'businesses' ? 3 : 4 }).map(
+              (_, index) => (
+                <div
+                  key={index}
+                  className={cn('min-w-0 shrink-0', compactSlideClass)}
+                >
+                  <EntitySkeletonCard kind={kind} />
+                </div>
+              ),
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className={cn('mt-4 grid gap-3', fullGridClass)}>
+          {Array.from({ length: kind === 'businesses' ? 3 : 4 }).map(
+            (_, index) => (
+              <EntitySkeletonCard key={index} kind={kind} />
+            ),
+          )}
+        </div>
+      )}
     </section>
   );
 }
 
-function SearchSkeleton({ locale }: { locale: LajukanLocale }) {
+function SearchSkeleton({
+  locale,
+  compact = true,
+}: {
+  locale: LajukanLocale;
+  compact?: boolean;
+}) {
   return (
     <section
       className="py-3"
@@ -174,7 +294,7 @@ function SearchSkeleton({ locale }: { locale: LajukanLocale }) {
     >
       <Skeleton variant="line" className="h-5 w-40" />
       {DEFAULT_SEARCH_GROUPS.map(kind => (
-        <SkeletonSection key={kind} kind={kind} locale={locale} />
+        <SkeletonSection key={kind} kind={kind} locale={locale} compact={compact} />
       ))}
     </section>
   );
@@ -345,7 +465,7 @@ export function ExploreSearchResults({ payload, loading, error, locale, compact 
   const visiblePayload: GlobalSearchResponse = safeReferenceItems.length === payload.groups.references.items.length ? payload : { ...payload, groups: { ...payload.groups, references: { ...payload.groups.references, items: safeReferenceItems, total: safeReferenceItems.length === 0 ? 0 : Math.max(safeReferenceItems.length, payload.groups.references.total) } } };
   const referenceNextCursor = activeTab === 'references' ? visiblePayload.groups.references.nextCursor : null;
   const hasVisibleItems = activeTab === 'all' ? DEFAULT_SEARCH_GROUPS.some(key => visiblePayload.groups[key].items.length > 0) : visiblePayload.groups[activeTab as GlobalSearchGroupKey]?.items.length > 0;
-  if (loading && !hasVisibleItems) return <SearchSkeleton locale={locale} />;
+  if (loading && !hasVisibleItems) return <SearchSkeleton locale={locale} compact={compact} />;
   if (error && !hasVisibleItems) return <section className="py-3"><div className="flex flex-col items-start gap-4 rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="flex items-center gap-2 text-sm font-bold"><CircleAlert className="h-4 w-4 text-amber-600" />{isId ? 'Hasil belum bisa dimuat.' : 'Results could not be loaded.'}</p><p className="mt-1 text-xs text-[color:var(--app-text-soft)]">{isId ? 'Coba lagi sebentar.' : 'Please retry in a moment.'}</p></div>{onRetry ? <button type="button" onClick={onRetry} className="min-h-10 rounded-[8px] border px-4 text-xs font-bold">{isId ? 'Coba lagi' : 'Retry'}</button> : null}</div></section>;
   const activeGroupKey = activeTab === 'all' ? null : activeTab as GlobalSearchGroupKey;
   const displayedTotal = activeGroupKey ? visiblePayload.groups[activeGroupKey]?.total || 0 : DEFAULT_SEARCH_GROUPS.reduce((total, key) => total + (visiblePayload.groups[key]?.total || 0), 0);

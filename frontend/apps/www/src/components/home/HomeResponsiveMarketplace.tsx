@@ -2404,9 +2404,52 @@ function HeroVisualStage({
   );
 }
 
+function GameProgressLoadingSkeleton({ compact = false }: { compact?: boolean }) {
+  return (
+    <section
+      className={cn(
+        'relative overflow-hidden rounded-2xl border border-zinc-100 bg-white text-[color:var(--app-text)] shadow-[0_8px_24px_-20px_rgba(15,23,42,0.24)] dark:border-zinc-800/80 dark:bg-zinc-950 dark:text-zinc-50',
+        compact ? 'px-3.5 py-3.5' : 'p-4',
+      )}
+      aria-busy="true"
+      data-skeleton-card="game-progress"
+    >
+      <div className="flex min-w-0 items-center gap-3">
+        <Skeleton className="h-11 w-11 shrink-0 rounded-[13px]" />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <Skeleton variant="line" className="h-4 w-20" />
+            <Skeleton variant="line" className="h-3 w-16" />
+          </div>
+          <Skeleton className="mt-2 h-2 w-full rounded-full" />
+        </div>
+      </div>
+      <div className={cn(
+        'mt-3 grid overflow-hidden rounded-xl border border-zinc-100 bg-zinc-50/70 dark:border-zinc-800 dark:bg-zinc-900/40',
+        compact ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2 sm:grid-cols-4',
+      )}>
+        {Array.from({ length: 4 }).map((_, index) => (
+          <div
+            key={index}
+            className={cn(
+              'min-w-0 px-3 py-2.5',
+              index > 0 && 'border-l border-zinc-100 dark:border-zinc-800',
+              index > 1 && 'border-t sm:border-t-0',
+            )}
+          >
+            <Skeleton variant="line" className="h-3 w-16" />
+            <Skeleton variant="line" className="mt-2 h-4 w-24 max-w-full" />
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function GameProgressCard({
   isId,
   isAuthenticated,
+  authLoading = false,
   summary,
   walletAmountLabel,
   walletModeLabel,
@@ -2415,6 +2458,7 @@ function GameProgressCard({
 }: {
   isId: boolean;
   isAuthenticated: boolean;
+  authLoading?: boolean;
   summary: LajukanSummary | null;
   walletAmountLabel?: string | null;
   walletModeLabel?: string | null;
@@ -2423,6 +2467,10 @@ function GameProgressCard({
 }) {
   if (PROMO_ONLY_MODE) {
     return null;
+  }
+
+  if (authLoading) {
+    return <GameProgressLoadingSkeleton compact={compact} />;
   }
 
   if (!isAuthenticated) {
@@ -2490,6 +2538,10 @@ function GameProgressCard({
         </div>
       </section>
     );
+  }
+
+  if (summary === null) {
+    return <GameProgressLoadingSkeleton compact={compact} />;
   }
 
   const snapshot = buildGameSnapshot(isId, isAuthenticated, summary);
@@ -5640,10 +5692,6 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
         ],
       };
 
-  if (authLoading) {
-    return <HomeLoadingState isId={isId} />;
-  }
-
   return (
     <MarketplacePageFrame>
       <main className="mx-auto w-full max-w-[720px] space-y-3.5 sm:space-y-4 lg:hidden">
@@ -5660,6 +5708,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
           <GameProgressCard
             isId={isId}
             isAuthenticated={isAuthenticated}
+            authLoading={authLoading}
             summary={summary}
             walletAmountLabel={walletAmountLabel}
             walletModeLabel={walletModeLabel}
@@ -5672,6 +5721,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
           <GameProgressCard
             isId={isId}
             isAuthenticated={isAuthenticated}
+            authLoading={authLoading}
             summary={summary}
             walletAmountLabel={walletAmountLabel}
             walletModeLabel={walletModeLabel}
@@ -5758,6 +5808,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
                 <GameProgressCard
                   isId={isId}
                   isAuthenticated={isAuthenticated}
+            authLoading={authLoading}
                   summary={summary}
                   walletAmountLabel={walletAmountLabel}
                   walletModeLabel={walletModeLabel}
@@ -5770,6 +5821,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
                 <GameProgressCard
                   isId={isId}
                   isAuthenticated={isAuthenticated}
+            authLoading={authLoading}
                   summary={summary}
                   walletAmountLabel={walletAmountLabel}
                   walletModeLabel={walletModeLabel}
