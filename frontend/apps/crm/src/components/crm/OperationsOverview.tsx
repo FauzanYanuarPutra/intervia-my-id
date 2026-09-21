@@ -28,7 +28,7 @@ export function OperationsOverview({ data, onOpen }: { data: DashboardData; onOp
       </div>
 
       <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-        {cards.map(([label, value]) => (
+        {cards.map(([label, value, destination]) => (
           <button
             key={String(label)}
             type="button"
