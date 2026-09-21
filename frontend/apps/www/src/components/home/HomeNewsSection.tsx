@@ -1,3 +1,5 @@
+'use client';
+
 import { ArrowRight, Clock3, Newspaper, MapPin } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { buildNewsPath, type LajukanNewsArticle } from '@/lib/news';
