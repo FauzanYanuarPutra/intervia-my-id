@@ -1242,7 +1242,7 @@ function Sidebar({
           }`}
       />
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex h-[100dvh] border-r border-slate-200 bg-white transition-all duration-300 lg:static lg:inset-auto lg:z-auto lg:h-full lg:shrink-0 ${collapsed ? "w-[88px]" : "w-[280px]"
+        className={`fixed inset-y-0 left-0 z-50 flex h-[100dvh] border-r border-slate-200 bg-white transition-all duration-300 lg:static lg:inset-auto lg:z-auto lg:h-full lg:shrink-0 ${collapsed ? "w-[72px]" : "w-[232px]"
           } ${mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
       >
         <div className="flex h-full min-h-0 w-full flex-col p-4">
@@ -1252,8 +1252,8 @@ function Sidebar({
             </span>
             {!collapsed ? (
               <div className="min-w-0">
-                <p className="text-base font-bold tracking-[-0.04em] text-slate-950">Lajukan CRM</p>
-                <p className="text-xs font-semibold text-slate-500">Admin marketplace</p>
+                <p className="text-base font-bold tracking-[-0.04em] text-slate-950">Lajukan</p>
+                <p className="text-[11px] font-semibold text-slate-400">CRM</p>
               </div>
             ) : null}
           </div>
@@ -1295,10 +1295,7 @@ function Sidebar({
                     </span>
                   ) : null}
                   {!collapsed ? (
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm font-bold">{item.label}</span>
-                      <span className="block truncate text-[11px] font-medium text-slate-400">{item.hint}</span>
-                    </span>
+                    <span className="min-w-0 truncate text-sm font-bold">{item.label}</span>
                   ) : null}
                 </button>
                 </React.Fragment>
@@ -1306,17 +1303,10 @@ function Sidebar({
             })}
           </nav>
 
-          <div className="mt-4 shrink-0 rounded-2xl border border-slate-200 bg-slate-50 p-3">
-            {!collapsed ? (
-              <>
-                <p className="text-xs font-bold text-slate-900">CRM Operator</p>
-                <p className="mt-1 text-xs leading-5 text-slate-500">
-                  Data real → antrean → tindakan → audit → efek ke produk.
-                </p>
-              </>
-            ) : (
-              <Badge tone="success">v1</Badge>
-            )}
+          <div className="mt-3 shrink-0 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+              {!collapsed ? "Internal" : "CRM"}
+            </p>
           </div>
         </div>
       </aside>
@@ -1373,14 +1363,14 @@ function TopBar({
         </button>
         <div className="hidden min-w-[150px] sm:block">
           <p className="text-sm font-bold text-slate-950">{page.label}</p>
-          <p className="text-xs font-semibold text-slate-500">{page.hint}</p>
+          <p className="text-xs font-medium text-slate-400">Lajukan CRM</p>
         </div>
         <label className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 text-slate-500 focus-within:border-emerald-300 focus-within:bg-white focus-within:ring-4 focus-within:ring-emerald-100">
           <Icon name="search" className="h-4 w-4 shrink-0" />
           <input
             value={query}
             onChange={event => onQueryChange(event.target.value)}
-            placeholder="Cari user, usaha, listing, transaksi..."
+            placeholder="Cari user, usaha, listing..."
             className="min-w-0 flex-1 bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400"
           />
         </label>
@@ -1390,7 +1380,7 @@ function TopBar({
           disabled={refreshing}
           className="hidden min-h-11 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60 sm:inline-flex sm:items-center"
         >
-          {refreshing ? "Memuat..." : "Refresh"}
+          {refreshing ? "Memuat…" : "Muat ulang"}
         </button>
 
         <div className="relative">
