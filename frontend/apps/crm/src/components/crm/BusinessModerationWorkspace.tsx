@@ -300,16 +300,13 @@ export default function BusinessModerationWorkspace() {
   }
 
   return (
-    <div className="space-y-5">
-      <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-        <p className="text-xs font-bold uppercase tracking-[0.14em] text-emerald-700">Usaha & Verifikasi</p>
-        <h1 className="mt-2 text-2xl font-bold tracking-[-0.05em] text-slate-950 sm:text-3xl">
+    <div className="space-y-4">
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-700">Usaha</p>
+        <h1 className="mt-1 text-xl font-black tracking-[-0.04em] text-slate-950 sm:text-2xl">
           Tinjau usaha yang tampil di sekitar pengguna
         </h1>
-        <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-500">
-          CRM dapat meninjau kelengkapan profil, meminta pemilik melengkapi data, menyembunyikan usaha dari publik,
-          memulihkan penayangan, dan melihat alasan serta riwayat setiap keputusan.
-        </p>
+        <p className="mt-1 text-xs leading-5 text-slate-500">Review kelengkapan, verifikasi, penayangan, dan history keputusan.</p>
       </section>
 
       {notice ? (
@@ -318,12 +315,12 @@ export default function BusinessModerationWorkspace() {
         </div>
       ) : null}
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-2">
+      <div className="rounded-xl border border-slate-200 bg-white p-1.5">
         <div className="grid grid-cols-2 gap-2">
           <button
             type="button"
             onClick={() => setActiveTab("businesses")}
-            className={`rounded-xl px-3 py-2.5 text-xs font-bold ${activeTab === "businesses" ? "bg-emerald-600 text-white" : "bg-slate-50 text-slate-600"}`}
+            className={`rounded-lg px-3 py-2 text-xs font-bold ${activeTab === "businesses" ? "bg-emerald-600 text-white" : "bg-slate-50 text-slate-600"}`}
           >
             Usaha terdaftar
             <span className="ml-1 opacity-70">({businesses.length})</span>
@@ -339,7 +336,7 @@ export default function BusinessModerationWorkspace() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-3">
+      <div className="rounded-xl border border-slate-200 bg-white p-2.5">
         <div className="flex flex-col gap-2 lg:flex-row">
           <input
             value={query}
@@ -348,13 +345,13 @@ export default function BusinessModerationWorkspace() {
               if (event.key === "Enter") void loadBusinesses();
             }}
             placeholder="Cari nama usaha, kota, alamat..."
-            className="min-h-11 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold outline-none focus:border-emerald-300 focus:bg-white"
+            className="min-h-10 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold outline-none focus:border-emerald-300 focus:bg-white"
           />
           {activeTab === "businesses" ? (
             <select
               value={status}
               onChange={event => setStatus(event.target.value)}
-              className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold"
+              className="min-h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold"
             >
               <option value="all">Semua status</option>
               <option value="needs_review">Perlu ditinjau</option>
@@ -385,7 +382,7 @@ export default function BusinessModerationWorkspace() {
       </div>
 
       {loading ? (
-        <div className="rounded-3xl border border-slate-200 bg-white p-8 text-sm font-semibold text-slate-500">
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm font-semibold text-slate-500">
           Memuat data usaha...
         </div>
       ) : activeTab === "references" ? (
