@@ -41,7 +41,7 @@ export function PipelineWorkspace({leads}:{leads:CrmLead[]}) {
   }
 
   return <div className="space-y-4">
-    <PageHeader label="Pipeline" title="Follow-up prospek sampai deal." description="Pilih stage langsung dari kartu lead." />
+    <PageHeader title="Follow-up prospek sampai deal." description="Pilih stage langsung dari kartu lead." />
     {notice ? <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">{notice}</div> : null}
     <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-2 xl:mx-0 xl:grid xl:grid-cols-5 xl:overflow-visible xl:px-0">
       {PIPELINE_COLUMNS.map(column=> {
