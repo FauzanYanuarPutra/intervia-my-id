@@ -94,24 +94,27 @@ def validate_manifest(data: dict) -> list[str]:
 def validate_service_code(data: dict) -> list[str]:
     errors: list[str] = []
 
-    implemented = {
+    service_entries = {
         item["service"]: item
         for item in data.get("services", [])
-        if item.get("status") == "implemented"
+        if item.get("status") in {"implemented", "target"}
     }
     database_hosts = {
         item.get("database")
-        for item in implemented.values()
+        for item in service_entries.values()
         if item.get("database")
     }
 
-    for service, item in implemented.items():
+    for service, item in service_entries.items():
         service_dir = SERVICES / service
         declared_db = item.get("database")
         if not service_dir.exists():
-            errors.append(f"{service}: declared implemented service directory is missing")
+            errors.append(f"{service}: declared service directory is missing")
             continue
 
+        # A target service is already a data-owner boundary even while traffic
+        # still runs in compatibility mode. Scanning it here prevents a new
+        # extraction from quietly reintroducing cross-domain SQL access.
         for path in iter_source_files(service_dir):
             try:
                 content = path.read_text(encoding="utf-8")
@@ -128,8 +131,6 @@ def validate_service_code(data: dict) -> list[str]:
             # Also catch explicit foreign *_db tokens in configuration/source.
             for token in DB_TOKEN_RE.findall(content):
                 if token in database_hosts and token != declared_db:
-                    # Ignore documentation/config samples that are outside runtime
-                    # source; this scanner is only for service source/config files.
                     errors.append(
                         f"{service}: foreign database token {token!r} referenced in "
                         f"{path.relative_to(ROOT)}"
