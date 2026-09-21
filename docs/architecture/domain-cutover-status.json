@@ -1,0 +1,64 @@
+{
+  "version": 1,
+  "updated_at": "2026-09-21",
+  "principle": "A target domain is cutover-scripted only when its backfill SQL, verification checks, and runner case exist together. Deferred domains remain explicit instead of being silently skipped.",
+  "domains": {
+    "profile": {
+      "status": "backfill-scripted",
+      "database": "profile_db"
+    },
+    "media": {
+      "status": "deferred",
+      "database": "media_db",
+      "reason": "Legacy media state spans object-storage/upload surfaces and is not safely represented by the relational SQL-only backfill runner."
+    },
+    "news": {
+      "status": "backfill-scripted",
+      "database": "news_db"
+    },
+    "order": {
+      "status": "backfill-scripted",
+      "database": "order_db"
+    },
+    "payment": {
+      "status": "backfill-scripted",
+      "database": "payment_db",
+      "critical": true
+    },
+    "promotion": {
+      "status": "backfill-scripted",
+      "database": "promotion_db"
+    },
+    "crm": {
+      "status": "backfill-scripted",
+      "database": "crm_db"
+    },
+    "communication": {
+      "status": "backfill-scripted",
+      "database": "communication_db"
+    },
+    "trust": {
+      "status": "backfill-scripted",
+      "database": "trust_db",
+      "critical": true
+    },
+    "support": {
+      "status": "backfill-scripted",
+      "database": "support_db"
+    },
+    "review": {
+      "status": "backfill-scripted",
+      "database": "review_db"
+    },
+    "search": {
+      "status": "deferred",
+      "database": null,
+      "reason": "Search is a rebuildable projection and does not use the relational domain cutover runner."
+    },
+    "audit": {
+      "status": "deferred",
+      "database": "audit_db",
+      "reason": "Audit sink extraction requires an immutable append-only retention and replay plan before traffic cutover."
+    }
+  }
+}
