@@ -1,10 +1,16 @@
+'use client';
+
 import { LocalizedAnchor as Link } from '@/components/navigation/LocalizedAnchor';
+import { HomeNewsSection } from '@/components/home/HomeNewsSection';
+import { useHomeNews } from '@/components/home/HomeNewsContext';
 
 type FeedColumnFooterProps = {
   isId: boolean;
 };
 
 export function FeedColumnFooter({ isId }: FeedColumnFooterProps) {
+  const { items: newsItems } = useHomeNews();
+
   const links = [
     { href: '/about', label: isId ? 'Tentang' : 'About' },
     { href: '/support', label: isId ? 'Bantuan' : 'Support' },
@@ -14,31 +20,35 @@ export function FeedColumnFooter({ isId }: FeedColumnFooterProps) {
   ];
 
   return (
-    <footer
-      data-testid="feed-column-footer"
-      className="border-t border-[color:var(--app-border)] px-3 pb-2 pt-5 text-center text-[11px] text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)]"
-    >
-      <nav
-        aria-label={isId ? 'Tautan informasi' : 'Information links'}
-        className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2"
+    <>
+      <HomeNewsSection locale={isId ? 'id' : 'en'} items={newsItems} />
+
+      <footer
+        data-testid="feed-column-footer"
+        className="border-t border-[color:var(--app-border)] px-3 pb-2 pt-5 text-center text-[11px] text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)]"
       >
-        {links.map(item => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className="font-semibold transition hover:text-[color:var(--app-accent-strong)] hover:underline"
-          >
-            {item.label}
-          </Link>
-        ))}
-      </nav>
-      <p className="mt-3">
-        &copy; {new Date().getFullYear()} Lajukan Indonesia
-        <span aria-hidden="true"> · </span>
-        {isId
-          ? 'Jelas kebutuhannya, tepat mitranya.'
-          : 'Clear needs, better-matched partners.'}
-      </p>
-    </footer>
+        <nav
+          aria-label={isId ? 'Tautan informasi' : 'Information links'}
+          className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2"
+        >
+          {links.map(item => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="font-semibold transition hover:text-[color:var(--app-accent-strong)] hover:underline"
+            >
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+        <p className="mt-3">
+          &copy; {new Date().getFullYear()} Lajukan Indonesia
+          <span aria-hidden="true"> · </span>
+          {isId
+            ? 'Jelas kebutuhannya, tepat mitranya.'
+            : 'Clear needs, better-matched partners.'}
+        </p>
+      </footer>
+    </>
   );
 }
