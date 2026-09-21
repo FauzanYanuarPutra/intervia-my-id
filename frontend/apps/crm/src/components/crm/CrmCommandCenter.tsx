@@ -1043,7 +1043,6 @@ export default function CrmCommandCenter() {
     [accessToken],
   );
 
-  const transactions = useMemo(() => normalizeTransactions(data.orders), [data.orders]);
   const operationPriorities = useMemo(() => buildOperationsPriorities({ leads: data.leads, tickets: data.tickets, orders: data.orders, chats: data.chats, users: data.users, listings: data.listings, newsPendingCount }), [data, newsPendingCount]);
 
   const filteredData = useMemo(() => {
@@ -1114,8 +1113,6 @@ export default function CrmCommandCenter() {
           onCloseMobile={() => setMobileNavOpen(false)}
           onSelect={page => navigatePage(page)}
           onToggle={() => setCollapsed(current => !current)}
-          newsPendingCount={newsPendingCount}
-          businessPendingCount={businessPendingCount}
           navBadges={navBadges}
         />
 
@@ -1240,8 +1237,6 @@ function Sidebar({
   onCloseMobile,
   onSelect,
   onToggle,
-  newsPendingCount,
-  businessPendingCount,
   navBadges,
 }: {
   activePage: PageId;
@@ -1250,8 +1245,6 @@ function Sidebar({
   onCloseMobile: () => void;
   onSelect: (page: PageId) => void;
   onToggle: () => void;
-  newsPendingCount: number;
-  businessPendingCount: number;
   navBadges: Record<string, number>;
 }) {
   return (
