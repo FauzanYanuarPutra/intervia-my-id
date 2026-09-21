@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card, EmptyState, PageHeader, StatusBadge } from 'lajukan-ui';
 import { useAuth } from '@/context/AuthContext';
 import { superAppApi, type SuperAppOrderDetail } from '@/lib/api';
@@ -9,10 +9,26 @@ import { rankRiskTransactions } from './queues';
 
 const money=(c:number)=>new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(Math.max(0,c)/100);
 
+function readOrderIdFromUrl(): string {
+  if (typeof window === 'undefined') return '';
+  return new URLSearchParams(window.location.search).get('order') || '';
+}
+
+function writeOrderUrl(id: string, mode: 'push' | 'replace' = 'push'): void {
+  if (typeof window === 'undefined') return;
+  const url = new URL(window.location.href);
+  url.searchParams.set('page', 'transactions');
+  if (id) url.searchParams.set('order', id);
+  else url.searchParams.delete('order');
+  const next = url.pathname + url.search + url.hash;
+  if (mode === 'replace') window.history.replaceState({ crmOrder: id }, '', next);
+  else window.history.pushState({ crmOrder: id }, '', next);
+}
+
 export function TransactionWorkspace({transactions}:{transactions:CrmTransactionRow[]}) {
   const { accessToken } = useAuth();
   const items=rankRiskTransactions(transactions);
-  const [selectedId,setSelectedId]=useState('');
+  const [selectedId,setSelectedId]=useState(() => readOrderIdFromUrl());
   const [detail,setDetail]=useState<SuperAppOrderDetail|null>(null);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
@@ -20,6 +36,7 @@ export function TransactionWorkspace({transactions}:{transactions:CrmTransaction
   async function openOrder(id:string) {
     if (!accessToken) return;
     setSelectedId(id);
+    writeOrderUrl(id);
     setBusy(true);
     setError('');
     try {
@@ -32,8 +49,31 @@ export function TransactionWorkspace({transactions}:{transactions:CrmTransaction
     }
   }
 
+  useEffect(() => {
+    const handlePopState = () => setSelectedId(readOrderIdFromUrl());
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  useEffect(() => {
+    if (!selectedId) return;
+    if (!items.some(item => item.id === selectedId)) {
+      setSelectedId('');
+      setDetail(null);
+      writeOrderUrl('', 'replace');
+      return;
+    }
+    if (!detail && !busy && accessToken) {
+      void openOrder(selectedId);
+    }
+  }, [accessToken, busy, detail, items, selectedId]);
+
   return <div className="space-y-5">
-    <PageHeader title="Transactions" description="Order bermasalah dan berisiko tampil lebih dulu; detail dan event berasal langsung dari order yang dimuat."/>
+    <PageHeader title="Transactions" description="Order adalah transaksi yang benar-benar terjadi. CRM dipakai untuk memantau status, risiko, nominal, dan event; perubahan bisnis tetap melewati API domain."/>
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-600">
+      <strong className="text-slate-900">Kapan buka halaman ini?</strong>{' '}
+      Saat ada order disputed/berisiko atau kamu perlu menelusuri event transaksi. Klik detail untuk melihat jejak backend.
+    </div>
     {error?<div className="rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-800">{error}</div>:null}
     <div className="grid gap-3 lg:grid-cols-2">
       {items.map(tx=><Card key={tx.id} className="p-4">
