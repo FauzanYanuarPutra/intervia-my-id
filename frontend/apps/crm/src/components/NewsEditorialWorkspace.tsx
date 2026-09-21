@@ -324,7 +324,7 @@ export default function NewsEditorialWorkspace({
         setQueueHasMore(value.has_more === true);
         setItems(nextItems);
         setSelectedId(nextSelected?.id || '');
-        writeNewsIdUrl(nextSelected?.id || '', 'replace');
+        writeNewsUrl(nextSelected?.id || '', nextStatus, 'replace');
         applySelected(nextSelected);
         if (nextSelected) void loadHistory(nextSelected.id);
       } catch (err) {
