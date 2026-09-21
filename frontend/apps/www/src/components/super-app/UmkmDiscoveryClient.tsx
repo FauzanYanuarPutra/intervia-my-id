@@ -336,8 +336,8 @@ export function UmkmDiscoveryClient(props: UmkmDiscoveryClientProps) {
               className={cn(
                 'inline-flex min-h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-[11px] font-bold shadow-[0_12px_26px_-24px_rgba(15,23,42,0.28)] transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)]',
                 cleanedCity
-                  ? 'border-white/80 bg-white/92 text-slate-700 hover:text-[color:var(--app-accent)] dark:border-white/10 dark:bg-slate-950/86 dark:text-slate-100'
-                  : 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]',
+                  ? 'border-slate-200 bg-white text-slate-700 hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100'
+                  : 'border-[color:var(--app-accent-border)] bg-white text-[color:var(--app-accent)] shadow-[0_10px_22px_-18px_rgba(15,23,42,0.24)] dark:border-[color:var(--app-accent-border)] dark:bg-slate-900 dark:text-[color:var(--app-accent)]',
               )}
             >
               <MapPin className="h-3.5 w-3.5" />
@@ -352,7 +352,7 @@ export function UmkmDiscoveryClient(props: UmkmDiscoveryClientProps) {
                     ? `Hapus filter kota ${cleanedCity}`
                     : `Clear city filter ${cleanedCity}`
                 }
-                className="inline-flex min-h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent)] px-3 text-[11px] font-bold text-white shadow-[0_12px_26px_-24px_rgba(15,23,42,0.28)] transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                className="inline-flex min-h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-[color:var(--app-accent-border)] bg-white px-3 text-[11px] font-bold text-[color:var(--app-accent)] shadow-[0_12px_26px_-24px_rgba(15,23,42,0.20)] transition hover:-translate-y-0.5 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] dark:bg-slate-900 dark:text-[color:var(--app-accent)]"
               >
                 <MapPin className="h-3.5 w-3.5" />
                 {cleanedCity}
@@ -371,8 +371,8 @@ export function UmkmDiscoveryClient(props: UmkmDiscoveryClientProps) {
                   className={cn(
                     'inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[11px] font-bold shadow-[0_12px_26px_-24px_rgba(15,23,42,0.28)] transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)]',
                     active
-                      ? 'cursor-default border-[color:var(--app-accent-border)] bg-[color:var(--app-accent)] text-white'
-                      : 'cursor-pointer border-white/80 bg-white/92 text-slate-700 hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:border-white/10 dark:bg-slate-950/86 dark:text-slate-100',
+                      ? 'cursor-default border-[color:var(--app-accent-border)] bg-white text-[color:var(--app-accent)] shadow-[0_10px_22px_-18px_rgba(15,23,42,0.24)] dark:bg-slate-900 dark:text-[color:var(--app-accent)]'
+                      : 'cursor-pointer border-slate-200 bg-white text-slate-700 hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100',
                   )}
                 >
                   <Icon className="h-3.5 w-3.5" />
@@ -384,7 +384,12 @@ export function UmkmDiscoveryClient(props: UmkmDiscoveryClientProps) {
               type="button"
               onClick={() => setShowAllLanes(current => !current)}
               aria-expanded={showAllLanes}
-              className="inline-flex min-h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-white/80 bg-white/92 px-3 text-[11px] font-bold text-slate-700 shadow-[0_12px_26px_-24px_rgba(15,23,42,0.28)] transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] dark:border-white/10 dark:bg-slate-950/86 dark:text-slate-100"
+              className={cn(
+                'inline-flex min-h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-[11px] font-bold shadow-[0_12px_26px_-24px_rgba(15,23,42,0.28)] transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)]',
+                showAllLanes
+                  ? 'border-[color:var(--app-accent-border)] bg-white text-[color:var(--app-accent)] shadow-[0_10px_22px_-18px_rgba(15,23,42,0.24)] dark:bg-slate-900 dark:text-[color:var(--app-accent)]'
+                  : 'border-slate-200 bg-white text-slate-700 hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100',
+              )}
             >
               {showAllLanes
                 ? isId

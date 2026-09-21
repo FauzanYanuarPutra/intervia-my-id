@@ -195,12 +195,12 @@ function ProductCard({
             {formatIdr(product.price_cents)}
           </span>
           <span
-            className={`inline-flex items-center gap-1 text-xs font-medium ${
+            className={`inline-flex min-h-6 items-center gap-1.5 rounded-full px-2.5 text-[11px] font-semibold ${
               stockStatus === 'in_stock'
-                ? 'text-emerald-600 dark:text-emerald-300'
+                ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-950/45 dark:text-emerald-200 dark:ring-emerald-900/70'
                 : stockStatus === 'unknown'
-                  ? 'text-amber-600 dark:text-amber-300'
-                  : 'text-slate-400 dark:text-slate-500'
+                  ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-100 dark:bg-amber-950/45 dark:text-amber-200 dark:ring-amber-900/70'
+                  : 'bg-slate-100 text-slate-500 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:ring-slate-700'
             }`}
           >
             <span className="h-1.5 w-1.5 rounded-full bg-current" />
