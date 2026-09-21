@@ -348,7 +348,7 @@ export default async function TokoPage({ params }: PageProps) {
   });
   const hasFixedLocation =
     place.locationMode === 'fixed' && hasValidCoordinates;
-  const explicitOpenHours = readMetaText(metadata, 'open_hours');
+  const explicitOpenHours = readMetaText(metadata, 'open_hours', 'schedule');
   const hasScheduleEvidence =
     Boolean(explicitOpenHours) ||
     hasMetaKey(
