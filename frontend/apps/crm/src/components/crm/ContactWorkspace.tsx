@@ -85,28 +85,22 @@ export function ContactWorkspace({
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <PageHeader
         title="Kontak & User"
         description="Cari user real, pahami status KYC/trust, lalu buka Customer 360. Action trust mengubah state backend dan harus dipakai untuk keputusan operasional."
       />
 
-      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-600">
-        <strong className="text-slate-900">Apa bedanya User dan Lead?</strong>{' '}
-        User adalah akun yang sudah ada di Identity. Lead adalah peluang/follow-up bisnis yang belum tentu sudah menjadi customer atau transaksi.
-        Pilih user untuk melihat konteks transaksi, listing, ticket, dan trust yang tersedia.
-      </div>
-
       <input
         value={query}
         onChange={event => setQuery(event.target.value)}
-        placeholder="Cari nama, handle, role, atau kota"
+        placeholder="Cari nama, @handle, role, atau kota"
         className="min-h-11 w-full rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-4 text-sm outline-none focus:ring-4 focus:ring-emerald-100"
       />
 
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
         {filtered.map(user => (
-          <Card key={user.id} className="p-4">
+          <Card key={user.id} className="p-3">
             <button type="button" onClick={() => selectUser(user.id)} className="w-full text-left">
               <div className="flex items-start justify-between gap-2">
                 <div>
@@ -122,14 +116,14 @@ export function ContactWorkspace({
               </p>
             </button>
 
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button onClick={() => onTrustAction(user, 'approve')} className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white">
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              <button onClick={() => onTrustAction(user, 'approve')} className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[11px] font-bold text-white">
                 Approve
               </button>
-              <button onClick={() => onTrustAction(user, 'reject')} className="rounded-xl border border-rose-200 px-3 py-2 text-xs font-bold text-rose-700">
+              <button onClick={() => onTrustAction(user, 'reject')} className="rounded-lg border border-rose-200 px-2.5 py-1.5 text-[11px] font-bold text-rose-700">
                 Reject
               </button>
-              <button onClick={() => onTrustAction(user, user.manualHold ? 'release' : 'hold')} className="rounded-xl border border-[color:var(--color-border)] px-3 py-2 text-xs font-bold">
+              <button onClick={() => onTrustAction(user, user.manualHold ? 'release' : 'hold')} className="rounded-lg border border-[color:var(--color-border)] px-2.5 py-1.5 text-[11px] font-bold">
                 {user.manualHold ? 'Lepas hold' : 'Hold'}
               </button>
             </div>
