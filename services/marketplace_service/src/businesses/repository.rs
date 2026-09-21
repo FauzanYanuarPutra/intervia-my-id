@@ -345,6 +345,7 @@ impl BusinessRepository {
                       || jsonb_build_object(
                         'category', $8::text,
                         'schedule', $9::text,
+                        'open_hours', $9::text,
                         'locationQuery', $10::text
                       )
                       || COALESCE($11::jsonb, '{}'::jsonb)
