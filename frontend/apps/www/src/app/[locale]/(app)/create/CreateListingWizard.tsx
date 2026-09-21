@@ -2779,85 +2779,254 @@ export default function CreateListingWizard({
         step = currentStep,
         nextValues = values,
         nextMedia = media,
+        options: {
+          autosave?: boolean;
+        } = {},
       ): Promise<void> => {
-        if (
-          !isAuthenticated ||
-          step < 4
-        ) {
+        if (!isAuthenticated || step < 4) {
           return;
         }
 
-        saveRequestedRef.current =
-          false;
+        saveRequestedRef.current = false;
 
-        /*
-         * Serialize saves.
-         * This avoids:
-         *
-         * PATCH v1
-         * PATCH v1
-         * PATCH v2
-         *
-         * finishing in the wrong order.
-         */
-        if (
-          saveInFlightRef.current
-        ) {
-          saveRequestedRef.current =
-            true;
-
+        if (saveInFlightRef.current) {
+          saveRequestedRef.current = true;
           await saveInFlightRef.current;
-
-          if (
-            saveRequestedRef.current
-          ) {
+          if (saveRequestedRef.current) {
             return saveServerDraft(
               step,
               nextValues,
               nextMedia,
+              options,
             );
           }
-
           return;
         }
 
-        const execute =
-          async () => {
-            let draft =
-              serverDraftRef.current;
+        const execute = async () => {
+          setSaveStatus('saving');
 
-            if (!draft?.id) {
-              draft =
-                await createServerDraft();
+          if (editingContentId) {
+            const savePayload = buildSavePayload(
+              step,
+              nextValues,
+              nextMedia,
+            );
+
+            const persistedMedia = nextMedia
+              .filter(
+                item =>
+                  item.status === 'uploaded' &&
+                  Boolean(item.url),
+              )
+              .map(item => ({
+                id: item.id,
+                name: item.name,
+                url: normalizeContentMediaUrl(item.url || ''),
+                status: 'uploaded' as const,
+              }))
+              .filter(item => Boolean(item.url));
+
+            const imageUrls = Array.from(
+              new Set(
+                persistedMedia.map(item => item.url),
+              ),
+            );
+
+            const metadata = {
+              ...(editingContentMetadata || {}),
+              form_values: savePayload.values,
+              media: persistedMedia,
+              image_urls: imageUrls,
+              gallery_images: imageUrls,
+              attributes: savePayload.attributes,
+              contact_snapshot:
+                savePayload.contact_snapshot,
+              listing_intent: intent,
+              intent,
+              market_side:
+                intent === 'request' ? 'demand' : 'supply',
+              listing_side:
+                intent === 'request' ? 'demand' : 'supply',
+              marketplace_category_slug: categorySlug,
+              marketplace_subcategory_slug: subcategorySlug,
+              industry_ids:
+                submissionIndustryIds(industryIds),
+              listing_progress: {
+                current_step: step,
+                completion_percentage:
+                  savePayload.completion_percentage,
+              },
+            };
+
+            const directPayload = {
+              content_type:
+                editingContentType ||
+                category?.contentType ||
+                valueAsString(metadata.content_type) ||
+                'product',
+              title: savePayload.title,
+              summary: savePayload.summary,
+              body: savePayload.body,
+              pricing_mode: savePayload.pricing_mode,
+              price_cents: savePayload.price_cents,
+              price_unit: savePayload.price_unit,
+              cover_image:
+                imageUrls[0] || undefined,
+              image_urls: imageUrls,
+              gallery_images: imageUrls,
+              category:
+                editingContentType ||
+                category?.contentType ||
+                valueAsString(metadata.category),
+              metadata,
+              content_status: 'active',
+            };
+
+            let response: Response | null = null;
+            let payload: unknown = null;
+            let lastError: unknown = null;
+
+            for (let attempt = 0; attempt < 3; attempt += 1) {
+              try {
+                const headers: Record<string, string> = {
+                  'Content-Type': 'application/json',
+                };
+                if (options.autosave) {
+                  headers['x-lajukan-autosave'] = '1';
+                }
+
+                response = await authFetch(
+                  '/api/content/' +
+                    encodeURIComponent(editingContentId),
+                  {
+                    method: 'PUT',
+                    headers,
+                    body: JSON.stringify(directPayload),
+                  },
+                );
+                payload = await readResponseJson(response);
+                if (response.ok) {
+                  lastError = null;
+                  break;
+                }
+
+                lastError = new Error(
+                  responseErrorMessage(
+                    payload,
+                    text(
+                      locale,
+                      'Perubahan belum berhasil disimpan.',
+                      'The changes could not be saved.',
+                    ),
+                  ),
+                );
+                const retryable =
+                  response.status === 408 ||
+                  response.status === 425 ||
+                  response.status === 429 ||
+                  response.status >= 500;
+                if (!retryable) break;
+              } catch (caught) {
+                lastError = caught;
+              }
+
+              if (attempt < 2) {
+                await new Promise(resolve =>
+                  window.setTimeout(
+                    resolve,
+                    700 * (attempt + 1),
+                  ),
+                );
+              }
             }
 
-            if (!draft?.id) {
-              throw new Error(
-                text(
-                  locale,
-                  'Draft belum siap disimpan.',
-                  'The draft is not ready to be saved.',
-                ),
+            if (!response?.ok) {
+              throw (
+                lastError instanceof Error
+                  ? lastError
+                  : new Error(
+                      text(
+                        locale,
+                        'Perubahan belum berhasil disimpan.',
+                        'The changes could not be saved.',
+                      ),
+                    )
               );
             }
 
-            setSaveStatus(
-              'saving',
-            );
+            const updatedRecord =
+              valueAsRecord(payload?.item) ||
+              valueAsRecord(payload?.content) ||
+              valueAsRecord(payload?.data) ||
+              valueAsRecord(payload) ||
+              {};
+            if (updatedRecord.metadata) {
+              setEditingContentMetadata(
+                valueAsRecord(updatedRecord.metadata) ||
+                metadata,
+              );
+            }
+            setSaveStatus('saved');
+            setLastSavedAt(new Date().toISOString());
+            return;
+          }
 
-            let response =
-              await authFetch(
-                `/api/listing-drafts/${encodeURIComponent(
-                  draft.id,
-                )}`,
-                {
-                  method: 'PATCH',
-                  headers: {
-                    'Content-Type':
-                      'application/json',
-                  },
-                  body:
-                    JSON.stringify(
+          let draft = serverDraftRef.current;
+          if (!draft?.id) {
+            draft = await createServerDraft();
+          }
+          if (!draft?.id) {
+            throw new Error(
+              text(
+                locale,
+                'Draft belum siap disimpan.',
+                'The draft is not ready to be saved.',
+              ),
+            );
+          }
+
+          let response = await authFetch(
+            '/api/listing-drafts/' +
+              encodeURIComponent(draft.id),
+            {
+              method: 'PATCH',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(
+                buildSavePayload(
+                  step,
+                  nextValues,
+                  nextMedia,
+                ),
+              ),
+            },
+          );
+          let payload = await readResponseJson(response);
+
+          if (!response.ok && isVersionConflict(response, payload)) {
+            const reload = await authFetch(
+              '/api/listing-drafts/' +
+                encodeURIComponent(draft.id),
+              { cache: 'no-store' },
+            );
+            if (reload.ok) {
+              const reloadPayload = await readResponseJson(reload);
+              const fresh = valueAsRecord(reloadPayload.draft);
+              if (fresh.id) {
+                syncServerDraftState(
+                  fresh as unknown as ServerDraft,
+                );
+                response = await authFetch(
+                  '/api/listing-drafts/' +
+                    encodeURIComponent(draft.id),
+                  {
+                    method: 'PATCH',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(
                       buildSavePayload(
                         step,
                         nextValues,
@@ -2865,179 +3034,70 @@ export default function CreateListingWizard({
                       ),
                     ),
                   },
-              );
+                );
+                payload = await readResponseJson(response);
+              }
+            }
+          }
 
-            let payload =
-              await readResponseJson(
-                response,
-              );
-
-            /*
-             * One recovery attempt for
-             * optimistic concurrency conflicts.
-             */
-            if (
-              !response.ok &&
-              isVersionConflict(
-                response,
+          if (!response.ok) {
+            throw new Error(
+              responseErrorMessage(
                 payload,
-              )
-            ) {
-              const reload =
-                await authFetch(
-                  `/api/listing-drafts/${encodeURIComponent(
-                    draft.id,
-                  )}`,
-                  {
-                    cache:
-                      'no-store',
-                  },
-                );
-
-              if (
-                reload.ok
-              ) {
-                const reloadPayload =
-                  await readResponseJson(
-                    reload,
-                  );
-
-                const fresh =
-                  valueAsRecord(
-                    reloadPayload.draft,
-                  ) as unknown as ServerDraft;
-
-                if (
-                  fresh.id
-                ) {
-                  syncServerDraftState(
-                    fresh,
-                  );
-
-                  response =
-                    await authFetch(
-                      `/api/listing-drafts/${encodeURIComponent(
-                        fresh.id,
-                      )}`,
-                      {
-                        method:
-                          'PATCH',
-                        headers: {
-                          'Content-Type':
-                            'application/json',
-                        },
-                        body:
-                          JSON.stringify(
-                            buildSavePayload(
-                              step,
-                              nextValues,
-                              nextMedia,
-                            ),
-                          ),
-                      },
-                    );
-
-                  payload =
-                    await readResponseJson(
-                      response,
-                    );
-                }
-              }
-            }
-
-            if (
-              !response.ok
-            ) {
-              throw new Error(
-                responseErrorMessage(
-                  payload,
-                  text(
-                    locale,
-                    'Draft belum berhasil disimpan.',
-                    'The draft could not be saved.',
-                  ),
+                text(
+                  locale,
+                  'Draft belum berhasil disimpan.',
+                  'The draft could not be saved.',
                 ),
+              ),
+            );
+          }
+
+          const nextDraft =
+            valueAsRecord(payload?.draft) as unknown as ServerDraft;
+          if (nextDraft.id) {
+            syncServerDraftState(nextDraft);
+          }
+          setSaveStatus('saved');
+          setLastSavedAt(new Date().toISOString());
+        };
+
+        const promise = execute()
+          .catch(error => {
+            if (mountedRef.current) {
+              setSaveStatus(
+                navigator.onLine ? 'error' : 'offline',
               );
             }
+            throw error;
+          })
+          .finally(() => {
+            saveInFlightRef.current = null;
+          });
 
-            const nextDraft =
-              valueAsRecord(
-                payload.draft,
-              ) as unknown as ServerDraft;
-
-            if (
-              nextDraft.id
-            ) {
-              syncServerDraftState(
-                nextDraft,
-              );
-            } else {
-              /*
-               * Some APIs may return 204 or
-               * a partial response.
-               *
-               * Keep the local draft version
-               * when there is no returned draft.
-               */
-              const retained =
-                serverDraftRef.current;
-
-              if (
-                retained
-              ) {
-                syncServerDraftState(
-                  retained,
-                );
-              }
-            }
-
-            setSaveStatus(
-              'saved',
-            );
-
-            setLastSavedAt(
-              new Date().toISOString(),
-            );
-          };
-
-        const promise =
-          execute()
-            .catch(error => {
-              if (
-                mountedRef.current
-              ) {
-                setSaveStatus(
-                  navigator.onLine
-                    ? 'error'
-                    : 'offline',
-                );
-              }
-
-              throw error;
-            })
-            .finally(() => {
-              saveInFlightRef.current =
-                null;
-            });
-
-        saveInFlightRef.current =
-          promise;
-
+        saveInFlightRef.current = promise;
         await promise;
       },
       [
         authFetch,
         buildSavePayload,
+        category,
+        categorySlug,
         createServerDraft,
         currentStep,
+        editingContentId,
+        editingContentMetadata,
+        editingContentType,
+        industryIds,
+        intent,
         isAuthenticated,
         locale,
         media,
+        subcategorySlug,
         syncServerDraftState,
         values,
       ],
     );
-
   /*
    * Server autosave after the main-detail phase.
    *
