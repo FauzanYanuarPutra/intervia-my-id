@@ -109,7 +109,10 @@ def validate_service_code(data: dict) -> list[str]:
         service_dir = SERVICES / service
         declared_db = item.get("database")
         if not service_dir.exists():
-            errors.append(f"{service}: declared service directory is missing")
+            if item.get("status") == "implemented":
+                errors.append(f"{service}: implemented service directory is missing")
+            # Target services may be declared before extraction. Their
+            # ownership/database boundary is still validated from the manifest.
             continue
 
         # A target service is already a data-owner boundary even while traffic
