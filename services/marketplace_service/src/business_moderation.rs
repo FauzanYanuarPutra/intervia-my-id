@@ -188,6 +188,8 @@ fn normalize_action(raw: &str) -> Option<&'static str> {
 
 fn normalize_reason(raw: &str) -> Option<&'static str> {
     match raw.trim().to_ascii_lowercase().as_str() {
+        "verification_complete" => Some("verification_complete"),
+        "restored_after_review" => Some("restored_after_review"),
         "missing_required_info" => Some("missing_required_info"),
         "missing_image" => Some("missing_image"),
         "missing_contact" => Some("missing_contact"),
@@ -901,6 +903,23 @@ async fn moderate_business(
 
     if action == "request_completion" && missing_fields.is_empty() {
         return err(StatusCode::CONFLICT, "business is already complete").into_response();
+    }
+
+    if matches!(action, "approve" | "restore") {
+        if business.verification_status != "verified" {
+            return err(
+                StatusCode::CONFLICT,
+                "business verification must be completed before publication",
+            )
+            .into_response();
+        }
+        if business.image_urls.is_empty() {
+            return err(
+                StatusCode::CONFLICT,
+                "business must have at least one verified business image before publication",
+            )
+            .into_response();
+        }
     }
 
     if matches!(action, "approve" | "restore") && !business.missing_fields.is_empty() {
@@ -1891,8 +1910,29 @@ async fn review_business_verification(
         _ => return err(StatusCode::BAD_REQUEST, "verification status must be verified or rejected").into_response(),
     };
     let note = normalize_text(payload.reason_note, 4000);
-    if status == "rejected" && note.is_none() {
-        return err(StatusCode::BAD_REQUEST, "verification rejection requires a reason").into_response();
+    if note.is_none() {
+        return err(StatusCode::BAD_REQUEST, "verification review note is required").into_response();
+    }
+
+    if status == "verified" {
+        let business = match load_business(&state, id).await {
+            Ok(value) => value,
+            Err(response) => return response.into_response(),
+        };
+        if !business.missing_fields.is_empty() {
+            return err(
+                StatusCode::CONFLICT,
+                "business profile must be complete before verification",
+            )
+            .into_response();
+        }
+        if business.image_urls.is_empty() {
+            return err(
+                StatusCode::CONFLICT,
+                "at least one business image is required before verification",
+            )
+            .into_response();
+        }
     }
 
     let row = match sqlx::query(
