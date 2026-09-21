@@ -230,6 +230,98 @@ def _validate_google_oauth_runtime(
         )
 
 
+DOMAIN_EXTRACTION_SERVICES = {
+    "profile_service": "PROFILE",
+    "media_service": "MEDIA",
+    "news_service": "NEWS",
+    "order_service": "ORDER",
+    "payment_service": "PAYMENT",
+    "promotion_service": "PROMOTION",
+    "crm_service": "CRM",
+    "communication_service": "COMMUNICATION",
+    "trust_service": "TRUST",
+    "support_service": "SUPPORT",
+    "review_service": "REVIEW",
+}
+
+
+def _validate_domain_extraction_runtime(
+    services: dict[str, Any],
+    environment: str,
+    errors: list[str],
+) -> None:
+    """
+    Guard the staged strangler architecture.
+
+    These services currently expose compatibility proxies backed by the target
+    database, not native domain handlers. A native mode switch before the target
+    service implements and verifies its own handlers would otherwise produce a
+    healthy-looking container that returns 503 for real traffic.
+    """
+    for service_name, domain_label in DOMAIN_EXTRACTION_SERVICES.items():
+        service = services.get(service_name)
+        if not isinstance(service, dict):
+            errors.append(
+                f"{domain_label} extraction contract requires the {service_name} Compose service."
+            )
+            continue
+
+        environment_map = service.get("environment")
+        if not isinstance(environment_map, dict):
+            environment_map = {}
+
+        mode = str(environment_map.get("DOMAIN_RUNTIME_MODE", "compatibility")).strip().lower()
+        proxy_enabled = str(
+            environment_map.get("LEGACY_PROXY_ENABLED", "true")
+        ).strip().lower()
+        upstream = environment_map.get("LEGACY_UPSTREAM_URL")
+        database_url = environment_map.get("DATABASE_URL")
+        timeout_raw = environment_map.get("LEGACY_PROXY_TIMEOUT_MS", "5000")
+
+        if mode not in {"compatibility", "proxy", "legacy"}:
+            errors.append(
+                f"{service_name} is currently a compatibility-proxy service; "
+                "DOMAIN_RUNTIME_MODE must remain compatibility until native handlers "
+                "and cutover verification are complete."
+            )
+
+        if proxy_enabled not in {"1", "true", "yes", "on"}:
+            errors.append(
+                f"{service_name} must keep LEGACY_PROXY_ENABLED=true while native "
+                "handlers are not verified."
+            )
+
+        upstream_host = urlparse(str(upstream)).hostname if non_empty(upstream) else None
+        if upstream_host != "marketplace_service":
+            errors.append(
+                f"{service_name} compatibility mode must proxy to marketplace_service."
+            )
+
+        database_host = urlparse(str(database_url)).hostname if non_empty(database_url) else None
+        if database_host != "domain_db":
+            errors.append(
+                f"{service_name} target database must use the domain_db Compose service."
+            )
+
+        try:
+            timeout_ms = int(str(timeout_raw))
+        except (TypeError, ValueError):
+            timeout_ms = 0
+        if not 250 <= timeout_ms <= 30_000:
+            errors.append(
+                f"{service_name} LEGACY_PROXY_TIMEOUT_MS must be between 250 and 30000 ms."
+            )
+
+        if environment in {"staging", "production"} and mode not in {
+            "compatibility",
+            "proxy",
+            "legacy",
+        }:
+            errors.append(
+                f"{service_name} cannot enter native mode in {environment} before cutover verification."
+            )
+
+
 def _validate_kyc_runtime(
     services: dict[str, Any],
     errors: list[str],
@@ -365,6 +457,7 @@ def validate_contract(
         errors.append("WWW Identity must use the identity_service service.")
 
     _validate_google_oauth_runtime(services, env_values, environment, errors)
+    _validate_domain_extraction_runtime(services, environment, errors)
 
     env_profiles = {
         profile.strip()
