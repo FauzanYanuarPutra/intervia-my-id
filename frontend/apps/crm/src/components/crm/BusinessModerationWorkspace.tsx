@@ -1059,17 +1059,45 @@ export default function BusinessModerationWorkspace() {
               </button>
             </div>
 
-            <div className="mt-5">
-              <p className="text-sm font-bold text-slate-950">Alasan</p>
-              <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                {REASONS.map(([value, label]) => (
-                  <label key={value} className="flex cursor-pointer items-start gap-2 rounded-2xl border border-slate-200 p-3 text-xs font-semibold">
-                    <input type="radio" name="business-reason" checked={reasonCode === value} onChange={() => setReasonCode(value)} className="mt-0.5" />
-                    <span>{label}</span>
-                  </label>
-                ))}
+            {draft.action === "approve" || draft.action === "restore" ? (
+              <section className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                <p className="text-sm font-black text-emerald-900">Checklist publikasi</p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                  {[
+                    ["Verifikasi Lajukan", draft.business.verification_status === "verified"],
+                    ["Profil lengkap", draft.business.missing_fields.length === 0],
+                    ["Foto usaha", draft.business.image_urls.length > 0],
+                  ].map(([label, ok]) => (
+                    <div key={String(label)} className="rounded-xl border border-emerald-100 bg-white p-3 text-xs font-bold text-slate-800">
+                      <span className={ok ? "text-emerald-700" : "text-rose-700"}>{ok ? "✓" : "!"}</span>
+                      <span className="ml-2">{String(label)}</span>
+                    </div>
+                  ))}
+                </div>
+                {!isPublishReady(draft.business) ? (
+                  <p className="mt-3 text-xs font-semibold leading-5 text-rose-700">Keputusan terkunci sampai semua pemeriksaan selesai.</p>
+                ) : null}
+              </section>
+            ) : draft.action === "request_completion" ? (
+              <section className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                <p className="text-sm font-black text-amber-900">Yang perlu dilengkapi pemilik</p>
+                <p className="mt-2 text-xs font-semibold leading-5 text-amber-800">
+                  {draft.business.missing_fields.length ? draft.business.missing_fields.join(" · ") : "Tidak ada kekurangan data dasar yang terdeteksi."}
+                </p>
+              </section>
+            ) : (
+              <div className="mt-5">
+                <p className="text-sm font-bold text-slate-950">Alasan tindakan</p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {decisionReasons(draft.action).map(([value, label]) => (
+                    <label key={value} className="flex cursor-pointer items-start gap-2 rounded-2xl border border-slate-200 p-3 text-xs font-semibold">
+                      <input type="radio" name="business-reason" checked={reasonCode === value} onChange={() => setReasonCode(value)} className="mt-0.5" />
+                      <span>{label}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {draft.action === "request_completion" && draft.business.missing_fields.length ? (
               <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-3">
@@ -1084,9 +1112,9 @@ export default function BusinessModerationWorkspace() {
                 value={reasonNote}
                 onChange={event => setReasonNote(event.target.value)}
                 maxLength={4000}
-                rows={4}
+                rows={draft.action === "approve" || draft.action === "restore" ? 3 : 4}
                 className="mt-2 w-full rounded-2xl border border-slate-200 p-3 text-sm outline-none focus:border-emerald-400"
-                placeholder="Tulis alasan yang faktual dan bisa dibaca lagi di history."
+                placeholder={draft.action === "approve" || draft.action === "restore" ? "Catatan internal singkat (opsional)." : "Tulis alasan yang faktual dan bisa dibaca lagi di history."}
               />
             </label>
 
