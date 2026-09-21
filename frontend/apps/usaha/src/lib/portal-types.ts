@@ -113,6 +113,8 @@ export type BusinessProfileSummary = {
 
 export type BusinessRecord = {
   id: string;
+  /** Legacy/public store identity used by /v1/umkm/stores endpoints. */
+  storeId?: string;
   version?: number;
   capabilityKey?: string;
   /** Typed profile is additive while old fixtures and older API payloads remain valid. */
