@@ -26,7 +26,12 @@ export default async function BusinessInfoPage({ params }: PageProps) {
   const businessPoint = toLatLng(business.latitude, business.longitude);
   const businessLocationQuery = buildBusinessLocationQuery({ name: business.name, address: business.address, city: business.city, locationQuery: business.locationQuery });
   const verificationChecks = {
-    profile: business.infoComplete,
+    profile:
+      Boolean(business.name) &&
+      Boolean(business.category) &&
+      Boolean(business.description) &&
+      Boolean(business.city) &&
+      Boolean(business.address),
     image: Boolean(business.logoUrl),
     contact: Boolean(business.phone),
     location: business.latitude !== null && business.longitude !== null,
