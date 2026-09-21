@@ -1364,7 +1364,7 @@ function TopBar({
   const page = CRM_NAV_ITEMS.find(item => item.id === activePage) || CRM_NAV_ITEMS[0];
   return (
     <header className="z-30 shrink-0 border-b border-slate-200 bg-white/90 ">
-      <div className="mx-auto flex h-16 max-w-[1360px] items-center gap-2 px-2 sm:px-4 lg:px-6">
+      <div className="mx-auto flex h-14 max-w-[1360px] items-center gap-1.5 px-2 sm:gap-2 sm:px-4 lg:px-6">
         <button
           type="button"
           onClick={onOpenMobile}
@@ -1373,18 +1373,29 @@ function TopBar({
         >
           <Icon name="menu" className="h-5 w-5" />
         </button>
-        <div className="hidden min-w-[120px] sm:block">
-          <p className="text-sm font-bold text-slate-950">{page.label}</p>
-          <p className="text-xs font-medium text-slate-400">Lajukan CRM</p>
+        <div className="min-w-0 max-w-[82px] sm:min-w-[120px] sm:max-w-none">
+          <p className="truncate text-xs font-bold text-slate-950 sm:text-sm">{page.label}</p>
+          <p className="hidden text-xs font-medium text-slate-400 sm:block">Lajukan CRM</p>
         </div>
-        <label className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 text-slate-500 focus-within:border-emerald-300 focus-within:bg-white focus-within:ring-4 focus-within:ring-emerald-100">
+        <label className="flex min-h-10 min-w-0 flex-1 items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 text-slate-500 focus-within:border-emerald-300 focus-within:bg-white focus-within:ring-4 focus-within:ring-emerald-100">
           <Icon name="search" className="h-4 w-4 shrink-0" />
           <input
             value={query}
             onChange={event => onQueryChange(event.target.value)}
-            placeholder="Cari user, usaha, listing, order, tiket..."
+            placeholder="Cari..."
+            aria-label="Cari data CRM"
             className="min-w-0 flex-1 bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400"
           />
+          {query ? (
+            <button
+              type="button"
+              onClick={() => onQueryChange("")}
+              aria-label="Hapus pencarian"
+              className="shrink-0 rounded-lg px-1.5 py-1 text-sm font-black text-slate-400 hover:bg-slate-200 hover:text-slate-700"
+            >
+              ×
+            </button>
+          ) : null}
         </label>
         <button
           type="button"
@@ -1399,7 +1410,7 @@ function TopBar({
           <button
             type="button"
             onClick={onToggleCrmNotifications}
-            className="relative inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"
+            className="relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"
             aria-label="Notifikasi CRM"
             aria-expanded={crmNotificationOpen}
           >
@@ -1455,7 +1466,7 @@ function TopBar({
           <button
             type="button"
             onClick={onToggleProfile}
-            className="flex min-h-11 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-2.5 text-left"
+            className="flex min-h-10 shrink-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 text-left"
           >
             <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-900 text-xs font-bold text-white">
               {userLabel.slice(0, 1).toUpperCase()}
