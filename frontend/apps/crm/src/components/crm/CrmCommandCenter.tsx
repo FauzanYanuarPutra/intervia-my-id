@@ -1075,6 +1075,16 @@ export default function CrmCommandCenter() {
     ["open", "in_progress", "pending_customer"].includes(ticket.status),
   ).length;
   const highRiskOrders = data.orders.filter(order => order.risk_score >= 70 || order.status === "disputed").length;
+  const navBadges = useMemo<Record<string, number>>(() => ({
+    pipeline: data.leads.filter(lead => !["won", "lost", "closed"].includes((lead.stage || "").toLowerCase())).length,
+    users: data.users.filter(user => user.kyc === "Pending").length,
+    businesses: businessPendingCount,
+    listings: data.listings.filter(listing => listing.reportCount > 0).length,
+    news: newsPendingCount,
+    transactions: highRiskOrders,
+    chat: data.chats.reduce((sum, chat) => sum + Math.max(0, chat.unread || 0), 0),
+    disputes: openIssues,
+  }), [data.leads, data.users, data.listings, data.chats, businessPendingCount, newsPendingCount, highRiskOrders, openIssues]);
 
   if (authLoading || loading) return <CrmLoadingSkeleton />;
 
@@ -1092,6 +1102,7 @@ export default function CrmCommandCenter() {
           onToggle={() => setCollapsed(current => !current)}
           newsPendingCount={newsPendingCount}
           businessPendingCount={businessPendingCount}
+          navBadges={navBadges}
         />
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -1267,43 +1278,35 @@ function Sidebar({
             {!collapsed ? "Ringkas sidebar" : null}
           </button>
 
-          <nav className="mt-4 min-h-0 flex-1 space-y-0.5 overflow-y-auto pr-1">
+          <nav className="mt-4 min-h-0 flex-1 space-y-0.5 overflow-y-auto pr-1" aria-label="Navigasi CRM">
             {CRM_NAV_ITEMS.map(item => {
               const active = activePage === item.id;
-              const showSecondaryHeading = item.id === "analytics" && !collapsed;
+              const section = item.id === "analytics" ? "Insight" : item.id === "settings" ? "Tim & bantuan" : item.id === "dashboard" ? "Operasional" : null;
+              const badgeValue = navBadges[item.id] || 0;
               return (
                 <React.Fragment key={item.id}>
-                  {showSecondaryHeading ? (
-                    <p className="px-3 pb-2 pt-5 text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">
-                      Insight & administrasi
-                    </p>
+                  {section && !collapsed ? (
+                    <p className="px-3 pb-1 pt-4 text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">{section}</p>
                   ) : null}
                   <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => onSelect(item.id)}
-                  className={`relative flex min-h-10 w-full items-center gap-2.5 rounded-xl px-3 text-left transition ${active
-                    ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100"
-                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-950"
-                    } ${collapsed ? "justify-center" : ""}`}
-                  title={item.label}
-                >
-                  <Icon name={item.icon} className="h-5 w-5 shrink-0" />
-                  {((item.id === "news" && newsPendingCount) || (item.id === "businesses" && businessPendingCount)) ? (
-                    <span className={`${collapsed ? "absolute right-1 top-1" : "ml-auto"} min-w-5 rounded-full bg-rose-500 px-1.5 py-0.5 text-center text-[10px] font-black text-white`}>
-                      {item.id === "news" ? (newsPendingCount > 99 ? "99+" : newsPendingCount) : (businessPendingCount > 99 ? "99+" : businessPendingCount)}
-                    </span>
-                  ) : null}
-                  {!collapsed ? (
-                    <span className="min-w-0 truncate text-sm font-bold">{item.label}</span>
-                  ) : null}
-                </button>
+                    type="button"
+                    onClick={() => onSelect(item.id)}
+                    title={item.label}
+                    aria-current={active ? "page" : undefined}
+                    className={`relative flex min-h-10 w-full items-center gap-2.5 rounded-xl px-3 text-left transition ${active ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100" : "text-slate-600 hover:bg-slate-50 hover:text-slate-950"} ${collapsed ? "justify-center" : ""}`}
+                  >
+                    <Icon name={item.icon} className="h-5 w-5 shrink-0" />
+                    {!collapsed ? <span className="min-w-0 flex-1 truncate text-sm font-bold">{item.label}</span> : null}
+                    {badgeValue > 0 ? (
+                      <span className={`${collapsed ? "absolute right-1 top-1" : "shrink-0"} min-w-5 rounded-full bg-rose-500 px-1.5 py-0.5 text-center text-[10px] font-black text-white`}>
+                        {badgeValue > 99 ? "99+" : badgeValue}
+                      </span>
+                    ) : null}
+                  </button>
                 </React.Fragment>
               );
             })}
-          </nav>
-
-          <div className="mt-3 shrink-0 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+          </nav>          <div className="mt-3 shrink-0 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
             <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
               {!collapsed ? "Internal" : "CRM"}
             </p>
