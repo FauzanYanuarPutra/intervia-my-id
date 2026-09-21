@@ -6663,7 +6663,7 @@ export default function ChatRoomPage() {
                               setOpenMessageActionsId(null);
                             }
                           }}
-                          className="inline-flex h-8.5 w-8.5 items-center justify-center rounded-full border border-black/[0.08] bg-white/95 text-[#54656f] shadow-[0_1px_3px_rgba(17,27,33,0.18)] backdrop-blur-sm transition-[background-color,color,box-shadow,transform] duration-150 hover:bg-[#f0f2f5] hover:text-[#008f72] active:scale-[0.96] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#25d366]/35 focus-visible:ring-offset-1 focus-visible:ring-offset-white dark:border-white/[0.10] dark:bg-[#202c33]/96 dark:text-[#aebac1] dark:shadow-[0_1px_3px_rgba(0,0,0,0.28)] dark:hover:bg-[#2a3942] dark:hover:text-[#25d366] dark:focus-visible:ring-offset-[#111b21] sm:h-9 sm:w-9"
+                          className="inline-flex h-[34px] w-[34px] items-center justify-center rounded-full border border-black/[0.08] bg-white/95 text-[#54656f] shadow-[0_1px_3px_rgba(17,27,33,0.18)] backdrop-blur-sm transition-[background-color,color,box-shadow,transform] duration-150 hover:bg-[#f0f2f5] hover:text-[#008f72] active:scale-[0.96] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#25d366]/35 focus-visible:ring-offset-1 focus-visible:ring-offset-white dark:border-white/[0.10] dark:bg-[#202c33]/96 dark:text-[#aebac1] dark:shadow-[0_1px_3px_rgba(0,0,0,0.28)] dark:hover:bg-[#2a3942] dark:hover:text-[#25d366] dark:focus-visible:ring-offset-[#111b21] sm:h-9 sm:w-9"
                           title={
                             chatLocale === 'id'
                               ? 'Aksi pesan'
@@ -6682,11 +6682,23 @@ export default function ChatRoomPage() {
                         </button>
 
                         {openMessageActionsId === msg.id ? (
-                          <div
+                          <motion.div
                             id={`message-actions-${msg.id}`}
                             role="menu"
                             aria-orientation="vertical"
-                            className={`absolute bottom-full z-50 mb-2 w-[184px] max-w-[calc(100vw-1.25rem)] overflow-hidden rounded-[14px] border border-black/[0.08] bg-white/98 p-1 shadow-[0_10px_34px_rgba(17,27,33,0.22),0_2px_8px_rgba(17,27,33,0.10)] backdrop-blur-xl dark:border-white/[0.08] dark:bg-[#233138]/98 dark:shadow-[0_12px_36px_rgba(0,0,0,0.42)] ${isOwn ? 'left-0' : 'right-0'}`}
+                            initial={reduceMotion ? false : { opacity: 0, scale: 0.96, y: 5 }}
+                            animate={
+                              reduceMotion
+                                ? undefined
+                                : {
+                                    opacity: 1,
+                                    scale: 1,
+                                    y: 0,
+                                    transition: { duration: 0.12, ease: 'easeOut' },
+                                  }
+                            }
+                            style={{ transformOrigin: isOwn ? 'bottom left' : 'bottom right' }}
+                            className={`absolute bottom-full z-50 mb-2 w-[184px] max-w-[calc(100vw-1.25rem)] overflow-hidden rounded-[14px] border border-black/[0.08] bg-white/[0.98] p-1 shadow-[0_10px_34px_rgba(17,27,33,0.22),0_2px_8px_rgba(17,27,33,0.10)] backdrop-blur-xl dark:border-white/[0.08] dark:bg-[#233138]/[0.98] dark:shadow-[0_12px_36px_rgba(0,0,0,0.42)] ${isOwn ? 'left-0' : 'right-0'}`}
                           >
                             {isOwn && status === 'failed' ? (
                               <button
@@ -6738,7 +6750,7 @@ export default function ChatRoomPage() {
                               <Copy className="h-[17px] w-[17px] shrink-0" aria-hidden="true" />
                               {chatLocale === 'id' ? 'Salin' : 'Copy'}
                             </button>
-                          </div>
+                          </motion.div>
                         ) : null}
                       </div>
                     );
