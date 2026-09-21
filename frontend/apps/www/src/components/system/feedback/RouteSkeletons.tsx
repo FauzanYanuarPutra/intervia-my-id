@@ -474,82 +474,105 @@ export function CommunityPageSkeleton({
 
 export function DashboardPageSkeleton() {
   return (
-    <div
-      className="mx-auto w-full max-w-6xl space-y-4 px-3 py-4 sm:px-5"
+    <main
+      className="page-shell min-w-0 space-y-3 overflow-x-clip pb-[calc(5.25rem+env(safe-area-inset-bottom))] pt-3 sm:space-y-4 sm:pb-8 lg:pt-5"
       data-skeleton-route="true"
+      aria-busy="true"
+      aria-label="Memuat dashboard"
     >
-      <section className="rounded-[32px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-5 shadow-sm dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <Pulse className="h-14 w-14 rounded-[20px]" />
-            <div>
-              <Pulse className="h-3 w-24 rounded-full" />
-              <Pulse className="mt-3 h-8 w-56" />
-              <Pulse className="mt-3 h-4 w-80 max-w-full" />
-            </div>
-          </div>
-          <Pulse className="h-10 w-28 rounded-full" />
+      <header className="flex min-w-0 flex-col gap-3 border-b border-[color:var(--app-border)] pb-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <Pulse className="h-3 w-24 rounded-full" />
+          <Pulse className="mt-1.5 h-8 w-44 rounded-lg sm:h-9 sm:w-52" />
+          <Pulse className="mt-2 h-4 w-full max-w-xl rounded-full" />
         </div>
 
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="flex shrink-0 items-center gap-2">
+          <Pulse className="hidden h-3 w-24 rounded-full sm:block" />
+          <Pulse className="h-10 w-10 rounded-xl" />
+          <Pulse className="h-10 w-24 rounded-xl" />
+        </div>
+      </header>
+
+      <section>
+        <div className="mb-2.5 flex items-center gap-2">
+          <span className="h-4 w-1 rounded-full bg-[color:var(--app-accent-soft)]" />
+          <Pulse className="h-5 w-24 rounded-full" />
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
           {Array.from({ length: 4 }).map((_, index) => (
             <article
               key={index}
-              className="rounded-[24px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-4 dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)]"
+              className="relative min-w-0 overflow-hidden rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3.5 sm:p-4"
             >
-              <Pulse className="h-3 w-20 rounded-full" />
-              <Pulse className="mt-3 h-7 w-16 rounded-full" />
-              <Pulse className="mt-3 h-3 w-24 rounded-full" />
+              <Pulse className="absolute inset-x-0 top-0 h-1 rounded-none" />
+              <div className="flex items-start justify-between gap-3 pt-0.5">
+                <div className="min-w-0 flex-1">
+                  <Pulse className="h-6 w-16 rounded-lg sm:h-7 sm:w-20" />
+                  <Pulse className="mt-2 h-3.5 w-20 rounded-full sm:w-28" />
+                </div>
+                <Pulse className="h-9 w-9 shrink-0 rounded-xl" />
+              </div>
+              <Pulse className="mt-2 h-3 w-24 rounded-full sm:w-32" />
             </article>
           ))}
         </div>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-        <article className="rounded-[28px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-5 shadow-sm dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <Pulse className="h-5 w-40" />
-            <Pulse className="h-8 w-24 rounded-full" />
+      <section className="overflow-hidden rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)]">
+        <div className="flex items-center justify-between gap-3 bg-[color:var(--app-surface-muted)] px-3.5 py-3 dark:bg-[color:var(--app-surface)] sm:px-4">
+          <div className="min-w-0">
+            <Pulse className="h-5 w-32 rounded-full" />
+            <Pulse className="mt-1.5 h-3 w-56 max-w-full rounded-full" />
           </div>
-          <div className="mt-4 space-y-3">
-            {Array.from({ length: 3 }).map((_, index) => (
-              <div
-                key={index}
-                className="rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-4 dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)]"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <Pulse className="h-4 w-40 rounded-full" />
-                    <Pulse className="mt-2 h-3 w-32 rounded-full" />
-                    <SkeletonBlock lines={2} className="mt-3 max-w-[420px]" />
-                  </div>
-                  <Pulse className="h-8 w-20 rounded-full" />
-                </div>
+        </div>
+
+        <div>
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div
+              key={index}
+              className="relative flex min-w-0 items-center gap-3 border-b border-[color:var(--app-border)] px-3.5 py-3.5 last:border-b-0 sm:px-4"
+            >
+              <Pulse className="ml-1 h-10 w-10 shrink-0 rounded-xl" />
+              <div className="min-w-0 flex-1">
+                <Pulse className="h-3.5 w-32 rounded-full sm:w-40" />
+                <Pulse className="mt-1.5 h-3 w-44 max-w-[70%] rounded-full sm:w-60" />
               </div>
-            ))}
-          </div>
-        </article>
-
-        <div className="space-y-4">
-          <section className="rounded-[28px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-5 shadow-sm dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]">
-            <Pulse className="h-4 w-28 rounded-full" />
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              {Array.from({ length: 4 }).map((_, index) => (
-                <Pulse key={index} className="h-10 w-full rounded-full" />
-              ))}
+              <Pulse className="hidden h-3.5 w-16 rounded-full sm:block" />
+              <Pulse className="h-4 w-4 shrink-0 rounded-full sm:hidden" />
             </div>
-          </section>
-
-          <section className="rounded-[28px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-5 shadow-sm dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]">
-            <Pulse className="h-4 w-32 rounded-full" />
-            <div className="mt-4 space-y-3">
-              <Pulse className="h-24 w-full rounded-[24px]" />
-              <Pulse className="h-24 w-full rounded-[24px]" />
-            </div>
-          </section>
+          ))}
         </div>
       </section>
-    </div>
+
+      <section>
+        <div className="mb-2.5">
+          <div className="flex items-center gap-2">
+            <span className="h-4 w-1 rounded-full bg-[color:var(--app-accent-soft)]" />
+            <Pulse className="h-5 w-24 rounded-full" />
+          </div>
+          <Pulse className="mt-1.5 h-3 w-48 rounded-full" />
+        </div>
+
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <article
+              key={index}
+              className="relative flex min-w-0 items-center gap-3 overflow-hidden rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3"
+            >
+              <Pulse className="absolute inset-y-0 left-0 w-1 rounded-none" />
+              <Pulse className="ml-1 h-10 w-10 shrink-0 rounded-xl" />
+              <div className="min-w-0 flex-1">
+                <Pulse className="h-3.5 w-24 rounded-full" />
+                <Pulse className="mt-1.5 h-3 w-32 max-w-full rounded-full" />
+              </div>
+              <Pulse className="h-4 w-4 shrink-0 rounded-full" />
+            </article>
+          ))}
+        </div>
+      </section>
+    </main>
   );
 }
 

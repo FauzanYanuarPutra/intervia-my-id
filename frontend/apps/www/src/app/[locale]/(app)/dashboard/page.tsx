@@ -21,6 +21,7 @@ import { useAuth, type User } from '@/context/AuthContext';
 import { Link } from '@/i18n/navigation';
 import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 import { cn } from '@/lib/utils';
+import { DashboardPageSkeleton } from '@/components/system/feedback/RouteSkeletons';
 
 type DashboardStats = {
   total_content: number;
@@ -565,13 +566,7 @@ export default function DashboardPage() {
   );
 
   if (loading) {
-    return (
-      <main className="page-shell py-4">
-        <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 text-sm text-[color:var(--app-text-soft)]">
-          {isId ? 'Memuat dashboard...' : 'Loading dashboard...'}
-        </div>
-      </main>
-    );
+    return <DashboardPageSkeleton />;
   }
 
   if (!user) {

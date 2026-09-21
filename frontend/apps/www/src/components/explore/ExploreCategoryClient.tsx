@@ -1,13 +1,14 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
-  ChevronDown,
   CircleAlert,
+  CircleHelp,
   Plus,
   Search,
+  X,
 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
@@ -301,14 +302,16 @@ function DataSection({
     | 'video';
 }) {
   const isId = locale === 'id';
-  const { emblaRef, emblaApi } =
-    useExploreEmblaRail();
+  const sectionRef = useRef<HTMLElement | null>(null);
+  const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    setPage(1);
+  }, [category.slug, config.key, items.length]);
 
   if (items.length === 0) return null;
 
-  const isNeedSection =
-    config.key === 'latest-needs';
-
+  const isNeedSection = config.key === 'latest-needs';
   const forcedSide =
     kind === 'listing'
       ? isNeedSection
@@ -316,36 +319,30 @@ function DataSection({
         : 'supply'
       : undefined;
 
-  const normalizedItems = items.map(
-    item =>
-      withResolvedSide(
-        item,
-        forcedSide,
-      ),
+  const normalizedItems = items.map(item =>
+    withResolvedSide(item, forcedSide),
   );
 
-  const previewItems = normalizedItems.slice(
-    0,
-    kind === 'video'
-      ? 10
-      : isNeedSection ||
-          kind === 'business' ||
-          kind === 'community'
-        ? 8
-        : 10,
+  const pageSize =
+    kind === 'listing' || kind === 'video'
+      ? 8
+      : 6;
+  const totalPages = Math.max(
+    1,
+    Math.ceil(normalizedItems.length / pageSize),
+  );
+  const safePage = Math.min(page, totalPages);
+  const pageStart = (safePage - 1) * pageSize;
+  const pageItems = normalizedItems.slice(
+    pageStart,
+    pageStart + pageSize,
   );
 
   const seeAllHref = (() => {
-    if (kind === 'community') {
-      return '/community';
-    }
-
-    if (kind === 'video') {
-      return '/reels';
-    }
+    if (kind === 'community') return '/community';
+    if (kind === 'video') return '/reels';
 
     const params = new URLSearchParams();
-
     if (config.key === 'latest-needs') {
       params.set('side', 'demand');
       params.set('tab', 'needs');
@@ -355,7 +352,6 @@ function DataSection({
     } else {
       params.set('side', 'supply');
     }
-
     params.set('sort', 'latest');
 
     return appendSearchParams(
@@ -364,56 +360,53 @@ function DataSection({
     );
   })();
 
-  const slideClass =
+  const gridClass =
     kind === 'video'
-      ? 'flex-[0_0_46%] min-[420px]:flex-[0_0_38%] sm:flex-[0_0_30%] md:flex-[0_0_23.5%] lg:flex-[0_0_19%]'
-      : isNeedSection ||
-          kind === 'business' ||
-          kind === 'community'
-        ? 'flex-[0_0_86%] min-[420px]:flex-[0_0_74%] sm:flex-[0_0_48%] lg:flex-[0_0_32%]'
-        : 'flex-[0_0_46%] min-[420px]:flex-[0_0_38%] sm:flex-[0_0_30%] md:flex-[0_0_23.5%] lg:flex-[0_0_19%]';
+      ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4'
+      : kind === 'listing'
+        ? 'grid-cols-2 md:grid-cols-3 xl:grid-cols-4'
+        : isNeedSection ||
+            kind === 'business' ||
+            kind === 'community'
+          ? 'sm:grid-cols-2 lg:grid-cols-3'
+          : 'grid-cols-2 md:grid-cols-3 xl:grid-cols-4';
 
-  const renderCard = (
-    item: GlobalSearchItem,
-  ) => {
+  const renderCard = (item: GlobalSearchItem) => {
     if (kind === 'business') {
-      return (
-        <ExploreBusinessCard
-          item={item}
-          locale={locale}
-        />
-      );
+      return <ExploreBusinessCard item={item} locale={locale} />;
     }
-
     if (kind === 'community') {
-      return (
-        <ExploreCommunityCard
-          item={item}
-          locale={locale}
-        />
-      );
+      return <ExploreCommunityCard item={item} locale={locale} />;
     }
-
     if (kind === 'video') {
       return <ExploreVideoCard item={item} />;
     }
+    return <ExploreListingCard item={item} locale={locale} />;
+  };
 
-    return (
-      <ExploreListingCard
-        item={item}
-        locale={locale}
-      />
-    );
+  const changePage = (nextPage: number) => {
+    const clamped = Math.max(1, Math.min(totalPages, nextPage));
+    setPage(clamped);
+
+    if (typeof window !== 'undefined') {
+      window.requestAnimationFrame(() => {
+        sectionRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        });
+      });
+    }
   };
 
   return (
-    <ExploreSurface className="mt-3 p-3 sm:p-4">
+    <section
+      ref={sectionRef}
+      className="mt-3 scroll-mt-3 rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 sm:p-4"
+    >
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
           <h2 className="min-w-0 truncate text-[13px] font-black text-[color:var(--app-text)] sm:text-sm">
-            {isId
-              ? config.titleId
-              : config.titleEn}
+            {isId ? config.titleId : config.titleEn}
           </h2>
 
           {config.key === 'latest-listings' &&
@@ -434,197 +427,189 @@ function DataSection({
           ) : null}
         </div>
 
-        <div className="flex shrink-0 items-center gap-1">
-          <EmblaDesktopControls
-            api={emblaApi}
-            isId={isId}
-            compact
-          />
-
-          <CompactSeeAllLink
-            href={seeAllHref}
-            isId={isId}
-            onClick={() => {
-              void trackLajukanEvent(
-                'explore_see_all_click',
-                {
-                  properties: {
-                    locale,
-                    source: 'explore_category',
-                    route:
-                      buildExploreCategoryHref(
-                        category,
-                      ),
-                    category: category.slug,
-                    contentType: kind,
-                    side:
-                      forcedSide || undefined,
-                  },
-                },
-              );
-            }}
-            ariaLabel={
-              isId
-                ? `Lihat semua ${
-                    config.titleId
-                  }`
-                : `View all ${config.titleEn}`
-            }
-          />
-        </div>
+        <CompactSeeAllLink
+          href={seeAllHref}
+          isId={isId}
+          onClick={() => {
+            void trackLajukanEvent('explore_see_all_click', {
+              properties: {
+                locale,
+                source: 'explore_category',
+                route: buildExploreCategoryHref(category),
+                category: category.slug,
+                contentType: kind,
+                side: forcedSide || undefined,
+              },
+            });
+          }}
+          ariaLabel={
+            isId
+              ? `Lihat semua ${config.titleId}`
+              : `View all ${config.titleEn}`
+          }
+        />
       </div>
 
       <div
-        ref={emblaRef}
-        className="mt-2.5 w-full min-w-0 cursor-grab overflow-hidden pb-1 active:cursor-grabbing"
-        aria-label={
-          isId
-            ? config.titleId
-            : config.titleEn
-        }
+        className={cn('mt-2.5 grid gap-3', gridClass)}
+        aria-label={isId ? config.titleId : config.titleEn}
       >
-        <div className="flex touch-pan-y gap-3 [backface-visibility:hidden] [will-change:transform]">
-          {previewItems.map(item => (
-            <div
-              key={`${kind}-${item.id}`}
-              className={cn(
-                'min-w-0 shrink-0 select-none [backface-visibility:hidden]',
-                slideClass,
-              )}
-            >
-              <div className="h-full w-full">
-                {renderCard(item)}
-              </div>
+        {pageItems.map(item => (
+          <div key={`${kind}-${item.id}`} className="min-w-0">
+            <div className="h-full w-full">
+              {renderCard(item)}
             </div>
-          ))}
-        </div>
-      </div>
-    </ExploreSurface>
-  );
-}
-
-function GuidesSection({
-  config,
-  items,
-  locale,
-}: {
-  config: ExploreSectionConfig;
-  items: ExploreGuide[];
-  locale: LajukanLocale;
-}) {
-  const isId = locale === 'id';
-  const { emblaRef, emblaApi } =
-    useExploreEmblaRail();
-
-  return (
-    <section className="py-2">
-      <div className="flex items-end justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="text-[13px] font-black text-[color:var(--app-text)] sm:text-sm">
-            {isId
-              ? config.titleId
-              : config.titleEn}
-          </h3>
-
-          <p className="mt-1 text-[10px] leading-4 text-[color:var(--app-text-soft)] sm:text-[11px]">
-            {isId
-              ? config.descriptionId
-              : config.descriptionEn}
-          </p>
-        </div>
-
-        {items.length > 1 ? (
-          <EmblaDesktopControls
-            api={emblaApi}
-            isId={isId}
-            compact
-          />
-        ) : null}
-      </div>
-
-      <div
-        ref={emblaRef}
-        className="mt-2 w-full min-w-0 cursor-grab overflow-hidden pb-1 active:cursor-grabbing"
-      >
-        <div className="flex touch-pan-y gap-3">
-          {items.map(item => (
-            <div
-              key={item.href}
-              className="min-w-0 shrink-0 flex-[0_0_86%] sm:flex-[0_0_48%] lg:flex-[0_0_32%]"
-            >
-              <Link
-                href={item.href}
-                className="group flex h-full min-h-[100px] cursor-pointer flex-col rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] focus-visible:ring-offset-2"
-              >
-                <h3 className="text-sm font-bold text-[color:var(--app-text)] group-hover:text-[color:var(--app-accent)]">
-                  {isId
-                    ? item.titleId
-                    : item.titleEn}
-                </h3>
-
-                <p className="mt-2 text-xs leading-5 text-[color:var(--app-text-soft)]">
-                  {isId
-                    ? item.summaryId
-                    : item.summaryEn}
-                </p>
-
-                <span className="mt-auto inline-flex items-center gap-1 pt-3 text-xs font-bold text-[color:var(--app-accent)]">
-                  {isId
-                    ? 'Baca panduan'
-                    : 'Read guide'}
-                  <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
-                </span>
-              </Link>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function FaqSection({
-  config,
-  items,
-  locale,
-}: {
-  config: ExploreSectionConfig;
-  items: ExploreFaq[];
-  locale: LajukanLocale;
-}) {
-  const isId = locale === 'id';
-
-  return (
-    <section className="py-2">
-      <h3 className="text-[13px] font-black text-[color:var(--app-text)] sm:text-sm">
-        {isId
-          ? config.titleId
-          : config.titleEn}
-      </h3>
-
-      <div className="mt-2 divide-y divide-[color:var(--app-border)] border-y border-[color:var(--app-border)]">
-        {items.map(item => (
-          <details
-            key={item.questionId}
-            className="group py-2.5"
-          >
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-xs font-bold text-[color:var(--app-text)] marker:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/25 sm:text-sm">
-              {isId
-                ? item.questionId
-                : item.questionEn}
-
-              <Plus className="h-4 w-4 shrink-0 transition group-open:rotate-45" />
-            </summary>
-
-            <p className="max-w-3xl pb-1 pt-1.5 text-xs leading-5 text-[color:var(--app-text-soft)] sm:text-sm sm:leading-6">
-              {isId
-                ? item.answerId
-                : item.answerEn}
-            </p>
-          </details>
+          </div>
         ))}
       </div>
+
+      {totalPages > 1 ? (
+        <div className="mt-4 flex flex-col gap-2 border-t border-[color:var(--app-border)] pt-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-[10px] font-semibold text-[color:var(--app-text-soft)] sm:text-[11px]">
+            {isId
+              ? `Halaman ${safePage} dari ${totalPages} · ${normalizedItems.length} hasil dimuat`
+              : `Page ${safePage} of ${totalPages} · ${normalizedItems.length} loaded results`}
+          </p>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              disabled={safePage <= 1}
+              onClick={() => changePage(safePage - 1)}
+              className="inline-flex min-h-8 items-center justify-center rounded-[9px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-[10px] font-black text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] disabled:cursor-not-allowed disabled:opacity-35"
+            >
+              {isId ? 'Sebelumnya' : 'Previous'}
+            </button>
+
+            <span
+              aria-live="polite"
+              className="inline-flex min-h-8 min-w-12 items-center justify-center rounded-[9px] bg-[color:var(--app-surface-muted)] px-2 text-[10px] font-black text-[color:var(--app-text-soft)]"
+            >
+              {safePage}/{totalPages}
+            </span>
+
+            <button
+              type="button"
+              disabled={safePage >= totalPages}
+              onClick={() => changePage(safePage + 1)}
+              className="inline-flex min-h-8 items-center justify-center rounded-[9px] bg-[color:var(--app-accent)] px-3 text-[10px] font-black text-white transition hover:bg-[color:var(--app-accent-strong)] disabled:cursor-not-allowed disabled:opacity-35"
+            >
+              {isId ? 'Berikutnya' : 'Next'}
+            </button>
+          </div>
+        </div>
+      ) : null}
     </section>
+  );
+}
+
+function ExploreHelpDialog({
+  isId,
+  guidesConfig,
+  faqConfig,
+  guides,
+  faq,
+  onClose,
+}: {
+  isId: boolean;
+  guidesConfig?: ExploreSectionConfig;
+  faqConfig?: ExploreSectionConfig;
+  guides: ExploreGuide[];
+  faq: ExploreFaq[];
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-[1400] flex items-end justify-center bg-zinc-950/45 p-3 backdrop-blur-[2px] sm:items-center sm:p-5"
+      role="presentation"
+      onMouseDown={event => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="explore-help-dialog-title"
+        className="max-h-[88svh] w-full max-w-2xl overflow-hidden rounded-[22px] border border-zinc-200 bg-white shadow-[0_30px_80px_-34px_rgba(15,23,42,0.45)] dark:border-zinc-800 dark:bg-zinc-950"
+      >
+        <div className="flex items-center justify-between gap-3 border-b border-zinc-100 px-4 py-3 dark:border-zinc-800 sm:px-5">
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
+              {isId ? 'Bantuan' : 'Help'}
+            </p>
+            <h2
+              id="explore-help-dialog-title"
+              className="mt-0.5 truncate text-sm font-black text-zinc-950 dark:text-zinc-50 sm:text-base"
+            >
+              {isId ? 'Panduan & bantuan' : 'Guides & help'}
+            </h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={isId ? 'Tutup bantuan' : 'Close help'}
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-600 transition hover:border-zinc-300 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/25 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-zinc-700 dark:hover:text-white"
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </div>
+
+        <div className="max-h-[calc(88svh-66px)] overflow-y-auto px-4 py-4 sm:px-5">
+          {guidesConfig && guides.length ? (
+            <section>
+              <h3 className="text-sm font-black text-zinc-950 dark:text-zinc-50">
+                {isId ? guidesConfig.titleId : guidesConfig.titleEn}
+              </h3>
+              <p className="mt-1 text-[11px] leading-5 text-zinc-500 dark:text-zinc-400">
+                {isId ? guidesConfig.descriptionId : guidesConfig.descriptionEn}
+              </p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {guides.map(guide => (
+                  <Link
+                    key={guide.href}
+                    href={guide.href}
+                    onClick={onClose}
+                    className="group rounded-[15px] border border-zinc-200 bg-white p-3 transition hover:border-emerald-300 hover:bg-emerald-50/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/25 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-emerald-800 dark:hover:bg-emerald-950/20"
+                  >
+                    <h4 className="text-xs font-black text-zinc-950 group-hover:text-emerald-700 dark:text-zinc-50 dark:group-hover:text-emerald-400">
+                      {isId ? guide.titleId : guide.titleEn}
+                    </h4>
+                    <p className="mt-1.5 line-clamp-3 text-[10.5px] leading-5 text-zinc-500 dark:text-zinc-400">
+                      {isId ? guide.summaryId : guide.summaryEn}
+                    </p>
+                    <span className="mt-2 inline-flex items-center gap-1 text-[10px] font-black text-emerald-700 dark:text-emerald-400">
+                      {isId ? 'Baca panduan' : 'Read guide'}
+                      <ArrowRight className="h-3 w-3" aria-hidden="true" />
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          {faqConfig && faq.length ? (
+            <section className={guidesConfig && guides.length ? 'mt-5 border-t border-zinc-100 pt-5 dark:border-zinc-800' : ''}>
+              <h3 className="text-sm font-black text-zinc-950 dark:text-zinc-50">
+                {isId ? faqConfig.titleId : faqConfig.titleEn}
+              </h3>
+              <div className="mt-2 divide-y divide-zinc-100 border-y border-zinc-100 dark:divide-zinc-800 dark:border-zinc-800">
+                {faq.map(item => (
+                  <details key={item.questionId} className="group py-3">
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-xs font-bold text-zinc-950 marker:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/25 dark:text-zinc-100 sm:text-sm">
+                      <span>{isId ? item.questionId : item.questionEn}</span>
+                      <Plus className="h-4 w-4 shrink-0 transition group-open:rotate-45" />
+                    </summary>
+                    <p className="pt-2 text-xs leading-5 text-zinc-500 dark:text-zinc-400">
+                      {isId ? item.answerId : item.answerEn}
+                    </p>
+                  </details>
+                ))}
+              </div>
+            </section>
+          ) : null}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -704,6 +689,8 @@ export function ExploreCategoryClient({
     searchRetryKey,
     setSearchRetryKey,
   ] = useState(0);
+
+  const [helpOpen, setHelpOpen] = useState(false);
 
   const isId = locale === 'id';
 
@@ -1625,6 +1612,17 @@ export function ExploreCategoryClient({
                   </button>
                 </div>
               ) : null}
+
+              {showHelpSection ? (
+                <button
+                  type="button"
+                  onClick={() => setHelpOpen(true)}
+                  className="mt-2 inline-flex min-h-8 items-center gap-1.5 rounded-[9px] border border-zinc-200 bg-white px-2.5 text-[10px] font-black text-zinc-700 transition hover:border-emerald-300 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/25 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:border-emerald-800 dark:hover:text-emerald-400 sm:text-[11px]"
+                >
+                  <CircleHelp className="h-3.5 w-3.5" aria-hidden="true" />
+                  {isId ? 'Panduan & bantuan' : 'Guides & help'}
+                </button>
+              ) : null}
             </div>
           </div>
         </ExploreSurface>
@@ -2242,57 +2240,21 @@ export function ExploreCategoryClient({
               </div>
             ) : null}
 
-            {showHelpSection ? (
-              <ExploreSurface className="mt-2.5 px-3 py-2.5 sm:px-4">
-                <details className="group">
-                  <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between gap-4 rounded-xl text-left marker:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/25">
-                    <span className="text-xs font-black text-zinc-900 dark:text-zinc-100 sm:text-sm">
-                      {isId
-                        ? 'Panduan & bantuan'
-                        : 'Guides & help'}
-                    </span>
 
-                    <ChevronDown className="h-4 w-4 shrink-0 text-zinc-400 transition group-open:rotate-180" />
-                  </summary>
 
-                  <div className="mt-3">
-                    {guidesConfig &&
-                    payload.guides
-                      .length ? (
-                      <GuidesSection
-                        config={
-                          guidesConfig
-                        }
-                        items={
-                          payload.guides
-                        }
-                        locale={
-                          locale
-                        }
-                      />
-                    ) : null}
-
-                    {faqConfig &&
-                    payload.faq
-                      .length ? (
-                      <FaqSection
-                        config={
-                          faqConfig
-                        }
-                        items={
-                          payload.faq
-                        }
-                        locale={
-                          locale
-                        }
-                      />
-                    ) : null}
-                  </div>
-                </details>
-              </ExploreSurface>
-            ) : null}
           </>
         ) : null}
+
+      {helpOpen && showHelpSection ? (
+        <ExploreHelpDialog
+          isId={isId}
+          guidesConfig={guidesConfig}
+          faqConfig={faqConfig}
+          guides={payload?.guides || []}
+          faq={payload?.faq || []}
+          onClose={() => setHelpOpen(false)}
+        />
+      ) : null}
       </main>
     </div>
   );
