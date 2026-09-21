@@ -2980,6 +2980,12 @@ async fn create_source_review_request(
     if requester_id == requested_reviewer_id {
         return response_error(StatusCode::CONFLICT, "reviewer must be different from requester");
     }
+    if fetch_user_read_model_brief(&state.db, requested_reviewer_id)
+        .await
+        .is_none()
+    {
+        return response_error(StatusCode::NOT_FOUND, "reviewer account not found");
+    }
     let note = trimmed(payload.note);
     if note.as_ref().is_some_and(|value| value.len() > NEWS_MAX_REVIEW_NOTE_LEN) {
         return response_error(StatusCode::BAD_REQUEST, "review request note is too long");
