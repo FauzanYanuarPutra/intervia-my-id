@@ -1126,8 +1126,8 @@ export default function CrmCommandCenter() {
             onLogout={() => void logout()}
           />
 
-          <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6 lg:px-8">
-            <div className="mx-auto max-w-[1540px] space-y-5">
+          <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 sm:px-5 sm:py-5 lg:px-6">
+            <div className="mx-auto max-w-[1360px] space-y-4">
               {pageDiagnostics.failures.length ? (
                 <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 shadow-sm">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -1245,7 +1245,7 @@ function Sidebar({
         className={`fixed inset-y-0 left-0 z-50 flex h-[100dvh] border-r border-slate-200 bg-white transition-all duration-300 lg:static lg:inset-auto lg:z-auto lg:h-full lg:shrink-0 ${collapsed ? "w-[72px]" : "w-[232px]"
           } ${mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
       >
-        <div className="flex h-full min-h-0 w-full flex-col p-4">
+        <div className="flex h-full min-h-0 w-full flex-col p-3">
           <div className="flex items-center gap-3">
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#6cd698] text-lg font-bold text-white shadow-[0_16px_26px_-18px_rgba(22,163,74,0.8)]">
               L
@@ -1261,13 +1261,13 @@ function Sidebar({
           <button
             type="button"
             onClick={onToggle}
-            className="mt-5 hidden min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 text-sm font-bold text-slate-600 transition hover:bg-slate-100 lg:flex"
+            className="mt-4 hidden min-h-9 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 text-sm font-bold text-slate-600 transition hover:bg-slate-100 lg:flex"
           >
             <Icon name="menu" className="h-4 w-4" />
             {!collapsed ? "Ringkas sidebar" : null}
           </button>
 
-          <nav className="mt-6 min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
+          <nav className="mt-4 min-h-0 flex-1 space-y-0.5 overflow-y-auto pr-1">
             {CRM_NAV_ITEMS.map(item => {
               const active = activePage === item.id;
               const showSecondaryHeading = item.id === "analytics" && !collapsed;
@@ -1282,13 +1282,13 @@ function Sidebar({
                   key={item.id}
                   type="button"
                   onClick={() => onSelect(item.id)}
-                  className={`relative flex min-h-12 w-full items-center gap-3 rounded-2xl px-3 text-left transition ${active
+                  className={`relative flex min-h-10 w-full items-center gap-2.5 rounded-xl px-3 text-left transition ${active
                     ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100"
                     : "text-slate-600 hover:bg-slate-50 hover:text-slate-950"
                     } ${collapsed ? "justify-center" : ""}`}
                   title={item.label}
                 >
-                  <Icon name={item.icon} className="h-5 w-5 shrink-0" />
+                  <Icon name={item.icon} className="h-4.5 w-4.5 shrink-0" />
                   {((item.id === "news" && newsPendingCount) || (item.id === "businesses" && businessPendingCount)) ? (
                     <span className={`${collapsed ? "absolute right-1 top-1" : "ml-auto"} min-w-5 rounded-full bg-rose-500 px-1.5 py-0.5 text-center text-[10px] font-black text-white`}>
                       {item.id === "news" ? (newsPendingCount > 99 ? "99+" : newsPendingCount) : (businessPendingCount > 99 ? "99+" : businessPendingCount)}
@@ -1352,7 +1352,7 @@ function TopBar({
   const page = CRM_NAV_ITEMS.find(item => item.id === activePage) || CRM_NAV_ITEMS[0];
   return (
     <header className="z-30 shrink-0 border-b border-slate-200 bg-white/90 ">
-      <div className="mx-auto flex h-16 max-w-[1540px] items-center gap-3 px-1 sm:px-3 md:px-6 lg:px-8">
+      <div className="mx-auto flex h-16 max-w-[1360px] items-center gap-2 px-2 sm:px-4 lg:px-6">
         <button
           type="button"
           onClick={onOpenMobile}
@@ -1361,7 +1361,7 @@ function TopBar({
         >
           <Icon name="menu" className="h-5 w-5" />
         </button>
-        <div className="hidden min-w-[150px] sm:block">
+        <div className="hidden min-w-[120px] sm:block">
           <p className="text-sm font-bold text-slate-950">{page.label}</p>
           <p className="text-xs font-medium text-slate-400">Lajukan CRM</p>
         </div>
