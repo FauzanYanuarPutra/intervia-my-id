@@ -22,6 +22,11 @@ DOMAIN="${DOMAIN:-all}"
 DRY_RUN="${DRY_RUN:-false}"
 VERIFY_AFTER_BACKFILL="${VERIFY_AFTER_BACKFILL:-true}"
 TARGET_RESET="${TARGET_RESET:-false}"
+TARGET_RESET_CONFIRMATION="${TARGET_RESET_CONFIRMATION:-}"
+if [[ "$TARGET_RESET" == "true" && "$TARGET_RESET_CONFIRMATION" != "I_UNDERSTAND_TARGET_RESET" ]]; then
+  echo "TARGET_RESET=true is destructive to target-only data. Set TARGET_RESET_CONFIRMATION=I_UNDERSTAND_TARGET_RESET explicitly." >&2
+  exit 2
+fi
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 ensure_target_db() {
