@@ -719,9 +719,16 @@ export async function getBusinessVerificationStatus(
   };
 }
 
-export async function requestBusinessVerification(businessId: string) {
+export type BusinessVerificationRequestResult = {
+  verification_id: string;
+  status: 'pending' | string;
+};
+
+export async function requestBusinessVerification(
+  businessId: string,
+): Promise<BusinessVerificationRequestResult> {
   const { token } = await requireAuthenticatedActor();
-  return requestJson(
+  const payload = await requestJson(
     `${MARKETPLACE_URL}/v1/umkm/stores/${encodeURIComponent(businessId)}/verification/request`,
     {
       method: 'POST',
@@ -735,6 +742,13 @@ export async function requestBusinessVerification(businessId: string) {
       }),
     },
   );
+  const root = nestedRecord(payload);
+  const verificationId = stringValue(root.verification_id);
+  const status = stringValue(root.status) || 'pending';
+  if (!verificationId) {
+    throw new Error('Respons verifikasi usaha dari server tidak valid.');
+  }
+  return { verification_id: verificationId, status };
 }
 
 export async function reconcileBusiness(input: {
