@@ -34,6 +34,7 @@ This documentation system describes what exists in the repository now. It is not
 - `architecture/deployment-architecture.md`
 - `architecture/modernization-2026-08.md`
 - `architecture/domain-service-boundaries-2026-09.md`
+- `architecture/domain-extraction-status-2026-09-21.md`
 - `architecture/domain-ownership.json`
 - `architecture/event-contracts-v1.json`
 - `architecture/crm-architecture.md`
