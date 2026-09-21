@@ -1,5 +1,5 @@
 import { ReviewPageSkeleton } from '@/components/system/feedback/RouteSkeletons';
 
-export default function ReviewLoading() {
+export default function TransactionReviewLoading() {
   return <ReviewPageSkeleton />;
 }
