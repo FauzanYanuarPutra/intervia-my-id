@@ -282,7 +282,11 @@ async fn require_super_admin(
     let claims = decode_access_token(&state.config.jwt_secret, token)
         .map_err(|_| StatusCode::UNAUTHORIZED)?;
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
-    let is_super_admin: bool = sqlx::query_scalar(
+
+    // Backoffice provisioning is a platform-admin operation. Keep
+    // super_admin access intact while allowing the normal CRM admin role
+    // to manage team access so the administration screen is not a dead end.
+    let has_owner_role: bool = sqlx::query_scalar(
         r#"
         SELECT EXISTS (
           SELECT 1
@@ -290,7 +294,7 @@ async fn require_super_admin(
           JOIN roles r ON r.id = ur.role_id
           JOIN core.users u ON u.id = ur.user_id
           WHERE ur.user_id = $1
-            AND lower(r.name::text) = 'super_admin'
+            AND lower(r.name::text) IN ('super_admin', 'admin')
             AND u.deleted_at IS NULL
             AND u.is_active = TRUE
             AND u.status = 'active'
@@ -301,7 +305,12 @@ async fn require_super_admin(
     .fetch_one(&state.db)
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    if !is_super_admin || !has_role(&claims.roles, "super_admin") {
+
+    let has_claimed_owner_role = claims.roles.iter().any(|role| {
+        matches!(role.trim().to_ascii_lowercase().as_str(), "super_admin" | "admin")
+    });
+
+    if !has_owner_role || !has_claimed_owner_role {
         return Err(StatusCode::FORBIDDEN);
     }
     Ok(claims)
