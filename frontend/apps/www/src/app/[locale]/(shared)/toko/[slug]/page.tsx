@@ -511,13 +511,13 @@ export default async function TokoPage({ params }: PageProps) {
             className="relative overflow-hidden bg-white dark:bg-slate-900 sm:rounded-3xl sm:border sm:border-slate-200 sm:shadow-sm sm:dark:border-slate-800"
             data-testid="storefront-summary"
           >
-            <Link
+            {/* <Link
               href={`/${locale}/umkm`}
               aria-label={isId ? 'Kembali' : 'Back'}
               className="absolute left-3 top-3 z-20 grid h-9 w-9 place-items-center rounded-full bg-white/95 text-slate-900 shadow-sm ring-1 ring-black/5 backdrop-blur transition hover:scale-[1.03] hover:bg-white dark:bg-slate-900/95 dark:text-slate-100 dark:ring-white/10 sm:left-4 sm:top-4"
             >
               <ArrowLeft className="h-5 w-5" />
-            </Link>
+            </Link> */}
             {brandMedia.coverUrl ? (
               <div
                 className="relative aspect-[8/3] overflow-hidden bg-slate-100 dark:bg-slate-800"
