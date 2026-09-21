@@ -3398,21 +3398,6 @@ export default function CreateListingWizard({
 
         if (
           step === 6 &&
-          media.some(
-            item =>
-              item.status ===
-              'uploading',
-          )
-        ) {
-          return text(
-            locale,
-            'Tunggu semua foto selesai diunggah sebelum lanjut.',
-            'Wait for all photo uploads to finish before continuing.',
-          );
-        }
-
-        if (
-          step === 6 &&
           requiresPrimaryImage &&
           media.filter(
             item =>
