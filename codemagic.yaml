@@ -75,8 +75,6 @@ workflows:
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.lajukan.app
-      groups:
-        - appstore_credentials
       vars:
         BUNDLE_ID: com.lajukan.app
         APP_STORE_APPLE_ID: "REPLACE_WITH_APPLE_ID"
@@ -99,7 +97,7 @@ workflows:
       - name: Resolve iOS build number
         script: |
           set -e
-          if [ "${APP_STORE_APPLE_ID}" != "REPLACE_WITH_APPLE_ID" ]; then
+          if [ "$APP_STORE_APPLE_ID" != "REPLACE_WITH_APPLE_ID" ]; then
             LATEST=$(app-store-connect get-latest-app-store-build-number "$APP_STORE_APPLE_ID" 2>/dev/null || true)
           else
             LATEST=""
@@ -132,8 +130,6 @@ workflows:
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.lajukan.app
-      groups:
-        - appstore_credentials
       vars:
         BUNDLE_ID: com.lajukan.app
         APP_STORE_APPLE_ID: "REPLACE_WITH_APPLE_ID"
@@ -156,7 +152,7 @@ workflows:
       - name: Resolve iOS build number
         script: |
           set -e
-          if [ "${APP_STORE_APPLE_ID}" != "REPLACE_WITH_APPLE_ID" ]; then
+          if [ "$APP_STORE_APPLE_ID" != "REPLACE_WITH_APPLE_ID" ]; then
             LATEST=$(app-store-connect get-latest-app-store-build-number "$APP_STORE_APPLE_ID" 2>/dev/null || true)
           else
             LATEST=""
