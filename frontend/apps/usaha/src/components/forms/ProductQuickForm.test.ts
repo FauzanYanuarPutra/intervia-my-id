@@ -6,6 +6,10 @@ const source = readFileSync(
   fileURLToPath(new URL('./ProductQuickFormSimple.tsx', import.meta.url)),
   'utf8',
 );
+const details = readFileSync(
+  fileURLToPath(new URL('./ProductDetailsModal.tsx', import.meta.url)),
+  'utf8',
+);
 
 describe('ProductQuickForm progressive disclosure', () => {
   it('keeps the everyday product flow focused on photo, name, price, and stock', () => {
@@ -19,9 +23,11 @@ describe('ProductQuickForm progressive disclosure', () => {
   it('moves optional catalog and stock settings behind one advanced disclosure', () => {
     expect(source).toContain('<details');
     expect(source).toContain('Detail lainnya');
-    expect(source).toContain('Kategori');
-    expect(source).toContain('Batas stok tipis');
-    expect(source).toContain('Barang titipan');
+    expect(source).toContain('ProductDetailsModal');
+    expect(details).toContain('Kategori');
+    expect(details).toContain('Batas stok tipis');
+    expect(details).toContain('Barang titipan');
+    expect(details).toContain('Cara menghitung stok');
   });
 
   it('uses mobile-friendly numeric inputs for rupiah and stock', () => {
