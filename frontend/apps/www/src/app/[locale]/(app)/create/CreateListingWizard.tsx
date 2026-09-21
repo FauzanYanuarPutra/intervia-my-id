@@ -92,7 +92,6 @@ import { normalizeContentMediaUrl } from '@/lib/content/catalog';
 import {
   extractUploadedContentImages,
   matchUploadedContentImages,
-  type UploadedContentImage,
 } from '@/lib/content/uploadMedia';
 import { activeListingNeedsPrimaryImage } from '@/lib/content/listingFlowRules';
 import { trackLajukanEvent } from '@/lib/analytics/lajukanEvents';
