@@ -29,6 +29,9 @@ describe('StorefrontProductOrderAction', () => {
 
     expect(html).toContain('data-variant="compact"');
     expect(html).toContain('>Pesan</button>');
+    expect(html).toContain('bg-emerald-50');
+    expect(html).toContain('text-emerald-800');
+    expect(html).not.toContain('bg-emerald-700');
     expect(html).not.toContain('w-full');
     expect(html).not.toContain('disabled=""');
   });
