@@ -3630,6 +3630,7 @@ export default function CreateListingWizard({
           currentStep,
           values,
           media,
+          { autosave: true },
         ).catch(() => undefined);
       }
     };
