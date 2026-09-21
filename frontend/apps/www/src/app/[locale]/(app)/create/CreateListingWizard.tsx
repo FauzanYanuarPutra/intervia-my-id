@@ -4611,17 +4611,35 @@ export default function CreateListingWizard({
                       () => null,
                     );
 
+                const reconciledRecord =
+                  valueAsRecord(
+                    reconciled?.item,
+                  ) ||
+                  valueAsRecord(
+                    reconciled?.content,
+                  ) ||
+                  valueAsRecord(
+                    reconciled?.data,
+                  ) ||
+                  valueAsRecord(
+                    reconciled,
+                  ) ||
+                  {};
+
                 const reconciledStatus =
                   valueAsString(
-                    reconciled?.content_status,
+                    reconciledRecord.content_status,
                   ) ||
                   valueAsString(
-                    reconciled?.status,
+                    reconciledRecord.status,
+                  ) ||
+                  valueAsString(
+                    reconciledRecord.listing_status,
                   );
 
                 const reconciledSlug =
                   valueAsString(
-                    reconciled?.slug,
+                    reconciledRecord.slug,
                   ) ||
                   publishDraftId;
 
