@@ -8,6 +8,9 @@ services:
       APP_ENV: prod
       RUST_LOG: ${RUST_LOG:-warn}
       RUN_MIGRATIONS_ON_STARTUP: "false"
+      DOMAIN_RUNTIME_MODE: "compatibility"
+      LEGACY_PROXY_ENABLED: "true"
+      LEGACY_PROXY_TIMEOUT_MS: "5000"
   media_service:
     build: !reset null
     image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-media:${IMAGE_TAG:?IMAGE_TAG is required}
@@ -17,6 +20,9 @@ services:
       APP_ENV: prod
       RUST_LOG: ${RUST_LOG:-warn}
       RUN_MIGRATIONS_ON_STARTUP: "false"
+      DOMAIN_RUNTIME_MODE: "compatibility"
+      LEGACY_PROXY_ENABLED: "true"
+      LEGACY_PROXY_TIMEOUT_MS: "5000"
   news_service:
     build: !reset null
     image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-news:${IMAGE_TAG:?IMAGE_TAG is required}
@@ -26,6 +32,9 @@ services:
       APP_ENV: prod
       RUST_LOG: ${RUST_LOG:-warn}
       RUN_MIGRATIONS_ON_STARTUP: "false"
+      DOMAIN_RUNTIME_MODE: "compatibility"
+      LEGACY_PROXY_ENABLED: "true"
+      LEGACY_PROXY_TIMEOUT_MS: "5000"
       JWT_ACCESS_ALG: ${JWT_ACCESS_ALG:?JWT_ACCESS_ALG is required}
       JWT_PUBLIC_KEY_PEM: ${JWT_PUBLIC_KEY_PEM:?JWT_PUBLIC_KEY_PEM is required}
       RABBITMQ_URL: amqp://${RABBIT_USER}:${RABBIT_PASS}@rabbitmq:5672/%2f
@@ -38,6 +47,9 @@ services:
       APP_ENV: prod
       RUST_LOG: ${RUST_LOG:-warn}
       RUN_MIGRATIONS_ON_STARTUP: "false"
+      DOMAIN_RUNTIME_MODE: "compatibility"
+      LEGACY_PROXY_ENABLED: "true"
+      LEGACY_PROXY_TIMEOUT_MS: "5000"
   payment_service:
     build: !reset null
     image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-payment:${IMAGE_TAG:?IMAGE_TAG is required}
@@ -47,6 +59,9 @@ services:
       APP_ENV: prod
       RUST_LOG: ${RUST_LOG:-warn}
       RUN_MIGRATIONS_ON_STARTUP: "false"
+      DOMAIN_RUNTIME_MODE: "compatibility"
+      LEGACY_PROXY_ENABLED: "true"
+      LEGACY_PROXY_TIMEOUT_MS: "5000"
   promotion_service:
     build: !reset null
     image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-promotion:${IMAGE_TAG:?IMAGE_TAG is required}
@@ -56,6 +71,9 @@ services:
       APP_ENV: prod
       RUST_LOG: ${RUST_LOG:-warn}
       RUN_MIGRATIONS_ON_STARTUP: "false"
+      DOMAIN_RUNTIME_MODE: "compatibility"
+      LEGACY_PROXY_ENABLED: "true"
+      LEGACY_PROXY_TIMEOUT_MS: "5000"
   crm_service:
     build: !reset null
     image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-crm:${IMAGE_TAG:?IMAGE_TAG is required}
@@ -65,6 +83,9 @@ services:
       APP_ENV: prod
       RUST_LOG: ${RUST_LOG:-warn}
       RUN_MIGRATIONS_ON_STARTUP: "false"
+      DOMAIN_RUNTIME_MODE: "compatibility"
+      LEGACY_PROXY_ENABLED: "true"
+      LEGACY_PROXY_TIMEOUT_MS: "5000"
   communication_service:
     build: !reset null
     image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-communication:${IMAGE_TAG:?IMAGE_TAG is required}
@@ -74,6 +95,9 @@ services:
       APP_ENV: prod
       RUST_LOG: ${RUST_LOG:-warn}
       RUN_MIGRATIONS_ON_STARTUP: "false"
+      DOMAIN_RUNTIME_MODE: "compatibility"
+      LEGACY_PROXY_ENABLED: "true"
+      LEGACY_PROXY_TIMEOUT_MS: "5000"
   trust_service:
     build: !reset null
     image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-trust:${IMAGE_TAG:?IMAGE_TAG is required}
@@ -83,6 +107,9 @@ services:
       APP_ENV: prod
       RUST_LOG: ${RUST_LOG:-warn}
       RUN_MIGRATIONS_ON_STARTUP: "false"
+      DOMAIN_RUNTIME_MODE: "compatibility"
+      LEGACY_PROXY_ENABLED: "true"
+      LEGACY_PROXY_TIMEOUT_MS: "5000"
   support_service:
     build: !reset null
     image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-support:${IMAGE_TAG:?IMAGE_TAG is required}
