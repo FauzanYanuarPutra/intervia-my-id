@@ -48,7 +48,7 @@ export function ContactWorkspace({
     const q = query.trim().toLowerCase();
     return q
       ? users.filter(user =>
-          (user.name + ' ' + user.handle + ' ' + user.role + ' ' + user.city)
+          (user.name + ' ' + user.handle + ' ' + user.role + ' ' + user.city + ' ' + user.kyc + ' ' + user.risk + ' ' + user.approvalStatus)
             .toLowerCase()
             .includes(q),
         )
@@ -84,7 +84,7 @@ export function ContactWorkspace({
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setSelectedId('');
-        writeUserUrl('', 'push');
+        writeUserUrl('', 'replace');
       }
     };
     window.addEventListener('keydown', handleKeyDown);
