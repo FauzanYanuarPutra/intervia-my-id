@@ -1122,7 +1122,7 @@ export default function CrmCommandCenter() {
                 <OperationsPriorityPanel items={operationPriorities} onOpen={destination => navigatePage(destination)} />
               ) : null}
 
-              {activePage === "dashboard" ? <OperationsOverview data={filteredData} /> : null}
+              {activePage === "dashboard" ? <OperationsOverview data={filteredData} onOpen={page => navigatePage(page)} /> : null}
               {activePage === "pipeline" ? <PipelineWorkspace leads={filteredData.leads} /> : null}
               {activePage === "users" ? (
                 <ContactWorkspace users={filteredData.users} listings={filteredData.listings} orders={data.orders} tickets={data.tickets} trustProfiles={data.trustProfiles} onTrustAction={handleUserTrustAction} />
