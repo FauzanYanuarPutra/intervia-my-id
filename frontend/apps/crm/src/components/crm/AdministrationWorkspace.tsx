@@ -132,10 +132,11 @@ export function AdministrationWorkspace() {
   };
 
   const search = async () => {
-    if (q.trim().length < 2) return;
+    const term = q.trim().replace(/^@/, '');
+    if (term.length < 2) return;
     setBusy(true); setMessage('');
     try {
-      const data = await json<{data: Candidate[]}>(`/api/backoffice/candidates?q=${encodeURIComponent(q.trim())}`);
+      const data = await json<{data: Candidate[]}>(`/api/backoffice/candidates?q=${encodeURIComponent(term)}`);
       setCandidates(data.data || []);
     } catch (e) {
       const error = e instanceof Error ? e.message : 'Pencarian gagal.';
