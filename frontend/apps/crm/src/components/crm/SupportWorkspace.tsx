@@ -94,7 +94,7 @@ export function SupportWorkspace({tickets,failed=false}:{tickets:SupportTicket[]
         </div>
       </Card>
 
-      <Card className="p-4 sm:p-5">
+      <Card className={`p-4 sm:p-5 ${selectedId ? "order-1 xl:order-2" : "order-2 xl:order-2"}`}>
         {!selectedId ? <EmptyState title="Pilih tiket" description="Pilih tiket di kiri untuk melihat detail, riwayat balasan, dan tindakan."/> :
         loadingDetail ? <div className="rounded-2xl bg-[color:var(--color-surface-muted)] p-6 text-sm font-semibold">Memuat detail tiket...</div> :
         detail ? <div>
