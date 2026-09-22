@@ -276,43 +276,69 @@ export function normalizeProfileContentTab(input: {
   category?: string | null;
   metadata?: Record<string, unknown> | null;
 }): ProfileLeafTab {
-  const tokens = [
-    normalizeToken(input.type),
-    normalizeToken(input.category),
-    ...collectMetadataTokens(input.metadata),
-  ].filter(Boolean);
-  const joined = tokens.join(' ');
+  const explicit = [normalizeToken(input.type), normalizeToken(input.category)]
+    .filter(Boolean)
+    .join(' ');
+  const metadata = collectMetadataTokens(input.metadata).join(' ');
+  const joined = [explicit, metadata].filter(Boolean).join(' ');
 
-  if (/(news|berita|analysis|analisis|press release|press_release|rilis bisnis|editorial)/.test(joined))
+  if (explicit && /(news|berita|analysis|analisis|press release|press_release|rilis bisnis|editorial)/.test(explicit))
     return 'news';
-  if (/(community|komunitas|forum|thread|discussion|diskusi|question|tanya)/.test(joined))
+  if (explicit && /(community|komunitas|forum|thread|discussion|diskusi|question|tanya)/.test(explicit))
     return 'community';
-  if (/(reels|reel|short video|video pendek|clips?)/.test(joined))
+  if (explicit && /(reels|reel|short video|video pendek|clips?)/.test(explicit))
     return 'reels';
   if (
-    /(business_profile|business profile|company|tempat usaha|outlet|merchant|warung|storefront|toko|profil usaha)/.test(
-      joined,
-    )
+    explicit &&
+    /(business_profile|business profile|company|tempat usaha|outlet|merchant|warung|storefront|toko|profil usaha)/.test(explicit)
   )
     return 'business_place';
-  if (/(supplier|pasokan|bahan baku|material|stockist|distributor)/.test(joined))
+  if (explicit && /(supplier|pasokan|bahan baku|material|stockist|distributor)/.test(explicit))
     return 'supplier';
-  if (/(freelancer|talent|creator|worker|professional)/.test(joined))
+  if (explicit && /(freelancer|talent|creator|worker|professional)/.test(explicit))
     return 'freelancer';
-  if (/(job|career|hiring|recruit|loker|vacancy)/.test(joined)) return 'job';
+  if (explicit && /(job|career|hiring|recruit|loker|vacancy)/.test(explicit)) return 'job';
   if (
-    /(business_transfer|business-transfer|business transfer|oper usaha|jual usaha|usaha berjalan|handover|takeover)/.test(
-      joined,
-    )
+    explicit &&
+    /(business_transfer|business-transfer|business transfer|oper usaha|jual usaha|usaha berjalan|handover|takeover)/.test(explicit)
   )
     return 'business_transfer';
-  if (/(tool_rental|tool-rental|rental|rent|sewa|pinjam|meminjam)/.test(joined))
+  if (explicit && /(tool_rental|tool-rental|rental|rent|sewa|pinjam|meminjam)/.test(explicit))
     return 'tool_rental';
-  if (/(property|real estate|apartment|house|ruko|kios|lapak)/.test(joined))
+  if (explicit && /(property|real estate|apartment|house|ruko|kios|lapak)/.test(explicit))
     return 'property';
-  if (/(umkm|kuliner)/.test(joined)) return 'umkm';
-  if (/(service|jasa|agency|consult)/.test(joined)) return 'service';
-  if (/(product|produk|shop|store|marketplace|commerce)/.test(joined))
+  if (explicit && /(umkm)/.test(explicit)) return 'umkm';
+  if (explicit && /(service|jasa|agency|consult)/.test(explicit))
+    return 'service';
+  if (explicit && /(product|produk|shop|store|marketplace|commerce)/.test(explicit))
+    return 'product';
+
+  if (/(news|berita|analysis|analisis|press release|press_release|rilis bisnis|editorial)/.test(metadata))
+    return 'news';
+  if (/(community|komunitas|forum|thread|discussion|diskusi|question|tanya)/.test(metadata))
+    return 'community';
+  if (/(reels|reel|short video|video pendek|clips?)/.test(metadata))
+    return 'reels';
+  if (
+    /(business_profile|business profile|company|tempat usaha|outlet|merchant|warung|storefront|toko|profil usaha)/.test(metadata)
+  )
+    return 'business_place';
+  if (/(supplier|pasokan|bahan baku|material|stockist|distributor)/.test(metadata))
+    return 'supplier';
+  if (/(freelancer|talent|creator|worker|professional)/.test(metadata))
+    return 'freelancer';
+  if (/(job|career|hiring|recruit|loker|vacancy)/.test(metadata)) return 'job';
+  if (
+    /(business_transfer|business-transfer|business transfer|oper usaha|jual usaha|usaha berjalan|handover|takeover)/.test(metadata)
+  )
+    return 'business_transfer';
+  if (/(tool_rental|tool-rental|rental|rent|sewa|pinjam|meminjam)/.test(metadata))
+    return 'tool_rental';
+  if (/(property|real estate|apartment|house|ruko|kios|lapak)/.test(metadata))
+    return 'property';
+  if (/(umkm|kuliner)/.test(metadata)) return 'umkm';
+  if (/(service|jasa|agency|consult)/.test(metadata)) return 'service';
+  if (/(product|produk|shop|store|marketplace|commerce)/.test(metadata))
     return 'product';
   if (joined) return 'other';
   return 'product';
