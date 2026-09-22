@@ -2382,7 +2382,9 @@ export function NewsArticleSkeleton() {
   return (
     <main className="page-shell page-shell-readable page-rhythm pb-12 pt-6" data-skeleton-route="true" aria-busy="true" aria-label="Memuat artikel Lajukan News">
       <div className="mb-3 flex items-center gap-2">
-        <div className="grid h-8 w-8 place-items-center rounded-[10px] bg-emerald-600 text-xs font-black text-white shadow-sm">L</div>
+        <div className="grid h-8 w-8 place-items-center rounded-[10px] border border-emerald-100 bg-white p-1.5 shadow-sm dark:border-emerald-400/20 dark:bg-white/10">
+          <Image src="/logo.svg" alt="Lajukan" width={72} height={24} className="h-4 w-auto object-contain" />
+        </div>
         <div>
           <div className="h-3.5 w-20 rounded bg-slate-200" />
           <div className="mt-1 h-2.5 w-24 rounded bg-slate-100" />
