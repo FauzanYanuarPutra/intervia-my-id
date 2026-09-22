@@ -89,15 +89,18 @@ export async function showBrowserNotification(
 }
 
 
-function urlBase64ToUint8Array(value: string): ArrayBuffer {
+function urlBase64ToArrayBuffer(value: string): ArrayBuffer {
   const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
-  const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
+  const padded =
+    normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
   const raw = window.atob(padded);
   const buffer = new ArrayBuffer(raw.length);
-  const output = new Uint8Array(buffer);
+  const bytes = new Uint8Array(buffer);
+
   for (let index = 0; index < raw.length; index += 1) {
-    output[index] = raw.charCodeAt(index);
+    bytes[index] = raw.charCodeAt(index);
   }
+
   return buffer;
 }
 
@@ -139,7 +142,7 @@ export async function ensureWebPushSubscription(deviceLabel?: string) {
     if (!subscription) {
       subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(config.publicKey),
+        applicationServerKey: urlBase64ToArrayBuffer(config.publicKey),
       });
     }
 
