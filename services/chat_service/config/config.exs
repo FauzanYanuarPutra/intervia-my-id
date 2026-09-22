@@ -10,7 +10,7 @@ config :chat_service,
 
 config :chat_service, ChatServiceWeb.Endpoint,
   url: [host: "localhost"],
-  adapter: Phoenix.Endpoint.Cowboy2Adapter,
+  adapter: Bandit.PhoenixAdapter,
   render_errors: [formats: [json: ChatServiceWeb.ErrorJSON], accepts: ~w(json)],
   pubsub_server: ChatService.PubSub
 
