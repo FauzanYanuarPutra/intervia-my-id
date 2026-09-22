@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { Newspaper } from 'lucide-react';
 import type { LajukanNewsArticle } from '@/lib/news';
 
@@ -25,7 +26,7 @@ export function NewsMedia({
   className?: string;
   showLabels?: boolean;
 }) {
-  const [failed, setFailed] = React.useState(false);
+  const [failed, setFailed] = useState(false);
   const showImage = Boolean(article.coverImage) && !failed;
 
   return (
@@ -82,7 +83,7 @@ export function NewsArticleMedia({
   article: LajukanNewsArticle;
   isId: boolean;
 }) {
-  const [failed, setFailed] = React.useState(false);
+  const [failed, setFailed] = useState(false);
   const showImage = Boolean(article.coverImage) && !failed;
 
   return (
