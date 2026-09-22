@@ -2978,7 +2978,10 @@ async fn create_source_review_request(
         Err(_) => return response_error(StatusCode::BAD_REQUEST, "invalid reviewer id"),
     };
     if requester_id == requested_reviewer_id {
-        return response_error(StatusCode::CONFLICT, "reviewer must be different from requester");
+        return response_error(
+            StatusCode::CONFLICT,
+            "reviewer must be different from requester",
+        );
     }
     if fetch_user_read_model_brief(&state.db, requested_reviewer_id)
         .await
@@ -2994,7 +2997,10 @@ async fn create_source_review_request(
     let mut tx = match state.db.begin().await {
         Ok(tx) => tx,
         Err(error) => {
-            tracing::error!("create_source_review_request begin transaction error: {:?}", error);
+            tracing::error!(
+                "create_source_review_request begin transaction error: {:?}",
+                error
+            );
             return response_error(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "failed to create source review request",
@@ -3006,7 +3012,10 @@ async fn create_source_review_request(
         Ok(Some(article)) => article,
         Ok(None) => return response_error(StatusCode::NOT_FOUND, "news article not found"),
         Err(error) => {
-            tracing::error!("create_source_review_request article lock error: {:?}", error);
+            tracing::error!(
+                "create_source_review_request article lock error: {:?}",
+                error
+            );
             return response_error(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "failed to lock news article",
@@ -3025,7 +3034,10 @@ async fn create_source_review_request(
     let has_verified_source = match has_verified_source_tx(&mut tx, content_id).await {
         Ok(value) => value,
         Err(error) => {
-            tracing::error!("create_source_review_request source check error: {:?}", error);
+            tracing::error!(
+                "create_source_review_request source check error: {:?}",
+                error
+            );
             return response_error(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "failed to validate news sources",
@@ -3062,7 +3074,10 @@ async fn create_source_review_request(
     {
         Ok(row) => row,
         Err(error) => {
-            tracing::error!("create_source_review_request insert error: {:?}", error);
+            tracing::error!(
+                "create_source_review_request insert error: {:?}",
+                error
+            );
             return response_error(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "failed to create source review request",
@@ -3341,7 +3356,10 @@ async fn update_news_source(
         .execute(&mut *tx)
         .await
         {
-            tracing::error!("update_news_source review request completion error: {:?}", error);
+            tracing::error!(
+            "update_news_source review request completion error: {:?}",
+            error
+        );
             return response_error(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "failed to complete source review request",
