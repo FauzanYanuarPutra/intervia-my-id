@@ -107,6 +107,7 @@ import {
   isExplicitlyNonTransactional,
   readPublicReference,
 } from '@/lib/content/publicReference';
+import { isHomeRecommendationEligible } from '@/lib/homeRecommendationRules';
 import {
   homeDesktopGridClassName,
   MarketplacePageFrame,
@@ -225,7 +226,51 @@ type RecommendationItem = {
   verified: boolean;
   side: 'supply' | 'demand';
   imageAttribution?: string;
+  ownerId?: string | null;
+  updatedAt?: number;
 };
+
+function recommendationScore(item: RecommendationItem): number {
+  let score = 0;
+
+  if (item.verified) score += 8;
+  if (item.image || item.images.length) score += 4;
+  if (item.badge) score += 2;
+
+  const rating = Number.parseFloat(item.rating);
+  if (Number.isFinite(rating)) score += Math.min(10, Math.max(0, rating * 2));
+
+  const reviews = Number.parseInt(item.reviews.replace(/[^\d]/g, ''), 10);
+  if (Number.isFinite(reviews)) score += Math.min(5, Math.log10(reviews + 1) * 3);
+
+  if (typeof item.distanceKm === 'number' && Number.isFinite(item.distanceKm)) {
+    if (item.distanceKm <= 2) score += 6;
+    else if (item.distanceKm <= 5) score += 4;
+    else if (item.distanceKm <= 10) score += 2;
+  }
+
+  if (item.updatedAt) {
+    const ageDays = Math.max(0, (Date.now() - item.updatedAt) / 86_400_000);
+    if (ageDays <= 7) score += 4;
+    else if (ageDays <= 30) score += 2;
+  }
+
+  return score;
+}
+
+function rankRecommendations(items: RecommendationItem[]): RecommendationItem[] {
+  return [...items].sort((left, right) => {
+    const scoreDelta = recommendationScore(right) - recommendationScore(left);
+    if (scoreDelta !== 0) return scoreDelta;
+
+    const distanceDelta =
+      (left.distanceKm ?? Number.POSITIVE_INFINITY) -
+      (right.distanceKm ?? Number.POSITIVE_INFINITY);
+    if (Number.isFinite(distanceDelta) && distanceDelta !== 0) return distanceDelta;
+
+    return left.title.localeCompare(right.title, 'id');
+  });
+}
 
 type PublicReferenceItem = {
   id: string;
@@ -1003,6 +1048,8 @@ function mapContentToRecommendation(
     verified: item.owner_profile?.identity_verified === true,
     side,
     imageAttribution: contentImageAttribution(item) || undefined,
+    ownerId: item.owner_id || null,
+    updatedAt: item.updated_at ? Date.parse(item.updated_at) || undefined : undefined,
   };
 }
 
@@ -3043,6 +3090,39 @@ function QuickCategoriesSection({ isId }: { isId: boolean }) {
   );
 }
 
+function RecommendationsLoadingSkeleton({ isId }: { isId: boolean }) {
+  return (
+    <section
+      className="w-full min-w-0 overflow-hidden py-1.5 sm:py-2"
+      aria-label={isId ? 'Memuat rekomendasi listing' : 'Loading listing recommendations'}
+      aria-busy="true"
+      data-testid="home-recommendations-skeleton"
+    >
+      <div className="flex items-center gap-1.5 px-2 sm:px-3 md:px-4 lg:px-6">
+        <Skeleton className="h-3.5 w-3.5 rounded-full" />
+        <Skeleton className="h-3.5 w-32 rounded-full" />
+      </div>
+      <div className="mt-2 flex gap-2 overflow-hidden px-2 sm:gap-2.5 sm:px-3 md:px-4 lg:gap-3 lg:px-6">
+        {Array.from({ length: 5 }).map((_, index) => (
+          <div
+            key={index}
+            className="w-[calc((100vw-32px)/2.08)] shrink-0 sm:w-[180px] md:w-[190px] lg:w-[200px] xl:w-[210px]"
+          >
+            <div className="overflow-hidden rounded-2xl border border-zinc-200/80 bg-white">
+              <Skeleton className="aspect-square w-full rounded-none" />
+              <div className="space-y-2 p-3">
+                <Skeleton className="h-3.5 w-4/5 rounded" />
+                <Skeleton className="h-4 w-2/5 rounded" />
+                <Skeleton className="h-2.5 w-3/5 rounded" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export function RecommendationsSection({
   isId,
   items,
@@ -3074,11 +3154,11 @@ export function RecommendationsSection({
         <Sparkles className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
 
         <h2 className="min-w-0 truncate text-[11px] font-bold leading-5 tracking-tight text-[color:var(--app-text)] sm:text-xs">
-          {isId ? 'Rekomendasi untuk usahamu' : 'Recommended for you'}
+          {isId ? 'Rekomendasi listing' : 'Recommended listings'}
         </h2>
 
         <span className="hidden shrink-0 text-[9px] font-medium text-zinc-400 sm:inline">
-          {isId ? 'Supplier, jasa & alat' : 'Suppliers, services & tools'}
+          {isId ? 'Produk, jasa, lokasi & sewa' : 'Products, services, places & rentals'}
         </span>
       </div>
 
@@ -3446,11 +3526,14 @@ function RecommendationCard({
           data-image-fallback
           className={cn(
             image ? 'hidden' : 'flex',
-            'absolute inset-0 items-center justify-center bg-zinc-100 px-4 text-center dark:bg-zinc-900',
+            'absolute inset-0 flex-col items-center justify-center gap-2 bg-[linear-gradient(135deg,#ecfdf5_0%,#f8fafc_55%,#fff7ed_100%)] px-4 text-center dark:bg-[linear-gradient(135deg,#052e24_0%,#0f172a_60%,#1c1917_100%)]',
           )}
         >
-          <span className="text-[10px] font-medium text-zinc-400 sm:text-xs">
-            {isId ? 'Belum ada foto' : 'No image'}
+          <span className="grid h-10 w-10 place-items-center rounded-2xl bg-white/80 text-emerald-700 shadow-sm ring-1 ring-emerald-100 dark:bg-slate-950/60 dark:text-emerald-300 dark:ring-white/10">
+            <Store className="h-5 w-5" aria-hidden="true" />
+          </span>
+          <span className="text-[10px] font-bold text-emerald-800/70 sm:text-xs dark:text-emerald-200/70">
+            {isId ? 'Listing Lajukan' : 'Lajukan listing'}
           </span>
         </div>
 
@@ -5098,6 +5181,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
   const [recommendations, setRecommendations] = useState<RecommendationItem[]>(
     [],
   );
+  const [recommendationsLoading, setRecommendationsLoading] = useState(true);
   const [publicReferences, setPublicReferences] = useState<
     PublicReferenceItem[]
   >([]);
@@ -5340,29 +5424,34 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
     };
 
     const loadHomeListings = async () => {
+      setRecommendationsLoading(true);
       try {
-        const listingItems = (await loadListings())
-          .filter(item => !isExplicitlyNonTransactional(item))
-          .map(item =>
-            mapContentToRecommendation(
-              item,
-              isId,
-              Boolean(viewerLocationKey),
+        const listingItems = rankRecommendations(
+          (await loadListings())
+            .filter(isHomeRecommendationEligible)
+            .map(item =>
+              mapContentToRecommendation(
+                item,
+                isId,
+                Boolean(viewerLocationKey),
+              ),
+            )
+            .filter((item): item is RecommendationItem => Boolean(item))
+            .filter(item => item.side === 'supply')
+            .filter(
+              (item, index, allItems) =>
+                allItems.findIndex(candidate => candidate.id === item.id) ===
+                index,
             ),
-          )
-          .filter((item): item is RecommendationItem => Boolean(item))
-          .filter(item => item.side === 'supply')
-          .filter(
-            (item, index, allItems) =>
-              allItems.findIndex(candidate => candidate.id === item.id) ===
-              index,
-          )
-          .slice(0, 12);
+        ).slice(0, 12);
+
         if (!active) return;
         setRecommendations(listingItems);
       } catch {
         if (!active) return;
         setRecommendations([]);
+      } finally {
+        if (active) setRecommendationsLoading(false);
       }
     };
 
@@ -5801,7 +5890,9 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
           dismissLocationPrompt={viewerLocationState.dismissLocationPrompt}
         />
         <PublicReferencesSection isId={isId} items={publicReferences} />
-        {recommendations.length > 0 ? (
+        {recommendationsLoading ? (
+          <RecommendationsLoadingSkeleton isId={isId} />
+        ) : recommendations.length > 0 ? (
           <RecommendationsSection isId={isId} items={recommendations} />
         ) : null}
         <HomeNewsSection locale={locale} items={homeNewsItems} />
