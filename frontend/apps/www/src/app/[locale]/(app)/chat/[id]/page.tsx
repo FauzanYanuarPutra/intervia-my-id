@@ -82,6 +82,7 @@ import { buildContentHref } from '@/lib/content/routes';
 import { buildCreatePath } from '@/lib/createRoutes';
 import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 import { soundManager } from '@/lib/soundManager';
+import { closeBrowserNotificationsByTag } from '@/lib/browserNotifications';
 import { ChatDetailSkeleton } from '@/components/system/feedback/RouteSkeletons';
 import { ChatSafetyControls } from '@/components/chat/ChatSafetyControls';
 import { Modal } from '@/components/common/Modal';
@@ -2523,6 +2524,7 @@ export default function ChatRoomPage() {
   const lastJoinAttemptRef = useRef<number>(0);
   const lastErrorTimeRef = useRef<number>(0);
   const activeCallIdRef = useRef<string | null>(null);
+  const handledIncomingCallActionRef = useRef<string>('');
   const prefilledDraftRef = useRef<string>('');
   const draftRoomResolutionRef = useRef<Promise<string> | null>(null);
   const incomingCallRefState = useRef<{
@@ -3415,6 +3417,137 @@ export default function ChatRoomPage() {
     roomKind,
     chatLocale,
     notifyRead,
+  ]);
+
+  useEffect(() => {
+    if (
+      !channelReady ||
+      !canonicalRoomId ||
+      !currentUserId ||
+      roomKind !== 'direct'
+    ) {
+      return;
+    }
+
+    const action = (searchParams.get('callAction') || '').trim();
+    const callId = (searchParams.get('callId') || '').trim();
+    if (
+      !callId ||
+      !['show', 'accept', 'reject'].includes(action) ||
+      handledIncomingCallActionRef.current === callId + ':' + action
+    ) {
+      return;
+    }
+
+    const requestKey = callId + ':' + action;
+    handledIncomingCallActionRef.current = requestKey;
+    let cancelled = false;
+
+    const handleNotificationAction = async () => {
+      try {
+        const response = await authFetch(
+          '/api/chat/calls/' + encodeURIComponent(callId),
+          { cache: 'no-store' },
+        );
+        const payload = (await response.json().catch(() => ({}))) as {
+          data?: {
+            call_id?: string;
+            room_id?: string;
+            caller_id?: string;
+            callee_id?: string;
+            call_type?: 'video' | 'voice';
+            status?: string;
+          };
+        };
+        const detail = payload.data;
+
+        if (
+          cancelled ||
+          !response.ok ||
+          !detail ||
+          detail.room_id !== canonicalRoomId ||
+          detail.call_id !== callId
+        ) {
+          return;
+        }
+
+        const currentId = currentUserId.toLowerCase();
+        const isCallee = detail.callee_id?.toLowerCase() === currentId;
+
+        if (action === 'reject') {
+          if (isCallee && detail.status === 'ringing') {
+            channelRef.current?.push('call_reject', { call_id: callId });
+          }
+          void closeBrowserNotificationsByTag('incoming-call:' + callId);
+          router.replace('/chat/' + encodeURIComponent(canonicalRoomId));
+          return;
+        }
+
+        if (action === 'accept') {
+          if (!isCallee || detail.status !== 'ringing') {
+            router.replace('/chat/' + encodeURIComponent(canonicalRoomId));
+            return;
+          }
+
+          void soundManager.unlock();
+          channelRef.current?.push('call_accept', { call_id: callId });
+          setActiveCallId(callId);
+          setActiveCallIsCaller(false);
+          setIncomingCall(null);
+          void closeBrowserNotificationsByTag('incoming-call:' + callId);
+
+          window.setTimeout(() => {
+            if (cancelled) return;
+            if (detail.call_type === 'video') setShowVideoCall(true);
+            else setShowVoiceCall(true);
+          }, 100);
+          router.replace('/chat/' + encodeURIComponent(canonicalRoomId));
+          return;
+        }
+
+        if (!isCallee || detail.status !== 'ringing') {
+          router.replace('/chat/' + encodeURIComponent(canonicalRoomId));
+          return;
+        }
+
+        const room = inboxRooms.find(
+          item => String(item.room_id ?? item.id ?? '') === canonicalRoomId,
+        );
+
+        setIncomingCall({
+          callId,
+          callerId: detail.caller_id || '',
+          callerName:
+            String(room?.room_name ?? room?.name ?? '').trim() ||
+            (chatLocale === 'id' ? 'Pengguna Lajukan' : 'Lajukan user'),
+          callerAvatar:
+            String(room?.room_avatar ?? room?.avatar ?? '').trim() || undefined,
+          callerAvatarStyle:
+            (room?.avatar_style ?? room?.room_avatar_style) as unknown,
+          callType: detail.call_type === 'video' ? 'video' : 'voice',
+        });
+      } catch {
+        if (!cancelled) {
+          router.replace('/chat/' + encodeURIComponent(canonicalRoomId));
+        }
+      }
+    };
+
+    void handleNotificationAction();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    authFetch,
+    canonicalRoomId,
+    channelReady,
+    chatLocale,
+    currentUserId,
+    inboxRooms,
+    roomKind,
+    router,
+    searchParams,
   ]);
 
   useEffect(() => {
