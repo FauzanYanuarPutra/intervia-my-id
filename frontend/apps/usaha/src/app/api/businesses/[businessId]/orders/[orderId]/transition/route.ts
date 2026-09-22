@@ -38,7 +38,7 @@ export async function POST(
       body.metadata &&
       typeof body.metadata === 'object' &&
       !Array.isArray(body.metadata)
-        ? body.metadata
+        ? body.metadata as Record<string, unknown>
         : null;
 
     if (!Number.isSafeInteger(expectedVersion) || expectedVersion <= 0 || !nextStatus) {
