@@ -508,7 +508,7 @@ export default async function TokoPage({ params }: PageProps) {
 
       <main
         data-layout="compact-food-storefront"
-        className="min-h-screen bg-white pb-24 text-slate-950 dark:bg-slate-950 dark:text-slate-50 sm:bg-slate-50 sm:py-4 sm:dark:bg-slate-950 lg:py-6"
+        className="min-h-screen bg-white pb-8 text-slate-950 dark:bg-slate-950 dark:text-slate-50 sm:bg-slate-50 sm:py-4 sm:dark:bg-slate-950 lg:py-6"
       >
         <div className="mx-auto w-full max-w-[960px] sm:px-4 lg:px-5">
 
