@@ -489,7 +489,13 @@ export function VideoCall({
           if (!lifecycle.isActive()) return;
           const state = pc.connectionState;
           console.log('[VideoCall] Peer state:', state);
-          if (state === 'failed') {
+          if (state === 'connected') {
+            try {
+              channel.push('call_connected', { call_id: callId });
+            } catch {
+              // Best effort; local WebRTC remains authoritative.
+            }
+          } else if (state === 'failed') {
             setConnectionStatus('failed');
           }
         };
