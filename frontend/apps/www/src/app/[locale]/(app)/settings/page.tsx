@@ -60,6 +60,7 @@ import {
   Users,
   WalletCards,
   Zap,
+  Phone,
 } from 'lucide-react';
 import { SocialDistributionSettings } from './SocialDistributionSettings';
 import { CallNotificationSettings } from './CallNotificationSettings';

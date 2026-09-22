@@ -19,6 +19,7 @@ type IncomingCallState = {
   callerAvatarStyle?: unknown;
   callType: 'video' | 'voice';
   receivedAt: number;
+  recipientUserId: string;
 };
 
 const PENDING_KEY = 'lajukan:pending-incoming-call:v1';
@@ -49,6 +50,7 @@ function readPendingCall(): IncomingCallState | null {
       typeof value.roomId !== 'string' ||
       typeof value.callerId !== 'string' ||
       typeof value.callerName !== 'string' ||
+      typeof value.recipientUserId !== 'string' ||
       (value.callType !== 'voice' && value.callType !== 'video') ||
       typeof value.receivedAt !== 'number'
     ) {
@@ -90,8 +92,14 @@ export function GlobalIncomingCallController() {
     }
 
     const initial = readPendingCall();
-    if (initial && !sameId(initial.callerId, user.id)) {
+    if (
+      initial &&
+      sameId(initial.recipientUserId, user.id) &&
+      !sameId(initial.callerId, user.id)
+    ) {
       setIncomingCall(initial);
+    } else if (initial) {
+      writePendingCall(null);
     }
 
     const onIncoming = (event: Event) => {
@@ -125,6 +133,7 @@ export function GlobalIncomingCallController() {
           detail.caller_avatar_style ?? detail.avatar_style,
         callType: detail.call_type === 'video' ? 'video' : 'voice',
         receivedAt: Date.now(),
+        recipientUserId: String(user.id),
       };
 
       writePendingCall(next);

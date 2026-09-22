@@ -1,6 +1,7 @@
 import 'server-only';
 
-import { Pool } from 'pg';
+import crypto from 'node:crypto';
+import { getRedis } from '@/lib/redis';
 
 type PushSubscriptionRow = {
   endpoint: string;
@@ -11,51 +12,52 @@ type PushSubscriptionRow = {
   device_label: string | null;
 };
 
-declare global {
-  // eslint-disable-next-line no-var
-  var __lajukanPushPool: Pool | undefined;
+const USER_PREFIX = 'push:subscriptions:user:';
+const ENDPOINT_PREFIX = 'push:subscriptions:endpoint:';
+
+function userKey(userId: string) {
+  return USER_PREFIX + userId.trim();
 }
 
-function getPool(): Pool {
-  if (globalThis.__lajukanPushPool) return globalThis.__lajukanPushPool;
+function endpointKey(endpoint: string) {
+  return (
+    ENDPOINT_PREFIX +
+    crypto.createHash('sha256').update(endpoint).digest('hex')
+  );
+}
 
-  const connectionString =
-    process.env.PUSH_DATABASE_URL || process.env.DATABASE_URL;
-  if (!connectionString) {
-    throw new Error('DATABASE_URL is not configured');
+function parseRow(value: string | null): PushSubscriptionRow | null {
+  if (!value) return null;
+
+  try {
+    const parsed = JSON.parse(value) as Partial<PushSubscriptionRow>;
+    if (
+      typeof parsed.endpoint !== 'string' ||
+      typeof parsed.user_id !== 'string' ||
+      typeof parsed.p256dh !== 'string' ||
+      typeof parsed.auth_secret !== 'string'
+    ) {
+      return null;
+    }
+
+    return {
+      endpoint: parsed.endpoint,
+      user_id: parsed.user_id,
+      p256dh: parsed.p256dh,
+      auth_secret: parsed.auth_secret,
+      user_agent: parsed.user_agent ?? null,
+      device_label: parsed.device_label ?? null,
+    };
+  } catch {
+    return null;
   }
-
-  const pool = new Pool({
-    connectionString,
-    max: 5,
-    idleTimeoutMillis: 10_000,
-    allowExitOnIdle: true,
-  });
-
-  globalThis.__lajukanPushPool = pool;
-  return pool;
 }
 
 export async function ensurePushSubscriptionTable() {
-  const pool = getPool();
-
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS lajukan_push_subscriptions (
-      endpoint TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL,
-      p256dh TEXT NOT NULL,
-      auth_secret TEXT NOT NULL,
-      user_agent TEXT,
-      device_label TEXT,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `);
-
-  await pool.query(
-    'CREATE INDEX IF NOT EXISTS idx_lajukan_push_subscriptions_user ON lajukan_push_subscriptions(user_id)',
-  );
+  // Kept as a compatibility name for the existing API. Redis is already
+  // provisioned for the WWW runtime, so there is no schema migration or
+  // backend startup dependency.
+  await getRedis().ping();
 }
 
 export async function upsertPushSubscription(input: {
@@ -66,69 +68,75 @@ export async function upsertPushSubscription(input: {
   userAgent?: string | null;
   deviceLabel?: string | null;
 }) {
-  await ensurePushSubscriptionTable();
+  const userId = input.userId.trim();
+  const endpoint = input.endpoint.trim();
+  if (!userId || !endpoint) {
+    throw new Error('Push subscription user and endpoint are required');
+  }
 
-  const pool = getPool();
-  await pool.query(
-    `
-      INSERT INTO lajukan_push_subscriptions
-        (endpoint, user_id, p256dh, auth_secret, user_agent, device_label)
-      VALUES ($1, $2, $3, $4, $5, $6)
-      ON CONFLICT (endpoint)
-      DO UPDATE SET
-        user_id = EXCLUDED.user_id,
-        p256dh = EXCLUDED.p256dh,
-        auth_secret = EXCLUDED.auth_secret,
-        user_agent = EXCLUDED.user_agent,
-        device_label = EXCLUDED.device_label,
-        updated_at = NOW(),
-        last_seen_at = NOW()
-    `,
-    [
-      input.endpoint,
-      input.userId,
-      input.p256dh,
-      input.auth,
-      input.userAgent ?? null,
-      input.deviceLabel ?? null,
-    ],
-  );
+  const redis = getRedis();
+  const row: PushSubscriptionRow = {
+    endpoint,
+    user_id: userId,
+    p256dh: input.p256dh,
+    auth_secret: input.auth,
+    user_agent: input.userAgent ?? null,
+    device_label: input.deviceLabel ?? null,
+  };
+
+  const previousUserId = await redis.get(endpointKey(endpoint));
+  const encoded = JSON.stringify(row);
+  const pipeline = redis.pipeline();
+
+  if (previousUserId && previousUserId !== userId) {
+    pipeline.hdel(userKey(previousUserId), endpoint);
+  }
+
+  pipeline.hset(userKey(userId), endpoint, encoded);
+  pipeline.set(endpointKey(endpoint), userId);
+
+  await pipeline.exec();
 }
 
 export async function listPushSubscriptions(
   userId: string,
 ): Promise<PushSubscriptionRow[]> {
-  await ensurePushSubscriptionTable();
-  const pool = getPool();
-  const result = await pool.query<PushSubscriptionRow>(
-    `
-      SELECT endpoint, user_id, p256dh, auth_secret, user_agent, device_label
-      FROM lajukan_push_subscriptions
-      WHERE user_id = $1
-      ORDER BY last_seen_at DESC
-    `,
-    [userId],
-  );
-  return result.rows;
+  const cleanUserId = userId.trim();
+  if (!cleanUserId) return [];
+
+  const redis = getRedis();
+  const rows = await redis.hgetall(userKey(cleanUserId));
+
+  return Object.values(rows)
+    .map(value => parseRow(value))
+    .filter((value): value is PushSubscriptionRow => value !== null);
 }
 
 export async function deletePushSubscription(
   userId: string,
   endpoint: string,
 ) {
-  await ensurePushSubscriptionTable();
-  const pool = getPool();
-  await pool.query(
-    'DELETE FROM lajukan_push_subscriptions WHERE user_id = $1 AND endpoint = $2',
-    [userId, endpoint],
-  );
+  const cleanUserId = userId.trim();
+  const cleanEndpoint = endpoint.trim();
+  if (!cleanUserId || !cleanEndpoint) return;
+
+  const redis = getRedis();
+  const pipeline = redis.pipeline();
+  pipeline.hdel(userKey(cleanUserId), cleanEndpoint);
+  pipeline.del(endpointKey(cleanEndpoint));
+  await pipeline.exec();
 }
 
 export async function deletePushEndpoint(endpoint: string) {
-  await ensurePushSubscriptionTable();
-  const pool = getPool();
-  await pool.query(
-    'DELETE FROM lajukan_push_subscriptions WHERE endpoint = $1',
-    [endpoint],
-  );
+  const cleanEndpoint = endpoint.trim();
+  if (!cleanEndpoint) return;
+
+  const redis = getRedis();
+  const ownerId = await redis.get(endpointKey(cleanEndpoint));
+  if (!ownerId) return;
+
+  const pipeline = redis.pipeline();
+  pipeline.hdel(userKey(ownerId), cleanEndpoint);
+  pipeline.del(endpointKey(cleanEndpoint));
+  await pipeline.exec();
 }

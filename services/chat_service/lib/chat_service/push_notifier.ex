@@ -31,8 +31,14 @@ defmodule ChatService.PushNotifier do
           body
         }
 
-      case :httpc.request(:post, request, [timeout: 5_000, connect_timeout: 2_000], []) do
-        {:ok, {{_version, status, _reason}, _headers, _response_body}} when status in 200..299 ->
+      case :httpc.request(
+             :post,
+             request,
+             [timeout: 5_000, connect_timeout: 2_000],
+             []
+           ) do
+        {:ok, {{_version, status, _reason}, _headers, _response_body}}
+        when status in 200..299 ->
           :ok
 
         {:ok, {{_version, status, _reason}, _headers, _response_body}} ->
@@ -41,6 +47,7 @@ defmodule ChatService.PushNotifier do
 
         {:error, reason} ->
           Logger.warning("[PushNotifier] push gateway request failed: #{inspect(reason)}")
+
           {:error, reason}
       end
     end

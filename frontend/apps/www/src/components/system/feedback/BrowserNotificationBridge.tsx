@@ -246,9 +246,6 @@ export function BrowserNotificationBridge() {
           ? `${detail.caller_username} menghubungi kamu`
           : `${detail.caller_username} is calling you`;
 
-      if (callPreferences.ringtone) {
-        playBackgroundSound('callAlert');
-      }
       void showBrowserNotification({
         title,
         body,
