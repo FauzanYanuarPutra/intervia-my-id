@@ -225,7 +225,7 @@ defmodule ChatServiceWeb.RoomChannel do
   def handle_in("call_accept", payload, socket) when is_map(payload) do
     with :ok <- authorize_call_event(socket, :control),
          {:ok, call_id} <- CallSignaling.call_id(Map.get(payload, "call_id")) do
-      case CallHistory.accept(call_id) do
+      case CallHistory.accept(call_id, socket.assigns.user_id_bin) do
         {:ok, _history} ->
           broadcast_from!(socket, "call_accepted", %{
             call_id: call_id,
@@ -237,6 +237,8 @@ defmodule ChatServiceWeb.RoomChannel do
             room_id: socket.assigns.room_id,
             user_id: socket.assigns.user_id
           })
+
+          schedule_call_push_cleanup(socket.assigns.room_id, call_id)
 
           {:reply, {:ok, %{call_id: call_id}}, socket}
 
@@ -253,7 +255,7 @@ defmodule ChatServiceWeb.RoomChannel do
   def handle_in("call_reject", payload, socket) when is_map(payload) do
     with :ok <- authorize_call_event(socket, :control),
          {:ok, call_id} <- CallSignaling.call_id(Map.get(payload, "call_id")) do
-      case CallHistory.reject(call_id) do
+      case CallHistory.reject(call_id, socket.assigns.user_id_bin) do
         {:ok, _history} ->
           broadcast_from!(socket, "call_rejected", %{
             call_id: call_id,
@@ -265,6 +267,8 @@ defmodule ChatServiceWeb.RoomChannel do
             room_id: socket.assigns.room_id,
             user_id: socket.assigns.user_id
           })
+
+          schedule_call_push_cleanup(socket.assigns.room_id, call_id)
 
           {:reply, {:ok, %{call_id: call_id}}, socket}
 
@@ -322,6 +326,7 @@ defmodule ChatServiceWeb.RoomChannel do
 
           broadcast_from!(socket, "call_ended", payload)
           broadcast_call_event(socket, "call_ended", payload)
+          schedule_call_push_cleanup(socket.assigns.room_id, call_id)
 
           {:reply, {:ok, payload}, socket}
 
@@ -819,6 +824,27 @@ defmodule ChatServiceWeb.RoomChannel do
         }
       )
     end)
+  end
+
+  defp schedule_call_push_cleanup(room_id, call_id) do
+    Task.Supervisor.start_child(ChatService.TaskSupervisor, fn ->
+      Enum.each(fetch_room_members(room_id), fn member_id_bin ->
+        push_payload = %{
+          target_user_id: Ecto.UUID.cast!(member_id_bin),
+          call_id: call_id,
+          room_id: room_id
+        }
+
+        case PushNotifier.call_cleanup(push_payload) do
+          :ok -> :ok
+          :disabled -> :ok
+          {:error, reason} ->
+            Logger.debug("[PushNotifier] call cleanup skipped: #{inspect(reason)}")
+        end
+      end)
+    end)
+
+    :ok
   end
 
   defp broadcast_call_event(socket, event, payload) do
