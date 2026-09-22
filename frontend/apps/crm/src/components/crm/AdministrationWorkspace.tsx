@@ -59,6 +59,7 @@ export function AdministrationWorkspace() {
   const [incidentSeverity, setIncidentSeverity] = useState('medium');
   const [incidentSummary, setIncidentSummary] = useState('');
   const [message, setMessage] = useState('');
+  const [initialLoading, setInitialLoading] = useState(true);
 
   const loadInvitations = useCallback(async () => {
     try {
@@ -81,8 +82,13 @@ export function AdministrationWorkspace() {
   }, []);
 
   useEffect(() => {
-    void loadInvitations();
-    void loadGovernance();
+    let active = true;
+    void Promise.all([loadInvitations(), loadGovernance()]).finally(() => {
+      if (active) setInitialLoading(false);
+    });
+    return () => {
+      active = false;
+    };
   }, [loadInvitations, loadGovernance]);
 
   const createIncident = async () => {
@@ -169,6 +175,33 @@ export function AdministrationWorkspace() {
   const toggleRole = (role: string) => setRoles(current =>
     current.includes(role) ? current.filter(x => x !== role) : [...current, role]
   );
+
+  if (initialLoading) {
+    return (
+      <div className="space-y-4" aria-busy="true">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="h-3 w-20 animate-pulse rounded-full bg-slate-100" />
+          <div className="mt-2 h-6 w-44 animate-pulse rounded-lg bg-slate-200" />
+          <div className="mt-2 h-3 w-full max-w-xl animate-pulse rounded bg-slate-100" />
+        </div>
+        <Card className="p-4">
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="h-10 flex-1 animate-pulse rounded-xl bg-slate-100" />
+            <div className="h-10 w-24 animate-pulse rounded-xl bg-slate-200" />
+          </div>
+          <div className="mt-4 space-y-2">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div key={index} className="rounded-xl border border-slate-100 p-3">
+                <div className="h-4 w-40 animate-pulse rounded bg-slate-200" />
+                <div className="mt-2 h-3 w-64 animate-pulse rounded bg-slate-100" />
+                <div className="mt-2 h-3 w-48 animate-pulse rounded bg-slate-100" />
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return <div className="space-y-5">
     <PageHeader title="Tim & akses" description="Cari akun Lajukan yang terdaftar di WWW → pilih CMS / Content Admin → kirim undangan." />
