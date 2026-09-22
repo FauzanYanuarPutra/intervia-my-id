@@ -207,27 +207,30 @@ if ((BUILD)); then
   fi
 fi
 
-if ((${#SERVICES[@]})); then
-  "${COMPOSE[@]}" up -d --remove-orphans --wait --wait-timeout 180 "${SERVICES[@]}"
-else
-  "${COMPOSE[@]}" up -d --remove-orphans --wait --wait-timeout 180
-fi
-
 LOCAL_AI_REQUESTED=0
 for profile in "${ACTIVE_PROFILES[@]}"; do
   [[ "$profile" == "local-ai" ]] && LOCAL_AI_REQUESTED=1
 done
 OLLAMA_SELECTED=0
-if ((${#SERVICES[@]} == 0)); then
+if ((LOCAL_AI_REQUESTED || ${#SERVICES[@]} == 0)); then
   OLLAMA_SELECTED=1
 else
   for service in "${SERVICES[@]}"; do
     [[ "$service" == "ollama" ]] && OLLAMA_SELECTED=1
   done
 fi
+
 if [[ "$ENVIRONMENT" == "development" && "$LOCAL_AI_REQUESTED" == "1" && "$OLLAMA_SELECTED" == "1" ]]; then
-  echo "Verifying configured Ollama model..."
+  echo "Starting Ollama readiness container before application startup..."
+  "${COMPOSE[@]}" up -d --remove-orphans --wait --wait-timeout 180 ollama
+  echo "Provisioning configured Ollama model before application startup..."
   "$PYTHON_BIN" scripts/config/provision_ollama_models.py --env-file "$ENV_FILE"
+fi
+
+if ((${#SERVICES[@]})); then
+  "${COMPOSE[@]}" up -d --remove-orphans --wait --wait-timeout 180 "${SERVICES[@]}"
+else
+  "${COMPOSE[@]}" up -d --remove-orphans --wait --wait-timeout 180
 fi
 
 # Caddyfile is bind-mounted. Compose does not reload a long-running Caddy
