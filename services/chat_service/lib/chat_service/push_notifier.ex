@@ -4,6 +4,14 @@ defmodule ChatService.PushNotifier do
   require Logger
 
   def incoming_call(payload) when is_map(payload) do
+    post(Map.put(payload, :type, "incoming_call"))
+  end
+
+  def call_cleanup(payload) when is_map(payload) do
+    post(Map.put(payload, :type, "call_end"))
+  end
+
+  defp post(payload) do
     url = System.get_env("INTERNAL_PUSH_URL", "") |> String.trim()
     secret = System.get_env("INTERNAL_PUSH_SECRET", "")
 
