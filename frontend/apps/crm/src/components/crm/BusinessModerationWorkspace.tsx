@@ -175,7 +175,7 @@ export default function BusinessModerationWorkspace() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [accessToken, query, referenceStatus]);
 
   useEffect(() => {
     void loadBusinesses();
