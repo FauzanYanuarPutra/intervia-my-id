@@ -10,6 +10,8 @@ export type UploadedContentImage = {
 export type UploadedContentDocument = {
   name?: string;
   url: string;
+  size?: number;
+  mime?: string;
 };
 
 function asObject(value: unknown): ContentMediaRecord | undefined {
