@@ -9,6 +9,8 @@ import {
   isBrowserNotificationSupported,
   requestBrowserNotificationPermission,
   showBrowserNotification,
+  ensureWebPushSubscription,
+  closeBrowserNotificationsByTag,
 } from '@/lib/browserNotifications';
 import type { InboxNotification } from '@/context/NotificationInboxContext';
 
@@ -106,6 +108,19 @@ export function BrowserNotificationBridge() {
 
   useEffect(() => {
     if (!user || !isBrowserNotificationSupported()) return;
+    if (Notification.permission !== 'granted') return;
+
+    return runWhenIdle(() => {
+      void ensureWebPushSubscription(
+        typeof navigator !== 'undefined'
+          ? navigator.userAgent.slice(0, 120)
+          : 'web',
+      );
+    }, 2500);
+  }, [user]);
+
+  useEffect(() => {
+    if (!user || !isBrowserNotificationSupported()) return;
     if (Notification.permission !== 'default') return;
 
     const promptKey = `lajukan:notifications:prompted:v1:${user.id}`;
@@ -132,6 +147,11 @@ export function BrowserNotificationBridge() {
         void requestBrowserNotificationPermission().then(permission => {
           if (permission === 'granted') {
             void ensureNotificationServiceWorkerRegistered();
+            void ensureWebPushSubscription(
+              typeof navigator !== 'undefined'
+                ? navigator.userAgent.slice(0, 120)
+                : 'web',
+            );
           }
         });
       });
@@ -182,6 +202,24 @@ export function BrowserNotificationBridge() {
       });
     };
 
+    const onCallLifecycle = (event: Event) => {
+      const detail = (
+        event as CustomEvent<{
+          event?: string;
+          call_id?: string;
+        }>
+      ).detail;
+      if (!detail?.call_id) return;
+
+      if (detail.event === 'call_rejected' || detail.event === 'call_ended') {
+        soundManager.stopLoop('incomingRing');
+        soundManager.stopLoop('outgoingRing');
+        void closeBrowserNotificationsByTag(
+          'incoming-call:' + detail.call_id,
+        );
+      }
+    };
+
     const onIncomingCallNotification = (event: Event) => {
       const detail = (event as CustomEvent<IncomingCallNotificationDetail>)
         .detail;
@@ -228,6 +266,10 @@ export function BrowserNotificationBridge() {
       'chat:incoming-call',
       onIncomingCallNotification as EventListener,
     );
+    window.addEventListener(
+      'chat:call-lifecycle',
+      onCallLifecycle as EventListener,
+    );
 
     return () => {
       window.removeEventListener(
@@ -241,6 +283,10 @@ export function BrowserNotificationBridge() {
       window.removeEventListener(
         'chat:incoming-call',
         onIncomingCallNotification as EventListener,
+      );
+      window.removeEventListener(
+        'chat:call-lifecycle',
+        onCallLifecycle as EventListener,
       );
     };
   }, [user]);
