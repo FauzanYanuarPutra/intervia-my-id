@@ -30,7 +30,9 @@ export function CrmLoadingSkeleton() {
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <header className="flex h-14 shrink-0 items-center gap-2 border-b border-slate-200 bg-white px-2 sm:px-4 lg:px-6">
-            <div className="h-10 w-10 animate-pulse rounded-xl bg-slate-100 lg:hidden" />
+            <div className="grid h-10 w-10 place-items-center rounded-xl border border-emerald-100 bg-white p-1 lg:hidden">
+              <Image src="/logo.svg" alt="Lajukan" width={96} height={28} className="h-5 w-auto object-contain" />
+            </div>
             <div className="flex shrink-0 items-center sm:hidden">
               <Image
                 src="/logo.svg"
