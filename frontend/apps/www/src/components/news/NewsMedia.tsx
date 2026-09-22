@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { Newspaper } from 'lucide-react';
 import type { LajukanNewsArticle } from '@/lib/news';
 
@@ -35,7 +36,7 @@ export function NewsMedia({
         <img
           src={article.coverImage as string}
           alt={variant === 'thumb' ? '' : article.title}
-          className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.035]"
+          className="h-full w-full object-cover object-center transition duration-500 group-hover:scale-[1.035]"
           loading={priority ? 'eager' : 'lazy'}
           fetchPriority={priority ? 'high' : 'auto'}
           decoding="async"
@@ -55,7 +56,9 @@ export function NewsMedia({
       {!showImage ? (
         <div className="absolute inset-0 flex items-center justify-between gap-4 bg-[linear-gradient(135deg,#ecfdf5_0%,#f8fafc_58%,#fff7ed_100%)] p-4 dark:bg-[linear-gradient(135deg,#082319_0%,#0f172a_62%,#1c1917_100%)] sm:p-5">
           <div className="min-w-0">
-            <div className="flex h-10 w-10 items-center justify-center rounded-[13px] bg-emerald-700 text-sm font-black text-white shadow-sm">L</div>
+            <div className="flex h-10 w-10 items-center justify-center rounded-[13px] border border-emerald-100 bg-white p-2 shadow-sm dark:border-emerald-400/20 dark:bg-white/10">
+              <Image src="/logo.svg" alt="" width={72} height={24} className="h-5 w-auto object-contain" />
+            </div>
             <p className="mt-2 text-[9px] font-black uppercase tracking-[0.12em] text-emerald-800 dark:text-emerald-300">Lajukan News</p>
             <p className="mt-1 truncate text-xs font-bold text-slate-600 dark:text-slate-300">{article.category}</p>
           </div>
@@ -102,7 +105,7 @@ export function NewsArticleMedia({
           <img
             src={article.coverImage as string}
             alt={article.title}
-            className="aspect-[16/9] w-full object-cover"
+            className="aspect-[16/9] w-full object-cover object-center"
             loading="eager"
             fetchPriority="high"
             decoding="async"
@@ -115,7 +118,9 @@ export function NewsArticleMedia({
       ) : (
         <div className="flex min-h-36 items-center justify-between gap-5 bg-[linear-gradient(135deg,#ecfdf5_0%,#f8fafc_58%,#fff7ed_100%)] p-5 dark:bg-[linear-gradient(135deg,#06261b_0%,#0f172a_62%,#1c1917_100%)] sm:min-h-40 sm:p-7">
           <div className="min-w-0">
-            <div className="flex h-10 w-10 items-center justify-center rounded-[13px] bg-emerald-700 text-sm font-black text-white shadow-sm">L</div>
+            <div className="flex h-10 w-10 items-center justify-center rounded-[13px] border border-emerald-100 bg-white p-2 shadow-sm dark:border-emerald-400/20 dark:bg-white/10">
+              <Image src="/logo.svg" alt="" width={72} height={24} className="h-5 w-auto object-contain" />
+            </div>
             <p className="mt-2 text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800 dark:text-emerald-300">Lajukan News</p>
             <p className="mt-1 text-sm font-black text-slate-700 dark:text-slate-200">{article.category}</p>
             <p className="mt-1 max-w-lg text-xs font-semibold leading-5 text-slate-500 dark:text-slate-400">
