@@ -142,12 +142,22 @@ defmodule ChatServiceWeb.RoomChannel do
 
           broadcast_call_event(socket, "incoming_call", incoming_payload)
 
+          recipient_ids =
+            socket.assigns.room_id
+            |> fetch_room_members()
+            |> Enum.reject(&(&1 == socket.assigns.user_id_bin))
+            |> Enum.map(&Ecto.UUID.cast!/1)
+
           Task.Supervisor.start_child(ChatService.TaskSupervisor, fn ->
-            case PushNotifier.incoming_call(incoming_payload) do
-              :ok -> :ok
-              :disabled -> :ok
-              {:error, reason} -> Logger.debug("[PushNotifier] call push skipped: #{inspect(reason)}")
-            end
+            Enum.each(recipient_ids, fn recipient_id ->
+              push_payload = Map.put(incoming_payload, :target_user_id, recipient_id)
+
+              case PushNotifier.incoming_call(push_payload) do
+                :ok -> :ok
+                :disabled -> :ok
+                {:error, reason} -> Logger.debug("[PushNotifier] call push skipped: #{inspect(reason)}")
+              end
+            end)
           end)
 
           {:reply, {:ok, %{call_id: call_id, call_type: call_type, started_at: DateTime.to_iso8601(started_at)}}, socket}
