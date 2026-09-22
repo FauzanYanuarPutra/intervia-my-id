@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { ArrowRight, Building2, Clock3, Newspaper, Search, Send, Store, TrendingUp } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
+import { NewsMedia } from '@/components/news/NewsMedia';
 import { buildNewsPath, buildNewsUrl, getPublishedNews, type LajukanNewsArticle } from '@/lib/news';
 
 type PageProps = {
@@ -70,64 +71,6 @@ function articleKindLabel(
   if (kind === 'analysis') return isId ? 'Analisis' : 'Analysis';
   if (kind === 'press_release') return isId ? 'Rilis bisnis' : 'Business release';
   return isId ? 'Berita' : 'News';
-}
-
-function NewsMedia({
-  article,
-  variant = 'card',
-}: {
-  article: LajukanNewsArticle;
-  variant?: 'hero' | 'card' | 'thumb';
-}) {
-  const sizeClass =
-    variant === 'hero'
-      ? 'aspect-[16/8] sm:aspect-[16/7]'
-      : variant === 'thumb'
-        ? 'aspect-[4/3]'
-        : 'aspect-[16/10]';
-
-  return (
-    <div className={'group relative overflow-hidden ' + sizeClass + ' bg-slate-100 dark:bg-slate-800'}>
-      {article.coverImage ? (
-        <img
-          src={article.coverImage}
-          alt=""
-          className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.025]"
-          loading={variant === 'hero' ? 'eager' : 'lazy'}
-          fetchPriority={variant === 'hero' ? 'high' : 'auto'}
-          decoding="async"
-          onError={event => {
-            event.currentTarget.style.display = 'none';
-            const fallback = event.currentTarget.parentElement?.querySelector('[data-news-media-fallback]');
-            if (fallback instanceof HTMLElement) fallback.classList.remove('hidden');
-          }}
-        />
-      ) : null}
-
-      <div
-        data-news-media-fallback
-        className={
-          'absolute inset-0 items-center justify-between gap-4 bg-[linear-gradient(135deg,#ecfdf5_0%,#f8fafc_54%,#fff7ed_100%)] p-5 dark:bg-[linear-gradient(135deg,#082319_0%,#0f172a_62%,#1c1917_100%)] ' +
-          (article.coverImage ? 'hidden flex' : 'flex')
-        }
-        aria-hidden="true"
-      >
-        <div className="min-w-0">
-          <span className="inline-flex rounded-full bg-white/80 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-800 dark:bg-slate-950/70 dark:text-emerald-300">
-            Lajukan News
-          </span>
-          <p className="mt-2 truncate text-sm font-black text-slate-700 dark:text-slate-200">
-            {article.category}
-          </p>
-        </div>
-        <Newspaper className="h-9 w-9 shrink-0 text-emerald-700/25 dark:text-emerald-300/25" />
-      </div>
-
-      {article.coverImage ? (
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
-      ) : null}
-    </div>
-  );
 }
 
 function buildNewsIndexHref(filters: {
