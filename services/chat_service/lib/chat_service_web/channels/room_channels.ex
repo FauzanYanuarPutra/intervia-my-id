@@ -142,6 +142,39 @@ defmodule ChatServiceWeb.RoomChannel do
 
           broadcast_call_event(socket, "incoming_call", incoming_payload)
 
+          call_room_id = socket.assigns.room_id
+          Task.Supervisor.start_child(ChatService.TaskSupervisor, fn ->
+            Process.sleep(45_000)
+
+            case CallHistory.timeout(call_id) do
+              {:ok, history} when history["status"] == "missed" ->
+                timeout_payload = %{
+                  call_id: call_id,
+                  room_id: call_room_id,
+                  user_id: nil,
+                  status: "missed",
+                  duration_seconds: 0
+                }
+
+                Enum.each(fetch_room_members(call_room_id), fn member_id_bin ->
+                  topic = "user:" <> Ecto.UUID.cast!(member_id_bin)
+
+                  Phoenix.PubSub.broadcast(
+                    ChatService.PubSub,
+                    topic,
+                    %Phoenix.Socket.Broadcast{
+                      topic: topic,
+                      event: "call_ended",
+                      payload: timeout_payload
+                    }
+                  )
+                end)
+
+              _ ->
+                :ok
+            end
+          end)
+
           recipient_ids =
             socket.assigns.room_id
             |> fetch_room_members()
