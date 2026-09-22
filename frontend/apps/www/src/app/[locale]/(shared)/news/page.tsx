@@ -212,7 +212,52 @@ export default async function NewsIndexPage({ params, searchParams }: PageProps)
       )}
 
       {rest.length > 0 ? (
-        <section className="mt-2"><div className="mb-3 flex items-end justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300">{isId ? 'Update' : 'Updates'}</p><h2 className="mt-1 text-xl font-black tracking-[-0.03em] text-slate-950 dark:text-white">{isId ? 'Berita terbaru' : 'Latest news'}</h2></div><span className="text-xs font-bold text-slate-400">{rest.length}{isId ? ' artikel' : ' articles'}</span></div><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{rest.map(article => <Link key={article.id} href={buildNewsPath(article.slug)} className="group overflow-hidden rounded-2xl border border-slate-200 bg-white transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-sm dark:border-white/10 dark:bg-slate-900"><NewsMedia article={article} /><div className="p-4"><div className="flex flex-wrap items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.1em]"><span className="text-emerald-700 dark:text-emerald-300">{article.category}</span><span className="text-slate-300">•</span><span className="text-slate-400">{articleKindLabel(article.articleKind, isId)}</span></div><h3 className="mt-1.5 line-clamp-3 text-base font-black leading-6 tracking-[-0.02em] text-slate-950 group-hover:text-emerald-800 dark:text-white dark:group-hover:text-emerald-300">{article.title}</h3>{article.summary ? <p className="mt-2 line-clamp-3 text-xs leading-5 text-slate-600 dark:text-slate-300">{article.summary}</p> : null}<div className="mt-3 flex items-center justify-between gap-2 text-[10px] font-bold text-slate-400"><span className="truncate">{article.location || article.byline}</span><span className="shrink-0">{formatDate(article.publishedAt, locale)}</span></div></div></Link>)}</div></div></section>>
+        <section className="mt-2">
+          <div className="mb-3 flex items-end justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300">
+                {isId ? 'Update' : 'Updates'}
+              </p>
+              <h2 className="mt-1 text-xl font-black tracking-[-0.03em] text-slate-950 dark:text-white">
+                {isId ? 'Berita terbaru' : 'Latest news'}
+              </h2>
+            </div>
+            <span className="text-xs font-bold text-slate-400">
+              {rest.length}
+              {isId ? ' artikel' : ' articles'}
+            </span>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {rest.map(article => (
+              <Link
+                key={article.id}
+                href={buildNewsPath(article.slug)}
+                className="group overflow-hidden rounded-2xl border border-slate-200 bg-white transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-sm dark:border-white/10 dark:bg-slate-900"
+              >
+                <NewsMedia article={article} />
+                <div className="p-4">
+                  <div className="flex flex-wrap items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.1em]">
+                    <span className="text-emerald-700 dark:text-emerald-300">{article.category}</span>
+                    <span className="text-slate-300">•</span>
+                    <span className="text-slate-400">{articleKindLabel(article.articleKind, isId)}</span>
+                  </div>
+                  <h3 className="mt-1.5 line-clamp-3 text-base font-black leading-6 tracking-[-0.02em] text-slate-950 group-hover:text-emerald-800 dark:text-white dark:group-hover:text-emerald-300">
+                    {article.title}
+                  </h3>
+                  {article.summary ? (
+                    <p className="mt-2 line-clamp-3 text-xs leading-5 text-slate-600 dark:text-slate-300">
+                      {article.summary}
+                    </p>
+                  ) : null}
+                  <div className="mt-3 flex min-w-0 items-center justify-between gap-2 text-[10px] font-bold text-slate-400">
+                    <span className="min-w-0 truncate">{article.location || article.byline}</span>
+                    <span className="shrink-0">{formatDate(article.publishedAt, locale)}</span>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
       ) : null}
 
       {nextCursor ? (
