@@ -1,6 +1,7 @@
 'use client';
 
-import { ArrowRight, Clock3, Newspaper } from 'lucide-react';
+import Image from 'next/image';
+import { ArrowRight, Newspaper } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import type { LajukanNewsArticle } from '@/lib/news';
 import { NewsCard } from '@/components/news/NewsCard';
@@ -23,8 +24,8 @@ export function HomeNewsSection({
     >
       <div className="flex min-h-9 items-center justify-between gap-3 px-3 sm:px-4 md:px-5">
         <div className="flex min-w-0 items-center gap-2.5">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[12px] bg-emerald-700 text-[12px] font-black text-white shadow-sm">
-            L
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[12px] border border-emerald-100 bg-white p-2 shadow-sm dark:border-emerald-400/20 dark:bg-white/10">
+            <Image src="/logo.svg" alt="" width={72} height={24} className="h-5 w-auto object-contain" />
           </span>
           <div className="min-w-0">
             <div className="flex min-w-0 items-center gap-2">
@@ -63,9 +64,9 @@ export function HomeNewsSection({
             </div>
           </div>
 
-          <div className="mt-2.5 flex gap-2 overflow-x-auto px-3 pb-0.5 sm:hidden">
+          <div className="mt-2.5 flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-3 pb-0.5 [scrollbar-width:none] sm:hidden">
             {visibleItems.map(item => (
-              <div key={item.id} className="min-w-[82vw] max-w-[340px] shrink-0">
+              <div key={item.id} className="min-w-[82vw] max-w-[360px] shrink-0 snap-start">
                 <NewsCard article={item} locale={locale} variant="hero" priority={item.id === visibleItems[0]?.id} />
               </div>
             ))}
