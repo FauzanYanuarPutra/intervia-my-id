@@ -716,12 +716,6 @@ async function callAiService(input: {
       : new Error('ai-service:network_error');
   }
 
-  if (!response) {
-    throw lastFetchError instanceof Error
-      ? lastFetchError
-      : new Error('ai-service:network_error');
-  }
-
   const data = (await response.json().catch(() => ({}))) as GatewayResponse;
   const text = cleanText(data.response || data.message, 20_000);
 
