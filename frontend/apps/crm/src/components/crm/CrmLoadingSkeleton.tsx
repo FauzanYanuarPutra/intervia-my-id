@@ -1,3 +1,5 @@
+import Image from 'next/image';
+
 export function CrmLoadingSkeleton() {
   return (
     <div
@@ -27,6 +29,9 @@ export function CrmLoadingSkeleton() {
           <header className="flex h-14 shrink-0 items-center gap-2 border-b border-slate-200 bg-white px-2 sm:px-4 lg:px-6">
             <div className="flex h-10 w-10 items-center justify-center lg:hidden">
               <img src="/logo.svg" alt="Lajukan" className="h-9 w-auto max-w-9 object-cover object-left" />
+            </div>
+            <div className="flex shrink-0 items-center sm:hidden">
+              <Image src="/logo.svg" alt="Lajukan" width={108} height={29} priority className="h-7 w-auto" />
             </div>
             <div className="hidden h-7 w-20 animate-pulse rounded-lg bg-slate-200 sm:block" />
             <div className="h-10 min-w-0 flex-1 animate-pulse rounded-xl bg-slate-100" />
