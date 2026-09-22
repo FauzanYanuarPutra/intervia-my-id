@@ -228,6 +228,11 @@ export function BrowserNotificationBridge() {
         .detail;
       if (!detail || shouldSuppressChatNotification(detail.room_id)) return;
 
+      const callPreferences = readCallAlertPreferences();
+      if (!callPreferences.enabled || !callPreferences.browserNotifications) {
+        return;
+      }
+
       const title =
         currentLocale() === 'id'
           ? detail.call_type === 'video'
@@ -241,7 +246,9 @@ export function BrowserNotificationBridge() {
           ? `${detail.caller_username} menghubungi kamu`
           : `${detail.caller_username} is calling you`;
 
-      playBackgroundSound('callAlert');
+      if (callPreferences.ringtone) {
+        playBackgroundSound('callAlert');
+      }
       void showBrowserNotification({
         title,
         body,
