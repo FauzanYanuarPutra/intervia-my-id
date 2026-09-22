@@ -12,8 +12,17 @@ defmodule ChatService.CallHistory do
   def start(call_id, room_id, caller_id_bin, call_type) do
     with {:ok, members} <- room_members(room_id),
          {:ok, callee_id_bin} <- peer_member(members, caller_id_bin),
-         {:ok, started_at} <- insert_record(call_id, room_id, caller_id_bin, callee_id_bin, call_type) do
-      :ok = insert_user_rows(call_id, room_id, caller_id_bin, callee_id_bin, call_type, started_at)
+         {:ok, started_at} <-
+           insert_record(call_id, room_id, caller_id_bin, callee_id_bin, call_type),
+         :ok <-
+           insert_user_rows(
+             call_id,
+             room_id,
+             caller_id_bin,
+             callee_id_bin,
+             call_type,
+             started_at
+           ) do
       {:ok, started_at}
     end
   end
@@ -34,6 +43,16 @@ defmodule ChatService.CallHistory do
   def reject(call_id, reason \\ "rejected") do
     update_from_record(call_id, fn record, now ->
       update_record(record, "declined", nil, now, now, reason)
+    end)
+  end
+
+  def timeout(call_id, reason \\ "timeout") do
+    update_from_record(call_id, fn record, now ->
+      if (record["status"] || "ringing") == "ringing" do
+        update_record(record, "missed", nil, now, now, reason)
+      else
+        record
+      end
     end)
   end
 
