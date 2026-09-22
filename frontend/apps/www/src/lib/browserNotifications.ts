@@ -93,11 +93,12 @@ function urlBase64ToUint8Array(value: string): ArrayBuffer {
   const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
   const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
   const raw = window.atob(padded);
-  const output = new Uint8Array(raw.length);
+  const buffer = new ArrayBuffer(raw.length);
+  const output = new Uint8Array(buffer);
   for (let index = 0; index < raw.length; index += 1) {
     output[index] = raw.charCodeAt(index);
   }
-  return output.buffer as ArrayBuffer;
+  return buffer;
 }
 
 export async function closeBrowserNotificationsByTag(tag: string) {
