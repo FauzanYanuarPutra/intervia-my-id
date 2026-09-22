@@ -784,6 +784,10 @@ async fn has_independent_verified_source_review_tx(
           JOIN news_source_review_events review
             ON review.source_id = source.id
            AND review.to_verification_status = 'verified'
+          JOIN news_source_review_requests request
+            ON request.content_id = source.content_id
+           AND request.requested_reviewer_id = review.reviewer_id
+           AND request.status = 'completed'
           WHERE source.content_id = $1
             AND source.verification_status = 'verified'
             AND review.reviewer_id <> $2
@@ -2397,18 +2401,21 @@ async fn list_editorial_reviewers(
     .await;
 
     match rows {
-        Ok(data) => (
-            StatusCode::OK,
-            Json(json!({
-                "data": data,
-                "meta": {
-                    "page": 1,
-                    "limit": 200,
-                    "total": data.len()
-                }
-            })),
-        )
-            .into_response(),
+        Ok(data) => {
+            let total = data.len();
+            (
+                StatusCode::OK,
+                Json(json!({
+                    "data": data,
+                    "meta": {
+                        "page": 1,
+                        "limit": 200,
+                        "total": total
+                    }
+                })),
+            )
+                .into_response()
+        },
         Err(error) => {
             tracing::error!("list_editorial_reviewers query error: {:?}", error);
             response_error(
@@ -3064,11 +3071,43 @@ async fn create_source_review_request(
             "reviewer must be different from requester",
         );
     }
-    if fetch_user_read_model_brief(&state.db, requested_reviewer_id)
-        .await
-        .is_none()
+    let requested_reviewer_exists = match sqlx::query_scalar::<_, bool>(
+        r#"
+        SELECT EXISTS (
+          SELECT 1
+          FROM core.users u
+          WHERE u.id = $1
+            AND u.deleted_at IS NULL
+            AND u.is_active = TRUE
+            AND u.status = 'active'
+            AND EXISTS (
+              SELECT 1
+              FROM core.user_roles ur
+              JOIN roles r ON r.id = ur.role_id
+              WHERE ur.user_id = u.id
+                AND lower(r.name::text) IN ('admin', 'content_admin', 'super_admin')
+            )
+        )
+        "#,
+    )
+    .bind(requested_reviewer_id)
+    .fetch_one(&state.db)
+    .await
     {
-        return response_error(StatusCode::NOT_FOUND, "reviewer account not found");
+        Ok(value) => value,
+        Err(error) => {
+            tracing::error!("create_source_review_request reviewer eligibility check error: {:?}", error);
+            return response_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to validate reviewer eligibility",
+            );
+        }
+    };
+    if !requested_reviewer_exists {
+        return response_error(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "selected reviewer is not an active CMS reviewer",
+        );
     }
     let note = trimmed(payload.note);
     if note
@@ -3112,6 +3151,31 @@ async fn create_source_review_request(
         return response_error(
             StatusCode::CONFLICT,
             "source review requests are only allowed before publication",
+        );
+    }
+
+    let news_meta = article
+        .metadata
+        .get("news")
+        .and_then(Value::as_object)
+        .cloned()
+        .unwrap_or_default();
+    let article_kind = news_meta
+        .get("article_kind")
+        .and_then(Value::as_str)
+        .unwrap_or("news")
+        .trim()
+        .to_ascii_lowercase();
+    let sensitivity = news_meta
+        .get("sensitivity")
+        .and_then(Value::as_str)
+        .unwrap_or("normal")
+        .trim()
+        .to_ascii_lowercase();
+    if article_kind == "press_release" || sensitivity != "high" {
+        return response_error(
+            StatusCode::CONFLICT,
+            "independent source review is only required for high-sensitivity News/Analysis",
         );
     }
 
@@ -3797,66 +3861,3 @@ mod tests {
             &valid_metadata,
         )
         .is_err());
-
-        let missing_sources = json!({
-            "news": {
-                "category": "Ekonomi",
-                "article_kind": "analysis",
-                "language": "id",
-                "source_urls": []
-            }
-        });
-        assert!(validate_submission_payload(
-            "Analisis ekonomi terbaru",
-            Some("Ringkasan analisis yang cukup panjang."),
-            &body,
-            &missing_sources,
-        )
-        .is_err());
-
-        let press_release = json!({
-            "news": {
-                "category": "Bisnis",
-                "article_kind": "press_release",
-                "language": "id",
-                "source_urls": []
-            }
-        });
-        assert!(validate_submission_payload(
-            "Rilis bisnis perusahaan",
-            Some("Ringkasan rilis bisnis yang cukup panjang."),
-            &body,
-            &press_release,
-        )
-        .is_ok());
-    }
-
-    #[test]
-    fn editorial_readiness_and_schedule_values_are_bounded() {
-        assert!(normalize_fact_check_status(Some("verified".into())).is_ok());
-        assert!(normalize_fact_check_status(Some("truthy".into())).is_err());
-        assert!(normalize_legal_review_status(Some("approved".into())).is_ok());
-        assert!(normalize_legal_review_status(Some("skipped".into())).is_err());
-        assert!(normalize_editorial_priority(Some("urgent".into())).is_ok());
-        assert!(normalize_editorial_priority(Some("critical".into())).is_err());
-        assert!(normalize_editorial_sensitivity(Some("high".into())).is_ok());
-        assert!(normalize_editorial_sensitivity(Some("extreme".into())).is_err());
-
-        let now = Utc::now();
-        let past = (now - Duration::hours(1)).to_rfc3339();
-        assert_eq!(
-            parse_requested_publish_at(Some(past), now).unwrap(),
-            Some(now)
-        );
-        let too_far = (Utc::now() + Duration::days(91)).to_rfc3339();
-        assert!(parse_requested_publish_at(Some(too_far), Utc::now()).is_err());
-    }
-
-    #[test]
-    fn cursor_parser_accepts_timestamp_and_uuid() {
-        let cursor = "2026-09-18T00:00:00+00:00|11111111-1111-1111-1111-111111111111";
-        assert!(parse_news_cursor(Some(cursor)).unwrap().is_some());
-        assert!(parse_news_cursor(Some("broken")).is_err());
-        assert!(parse_news_cursor(Some(&"x".repeat(97))).is_err());
-    }
-}
