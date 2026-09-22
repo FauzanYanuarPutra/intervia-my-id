@@ -37,12 +37,7 @@ function sanitizeText(value: string, maxLength: number) {
 }
 
 function isSafePublicUrl(value: string): boolean {
-  try {
-    const url = new URL(value);
-    return ['http:', 'https:'].includes(url.protocol) && !isPrivateSourceHost(url.hostname);
-  } catch {
-    return false;
-  }
+  return normalizeSafeExternalHttpUrl(value) !== null;
 }
 
 function sanitizeRichText(value: string, maxLength: number) {
@@ -103,7 +98,7 @@ function sanitizeSources(value: unknown): string[] {
     const normalized = normalizeSafeExternalHttpUrl(readString(entry));
     if (!normalized || seen.has(normalized)) continue;
     seen.add(normalized);
-    sources.push(normalized);
+    result.push(normalized);
     if (sources.length >= 10) break;
   }
   return result;
