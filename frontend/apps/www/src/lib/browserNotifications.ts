@@ -9,6 +9,7 @@ export type BrowserNotificationPayload = {
   url?: string;
   requireInteraction?: boolean;
   renotify?: boolean;
+  actions?: Array<{ action: string; title: string }>;
 };
 
 const NOTIFICATION_SW_URL = '/notification-sw.js';
@@ -66,6 +67,7 @@ export async function showBrowserNotification(
     tag: payload.tag,
     renotify: Boolean(payload.renotify),
     requireInteraction: Boolean(payload.requireInteraction),
+    ...(payload.actions?.length ? { actions: payload.actions } : {}),
     data: { url: resolvedUrl },
   };
 
@@ -84,4 +86,112 @@ export async function showBrowserNotification(
   };
 
   return true;
+}
+
+
+function urlBase64ToUint8Array(value: string): Uint8Array {
+  const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
+  const raw = window.atob(padded);
+  const output = new Uint8Array(raw.length);
+  for (let index = 0; index < raw.length; index += 1) {
+    output[index] = raw.charCodeAt(index);
+  }
+  return output;
+}
+
+export async function closeBrowserNotificationsByTag(tag: string) {
+  if (!isBrowserNotificationSupported() || !tag) return;
+  try {
+    const registration = await ensureNotificationServiceWorkerRegistered();
+    if (!registration?.getNotifications) return;
+    const notifications = await registration.getNotifications({ tag });
+    notifications.forEach(notification => notification.close());
+  } catch {
+    // Notification cleanup is best-effort.
+  }
+}
+
+export async function ensureWebPushSubscription(deviceLabel?: string) {
+  if (!isBrowserNotificationSupported() || Notification.permission !== 'granted') {
+    return false;
+  }
+
+  try {
+    const registration = await ensureNotificationServiceWorkerRegistered();
+    if (!registration?.pushManager) return false;
+
+    const configResponse = await fetch('/api/notifications/push/subscriptions', {
+      method: 'GET',
+      credentials: 'include',
+      cache: 'no-store',
+    });
+    if (!configResponse.ok) return false;
+
+    const config = (await configResponse.json().catch(() => ({}))) as {
+      enabled?: boolean;
+      publicKey?: string | null;
+    };
+    if (!config.enabled || !config.publicKey) return false;
+
+    let subscription = await registration.pushManager.getSubscription();
+    if (!subscription) {
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(config.publicKey),
+      });
+    }
+
+    const json = subscription.toJSON();
+    const endpoint = json.endpoint || subscription.endpoint;
+    const p256dh = json.keys?.p256dh || '';
+    const auth = json.keys?.auth || '';
+    if (!endpoint || !p256dh || !auth) return false;
+
+    const saveResponse = await fetch(
+      '/api/notifications/push/subscriptions',
+      {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          endpoint,
+          p256dh,
+          auth,
+          deviceLabel:
+            deviceLabel ||
+            (typeof navigator !== 'undefined' ? navigator.userAgent.slice(0, 120) : 'web'),
+        }),
+      },
+    );
+
+    return saveResponse.ok;
+  } catch (error) {
+    console.warn('[Notifications] push subscription sync failed', error);
+    return false;
+  }
+}
+
+
+export async function disableWebPushSubscription() {
+  if (!isBrowserNotificationSupported()) return false;
+
+  try {
+    const registration = await ensureNotificationServiceWorkerRegistered();
+    const subscription = await registration?.pushManager?.getSubscription();
+    if (!subscription) return true;
+
+    await fetch('/api/notifications/push/subscriptions', {
+      method: 'DELETE',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ endpoint: subscription.endpoint }),
+    }).catch(() => null);
+
+    await subscription.unsubscribe().catch(() => false);
+    return true;
+  } catch (error) {
+    console.warn('[Notifications] push subscription disable failed', error);
+    return false;
+  }
 }
