@@ -112,7 +112,7 @@ export function StorefrontProductOrderAction({
   );
   const compact = variant === 'compact';
   const canOrder = onlineOrderEnabled && productAvailable;
-  const locked = state.phase === 'submitting' || state.phase === 'success' || loadingCustomization;
+  const locked = state.phase === 'submitting' || (state.phase === 'success' && !cartEnabled) || loadingCustomization;
 
   function addLinesToCart(lines: StorefrontOrderLineInput[], estimatedUnitPriceCents = productPriceCents) {
     if (!lines.length) return;
@@ -129,7 +129,7 @@ export function StorefrontProductOrderAction({
       };
       window.dispatchEvent(new CustomEvent(STOREFRONT_CART_EVENT, { detail }));
     }
-    setState({ phase: 'success', bundle: null as never });
+    setState({ phase: 'idle' });
     setConfigOpen(false);
   }
 
@@ -159,7 +159,7 @@ export function StorefrontProductOrderAction({
     }
   }
 
-   {
+  async function handleOrder() {
     if (!canOrder || locked || submittingRef.current) return;
     setState({ phase: 'idle' });
 
@@ -209,7 +209,7 @@ export function StorefrontProductOrderAction({
           : 'inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 px-3 text-sm font-bold text-white transition hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600 dark:disabled:bg-slate-700 dark:disabled:text-slate-300'}
       >
         {state.phase === 'submitting' || loadingCustomization ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : state.phase === 'success' ? <CheckCircle2 className="h-4 w-4" aria-hidden="true" /> : <ShoppingBag className="h-4 w-4" aria-hidden="true" />}
-        {loadingCustomization ? (isId ? 'Membuka…' : 'Opening…') : state.phase === 'submitting' ? (isId ? 'Membuat pesanan…' : 'Creating order…') : state.phase === 'success' ? (cartEnabled ? (isId ? 'Ditambahkan' : 'Added') : (isId ? 'Pesanan dibuat' : 'Order created')) : idleLabel}
+        {loadingCustomization ? (isId ? 'Membuka…' : 'Opening…') : state.phase === 'submitting' ? (isId ? 'Membuat pesanan…' : 'Creating order…') : state.phase === 'success' ? (isId ? 'Pesanan dibuat' : 'Order created') : idleLabel}
       </button>
 
       {disabledReason ? <p className="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">{disabledReason}</p> : null}
