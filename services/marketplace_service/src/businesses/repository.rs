@@ -1044,7 +1044,7 @@ const LOCATION_QUERY: &str = r#"
 
 #[cfg(test)]
 mod tests {
-    use super::{audit, optional_complete_aggregate, RepositoryError};
+    use super::{optional_complete_aggregate, RepositoryError};
 
     #[test]
     fn complete_aggregate_is_returned() {
