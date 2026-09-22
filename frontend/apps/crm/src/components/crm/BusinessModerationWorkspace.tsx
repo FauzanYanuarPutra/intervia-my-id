@@ -342,7 +342,7 @@ export default function BusinessModerationWorkspace() {
             value={query}
             onChange={event => setQuery(event.target.value)}
             onKeyDown={event => {
-              if (event.key === "Enter") void loadBusinesses();
+              if (event.key === "Enter") void loadBusinesses(query);
             }}
             placeholder="Cari nama usaha, kota, alamat..."
             className="min-h-10 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold outline-none focus:border-emerald-300 focus:bg-white"
@@ -373,7 +373,7 @@ export default function BusinessModerationWorkspace() {
           )}
           <button
             type="button"
-            onClick={() => void loadBusinesses()}
+            onClick={() => void loadBusinesses(query)
             className="min-h-11 rounded-xl bg-slate-950 px-4 text-sm font-bold text-white"
           >
             Refresh
