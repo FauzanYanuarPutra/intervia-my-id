@@ -212,7 +212,7 @@ defmodule ChatServiceWeb.RoomChannel do
         {:error, reason} ->
           Logger.error("[CallHistory] start failed: #{inspect(reason)}")
           call_error(socket, :storage_unavailable)
-      end}
+      end
     else
       {:error, reason} ->
         call_error(socket, reason)
