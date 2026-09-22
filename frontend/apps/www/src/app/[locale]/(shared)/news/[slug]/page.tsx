@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
-import { ArrowLeft, BookOpenText, CalendarDays, ExternalLink, Hash, MapPin, Store } from 'lucide-react';
+import { ArrowLeft, BookOpenText, CalendarDays, ExternalLink, Hash, MapPin, Newspaper, Store, Timer } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import {
   buildNewsArticleJsonLd,
@@ -84,6 +84,19 @@ function formatDate(value: string, locale: string) {
   }).format(new Date(value));
 }
 
+function readingMinutes(text: string): number {
+  const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+  return Math.max(1, Math.ceil(words / 220));
+}
+
+function sourceDomain(value: string): string {
+  try {
+    return new URL(value).hostname.replace(/^www\./, '');
+  } catch {
+    return value.replace(/^https?:\/\//, '').split('/')[0] || value;
+  }
+}
+
 export default async function NewsArticlePage({ params }: PageProps) {
   const { locale, slug } = await params;
   const isId = locale === 'id';
@@ -102,6 +115,7 @@ export default async function NewsArticlePage({ params }: PageProps) {
     .split(/\n{2,}/)
     .map(part => part.trim())
     .filter(Boolean);
+  const estimatedMinutes = readingMinutes(article.body || article.richBody.replace(/<[^>]+>/g, ' '));
 
   const jsonLd = isRetracted
     ? [buildNewsBreadcrumbJsonLd(article, article.language)]
@@ -139,6 +153,7 @@ export default async function NewsArticlePage({ params }: PageProps) {
                 alt={article.title}
                 className="aspect-[16/9] w-full object-cover"
                 loading="eager"
+                decoding="async"
                 onError={event => {
                   event.currentTarget.onerror = null;
                   event.currentTarget.src = '/opengraph-image.png';
@@ -148,13 +163,36 @@ export default async function NewsArticlePage({ params }: PageProps) {
                 {isId ? 'Media utama artikel' : 'Article featured media'}
               </figcaption>
             </figure>
-          ) : null}
-          <div className="mt-5 flex flex-wrap gap-2 text-xs font-bold text-slate-600 dark:text-slate-300">
+          ) : (
+            <div className="mt-6 overflow-hidden rounded-[24px] border border-emerald-100 bg-[linear-gradient(135deg,#ecfdf5_0%,#f8fafc_58%,#fff7ed_100%)] p-5 dark:border-white/10 dark:bg-[linear-gradient(135deg,#06261b_0%,#0f172a_62%,#1c1917_100%)] sm:p-7">
+              <div className="flex min-h-40 items-center justify-between gap-6">
+                <div className="min-w-0">
+                  <span className="inline-flex rounded-full bg-white/85 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800 dark:bg-slate-950/70 dark:text-emerald-300">
+                    Lajukan News
+                  </span>
+                  <p className="mt-3 text-sm font-black text-slate-700 dark:text-slate-200">
+                    {article.category}
+                  </p>
+                  <p className="mt-1 max-w-lg text-xs font-semibold leading-5 text-slate-500 dark:text-slate-400">
+                    {isId ? 'Artikel ini tidak menggunakan gambar sampul.' : 'This article does not use a cover image.'}
+                  </p>
+                </div>
+                <Newspaper className="h-12 w-12 shrink-0 text-emerald-700/25 dark:text-emerald-300/25" />
+              </div>
+            </div>
+          )}
+          <div className="mt-5 grid gap-2 text-xs font-bold text-slate-600 dark:text-slate-300 sm:flex sm:flex-wrap">
             <span className="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-white px-3 dark:bg-white/10">
               <CalendarDays className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-300" />
               {formatDate(article.publishedAt, locale)}
             </span>
-            <span className="inline-flex min-h-8 items-center rounded-full bg-white px-3 dark:bg-white/10">{article.byline}</span>
+            <span className="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-white px-3 dark:bg-white/10">
+              <Timer className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-300" />
+              {estimatedMinutes} {isId ? 'menit baca' : 'min read'}
+            </span>
+            <span className="inline-flex min-h-8 items-center rounded-full bg-white px-3 dark:bg-white/10">
+              {article.byline}
+            </span>
             {article.location ? (
               <Link
                 href={buildNewsFacetPath('location', article.location)}
@@ -163,6 +201,11 @@ export default async function NewsArticlePage({ params }: PageProps) {
                 <MapPin className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-300" />
                 {article.location}
               </Link>
+            ) : null}
+            {article.updatedAt !== article.publishedAt ? (
+              <span className="inline-flex min-h-8 items-center rounded-full bg-white/70 px-3 text-slate-500 dark:bg-white/5 dark:text-slate-400">
+                {isId ? 'Diperbarui' : 'Updated'} {formatDate(article.updatedAt, locale)}
+              </span>
             ) : null}
           </div>
           {article.tags.length ? (
@@ -243,6 +286,27 @@ export default async function NewsArticlePage({ params }: PageProps) {
           </div>
 
           <aside className="space-y-3">
+            <div className="rounded-[24px] border border-emerald-100 bg-emerald-50/60 p-5 dark:border-emerald-400/15 dark:bg-emerald-400/5">
+              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-300">
+                {isId ? 'Ringkasan artikel' : 'Article snapshot'}
+              </p>
+              <dl className="mt-3 grid grid-cols-2 gap-2">
+                <div className="rounded-xl bg-white/75 p-3 dark:bg-white/5">
+                  <dt className="text-[10px] font-bold text-slate-500">{isId ? 'Waktu baca' : 'Read time'}</dt>
+                  <dd className="mt-1 text-sm font-black text-slate-900 dark:text-white">{estimatedMinutes} {isId ? 'menit' : 'min'}</dd>
+                </div>
+                <div className="rounded-xl bg-white/75 p-3 dark:bg-white/5">
+                  <dt className="text-[10px] font-bold text-slate-500">{isId ? 'Sumber' : 'Sources'}</dt>
+                  <dd className="mt-1 text-sm font-black text-slate-900 dark:text-white">{article.sourceUrls.length}</dd>
+                </div>
+                <div className="col-span-2 rounded-xl bg-white/75 p-3 dark:bg-white/5">
+                  <dt className="text-[10px] font-bold text-slate-500">{isId ? 'Jenis' : 'Type'}</dt>
+                  <dd className="mt-1 text-sm font-black text-slate-900 dark:text-white">
+                    {article.articleKind === 'analysis' ? (isId ? 'Analisis' : 'Analysis') : article.articleKind === 'press_release' ? (isId ? 'Rilis bisnis' : 'Business release') : (isId ? 'Berita' : 'News')}
+                  </dd>
+                </div>
+              </dl>
+            </div>
             <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5 dark:border-white/10 dark:bg-white/[0.04]">
               <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">{isId ? 'Tentang publikasi' : 'About this publication'}</p>
               <p className="mt-3 text-sm font-semibold leading-6 text-slate-700 dark:text-slate-200">
@@ -271,10 +335,21 @@ export default async function NewsArticlePage({ params }: PageProps) {
                       key={related.id}
                       href={buildNewsPath(related.slug)}
                       data-news-action="related_clicked"
-                      className="block rounded-xl bg-slate-50 p-3 transition hover:bg-emerald-50 dark:bg-white/[0.04] dark:hover:bg-emerald-400/10"
+                      className="group grid grid-cols-[76px_minmax(0,1fr)] gap-3 rounded-xl bg-slate-50 p-2.5 transition hover:bg-emerald-50 dark:bg-white/[0.04] dark:hover:bg-emerald-400/10"
                     >
-                      <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-emerald-700 dark:text-emerald-300">{related.category}</span>
-                      <p className="mt-1 line-clamp-3 text-sm font-bold leading-5 text-slate-900 dark:text-white">{related.title}</p>
+                      <div className="overflow-hidden rounded-lg bg-slate-200 dark:bg-slate-800">
+                        {related.coverImage ? (
+                          <img src={related.coverImage} alt="" className="aspect-[4/3] h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]" loading="lazy" decoding="async" />
+                        ) : (
+                          <div className="grid aspect-[4/3] place-items-center bg-emerald-50 text-emerald-700/40 dark:bg-emerald-950/40 dark:text-emerald-300/40">
+                            <Newspaper className="h-5 w-5" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-[9px] font-bold uppercase tracking-[0.1em] text-emerald-700 dark:text-emerald-300">{related.category}</span>
+                        <p className="mt-1 line-clamp-3 text-sm font-bold leading-5 text-slate-900 transition-colors group-hover:text-emerald-800 dark:text-white dark:group-hover:text-emerald-300">{related.title}</p>
+                      </div>
                     </Link>
                   ))}
                 </div>
