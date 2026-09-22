@@ -385,6 +385,7 @@ async fn retiring_active_recipe_records_pic_history_and_preserves_version_eviden
                     quantity: Decimal::from(150),
                     waste_percent_override: None,
                 }],
+                reason: Some("test recipe publish".to_owned()),
             },
         )
         .await
