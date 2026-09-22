@@ -6,6 +6,8 @@ on:
       - 'services/marketplace_service/src/businesses/**'
       - 'services/marketplace_service/migrations/**'
       - 'services/marketplace_service/tests/**'
+      - 'services/marketplace_service/src/main.rs'
+      - 'infrastructure/postgres/marketplace-init/**'
       - 'scripts/ci/check_business_os_migration_immutability.py'
       - 'scripts/ci/test_business_os_migration_immutability.py'
       - '.github/workflows/usaha-control-backend-gate.yml'
@@ -52,6 +54,14 @@ jobs:
           python ../../scripts/ci/check_business_os_migration_immutability.py
           cd ../../scripts/ci
           python -m unittest -v test_business_os_migration_immutability.py
+      - name: Bootstrap shared marketplace PostgreSQL helpers
+        run: |
+          docker run --rm --network host \
+            -v "$GITHUB_WORKSPACE/infrastructure/postgres/marketplace-init:/init:ro" \
+            -e PGPASSWORD=postgres \
+            postgres:16-alpine \
+            psql -h 127.0.0.1 -U postgres -d template1 -v ON_ERROR_STOP=1 -f /init/00_shared_functions.sql
+
       - name: Cargo check locked
         run: cargo check --locked
       - name: Applied migration immutability contract

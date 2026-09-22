@@ -1980,6 +1980,24 @@ async fn main() -> anyhow::Result<()> {
         .connect(&database_url)
         .await?;
 
+    // Marketplace owns its own PostgreSQL database, so shared trigger
+    // helpers must exist locally before any business migration can reference them.
+    sqlx::query(
+        r#"
+        CREATE OR REPLACE FUNCTION public.update_timestamp()
+        RETURNS trigger
+        LANGUAGE plpgsql
+        AS $
+        BEGIN
+          NEW.updated_at = NOW();
+          RETURN NEW;
+        END;
+        $;
+        "#,
+    )
+    .execute(&db)
+    .await?;
+
     let app_env = env::var("ENV").unwrap_or_else(|_| "development".to_string());
     let strict_secrets =
         app_env.eq_ignore_ascii_case("production") || app_env.eq_ignore_ascii_case("staging");
