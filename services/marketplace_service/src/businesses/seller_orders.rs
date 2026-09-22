@@ -738,7 +738,8 @@ mod tests {
 
     #[test]
     fn seller_fulfillment_next_step_depends_on_mode() {
-        let courier = allowed_seller_status_labels(&order("PROCESSING", "PHYSICAL_GOODS", "courier"));
+        let courier =
+            allowed_seller_status_labels(&order("PROCESSING", "PHYSICAL_GOODS", "courier"));
         assert!(courier.contains(&"SHIPPED".to_owned()));
         assert!(courier.contains(&"CANCELLED".to_owned()));
 
@@ -746,8 +747,11 @@ mod tests {
         assert!(pickup.contains(&"DELIVERED".to_owned()));
         assert!(pickup.contains(&"CANCELLED".to_owned()));
 
-        let service =
-            allowed_seller_status_labels(&order("PROCESSING", "SERVICE_MARKETPLACE", "escrow_booking"));
+        let service = allowed_seller_status_labels(&order(
+            "PROCESSING",
+            "SERVICE_MARKETPLACE",
+            "escrow_booking",
+        ));
         assert!(service.contains(&"IN_SERVICE".to_owned()));
         assert!(service.contains(&"CANCELLED".to_owned()));
     }
