@@ -29,6 +29,14 @@ const LajukanEventBridge = dynamic(
     ),
   { ssr: false },
 );
+const GlobalIncomingCallController = dynamic(
+  () =>
+    import('@/components/chat/GlobalIncomingCallController').then(
+      module => module.GlobalIncomingCallController,
+    ),
+  { ssr: false },
+);
+
 
 type Props = {
   children: React.ReactNode;
@@ -116,6 +124,9 @@ export function Providers({ children }: Props) {
                     </Suspense>
                     {deferredBridgesReady ? (
                       <BrowserNotificationBridge />
+                    ) : null}
+                    {deferredBridgesReady ? (
+                      <GlobalIncomingCallController />
                     ) : null}
                     {children}
                   </PageMetaProviderWrapper>
