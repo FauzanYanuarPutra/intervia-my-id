@@ -969,6 +969,8 @@ services:
       SMTP_FROM: ${SMTP_FROM:-}
       FROM_EMAIL: ${FROM_EMAIL:-}
       FROM_NAME: ${FROM_NAME:-Lajukan}
+    depends_on:
+      domain_db: { condition: service_healthy }
     volumes:
       - www_runtime:/app/apps/www/.runtime
     expose: ["3000"]
@@ -978,7 +980,7 @@ services:
       timeout: 8s
       retries: 10
       start_period: 45s
-    networks: [app, cache, media]
+    networks: [app, cache, media, data]
 
   cms:
     <<: *service-defaults
@@ -1083,5 +1085,68 @@ services:
       - "80:80"
       - "443:443"
     depends_on:
-      domain_db: { condition: service_healthy }
+      - www
+      - usaha
+      - cms
+      - crm
+    networks: [edge, app]
+    logging: *default-logging
 
+  cloudflared:
+    image: ${CLOUDFLARED_IMAGE:-cloudflare/cloudflared:2026.7.3}
+    profiles: [tunnel]
+    restart: unless-stopped
+    command:
+      - tunnel
+      - --no-autoupdate
+      - --loglevel
+      - info
+      - --metrics
+      - 0.0.0.0:2000
+      - run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    expose: ["2000"]
+    depends_on:
+      caddy: { condition: service_started }
+    networks: [edge]
+    logging: *default-logging
+
+  mailhog:
+    profiles: [devtools]
+    image: mailhog/mailhog:v1.0.1
+    restart: unless-stopped
+    expose: ["1025", "8025"]
+    networks: [app]
+    logging: *default-logging
+
+networks:
+  edge:
+    driver: bridge
+  app:
+    driver: bridge
+  cache:
+    driver: bridge
+    internal: true
+  media:
+    driver: bridge
+    internal: true
+  data:
+    driver: bridge
+    internal: true
+
+volumes:
+  identity_postgres_data:
+  domain_postgres_data:
+  community_postgres_data:
+  marketplace_postgres_data:
+  redis_data:
+  rabbitmq_data:
+  meili_data:
+  minio_data:
+  scylla_data:
+  community_uploads:
+  ollama_data:
+  caddy_data:
+  caddy_config:
+  www_runtime:
