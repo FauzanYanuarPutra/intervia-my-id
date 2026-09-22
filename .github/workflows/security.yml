@@ -118,7 +118,6 @@ jobs:
           allowed = {
               'EEF-CVE-2026-43966',
               'EEF-CVE-2026-43969',
-              'EEF-CVE-2026-43971',
           }
           unexpected = ids - allowed
           if unexpected:
@@ -126,13 +125,13 @@ jobs:
           if ids and ids != allowed:
               raise SystemExit(f'known Cowlib advisory set changed; observed {sorted(ids)}')
           if ids:
-              if 'cowlib 2.19.0' not in text:
-                  raise SystemExit('known advisories are no longer tied to cowlib 2.19.0')
-              print('Only the three known upstream Cowlib 2.19.0 advisories remain.')
+              if 'cowlib 2.20.0' not in text:
+                  raise SystemExit('known advisories are no longer tied to cowlib 2.20.0')
+              print('Only the two known upstream Cowlib 2.20.0 advisories remain; newer 2.20-fixed advisories are absent.')
           else:
               print('Hex audit is clean; no exception is currently needed.')
           PY
-          if [[ "$audit_status" -ne 0 ]] && ! grep -q 'cowlib 2.19.0' /tmp/hex-audit.txt; then
+          if [[ "$audit_status" -ne 0 ]] && ! grep -q 'cowlib 2.20.0' /tmp/hex-audit.txt; then
             exit "$audit_status"
           fi
 
