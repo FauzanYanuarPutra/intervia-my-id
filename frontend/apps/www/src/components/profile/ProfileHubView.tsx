@@ -2097,23 +2097,11 @@ export function ProfileHubView(props: ProfileHubViewProps) {
     Boolean(verificationRecord?.phone_verified);
 
   const listingCounts = useMemo(() => {
-    const counts: Record<ProfileContentTab, number> = {
-      all: listings.length,
-      news: 0,
-      community: 0,
-      reels: 0,
-      job: 0,
-      freelancer: 0,
-      product: 0,
-      service: 0,
-      supplier: 0,
-      tool_rental: 0,
-      business_transfer: 0,
-      business_place: 0,
-      property: 0,
-      umkm: 0,
-      other: 0,
-    };
+    const counts = Object.fromEntries(
+      ['all', ...PROFILE_CONTENT_TABS.map(tab => tab.key)].map(key => [key, 0]),
+    ) as Record<ProfileContentTab, number>;
+
+    counts.all = listings.length;
     for (const item of listings) {
       counts[classifyListing(item)] += 1;
     }
