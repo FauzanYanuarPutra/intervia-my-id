@@ -155,7 +155,7 @@ export default function BusinessModerationWorkspace() {
   const [severity, setSeverity] = useState<"low" | "medium" | "high" | "critical">("medium");
   const [busy, setBusy] = useState(false);
 
-  async function loadBusinesses() {
+  const loadBusinesses = useCallback(async () => {
     if (!accessToken) return;
     setLoading(true);
     try {
@@ -179,7 +179,7 @@ export default function BusinessModerationWorkspace() {
 
   useEffect(() => {
     void loadBusinesses();
-  }, [accessToken, referenceStatus]);
+  }, [loadBusinesses]);
 
   useEffect(() => {
     const requested =
