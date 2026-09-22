@@ -140,14 +140,6 @@ fn has_business_case_access(claims: &AccessClaims) -> bool {
             .any(|permission| permission.eq_ignore_ascii_case("business:case:manage"))
 }
 
-fn has_business_report_read_access(claims: &AccessClaims) -> bool {
-    has_business_read_access(claims)
-        || claims
-            .perms
-            .iter()
-            .any(|permission| permission.eq_ignore_ascii_case("business:report:read"))
-}
-
 fn has_business_verification_access(claims: &AccessClaims) -> bool {
     has_business_moderation_access(claims)
         || claims
@@ -336,6 +328,7 @@ fn metadata_text(metadata: &Value, keys: &[&str]) -> Option<String> {
     None
 }
 
+#[allow(clippy::too_many_arguments)]
 fn derive_missing_fields(
     name: &str,
     description: Option<&str>,
@@ -500,13 +493,7 @@ async fn list_crm_business_references(
 
     let q = normalize_text(query.q, BUSINESS_MAX_QUERY_LEN);
     let city = normalize_text(query.city, 80);
-    let status = normalize_text(query.status, 30).and_then(|value| {
-        if value.eq_ignore_ascii_case("all") {
-            None
-        } else {
-            Some(value)
-        }
-    });
+    let status = normalize_text(query.status, 30).filter(|value| !value.eq_ignore_ascii_case("all"));
     let limit = query.limit.unwrap_or(50).clamp(1, BUSINESS_MAX_LIMIT);
     let offset = query.offset.unwrap_or(0).max(0);
 
