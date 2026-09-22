@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { useRouter } from '@/i18n/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { joinRoom } from '@/lib/chat';
 import { soundManager } from '@/lib/soundManager';
@@ -80,7 +79,6 @@ function writePendingCall(call: IncomingCallState | null) {
 export function GlobalIncomingCallController() {
   const { user, accessToken } = useAuth();
   const pathname = usePathname() || '';
-  const router = useRouter();
   const [incomingCall, setIncomingCall] = useState<IncomingCallState | null>(
     null,
   );
@@ -211,11 +209,19 @@ export function GlobalIncomingCallController() {
         callAction: action,
         callId: call.callId,
       });
-      router.push(
-        '/chat/' + encodeURIComponent(call.roomId) + '?' + query.toString(),
+      if (typeof window === 'undefined') return;
+
+      const locale = window.location.pathname.startsWith('/en') ? 'en' : 'id';
+      window.location.assign(
+        '/' +
+          locale +
+          '/chat/' +
+          encodeURIComponent(call.roomId) +
+          '?' +
+          query.toString(),
       );
     },
-    [clearPending, router],
+    [clearPending],
   );
 
   const rejectCall = useCallback(async () => {
