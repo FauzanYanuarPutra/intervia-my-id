@@ -677,6 +677,13 @@ export default function NewsEditorialWorkspace({
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={onBack}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
+            >
+              Kembali
+            </button>
             <a
               href={process.env.NEXT_PUBLIC_CMS_URL || '/news'}
               className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
@@ -812,7 +819,7 @@ export default function NewsEditorialWorkspace({
                   <button
                     key={item.id}
                     type="button"
-                    onClick={() => setSelectedId(item.id)}
+                    onClick={() => selectNews(item.id)}
                     className={
                       'w-full rounded-xl border p-2.5 text-left transition ' +
                       (active
