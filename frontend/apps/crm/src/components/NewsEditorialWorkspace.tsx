@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { newsApi, usersApi } from '@/lib/api';
+import { newsApi } from '@/lib/api';
 
 type NewsItem = {
   id: string;
@@ -41,7 +41,7 @@ type EditorialEvent = {
 type NewsSourceReview = {
   id: string;
   content_id: string;
-  source_id: string;
+  source_id: string | null;
   reviewer_id: string;
   from_verification_status?: string | null;
   to_verification_status?: string | null;
@@ -223,6 +223,7 @@ export default function NewsEditorialWorkspace({
   const [selectedReviewerId, setSelectedReviewerId] = useState('');
   const [reviewRequestNote, setReviewRequestNote] = useState('');
   const [reviewersLoading, setReviewersLoading] = useState(false);
+  const [reviewersError, setReviewersError] = useState('');
   const [reviewRequestBusy, setReviewRequestBusy] = useState(false);
   const [history, setHistory] = useState<EditorialEvent[]>([]);
   const [versions, setVersions] = useState<NewsVersion[]>([]);
@@ -299,6 +300,7 @@ export default function NewsEditorialWorkspace({
     setSourceReviews([]);
     setSourceReviewRequests([]);
     setSelectedReviewerId('');
+    setReviewersError('');
     setReviewRequestNote('');
     setHistory([]);
     setVersions([]);
@@ -344,21 +346,23 @@ export default function NewsEditorialWorkspace({
 
   const loadReviewers = useCallback(async () => {
     setReviewersLoading(true);
+    setReviewersError('');
     try {
-      const payload = await usersApi.list(accessToken, { limit: 100 });
-      const eligible = (payload.data || []).filter(user => {
-        if (!user.is_active || user.id === reviewerId) return false;
-        return user.roles.some((role: string) =>
-          ['admin', 'content_admin', 'super_admin'].includes(role.trim().toLowerCase()),
-        );
-      });
+      const payload = await newsApi.reviewers(accessToken);
+      const eligible = (payload.data || []).filter(user => user.is_active && user.id !== reviewerId);
       setReviewers(eligible);
       setSelectedReviewerId(current =>
         eligible.some(user => user.id === current) ? current : eligible[0]?.id || '',
       );
-    } catch {
+      if (!eligible.length) {
+        setReviewersError('Belum ada reviewer/editor lain yang eligible untuk independent source review.');
+      }
+    } catch (err) {
       setReviewers([]);
       setSelectedReviewerId('');
+      setReviewersError(
+        err instanceof Error ? err.message : 'Daftar reviewer editorial tidak dapat dimuat.',
+      );
     } finally {
       setReviewersLoading(false);
     }
@@ -414,6 +418,17 @@ export default function NewsEditorialWorkspace({
       void loadReviewers();
     }
   }, [loadReviewers, selectedArticleKind, sensitivity]);
+
+  useEffect(() => {
+    if (!selected || sensitivity !== 'high' || selectedArticleKind === 'press_release') return;
+    const refresh = () => void loadHistory(selected.id);
+    const timer = window.setInterval(refresh, 15_000);
+    window.addEventListener('focus', refresh);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', refresh);
+    };
+  }, [loadHistory, selected, selectedArticleKind, sensitivity]);
 
   const loadQueue = useCallback(
     async (nextStatus: string, preserveId = '', nextOffset = 0) => {
@@ -996,15 +1011,17 @@ export default function NewsEditorialWorkspace({
                     <select
                       value={selectedReviewerId}
                       onChange={event => setSelectedReviewerId(event.target.value)}
-                      disabled={reviewersLoading || reviewRequestBusy || hasIndependentSourceReview}
+                      disabled={reviewersLoading || reviewRequestBusy || hasIndependentSourceReview || Boolean(reviewersError)}
                       className="min-h-10 rounded-xl border border-sky-200 bg-white px-3 text-sm font-bold text-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       <option value="">
                         {reviewersLoading
                           ? 'Memuat reviewer…'
-                          : reviewers.length
-                            ? 'Pilih reviewer lain'
-                            : 'Tidak ada reviewer lain'}
+                          : reviewersError
+                            ? 'Reviewer belum dapat dimuat'
+                            : reviewers.length
+                              ? 'Pilih reviewer lain'
+                              : 'Tidak ada reviewer lain'}
                       </option>
                       {reviewers.map(user => (
                         <option key={user.id} value={user.id}>
@@ -1018,6 +1035,7 @@ export default function NewsEditorialWorkspace({
                       disabled={
                         reviewRequestBusy ||
                         reviewersLoading ||
+                        Boolean(reviewersError) ||
                         !selectedReviewerId ||
                         hasIndependentSourceReview ||
                         Boolean(
@@ -1033,6 +1051,20 @@ export default function NewsEditorialWorkspace({
                       {reviewRequestBusy ? 'Mengirim…' : 'Minta review'}
                     </button>
                   </div>
+
+                  {reviewersError ? (
+                    <div className="mt-2 flex flex-col gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs font-semibold text-amber-800 sm:flex-row sm:items-center sm:justify-between">
+                      <span>{reviewersError}</span>
+                      <button
+                        type="button"
+                        onClick={() => void loadReviewers()}
+                        disabled={reviewersLoading || reviewRequestBusy}
+                        className="w-fit rounded-lg bg-white px-3 py-1.5 text-[11px] font-black text-amber-800 ring-1 ring-amber-200 disabled:opacity-50"
+                      >
+                        Coba lagi
+                      </button>
+                    </div>
+                  ) : null}
 
                   <textarea
                     value={reviewRequestNote}
@@ -1161,7 +1193,11 @@ export default function NewsEditorialWorkspace({
                           ? 'Legal review harus Approved untuk sensitivitas tinggi.'
                           : needsSource && verifiedSources === 0
                             ? 'Verifikasi minimal satu sumber terlebih dahulu.'
-                            : 'Masih ada gate editorial yang belum terpenuhi.'}
+                            : sensitivity === 'high' && !hasIndependentSourceReview
+                              ? reviewersError
+                                ? 'Daftar reviewer lain belum tersedia. Muat ulang daftar reviewer sebelum approval.'
+                                : 'Minta dan selesaikan independent source review oleh reviewer/editor lain.'
+                              : 'Masih ada gate editorial yang belum terpenuhi.'}
                   </div>
                 ) : null}
 
