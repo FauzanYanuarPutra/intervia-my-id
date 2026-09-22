@@ -1,6 +1,7 @@
 /**
  * MinIO/S3-compatible upload for chat media.
- * Uses unique keys: chat/{roomId}/{uuid}.{ext} — no overwrites.
+ * Chat objects use deterministic content-hash keys so retries converge on the
+ * same object instead of creating orphaned duplicate uploads.
  */
 import {
   CreateBucketCommand,
@@ -105,10 +106,7 @@ export async function uploadToMinIO(
   const personalAiUserId = roomId.startsWith('personal-ai/')
     ? safeRoomKey(roomId.slice('personal-ai/'.length))
     : '';
-  const contentHash =
-    roomId === 'content'
-      ? createHash('sha256').update(buffer).digest('hex')
-      : '';
+  const contentHash = createHash('sha256').update(buffer).digest('hex');
 
   const key =
     roomId === 'content'
@@ -117,7 +115,7 @@ export async function uploadToMinIO(
         ? `forum/${randomUUID()}${ext}`
         : personalAiUserId
           ? `personal-ai/${personalAiUserId}/${randomUUID()}${ext}`
-          : `chat/${safeRoomKey(roomId)}/${randomUUID()}${ext}`;
+          : `chat/${safeRoomKey(roomId)}/${contentHash}${ext}`;
 
   await ensureBucket(client);
 
