@@ -2990,7 +2990,10 @@ async fn create_source_review_request(
         return response_error(StatusCode::NOT_FOUND, "reviewer account not found");
     }
     let note = trimmed(payload.note);
-    if note.as_ref().is_some_and(|value| value.len() > NEWS_MAX_REVIEW_NOTE_LEN) {
+    if note
+        .as_ref()
+        .is_some_and(|value| value.len() > NEWS_MAX_REVIEW_NOTE_LEN)
+    {
         return response_error(StatusCode::BAD_REQUEST, "review request note is too long");
     }
 
@@ -3074,10 +3077,7 @@ async fn create_source_review_request(
     {
         Ok(row) => row,
         Err(error) => {
-            tracing::error!(
-                "create_source_review_request insert error: {:?}",
-                error
-            );
+            tracing::error!("create_source_review_request insert error: {:?}", error);
             return response_error(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "failed to create source review request",
@@ -3357,9 +3357,9 @@ async fn update_news_source(
         .await
         {
             tracing::error!(
-            "update_news_source review request completion error: {:?}",
-            error
-        );
+                "update_news_source review request completion error: {:?}",
+                error
+            );
             return response_error(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "failed to complete source review request",
