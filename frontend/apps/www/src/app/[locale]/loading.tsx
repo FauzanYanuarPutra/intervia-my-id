@@ -1,3 +1,5 @@
+import Image from 'next/image';
+
 export default function LocaleLoading() {
   return (
     <main
@@ -69,8 +71,8 @@ export default function LocaleLoading() {
             <span className="absolute left-1/2 top-[-3px] h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-emerald-500 shadow-[0_0_14px_rgba(16,185,129,0.95)]" />
           </div>
 
-          <div className="lajukan-loading-motion relative grid h-16 w-16 place-items-center rounded-[21px] bg-emerald-700 text-white shadow-[0_16px_38px_-18px_rgba(5,150,105,0.85)]">
-            <span className="text-[34px] font-black leading-none tracking-[-0.08em]">L</span>
+          <div className="lajukan-loading-motion relative grid h-16 w-16 place-items-center rounded-[21px] bg-white p-3 shadow-[0_16px_38px_-18px_rgba(5,150,105,0.28)] dark:bg-slate-900">
+            <Image src="/logo.svg" alt="Lajukan" width={160} height={48} priority className="h-auto w-full object-contain" />
           </div>
         </div>
 
