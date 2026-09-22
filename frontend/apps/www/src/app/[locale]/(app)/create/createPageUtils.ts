@@ -36,6 +36,11 @@ export interface ContentItem {
   price_unit?: string | null;
   tags?: string[] | null;
   cover_image?: string | null;
+  image_url?: string | null;
+  image_urls?: unknown;
+  images?: unknown;
+  gallery?: unknown;
+  gallery_images?: unknown;
   category?: string | null;
   metadata?: Record<string, unknown> | null;
   content_status?: string;
