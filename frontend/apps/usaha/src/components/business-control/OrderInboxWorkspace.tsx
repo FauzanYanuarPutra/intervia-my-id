@@ -3,13 +3,18 @@
 import { useMemo, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
+  Banknote,
+  Building2,
   CheckCircle2,
   ChevronRight,
   Clock3,
+  CreditCard,
   Loader2,
+  QrCode,
   RefreshCw,
   Search,
   ShoppingBag,
+  X,
 } from 'lucide-react';
 import { StatusBadge } from '@/components/portal/StatusBadge';
 import { businessApiErrorMessage } from '@/lib/business-api-error';
@@ -75,6 +80,8 @@ function paymentLabel(status: string) {
   return status.replaceAll('_', ' ').toLocaleLowerCase('id-ID');
 }
 
+type ManualPaymentMethod = 'cash' | 'bank_transfer' | 'qris_manual';
+
 type Props = {
   businessId: string;
   orders: SellerOrderAggregate[];
@@ -94,6 +101,11 @@ export function OrderInboxWorkspace({
   const [reason, setReason] = useState('');
   const [busyAction, setBusyAction] = useState<SellerOrderStatus | null>(null);
   const [message, setMessage] = useState('');
+  const [showManualPayment, setShowManualPayment] = useState(false);
+  const [manualPaymentMethod, setManualPaymentMethod] =
+    useState<ManualPaymentMethod>('cash');
+  const [manualPaymentReference, setManualPaymentReference] = useState('');
+  const [manualPaymentNote, setManualPaymentNote] = useState('');
   const attemptRef = useRef<ClientIdempotencyAttempt | null>(null);
 
   const filteredOrders = useMemo(() => {
@@ -119,27 +131,28 @@ export function OrderInboxWorkspace({
     filteredOrders[0] ??
     null;
 
-  async function transition(nextStatus: SellerOrderStatus) {
-    if (!selected || busyAction) return;
+  async function transition(
+    nextStatus: SellerOrderStatus,
+    metadata?: Record<string, unknown>,
+  ): Promise<boolean> {
+    if (!selected || busyAction) return false;
     const requiresReason =
       nextStatus === 'REJECTED' || nextStatus === 'CANCELLED';
     if (requiresReason && reason.trim().length < 3) {
       setMessage('Isi alasan minimal 3 karakter untuk menolak atau membatalkan.');
-      return;
+      return false;
     }
 
     const payload = {
       expected_version: selected.order.version,
       next_status: nextStatus,
       reason: reason.trim() || null,
+      metadata: metadata ?? null,
     };
-    const attempt = resolveIdempotencyAttempt(
-      attemptRef.current,
-      {
-        order_id: selected.order.id,
-        ...payload,
-      },
-    );
+    const attempt = resolveIdempotencyAttempt(attemptRef.current, {
+      order_id: selected.order.id,
+      ...payload,
+    });
     attemptRef.current = attempt;
     setBusyAction(nextStatus);
     setMessage('');
@@ -170,7 +183,7 @@ export function OrderInboxWorkspace({
           attemptRef.current = null;
           setMessage('Pesanan sudah berubah di perangkat lain. Data dimuat ulang.');
           startRefresh(() => router.refresh());
-          return;
+          return false;
         }
         if (
           response.status === 409 &&
@@ -179,24 +192,66 @@ export function OrderInboxWorkspace({
           attemptRef.current = null;
           setMessage('Status pesanan sudah tidak cocok untuk aksi ini. Data dimuat ulang.');
           startRefresh(() => router.refresh());
-          return;
+          return false;
         }
-        throw new Error(businessApiErrorMessage(result, 'Perubahan status belum berhasil.', response.status));
+        throw new Error(
+          businessApiErrorMessage(
+            result,
+            'Perubahan status belum berhasil.',
+            response.status,
+          ),
+        );
       }
 
       attemptRef.current = null;
       setReason('');
       setMessage('Status pesanan tersimpan.');
       startRefresh(() => router.refresh());
+      return true;
     } catch (error) {
       setMessage(
         error instanceof Error
           ? error.message
           : 'Perubahan status belum berhasil. Coba lagi.',
       );
+      return false;
     } finally {
       setBusyAction(null);
     }
+  }
+
+  function resetManualPayment() {
+    setShowManualPayment(false);
+    setManualPaymentMethod('cash');
+    setManualPaymentReference('');
+    setManualPaymentNote('');
+  }
+
+  async function confirmManualPayment() {
+    if (!selected || selected.order.base_status !== 'PENDING_PAYMENT' || busyAction) return;
+
+    const reference = manualPaymentReference.trim();
+    const note = manualPaymentNote.trim();
+
+    if (manualPaymentMethod !== 'cash' && reference.length < 3) {
+      setMessage(
+        manualPaymentMethod === 'bank_transfer'
+          ? 'Isi nomor referensi / nama pengirim untuk pembayaran transfer.'
+          : 'Isi referensi pembayaran QRIS manual.',
+      );
+      return;
+    }
+
+    const success = await transition('PAID', {
+      payment_confirmation: {
+        mode: 'manual',
+        method: manualPaymentMethod,
+        reference,
+        note,
+      },
+    });
+
+    if (success) resetManualPayment();
   }
 
   function refresh() {
@@ -282,6 +337,7 @@ export function OrderInboxWorkspace({
                     setSelectedId(order.order.id);
                     setReason('');
                     setMessage('');
+                    resetManualPayment();
                     attemptRef.current = null;
                   }}
                   className={`grid w-full gap-2 border-b border-portal-line px-4 py-3 text-left last:border-b-0 sm:grid-cols-[minmax(0,.9fr)_minmax(0,1.5fr)_120px_auto] sm:items-center ${
@@ -384,6 +440,28 @@ export function OrderInboxWorkspace({
                   <p className="mt-1 text-sm font-black text-portal-ink">
                     {paymentLabel(selected.order.payment_status)}
                   </p>
+                  {selected.order.payment_status === 'PAID' &&
+                  selected.order.category_specific_metadata &&
+                  typeof selected.order.category_specific_metadata === 'object' ? (
+                    (() => {
+                      const confirmation = selected.order.category_specific_metadata.payment_confirmation;
+                      if (!confirmation || typeof confirmation !== 'object') return null;
+                      const value = confirmation as Record<string, unknown>;
+                      const method =
+                        value.method === 'cash'
+                          ? 'Tunai'
+                          : value.method === 'bank_transfer'
+                            ? 'Transfer bank'
+                            : value.method === 'qris_manual'
+                              ? 'QRIS manual'
+                              : null;
+                      return method ? (
+                        <p className="mt-1 text-[11px] font-semibold text-emerald-700">
+                          {method} · manual
+                        </p>
+                      ) : null;
+                    })()
+                  ) : null}
                 </div>
                 <div className="rounded-xl bg-[#f5f7f3] p-3 text-right">
                   <p className="text-[10px] font-bold uppercase text-portal-soft">Total</p>
@@ -393,7 +471,132 @@ export function OrderInboxWorkspace({
                 </div>
               </div>
 
-              {selected.allowed_next_statuses.length ? (
+              {selected.allowed_next_statuses.includes('PAID') &&
+              selected.order.base_status === 'PENDING_PAYMENT' ? (
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-black uppercase tracking-wide text-emerald-800">
+                        Pembayaran manual
+                      </p>
+                      <p className="mt-1 text-sm font-black text-emerald-950">
+                        Terima pembayaran di luar gateway
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-emerald-800">
+                        Tunai, transfer bank, atau QRIS yang dikonfirmasi langsung oleh penjual.
+                      </p>
+                    </div>
+                    {showManualPayment ? (
+                      <button
+                        type="button"
+                        onClick={resetManualPayment}
+                        className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white text-emerald-800 shadow-sm transition hover:bg-emerald-100"
+                        aria-label="Tutup pembayaran manual"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    ) : null}
+                  </div>
+
+                  {!showManualPayment ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!canManageOrders) return;
+                        setMessage('');
+                        setShowManualPayment(true);
+                      }}
+                      disabled={!canManageOrders || busyAction !== null}
+                      className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#00a884] px-4 text-sm font-black text-white shadow-sm transition hover:bg-[#008f72] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <CheckCircle2 className="h-4 w-4" />
+                      Konfirmasi pembayaran manual
+                    </button>
+                  ) : (
+                    <div className="mt-4 space-y-3 rounded-xl border border-emerald-200 bg-white p-3">
+                      <p className="text-[11px] font-black uppercase tracking-wide text-portal-soft">
+                        Metode pembayaran
+                      </p>
+
+                      <div className="grid grid-cols-3 gap-2">
+                        {([
+                          ['cash', Banknote, 'Tunai'],
+                          ['bank_transfer', Building2, 'Transfer'],
+                          ['qris_manual', QrCode, 'QRIS'],
+                        ] as const).map(([method, Icon, label]) => (
+                          <button
+                            key={method}
+                            type="button"
+                            onClick={() => setManualPaymentMethod(method)}
+                            className={`flex min-h-20 flex-col items-center justify-center gap-1 rounded-xl border px-2 text-center transition ${
+                              manualPaymentMethod === method
+                                ? 'border-emerald-500 bg-emerald-50 text-emerald-900'
+                                : 'border-portal-line bg-white text-portal-ink hover:bg-[#fafbf9]'
+                            }`}
+                          >
+                            <Icon className="h-5 w-5" />
+                            <span className="text-xs font-black">{label}</span>
+                          </button>
+                        ))}
+                      </div>
+
+                      <label className="block text-xs font-semibold text-portal-ink">
+                        Referensi pembayaran
+                        <input
+                          value={manualPaymentReference}
+                          onChange={event => setManualPaymentReference(event.target.value)}
+                          maxLength={120}
+                          className="portal-input mt-1 w-full"
+                          placeholder={
+                            manualPaymentMethod === 'cash'
+                              ? 'Opsional, mis. nota/manual'
+                              : 'Nomor referensi atau nama pengirim'
+                          }
+                        />
+                      </label>
+
+                      <label className="block text-xs font-semibold text-portal-ink">
+                        Catatan
+                        <textarea
+                          value={manualPaymentNote}
+                          onChange={event => setManualPaymentNote(event.target.value)}
+                          maxLength={500}
+                          className="portal-input mt-1 min-h-20 w-full resize-y"
+                          placeholder="Contoh: uang diterima penuh oleh kasir"
+                        />
+                      </label>
+
+                      <div className="rounded-xl bg-[#f5f7f3] p-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-xs font-bold text-portal-soft">Jumlah dikonfirmasi</span>
+                          <strong className="text-base font-black text-portal-ink">
+                            {money.format(Number(selected.order.total_amount))}
+                          </strong>
+                        </div>
+                        <p className="mt-1 text-[11px] leading-5 text-portal-soft">
+                          Pembayaran dicatat sebagai pembayaran manual, tanpa gateway.
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={confirmManualPayment}
+                        disabled={!canManageOrders || busyAction !== null}
+                        className="portal-button-primary min-h-11 w-full justify-center disabled:opacity-50"
+                      >
+                        {busyAction === 'PAID' ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <CreditCard className="h-4 w-4" />
+                        )}
+                        Tandai sudah dibayar
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : null}
+
+              {selected.allowed_next_statuses.filter(status => status !== 'PAID').length ? (
                 <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
                   <div className="flex gap-3">
                     <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
@@ -402,28 +605,30 @@ export function OrderInboxWorkspace({
                         Langkah berikutnya
                       </p>
                       <div className="mt-3 grid gap-2">
-                        {selected.allowed_next_statuses.map(nextStatus => {
-                          const destructive =
-                            nextStatus === 'REJECTED' || nextStatus === 'CANCELLED';
-                          return (
-                            <button
-                              key={nextStatus}
-                              type="button"
-                              onClick={() => transition(nextStatus)}
-                              disabled={!canManageOrders || busyAction !== null}
-                              className={
-                                destructive
-                                  ? 'portal-button-secondary justify-center border-red-200 text-red-700 disabled:opacity-50'
-                                  : 'portal-button-primary justify-center disabled:opacity-50'
-                              }
-                            >
-                              {busyAction === nextStatus ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : null}
-                              {sellerOrderActionLabel(nextStatus)}
-                            </button>
-                          );
-                        })}
+                        {selected.allowed_next_statuses
+                          .filter(status => status !== 'PAID')
+                          .map(nextStatus => {
+                            const destructive =
+                              nextStatus === 'REJECTED' || nextStatus === 'CANCELLED';
+                            return (
+                              <button
+                                key={nextStatus}
+                                type="button"
+                                onClick={() => transition(nextStatus)}
+                                disabled={!canManageOrders || busyAction !== null}
+                                className={
+                                  destructive
+                                    ? 'portal-button-secondary justify-center border-red-200 text-red-700 disabled:opacity-50'
+                                    : 'portal-button-primary justify-center disabled:opacity-50'
+                                }
+                              >
+                                {busyAction === nextStatus ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : null}
+                                {sellerOrderActionLabel(nextStatus)}
+                              </button>
+                            );
+                          })}
                       </div>
                       {selected.allowed_next_statuses.some(
                         status => status === 'REJECTED' || status === 'CANCELLED',
@@ -447,21 +652,7 @@ export function OrderInboxWorkspace({
                     </div>
                   </div>
                 </div>
-              ) : (
-                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-                  <div className="flex gap-3">
-                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" />
-                    <div>
-                      <p className="text-sm font-black text-emerald-950">
-                        Tidak ada aksi seller berikutnya
-                      </p>
-                      <p className="mt-1 text-xs leading-5 text-emerald-800">
-                        Pembayaran, refund, expiry, dan state terminal tetap dikendalikan sumber transaksi yang berwenang.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
+              ) : null}
 
               {message ? (
                 <p role="status" className="text-xs font-semibold text-portal-soft">
