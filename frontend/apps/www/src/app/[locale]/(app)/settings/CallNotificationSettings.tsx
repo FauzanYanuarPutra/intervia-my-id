@@ -5,6 +5,7 @@ import { BellRing, CheckCircle2, ExternalLink, Loader2, Phone, ShieldAlert, Vide
 import { Link } from '@/i18n/navigation';
 import {
   ensureWebPushSubscription,
+  disableWebPushSubscription,
   isBrowserNotificationSupported,
   requestBrowserNotificationPermission,
 } from '@/lib/browserNotifications';
@@ -89,6 +90,15 @@ export function CallNotificationSettings({ locale }: Props) {
   const toggleEnabled = (next: boolean) => {
     writeCallAlertPreferences({ enabled: next });
     setPreferences(readCallAlertPreferences());
+    if (!next) {
+      void disableWebPushSubscription();
+    } else if (Notification.permission === 'granted') {
+      void ensureWebPushSubscription(
+        typeof navigator !== 'undefined'
+          ? navigator.userAgent.slice(0, 120)
+          : 'web',
+      );
+    }
   };
 
   const toggleRingtone = (next: boolean) => {
