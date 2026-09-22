@@ -13,8 +13,8 @@ use std::{net::IpAddr, sync::Arc};
 use uuid::Uuid;
 
 use crate::{
-    auth_claims_from_headers, has_cms_access, make_slug, push_notification_best_effort,
-    user_id_from_auth, AppState,
+    auth_claims_from_headers, fetch_user_read_model_brief, has_cms_access, make_slug,
+    push_notification_best_effort, user_id_from_auth, AppState,
 };
 
 const PUBLIC_NEWS_MAX_OFFSET: i64 = 10_000;
@@ -3101,7 +3101,7 @@ async fn create_source_review_request(
         "news.source_review.requested",
         "Review sumber News diperlukan",
         &format!(
-            "Ada permintaan independent source review untuk "{}".",
+            "Ada permintaan independent source review untuk \"{}\".",
             article.title
         ),
         json!({
