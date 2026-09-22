@@ -678,12 +678,11 @@ async function callAiService(input: {
     headers.Authorization = `Bearer ${AI_SERVICE_TOKEN.trim()}`;
   }
 
-  let response: Response | undefined;
-  let lastFetchError: unknown;
-
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
-    try {
-      const candidate = await fetch(`${trimBaseUrl(INTERNAL_AI_URL)}/v1/chat`, {
+  let response: Response;
+  try {
+    response = await fetch(
+      `${trimBaseUrl(INTERNAL_AI_URL)}/v1/chat`,
+      {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -709,23 +708,12 @@ async function callAiService(input: {
           use_rag: PERSONAL_AI_USE_RAG,
         }),
         signal: AbortSignal.timeout(INTERNAL_AI_TIMEOUT_MS),
-      });
-
-      const transient = [502, 503, 504].includes(candidate.status);
-      if (!transient || attempt >= 3) {
-        response = candidate;
-        break;
-      }
-
-      if (candidate.body) {
-        await candidate.body.cancel().catch(() => undefined);
-      }
-      await new Promise(resolve => setTimeout(resolve, 350 * attempt));
-    } catch (error) {
-      lastFetchError = error;
-      if (attempt >= 3) break;
-      await new Promise(resolve => setTimeout(resolve, 350 * attempt));
-    }
+      },
+    );
+  } catch (error) {
+    throw error instanceof Error
+      ? error
+      : new Error('ai-service:network_error');
   }
 
   if (!response) {
