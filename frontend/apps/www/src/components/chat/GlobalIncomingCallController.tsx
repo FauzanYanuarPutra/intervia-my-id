@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useRouter } from '@/i18n/navigation';
 import { useAuth } from '@/context/AuthContext';
@@ -22,10 +22,6 @@ type IncomingCallState = {
 
 const PENDING_KEY = 'lajukan:pending-incoming-call:v1';
 const MAX_PENDING_AGE_MS = 55_000;
-
-function currentLocale(pathname: string): 'id' | 'en' {
-  return pathname.startsWith('/en') ? 'en' : 'id';
-}
 
 function currentChatRoomId(pathname: string): string | null {
   const match = pathname.match(/^\/(?:id|en)\/chat\/([^/?#]+)/);
@@ -85,8 +81,6 @@ export function GlobalIncomingCallController() {
   const [incomingCall, setIncomingCall] = useState<IncomingCallState | null>(
     null,
   );
-
-  const locale = useMemo(() => currentLocale(pathname), [pathname]);
 
   useEffect(() => {
     if (!user?.id || typeof window === 'undefined') {
