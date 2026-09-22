@@ -4,8 +4,8 @@ defmodule ChatService.PushNotifier do
   require Logger
 
   def incoming_call(payload) when is_map(payload) do
-    url = Application.get_env(:chat_service, :internal_push_url, "") |> to_string() |> String.trim()
-    secret = Application.get_env(:chat_service, :internal_push_secret, "") |> to_string()
+    url = System.get_env("INTERNAL_PUSH_URL", "") |> String.trim()
+    secret = System.get_env("INTERNAL_PUSH_SECRET", "")
 
     if url == "" or secret == "" do
       :disabled
