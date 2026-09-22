@@ -81,7 +81,29 @@ export function TransactionWorkspace({transactions}:{transactions:CrmTransaction
         <button type="button" onClick={()=>void openOrder(tx.id)} className="mt-3 rounded-xl border border-[color:var(--color-border)] px-3 py-2 text-xs font-bold">Lihat detail & event</button>
         {selectedId===tx.id ? (
           <div className="mt-2 rounded-xl bg-[color:var(--color-surface-muted)] p-3">
-            {busy ? <p className="text-sm font-semibold">Memuat detail...</p> : detail ? <>
+            {busy ? (
+              <div className="space-y-3" aria-busy="true">
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {Array.from({ length: 4 }).map((_, index) => (
+                    <div key={index} className="rounded-xl border border-[color:var(--color-border)] bg-white p-3">
+                      <div className="h-2.5 w-16 animate-pulse rounded bg-slate-100" />
+                      <div className="mt-2 h-4 w-24 animate-pulse rounded bg-slate-200" />
+                    </div>
+                  ))}
+                </div>
+                <div className="space-y-2">
+                  {Array.from({ length: 2 }).map((_, index) => (
+                    <div key={index} className="rounded-xl border border-[color:var(--color-border)] bg-white p-3">
+                      <div className="flex justify-between gap-2">
+                        <div className="h-3 w-24 animate-pulse rounded bg-slate-200" />
+                        <div className="h-3 w-20 animate-pulse rounded bg-slate-100" />
+                      </div>
+                      <div className="mt-2 h-12 animate-pulse rounded bg-slate-50" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : detail ? <>
               <dl className="grid gap-2 text-xs sm:grid-cols-2">
                 <div><dt className="text-[color:var(--color-text-soft)]">Payment</dt><dd className="font-bold">{detail.order.payment_mode}</dd></div>
                 <div><dt className="text-[color:var(--color-text-soft)]">Risk</dt><dd className="font-bold">{detail.order.risk_score}</dd></div>
