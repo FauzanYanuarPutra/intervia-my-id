@@ -90,6 +90,14 @@ function readingMinutes(text: string): number {
   return Math.max(1, Math.ceil(words / 220));
 }
 
+function sourceHost(value: string): string {
+  try {
+    return new URL(value).hostname.replace(/^www./, '');
+  } catch {
+    return value;
+  }
+}
+
 export default async function NewsArticlePage({ params }: PageProps) {
   const { locale, slug } = await params;
   const isId = locale === 'id';
@@ -122,27 +130,33 @@ export default async function NewsArticlePage({ params }: PageProps) {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }} />
       <NewsAnalytics articleId={article.id} slug={article.slug} category={article.category} />
 
-      <nav aria-label="Breadcrumb" className="flex items-center justify-between gap-3">
-        <Link href="/news" className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 hover:border-emerald-200 hover:text-emerald-700 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200">
-          <ArrowLeft className="h-3.5 w-3.5" />
-          {isId ? 'Kembali ke News' : 'Back to News'}
-        </Link>
+      <nav aria-label="Breadcrumb" className="flex flex-wrap items-center justify-between gap-2.5">
+        <div className="flex min-w-0 items-center gap-2">
+          <Link href="/news" className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 transition hover:border-emerald-200 hover:text-emerald-700 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200">
+            <ArrowLeft className="h-3.5 w-3.5" />
+            {isId ? 'News' : 'News'}
+          </Link>
+          <span className="text-slate-300">/</span>
+          <Link href={buildNewsFacetPath('topic', article.category)} className="truncate text-xs font-bold text-emerald-700 hover:underline dark:text-emerald-300">
+            {article.category}
+          </Link>
+        </div>
         <div className="hidden items-center gap-2 sm:flex">
           <span className="grid h-8 w-8 place-items-center rounded-[10px] bg-emerald-700 text-xs font-black text-white shadow-sm">L</span>
           <span className="text-xs font-black text-slate-500 dark:text-slate-400">Lajukan News</span>
         </div>
       </nav>
 
-      <article id="news-article" className="overflow-hidden rounded-[34px] border border-slate-200 bg-white shadow-[0_24px_68px_-50px_rgba(15,23,42,0.38)] dark:border-white/10 dark:bg-slate-900">
-        <header className="bg-[linear-gradient(135deg,#f8fafc_0%,#ecfdf5_56%,#fff7ed_100%)] p-4 dark:bg-[linear-gradient(135deg,#0f172a_0%,#052e24_58%,#1c1917_100%)] sm:p-8 lg:p-10">
+      <article id="news-article" className="overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-[0_24px_68px_-52px_rgba(15,23,42,0.4)] dark:border-white/10 dark:bg-slate-900">
+        <header className="bg-[linear-gradient(135deg,#f8fafc_0%,#ecfdf5_56%,#fff7ed_100%)] p-4 dark:bg-[linear-gradient(135deg,#0f172a_0%,#052e24_58%,#1c1917_100%)] sm:p-7 lg:p-9">
           <div className="flex flex-wrap gap-2 text-[11px] font-bold uppercase tracking-[0.14em]">
             <span className="rounded-full bg-emerald-700 px-3 py-1.5 text-white">{article.category}</span>
             {isRetracted ? <span className="rounded-full bg-rose-100 px-3 py-1.5 text-rose-800 dark:bg-rose-400/15 dark:text-rose-200">{isId ? 'Ditarik' : 'Retracted'}</span> : null}
             {article.articleKind === 'press_release' ? <span className="rounded-full bg-amber-100 px-3 py-1.5 text-amber-800 dark:bg-amber-400/15 dark:text-amber-200">{isId ? 'Rilis bisnis' : 'Business release'}</span> : null}
             {article.articleKind === 'analysis' ? <span className="rounded-full bg-sky-100 px-3 py-1.5 text-sky-800 dark:bg-sky-400/15 dark:text-sky-200">{isId ? 'Analisis' : 'Analysis'}</span> : null}
           </div>
-          <h1 className="mt-4 max-w-4xl text-[30px] font-black leading-[1.08] tracking-[-0.055em] text-slate-950 dark:text-white sm:text-5xl">{article.title}</h1>
-          {!isRetracted && article.summary ? <p className="mt-3 max-w-3xl text-sm font-semibold leading-7 sm:text-base sm:leading-8 text-slate-600 dark:text-slate-300">{article.summary}</p> : null}
+          <h1 className="mt-4 max-w-4xl text-[31px] font-black leading-[1.06] tracking-[-0.055em] text-slate-950 dark:text-white sm:text-[48px]">{article.title}</h1>
+          {!isRetracted && article.summary ? <p className="mt-3 max-w-3xl text-[15px] font-semibold leading-7 sm:text-base sm:leading-8 text-slate-600 dark:text-slate-300">{article.summary}</p> : null}
           <div className="mt-6">
             <NewsArticleMedia article={article} isId={isId} />
           </div>
@@ -198,7 +212,7 @@ export default async function NewsArticlePage({ params }: PageProps) {
           ) : null}
         </header>
 
-        <div className="grid gap-6 p-4 sm:p-7 lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-8 lg:p-10">
+        <div className="grid gap-7 p-4 sm:p-7 lg:grid-cols-[minmax(0,760px)_280px] lg:items-start lg:gap-9 lg:p-9">
           <div className="min-w-0">
             {isRetracted ? (
               <section className="rounded-[24px] border border-rose-200 bg-rose-50 p-5 dark:border-rose-400/20 dark:bg-rose-400/10">
@@ -212,9 +226,9 @@ export default async function NewsArticlePage({ params }: PageProps) {
             ) : (
               <>
                 {article.richBody ? (
-                  <div className="prose prose-slate max-w-none text-[15px] leading-8 dark:prose-invert [&_a]:text-emerald-700 [&_a]:font-semibold [&_blockquote]:border-emerald-500 [&_img]:rounded-2xl [&_img]:shadow-sm" dangerouslySetInnerHTML={{ __html: article.richBody }} />
+                  <div className="prose prose-slate max-w-none text-[15px] leading-8 sm:text-[15.5px] [&_p]:leading-8 [&_h2]:mt-9 [&_h2]:text-2xl [&_h2]:font-black [&_h2]:tracking-tight [&_h3]:mt-8 [&_h3]:text-xl [&_h3]:font-black dark:prose-invert [&_a]:text-emerald-700 [&_a]:font-semibold [&_blockquote]:border-emerald-500 [&_img]:rounded-2xl [&_img]:shadow-sm" dangerouslySetInnerHTML={{ __html: article.richBody }} />
                 ) : (
-                  <div className="space-y-5 text-[15px] font-medium leading-8 sm:text-[15.5px] text-slate-700 dark:text-slate-200">
+                  <div className="space-y-5 text-[15px] font-medium leading-8 text-slate-700 dark:text-slate-200 sm:text-[15.5px]">
                     {paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}
                   </div>
                 )}
@@ -238,9 +252,30 @@ export default async function NewsArticlePage({ params }: PageProps) {
                 <h2 className="text-lg font-bold text-slate-950 dark:text-white">{isId ? 'Sumber' : 'Sources'}</h2>
                 <div className="mt-3 grid gap-2">
                   {article.sourceUrls.map((source, index) => (
-                    <a key={source} href={source} target="_blank" rel="noopener noreferrer nofollow" data-news-action="source_clicked" className="inline-flex items-start gap-2 break-all text-sm font-semibold text-emerald-700 hover:underline dark:text-emerald-300">
-                      <ExternalLink className="mt-0.5 h-4 w-4 shrink-0" />
-                      {isId ? `Sumber ${index + 1}` : `Source ${index + 1}`}: {source}
+                    <a
+                      key={source}
+                      href={source}
+                      target="_blank"
+                      rel="noopener noreferrer nofollow"
+                      data-news-action="source_clicked"
+                      className="group rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5 transition hover:border-emerald-200 hover:bg-emerald-50/60 dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-emerald-400/10"
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white text-emerald-700 shadow-sm dark:bg-white/10 dark:text-emerald-300">
+                          <ExternalLink className="h-4 w-4" />
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
+                            {isId ? `Sumber ${index + 1}` : `Source ${index + 1}`}
+                          </span>
+                          <span className="mt-1 block truncate text-sm font-black text-slate-800 group-hover:text-emerald-800 dark:text-slate-100 dark:group-hover:text-emerald-300">
+                            {sourceHost(source)}
+                          </span>
+                          <span className="mt-1 block line-clamp-2 break-all text-xs font-semibold leading-5 text-slate-500 dark:text-slate-400">
+                            {source}
+                          </span>
+                        </span>
+                      </div>
                     </a>
                   ))}
                 </div>
@@ -250,7 +285,7 @@ export default async function NewsArticlePage({ params }: PageProps) {
             )}
           </div>
 
-          <aside className="space-y-3">
+          <aside className="space-y-3 lg:sticky lg:top-24">
             <div className="rounded-[20px] border border-emerald-100 bg-emerald-50/60 p-4 sm:p-5 dark:border-emerald-400/15 dark:bg-emerald-400/5">
               <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-300">
                 {isId ? 'Ringkasan artikel' : 'Article snapshot'}
@@ -292,7 +327,7 @@ export default async function NewsArticlePage({ params }: PageProps) {
               <p className="mt-3 font-bold text-slate-950 dark:text-white">{isId ? 'Cari produk, jasa, dan supplier' : 'Find products, services, and suppliers'}</p>
             </Link>
             {relatedArticles.length ? (
-              <section className="rounded-[24px] border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-slate-900">
+              <section className="rounded-[22px] border border-slate-200 bg-white p-4 sm:p-5 dark:border-white/10 dark:bg-slate-900">
                 <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">{isId ? 'Berita terkait' : 'Related news'}</p>
                 <div className="mt-3 grid gap-3">
                   {relatedArticles.map(related => (
@@ -322,6 +357,25 @@ export default async function NewsArticlePage({ params }: PageProps) {
             ) : null}
           </aside>
         </div>
+
+        {!isRetracted ? (
+          <div className="border-t border-slate-200 bg-slate-50/70 px-4 py-5 sm:px-7 dark:border-white/10 dark:bg-white/[0.03]">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <p className="text-sm font-black text-slate-950 dark:text-white">
+                  {isId ? 'Mau baca berita lain yang relevan?' : 'Want more relevant news?'}
+                </p>
+                <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                  {isId ? 'Lanjutkan ke Lajukan News untuk kategori, topik, dan berita terbaru.' : 'Continue to Lajukan News for categories, topics, and the latest stories.'}
+                </p>
+              </div>
+              <Link href="/news" className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 text-xs font-black text-white transition hover:bg-emerald-800">
+                {isId ? 'Jelajahi News' : 'Explore News'}
+                <ArrowLeft className="h-3.5 w-3.5 rotate-180" />
+              </Link>
+            </div>
+          </div>
+        ) : null}
       </article>
     </main>
   );
