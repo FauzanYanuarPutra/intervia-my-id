@@ -8,7 +8,7 @@ import {
   type StorefrontCanonicalOrderBundle,
   type StorefrontOrderLineInput,
 } from '@/lib/super-app/storefront-order-client';
-import { parseStorefrontModifierGroups } from '@/lib/super-app/storefront-product-modifiers';
+import { estimatedConfiguredPriceCents, parseStorefrontModifierGroups } from '@/lib/super-app/storefront-product-modifiers';
 import { loadStorefrontProductCustomization } from '@/lib/super-app/storefront-product-customization-client';
 import { StorefrontProductConfigurator } from './StorefrontProductConfigurator';
 import { STOREFRONT_CART_EVENT, type StorefrontCartAddDetail } from './StorefrontOrderCart';
@@ -123,7 +123,11 @@ export function StorefrontProductOrderAction({
         productName,
         quantity: line.quantity,
         unitPriceCents: productPriceCents,
-        estimatedUnitPriceCents,
+        estimatedUnitPriceCents: estimatedConfiguredPriceCents(
+          resolvedProduct?.priceCents ?? productPriceCents,
+          groups,
+          line.selectedOptions || [],
+        ),
         selectedOptions: line.selectedOptions,
         note: line.note,
       };
@@ -202,7 +206,7 @@ export function StorefrontProductOrderAction({
         type="button"
         onClick={handleOrder}
         disabled={!canOrder || locked}
-        aria-label={isId ? `Pesan ${productName}` : `Order ${productName}`}
+        aria-label={isId ? (cartEnabled ? `Tambah ${productName}` : `Pesan ${productName}`) : (cartEnabled ? `Add ${productName}` : `Order ${productName}`)}
         data-testid="storefront-order-button"
         className={compact
           ? 'inline-flex min-h-10 items-center justify-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-4 text-xs font-extrabold text-emerald-800 shadow-sm shadow-emerald-950/5 transition hover:-translate-y-px hover:border-emerald-300 hover:bg-emerald-100 hover:shadow-md hover:shadow-emerald-950/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none dark:border-emerald-900/70 dark:bg-emerald-950/35 dark:text-emerald-200 dark:shadow-none dark:hover:border-emerald-800 dark:hover:bg-emerald-950/55 dark:disabled:border-slate-700 dark:disabled:bg-slate-800 dark:disabled:text-slate-500'
