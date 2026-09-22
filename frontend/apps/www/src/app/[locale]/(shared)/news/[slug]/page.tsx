@@ -89,13 +89,6 @@ function readingMinutes(text: string): number {
   return Math.max(1, Math.ceil(words / 220));
 }
 
-function sourceDomain(value: string): string {
-  try {
-    return new URL(value).hostname.replace(/^www\./, '');
-  } catch {
-    return value.replace(/^https?:\/\//, '').split('/')[0] || value;
-  }
-}
 
 export default async function NewsArticlePage({ params }: PageProps) {
   const { locale, slug } = await params;
