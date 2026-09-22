@@ -61,29 +61,35 @@ defmodule ChatService.CallHistory do
       current_status = record["status"] || "ringing"
       caller_id = record["caller_id"]
 
-      status =
-        cond do
-          current_status in ["connected", "connecting"] ->
-            "completed"
+      if current_status in ["completed", "cancelled", "declined", "missed", "failed"] do
+        record
+      else
+        status =
+          cond do
+            current_status in ["connected", "connecting"] ->
+              "completed"
 
-          caller_id == user_id_bin ->
-            "cancelled"
+            caller_id == user_id_bin ->
+              "cancelled"
 
-          true ->
-            "missed"
-        end
+            true ->
+              "missed"
+          end
 
-      duration_seconds =
-        case {record["connected_at"], now} do
-          {%DateTime{} = connected_at, %DateTime{} = ended_at} ->
-            max(DateTime.diff(ended_at, connected_at, :second), 0)
+        duration_seconds =
+          case {record["connected_at"], now} do
+            {%DateTime{} = connected_at, %DateTime{} = ended_at} ->
+              max(DateTime.diff(ended_at, connected_at, :second), 0)
 
-          _ ->
-            0
-        end
+            _ ->
+              0
+          end
 
-      update_record(record, status, record["connected_at"], now, now, reason)
-      |> Map.put("duration_seconds", duration_seconds)
+        update_record(record, status, record["connected_at"], now, now, reason)
+        |> Map.put("duration_seconds", duration_seconds)
+      end
+
+
     end)
   end
 
