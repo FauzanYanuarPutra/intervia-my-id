@@ -165,7 +165,13 @@ export default async function NewsIndexPage({ params, searchParams }: PageProps)
       <section className="overflow-hidden rounded-[28px] border border-emerald-100 bg-[linear-gradient(135deg,#f0fdf4_0%,#ffffff_48%,#fffaf2_100%)] shadow-[0_20px_60px_-46px_rgba(15,23,42,0.35)] dark:border-white/10 dark:bg-[linear-gradient(135deg,#06261b_0%,#0f172a_62%,#1c1917_100%)]">
         <div className="grid gap-6 p-5 sm:p-7 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-end lg:p-8">
           <div className="min-w-0">
-            <span className="inline-flex rounded-full bg-emerald-700 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white">Lajukan News</span>
+            <div className="flex items-center gap-2">
+              <span className="grid h-9 w-9 place-items-center rounded-[12px] bg-emerald-700 text-sm font-black text-white shadow-sm">L</span>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300">Lajukan</p>
+                <p className="text-xs font-bold text-slate-500 dark:text-slate-400">News</p>
+              </div>
+            </div>
             <h1 className="mt-3 max-w-3xl text-3xl font-black tracking-[-0.055em] text-slate-950 dark:text-white sm:text-4xl">{isId ? 'Berita ekonomi, bisnis, dan peluang usaha.' : 'Economy, business, and opportunity in one place.'}</h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300 sm:text-base">{isId ? 'Berita yang ringkas, jelas, dan relevan untuk membantu pelaku usaha mengambil langkah berikutnya.' : 'Clear, practical news to help businesses understand what matters and what to do next.'}</p>
           </div>
@@ -176,8 +182,8 @@ export default async function NewsIndexPage({ params, searchParams }: PageProps)
         </div>
       </section>
 
-      <nav aria-label={isId ? 'Kategori berita' : 'News categories'} className="flex gap-2 overflow-x-auto pb-1">
-        <Link href="/news" className={`shrink-0 rounded-full border px-3.5 py-2 text-sm font-bold ${!category ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-slate-200 bg-white text-slate-700 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200'}`}>
+      <nav aria-label={isId ? 'Kategori berita' : 'News categories'} className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
+        <Link href="/news" className={`shrink-0 rounded-full border px-3.5 py-2 text-xs font-bold sm:text-sm ${!category ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-slate-200 bg-white text-slate-700 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200'}`}>
           {isId ? 'Semua' : 'All'}
         </Link>
         {CATEGORIES.map(item => (
@@ -224,7 +230,7 @@ export default async function NewsIndexPage({ params, searchParams }: PageProps)
       )}
 
       {rest.length > 0 ? (
-        <section className="mt-2">
+        <section className="mt-3">
           <div className="mb-3 flex items-end justify-between gap-3">
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300">
@@ -244,10 +250,10 @@ export default async function NewsIndexPage({ params, searchParams }: PageProps)
               <Link
                 key={article.id}
                 href={buildNewsPath(article.slug)}
-                className="group overflow-hidden rounded-2xl border border-slate-200 bg-white transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-sm dark:border-white/10 dark:bg-slate-900"
+                className="group flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-sm dark:border-white/10 dark:bg-slate-900"
               >
                 <NewsMedia article={article} />
-                <div className="p-4">
+                <div className="flex-1 p-4">
                   <div className="flex flex-wrap items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.1em]">
                     <span className="text-emerald-700 dark:text-emerald-300">{article.category}</span>
                     <span className="text-slate-300">•</span>
