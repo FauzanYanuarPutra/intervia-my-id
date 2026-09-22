@@ -467,6 +467,8 @@ defmodule ChatServiceWeb.RoomChannel do
   defp safe_call_error(:storage_unavailable), do: "room_unavailable"
   defp safe_call_error(:call_no_longer_available), do: "call_no_longer_available"
   defp safe_call_error(:call_not_found), do: "call_not_found"
+  defp safe_call_error(:not_found), do: "call_not_found"
+  defp safe_call_error(:peer_not_found), do: "call_no_longer_available"
   defp safe_call_error(:invalid_call_id), do: "invalid_call_id"
   defp safe_call_error(:invalid_signal), do: "invalid_signal"
   defp safe_call_error(:invalid_call_payload), do: "invalid_call_payload"
