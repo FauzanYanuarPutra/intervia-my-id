@@ -8,12 +8,12 @@ export function CrmLoadingSkeleton() {
     >
       <div className="flex h-full min-h-0">
         <aside className="hidden w-[232px] shrink-0 border-r border-slate-200 bg-white p-3 lg:block">
-          <div className="flex items-center gap-3">
-            <div className="h-11 w-11 animate-pulse rounded-2xl bg-slate-200" />
-            <div className="space-y-1.5">
-              <div className="h-4 w-20 animate-pulse rounded bg-slate-200" />
-              <div className="h-2.5 w-10 animate-pulse rounded bg-slate-100" />
-            </div>
+          <div className="flex h-11 items-center">
+            <img
+              src="/logo.svg"
+              alt="Lajukan"
+              className="h-11 w-auto max-w-[180px] object-contain"
+            />
           </div>
           <div className="mt-4 h-9 animate-pulse rounded-xl bg-slate-100" />
           <div className="mt-4 space-y-1.5">
@@ -25,7 +25,9 @@ export function CrmLoadingSkeleton() {
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <header className="flex h-14 shrink-0 items-center gap-2 border-b border-slate-200 bg-white px-2 sm:px-4 lg:px-6">
-            <div className="h-10 w-10 animate-pulse rounded-xl bg-slate-100 lg:hidden" />
+            <div className="flex h-10 w-10 items-center justify-center lg:hidden">
+              <img src="/logo.svg" alt="Lajukan" className="h-9 w-auto max-w-9 object-cover object-left" />
+            </div>
             <div className="hidden h-7 w-20 animate-pulse rounded-lg bg-slate-200 sm:block" />
             <div className="h-10 min-w-0 flex-1 animate-pulse rounded-xl bg-slate-100" />
             <div className="hidden h-10 w-24 animate-pulse rounded-xl bg-slate-100 sm:block" />
