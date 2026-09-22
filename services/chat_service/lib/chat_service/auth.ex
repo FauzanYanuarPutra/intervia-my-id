@@ -20,7 +20,7 @@ defmodule ChatService.Auth do
         verify_rs256(token)
 
       "HS256" ->
-        if Application.get_env(:chat_service, :jwt_allow_legacy_hs256, true) do
+        if Application.get_env(:chat_service, :jwt_allow_legacy_hs256, false) do
           verify_hs256(token)
         else
           {:error, :legacy_algorithm_disabled}
