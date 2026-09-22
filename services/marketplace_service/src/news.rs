@@ -13,7 +13,7 @@ use std::{net::IpAddr, sync::Arc};
 use uuid::Uuid;
 
 use crate::{
-    auth_claims_from_headers, fetch_user_read_model_brief, has_cms_access, make_slug,
+    auth_claims_from_headers, has_cms_access, make_slug,
     push_notification_best_effort, user_id_from_auth, AppState,
 };
 
@@ -26,6 +26,7 @@ pub(crate) fn router() -> Router<Arc<AppState>> {
         .route("/v1/news/submissions/mine", get(list_my_news_submissions))
         .route("/v1/news/submissions/{id}", patch(update_news_submission))
         .route("/v1/news/editorial/queue", get(list_editorial_queue))
+        .route("/v1/news/editorial/reviewers", get(list_editorial_reviewers))
         .route("/v1/news/{id}/editorial/edit", patch(edit_news_editorial))
         .route("/v1/news/editorial/metrics", get(get_editorial_metrics))
         .route("/v1/news/{id}/editorial", get(list_editorial_history))
@@ -216,6 +217,16 @@ struct NewsSourceReviewRequestRow {
     note: Option<String>,
     created_at: DateTime<Utc>,
     completed_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Serialize, FromRow)]
+struct EditorialReviewerRow {
+    id: Uuid,
+    email: String,
+    username: Option<String>,
+    full_name: Option<String>,
+    is_active: bool,
+    roles: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -773,6 +784,10 @@ async fn has_independent_verified_source_review_tx(
           JOIN news_source_review_events review
             ON review.source_id = source.id
            AND review.to_verification_status = 'verified'
+          JOIN news_source_review_requests request
+            ON request.content_id = source.content_id
+           AND request.requested_reviewer_id = review.reviewer_id
+           AND request.status = 'completed'
           WHERE source.content_id = $1
             AND source.verification_status = 'verified'
             AND review.reviewer_id <> $2
@@ -2338,6 +2353,79 @@ async fn list_editorial_queue(
     }
 }
 
+async fn list_editorial_reviewers(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    let reviewer_id = match cms_reviewer_id(&headers, &state) {
+        Some(id) => id,
+        None => return response_error(StatusCode::FORBIDDEN, "cms access required"),
+    };
+
+    let rows = sqlx::query_as::<_, EditorialReviewerRow>(
+        r#"
+        SELECT
+            u.id,
+            COALESCE(u.email::text, '') AS email,
+            up.username,
+            up.full_name,
+            u.is_active,
+            COALESCE(
+                ARRAY_AGG(DISTINCT r.name) FILTER (WHERE r.name IS NOT NULL),
+                '{}'
+            ) AS roles
+        FROM core.users u
+        LEFT JOIN core.user_profiles up ON up.user_id = u.id
+        LEFT JOIN core.user_roles ur ON ur.user_id = u.id
+        LEFT JOIN roles r ON r.id = ur.role_id
+        WHERE u.id <> $1
+          AND u.deleted_at IS NULL
+          AND u.is_active = TRUE
+          AND u.status = 'active'
+          AND EXISTS (
+              SELECT 1
+              FROM core.user_roles eligible_ur
+              JOIN roles eligible_role ON eligible_role.id = eligible_ur.role_id
+              WHERE eligible_ur.user_id = u.id
+                AND lower(eligible_role.name::text) IN ('admin', 'content_admin', 'super_admin')
+          )
+        GROUP BY u.id, up.username, up.full_name
+        ORDER BY lower(COALESCE(NULLIF(up.full_name, ''), NULLIF(up.username, ''), u.email::text)) ASC,
+                 u.created_at ASC,
+                 u.id ASC
+        LIMIT 200
+        "#,
+    )
+    .bind(reviewer_id)
+    .fetch_all(&state.db)
+    .await;
+
+    match rows {
+        Ok(data) => {
+            let total = data.len();
+            (
+                StatusCode::OK,
+                Json(json!({
+                    "data": data,
+                    "meta": {
+                        "page": 1,
+                        "limit": 200,
+                        "total": total
+                    }
+                })),
+            )
+                .into_response()
+        },
+        Err(error) => {
+            tracing::error!("list_editorial_reviewers query error: {:?}", error);
+            response_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load eligible editorial reviewers",
+            )
+        }
+    }
+}
+
 async fn load_news_for_review(
     tx: &mut Transaction<'_, Postgres>,
     id: Uuid,
@@ -2983,11 +3071,43 @@ async fn create_source_review_request(
             "reviewer must be different from requester",
         );
     }
-    if fetch_user_read_model_brief(&state.db, requested_reviewer_id)
-        .await
-        .is_none()
+    let requested_reviewer_exists = match sqlx::query_scalar::<_, bool>(
+        r#"
+        SELECT EXISTS (
+          SELECT 1
+          FROM core.users u
+          WHERE u.id = $1
+            AND u.deleted_at IS NULL
+            AND u.is_active = TRUE
+            AND u.status = 'active'
+            AND EXISTS (
+              SELECT 1
+              FROM core.user_roles ur
+              JOIN roles r ON r.id = ur.role_id
+              WHERE ur.user_id = u.id
+                AND lower(r.name::text) IN ('admin', 'content_admin', 'super_admin')
+            )
+        )
+        "#,
+    )
+    .bind(requested_reviewer_id)
+    .fetch_one(&state.db)
+    .await
     {
-        return response_error(StatusCode::NOT_FOUND, "reviewer account not found");
+        Ok(value) => value,
+        Err(error) => {
+            tracing::error!("create_source_review_request reviewer eligibility check error: {:?}", error);
+            return response_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to validate reviewer eligibility",
+            );
+        }
+    };
+    if !requested_reviewer_exists {
+        return response_error(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "selected reviewer is not an active CMS reviewer",
+        );
     }
     let note = trimmed(payload.note);
     if note
@@ -3031,6 +3151,31 @@ async fn create_source_review_request(
         return response_error(
             StatusCode::CONFLICT,
             "source review requests are only allowed before publication",
+        );
+    }
+
+    let news_meta = article
+        .metadata
+        .get("news")
+        .and_then(Value::as_object)
+        .cloned()
+        .unwrap_or_default();
+    let article_kind = news_meta
+        .get("article_kind")
+        .and_then(Value::as_str)
+        .unwrap_or("news")
+        .trim()
+        .to_ascii_lowercase();
+    let sensitivity = news_meta
+        .get("sensitivity")
+        .and_then(Value::as_str)
+        .unwrap_or("normal")
+        .trim()
+        .to_ascii_lowercase();
+    if article_kind == "press_release" || sensitivity != "high" {
+        return response_error(
+            StatusCode::CONFLICT,
+            "independent source review is only required for high-sensitivity News/Analysis",
         );
     }
 
