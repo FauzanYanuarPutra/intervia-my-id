@@ -252,6 +252,8 @@ export function FinanceLedger({ businessId, initialEntries, channels = [] }: Pro
   const choices = commonFinanceChoices(direction);
   const channelChoices = financeChannelOptions(channels);
 
+  const liquidCash = summary?.liquid_cash ?? legacySummary.cashMovement;
+  const cashMovement = summary?.cash_movement ?? legacySummary.cashMovement;
   const allocations = summary?.allocations ?? [
     { bucket: 'owner' as const, balance: 0 },
     { bucket: 'team' as const, balance: 0 },
@@ -259,7 +261,7 @@ export function FinanceLedger({ businessId, initialEntries, channels = [] }: Pro
     { bucket: 'operations' as const, balance: 0 },
     { bucket: 'reserve' as const, balance: 0 },
   ];
-  const unallocatedBalance = Math.max(0, summary?.unallocated_cash ?? 0);
+  const unallocatedBalance = Math.max(0, summary?.unallocated_cash ?? Math.max(0, liquidCash));
   const allocationChoiceOptions = [
     { value: 'unallocated', label: `Belum dibagi · ${money.format(unallocatedBalance)}` },
     ...allocations.map(item => ({
@@ -619,9 +621,6 @@ export function FinanceLedger({ businessId, initialEntries, channels = [] }: Pro
     }
   }
 
-  const liquidCash = summary?.liquid_cash ?? legacySummary.cashMovement;
-  const cashMovement = summary?.cash_movement ?? legacySummary.cashMovement;
-
   return (
     <div className="space-y-3">
       <section className="portal-panel p-4 sm:p-5">
@@ -669,7 +668,7 @@ export function FinanceLedger({ businessId, initialEntries, channels = [] }: Pro
           ))}
           <div className="rounded-xl border border-dashed border-portal-line bg-[#fafbf9] p-3">
             <p className="text-[10px] font-bold text-portal-soft">Belum dibagi</p>
-            <p className="mt-1 text-sm font-black text-portal-ink">{money.format(Math.max(0, summary?.unallocated_cash ?? liquidCash))}</p>
+            <p className="mt-1 text-sm font-black text-portal-ink">{money.format(unallocatedBalance)}</p>
           </div>
         </div>
         <details className="mt-3 rounded-xl bg-[#fafbf9] p-3">
@@ -746,7 +745,7 @@ export function FinanceLedger({ businessId, initialEntries, channels = [] }: Pro
                 value={entryAmount ? Number(entryAmount) : null}
                 onValueChange={value => setEntryAmount(value == null ? '' : String(value))}
                 className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-base font-bold text-portal-ink"
-                placeholder="120.000"
+                placeholder="Masukkan nominal"
               />
             </label>
             <div>
@@ -813,7 +812,7 @@ export function FinanceLedger({ businessId, initialEntries, channels = [] }: Pro
           <p className="mt-1 text-xs leading-5 text-portal-soft">Cocok untuk usaha yang sudah lama berjalan. Saldo awal tidak dihitung sebagai omzet atau biaya.</p>
           <div className="mt-4 grid gap-3">
             <div><p className="text-xs font-semibold text-portal-soft">Akun</p><div className="mt-1.5"><ChoiceChips value={openingBalanceAccount} onChange={setOpeningBalanceAccount} ariaLabel="Akun saldo awal" options={openingBalanceAccountOptions} /></div></div>
-            <label className="text-xs font-semibold text-portal-soft">Saldo<RupiahInput min={1} value={openingBalanceAmount ? Number(openingBalanceAmount) : null} onValueChange={value => setOpeningBalanceAmount(value == null ? '' : String(value))} className="mt-1 min-h-11 w-full rounded-xl border border-portal-line bg-white px-3 text-base font-bold" placeholder="12.000.000" /></label>
+            <label className="text-xs font-semibold text-portal-soft">Saldo<RupiahInput min={1} value={openingBalanceAmount ? Number(openingBalanceAmount) : null} onValueChange={value => setOpeningBalanceAmount(value == null ? '' : String(value))} className="mt-1 min-h-11 w-full rounded-xl border border-portal-line bg-white px-3 text-base font-bold" placeholder="Masukkan nominal" /></label>
             <label className="text-xs font-semibold text-portal-soft">Tanggal posisi<input type="date" value={openingBalanceDate} onChange={event => setOpeningBalanceDate(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3 text-sm" /></label>
             <label className="text-xs font-semibold text-portal-soft">Catatan <span className="font-normal">(opsional)</span><input value={openingBalanceNote} onChange={event => setOpeningBalanceNote(event.target.value)} placeholder="Contoh: saldo bank saat mulai memakai Lajukan" className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3 text-sm" /></label>
             <p className="rounded-xl bg-amber-50 px-3 py-2 text-[11px] leading-5 text-amber-800">Catat tiap akun satu kali untuk posisi awal: Kas, Bank, E-wallet, Piutang, atau Utang.</p>
@@ -838,7 +837,7 @@ export function FinanceLedger({ businessId, initialEntries, channels = [] }: Pro
           <div className="mt-4 grid gap-3">
             <div><p className="text-xs font-semibold text-portal-soft">Dari</p><div className="mt-1.5"><ChoiceChips value={transferFrom} onChange={setTransferFrom} ariaLabel="Akun sumber" options={liquidAccountOptions.filter(item => item.value !== transferTo)} /></div></div>
             <div><p className="text-xs font-semibold text-portal-soft">Ke</p><div className="mt-1.5"><ChoiceChips value={transferTo} onChange={setTransferTo} ariaLabel="Akun tujuan" options={liquidAccountOptions.filter(item => item.value !== transferFrom)} /></div></div>
-            <label className="text-xs font-semibold text-portal-soft">Nominal<RupiahInput min={1} value={transferAmount ? Number(transferAmount) : null} onValueChange={value => setTransferAmount(value == null ? '' : String(value))} className="mt-1 min-h-11 w-full rounded-xl border border-portal-line bg-white px-3 text-base font-bold" placeholder="500.000" /></label>
+            <label className="text-xs font-semibold text-portal-soft">Nominal<RupiahInput min={1} value={transferAmount ? Number(transferAmount) : null} onValueChange={value => setTransferAmount(value == null ? '' : String(value))} className="mt-1 min-h-11 w-full rounded-xl border border-portal-line bg-white px-3 text-base font-bold" placeholder="Masukkan nominal" /></label>
             <label className="text-xs font-semibold text-portal-soft">Tanggal<input type="date" value={transferDate} onChange={event => setTransferDate(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3 text-sm" /></label>
             <label className="text-xs font-semibold text-portal-soft">Catatan <span className="font-normal">(opsional)</span><input value={transferNote} onChange={event => setTransferNote(event.target.value)} placeholder="Contoh: setor hasil penjualan ke bank" className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3 text-sm" /></label>
             <button type="button" onClick={transferAccounts} disabled={transferring || transferFrom === transferTo} className="portal-button-primary min-h-11 justify-center disabled:opacity-60">{transferring ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowLeftRight className="h-4 w-4" />} Simpan transfer</button>
@@ -889,7 +888,7 @@ export function FinanceLedger({ businessId, initialEntries, channels = [] }: Pro
                             )
                           }
                           className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3"
-                          placeholder="120.000"
+                          placeholder="Masukkan nominal"
                         />
                       </label>
                     ) : null}

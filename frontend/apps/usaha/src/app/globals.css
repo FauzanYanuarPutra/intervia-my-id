@@ -182,6 +182,9 @@
     color: inherit;
   }
 
+  /* Native <dialog> stays hidden until showModal() is called. */
+  .portal-modal:not([open]) { display: none; }
+
   .portal-modal::backdrop {
     background: rgba(0, 0, 0, 0.56);
     backdrop-filter: blur(1px);
