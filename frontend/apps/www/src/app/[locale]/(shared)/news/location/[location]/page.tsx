@@ -81,7 +81,11 @@ export default async function NewsLocationPage({ params, searchParams }: Props) 
             </Link>
           ))}
         </section>
-      ) : <div className="rounded-[26px] border border-dashed border-slate-300 p-8 text-center text-sm font-semibold text-slate-500 dark:border-white/15">{isId ? 'Belum ada berita untuk wilayah ini.' : 'No news for this location yet.'}</div>
+      ) : (
+        <div className="rounded-[26px] border border-dashed border-slate-300 p-8 text-center text-sm font-semibold text-slate-500 dark:border-white/15">
+          {isId ? 'Belum ada berita untuk wilayah ini.' : 'No news for this location yet.'}
+        </div>
+      )}
       {nextCursor ? (
         <nav aria-label={isId ? 'Navigasi berita daerah' : 'Local news navigation'} className="flex justify-center">
           <Link href={`${buildNewsFacetPath('location', value)}?cursor=${encodeURIComponent(nextCursor)}`} rel="next" className="inline-flex min-h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-5 text-sm font-bold text-slate-700 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200">
