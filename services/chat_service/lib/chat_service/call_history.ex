@@ -11,16 +11,12 @@ defmodule ChatService.CallHistory do
          {:ok, callee_id_bin} <- peer_member(members, caller_id_bin),
          {:ok, started_at} <-
            insert_record(call_id, room_id, caller_id_bin, callee_id_bin, call_type),
-         :ok <-
-           insert_user_rows(
-             call_id,
-             room_id,
-             caller_id_bin,
-             callee_id_bin,
-             call_type,
-             started_at
-           ) do
+         :ok <- insert_user_rows(call_id, room_id, caller_id_bin, callee_id_bin, call_type, started_at) do
       {:ok, started_at}
+    else
+      {:error, reason} ->
+        _ = delete_record(call_id)
+        {:error, reason}
     end
   end
 
@@ -191,6 +187,17 @@ defmodule ChatService.CallHistory do
 
       {:error, reason} ->
         {:error, reason}
+    end
+  end
+
+  defp delete_record(call_id) do
+    Repo.execute(
+      "DELETE FROM call_records_by_id WHERE call_id = ?",
+      [{"uuid", call_id}]
+    )
+    |> case do
+      {:ok, _} -> :ok
+      {:error, reason} -> {:error, reason}
     end
   end
 
