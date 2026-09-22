@@ -58,6 +58,7 @@ import {
   type LucideIcon,
   Search,
   SlidersHorizontal,
+  Store,
   Video,
   Play,
    ExternalLink,
