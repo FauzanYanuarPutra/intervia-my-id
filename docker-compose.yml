@@ -68,6 +68,7 @@ services:
       POSTGRES_DB: marketplace_db
     volumes:
       - marketplace_postgres_data:/var/lib/postgresql/data
+      - ./infrastructure/postgres/marketplace-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d marketplace_db"]
       interval: 10s
