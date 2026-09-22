@@ -314,7 +314,7 @@ export const routes: RouteConfig[] = [
       description: "Lihat detail produk, jasa, kebutuhan, supplier, atau tempat usaha di Lajukan.",
       titleEn: "Listing Details",
       descriptionEn: "View product, service, need, supplier, or business-place details on Lajukan.",
-      topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+      topbar: { isVisibleOnWeb: true, isVisibleOnMobile: false },
       navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
       footer: { isVisibleOnWeb: true, isVisibleOnMobile: false },
