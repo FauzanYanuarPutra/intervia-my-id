@@ -39,6 +39,15 @@ export function NewsMedia({
           loading={priority ? 'eager' : 'lazy'}
           fetchPriority={priority ? 'high' : 'auto'}
           decoding="async"
+          sizes={
+            variant === 'thumb'
+              ? '(max-width: 640px) 96px, 132px'
+              : variant === 'hero'
+                ? '(max-width: 1024px) 100vw, 680px'
+                : variant === 'detail'
+                  ? '(max-width: 1024px) 100vw, 1200px'
+                  : '(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 360px'
+          }
           onError={() => setFailed(true)}
         />
       ) : null}
