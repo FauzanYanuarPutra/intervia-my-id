@@ -62,10 +62,15 @@ function NewsImage({
 
       <div
         data-news-image-fallback
-        className={`absolute inset-0 items-center justify-center bg-[linear-gradient(135deg,#ecfdf5_0%,#f8fafc_100%)] dark:bg-[linear-gradient(135deg,#092016_0%,#0f172a_100%)] ${item.coverImage ? 'hidden' : 'flex'}`}
+        className={`absolute inset-0 items-center justify-between gap-4 bg-[linear-gradient(135deg,#ecfdf5_0%,#f8fafc_58%,#fff7ed_100%)] p-4 dark:bg-[linear-gradient(135deg,#082319_0%,#0f172a_62%,#1c1917_100%)] ${item.coverImage ? 'hidden flex' : 'flex'}`}
         aria-hidden="true"
       >
-        <Newspaper className="h-9 w-9 text-emerald-700/35 dark:text-emerald-300/35" />
+        <div className="min-w-0">
+          <div className="flex h-10 w-10 items-center justify-center rounded-[13px] bg-emerald-700 text-sm font-black text-white shadow-sm">L</div>
+          <p className="mt-2 text-[9px] font-black uppercase tracking-[0.12em] text-emerald-800 dark:text-emerald-300">Lajukan News</p>
+          <p className="mt-1 truncate text-xs font-bold text-slate-600 dark:text-slate-300">{item.category}</p>
+        </div>
+        <Newspaper className="h-9 w-9 shrink-0 text-emerald-700/20 dark:text-emerald-300/20" />
       </div>
 
       <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/45 to-transparent" />
@@ -141,13 +146,13 @@ export function HomeNewsSection({
               <Link
                 key={item.id}
                 href={buildNewsPath(item.slug)}
-                className="group min-w-0 overflow-hidden rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] text-left transition hover:border-[color:var(--app-accent-border)] hover:shadow-sm"
+                className="group flex min-w-0 h-full flex-col overflow-hidden rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] text-left transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:shadow-sm"
                 data-testid="home-news-headline-card"
               >
                 <div className="aspect-[16/9] sm:aspect-[16/8.7] lg:aspect-[16/10]">
                   <NewsImage item={item} priority className="h-full w-full" />
                 </div>
-                <div className="p-3.5 sm:p-4">
+                <div className="flex-1 p-3.5 sm:p-4">
                   <div className="flex flex-wrap items-center gap-1.5">
                     <span className="text-[9px] font-black uppercase tracking-[0.12em] text-emerald-700 dark:text-emerald-300">{item.category}</span>
                     <span className="text-[9px] font-semibold text-[color:var(--app-text-soft)]">{articleKindLabel(item.articleKind, item.language === 'id')}</span>
