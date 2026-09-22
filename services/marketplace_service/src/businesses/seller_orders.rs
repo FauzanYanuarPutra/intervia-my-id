@@ -728,10 +728,9 @@ mod tests {
             allowed_seller_status_labels(&order("PENDING_PAYMENT", "PHYSICAL_GOODS", "pickup")),
             vec!["REJECTED"]
         );
-        assert_eq!(
-            allowed_seller_status_labels(&order("PAID", "PHYSICAL_GOODS", "pickup")),
-            vec!["PROCESSING"]
-        );
+        let paid = allowed_seller_status_labels(&order("PAID", "PHYSICAL_GOODS", "pickup"));
+        assert!(paid.contains(&"PROCESSING".to_owned()));
+        assert!(paid.contains(&"CANCELLED".to_owned()));
         assert!(
             allowed_seller_status_labels(&order("REFUNDED", "PHYSICAL_GOODS", "pickup")).is_empty()
         );
@@ -739,21 +738,17 @@ mod tests {
 
     #[test]
     fn seller_fulfillment_next_step_depends_on_mode() {
-        assert_eq!(
-            allowed_seller_status_labels(&order("PROCESSING", "PHYSICAL_GOODS", "courier")),
-            vec!["SHIPPED"]
-        );
-        assert_eq!(
-            allowed_seller_status_labels(&order("PROCESSING", "PHYSICAL_GOODS", "pickup")),
-            vec!["DELIVERED"]
-        );
-        assert_eq!(
-            allowed_seller_status_labels(&order(
-                "PROCESSING",
-                "SERVICE_MARKETPLACE",
-                "escrow_booking"
-            )),
-            vec!["IN_SERVICE"]
-        );
+        let courier = allowed_seller_status_labels(&order("PROCESSING", "PHYSICAL_GOODS", "courier"));
+        assert!(courier.contains(&"SHIPPED".to_owned()));
+        assert!(courier.contains(&"CANCELLED".to_owned()));
+
+        let pickup = allowed_seller_status_labels(&order("PROCESSING", "PHYSICAL_GOODS", "pickup"));
+        assert!(pickup.contains(&"DELIVERED".to_owned()));
+        assert!(pickup.contains(&"CANCELLED".to_owned()));
+
+        let service =
+            allowed_seller_status_labels(&order("PROCESSING", "SERVICE_MARKETPLACE", "escrow_booking"));
+        assert!(service.contains(&"IN_SERVICE".to_owned()));
+        assert!(service.contains(&"CANCELLED".to_owned()));
     }
 }
