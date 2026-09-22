@@ -228,7 +228,7 @@ export function StorefrontOrderCart({
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <button type="button" onClick={() => setOpen(false)} className="min-h-11 rounded-xl border border-slate-200 px-3 text-sm font-bold text-slate-700 dark:border-slate-700 dark:text-slate-200">{isId ? 'Kembali ke menu' : 'Back to menu'}</button>
-                  <a href={'/' + locale + '/super-app'} className="inline-flex min-h-11 items-center justify-center rounded-xl bg-emerald-700 px-3 text-sm font-black text-white">{isId ? 'Lihat pesanan' : 'View order'}</a>
+                  <a href={'/' + locale + '/super-app/tracker/' + success.order.id} className="inline-flex min-h-11 items-center justify-center rounded-xl bg-emerald-700 px-3 text-sm font-black text-white">{isId ? 'Lihat pesanan' : 'View order'}</a>
                 </div>
               </div>
             ) : (
