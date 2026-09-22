@@ -150,7 +150,7 @@ export default async function NewsIndexPage({ params, searchParams }: PageProps)
 
       {featured ? (
         <section className="grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.65fr)]">
-          <Link href={buildNewsPath(featured.slug)} className="group overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_18px_50px_-42px_rgba(15,23,42,0.38)] dark:border-white/10 dark:bg-slate-900"><NewsMedia article={featured} variant="hero" /><div className="p-5 sm:p-7"><div className="flex items-center gap-2 text-xs font-extrabold text-emerald-700 dark:text-emerald-300"><span>{featured.category}</span>{featured.location ? <><span className="text-slate-300">•</span><span className="text-slate-500">{featured.location}</span></> : null}</div><h2 className="mt-2 text-3xl font-black leading-tight tracking-[-0.04em] text-slate-950 group-hover:text-emerald-800 dark:text-white sm:text-4xl">{featured.title}</h2>{featured.summary ? <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-600 dark:text-slate-300">{featured.summary}</p> : null}<div className="mt-4 flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400"><Clock3 className="h-3.5 w-3.5" />{formatDate(featured.publishedAt, locale)}</div></div></Link>
+          <Link href={buildNewsPath(featured.slug)} className="group overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_18px_50px_-42px_rgba(15,23,42,0.38)] dark:border-white/10 dark:bg-slate-900"><NewsMedia article={featured} variant="hero" priority showLabels={false} /><div className="p-5 sm:p-7"><div className="flex items-center gap-2 text-xs font-extrabold text-emerald-700 dark:text-emerald-300"><span>{featured.category}</span>{featured.location ? <><span className="text-slate-300">•</span><span className="text-slate-500">{featured.location}</span></> : null}</div><h2 className="mt-2 text-3xl font-black leading-tight tracking-[-0.04em] text-slate-950 group-hover:text-emerald-800 dark:text-white sm:text-4xl">{featured.title}</h2>{featured.summary ? <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-600 dark:text-slate-300">{featured.summary}</p> : null}<div className="mt-4 flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400"><Clock3 className="h-3.5 w-3.5" />{formatDate(featured.publishedAt, locale)}</div></div></Link>
           <div className="grid gap-3">
             <Link href="/explore" className="rounded-[26px] border border-slate-200 bg-[#f8f5ee] p-5 dark:border-white/10 dark:bg-white/[0.04]">
               <Store className="h-5 w-5 text-emerald-700 dark:text-emerald-300" />
@@ -188,14 +188,14 @@ export default async function NewsIndexPage({ params, searchParams }: PageProps)
               {isId ? ' artikel' : ' articles'}
             </span>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
             {rest.map(article => (
               <Link
                 key={article.id}
                 href={buildNewsPath(article.slug)}
                 className="group flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-sm dark:border-white/10 dark:bg-slate-900"
               >
-                <NewsMedia article={article} />
+                <NewsMedia article={article} variant="card" showLabels={false} />
                 <div className="flex-1 p-4">
                   <div className="flex flex-wrap items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.1em]">
                     <span className="text-emerald-700 dark:text-emerald-300">{article.category}</span>
@@ -210,7 +210,7 @@ export default async function NewsIndexPage({ params, searchParams }: PageProps)
                       {article.summary}
                     </p>
                   ) : null}
-                  <div className="mt-3 flex min-w-0 items-center justify-between gap-2 text-[10px] font-bold text-slate-400">
+                  <div className="mt-3 flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[10px] font-bold text-slate-400">
                     <span className="min-w-0 truncate">{article.location || article.byline}</span>
                     <span className="shrink-0">{formatDate(article.publishedAt, locale)}</span>
                   </div>
