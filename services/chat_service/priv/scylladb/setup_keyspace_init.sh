@@ -6,6 +6,7 @@ set -e
 HOST="scylla_db"
 CQL_FILE="/scylladb/init.cql"
 RESET_KEYSPACE="${SCYLLA_RESET_KEYSPACE:-0}"
+KEYSPACE="${SCYLLA_KEYSPACE:-laju_chat}"
 
 echo "=== [INIT] Running ScyllaDB keyspace setup script ==="
 
@@ -59,7 +60,11 @@ if [ -d "$MIGRATIONS_DIR" ]; then
     for migration in "$MIGRATIONS_DIR"/*.cql; do
         [ -f "$migration" ] || continue
         echo "Applying Scylla migration: $(basename "$migration")"
-        cqlsh --request-timeout=60 -f "$migration" "$HOST"
+        tmp_migration="$(mktemp)"
+        printf 'USE %s;\n' "$KEYSPACE" > "$tmp_migration"
+        cat "$migration" >> "$tmp_migration"
+        cqlsh --request-timeout=60 -f "$tmp_migration" "$HOST"
+        rm -f "$tmp_migration"
     done
 fi
 
