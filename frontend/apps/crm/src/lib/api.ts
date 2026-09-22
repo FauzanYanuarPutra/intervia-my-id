@@ -997,10 +997,7 @@ export const newsApi = {
   history: async (token: string, id: string) => {
     return fetchJson(
       `${MARKETPLACE_URL}/v1/news/${encodeURIComponent(id)}/editorial`,
-      {
-        method: 'GET',
-        token,
-      },
+      { method: 'GET', token },
     );
   },
 
@@ -1028,40 +1025,6 @@ export const newsApi = {
     });
   },
 
-  reviewers: async (token: string) => {
-    return fetchJson<{
-      data: Array<{
-        id: string;
-        email: string;
-        username?: string | null;
-        full_name?: string | null;
-        is_active: boolean;
-        roles: string[];
-      }>;
-      meta?: { page: number; limit: number; total: number };
-    }>(`${MARKETPLACE_URL}/v1/news/editorial/reviewers`, {
-      method: 'GET',
-      token,
-    });
-  },
-
-  requestIndependentReview: async (
-    token: string,
-    contentId: string,
-    data: { requested_reviewer_id: string; note?: string },
-  ) => {
-    return fetchJson(
-      `${MARKETPLACE_URL}/v1/news/${encodeURIComponent(contentId)}/source-review-requests`,
-      {
-        method: 'POST',
-        token,
-        body: JSON.stringify(data),
-      },
-    );
-  },
-
-
-
   updateSource: async (
     token: string,
     contentId: string,
@@ -1084,43 +1047,8 @@ export const newsApi = {
 
   requestIndependentReview: async (
     token: string,
-    id: string,
-    data: { requested_reviewer_id: string; note?: string },
-  ) => {
-    return fetchJson(
-      `${MARKETPLACE_URL}/v1/news/${encodeURIComponent(id)}/source-review-requests`,
-      {
-        method: 'POST',
-        token,
-        body: JSON.stringify(data),
-      },
-    );
-  },
-
-  reviewers: async (token: string) => {
-    return fetchJson<{
-      data: Array<{
-        id: string;
-        email: string;
-        username?: string | null;
-        full_name?: string | null;
-        is_active: boolean;
-        roles: string[];
-      }>;
-      meta?: { page: number; limit: number; total: number };
-    }>(IDENTITY_API_URL + '/users?limit=100', {
-      method: 'GET',
-      token,
-    });
-  },
-
-  requestIndependentReview: async (
-    token: string,
     contentId: string,
-    data: {
-      requested_reviewer_id: string;
-      note?: string;
-    },
+    data: { requested_reviewer_id: string; note?: string },
   ) => {
     return fetchJson<{
       id: string;
@@ -1132,7 +1060,7 @@ export const newsApi = {
       created_at: string;
       completed_at?: string | null;
     }>(
-      MARKETPLACE_URL + '/v1/news/' + encodeURIComponent(contentId) + '/source-review-requests',
+      `${MARKETPLACE_URL}/v1/news/${encodeURIComponent(contentId)}/source-review-requests`,
       {
         method: 'POST',
         token,
