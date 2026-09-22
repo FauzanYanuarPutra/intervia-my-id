@@ -2205,7 +2205,7 @@ async fn edit_news_editorial(
     .bind(reviewer_id)
     .bind(&action)
     .bind(&current_status)
-.bind(next_editorial_status)
+    .bind(next_editorial_status)
     .bind(&note)
     .execute(&mut *tx)
     .await
