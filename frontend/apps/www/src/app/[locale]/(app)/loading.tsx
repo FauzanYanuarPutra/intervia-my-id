@@ -1,5 +1,5 @@
-import { AppPageSkeleton } from '@/components/system/feedback/RouteSkeletons';
+import { RouteGroupLoadingSkeleton } from '@/components/system/feedback/RouteSkeletons';
 
-export default function AppLoading() {
-  return <AppPageSkeleton />;
+export default function AppRouteLoading() {
+  return <RouteGroupLoadingSkeleton tone="app" />;
 }
