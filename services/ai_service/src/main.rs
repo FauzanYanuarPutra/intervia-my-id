@@ -3324,7 +3324,7 @@ fn env_f64(key: &str, fallback: f64, min: f64, max: f64) -> f64 {
 
 #[cfg(test)]
 mod tests {
-    use super::normalize_vllm_urls;
+    use super::{is_model_unavailable_error, model_list_contains, normalize_vllm_urls};
 
     #[test]
     fn normalizes_openai_compatible_base_url() {
@@ -3340,5 +3340,26 @@ mod tests {
 
         assert_eq!(chat, "https://provider.example/v1/chat/completions");
         assert_eq!(models, "https://provider.example/v1/models");
+    }
+
+    #[test]
+    fn recognizes_ollama_and_openai_model_list_shapes() {
+        let ollama = serde_json::json!({
+            "models": [{"name": "qwen3:4b"}]
+        });
+        let openai = serde_json::json!({
+            "data": [{"id": "qwen3:4b"}]
+        });
+
+        assert!(model_list_contains(&ollama, "qwen3:4b"));
+        assert!(model_list_contains(&openai, "qwen3:4b"));
+        assert!(!model_list_contains(&ollama, "qwen3:8b"));
+    }
+
+    #[test]
+    fn identifies_model_not_found_errors_without_treating_timeouts_as_model_failures() {
+        assert!(is_model_unavailable_error("vllm_http_404: model not found"));
+        assert!(is_model_unavailable_error("unknown model qwen3:8b"));
+        assert!(!is_model_unavailable_error("vllm_timeout: request timed out"));
     }
 }
