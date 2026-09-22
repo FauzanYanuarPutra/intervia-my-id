@@ -2,13 +2,12 @@
 defmodule ChatServiceWeb.SpatialChannel do
   use ChatServiceWeb, :channel
 
-  alias ChatService.{Repo, PresenceCache, SpatialTracker}
+  alias ChatService.SpatialTracker
   alias ChatServiceWeb.Presence
   require Logger
 
   # Radius untuk proximity chat (dalam unit grid, misalnya pixel atau tile)
   @proximity_radius 150.0
-  @update_interval_ms 1000
 
   # Join spatial room (misalnya "spatial:world:1" atau "spatial:lobby")
   @impl true
@@ -28,7 +27,7 @@ defmodule ChatServiceWeb.SpatialChannel do
     })
 
     # Track presence dengan metadata posisi
-    track_spatial_presence(socket, room_id, initial_x, initial_y)
+    track_spatial_presence(socket, initial_x, initial_y)
 
     # Kirim daftar user yang sudah ada di room
     send(self(), {:after_join, room_id})
@@ -77,10 +76,10 @@ defmodule ChatServiceWeb.SpatialChannel do
     })
 
     # Update presence dengan posisi baru
-    track_spatial_presence(socket, room_id, x_float, y_float)
+    track_spatial_presence(socket, x_float, y_float)
 
     # Hitung siapa yang dalam proximity dan broadcast update
-    broadcast_position_update(socket, room_id, user_id, x_float, y_float)
+    broadcast_position_update(socket, user_id, x_float, y_float)
 
     {:reply, {:ok, %{x: x_float, y: y_float}}, socket}
   end
@@ -147,7 +146,7 @@ defmodule ChatServiceWeb.SpatialChannel do
   end
 
   # Helper: Track presence dengan posisi
-  defp track_spatial_presence(socket, room_id, x, y) do
+  defp track_spatial_presence(socket, x, y) do
     Presence.track(socket, socket.assigns.user_id, %{
       x: x,
       y: y,
@@ -158,7 +157,7 @@ defmodule ChatServiceWeb.SpatialChannel do
   end
 
   # Helper: Broadcast posisi update ke semua user di room
-  defp broadcast_position_update(socket, room_id, user_id, x, y) do
+  defp broadcast_position_update(socket, user_id, x, y) do
     payload = %{
       user_id: user_id,
       username: socket.assigns.username,
@@ -172,13 +171,13 @@ defmodule ChatServiceWeb.SpatialChannel do
   end
 
   # Helper: Clamp nilai antara min dan max
-  defp clamp(value, min, max) when value < min, do: min
-  defp clamp(value, min, max) when value > max, do: max
+  defp clamp(value, _min, max) when value > max, do: max
+  defp clamp(value, min, _max) when value < min, do: min
   defp clamp(value, _, _), do: value
 
   # Helper: Parse float dengan fallback
-  defp parse_float(value, default) when is_float(value), do: value
-  defp parse_float(value, default) when is_integer(value), do: value * 1.0
+  defp parse_float(value, _default) when is_float(value), do: value
+  defp parse_float(value, _default) when is_integer(value), do: value * 1.0
 
   defp parse_float(value, default) when is_binary(value) do
     case Float.parse(value) do
