@@ -752,6 +752,27 @@ try {
         }
     }
 
+    # Local AI must be provisioned before the main stack starts. Otherwise
+    # ai_service/www can race Ollama startup and the first Personal AI request
+    # falls into a temporary gateway fallback even though the model is about to
+    # become available.
+    $LocalAiRequested = $RequestedProfiles -contains "local-ai"
+    $OllamaSelected = $LocalAiRequested -or ($Services.Count -eq 0) -or ($Services -contains "ollama")
+    if ($Environment -eq "development" -and $LocalAiRequested -and $OllamaSelected) {
+        Write-Host "Starting Ollama readiness container before application startup..." -ForegroundColor Cyan
+        $OllamaUpArgs = @("up", "-d", "--remove-orphans", "--wait", "--wait-timeout", "180", "ollama")
+        & docker @ComposeArgs @OllamaUpArgs
+        if ($LASTEXITCODE -ne 0) {
+            throw "Ollama container gagal siap sebelum Personal AI provisioning."
+        }
+
+        Write-Host "Provisioning configured Ollama model before application startup..." -ForegroundColor Cyan
+        & $PythonCommand.Source "scripts/config/provision_ollama_models.py" "--env-file" $EnvFile
+        if ($LASTEXITCODE -ne 0) {
+            throw "Model Ollama gagal disiapkan. Periksa koneksi model registry dan kapasitas disk."
+        }
+    }
+
     $UpArgs = @("up", "-d", "--remove-orphans", "--wait", "--wait-timeout", "420")
     if ($Build.IsPresent) {
         # A freshly built image must never keep running behind a stale container
@@ -805,15 +826,6 @@ try {
         exit $UpExitCode
     }
 
-    $LocalAiRequested = $RequestedProfiles -contains "local-ai"
-    $OllamaSelected = $Services.Count -eq 0 -or $Services -contains "ollama"
-    if ($Environment -eq "development" -and $LocalAiRequested -and $OllamaSelected) {
-        Write-Host "Verifying configured Ollama model..." -ForegroundColor Cyan
-        & $PythonCommand.Source "scripts/config/provision_ollama_models.py" "--env-file" $EnvFile
-        if ($LASTEXITCODE -ne 0) {
-            throw "Model Ollama gagal disiapkan. Periksa koneksi registry model dan kapasitas disk."
-        }
-    }
 
     # Caddyfile is bind-mounted. `docker compose up` does not reload an already
     # running Caddy process when only the mounted file content changes. Always
