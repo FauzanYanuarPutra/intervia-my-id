@@ -38,6 +38,18 @@ export default function LocaleLoading() {
           }
         }
 
+        .lajukan-loading-motion {
+          animation: lajukan-logo-breathe 1.8s ease-in-out infinite;
+        }
+
+        .lajukan-loading-orbit {
+          animation: lajukan-logo-orbit 2.4s linear infinite;
+        }
+
+        .lajukan-loading-glow {
+          animation: lajukan-logo-glow 1.8s ease-in-out infinite;
+        }
+
         @media (prefers-reduced-motion: reduce) {
           .lajukan-loading-motion,
           .lajukan-loading-orbit,
