@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import React, { Suspense, useEffect, useState } from 'react';
+import React, { Component, Suspense, useEffect, useState } from 'react';
 import { AuthProvider } from '@/context/AuthContext';
 import { ChatInboxProvider } from '@/context/ChatInboxContext';
 import { NotificationInboxProvider } from '@/context/NotificationInboxContext';
@@ -41,6 +41,30 @@ const GlobalIncomingCallController = dynamic(
 type Props = {
   children: React.ReactNode;
 };
+
+type BridgeBoundaryProps = {
+  children: React.ReactNode;
+};
+
+type BridgeBoundaryState = {
+  failed: boolean;
+};
+
+class BridgeBoundary extends Component<
+  BridgeBoundaryProps,
+  BridgeBoundaryState
+> {
+  state: BridgeBoundaryState = { failed: false };
+
+  static getDerivedStateFromError(): BridgeBoundaryState {
+    return { failed: true };
+  }
+
+  render() {
+    if (this.state.failed) return null;
+    return this.props.children;
+  }
+}
 
 export function Providers({ children }: Props) {
   const [deferredBridgesReady, setDeferredBridgesReady] = useState(false);
@@ -123,10 +147,14 @@ export function Providers({ children }: Props) {
                       {deferredBridgesReady ? <LajukanEventBridge /> : null}
                     </Suspense>
                     {deferredBridgesReady ? (
-                      <BrowserNotificationBridge />
+                      <BridgeBoundary>
+                        <BrowserNotificationBridge />
+                      </BridgeBoundary>
                     ) : null}
                     {deferredBridgesReady ? (
-                      <GlobalIncomingCallController />
+                      <BridgeBoundary>
+                        <GlobalIncomingCallController />
+                      </BridgeBoundary>
                     ) : null}
                     {children}
                   </PageMetaProviderWrapper>
