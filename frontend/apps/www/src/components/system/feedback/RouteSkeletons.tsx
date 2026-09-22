@@ -15,6 +15,157 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
   );
 }
 
+function BrandLoadingMark({ compact = false }: { compact?: boolean }) {
+  return (
+    <div className={cn('flex items-center gap-2.5', compact ? 'gap-2' : '')}>
+      <div className={cn(
+        'grid shrink-0 place-items-center rounded-[12px] border border-emerald-100 bg-white p-1.5 shadow-sm dark:border-emerald-400/20 dark:bg-white/10',
+        compact ? 'h-8 w-8' : 'h-9 w-9',
+      )}>
+        <Image
+          src="/logo.svg"
+          alt="Lajukan"
+          width={96}
+          height={28}
+          priority
+          className={cn(compact ? 'h-4' : 'h-5', 'w-auto object-contain')}
+        />
+      </div>
+      <div className="min-w-0">
+        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300">Lajukan</p>
+        <p className="mt-0.5 truncate text-[10px] font-semibold text-slate-400">Memuat halaman…</p>
+      </div>
+    </div>
+  );
+}
+
+export function RouteGroupLoadingSkeleton({
+  tone = 'shared',
+}: {
+  tone?: 'shared' | 'app' | 'auth';
+} = {}) {
+  const auth = tone === 'auth';
+  const app = tone === 'app';
+
+  return (
+    <main
+      className={cn(
+        'min-h-[100svh] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)]',
+        auth && 'bg-[linear-gradient(180deg,#fff8ef_0%,#f8fbff_62%,#eef6ff_100%)] dark:bg-[linear-gradient(180deg,#020617_0%,#081225_46%,#0f172a_100%)]',
+      )}
+      data-skeleton-route="true"
+      aria-busy="true"
+      aria-label="Memuat Lajukan"
+    >
+      <div className={cn(
+        'mx-auto flex min-h-[100svh] w-full flex-col',
+        auth ? 'max-w-5xl px-3 py-5 sm:px-5 lg:px-8' : 'max-w-[1700px]',
+      )}>
+        {!auth ? (
+          <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between gap-3 border-b border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)]/95 px-3 backdrop-blur sm:px-5 lg:px-6">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <button type="button" aria-hidden="true" tabIndex={-1} className="grid h-9 w-9 place-items-center rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface)] lg:hidden">
+                <span className="h-4 w-4 animate-pulse rounded bg-slate-200" />
+              </button>
+              <BrandLoadingMark compact />
+            </div>
+            <div className="hidden min-w-0 flex-1 items-center justify-end gap-2 sm:flex">
+              <div className="h-9 w-28 animate-pulse rounded-full bg-slate-100 dark:bg-white/10" />
+              <div className="h-9 w-9 animate-pulse rounded-full bg-slate-100 dark:bg-white/10" />
+            </div>
+          </header>
+        ) : null}
+
+        <div className={cn(
+          'grid flex-1 min-h-0 gap-4',
+          auth ? 'grid-cols-1' : app ? 'lg:grid-cols-[76px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,1fr)]' : 'lg:grid-cols-[220px_minmax(0,1fr)]',
+        )}>
+          {!auth ? (
+            <aside className="hidden overflow-hidden border-r border-[color:var(--app-border)] p-3 lg:block">
+              <div className="mb-4 flex items-center gap-2">
+                <div className="h-9 w-9 animate-pulse rounded-xl bg-slate-100 dark:bg-white/10" />
+                <div className={app ? 'hidden xl:block' : 'block'}>
+                  <div className="h-3.5 w-20 animate-pulse rounded bg-slate-200 dark:bg-white/10" />
+                  <div className="mt-1.5 h-2.5 w-12 animate-pulse rounded bg-slate-100 dark:bg-white/5" />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                {Array.from({ length: app ? 8 : 7 }).map((_, index) => (
+                  <div key={index} className={cn('h-9 animate-pulse rounded-xl bg-slate-100 dark:bg-white/5', app && 'xl:h-10')} />
+                ))}
+              </div>
+            </aside>
+          ) : null}
+
+          <section className={cn(
+            'min-w-0',
+            auth ? 'flex items-start justify-center py-5 sm:py-8' : 'p-3 sm:p-5 lg:p-6',
+          )}>
+            {auth ? (
+              <div className="w-full max-w-[760px] overflow-hidden rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-slate-950 sm:p-7">
+                <BrandLoadingMark />
+                <Pulse className="mt-6 h-11 w-full rounded-2xl" />
+                <Pulse className="mt-3 h-11 w-full rounded-2xl" />
+                <Pulse className="mt-4 h-11 w-full rounded-2xl bg-emerald-100/80" />
+                <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                  <Pulse className="h-20 w-full rounded-2xl" />
+                  <Pulse className="h-20 w-full rounded-2xl" />
+                </div>
+              </div>
+            ) : (
+              <div className="mx-auto w-full max-w-[1360px] space-y-4">
+                <section className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <Pulse className="h-3 w-24 rounded-full" />
+                      <Pulse className="mt-2 h-7 w-56 rounded-lg" />
+                      <Pulse className="mt-2 h-3.5 w-full max-w-2xl" />
+                    </div>
+                    <div className="hidden h-12 w-12 animate-pulse rounded-2xl bg-emerald-50 dark:bg-emerald-400/10 sm:block" />
+                  </div>
+                </section>
+
+                <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  {Array.from({ length: 4 }).map((_, index) => (
+                    <div key={index} className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4">
+                      <Pulse className="h-3 w-20 rounded-full" />
+                      <Pulse className="mt-3 h-7 w-24 rounded-lg" />
+                      <Pulse className="mt-2 h-3 w-28 rounded-full" />
+                    </div>
+                  ))}
+                </section>
+
+                <section className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+                  <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 sm:p-5">
+                    <Pulse className="h-4 w-40 rounded" />
+                    <div className="mt-4 space-y-3">
+                      {Array.from({ length: 4 }).map((_, index) => (
+                        <div key={index} className="rounded-xl border border-[color:var(--app-border)] p-3">
+                          <Pulse className="h-3.5 w-2/3 rounded" />
+                          <Pulse className="mt-2 h-3 w-5/6 rounded" />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 sm:p-5">
+                    <Pulse className="h-4 w-32 rounded" />
+                    <div className="mt-4 grid grid-cols-2 gap-2">
+                      <Pulse className="h-16 rounded-xl" />
+                      <Pulse className="h-16 rounded-xl" />
+                      <Pulse className="h-16 rounded-xl" />
+                      <Pulse className="h-16 rounded-xl" />
+                    </div>
+                  </div>
+                </section>
+              </div>
+            )}
+          </section>
+        </div>
+      </div>
+    </main>
+  );
+}
+
 function HeroCard() {
   return (
     <section className="ui-panel ui-hero-panel rounded-[32px] p-6">
