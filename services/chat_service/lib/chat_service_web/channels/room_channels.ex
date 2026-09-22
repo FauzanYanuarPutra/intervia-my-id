@@ -877,17 +877,6 @@ defmodule ChatServiceWeb.RoomChannel do
     end)
   end
 
-  defp to_binary_uuid(nil), do: nil
-
-  defp to_binary_uuid(str),
-    do:
-      case(Ecto.UUID.dump(str),
-        do: (
-          {:ok, b} -> b
-          _ -> nil
-        )
-      )
-
   defp normalize_call_type(v) when is_binary(v) and byte_size(v) <= 16 do
     t = String.downcase(String.trim(v))
     if t in ["video", "voice"], do: t, else: "voice"
