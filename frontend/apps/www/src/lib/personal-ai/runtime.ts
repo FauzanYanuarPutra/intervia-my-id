@@ -717,7 +717,9 @@ async function callAiService(input: {
         break;
       }
 
-      await candidate.body?.cancel().catch(() => undefined);
+      if (candidate.body) {
+        await candidate.body.cancel().catch(() => undefined);
+      }
       await new Promise(resolve => setTimeout(resolve, 350 * attempt));
     } catch (error) {
       lastFetchError = error;
