@@ -122,23 +122,27 @@ export default async function NewsArticlePage({ params }: PageProps) {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }} />
       <NewsAnalytics articleId={article.id} slug={article.slug} category={article.category} />
 
-      <nav aria-label="Breadcrumb">
-        <Link href="/news" className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 hover:border-emerald-200 hover:text-emerald-700 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200">
+      <nav aria-label="Breadcrumb" className="flex items-center justify-between gap-3">
+        <Link href="/news" className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 hover:border-emerald-200 hover:text-emerald-700 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200">
           <ArrowLeft className="h-3.5 w-3.5" />
-          Lajukan News
+          {isId ? 'Kembali ke News' : 'Back to News'}
         </Link>
+        <div className="hidden items-center gap-2 sm:flex">
+          <span className="grid h-8 w-8 place-items-center rounded-[10px] bg-emerald-700 text-xs font-black text-white shadow-sm">L</span>
+          <span className="text-xs font-black text-slate-500 dark:text-slate-400">Lajukan News</span>
+        </div>
       </nav>
 
       <article id="news-article" className="overflow-hidden rounded-[34px] border border-slate-200 bg-white shadow-[0_24px_68px_-50px_rgba(15,23,42,0.38)] dark:border-white/10 dark:bg-slate-900">
-        <header className="bg-[linear-gradient(135deg,#f8fafc_0%,#ecfdf5_56%,#fff7ed_100%)] p-5 dark:bg-[linear-gradient(135deg,#0f172a_0%,#052e24_58%,#1c1917_100%)] sm:p-8 lg:p-10">
+        <header className="bg-[linear-gradient(135deg,#f8fafc_0%,#ecfdf5_56%,#fff7ed_100%)] p-4 dark:bg-[linear-gradient(135deg,#0f172a_0%,#052e24_58%,#1c1917_100%)] sm:p-8 lg:p-10">
           <div className="flex flex-wrap gap-2 text-[11px] font-bold uppercase tracking-[0.14em]">
             <span className="rounded-full bg-emerald-700 px-3 py-1.5 text-white">{article.category}</span>
             {isRetracted ? <span className="rounded-full bg-rose-100 px-3 py-1.5 text-rose-800 dark:bg-rose-400/15 dark:text-rose-200">{isId ? 'Ditarik' : 'Retracted'}</span> : null}
             {article.articleKind === 'press_release' ? <span className="rounded-full bg-amber-100 px-3 py-1.5 text-amber-800 dark:bg-amber-400/15 dark:text-amber-200">{isId ? 'Rilis bisnis' : 'Business release'}</span> : null}
             {article.articleKind === 'analysis' ? <span className="rounded-full bg-sky-100 px-3 py-1.5 text-sky-800 dark:bg-sky-400/15 dark:text-sky-200">{isId ? 'Analisis' : 'Analysis'}</span> : null}
           </div>
-          <h1 className="mt-5 max-w-4xl text-3xl font-bold tracking-[-0.055em] text-slate-950 dark:text-white sm:text-5xl">{article.title}</h1>
-          {!isRetracted && article.summary ? <p className="mt-4 max-w-3xl text-base font-semibold leading-8 text-slate-600 dark:text-slate-300">{article.summary}</p> : null}
+          <h1 className="mt-4 max-w-4xl text-[30px] font-black leading-[1.08] tracking-[-0.055em] text-slate-950 dark:text-white sm:text-5xl">{article.title}</h1>
+          {!isRetracted && article.summary ? <p className="mt-3 max-w-3xl text-sm font-semibold leading-7 sm:text-base sm:leading-8 text-slate-600 dark:text-slate-300">{article.summary}</p> : null}
           {article.coverImage ? (
             <figure className="mt-6 overflow-hidden rounded-[24px] border border-slate-200 bg-slate-100 dark:border-white/10 dark:bg-slate-800">
               <img
@@ -158,7 +162,7 @@ export default async function NewsArticlePage({ params }: PageProps) {
             </figure>
           ) : (
             <div className="mt-6 overflow-hidden rounded-[24px] border border-emerald-100 bg-[linear-gradient(135deg,#ecfdf5_0%,#f8fafc_58%,#fff7ed_100%)] p-5 dark:border-white/10 dark:bg-[linear-gradient(135deg,#06261b_0%,#0f172a_62%,#1c1917_100%)] sm:p-7">
-              <div className="flex min-h-40 items-center justify-between gap-6">
+              <div className="flex min-h-36 items-center justify-between gap-5 sm:min-h-40">
                 <div className="min-w-0">
                   <span className="inline-flex rounded-full bg-white/85 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800 dark:bg-slate-950/70 dark:text-emerald-300">
                     Lajukan News
@@ -226,7 +230,7 @@ export default async function NewsArticlePage({ params }: PageProps) {
           ) : null}
         </header>
 
-        <div className="grid gap-8 p-5 sm:p-8 lg:grid-cols-[minmax(0,1fr)_300px] lg:p-10">
+        <div className="grid gap-6 p-4 sm:p-7 lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-8 lg:p-10">
           <div className="min-w-0">
             {isRetracted ? (
               <section className="rounded-[24px] border border-rose-200 bg-rose-50 p-5 dark:border-rose-400/20 dark:bg-rose-400/10">
@@ -242,13 +246,13 @@ export default async function NewsArticlePage({ params }: PageProps) {
                 {article.richBody ? (
                   <div className="prose prose-slate max-w-none text-[15px] leading-8 dark:prose-invert [&_a]:text-emerald-700 [&_a]:font-semibold [&_blockquote]:border-emerald-500 [&_img]:rounded-2xl [&_img]:shadow-sm" dangerouslySetInnerHTML={{ __html: article.richBody }} />
                 ) : (
-                  <div className="space-y-5 text-[15px] font-medium leading-8 text-slate-700 dark:text-slate-200">
+                  <div className="space-y-5 text-[15px] font-medium leading-8 sm:text-[15.5px] text-slate-700 dark:text-slate-200">
                     {paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}
                   </div>
                 )}
 
             {article.businessImpact ? (
-              <section className="mt-8 rounded-[24px] border border-emerald-200 bg-emerald-50 p-5 dark:border-emerald-400/20 dark:bg-emerald-400/10">
+              <section className="mt-6 rounded-[22px] border border-emerald-200 bg-emerald-50 p-5 dark:border-emerald-400/20 dark:bg-emerald-400/10">
                 <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-300">{isId ? 'Dampak untuk pelaku usaha' : 'Impact for business owners'}</p>
                 <p className="mt-3 text-sm font-semibold leading-7 text-emerald-950 dark:text-emerald-100">{article.businessImpact}</p>
               </section>
@@ -279,7 +283,7 @@ export default async function NewsArticlePage({ params }: PageProps) {
           </div>
 
           <aside className="space-y-3">
-            <div className="rounded-[24px] border border-emerald-100 bg-emerald-50/60 p-5 dark:border-emerald-400/15 dark:bg-emerald-400/5">
+            <div className="rounded-[20px] border border-emerald-100 bg-emerald-50/60 p-4 sm:p-5 dark:border-emerald-400/15 dark:bg-emerald-400/5">
               <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-300">
                 {isId ? 'Ringkasan artikel' : 'Article snapshot'}
               </p>
@@ -300,7 +304,7 @@ export default async function NewsArticlePage({ params }: PageProps) {
                 </div>
               </dl>
             </div>
-            <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5 dark:border-white/10 dark:bg-white/[0.04]">
+            <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-4 sm:p-5 dark:border-white/10 dark:bg-white/[0.04]">
               <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">{isId ? 'Tentang publikasi' : 'About this publication'}</p>
               <p className="mt-3 text-sm font-semibold leading-6 text-slate-700 dark:text-slate-200">
                 {isRetracted
@@ -310,12 +314,12 @@ export default async function NewsArticlePage({ params }: PageProps) {
                     : (isId ? 'Artikel ini diterbitkan melalui alur editorial Lajukan News. Koreksi material dicatat pada artikel.' : 'This article is published through the Lajukan News editorial workflow. Material corrections are recorded on the article.')}
               </p>
             </div>
-            <Link href="/blog" data-news-action="related_clicked" className="block rounded-[24px] border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-slate-900">
+            <Link href="/blog" data-news-action="related_clicked" className="block rounded-[20px] border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-slate-900">
               <BookOpenText className="h-5 w-5 text-emerald-700 dark:text-emerald-300" />
               <p className="mt-3 font-bold text-slate-950 dark:text-white">{isId ? 'Pelajari topiknya' : 'Learn the topic'}</p>
               <p className="mt-2 text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">{isId ? 'Buka panduan evergreen Lajukan untuk konteks dan cara menerapkannya ke usaha.' : 'Open evergreen Lajukan guides for context and practical application.'}</p>
             </Link>
-            <Link href="/explore" data-news-action="related_clicked" className="block rounded-[24px] border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-slate-900">
+            <Link href="/explore" data-news-action="related_clicked" className="block rounded-[20px] border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-slate-900">
               <Store className="h-5 w-5 text-emerald-700 dark:text-emerald-300" />
               <p className="mt-3 font-bold text-slate-950 dark:text-white">{isId ? 'Cari produk, jasa, dan supplier' : 'Find products, services, and suppliers'}</p>
             </Link>
