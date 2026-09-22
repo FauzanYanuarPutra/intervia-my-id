@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { ArrowRight, BarChart3, Building2, Clock3, Newspaper, Search, Send, Store, TrendingUp } from 'lucide-react';
+import { ArrowRight, Building2, Clock3, Newspaper, Search, Send, Store, TrendingUp } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { buildNewsPath, buildNewsUrl, getPublishedNews } from '@/lib/news';
 
@@ -62,6 +62,62 @@ function formatDate(value: string, locale: string) {
   }).format(new Date(value));
 }
 
+
+function articleKindLabel(
+  kind: LajukanNewsArticle['articleKind'],
+  isId: boolean,
+) {
+  if (kind === 'analysis') return isId ? 'Analisis' : 'Analysis';
+  if (kind === 'press_release') return isId ? 'Rilis bisnis' : 'Business release';
+  return isId ? 'Berita' : 'News';
+}
+
+function NewsMedia({
+  article,
+  variant = 'card',
+}: {
+  article: LajukanNewsArticle;
+  variant?: 'hero' | 'card' | 'thumb';
+}) {
+  const sizeClass =
+    variant === 'hero'
+      ? 'aspect-[16/8] sm:aspect-[16/7]'
+      : variant === 'thumb'
+        ? 'aspect-[4/3]'
+        : 'aspect-[16/10]';
+
+  if (!article.coverImage) {
+    return (
+      <div className={'relative overflow-hidden ' + sizeClass + ' bg-[linear-gradient(135deg,#ecfdf5_0%,#f8fafc_54%,#fff7ed_100%)] dark:bg-[linear-gradient(135deg,#082319_0%,#0f172a_62%,#1c1917_100%)]'}>
+        <div className="absolute inset-0 flex items-center justify-between gap-4 p-5 sm:p-7">
+          <div className="min-w-0">
+            <span className="inline-flex rounded-full bg-white/80 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-800 dark:bg-slate-950/70 dark:text-emerald-300">
+              Lajukan News
+            </span>
+            <p className="mt-2 truncate text-sm font-black text-slate-700 dark:text-slate-200">
+              {article.category}
+            </p>
+          </div>
+          <Newspaper className="h-9 w-9 shrink-0 text-emerald-700/25 dark:text-emerald-300/25" />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={'relative overflow-hidden bg-slate-100 dark:bg-slate-800 ' + sizeClass}>
+      <img
+        src={article.coverImage}
+        alt=""
+        className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.025]"
+        loading={variant === 'hero' ? 'eager' : 'lazy'}
+        decoding="async"
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+    </div>
+  );
+}
+
 function buildNewsIndexHref(filters: {
   category?: string;
   query?: string;
@@ -121,16 +177,7 @@ export default async function NewsIndexPage({ params, searchParams }: PageProps)
 
       {featured ? (
         <section className="grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.65fr)]">
-          <Link href={buildNewsPath(featured.slug)} className="group overflow-hidden border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-900">{featured.coverImage ? <div className="aspect-[16/9] overflow-hidden bg-slate-100 dark:bg-slate-800"><img
-                src={featured.coverImage}
-                alt={featured.title}
-                className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.02]"
-                loading="eager"
-                onError={event => {
-                  event.currentTarget.onerror = null;
-                  event.currentTarget.src = '/opengraph-image.png';
-                }}
-              /></div> : <div className="flex aspect-[16/9] items-end bg-slate-100 p-5 dark:bg-slate-800"><span className="text-xs font-extrabold uppercase tracking-[0.16em] text-slate-400">Lajukan News</span></div>}<div className="p-5 sm:p-7"><div className="flex items-center gap-2 text-xs font-extrabold text-emerald-700 dark:text-emerald-300"><span>{featured.category}</span>{featured.location ? <><span className="text-slate-300">•</span><span className="text-slate-500">{featured.location}</span></> : null}</div><h2 className="mt-2 text-3xl font-black leading-tight tracking-[-0.04em] text-slate-950 group-hover:text-emerald-800 dark:text-white sm:text-4xl">{featured.title}</h2>{featured.summary ? <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-600 dark:text-slate-300">{featured.summary}</p> : null}<div className="mt-4 flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400"><Clock3 className="h-3.5 w-3.5" />{formatDate(featured.publishedAt, locale)}</div></div></Link>
+          <Link href={buildNewsPath(featured.slug)} className="group overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_18px_50px_-42px_rgba(15,23,42,0.38)] dark:border-white/10 dark:bg-slate-900"><NewsMedia article={featured} variant="hero" /><div className="p-5 sm:p-7"><div className="flex items-center gap-2 text-xs font-extrabold text-emerald-700 dark:text-emerald-300"><span>{featured.category}</span>{featured.location ? <><span className="text-slate-300">•</span><span className="text-slate-500">{featured.location}</span></> : null}</div><h2 className="mt-2 text-3xl font-black leading-tight tracking-[-0.04em] text-slate-950 group-hover:text-emerald-800 dark:text-white sm:text-4xl">{featured.title}</h2>{featured.summary ? <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-600 dark:text-slate-300">{featured.summary}</p> : null}<div className="mt-4 flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400"><Clock3 className="h-3.5 w-3.5" />{formatDate(featured.publishedAt, locale)}</div></div></Link>
           <div className="grid gap-3">
             <Link href="/explore" className="rounded-[26px] border border-slate-200 bg-[#f8f5ee] p-5 dark:border-white/10 dark:bg-white/[0.04]">
               <Store className="h-5 w-5 text-emerald-700 dark:text-emerald-300" />
@@ -153,7 +200,7 @@ export default async function NewsIndexPage({ params, searchParams }: PageProps)
       )}
 
       {rest.length > 0 ? (
-        <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]"><div><div className="mb-4 border-b-2 border-slate-950 pb-2 dark:border-white"><h2 className="text-xl font-black text-slate-950 dark:text-white">{isId ? 'Berita terbaru' : 'Latest news'}</h2></div><div className="divide-y divide-slate-200 dark:divide-white/10">{rest.map(article => <Link key={article.id} href={buildNewsPath(article.slug)} className="group grid gap-4 py-5 sm:grid-cols-[180px_minmax(0,1fr)]"><div className="aspect-[16/10] overflow-hidden bg-slate-100 dark:bg-slate-800">{article.coverImage ? <img src={article.coverImage} alt="" className="h-full w-full object-cover transition group-hover:scale-[1.02]" loading="lazy" /> : <div className="flex h-full items-end p-3 text-[10px] font-extrabold uppercase tracking-[0.14em] text-slate-400">Lajukan News</div>}</div><div className="min-w-0"><div className="text-xs font-extrabold text-emerald-700 dark:text-emerald-300">{article.category}</div><h3 className="mt-1 text-xl font-extrabold leading-7 tracking-[-0.025em] text-slate-950 group-hover:text-emerald-800 dark:text-white">{article.title}</h3>{article.summary ? <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-600 dark:text-slate-300">{article.summary}</p> : null}<p className="mt-3 text-xs font-semibold text-slate-500">{formatDate(article.publishedAt, locale)}{article.location ? ` · ${article.location}` : ''}</p></div></Link>)}</div></div><aside className="hidden lg:block"><div className="sticky top-20 border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-slate-900"><p className="text-xs font-extrabold uppercase tracking-[0.14em] text-slate-500">{isId ? 'Tentang Lajukan News' : 'About Lajukan News'}</p><p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">{isId ? 'Kiriman komunitas melewati review editorial sebelum diterbitkan. Sumber dan koreksi material dicatat.' : 'Community submissions go through editorial review before publication. Sources and material corrections are recorded.'}</p></div></aside></section>
+        <section className="mt-2"><div className="mb-3 flex items-end justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300">{isId ? 'Update' : 'Updates'}</p><h2 className="mt-1 text-xl font-black tracking-[-0.03em] text-slate-950 dark:text-white">{isId ? 'Berita terbaru' : 'Latest news'}</h2></div><span className="text-xs font-bold text-slate-400">{rest.length}{isId ? ' artikel' : ' articles'}</span></div><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{rest.map(article => <Link key={article.id} href={buildNewsPath(article.slug)} className="group overflow-hidden rounded-2xl border border-slate-200 bg-white transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-sm dark:border-white/10 dark:bg-slate-900"><NewsMedia article={article} /><div className="p-4"><div className="flex flex-wrap items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.1em]"><span className="text-emerald-700 dark:text-emerald-300">{article.category}</span><span className="text-slate-300">•</span><span className="text-slate-400">{articleKindLabel(article.articleKind, isId)}</span></div><h3 className="mt-1.5 line-clamp-3 text-base font-black leading-6 tracking-[-0.02em] text-slate-950 group-hover:text-emerald-800 dark:text-white dark:group-hover:text-emerald-300">{article.title}</h3>{article.summary ? <p className="mt-2 line-clamp-3 text-xs leading-5 text-slate-600 dark:text-slate-300">{article.summary}</p> : null}<div className="mt-3 flex items-center justify-between gap-2 text-[10px] font-bold text-slate-400"><span className="truncate">{article.location || article.byline}</span><span className="shrink-0">{formatDate(article.publishedAt, locale)}</span></div></div></Link>)}</div></div><aside className="hidden lg:block"><div className="sticky top-20 border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-slate-900"><p className="text-xs font-extrabold uppercase tracking-[0.14em] text-slate-500">{isId ? 'Tentang Lajukan News' : 'About Lajukan News'}</p><p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">{isId ? 'Kiriman komunitas melewati review editorial sebelum diterbitkan. Sumber dan koreksi material dicatat.' : 'Community submissions go through editorial review before publication. Sources and material corrections are recorded.'}</p></div></aside></section>
       ) : null}
 
       {nextCursor ? (
