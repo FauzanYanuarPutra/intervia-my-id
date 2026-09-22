@@ -747,6 +747,8 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
       MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:-}
       CHAT_MEDIA_ALLOWED_ORIGINS: ${CHAT_MEDIA_ALLOWED_ORIGINS:-}
+      INTERNAL_PUSH_URL: ${INTERNAL_PUSH_URL:-http://www:3000/api/internal/notifications/call}
+      INTERNAL_PUSH_SECRET: ${INTERNAL_PUSH_SECRET:-}
     depends_on:
       scylla_keyspace_setup: { condition: service_completed_successfully }
       redis_cache: { condition: service_healthy }
@@ -899,6 +901,10 @@ services:
       INTERNAL_COMMUNITY_URL: http://community_service:8082
       COMMUNITY_SERVICE_URL: http://community_service:8082
       INTERNAL_CHAT_URL: http://chat_service:4000
+      PUSH_DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@domain_db:5432/profile_db
+      INTERNAL_PUSH_SECRET: ${INTERNAL_PUSH_SECRET:-}
+      WEB_PUSH_VAPID_PRIVATE_KEY: ${WEB_PUSH_VAPID_PRIVATE_KEY:-}
+      WEB_PUSH_VAPID_SUBJECT: ${WEB_PUSH_VAPID_SUBJECT:-mailto:admin@lajukan.com}
       INTERNAL_AI_URL: http://ai_service:8080
       AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN}
       AI_LEARNING_ENABLED: ${AI_LEARNING_ENABLED:-false}
@@ -1077,68 +1083,5 @@ services:
       - "80:80"
       - "443:443"
     depends_on:
-      - www
-      - usaha
-      - cms
-      - crm
-    networks: [edge, app]
-    logging: *default-logging
+      domain_db: { condition: service_healthy }
 
-  cloudflared:
-    image: ${CLOUDFLARED_IMAGE:-cloudflare/cloudflared:2026.7.3}
-    profiles: [tunnel]
-    restart: unless-stopped
-    command:
-      - tunnel
-      - --no-autoupdate
-      - --loglevel
-      - info
-      - --metrics
-      - 0.0.0.0:2000
-      - run
-    environment:
-      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
-    expose: ["2000"]
-    depends_on:
-      caddy: { condition: service_started }
-    networks: [edge]
-    logging: *default-logging
-
-  mailhog:
-    profiles: [devtools]
-    image: mailhog/mailhog:v1.0.1
-    restart: unless-stopped
-    expose: ["1025", "8025"]
-    networks: [app]
-    logging: *default-logging
-
-networks:
-  edge:
-    driver: bridge
-  app:
-    driver: bridge
-  cache:
-    driver: bridge
-    internal: true
-  media:
-    driver: bridge
-    internal: true
-  data:
-    driver: bridge
-    internal: true
-
-volumes:
-  identity_postgres_data:
-  domain_postgres_data:
-  community_postgres_data:
-  marketplace_postgres_data:
-  redis_data:
-  rabbitmq_data:
-  meili_data:
-  minio_data:
-  scylla_data:
-  community_uploads:
-  ollama_data:
-  caddy_data:
-  caddy_config:
-  www_runtime:
