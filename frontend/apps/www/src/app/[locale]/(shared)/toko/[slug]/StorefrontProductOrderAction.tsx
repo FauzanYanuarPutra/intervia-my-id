@@ -11,6 +11,7 @@ import {
 import { parseStorefrontModifierGroups } from '@/lib/super-app/storefront-product-modifiers';
 import { loadStorefrontProductCustomization } from '@/lib/super-app/storefront-product-customization-client';
 import { StorefrontProductConfigurator } from './StorefrontProductConfigurator';
+import { STOREFRONT_CART_EVENT, type StorefrontCartAddDetail } from './StorefrontOrderCart';
 
 type StorefrontProductOrderActionProps = {
   storeId: string;
@@ -18,6 +19,8 @@ type StorefrontProductOrderActionProps = {
   productName: string;
   productPriceCents?: number;
   productMetadata?: Record<string, unknown>;
+  productPriceCents?: number;
+  cartEnabled?: boolean;
   onlineOrderEnabled: boolean;
   productAvailable: boolean;
   isId: boolean;
@@ -82,6 +85,8 @@ export function StorefrontProductOrderAction({
   productMetadata,
   onlineOrderEnabled,
   productAvailable,
+  productPriceCents = 0,
+  cartEnabled = false,
   isId,
   variant = 'default',
 }: StorefrontProductOrderActionProps) {
@@ -109,8 +114,31 @@ export function StorefrontProductOrderAction({
   const canOrder = onlineOrderEnabled && productAvailable;
   const locked = state.phase === 'submitting' || state.phase === 'success' || loadingCustomization;
 
+  function addLinesToCart(lines: StorefrontOrderLineInput[], estimatedUnitPriceCents = productPriceCents) {
+    if (!lines.length) return;
+    for (const line of lines) {
+      const detail: StorefrontCartAddDetail = {
+        storeId,
+        productId: line.productId,
+        productName,
+        quantity: line.quantity,
+        unitPriceCents: productPriceCents,
+        estimatedUnitPriceCents,
+        selectedOptions: line.selectedOptions,
+        note: line.note,
+      };
+      window.dispatchEvent(new CustomEvent(STOREFRONT_CART_EVENT, { detail }));
+    }
+    setState({ phase: 'success', bundle: null as never });
+    setConfigOpen(false);
+  }
+
   async function submitLines(lines: StorefrontOrderLineInput[]) {
     if (!canOrder || submittingRef.current || !lines.length) return;
+    if (cartEnabled) {
+      addLinesToCart(lines);
+      return;
+    }
     submittingRef.current = true;
     setState({ phase: 'submitting' });
     try {
@@ -131,7 +159,7 @@ export function StorefrontProductOrderAction({
     }
   }
 
-  async function handleOrder() {
+   {
     if (!canOrder || locked || submittingRef.current) return;
     setState({ phase: 'idle' });
 
@@ -165,7 +193,7 @@ export function StorefrontProductOrderAction({
     : !productAvailable
       ? isId ? 'Produk ini belum tersedia untuk dipesan.' : 'This product is not currently available to order.'
       : null;
-  const idleLabel = compact ? (isId ? 'Pesan' : 'Order') : groups.length ? (isId ? 'Pilih & pesan' : 'Choose & order') : (isId ? 'Pesan 1 produk' : 'Order 1 item');
+  const idleLabel = cartEnabled ? (isId ? 'Tambah' : 'Add') : compact ? (isId ? 'Pesan' : 'Order') : groups.length ? (isId ? 'Pilih & pesan' : 'Choose & order') : (isId ? 'Pesan 1 produk' : 'Order 1 item');
 
   return (
     <div data-variant={variant} className={compact ? 'mt-2' : 'mt-3 border-t border-slate-100 pt-3 dark:border-slate-800'}>
@@ -181,12 +209,12 @@ export function StorefrontProductOrderAction({
           : 'inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 px-3 text-sm font-bold text-white transition hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600 dark:disabled:bg-slate-700 dark:disabled:text-slate-300'}
       >
         {state.phase === 'submitting' || loadingCustomization ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : state.phase === 'success' ? <CheckCircle2 className="h-4 w-4" aria-hidden="true" /> : <ShoppingBag className="h-4 w-4" aria-hidden="true" />}
-        {loadingCustomization ? (isId ? 'Membuka…' : 'Opening…') : state.phase === 'submitting' ? (isId ? 'Membuat pesanan…' : 'Creating order…') : state.phase === 'success' ? (isId ? 'Pesanan dibuat' : 'Order created') : idleLabel}
+        {loadingCustomization ? (isId ? 'Membuka…' : 'Opening…') : state.phase === 'submitting' ? (isId ? 'Membuat pesanan…' : 'Creating order…') : state.phase === 'success' ? (cartEnabled ? (isId ? 'Ditambahkan' : 'Added') : (isId ? 'Pesanan dibuat' : 'Order created')) : idleLabel}
       </button>
 
       {disabledReason ? <p className="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">{disabledReason}</p> : null}
       {state.phase === 'error' && !configOpen ? <p role="alert" className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold leading-5 text-rose-700 dark:bg-rose-950/40 dark:text-rose-200">{state.message}</p> : null}
-      {state.phase === 'success' ? (
+      {state.phase === 'success' && !cartEnabled ? (
         <div role="status" data-testid="storefront-order-success" className="mt-2 rounded-xl bg-emerald-50 px-3 py-2.5 text-xs leading-5 text-emerald-900 dark:bg-emerald-950/45 dark:text-emerald-100">
           <p className="font-extrabold">{isId ? 'Referensi pesanan' : 'Order reference'}: <span className="font-mono">{state.bundle.order.order_number}</span></p>
           <p className="mt-0.5">{isId ? 'Total' : 'Total'}: <strong>{formatCanonicalAmount(state.bundle.order.total_amount, state.bundle.order.currency, isId)}</strong></p>
