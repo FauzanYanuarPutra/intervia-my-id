@@ -48,6 +48,17 @@ function CardGrid({ count = 3 }: { count?: number }) {
 export function LocaleRouteSkeleton() {
   return (
     <ShellFrame>
+      <div className="flex items-center gap-2.5 px-1">
+        <div className="grid h-9 w-9 place-items-center rounded-[12px] bg-emerald-700 text-sm font-black text-white shadow-sm">
+          L
+        </div>
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">
+            Lajukan
+          </p>
+          <p className="text-[10px] font-semibold text-slate-400">Memuat halaman…</p>
+        </div>
+      </div>
       <HeroCard />
       <CardGrid />
     </ShellFrame>
