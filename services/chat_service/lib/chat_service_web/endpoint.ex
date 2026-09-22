@@ -45,7 +45,7 @@ defmodule ChatServiceWeb.Endpoint do
                               "//localhost:3002"
                             ]
 
- socket("/socket", ChatServiceWeb.UserSocket,
+  socket("/socket", ChatServiceWeb.UserSocket,
     websocket: [
       check_origin: @socket_allowed_origins,
       connect_info: [:peer_data, :x_headers],
