@@ -105,8 +105,8 @@ export function HomeNewsSection({
     >
       <div className="flex min-h-9 items-center justify-between gap-3 px-3 sm:px-4 md:px-5">
         <div className="flex min-w-0 items-center gap-2.5">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[12px] bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 dark:ring-emerald-900/60">
-            <Newspaper className="h-4 w-4" />
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[12px] bg-emerald-700 text-[12px] font-black text-white shadow-sm">
+            L
           </span>
           <div className="min-w-0">
             <div className="flex min-w-0 items-center gap-2">
