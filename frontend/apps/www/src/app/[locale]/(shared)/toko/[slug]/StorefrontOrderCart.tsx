@@ -187,6 +187,7 @@ export function StorefrontOrderCart({
 
   return (
     <>
+      {lines.length ? <div className="h-24" aria-hidden="true" /> : null}
       {lines.length ? (
         <div className="fixed inset-x-0 bottom-0 z-[70] px-3 pb-[max(.75rem,env(safe-area-inset-bottom))] sm:px-4">
           <div className="mx-auto flex w-full max-w-[960px] items-center gap-3 rounded-2xl border border-emerald-200 bg-white/95 px-3 py-2.5 shadow-[0_14px_40px_-18px_rgba(15,23,42,.45)] backdrop-blur dark:border-emerald-900 dark:bg-slate-900/95">
