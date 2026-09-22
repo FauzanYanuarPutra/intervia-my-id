@@ -366,6 +366,35 @@ export function HomePageSkeleton() {
           ))}
         </div>
       </section>
+
+      <section className="ui-panel rounded-[22px] p-3 sm:p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <Pulse className="h-9 w-9 rounded-xl" />
+            <div>
+              <Pulse className="h-4 w-24 rounded-full" />
+              <Pulse className="mt-1.5 h-3 w-40 rounded-full" />
+            </div>
+          </div>
+          <Pulse className="h-8 w-20 rounded-full" />
+        </div>
+        <div className="mt-3 hidden gap-3 sm:grid sm:grid-cols-2">
+          <article className="overflow-hidden rounded-[18px] border border-[color:var(--app-border)]">
+            <Pulse className="aspect-[16/10] w-full rounded-none" />
+            <div className="p-4">
+              <Pulse className="h-3 w-20 rounded-full" />
+              <Pulse className="mt-2 h-6 w-4/5 rounded-lg" />
+              <SkeletonBlock lines={2} className="mt-2" />
+            </div>
+          </article>
+          <div className="grid gap-2">
+            {[0,1,2].map(index => <div key={index} className="flex gap-3 rounded-[16px] border border-[color:var(--app-border)] p-2.5"><Pulse className="h-20 w-24 shrink-0 rounded-xl" /><div className="min-w-0 flex-1"><Pulse className="h-3 w-20 rounded-full" /><Pulse className="mt-2 h-4 w-full" /><Pulse className="mt-1 h-3 w-3/4 rounded-full" /></div></div>)}
+          </div>
+        </div>
+        <div className="mt-3 flex gap-2 overflow-hidden sm:hidden">
+          {[0,1,2].map(index => <div key={index} className="w-[76vw] shrink-0 overflow-hidden rounded-[16px] border border-[color:var(--app-border)]"><Pulse className="aspect-[16/9] w-full rounded-none" /><div className="p-3"><Pulse className="h-3 w-20 rounded-full" /><Pulse className="mt-2 h-5 w-full rounded-lg" /></div></div>)}
+        </div>
+      </section>
     </div>
   );
 }
@@ -2261,24 +2290,68 @@ export function DriverConsoleSkeleton({ className }: { className?: string }) {
     
 export function NewsListSkeleton() {
   return (
-    <main className="page-shell page-rhythm pb-12 pt-6" data-skeleton-route="true" aria-busy="true">
-      <section className="border-y border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-slate-950 sm:p-6">
-        <Pulse className="h-3 w-24 rounded-full" />
-        <Pulse className="mt-3 h-9 w-72 max-w-full rounded-xl sm:h-11 sm:w-[460px]" />
+    <main className="page-shell page-rhythm pb-12 pt-4 sm:pt-6" data-skeleton-route="true" aria-busy="true" aria-label="Memuat Lajukan News">
+      <section className="overflow-hidden rounded-[28px] border border-emerald-100 bg-[linear-gradient(135deg,#f0fdf4_0%,#ffffff_48%,#fffaf2_100%)] p-5 dark:border-white/10 dark:bg-slate-950 sm:p-7">
+        <Pulse className="h-6 w-28 rounded-full" />
+        <Pulse className="mt-3 h-10 w-full max-w-2xl rounded-xl sm:h-12" />
         <SkeletonBlock lines={2} className="mt-3 max-w-2xl" />
-        <div className="mt-4 flex flex-wrap gap-2"><Pulse className="h-10 w-28 rounded-xl" /><Pulse className="h-10 w-24 rounded-xl" /></div>
+        <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:max-w-[320px] lg:grid-cols-1">
+          <Pulse className="h-11 w-full rounded-xl" />
+          <Pulse className="h-11 w-full rounded-xl" />
+        </div>
       </section>
-      <div className="mt-4 flex gap-2"><Pulse className="h-11 flex-1 rounded-xl" /><Pulse className="h-11 w-24 rounded-xl" /></div>
-      <section className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.65fr)]">
-        <article className="overflow-hidden rounded-[30px] border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-900">
-          <Pulse className="aspect-[16/9] w-full rounded-none" />
-          <div className="p-5 sm:p-7"><Pulse className="h-3 w-32 rounded-full" /><Pulse className="mt-3 h-9 w-4/5 rounded-xl" /><SkeletonBlock lines={2} className="mt-3" /><Pulse className="mt-4 h-8 w-28 rounded-full" /></div>
+
+      <div className="mt-4 flex gap-2 overflow-hidden">
+        {Array.from({ length: 8 }).map((_, index) => <Pulse key={index} className="h-9 w-20 shrink-0 rounded-full" />)}
+      </div>
+
+      <div className="mt-3 flex gap-2">
+        <Pulse className="h-11 flex-1 rounded-xl" />
+        <Pulse className="h-11 w-20 shrink-0 rounded-xl" />
+      </div>
+
+      <section className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,1.45fr)_minmax(280px,0.55fr)]">
+        <article className="overflow-hidden rounded-[28px] border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-900">
+          <Pulse className="aspect-[16/8] w-full rounded-none" />
+          <div className="p-5 sm:p-7">
+            <Pulse className="h-3 w-28 rounded-full" />
+            <Pulse className="mt-3 h-9 w-full max-w-2xl rounded-xl" />
+            <SkeletonBlock lines={3} className="mt-3 max-w-2xl" />
+            <Pulse className="mt-4 h-4 w-36 rounded-full" />
+          </div>
         </article>
-        <div className="grid gap-3">{[0,1,2].map(i => <article key={i} className="rounded-[22px] border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-slate-900"><Pulse className="h-3 w-24 rounded-full" /><Pulse className="mt-2 h-5 w-4/5 rounded-lg" /><SkeletonBlock lines={2} className="mt-2" /></article>)}</div>
+        <div className="grid gap-3">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <article key={index} className="grid grid-cols-[104px_minmax(0,1fr)] overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-900">
+              <Pulse className="h-full min-h-[112px] w-full rounded-none" />
+              <div className="p-3.5">
+                <Pulse className="h-3 w-20 rounded-full" />
+                <Pulse className="mt-2 h-4 w-full" />
+                <Pulse className="mt-1 h-4 w-4/5" />
+              </div>
+            </article>
+          ))}
+        </div>
       </section>
-      <section className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
-        <div>{[0,1,2,3].map(i => <article key={i} className="flex gap-4 border-b border-slate-200 py-5 dark:border-white/10"><Pulse className="h-[112px] w-[180px] shrink-0 rounded-xl" /><div className="min-w-0 flex-1"><Pulse className="h-3 w-24 rounded-full" /><Pulse className="mt-2 h-6 w-4/5 rounded-lg" /><SkeletonBlock lines={2} className="mt-2" /></div></article>)}</div>
-        <aside className="hidden lg:block"><div className="sticky top-20 rounded-[24px] border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-slate-900"><Pulse className="h-3 w-28 rounded-full" /><SkeletonBlock lines={4} className="mt-3" /></div></aside>
+
+      <section className="mt-7">
+        <div className="mb-3">
+          <Pulse className="h-3 w-16 rounded-full" />
+          <Pulse className="mt-2 h-6 w-44 rounded-lg" />
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <article key={index} className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-900">
+              <Pulse className="aspect-[16/10] w-full rounded-none" />
+              <div className="p-4">
+                <Pulse className="h-3 w-24 rounded-full" />
+                <Pulse className="mt-2 h-5 w-4/5 rounded-lg" />
+                <SkeletonBlock lines={2} className="mt-2" />
+                <Pulse className="mt-3 h-3 w-28 rounded-full" />
+              </div>
+            </article>
+          ))}
+        </div>
       </section>
     </main>
   );
