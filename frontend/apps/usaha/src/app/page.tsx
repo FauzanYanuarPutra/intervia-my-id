@@ -25,6 +25,8 @@ import { jakartaDateKey, summarizeControlCenter } from '@/lib/business-control/i
 import { buildMerchantNextActions } from '@/lib/business-control/next-actions';
 import { settleHomeControlData } from '@/lib/home-control-data';
 import { getSetupSteps, getStatusCopy, hasPermission } from '@/lib/portal-logic';
+import { getFinanceCoreSummary } from '@/lib/finance-core-server';
+import { listBusinessWork } from '@/lib/business-work-server';
 import { resolvePortalHomeState } from '@/lib/portal-server';
 
 const money = new Intl.NumberFormat('id-ID', {
@@ -127,6 +129,11 @@ export default async function HomePage({
       : Promise.resolve([]),
   });
 
+  const [financeCore, workItems] = await Promise.all([
+    canViewFinance ? getFinanceCoreSummary(business.id).catch(() => null) : Promise.resolve(null),
+    listBusinessWork(business.id).catch(() => []),
+  ]);
+
   const today = jakartaDateKey();
   const control = summarizeControlCenter({ ingredients, financeEntries, channels, today });
   const stockAttention =
@@ -211,6 +218,16 @@ export default async function HomePage({
         label: metric.label,
         value: metric.key === 'expense' ? (canViewFinance ? money.format(metric.value) : '—') : metric.value,
       }))} />
+
+      <section className="merchant-surface-bordered overflow-hidden">
+        <div className="border-b border-portal-line px-4 py-3.5 sm:px-5"><p className="text-[10px] font-black uppercase tracking-[0.1em] text-portal-soft">Kondisi usaha</p><h2 className="mt-1 text-base font-black text-portal-ink">Yang perlu kamu tahu sekarang</h2></div>
+        <div className="grid gap-px bg-portal-line sm:grid-cols-2 lg:grid-cols-4">
+          {canViewFinance ? <><div className="bg-white p-4"><p className="text-xs text-portal-soft">Kas</p><p className="mt-1 text-lg font-black text-portal-ink">{money.format(financeCore?.accounts.find(account => account.account_key === 'cash')?.balance ?? 0)}</p></div><div className="bg-white p-4"><p className="text-xs text-portal-soft">E-wallet</p><p className="mt-1 text-lg font-black text-portal-ink">{money.format(financeCore?.accounts.find(account => account.account_key === 'ewallet')?.balance ?? 0)}</p></div></> : null}
+          <div className="bg-white p-4"><p className="text-xs text-portal-soft">Stok perlu perhatian</p><p className="mt-1 text-lg font-black text-portal-ink">{stockAttention}</p></div>
+          <div className="bg-white p-4"><p className="text-xs text-portal-soft">Pekerjaan terbuka</p><p className="mt-1 text-lg font-black text-portal-ink">{workItems.filter(item => !['done','cancelled'].includes(item.status)).length}</p></div>
+        </div>
+      </section>
+      {workItems.some(item => !['done','cancelled'].includes(item.status)) ? <section><div className="mb-2.5 flex items-end justify-between gap-3"><div><h2 className="font-black text-portal-ink">Pekerjaan yang berjalan</h2><p className="mt-0.5 text-xs text-portal-soft">Supaya kondisi usaha langsung berubah jadi tindakan.</p></div><Link href={`/businesses/${business.id}/work`} className="text-xs font-black text-portal-forest">Lihat semua</Link></div><div className="merchant-list border border-portal-line/80">{workItems.filter(item => !['done','cancelled'].includes(item.status)).slice(0,3).map(item => <Link key={item.id} href={`/businesses/${business.id}/work`} className="merchant-action-row"><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold text-portal-ink">{item.title}</p><p className="mt-0.5 text-[11px] text-portal-soft">{item.assignee_user_id ? 'Sudah ditugaskan' : 'Belum ditugaskan'}</p></div><span className="text-xs font-black text-portal-forest">Kerjakan</span></Link>)}</div></section> : null}
 
       <section className="merchant-surface-bordered overflow-hidden">
         <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
