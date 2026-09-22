@@ -656,9 +656,110 @@ function readMessageReference(raw: Record<string, unknown>, content: string): Me
 }
 
 function normalizeAttachmentUrl(raw: unknown): string {
+  if (typeof raw !== 'string') return '';
+  const value = raw.trim();
+  if (!value) return '';
+
   const appOrigins =
     typeof window !== 'undefined' ? [window.location.origin] : [];
-  return safeChatMediaReference(raw, { appOrigins }) || '';
+  const safe = safeChatMediaReference(value, { appOrigins });
+  if (safe) return safe;
+
+  // Chat storage may return a MinIO/object-storage URL instead of the public
+  // media proxy. Convert known storage shapes to the same-origin proxy before
+  // rendering or sending them back to the chat API.
+  const toProxyPath = (pathname: string): string => {
+    const clean = pathname.replace(/^\\/+/, '/').replace(/\\/+$/, '');
+    if (clean.startsWith('/api/chat/media/')) return clean;
+
+    const segments = clean.split('/').filter(Boolean);
+    if (segments.length >= 4 && segments[1] === 'chat') {
+      const bucket = segments[0];
+      if (/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/.test(bucket)) {
+        return `/api/chat/media/${segments.join('/')}`;
+      }
+    }
+
+    if (segments.length >= 3 && segments[0] === 'uploads' && segments[1] === 'chat') {
+      return `/api/chat/media/local/${segments.join('/')}`;
+    }
+
+    return '';
+  };
+
+  if (value.startsWith('laju-chat/')) {
+    return toProxyPath(`/${value}`);
+  }
+  if (value.startsWith('/laju-chat/')) {
+    return toProxyPath(value);
+  }
+  if (value.startsWith('/uploads/chat/')) {
+    return toProxyPath(value);
+  }
+
+  try {
+    const parsed = new URL(value);
+    return toProxyPath(parsed.pathname);
+  } catch {
+    return '';
+  }
+}
+
+function extractChatUploadPayload(payload: unknown): {
+  url: string;
+  type?: AttachmentKind;
+} {
+  const root = asObject(payload);
+  const data = asObject(root.data);
+  const file = asObject(root.file);
+  const nestedData = asObject(data.data);
+  const candidates = [root, data, file, nestedData];
+
+  let url = '';
+  let type: AttachmentKind | undefined;
+
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    if (!url) {
+      const rawUrl =
+        typeof candidate.url === 'string'
+          ? candidate.url
+          : typeof candidate.uri === 'string'
+            ? candidate.uri
+            : typeof candidate.path === 'string'
+              ? candidate.path
+              : '';
+      if (rawUrl.trim()) url = rawUrl.trim();
+    }
+
+    if (!type) {
+      const rawType = String(candidate.type ?? candidate.mime_type ?? '').toLowerCase();
+      if (
+        rawType === 'image' ||
+        rawType === 'video' ||
+        rawType === 'audio' ||
+        rawType === 'file'
+      ) {
+        type = rawType;
+      } else if (rawType.startsWith('image/')) {
+        type = 'image';
+      } else if (rawType.startsWith('video/')) {
+        type = 'video';
+      } else if (rawType.startsWith('audio/')) {
+        type = 'audio';
+      }
+    }
+  }
+
+  return { url, type };
+}
+
+function isRetryableChatUploadStatus(status: number): boolean {
+  return status === 408 || status === 425 || status === 429 || status >= 500;
+}
+
+function delayChatUpload(ms: number): Promise<void> {
+  return new Promise(resolve => window.setTimeout(resolve, ms));
 }
 
 type TimelineItem =
@@ -3549,59 +3650,96 @@ export default function ChatRoomPage() {
   const uploadAttachment = useCallback(
     async (file: File, attachmentId: string) => {
       if (!canonicalRoomId || roomReadOnly) return;
+
       setDraftAttachments(prev =>
         prev.map(att =>
-          att.id === attachmentId ? { ...att, status: 'uploading' } : att,
+          att.id === attachmentId
+            ? { ...att, status: 'uploading' }
+            : att,
         ),
       );
-      try {
-        const writableRoomId = await ensureWritableRoomId();
-        const encodedRoomId = encodeURIComponent(writableRoomId);
-        const optimizedFile = await prepareUploadFile(file);
-        const form = new FormData();
-        form.append('file', optimizedFile);
-        const uploadRes = await authFetch(
-          `/api/chat/rooms/${encodedRoomId}/upload`,
-          { method: 'POST', body: form },
-        );
-        const uploadData = asObject(await uploadRes.json().catch(() => ({})));
-        if (!uploadRes.ok) {
-          throw new Error(
-            typeof uploadData.error === 'string'
-              ? uploadData.error
-              : 'upload failed',
+
+      let lastError: unknown = null;
+
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        try {
+          const writableRoomId = await ensureWritableRoomId();
+          const encodedRoomId = encodeURIComponent(writableRoomId);
+          const optimizedFile = await prepareUploadFile(file);
+          const form = new FormData();
+          form.append('file', optimizedFile);
+
+          const uploadRes = await authFetch(
+            `/api/chat/rooms/${encodedRoomId}/upload`,
+            {
+              method: 'POST',
+              body: form,
+              headers: {
+                'x-idempotency-key': `chat-upload-${writableRoomId}-${attachmentId}`,
+              },
+            },
           );
+
+          const uploadData = asObject(
+            await uploadRes.json().catch(() => ({})),
+          );
+
+          if (!uploadRes.ok) {
+            const serverMessage =
+              typeof uploadData.error === 'string'
+                ? uploadData.error
+                : typeof uploadData.message === 'string'
+                  ? uploadData.message
+                  : 'Upload media gagal.';
+            const retryable = isRetryableChatUploadStatus(uploadRes.status);
+            if (retryable && attempt < 2) {
+              await delayChatUpload(650 * (attempt + 1));
+              continue;
+            }
+            throw new Error(serverMessage);
+          }
+
+          const uploaded = extractChatUploadPayload(uploadData);
+          const fileUrl = normalizeAttachmentUrl(uploaded.url);
+          if (!fileUrl) {
+            throw new Error('Upload berhasil tetapi URL media tidak valid.');
+          }
+
+          const uploadType =
+            uploaded.type ?? detectAttachmentType(file);
+
+          setDraftAttachments(prev =>
+            prev.map(att =>
+              att.id === attachmentId
+                ? {
+                    ...att,
+                    serverUrl: fileUrl,
+                    status: 'uploaded',
+                    type: uploadType,
+                  }
+                : att,
+            ),
+          );
+          return;
+        } catch (error) {
+          lastError = error;
+          if (attempt < 2) {
+            await delayChatUpload(650 * (attempt + 1));
+            continue;
+          }
         }
-        const payload = asObject(uploadData.data);
-        const fileUrl =
-          typeof payload.url === 'string' ? payload.url.trim() : '';
-        if (!fileUrl) throw new Error('upload response did not include a URL');
-        const uploadType =
-          payload.type === 'image' ||
-          payload.type === 'video' ||
-          payload.type === 'audio' ||
-          payload.type === 'file'
-            ? payload.type
-            : detectAttachmentType(file);
-        setDraftAttachments(prev =>
-          prev.map(att =>
-            att.id === attachmentId
-              ? {
-                  ...att,
-                  serverUrl: fileUrl,
-                  status: 'uploaded',
-                  type: uploadType,
-                }
-              : att,
-          ),
-        );
-      } catch {
-        setDraftAttachments(prev =>
-          prev.map(att =>
-            att.id === attachmentId ? { ...att, status: 'error' } : att,
-          ),
-        );
       }
+
+      console.error('[chat] attachment upload failed', {
+        roomId: canonicalRoomId,
+        attachmentId,
+        error: lastError,
+      });
+      setDraftAttachments(prev =>
+        prev.map(att =>
+          att.id === attachmentId ? { ...att, status: 'error' } : att,
+        ),
+      );
     },
     [authFetch, canonicalRoomId, ensureWritableRoomId, roomReadOnly],
   );
@@ -6585,10 +6723,18 @@ export default function ChatRoomPage() {
                       (!msg.message_type || msg.message_type === 'text') &&
                       !msg.attachments?.length;
 
+                    const isMediaMessage =
+                      msg.message_type === 'image' ||
+                      msg.message_type === 'video' ||
+                      msg.message_type === 'audio' ||
+                      msg.message_type === 'file';
+
                     const bubbleMaxWidthClass =
                       msg.message_type === 'transaction'
-                        ? 'w-fit max-w-[calc(100%-1rem)] sm:max-w-[560px]'
-                        : 'w-fit max-w-[92%] sm:max-w-[72%] lg:max-w-[640px]';
+                        ? 'w-fit max-w-[calc(100%-1rem)] sm:max-w-[520px]'
+                        : isMediaMessage
+                          ? 'w-fit max-w-[min(82vw,360px)] sm:max-w-[390px] lg:max-w-[460px]'
+                          : 'w-fit max-w-[82%] sm:max-w-[68%] lg:max-w-[560px]';
                     const bubbleClass = `relative ${bubbleMaxWidthClass} overflow-visible rounded-[18px] px-2.5 py-2 text-[13px] leading-[1.45] break-words whitespace-pre-wrap sm:px-3 sm:py-2.5 sm:text-sm ${
                       isOwn
                         ? 'rounded-br-[6px] bg-[#d9fdd3] text-[#111b21] shadow-[0_1px_1px_rgba(17,27,33,0.16)] dark:bg-[#005c4b] dark:text-[#e9edef]'
@@ -7590,7 +7736,7 @@ export default function ChatRoomPage() {
                                           ? `Image ${index + 1}`
                                           : 'Image'
                                       }
-                                      className="block max-h-[min(58dvh,520px)] w-full rounded-[14px] border border-black/[0.06] bg-black/95 object-contain shadow-sm dark:border-white/[0.08] sm:max-h-[560px]"
+                                      className="mx-auto block max-h-[min(48dvh,420px)] max-w-full rounded-[12px] border border-black/[0.06] bg-black/95 object-contain shadow-sm dark:border-white/[0.08] sm:max-h-[460px]"
                                       loading="lazy"
                                     />
                                   );
@@ -7612,7 +7758,7 @@ export default function ChatRoomPage() {
                                       src={videoUrl}
                                       controls
                                       preload="metadata"
-                                      className="block max-h-[min(58dvh,520px)] w-full rounded-[14px] bg-black shadow-sm sm:max-h-[560px]"
+                                      className="mx-auto block max-h-[min(48dvh,420px)] max-w-full rounded-[12px] bg-black shadow-sm sm:max-h-[460px]"
                                     />
                                   );
                                 })}
@@ -7771,41 +7917,41 @@ export default function ChatRoomPage() {
           ) : null}
 
           {activeDraftAttachment && (
-            <div className="overflow-hidden rounded-[24px] border border-black/[0.06] bg-white/92 p-2 shadow-[0_14px_34px_-24px_rgba(17,27,33,0.42)] backdrop-blur-sm dark:border-white/[0.08] dark:bg-[#111b21]/94 sm:p-2.5">
-              <div className="mb-2 flex items-center justify-between gap-2 px-1">
-                <div className="min-w-0">
-                  <p className="truncate text-[12px] font-bold text-[#111b21] dark:text-[#e9edef]">
-                    {chatLocale === 'id'
-                      ? 'Pratinjau sebelum kirim'
-                      : 'Preview before sending'}
-                  </p>
-                  <p className="truncate text-[11px] font-semibold text-[#667781] dark:text-[#8696a0]">
+            <div className="mx-auto w-full max-w-[520px] rounded-[16px] border border-black/[0.06] bg-white/95 p-2 shadow-[0_10px_26px_-22px_rgba(17,27,33,0.42)] backdrop-blur-sm dark:border-white/[0.08] dark:bg-[#111b21]/96 sm:p-2.5">
+              <div className="flex items-center gap-2 px-0.5 pb-2">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[11px] font-bold text-[#111b21] dark:text-[#e9edef]">
                     {draftAttachments.length > 1
-                      ? `${activeDraftAttachmentIndex + 1}/${draftAttachments.length} ${chatLocale === 'id' ? 'berkas' : 'files'}`
+                      ? `${activeDraftAttachmentIndex + 1}/${draftAttachments.length} ${chatLocale === 'id' ? 'media' : 'media'}`
                       : chatLocale === 'id'
-                        ? '1 berkas'
-                        : '1 file'}
-                    {' - '}
+                        ? 'Media'
+                        : 'Media'}
+                  </p>
+                  <p className="truncate text-[10px] font-medium text-[#667781] dark:text-[#8696a0]">
                     {isUploadingAttachments
                       ? chatLocale === 'id'
-                        ? 'Masih mengunggah'
-                        : 'Still uploading'
-                      : chatLocale === 'id'
-                        ? 'Siap dikirim'
-                        : 'Ready to send'}
+                        ? 'Sedang diunggah…'
+                        : 'Uploading…'
+                      : activeDraftAttachment.status === 'error'
+                        ? chatLocale === 'id'
+                          ? 'Upload gagal'
+                          : 'Upload failed'
+                        : chatLocale === 'id'
+                          ? 'Siap dikirim'
+                          : 'Ready to send'}
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => clearDraftAttachments()}
-                  className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-full border border-black/5 bg-[#f0f2f5] px-3 text-[11px] font-bold text-[#54656f] transition hover:bg-[#e9edef] dark:border-white/8 dark:bg-[#202c33] dark:text-[#aebac1] dark:hover:bg-[#2a3942]"
+                  className="inline-flex h-8 shrink-0 items-center rounded-full bg-[#f0f2f5] px-2.5 text-[10px] font-bold text-[#54656f] transition hover:bg-[#e9edef] dark:bg-[#202c33] dark:text-[#aebac1] dark:hover:bg-[#2a3942]"
                 >
-                  {chatLocale === 'id' ? 'Hapus semua' : 'Remove all'}
+                  {chatLocale === 'id' ? 'Hapus' : 'Clear'}
                 </button>
               </div>
 
               <div
-                className="relative overflow-hidden rounded-[20px] bg-[#0b141a] shadow-inner sm:rounded-[22px]"
+                className="relative overflow-hidden rounded-[14px] bg-[#0b141a]"
                 onTouchStart={event => {
                   if (draftAttachments.length < 2) return;
                   attachmentTouchStartXRef.current =
@@ -7822,51 +7968,46 @@ export default function ChatRoomPage() {
                   showDraftAttachmentAtOffset(deltaX < 0 ? 1 : -1);
                 }}
               >
-                <div className="flex min-h-[clamp(140px,30dvh,250px)] items-center justify-center sm:min-h-[clamp(180px,34dvh,320px)] lg:min-h-[clamp(220px,38dvh,380px)]">
+                <div className="flex h-[min(30dvh,220px)] min-h-[108px] items-center justify-center">
                   {activeDraftAttachment.type === 'image' &&
                   activeDraftAttachment.previewUrl ? (
                     <img
                       src={activeDraftAttachment.previewUrl}
                       alt={activeDraftAttachment.name}
-                      className="max-h-[min(calc(var(--app-viewport-height)-13rem),560px)] w-full object-contain"
+                      className="max-h-[220px] max-w-full object-contain"
                     />
                   ) : activeDraftAttachment.type === 'video' &&
                     activeDraftAttachment.previewUrl ? (
                     <video
                       src={activeDraftAttachment.previewUrl}
-                      className="max-h-[min(calc(var(--app-viewport-height)-13rem),560px)] w-full object-contain"
+                      className="max-h-[220px] max-w-full object-contain"
                       muted
-                      loop
                       playsInline
                       controls
                     />
                   ) : activeDraftAttachment.type === 'audio' &&
                     activeDraftAttachment.previewUrl ? (
-                    <div className="flex min-h-[clamp(120px,26dvh,210px)] w-full flex-col items-center justify-center gap-3 px-4 pb-20 pt-8 text-white sm:min-h-[clamp(160px,30dvh,280px)] sm:px-6 lg:min-h-[clamp(180px,32dvh,320px)]">
-                      <span className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-[#00a884]/18 text-[#25d366]">
-                        <Mic className="h-7 w-7" />
+                    <div className="flex w-full flex-col items-center justify-center gap-2 px-3 text-white">
+                      <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#00a884]/18 text-[#25d366]">
+                        <Mic className="h-5 w-5" />
                       </span>
                       <audio
                         controls
                         preload="metadata"
                         src={activeDraftAttachment.previewUrl}
-                        className="relative z-10 h-11 w-full max-w-md"
-                      >
-                        {chatLocale === 'id'
-                          ? 'Browser tidak dapat memutar rekaman ini.'
-                          : 'Your browser cannot play this recording.'}
-                      </audio>
+                        className="h-9 w-[min(100%,360px)]"
+                      />
                     </div>
                   ) : (
-                    <div className="flex min-h-[clamp(120px,26dvh,210px)] w-full flex-col items-center justify-center gap-3 px-4 text-center text-white/82 sm:min-h-[clamp(160px,30dvh,280px)] sm:px-6 lg:min-h-[clamp(180px,32dvh,320px)]">
-                      <span className="inline-flex h-16 w-16 items-center justify-center rounded-[22px] bg-white/10 text-white">
-                        <Paperclip className="h-7 w-7" />
+                    <div className="flex min-w-0 items-center gap-2 px-4 text-white/82">
+                      <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white">
+                        <Paperclip className="h-4 w-4" />
                       </span>
                       <div className="min-w-0">
-                        <p className="line-clamp-2 text-sm font-bold">
+                        <p className="truncate text-xs font-bold">
                           {activeDraftAttachment.name}
                         </p>
-                        <p className="mt-1 text-xs font-semibold text-white/58">
+                        <p className="mt-0.5 text-[10px] font-semibold text-white/58">
                           {formatFileSize(activeDraftAttachment.size)}
                         </p>
                       </div>
@@ -7878,7 +8019,7 @@ export default function ChatRoomPage() {
                     onClick={() =>
                       removeDraftAttachment(activeDraftAttachment.id)
                     }
-                    className="absolute right-2 top-2 inline-flex h-11 w-11 items-center justify-center rounded-full bg-black/55 text-white shadow-sm transition hover:bg-black/72"
+                    className="absolute right-1.5 top-1.5 inline-flex h-8 w-8 items-center justify-center rounded-full bg-black/55 text-white"
                     title={
                       chatLocale === 'id'
                         ? 'Hapus lampiran'
@@ -7890,58 +8031,46 @@ export default function ChatRoomPage() {
                         : 'Remove attachment'
                     }
                   >
-                    <X className="h-4 w-4" />
+                    <X className="h-3.5 w-3.5" />
                   </button>
 
-                  {draftAttachments.length > 1 && (
+                  {draftAttachments.length > 1 ? (
                     <>
                       <button
                         type="button"
                         onClick={() => showDraftAttachmentAtOffset(-1)}
-                        className="absolute left-2 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/48 text-white shadow-sm transition hover:bg-black/70"
+                        className="absolute left-1.5 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white"
                         aria-label={
                           chatLocale === 'id'
                             ? 'Lampiran sebelumnya'
                             : 'Previous attachment'
                         }
                       >
-                        <ChevronLeft className="h-5 w-5" />
+                        <ChevronLeft className="h-4 w-4" />
                       </button>
                       <button
                         type="button"
                         onClick={() => showDraftAttachmentAtOffset(1)}
-                        className="absolute right-2 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/48 text-white shadow-sm transition hover:bg-black/70"
+                        className="absolute right-1.5 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white"
                         aria-label={
                           chatLocale === 'id'
                             ? 'Lampiran berikutnya'
                             : 'Next attachment'
                         }
                       >
-                        <ChevronRight className="h-5 w-5" />
+                        <ChevronRight className="h-4 w-4" />
                       </button>
                     </>
-                  )}
-                </div>
+                  ) : null}
 
-                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/76 via-black/36 to-transparent px-3 pb-3 pt-8">
-                  <div className="flex min-w-0 items-center justify-between gap-3 text-white">
-                    <div className="min-w-0">
-                      <p className="truncate text-[12px] font-bold">
-                        {activeDraftAttachment.name}
-                      </p>
-                      <p className="mt-0.5 truncate text-[11px] font-semibold text-white/64">
-                        {formatFileSize(activeDraftAttachment.size)}
-                      </p>
-                    </div>
+                  <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-gradient-to-t from-black/65 to-transparent px-2.5 pb-2 pt-5">
+                    <p className="min-w-0 truncate text-[10px] font-semibold text-white/85">
+                      {activeDraftAttachment.name}
+                    </p>
                     {activeDraftAttachment.status === 'uploading' ? (
-                      <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white/12 px-2.5 py-1 text-[11px] font-bold text-white">
-                        <Loader2
-                          className="h-3.5 w-3.5 animate-spin"
-                          aria-label={
-                            chatLocale === 'id' ? 'Mengunggah' : 'Uploading'
-                          }
-                        />
-                        {chatLocale === 'id' ? 'Unggah' : 'Upload'}
+                      <span className="inline-flex h-6 shrink-0 items-center gap-1 rounded-full bg-black/45 px-2 text-[9px] font-bold text-white">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        {chatLocale === 'id' ? 'Upload' : 'Uploading'}
                       </span>
                     ) : activeDraftAttachment.status === 'error' ? (
                       <button
@@ -7949,12 +8078,12 @@ export default function ChatRoomPage() {
                         onClick={() =>
                           retryAttachmentUpload(activeDraftAttachment.id)
                         }
-                        className="inline-flex min-h-11 shrink-0 items-center rounded-full bg-white px-3 py-1 text-[11px] font-bold text-[#128c7e]"
+                        className="inline-flex h-6 shrink-0 items-center rounded-full bg-white px-2 text-[9px] font-bold text-[#128c7e]"
                       >
-                        {chatLocale === 'id' ? 'Coba lagi' : 'Retry'}
+                        {chatLocale === 'id' ? 'Ulangi' : 'Retry'}
                       </button>
                     ) : (
-                      <span className="inline-flex shrink-0 items-center rounded-full bg-[#25d366] px-2.5 py-1 text-[11px] font-bold text-[#0b141a]">
+                      <span className="inline-flex h-6 shrink-0 items-center rounded-full bg-[#25d366] px-2 text-[9px] font-bold text-[#0b141a]">
                         {chatLocale === 'id' ? 'Siap' : 'Ready'}
                       </span>
                     )}
@@ -7962,23 +8091,21 @@ export default function ChatRoomPage() {
                 </div>
               </div>
 
-              {draftAttachments.length > 1 && (
-                <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+              {draftAttachments.length > 1 ? (
+                <div className="mt-2 flex gap-1.5 overflow-x-auto pb-0.5">
                   {draftAttachments.map((attachment, index) => {
                     const isActive = attachment.id === activeDraftAttachment.id;
                     return (
                       <button
                         key={attachment.id}
                         type="button"
-                        onClick={() =>
-                          setActiveDraftAttachmentId(attachment.id)
-                        }
-                        className={`relative h-[58px] w-[58px] shrink-0 overflow-hidden rounded-[14px] border transition ${
+                        onClick={() => setActiveDraftAttachmentId(attachment.id)}
+                        className={`relative h-[46px] w-[46px] shrink-0 overflow-hidden rounded-[10px] border transition ${
                           isActive
-                            ? 'border-[#25d366] ring-2 ring-[#25d366]/28'
-                            : 'border-black/5 opacity-72 hover:opacity-100 dark:border-white/8'
+                            ? 'border-[#25d366] ring-2 ring-[#25d366]/25'
+                            : 'border-black/5 opacity-75 hover:opacity-100 dark:border-white/8'
                         }`}
-                        aria-label={`${chatLocale === 'id' ? 'Buka lampiran' : 'Open attachment'} ${index + 1}`}
+                        aria-label={`${chatLocale === 'id' ? 'Buka media' : 'Open media'} ${index + 1}`}
                       >
                         {attachment.type === 'image' &&
                         attachment.previewUrl ? (
@@ -7997,28 +8124,27 @@ export default function ChatRoomPage() {
                           />
                         ) : attachment.type === 'audio' ? (
                           <span className="flex h-full w-full items-center justify-center bg-[#0b141a] text-[#25d366]">
-                            <Mic className="h-5 w-5" />
+                            <Mic className="h-4 w-4" />
                           </span>
                         ) : (
                           <span className="flex h-full w-full items-center justify-center bg-[#f0f2f5] text-[#667781] dark:bg-[#202c33] dark:text-[#aebac1]">
-                            <Paperclip className="h-5 w-5" />
+                            <Paperclip className="h-4 w-4" />
                           </span>
                         )}
-                        {attachment.status === 'uploading' && (
-                          <span className="absolute inset-0 grid place-items-center bg-black/36 text-white">
-                            <Loader2 className="h-4 w-4 animate-spin" />
+                        {attachment.status === 'uploading' ? (
+                          <span className="absolute inset-0 grid place-items-center bg-black/35 text-white">
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
                           </span>
-                        )}
-                        {attachment.status === 'error' && (
-                          <span className="absolute inset-x-1 bottom-1 rounded-full bg-white px-1 py-0.5 text-[9px] font-bold text-[#d14343]">
+                        ) : attachment.status === 'error' ? (
+                          <span className="absolute inset-x-1 bottom-1 rounded-full bg-white px-1 py-0.5 text-[8px] font-bold text-[#d14343]">
                             {chatLocale === 'id' ? 'Ulangi' : 'Retry'}
                           </span>
-                        )}
+                        ) : null}
                       </button>
                     );
                   })}
                 </div>
-              )}
+              ) : null}
             </div>
           )}
 
