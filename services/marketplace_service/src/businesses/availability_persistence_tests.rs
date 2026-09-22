@@ -140,6 +140,7 @@ async fn create_recipe_backed_product(
     let control_repository = ControlRepository::new(pool.clone());
     let ingredient = control_repository
         .create_ingredient(
+            actor_id,
             business_id,
             organization_id,
             ingredient_request(ingredient_stock),
@@ -160,6 +161,7 @@ async fn create_recipe_backed_product(
                     quantity: Decimal::from(150),
                     waste_percent_override: None,
                 }],
+                reason: Some("test recipe update".to_owned()),
             },
         )
         .await
@@ -230,6 +232,7 @@ async fn multi_ingredient_capacity_uses_limiting_input_and_recipe_servings(pool:
 
     let mango = control
         .create_ingredient(
+            actor_id,
             business_id,
             organization_id,
             ingredient_request(Decimal::from(900)),
@@ -239,7 +242,7 @@ async fn multi_ingredient_capacity_uses_limiting_input_and_recipe_servings(pool:
     let mut sugar_request = ingredient_request(Decimal::from(200));
     sugar_request.name = "Gula".to_owned();
     let sugar = control
-        .create_ingredient(business_id, organization_id, sugar_request)
+        .create_ingredient(actor_id, business_id, organization_id, sugar_request)
         .await
         .unwrap();
 
@@ -263,6 +266,7 @@ async fn multi_ingredient_capacity_uses_limiting_input_and_recipe_servings(pool:
                         waste_percent_override: None,
                     },
                 ],
+                reason: Some("test recipe update".to_owned()),
             },
         )
         .await
@@ -289,6 +293,7 @@ async fn multi_ingredient_capacity_uses_limiting_input_and_recipe_servings(pool:
                         waste_percent_override: None,
                     },
                 ],
+                reason: Some("test recipe update".to_owned()),
             },
         )
         .await
