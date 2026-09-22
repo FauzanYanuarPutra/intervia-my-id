@@ -622,7 +622,9 @@ export default async function TokoPage({ params }: PageProps) {
             </div>
           </section>
 
-          <StorefrontOrderCart storeId={store.id} isId={isId} locale={locale} />\n\n      <section
+          <StorefrontOrderCart storeId={store.id} isId={isId} locale={locale} />
+
+          <section
             id="produk"
             className="mt-1.5 bg-white dark:bg-slate-900 sm:mt-3 sm:overflow-hidden sm:rounded-3xl sm:border sm:border-slate-200 sm:shadow-sm sm:dark:border-slate-800"
             data-testid="storefront-products"
