@@ -64,6 +64,7 @@ pub(crate) struct TransitionSellerOrderRequest {
     pub(crate) expected_version: i64,
     pub(crate) next_status: String,
     pub(crate) reason: Option<String>,
+    pub(crate) metadata: Option<Value>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -249,12 +250,14 @@ impl SellerOrderRepository {
             SellerOrderRepositoryError::Validation("invalid_order_status"),
         )?;
         let reason = normalize_reason(request.reason.as_deref(), next_status)?;
+        let metadata = normalize_transition_metadata(request.metadata, next_status)?;
         let request_hash = canonical_request_hash(&json!({
             "business_id": business_id,
             "order_id": order_id,
             "expected_version": request.expected_version,
             "next_status": next_status.as_db(),
             "reason": reason.as_deref(),
+            "metadata": &metadata,
         }))
         .map_err(|_| SellerOrderRepositoryError::Database)?;
 
@@ -331,6 +334,32 @@ impl SellerOrderRepository {
             UPDATE orders
             SET
               base_status = $2::order_base_status,
+              payment_status = CASE
+                WHEN $2 = 'PAID' THEN 'PAID'::order_payment_status
+                ELSE payment_status
+              END,
+              payment_provider = CASE
+                WHEN $2 = 'PAID' THEN 'manual'
+                ELSE payment_provider
+              END,
+              payment_reference = CASE
+                WHEN $2 = 'PAID' THEN NULLIF($4->'payment_confirmation'->>'reference', '')
+                ELSE payment_reference
+              END,
+              paid_at = CASE
+                WHEN $2 = 'PAID' THEN COALESCE(paid_at, NOW())
+                ELSE paid_at
+              END,
+              category_specific_metadata = CASE
+                WHEN $2 = 'PAID' AND $4 ? 'payment_confirmation' THEN
+                  jsonb_set(
+                    COALESCE(category_specific_metadata, '{}'::jsonb),
+                    '{payment_confirmation}',
+                    $4->'payment_confirmation',
+                    true
+                  )
+                ELSE category_specific_metadata
+              END,
               accepted_at = CASE
                 WHEN $2 = 'PROCESSING' THEN COALESCE(accepted_at, NOW())
                 ELSE accepted_at
@@ -368,6 +397,7 @@ impl SellerOrderRepository {
         .bind(order_id)
         .bind(next_status.as_db())
         .bind(request.expected_version)
+        .bind(&metadata)
         .fetch_optional(&mut *tx)
         .await?
         .ok_or(SellerOrderRepositoryError::VersionConflict)?;
@@ -402,6 +432,7 @@ impl SellerOrderRepository {
             "organization_id": organization_id,
             "source_type": current.source_type.as_deref(),
             "source_surface": current.source_surface.as_deref(),
+            "command_metadata": &metadata,
         }))
         .bind(idempotency_key)
         .bind(&request_hash)
@@ -426,6 +457,7 @@ impl SellerOrderRepository {
             "version": updated.version,
             "actor_id": actor_id,
             "reason": &reason,
+            "metadata": &metadata,
             "stock_reservations_consumed": reservations_consumed,
             "stock_reservations_released": reservations_released,
         });
@@ -467,6 +499,52 @@ fn map_stock_reservation_error(error: StockReservationError) -> SellerOrderRepos
     }
 }
 
+fn normalize_transition_metadata(
+    value: Option<Value>,
+    next_status: OrderState,
+) -> Result<Value, SellerOrderRepositoryError> {
+    let metadata = value.unwrap_or_else(|| json!({}));
+    let Some(object) = metadata.as_object() else {
+        return Err(SellerOrderRepositoryError::Validation(
+            "order_transition_metadata_must_be_object",
+        ));
+    };
+    if next_status != OrderState::Paid {
+        return Ok(Value::Object(object.clone()));
+    }
+    let Some(confirmation) = object.get("payment_confirmation").and_then(Value::as_object) else {
+        return Err(SellerOrderRepositoryError::Validation(
+            "manual_payment_confirmation_required",
+        ));
+    };
+    if confirmation.get("mode").and_then(Value::as_str) != Some("manual") {
+        return Err(SellerOrderRepositoryError::Validation(
+            "manual_payment_confirmation_required",
+        ));
+    }
+    let method = confirmation.get("method").and_then(Value::as_str).unwrap_or("");
+    if !matches!(method, "cash" | "bank_transfer" | "qris_manual") {
+        return Err(SellerOrderRepositoryError::Validation(
+            "invalid_manual_payment_method",
+        ));
+    }
+    if let Some(reference) = confirmation.get("reference").and_then(Value::as_str) {
+        if reference.chars().count() > 120 {
+            return Err(SellerOrderRepositoryError::Validation(
+                "manual_payment_reference_too_long",
+            ));
+        }
+    }
+    if let Some(note) = confirmation.get("note").and_then(Value::as_str) {
+        if note.chars().count() > MAX_REASON_LEN {
+            return Err(SellerOrderRepositoryError::Validation(
+                "manual_payment_note_too_long",
+            ));
+        }
+    }
+    Ok(Value::Object(object.clone()))
+}
+
 fn normalize_reason(
     value: Option<&str>,
     next_status: OrderState,
@@ -502,7 +580,7 @@ fn allowed_seller_transitions(order: &SellerOrderRecord) -> Vec<OrderState> {
 
     match current {
         OrderState::Draft => vec![OrderState::Cancelled],
-        OrderState::PendingPayment => vec![OrderState::Rejected],
+        OrderState::PendingPayment => vec![OrderState::Paid, OrderState::Rejected],
         OrderState::Paid => vec![OrderState::Processing, OrderState::Cancelled],
         OrderState::Processing => {
             if order.category_type == "SERVICE_MARKETPLACE" {
