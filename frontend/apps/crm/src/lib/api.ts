@@ -1004,6 +1004,23 @@ export const newsApi = {
     );
   },
 
+  reviewers: async (token: string) => {
+    return fetchJson<{
+      data: Array<{
+        id: string;
+        email: string;
+        username?: string | null;
+        full_name?: string | null;
+        is_active: boolean;
+        roles: string[];
+      }>;
+      meta?: { page: number; limit: number; total: number };
+    }>(`${MARKETPLACE_URL}/v1/news/editorial/reviewers`, {
+      method: 'GET',
+      token,
+    });
+  },
+
   metrics: async (token: string) => {
     return fetchJson(`${MARKETPLACE_URL}/v1/news/editorial/metrics`, {
       method: 'GET',
