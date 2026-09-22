@@ -6,9 +6,6 @@ defmodule ChatService.CallHistory do
   @history_buckets 18
   @missed_after_seconds 45
 
-  @type call_type :: String.t()
-  @type status :: String.t()
-
   def start(call_id, room_id, caller_id_bin, call_type) do
     with {:ok, members} <- room_members(room_id),
          {:ok, callee_id_bin} <- peer_member(members, caller_id_bin),
@@ -110,8 +107,6 @@ defmodule ChatService.CallHistory do
         update_record(record, status, record["connected_at"], now, now, reason)
         |> Map.put("duration_seconds", duration_seconds)
       end
-
-
     end)
   end
 
@@ -287,7 +282,8 @@ defmodule ChatService.CallHistory do
     [record["caller_id"], record["callee_id"]]
     |> Enum.filter(&is_binary/1)
     |> Enum.reduce_while(:ok, fn user_id, :ok ->
-      peer_id = if user_id == record["caller_id"], do: record["callee_id"], else: record["caller_id"]
+      peer_id =
+        if user_id == record["caller_id"], do: record["callee_id"], else: record["caller_id"]
 
       case Repo.execute(
              """
@@ -406,7 +402,10 @@ defmodule ChatService.CallHistory do
 
   defp iso(nil), do: nil
   defp iso(%DateTime{} = value), do: DateTime.to_iso8601(value)
-  defp iso(%NaiveDateTime{} = value), do: value |> DateTime.from_naive!("Etc/UTC") |> DateTime.to_iso8601()
+
+  defp iso(%NaiveDateTime{} = value),
+    do: value |> DateTime.from_naive!("Etc/UTC") |> DateTime.to_iso8601()
+
   defp iso(value) when is_binary(value), do: value
   defp iso(_), do: nil
 

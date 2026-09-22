@@ -77,14 +77,14 @@ self.addEventListener('push', (event) => {
         : {}),
       data: {
         ...(payload.data || fallback.data),
-        type: payload.type,
-        call_id: payload.call_id,
-        room_id: payload.room_id,
-        call_type: payload.call_type,
         url:
           typeof payload.url === 'string' && payload.url
             ? payload.url
             : payload.data?.url || fallback.data.url,
+        type: payload.type,
+        call_id: payload.call_id,
+        room_id: payload.room_id,
+        call_type: payload.call_type,
       },
     }),
   );

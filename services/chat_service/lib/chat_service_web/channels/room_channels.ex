@@ -152,35 +152,37 @@ defmodule ChatServiceWeb.RoomChannel do
           Task.Supervisor.start_child(ChatService.TaskSupervisor, fn ->
             Process.sleep(45_000)
 
-             case CallHistory.timeout(call_id) do
-               {:ok, history} ->
-                 if Map.get(history, "status") == "missed" do
-                   timeout_payload = %{
-                     call_id: call_id,
-                     room_id: call_room_id,
-                     user_id: nil,
-                     status: "missed",
-                     duration_seconds: 0
-                   }
+            case CallHistory.timeout(call_id) do
+              {:ok, history} ->
+                if history["status"] == "missed" do
+                  timeout_payload = %{
+                    call_id: call_id,
+                    room_id: call_room_id,
+                    user_id: nil,
+                    status: "missed",
+                    duration_seconds: 0
+                  }
 
-                   Enum.each(fetch_room_members(call_room_id), fn member_id_bin ->
-                     topic = "user:" <> Ecto.UUID.cast!(member_id_bin)
+                  Enum.each(fetch_room_members(call_room_id), fn member_id_bin ->
+                    topic = "user:" <> Ecto.UUID.cast!(member_id_bin)
 
-                     Phoenix.PubSub.broadcast(
-                       ChatService.PubSub,
-                       topic,
-                       %Phoenix.Socket.Broadcast{
-                         topic: topic,
-                         event: "call_ended",
-                         payload: timeout_payload
-                       }
-                     )
-                   end)
-                 end
+                    Phoenix.PubSub.broadcast(
+                      ChatService.PubSub,
+                      topic,
+                      %Phoenix.Socket.Broadcast{
+                        topic: topic,
+                        event: "call_ended",
+                        payload: timeout_payload
+                      }
+                    )
+                  end)
 
-               _ ->
-                 :ok
-             end
+                  schedule_call_push_cleanup(call_room_id, call_id)
+                end
+
+              _ ->
+                :ok
+            end
           end)
 
           recipient_ids =
@@ -194,8 +196,11 @@ defmodule ChatServiceWeb.RoomChannel do
               push_payload = Map.put(incoming_payload, :target_user_id, recipient_id)
 
               case PushNotifier.incoming_call(push_payload) do
-                :ok -> :ok
-                :disabled -> :ok
+                :ok ->
+                  :ok
+
+                :disabled ->
+                  :ok
 
                 {:error, reason} ->
                   Logger.debug("[PushNotifier] call push skipped: #{inspect(reason)}")
@@ -460,6 +465,8 @@ defmodule ChatServiceWeb.RoomChannel do
   defp safe_call_error(:room_unavailable), do: "room_unavailable"
   defp safe_call_error(:blocked), do: "contact_blocked"
   defp safe_call_error(:storage_unavailable), do: "room_unavailable"
+  defp safe_call_error(:call_no_longer_available), do: "call_no_longer_available"
+  defp safe_call_error(:call_not_found), do: "call_not_found"
   defp safe_call_error(:invalid_call_id), do: "invalid_call_id"
   defp safe_call_error(:invalid_signal), do: "invalid_signal"
   defp safe_call_error(:invalid_call_payload), do: "invalid_call_payload"
@@ -836,8 +843,12 @@ defmodule ChatServiceWeb.RoomChannel do
         }
 
         case PushNotifier.call_cleanup(push_payload) do
-          :ok -> :ok
-          :disabled -> :ok
+          :ok ->
+            :ok
+
+          :disabled ->
+            :ok
+
           {:error, reason} ->
             Logger.debug("[PushNotifier] call cleanup skipped: #{inspect(reason)}")
         end

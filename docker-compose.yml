@@ -901,7 +901,6 @@ services:
       INTERNAL_COMMUNITY_URL: http://community_service:8082
       COMMUNITY_SERVICE_URL: http://community_service:8082
       INTERNAL_CHAT_URL: http://chat_service:4000
-      PUSH_DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@domain_db:5432/profile_db
       INTERNAL_PUSH_SECRET: ${INTERNAL_PUSH_SECRET:-}
       WEB_PUSH_VAPID_PRIVATE_KEY: ${WEB_PUSH_VAPID_PRIVATE_KEY:-}
       WEB_PUSH_VAPID_SUBJECT: ${WEB_PUSH_VAPID_SUBJECT:-mailto:admin@lajukan.com}
@@ -978,7 +977,7 @@ services:
       timeout: 8s
       retries: 10
       start_period: 45s
-    networks: [app, cache, media, data]
+    networks: [app, cache, media]
 
   cms:
     <<: *service-defaults

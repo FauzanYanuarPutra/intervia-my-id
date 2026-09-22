@@ -45,10 +45,24 @@ echo "Executing fresh schema from $CQL_FILE on $HOST..."
 cqlsh --request-timeout=60 -f $CQL_FILE $HOST
 
 # Periksa status keluar (exit status) dari perintah cqlsh
-if [ $? -eq 0 ]; then
-    echo "Keyspace and all tables created successfully."
-    echo "=== [INIT] ScyllaDB keyspace setup complete ==="
-else
+if [ $? -ne 0 ]; then
     echo "Error running cqlsh. Check your init.cql file."
     exit 1
 fi
+
+# Apply additive, versioned Scylla migrations after the immutable baseline.
+# Existing migrations are intentionally idempotent (CREATE ... IF NOT EXISTS),
+# so rerunning them is safe during rolling/local restarts while new migrations
+# become effective without rewriting init.cql.
+MIGRATIONS_DIR="/scylladb/migrations"
+if [ -d "$MIGRATIONS_DIR" ]; then
+    for migration in "$MIGRATIONS_DIR"/*.cql; do
+        [ -f "$migration" ] || continue
+        echo "Applying Scylla migration: $(basename "$migration")"
+        cqlsh --request-timeout=60 -f "$migration" "$HOST"
+    done
+fi
+
+echo "Keyspace, baseline schema, and additive migrations applied successfully."
+echo "=== [INIT] ScyllaDB keyspace setup complete ==="
+exit 0

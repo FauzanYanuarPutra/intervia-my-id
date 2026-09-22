@@ -38,60 +38,52 @@ export async function POST(req: NextRequest) {
 
   try {
     const subscriptions = await listPushSubscriptions(targetUserId);
-    const isCleanup = body?.type === 'call_end';
     let sent = 0;
     let expired = 0;
 
     for (const subscription of subscriptions) {
       try {
-        if (isCleanup) {
-          const result = await sendWebPush(subscription, {
-            type: 'call_end',
-            call_id: body?.call_id,
-            room_id: body?.room_id,
-            tag:
-              typeof body?.call_id === 'string'
-                ? `incoming-call:${body.call_id}`
-                : 'incoming-call',
-          });
-
-          if (result === 'ok') {
-            sent += 1;
-          } else {
-            expired += 1;
-            await deletePushEndpoint(subscription.endpoint);
-          }
-          continue;
-        }
-
-        const result = await sendWebPush(subscription, {
-          type: 'incoming_call',
-          call_id: body?.call_id,
-          room_id: body?.room_id,
-          caller_id: body?.caller_id,
-          caller_username: body?.caller_username,
-          caller_avatar: body?.caller_avatar,
-          caller_avatar_style: body?.caller_avatar_style,
-          call_type: body?.call_type === 'video' ? 'video' : 'voice',
-          title:
-            body?.call_type === 'video'
-              ? 'Panggilan video masuk'
-              : 'Panggilan suara masuk',
-          body:
-            typeof body?.caller_username === 'string'
-              ? `${body.caller_username} menghubungi kamu`
-              : 'Ada panggilan masuk',
-          url:
-            typeof body?.room_id === 'string'
-              ? `/id/chat/${encodeURIComponent(body.room_id)}?incomingCall=1`
-              : '/id/chat',
-          tag:
-            typeof body?.call_id === 'string'
-              ? `incoming-call:${body.call_id}`
-              : 'incoming-call',
-          requireInteraction: true,
-          renotify: true,
-        });
+        const isCleanup = body?.type === 'call_end';
+        const result = await sendWebPush(
+          subscription,
+          isCleanup
+            ? {
+                type: 'call_end',
+                call_id: body?.call_id,
+                tag:
+                  typeof body?.call_id === 'string'
+                    ? `incoming-call:${body.call_id}`
+                    : 'incoming-call',
+              }
+            : {
+                type: 'incoming_call',
+                call_id: body?.call_id,
+                room_id: body?.room_id,
+                caller_id: body?.caller_id,
+                caller_username: body?.caller_username,
+                caller_avatar: body?.caller_avatar,
+                caller_avatar_style: body?.caller_avatar_style,
+                call_type: body?.call_type === 'video' ? 'video' : 'voice',
+                title:
+                  body?.call_type === 'video'
+                    ? 'Panggilan video masuk'
+                    : 'Panggilan suara masuk',
+                body:
+                  typeof body?.caller_username === 'string'
+                    ? `${body.caller_username} menghubungi kamu`
+                    : 'Ada panggilan masuk',
+                url:
+                  typeof body?.room_id === 'string'
+                    ? `/id/chat/${encodeURIComponent(body.room_id)}?incomingCall=1`
+                    : '/id/chat',
+                tag:
+                  typeof body?.call_id === 'string'
+                    ? `incoming-call:${body.call_id}`
+                    : 'incoming-call',
+                requireInteraction: true,
+                renotify: true,
+              },
+        );
 
         if (result === 'ok') {
           sent += 1;
