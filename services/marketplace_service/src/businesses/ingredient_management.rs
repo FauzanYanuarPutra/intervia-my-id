@@ -487,6 +487,7 @@ mod tests {
             waste_percent: Decimal::ZERO,
             minimum_stock: Decimal::from(500),
             supplier_name: Some("Pasar Induk".into()),
+            reason: None,
         }
     }
 
