@@ -1109,22 +1109,21 @@ pub async fn review_content_appeal(
         }
     };
 
-    if action == "overturned" {
-        if sqlx::query(
+    if action == "overturned"
+        && sqlx::query(
             "UPDATE content_items SET content_status='active', updated_at=NOW() WHERE id=$1",
         )
         .bind(content_id)
         .execute(&mut *tx)
         .await
         .is_err()
-        {
-            let _ = tx.rollback().await;
-            return err(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "failed to restore content",
-            )
-            .into_response();
-        }
+    {
+        let _ = tx.rollback().await;
+        return err(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to restore content",
+        )
+        .into_response();
     }
 
     if sqlx::query(
