@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { SkeletonBlock } from '@/components/system/feedback/SkeletonBlock';
@@ -2303,7 +2304,9 @@ export function NewsListSkeleton() {
   return (
     <main className="page-shell page-rhythm pb-12 pt-4 sm:pt-6" data-skeleton-route="true" aria-busy="true" aria-label="Memuat Lajukan News">
       <div className="mb-3 flex items-center gap-2">
-        <div className="grid h-8 w-8 place-items-center rounded-[10px] bg-emerald-600 text-xs font-black text-white shadow-sm">L</div>
+        <div className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-white p-1 shadow-sm dark:bg-white/10">
+          <Image src="/logo.svg" alt="Lajukan" width={96} height={28} priority className="h-5 w-auto object-contain" />
+        </div>
         <div>
           <div className="h-3.5 w-20 rounded bg-slate-200" />
           <div className="mt-1 h-2.5 w-24 rounded bg-slate-100" />
