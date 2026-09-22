@@ -349,7 +349,7 @@ export default async function NewsArticlePage({ params }: PageProps) {
                 <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-300">{isId ? 'Lanjut baca' : 'Continue reading'}</p>
                 <h2 className="mt-1 text-xl font-black tracking-[-0.03em] text-slate-950 dark:text-white">{isId ? 'Berita terkait' : 'Related news'}</h2>
               </div>
-              <Link href="/news" className="text-xs font-bold text-emerald-700 dark:text-emerald-300">{isId ? 'Semua berita' : 'All news'}</Link>
+              <Link href="/news" data-news-action="related_clicked" className="text-xs font-bold text-emerald-700 dark:text-emerald-300">{isId ? 'Semua berita' : 'All news'}</Link>
             </div>
             <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {relatedArticles.map(related => (
