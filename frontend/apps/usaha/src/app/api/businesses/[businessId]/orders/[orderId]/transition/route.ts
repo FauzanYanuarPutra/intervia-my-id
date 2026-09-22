@@ -27,12 +27,19 @@ export async function POST(
       expected_version?: unknown;
       next_status?: unknown;
       reason?: unknown;
+      metadata?: unknown;
     };
     const expectedVersion = Number(body.expected_version);
     const nextStatus =
       typeof body.next_status === 'string' ? body.next_status.trim() : '';
     const reason =
       typeof body.reason === 'string' ? body.reason.trim() : null;
+    const metadata =
+      body.metadata &&
+      typeof body.metadata === 'object' &&
+      !Array.isArray(body.metadata)
+        ? body.metadata
+        : null;
 
     if (!Number.isSafeInteger(expectedVersion) || expectedVersion <= 0 || !nextStatus) {
       return NextResponse.json(
@@ -50,6 +57,7 @@ export async function POST(
         expected_version: expectedVersion,
         next_status: nextStatus,
         reason,
+        metadata,
       },
     );
     return NextResponse.json({ data: result }, { status: 200 });
