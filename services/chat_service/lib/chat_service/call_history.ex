@@ -8,16 +8,29 @@ defmodule ChatService.CallHistory do
 
   def start(call_id, room_id, caller_id_bin, call_type) do
     with {:ok, members} <- room_members(room_id),
-         {:ok, callee_id_bin} <- peer_member(members, caller_id_bin),
-         {:ok, started_at} <-
-           insert_record(call_id, room_id, caller_id_bin, callee_id_bin, call_type),
-         :ok <- insert_user_rows(call_id, room_id, caller_id_bin, callee_id_bin, call_type, started_at) do
-      {:ok, started_at}
-    else
-      {:error, reason} ->
-        _ = delete_record(call_id)
-        _ = delete_user_rows(call_id, caller_id_bin, callee_id_bin, started_at)
-        {:error, reason}
+         {:ok, callee_id_bin} <- peer_member(members, caller_id_bin) do
+      case insert_record(call_id, room_id, caller_id_bin, callee_id_bin, call_type) do
+        {:ok, started_at} ->
+          case insert_user_rows(
+                 call_id,
+                 room_id,
+                 caller_id_bin,
+                 callee_id_bin,
+                 call_type,
+                 started_at
+               ) do
+            :ok ->
+              {:ok, started_at}
+
+            {:error, reason} ->
+              _ = delete_user_rows(call_id, caller_id_bin, callee_id_bin, started_at)
+              _ = delete_record(call_id)
+              {:error, reason}
+          end
+
+        {:error, reason} ->
+          {:error, reason}
+      end
     end
   end
 
