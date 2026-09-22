@@ -99,7 +99,7 @@ function sanitizeSources(value: unknown): string[] {
     if (!normalized || seen.has(normalized)) continue;
     seen.add(normalized);
     result.push(normalized);
-    if (sources.length >= 10) break;
+    if (result.length >= 10) break;
   }
   return result;
 }
