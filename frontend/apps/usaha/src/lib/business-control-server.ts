@@ -454,6 +454,7 @@ export async function transitionControlOrder(
     expected_version: number;
     next_status: string;
     reason?: string | null;
+    metadata?: Record<string, unknown> | null;
   },
 ): Promise<{ order: SellerOrderAggregate; replayed: boolean }> {
   const payload = await requestControl(
