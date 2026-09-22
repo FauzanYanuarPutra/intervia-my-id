@@ -52,13 +52,13 @@ RUN sh -eux -c '\
 # 3. Copy Mix files & Download Dependencies
 # Dilakukan lebih awal agar Docker bisa cache layer 'deps' jika mix.exs tidak berubah
 COPY mix.exs mix.lock ./
-RUN sh -c '\
+RUN sh -eux -c '\
     for i in 1 2 3 4 5; do \
-      mix deps.get --only prod && exit 0; \
+      mix deps.get --only prod && break; \
       echo "mix deps.get failed, retry $i/5"; \
       sleep 8; \
     done; \
-    exit 1'
+    mix deps.get --only prod'
 
 # 4. Copy Source Code
 # PENTING: Pastikan folder _build dan deps di Windows sudah dihapus agar tidak bentrok
