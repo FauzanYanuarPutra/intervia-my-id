@@ -22,6 +22,7 @@ Desktop.ini
 !.env.development.example
 !.env.staging.example
 !.env.production.example
+!.env.ha.example
 .npmrc
 
 # Local runtime, cache, recovery and generated audit output
