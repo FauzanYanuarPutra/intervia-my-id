@@ -103,10 +103,7 @@ import {
 import { resolveContentPriceUnitLabel } from '@/lib/content/priceUnit';
 import { buildContentHref } from '@/lib/content/routes';
 import { resolveListingSide } from '@/lib/content/listingSide';
-import {
-  isExplicitlyNonTransactional,
-  readPublicReference,
-} from '@/lib/content/publicReference';
+import { readPublicReference } from '@/lib/content/publicReference';
 import { isHomeRecommendationEligible } from '@/lib/homeRecommendationRules';
 import {
   homeDesktopGridClassName,
