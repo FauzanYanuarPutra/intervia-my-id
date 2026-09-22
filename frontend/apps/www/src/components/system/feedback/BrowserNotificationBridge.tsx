@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { profileAvatarSrc } from '@/lib/profile/avatar';
 import { soundManager } from '@/lib/soundManager';
+import { readCallAlertPreferences } from '@/lib/callPreferences';
 import {
   ensureNotificationServiceWorkerRegistered,
   isBrowserNotificationSupported,
@@ -108,6 +109,8 @@ export function BrowserNotificationBridge() {
 
   useEffect(() => {
     if (!user || !isBrowserNotificationSupported()) return;
+    const callPreferences = readCallAlertPreferences();
+    if (!callPreferences.enabled || !callPreferences.browserNotifications) return;
     if (Notification.permission !== 'granted') return;
 
     return runWhenIdle(() => {
