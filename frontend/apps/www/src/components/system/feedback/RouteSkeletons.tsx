@@ -2291,6 +2291,13 @@ export function DriverConsoleSkeleton({ className }: { className?: string }) {
 export function NewsListSkeleton() {
   return (
     <main className="page-shell page-rhythm pb-12 pt-4 sm:pt-6" data-skeleton-route="true" aria-busy="true" aria-label="Memuat Lajukan News">
+      <div className="mb-3 flex items-center gap-2">
+        <div className="grid h-8 w-8 place-items-center rounded-[10px] bg-emerald-600 text-xs font-black text-white shadow-sm">L</div>
+        <div>
+          <div className="h-3.5 w-20 rounded bg-slate-200" />
+          <div className="mt-1 h-2.5 w-24 rounded bg-slate-100" />
+        </div>
+      </div>
       <section className="overflow-hidden rounded-[28px] border border-emerald-100 bg-[linear-gradient(135deg,#f0fdf4_0%,#ffffff_48%,#fffaf2_100%)] p-5 dark:border-white/10 dark:bg-slate-950 sm:p-7">
         <Pulse className="h-6 w-28 rounded-full" />
         <Pulse className="mt-3 h-10 w-full max-w-2xl rounded-xl sm:h-12" />
@@ -2359,7 +2366,14 @@ export function NewsListSkeleton() {
 
 export function NewsArticleSkeleton() {
   return (
-    <main className="page-shell page-shell-readable page-rhythm pb-12 pt-6" data-skeleton-route="true" aria-busy="true">
+    <main className="page-shell page-shell-readable page-rhythm pb-12 pt-6" data-skeleton-route="true" aria-busy="true" aria-label="Memuat artikel Lajukan News">
+      <div className="mb-3 flex items-center gap-2">
+        <div className="grid h-8 w-8 place-items-center rounded-[10px] bg-emerald-600 text-xs font-black text-white shadow-sm">L</div>
+        <div>
+          <div className="h-3.5 w-20 rounded bg-slate-200" />
+          <div className="mt-1 h-2.5 w-24 rounded bg-slate-100" />
+        </div>
+      </div>
       <Pulse className="h-9 w-32 rounded-full" />
       <article className="mt-4 overflow-hidden rounded-[34px] border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-900">
         <header className="bg-[linear-gradient(135deg,#f8fafc_0%,#ecfdf5_56%,#fff7ed_100%)] p-5 dark:bg-slate-900 sm:p-8 lg:p-10">
