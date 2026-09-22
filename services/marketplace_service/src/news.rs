@@ -26,6 +26,7 @@ pub(crate) fn router() -> Router<Arc<AppState>> {
         .route("/v1/news/submissions/mine", get(list_my_news_submissions))
         .route("/v1/news/submissions/{id}", patch(update_news_submission))
         .route("/v1/news/editorial/queue", get(list_editorial_queue))
+        .route("/v1/news/editorial/reviewers", get(list_editorial_reviewers))
         .route("/v1/news/{id}/editorial/edit", patch(edit_news_editorial))
         .route("/v1/news/editorial/metrics", get(get_editorial_metrics))
         .route("/v1/news/{id}/editorial", get(list_editorial_history))
@@ -216,6 +217,16 @@ struct NewsSourceReviewRequestRow {
     note: Option<String>,
     created_at: DateTime<Utc>,
     completed_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Serialize, FromRow)]
+struct EditorialReviewerRow {
+    id: Uuid,
+    email: String,
+    username: Option<String>,
+    full_name: Option<String>,
+    is_active: bool,
+    roles: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -2333,6 +2344,76 @@ async fn list_editorial_queue(
             response_error(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "failed to load editorial queue",
+            )
+        }
+    }
+}
+
+async fn list_editorial_reviewers(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    let reviewer_id = match cms_reviewer_id(&headers, &state) {
+        Some(id) => id,
+        None => return response_error(StatusCode::FORBIDDEN, "cms access required"),
+    };
+
+    let rows = sqlx::query_as::<_, EditorialReviewerRow>(
+        r#"
+        SELECT
+            u.id,
+            COALESCE(u.email::text, '') AS email,
+            up.username,
+            up.full_name,
+            u.is_active,
+            COALESCE(
+                ARRAY_AGG(DISTINCT r.name) FILTER (WHERE r.name IS NOT NULL),
+                '{}'
+            ) AS roles
+        FROM core.users u
+        LEFT JOIN core.user_profiles up ON up.user_id = u.id
+        LEFT JOIN core.user_roles ur ON ur.user_id = u.id
+        LEFT JOIN roles r ON r.id = ur.role_id
+        WHERE u.id <> $1
+          AND u.deleted_at IS NULL
+          AND u.is_active = TRUE
+          AND u.status = 'active'
+          AND EXISTS (
+              SELECT 1
+              FROM core.user_roles eligible_ur
+              JOIN roles eligible_role ON eligible_role.id = eligible_ur.role_id
+              WHERE eligible_ur.user_id = u.id
+                AND lower(eligible_role.name::text) IN ('admin', 'content_admin', 'super_admin')
+          )
+        GROUP BY u.id, up.username, up.full_name
+        ORDER BY lower(COALESCE(NULLIF(up.full_name, ''), NULLIF(up.username, ''), u.email::text)) ASC,
+                 u.created_at ASC,
+                 u.id ASC
+        LIMIT 200
+        "#,
+    )
+    .bind(reviewer_id)
+    .fetch_all(&state.db)
+    .await;
+
+    match rows {
+        Ok(data) => (
+            StatusCode::OK,
+            Json(json!({
+                "data": data,
+                "meta": {
+                    "page": 1,
+                    "limit": 200,
+                    "total": data.len()
+                }
+            })),
+        )
+            .into_response(),
+        Err(error) => {
+            tracing::error!("list_editorial_reviewers query error: {:?}", error);
+            response_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load eligible editorial reviewers",
             )
         }
     }
