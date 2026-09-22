@@ -25,5 +25,7 @@ describe('seller orders canonical contract', () => {
     expect(server).toContain("businessPath(businessId, '/orders')");
     expect(server).toContain('/transition');
     expect(server).toContain("'Idempotency-Key': idempotencyKey");
+    expect(inbox).toContain('payment_confirmation');
+    expect(inbox).toContain('Konfirmasi pembayaran manual');
   });
 });
