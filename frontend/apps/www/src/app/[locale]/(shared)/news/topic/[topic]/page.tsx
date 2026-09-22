@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, ArrowRight, Hash } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
+import { NewsMedia } from '@/components/news/NewsMedia';
 import { buildNewsFacetPath, buildNewsFacetUrl, buildNewsPath, getNewsLanguageAvailability, getPublishedNews } from '@/lib/news';
 
 type Props = {
@@ -69,17 +70,18 @@ export default async function NewsTopicPage({ params, searchParams }: Props) {
       {items.length ? (
         <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {items.map(article => (
-            <Link key={article.id} href={buildNewsPath(article.slug)} className="group flex min-h-[230px] flex-col rounded-[26px] border border-slate-200 bg-white p-5 transition hover:-translate-y-0.5 hover:border-emerald-200 dark:border-white/10 dark:bg-slate-900">
-              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-700 dark:text-emerald-300">{article.category}{article.location ? ` • ${article.location}` : ''}</p>
-              <h2 className="mt-3 text-xl font-bold tracking-[-0.04em] text-slate-950 group-hover:text-emerald-800 dark:text-white">{article.title}</h2>
-              <p className="mt-3 line-clamp-4 text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">{article.summary}</p>
-              <span className="mt-auto inline-flex items-center gap-1 pt-5 text-xs font-bold text-emerald-700 dark:text-emerald-300">{isId ? 'Baca' : 'Read'}<ArrowRight className="h-3.5 w-3.5" /></span>
+            <Link key={article.id} href={buildNewsPath(article.slug)} className="group flex min-h-[230px] flex-col overflow-hidden rounded-[24px] border border-slate-200 bg-white transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-sm dark:border-white/10 dark:bg-slate-900">
+              <NewsMedia article={article} variant="card" showLabels={false} />
+              <div className="flex min-h-0 flex-1 flex-col p-4 sm:p-5">
+                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-700 dark:text-emerald-300">{article.category}{article.location ? ' • ' + article.location : ''}</p>
+                <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] text-slate-950 group-hover:text-emerald-800 dark:text-white">{article.title}</h2>
+                <p className="mt-2 line-clamp-3 text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">{article.summary || (isId ? 'Buka artikel untuk membaca konteks selengkapnya.' : 'Open the article for the full context.')}</p>
+                <span className="mt-auto inline-flex items-center gap-1 pt-4 text-xs font-bold text-emerald-700 dark:text-emerald-300">{isId ? 'Baca' : 'Read'}<ArrowRight className="h-3.5 w-3.5" /></span>
+              </div>
             </Link>
           ))}
         </section>
-      ) : (
-        <div className="rounded-[26px] border border-dashed border-slate-300 p-8 text-center text-sm font-semibold text-slate-500 dark:border-white/15">{isId ? 'Belum ada berita untuk topik ini.' : 'No news for this topic yet.'}</div>
-      )}
+      ) : <div className="rounded-[26px] border border-dashed border-slate-300 p-8 text-center text-sm font-semibold text-slate-500 dark:border-white/15">{isId ? 'Belum ada berita untuk topik ini.' : 'No news for this topic yet.'}</div>
       {nextCursor ? (
         <nav aria-label={isId ? 'Navigasi topik berita' : 'News topic navigation'} className="flex justify-center">
           <Link href={`${buildNewsFacetPath('topic', value)}?cursor=${encodeURIComponent(nextCursor)}`} rel="next" className="inline-flex min-h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-5 text-sm font-bold text-slate-700 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200">
