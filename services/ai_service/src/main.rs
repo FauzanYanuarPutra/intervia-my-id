@@ -1343,7 +1343,7 @@ fn task_instructions(task: AiTask, locale: &str) -> &'static str {
     }
 }
 
-async fn call_vllm(
+async fn call_vllm_single(
     state: &AppState,
     request_id: &str,
     model: &str,
@@ -1540,6 +1540,58 @@ async fn call_vllm(
     Err("vllm_failed_after_bounded_retries".to_string())
 }
 
+async fn call_vllm(
+    state: &AppState,
+    request_id: &str,
+    model: &str,
+    messages: &[Value],
+    temperature: f64,
+    max_tokens: u32,
+    schema: Option<&Value>,
+) -> Result<(String, String, Vec<String>), String> {
+    match call_vllm_single(state, request_id, model, messages, temperature, max_tokens, schema).await {
+        Ok(result) => Ok(result),
+        Err(primary_error)
+            if model != state.config.vllm_vision_model
+                && !state.config.vllm_fallback_model.is_empty()
+                && state.config.vllm_fallback_model != model
+                && is_model_unavailable_error(&primary_error) =>
+        {
+            match call_vllm_single(
+                state,
+                request_id,
+                &state.config.vllm_fallback_model,
+                messages,
+                temperature,
+                max_tokens,
+                schema,
+            )
+            .await
+            {
+                Ok((response, returned_model, mut warnings)) => {
+                    warnings.push("vllm_fallback_model_used".to_string());
+                    Ok((response, returned_model, warnings))
+                }
+                Err(fallback_error) => Err(format!(
+                    "primary_model_unavailable: {}; fallback_model_failed: {}",
+                    safe_error(&primary_error, 240),
+                    safe_error(&fallback_error, 240),
+                )),
+            }
+        }
+        Err(error) => Err(error),
+    }
+}
+
+fn is_model_unavailable_error(error: &str) -> bool {
+    let lower = error.to_ascii_lowercase();
+    lower.contains("404")
+        || lower.contains("model not found")
+        || lower.contains("model_not_found")
+        || lower.contains("does not exist")
+        || lower.contains("unknown model")
+        || lower.contains("pull model")
+}
 fn response_schema_for_task(task: AiTask) -> Value {
     let data_schema = task_data_schema(task);
 
