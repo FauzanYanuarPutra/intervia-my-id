@@ -141,37 +141,25 @@ export function HomeNewsSection({
               <Link
                 key={item.id}
                 href={buildNewsPath(item.slug)}
-                className="group relative min-w-0 overflow-hidden rounded-[18px] border border-[color:var(--app-border)] bg-black text-left"
+                className="group min-w-0 overflow-hidden rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] text-left transition hover:border-[color:var(--app-accent-border)] hover:shadow-sm"
                 data-testid="home-news-headline-card"
               >
                 <div className="aspect-[16/9] sm:aspect-[16/8.7] lg:aspect-[16/10]">
                   <NewsImage item={item} priority className="h-full w-full" />
                 </div>
-
-                <div className="absolute inset-x-0 bottom-0 p-3.5 sm:p-4">
-                  <p className="line-clamp-1 text-[9px] font-bold uppercase tracking-[0.12em] text-white/70">
-                    {item.byline}
-                  </p>
-                  <h3 className="mt-1 line-clamp-3 text-[17px] font-black leading-[21px] tracking-[-0.035em] text-white sm:text-[20px] sm:leading-[24px]">
-                    {item.title}
-                  </h3>
-                  {item.summary ? (
-                    <p className="mt-1.5 hidden line-clamp-2 text-[11px] leading-[17px] text-white/78 sm:block">
-                      {item.summary}
-                    </p>
-                  ) : null}
-                  <div className="mt-2.5 flex min-w-0 items-center gap-2 text-[9px] font-semibold text-white/70">
-                    <span className="inline-flex items-center gap-1 shrink-0">
+                <div className="p-3.5 sm:p-4">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-[9px] font-black uppercase tracking-[0.12em] text-emerald-700 dark:text-emerald-300">{item.category}</span>
+                    <span className="text-[9px] font-semibold text-[color:var(--app-text-soft)]">{articleKindLabel(item.articleKind, item.language === 'id')}</span>
+                  </div>
+                  <h3 className="mt-1 line-clamp-3 text-[17px] font-black leading-[21px] tracking-[-0.03em] text-[color:var(--app-text)] group-hover:text-emerald-700 dark:group-hover:text-emerald-300 sm:text-[20px] sm:leading-[24px]">{item.title}</h3>
+                  {item.summary ? <p className="mt-1.5 line-clamp-2 text-[11px] leading-[17px] text-[color:var(--app-text-soft)]">{item.summary}</p> : null}
+                  <div className="mt-2.5 flex min-w-0 items-center gap-2 text-[9px] font-semibold text-[color:var(--app-text-soft)]">
+                    <span className="inline-flex shrink-0 items-center gap-1">
                       <Clock3 className="h-3 w-3" />
-                      {formatNewsDate(item.publishedAt, locale) ||
-                        (isId ? 'Terbaru' : 'Latest')}
+                      {formatNewsDate(item.publishedAt, locale) || (isId ? 'Terbaru' : 'Latest')}
                     </span>
-                    {item.location ? (
-                      <span className="inline-flex min-w-0 items-center gap-1 truncate">
-                        <MapPin className="h-3 w-3 shrink-0" />
-                        <span className="truncate">{item.location}</span>
-                      </span>
-                    ) : null}
+                    {item.location ? <span className="inline-flex min-w-0 items-center gap-1 truncate"><MapPin className="h-3 w-3 shrink-0" /><span className="truncate">{item.location}</span></span> : null}
                   </div>
                 </div>
               </Link>
