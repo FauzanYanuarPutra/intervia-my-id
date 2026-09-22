@@ -1,31 +1,9 @@
 'use client';
 
-import { ArrowRight, Clock3, Newspaper, MapPin } from 'lucide-react';
+import { ArrowRight, Clock3, Newspaper } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
-import { buildNewsPath, type LajukanNewsArticle } from '@/lib/news';
-import { NewsMedia } from '@/components/news/NewsMedia';
-
-function formatNewsDate(value: string, locale: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-
-  return new Intl.DateTimeFormat(locale === 'id' ? 'id-ID' : 'en-US', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  }).format(date);
-}
-
-function articleKindLabel(
-  articleKind: LajukanNewsArticle['articleKind'],
-  isId: boolean,
-) {
-  if (articleKind === 'analysis') return isId ? 'Analisis' : 'Analysis';
-  if (articleKind === 'press_release') {
-    return isId ? 'Rilis' : 'Press release';
-  }
-  return isId ? 'Berita' : 'News';
-}
+import type { LajukanNewsArticle } from '@/lib/news';
+import { NewsCard } from '@/components/news/NewsCard';
 
 export function HomeNewsSection({
   locale,
@@ -50,22 +28,17 @@ export function HomeNewsSection({
           </span>
           <div className="min-w-0">
             <div className="flex min-w-0 items-center gap-2">
-              <h2
-                id="home-news-title"
-                className="truncate text-[13px] font-black tracking-[-0.025em] text-[color:var(--app-text)] sm:text-[14px]"
-              >
+              <h2 id="home-news-title" className="truncate text-[13px] font-black tracking-[-0.025em] text-[color:var(--app-text)] sm:text-[14px]">
                 Lajukan News
               </h2>
-              {visibleItems.length > 0 ? (
+              {visibleItems.length ? (
                 <span className="hidden rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-bold text-emerald-700 sm:inline dark:bg-emerald-950/60 dark:text-emerald-300">
                   {isId ? 'Terbaru' : 'Latest'}
                 </span>
               ) : null}
             </div>
             <p className="hidden truncate text-[10px] font-medium text-[color:var(--app-text-soft)] sm:block">
-              {isId
-                ? 'Berita ekonomi, bisnis, UMKM, teknologi, dan daerah yang relevan untuk usaha.'
-                : 'Economy, business, SME, technology, and local news relevant to businesses.'}
+              {isId ? 'Berita bisnis, UMKM, ekonomi, teknologi, dan daerah.' : 'Business, SME, economy, technology, and local news.'}
             </p>
           </div>
         </div>
@@ -79,102 +52,22 @@ export function HomeNewsSection({
         </Link>
       </div>
 
-      {visibleItems.length > 0 ? (
+      {visibleItems.length ? (
         <>
-          <div className="mt-3 hidden gap-2.5 px-3 sm:grid sm:gap-3 sm:px-4 md:px-5 lg:grid-cols-2">
-            {visibleItems.slice(0, 1).map(item => (
-              <Link
-                key={item.id}
-                href={buildNewsPath(item.slug)}
-                className="group flex min-w-0 h-full flex-col overflow-hidden rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] text-left transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:shadow-sm"
-                data-testid="home-news-headline-card"
-              >
-                <div className="aspect-[16/9] sm:aspect-[16/8.7] lg:aspect-[16/10]">
-                  <NewsMedia article={item} variant="hero" priority showLabels={false} className="h-full w-full" />
-                </div>
-                <div className="flex-1 p-3.5 sm:p-4">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="text-[9px] font-black uppercase tracking-[0.12em] text-emerald-700 dark:text-emerald-300">{item.category}</span>
-                    <span className="text-[9px] font-semibold text-[color:var(--app-text-soft)]">{articleKindLabel(item.articleKind, item.language === 'id')}</span>
-                  </div>
-                  <h3 className="mt-1 line-clamp-3 text-[17px] font-black leading-[21px] tracking-[-0.03em] text-[color:var(--app-text)] group-hover:text-emerald-700 dark:group-hover:text-emerald-300 sm:text-[20px] sm:leading-[24px]">{item.title}</h3>
-                  {item.summary ? <p className="mt-1.5 line-clamp-2 text-[11px] leading-[17px] text-[color:var(--app-text-soft)]">{item.summary}</p> : null}
-                  <div className="mt-2.5 flex min-w-0 items-center gap-2 text-[9px] font-semibold text-[color:var(--app-text-soft)]">
-                    <span className="inline-flex shrink-0 items-center gap-1">
-                      <Clock3 className="h-3 w-3" />
-                      {formatNewsDate(item.publishedAt, locale) || (isId ? 'Terbaru' : 'Latest')}
-                    </span>
-                    {item.location ? <span className="inline-flex min-w-0 items-center gap-1 truncate"><MapPin className="h-3 w-3 shrink-0" /><span className="truncate">{item.location}</span></span> : null}
-                  </div>
-                </div>
-              </Link>
-            ))}
-
+          <div className="mt-3 hidden gap-3 px-3 sm:grid sm:px-4 md:px-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+            <NewsCard article={visibleItems[0]} locale={locale} variant="hero" priority />
             <div className="grid min-w-0 gap-2.5 sm:gap-3">
               {visibleItems.slice(1).map(item => (
-                <Link
-                  key={item.id}
-                  href={buildNewsPath(item.slug)}
-                  className="group grid min-w-0 grid-cols-[112px_minmax(0,1fr)] gap-3 rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] p-2.5 text-left transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface-muted)] sm:grid-cols-[132px_minmax(0,1fr)] sm:p-3"
-                  data-testid="home-news-card"
-                >
-                  <NewsMedia
-                    article={item}
-                    variant="thumb"
-                    showLabels={false}
-                    className="w-full rounded-[12px]"
-                  />
-
-                  <div className="min-w-0 py-0.5">
-                    <div className="flex min-w-0 items-center gap-1.5">
-                      <span className="max-w-[48%] truncate text-[9px] font-extrabold text-emerald-700 dark:text-emerald-300">
-                        {item.category}
-                      </span>
-                      <span className="truncate text-[9px] font-semibold text-[color:var(--app-text-soft)]">
-                        {formatNewsDate(item.publishedAt, locale) ||
-                          (isId ? 'Terbaru' : 'Latest')}
-                      </span>
-                    </div>
-                    <h3 className="mt-1 line-clamp-2 text-[12px] font-extrabold leading-[17px] tracking-[-0.018em] text-[color:var(--app-text)] transition-colors group-hover:text-emerald-700 dark:group-hover:text-emerald-300 sm:text-[13px]">
-                      {item.title}
-                    </h3>
-                    {item.summary ? (
-                      <p className="mt-1 line-clamp-2 text-[10px] leading-[15px] text-[color:var(--app-text-soft)]">
-                        {item.summary}
-                      </p>
-                    ) : null}
-                    {item.location ? (
-                      <p className="mt-1.5 flex items-center gap-1 truncate text-[9px] font-semibold text-[color:var(--app-text-soft)]">
-                        <MapPin className="h-3 w-3 shrink-0" />
-                        <span className="truncate">{item.location}</span>
-                      </p>
-                    ) : null}
-                  </div>
-                </Link>
+                <NewsCard key={item.id} article={item} locale={locale} variant="compact" />
               ))}
             </div>
           </div>
 
           <div className="mt-2.5 flex gap-2 overflow-x-auto px-3 pb-0.5 sm:hidden">
             {visibleItems.map(item => (
-              <Link
-                key={`mobile-${item.id}`}
-                href={buildNewsPath(item.slug)}
-                className="group min-w-[82vw] max-w-[340px] shrink-0 overflow-hidden rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)]"
-                data-testid="home-news-mobile-card"
-              >
-                <div className="aspect-[16/9]">
-                  <NewsMedia article={item} variant="card" showLabels={false} className="h-full w-full" />
-                </div>
-                <div className="p-3">
-                  <p className="text-[9px] font-bold text-emerald-700 dark:text-emerald-300">
-                    {item.category}
-                  </p>
-                  <h3 className="mt-1 line-clamp-2 text-[14px] font-extrabold leading-[19px] text-[color:var(--app-text)]">
-                    {item.title}
-                  </h3>
-                </div>
-              </Link>
+              <div key={item.id} className="min-w-[82vw] max-w-[340px] shrink-0">
+                <NewsCard article={item} locale={locale} variant="hero" priority={item.id === visibleItems[0]?.id} />
+              </div>
             ))}
           </div>
         </>
@@ -182,11 +75,14 @@ export function HomeNewsSection({
         <div className="mx-3 mt-3 flex items-center justify-between gap-3 rounded-[16px] border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-3 sm:mx-4 md:mx-5">
           <div className="flex min-w-0 items-center gap-2">
             <Newspaper className="h-4 w-4 shrink-0 text-[color:var(--app-accent)]" />
-            <p className="min-w-0 text-[10px] font-semibold leading-4 text-[color:var(--app-text-soft)]">
-              {isId
-                ? 'Belum ada berita terbaru yang terbit.'
-                : 'No published news yet.'}
-            </p>
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold leading-4 text-[color:var(--app-text-soft)]">
+                {isId ? 'Belum ada berita terbaru yang terbit.' : 'No published news yet.'}
+              </p>
+              <p className="mt-0.5 text-[9px] font-medium text-[color:var(--app-text-soft)]">
+                {isId ? 'Coba lagi nanti untuk update terbaru.' : 'Check again later for the latest updates.'}
+              </p>
+            </div>
           </div>
           <Link
             href="/news"
