@@ -125,8 +125,6 @@ export function CameraCaptureModal({
     if (!streamRef.current) return;
     streamRef.current.getTracks().forEach(track => track.stop());
     streamRef.current = null;
-    setHasTorch(false);
-    setTorchEnabled(false);
   }, []);
 
   const startCamera = useCallback(async () => {
@@ -140,6 +138,8 @@ export function CameraCaptureModal({
     setStatus('loading');
     setErrorMsg(null);
     setVideoReady(false);
+    setHasTorch(false);
+    setTorchEnabled(false);
     clearCapturedPreview();
     stopStream();
 
@@ -178,12 +178,7 @@ export function CameraCaptureModal({
   }, [clearCapturedPreview, facingMode, locale, open, stopStream]);
 
   useEffect(() => {
-    if (!open) {
-      stopStream();
-      clearCapturedPreview();
-      setStatus('idle');
-      return;
-    }
+    if (!open) return;
 
     const timeoutId = window.setTimeout(() => {
       void startCamera();
@@ -193,7 +188,7 @@ export function CameraCaptureModal({
       window.clearTimeout(timeoutId);
       stopStream();
     };
-  }, [clearCapturedPreview, open, startCamera, stopStream]);
+  }, [open, startCamera, stopStream]);
 
   useEffect(() => {
     if (status !== 'ready' || !streamRef.current || !videoRef.current) return;
@@ -293,6 +288,9 @@ export function CameraCaptureModal({
   const handleClose = useCallback(() => {
     stopStream();
     clearCapturedPreview();
+    setHasTorch(false);
+    setTorchEnabled(false);
+    setVideoReady(false);
     setStatus('idle');
     onClose();
   }, [clearCapturedPreview, onClose, stopStream]);
