@@ -72,7 +72,7 @@ export default function LocaleLoading() {
         </div>
 
         <div className="mt-5 h-1.5 w-24 overflow-hidden rounded-full bg-emerald-100/90 dark:bg-emerald-950/70">
-          <div className="h-full w-2/5 rounded-full bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.7)] animate-[lajukan-loading-bar_1.4s_ease-in-out_infinite]" />
+          <div className="h-full w-2/5 rounded-full bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.7)] lajukan-loading-bar" />
         </div>
       </div>
 
@@ -89,8 +89,12 @@ export default function LocaleLoading() {
           }
         }
 
+        .lajukan-loading-bar {
+          animation: lajukan-loading-bar 1.4s ease-in-out infinite;
+        }
+
         @media (prefers-reduced-motion: reduce) {
-          .animate-\[lajukan-loading-bar_1\.4s_ease-in-out_infinite\] {
+          .lajukan-loading-bar {
             animation: none !important;
             transform: translateX(0);
           }
