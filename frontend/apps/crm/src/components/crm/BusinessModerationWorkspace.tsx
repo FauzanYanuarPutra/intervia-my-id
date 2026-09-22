@@ -155,15 +155,15 @@ export default function BusinessModerationWorkspace() {
   const [severity, setSeverity] = useState<"low" | "medium" | "high" | "critical">("medium");
   const [busy, setBusy] = useState(false);
 
-  const loadBusinesses = useCallback(async () => {
+  const loadBusinesses = useCallback(async (searchQuery = '') => {
     if (!accessToken) return;
     setLoading(true);
     try {
       const [response, referenceResponse] = await Promise.all([
-        businessModerationApi.list(accessToken, { limit: "100", q: query }),
+        businessModerationApi.list(accessToken, { limit: "100", q: searchQuery }),
         businessModerationApi.references(accessToken, {
           limit: "100",
-          q: query,
+          q: searchQuery,
           status: referenceStatus,
         }),
       ]);
@@ -175,7 +175,7 @@ export default function BusinessModerationWorkspace() {
     } finally {
       setLoading(false);
     }
-  }, [accessToken, query, referenceStatus]);
+  }, [accessToken, referenceStatus]);
 
   useEffect(() => {
     void loadBusinesses();
@@ -290,7 +290,7 @@ export default function BusinessModerationWorkspace() {
           : "Keputusan moderasi usaha berhasil disimpan dan masuk history.",
       );
       setDraft(null);
-      await loadBusinesses();
+      await loadBusinesses(query);
       if (selected?.id === draft.business.id) await openHistory(draft.business);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Keputusan usaha gagal disimpan.");
@@ -579,7 +579,7 @@ export default function BusinessModerationWorkspace() {
                     {business.review_state !== "approved" || business.assigned_to !== user?.id ? (
                       <button
                         type="button"
-                        onClick={() => void (accessToken && businessModerationApi.assign(accessToken, business.id, user?.id || null, 24).then(() => loadBusinesses()))}
+                        onClick={() => void (accessToken && businessModerationApi.assign(accessToken, business.id, user?.id || null, 24).then(() => loadBusinesses(query)))}
                         className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700"
                       >
                         {business.assigned_to === user?.id ? "Saya pegang tugas" : "Ambil tugas"}
@@ -588,7 +588,7 @@ export default function BusinessModerationWorkspace() {
                     {business.assigned_to === user?.id ? (
                       <button
                         type="button"
-                        onClick={() => void (accessToken && businessModerationApi.assign(accessToken, business.id, null).then(() => loadBusinesses()))}
+                        onClick={() => void (accessToken && businessModerationApi.assign(accessToken, business.id, null).then(() => loadBusinesses(query)))}
                         className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700"
                       >
                         Lepas tugas
@@ -819,7 +819,7 @@ export default function BusinessModerationWorkspace() {
                   }).then(async () => {
                     setReferenceDraft(null);
                     setNotice(referenceDraft.action === "hide" ? "Data referensi disembunyikan dan dicatat di history moderasi." : "Data referensi dipulihkan.");
-                    await loadBusinesses();
+                    await loadBusinesses(query);
                   }).catch(error => {
                     setNotice(error instanceof Error ? error.message : "Keputusan data referensi gagal.");
                   }).finally(() => setBusy(false));
@@ -968,7 +968,7 @@ export default function BusinessModerationWorkspace() {
                         setNotice("Verifikasi ditolak. Catatan pemeriksaan tersimpan.");
                         setVerificationDraft(null);
                         setVerificationReason("");
-                        await loadBusinesses();
+                        await loadBusinesses(query);
                       }).catch(error => setNotice(error instanceof Error ? error.message : "Keputusan verifikasi gagal."))
                         .finally(() => setBusy(false));
                     }}
@@ -989,7 +989,7 @@ export default function BusinessModerationWorkspace() {
                         setNotice("Usaha berhasil diverifikasi di Lajukan. Sekarang keputusan penayangan bisa diproses.");
                         setVerificationDraft(null);
                         setVerificationReason("");
-                        await loadBusinesses();
+                        await loadBusinesses(query);
                       }).catch(error => setNotice(error instanceof Error ? error.message : "Keputusan verifikasi gagal."))
                         .finally(() => setBusy(false));
                     }}
