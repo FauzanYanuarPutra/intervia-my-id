@@ -2913,7 +2913,7 @@ export default function CreateListingWizard({
 
                 lastError = new Error(
                   responseErrorMessage(
-                    payload,
+                    valueAsRecord(payload),
                     text(
                       locale,
                       'Perubahan belum berhasil disimpan.',
