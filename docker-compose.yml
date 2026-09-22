@@ -969,8 +969,6 @@ services:
       SMTP_FROM: ${SMTP_FROM:-}
       FROM_EMAIL: ${FROM_EMAIL:-}
       FROM_NAME: ${FROM_NAME:-Lajukan}
-    depends_on:
-      domain_db: { condition: service_healthy }
     volumes:
       - www_runtime:/app/apps/www/.runtime
     expose: ["3000"]
