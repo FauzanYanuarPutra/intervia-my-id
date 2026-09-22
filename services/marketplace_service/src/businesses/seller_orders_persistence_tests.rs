@@ -184,6 +184,7 @@ fn transition_request(expected_version: i64, next_status: &str) -> TransitionSel
         expected_version,
         next_status: next_status.to_owned(),
         reason: Some("operasional normal".to_owned()),
+        metadata: None,
     }
 }
 
@@ -240,6 +241,60 @@ async fn seller_transition_is_atomic_and_replay_safe(pool: PgPool) {
     .await
     .unwrap();
     assert_eq!(outbox_count, 1);
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn seller_can_confirm_manual_payment_from_pending_payment(pool: PgPool) {
+    let seeded = seed_order_context(&pool, "PENDING_PAYMENT").await;
+    let repository = SellerOrderRepository::new(pool.clone());
+    let mut request = transition_request(1, "PAID");
+    request.reason = Some("Pembayaran manual dikonfirmasi".to_owned());
+    request.metadata = Some(serde_json::json!({
+        "payment_confirmation": {
+            "mode": "manual",
+            "method": "cash",
+            "reference": "",
+            "note": "Dibayar tunai di toko"
+        }
+    }));
+
+    let outcome = repository
+        .transition(
+            seeded.actor_id,
+            seeded.business_id,
+            seeded.organization_id,
+            seeded.order_id,
+            Uuid::new_v4(),
+            request,
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(outcome.order.order.base_status, "PAID");
+    assert_eq!(outcome.order.order.payment_status, "PAID");
+
+    let (base_status, payment_status, paid_at, provider, metadata): (
+        String,
+        String,
+        Option<chrono::DateTime<chrono::Utc>>,
+        Option<String>,
+        serde_json::Value,
+    ) = sqlx::query_as(
+        "SELECT base_status::text, payment_status::text, paid_at, payment_provider, category_specific_metadata FROM orders WHERE id=$1",
+    )
+    .bind(seeded.order_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+
+    assert_eq!(base_status, "PAID");
+    assert_eq!(payment_status, "PAID");
+    assert!(paid_at.is_some());
+    assert_eq!(provider.as_deref(), Some("manual"));
+    assert_eq!(
+        metadata["payment_confirmation"]["method"].as_str(),
+        Some("cash")
+    );
 }
 
 #[sqlx::test(migrations = "./migrations")]
