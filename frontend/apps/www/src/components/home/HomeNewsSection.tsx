@@ -3,6 +3,7 @@
 import { ArrowRight, Clock3, Newspaper, MapPin } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { buildNewsPath, type LajukanNewsArticle } from '@/lib/news';
+import { NewsMedia } from '@/components/news/NewsMedia';
 
 function formatNewsDate(value: string, locale: string) {
   const date = new Date(value);
@@ -26,67 +27,6 @@ function articleKindLabel(
   return isId ? 'Berita' : 'News';
 }
 
-function NewsImage({
-  item,
-  priority = false,
-  className = '',
-}: {
-  item: LajukanNewsArticle;
-  priority?: boolean;
-  className?: string;
-}) {
-  return (
-    <div
-      className={`relative overflow-hidden bg-[color:var(--app-surface-muted)] ${className}`}
-    >
-      {item.coverImage ? (
-        <img
-          src={item.coverImage}
-          alt={item.title}
-          loading={priority ? 'eager' : 'lazy'}
-          fetchPriority={priority ? 'high' : 'auto'}
-          decoding="async"
-          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.035]"
-          onError={event => {
-            event.currentTarget.style.display = 'none';
-            const fallback =
-              event.currentTarget.parentElement?.querySelector(
-                '[data-news-image-fallback]',
-              );
-            if (fallback instanceof HTMLElement) {
-              fallback.classList.remove('hidden');
-            }
-          }}
-        />
-      ) : null}
-
-      <div
-        data-news-image-fallback
-        className={`absolute inset-0 items-center justify-between gap-4 bg-[linear-gradient(135deg,#ecfdf5_0%,#f8fafc_58%,#fff7ed_100%)] p-4 dark:bg-[linear-gradient(135deg,#082319_0%,#0f172a_62%,#1c1917_100%)] ${item.coverImage ? 'hidden flex' : 'flex'}`}
-        aria-hidden="true"
-      >
-        <div className="min-w-0">
-          <div className="flex h-10 w-10 items-center justify-center rounded-[13px] bg-emerald-700 text-sm font-black text-white shadow-sm">L</div>
-          <p className="mt-2 text-[9px] font-black uppercase tracking-[0.12em] text-emerald-800 dark:text-emerald-300">Lajukan News</p>
-          <p className="mt-1 truncate text-xs font-bold text-slate-600 dark:text-slate-300">{item.category}</p>
-        </div>
-        <Newspaper className="h-9 w-9 shrink-0 text-emerald-700/20 dark:text-emerald-300/20" />
-      </div>
-
-      <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/45 to-transparent" />
-
-      <div className="absolute left-3 top-3 flex min-w-0 items-center gap-1.5">
-        <span className="max-w-[48%] truncate rounded-full bg-white/92 px-2 py-1 text-[9px] font-extrabold text-emerald-800 shadow-sm backdrop-blur dark:bg-slate-950/90 dark:text-emerald-300">
-          {item.category}
-        </span>
-        <span className="max-w-[45%] truncate rounded-full bg-black/50 px-2 py-1 text-[9px] font-bold text-white backdrop-blur">
-          {articleKindLabel(item.articleKind, item.language === 'id')}
-        </span>
-      </div>
-    </div>
-  );
-}
-
 export function HomeNewsSection({
   locale,
   items,
@@ -99,7 +39,7 @@ export function HomeNewsSection({
 
   return (
     <section
-      className="w-full overflow-hidden rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] py-3 shadow-[0_16px_34px_-30px_rgba(15,23,42,0.22)]"
+      className="w-full overflow-hidden rounded-[24px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] py-3.5 shadow-[0_16px_34px_-30px_rgba(15,23,42,0.22)]"
       aria-labelledby="home-news-title"
       data-testid="home-news-section"
     >
@@ -150,7 +90,7 @@ export function HomeNewsSection({
                 data-testid="home-news-headline-card"
               >
                 <div className="aspect-[16/9] sm:aspect-[16/8.7] lg:aspect-[16/10]">
-                  <NewsImage item={item} priority className="h-full w-full" />
+                  <NewsMedia article={item} variant="hero" priority showLabels={false} className="h-full w-full" />
                 </div>
                 <div className="flex-1 p-3.5 sm:p-4">
                   <div className="flex flex-wrap items-center gap-1.5">
@@ -178,9 +118,11 @@ export function HomeNewsSection({
                   className="group grid min-w-0 grid-cols-[112px_minmax(0,1fr)] gap-3 rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] p-2.5 text-left transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface-muted)] sm:grid-cols-[132px_minmax(0,1fr)] sm:p-3"
                   data-testid="home-news-card"
                 >
-                  <NewsImage
-                    item={item}
-                    className="aspect-[4/3] w-full rounded-[12px]"
+                  <NewsMedia
+                    article={item}
+                    variant="thumb"
+                    showLabels={false}
+                    className="w-full rounded-[12px]"
                   />
 
                   <div className="min-w-0 py-0.5">
@@ -218,17 +160,17 @@ export function HomeNewsSection({
               <Link
                 key={`mobile-${item.id}`}
                 href={buildNewsPath(item.slug)}
-                className="group min-w-[76vw] max-w-[310px] shrink-0 overflow-hidden rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)]"
+                className="group min-w-[82vw] max-w-[340px] shrink-0 overflow-hidden rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)]"
                 data-testid="home-news-mobile-card"
               >
                 <div className="aspect-[16/9]">
-                  <NewsImage item={item} className="h-full w-full" />
+                  <NewsMedia article={item} variant="card" showLabels={false} className="h-full w-full" />
                 </div>
                 <div className="p-3">
                   <p className="text-[9px] font-bold text-emerald-700 dark:text-emerald-300">
                     {item.category}
                   </p>
-                  <h3 className="mt-1 line-clamp-2 text-[13px] font-extrabold leading-[18px] text-[color:var(--app-text)]">
+                  <h3 className="mt-1 line-clamp-2 text-[14px] font-extrabold leading-[19px] text-[color:var(--app-text)]">
                     {item.title}
                   </h3>
                 </div>
