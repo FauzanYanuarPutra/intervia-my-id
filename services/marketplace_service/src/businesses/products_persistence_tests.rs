@@ -222,6 +222,7 @@ async fn product_update_and_inventory_adjustment_keep_public_projection_in_sync(
                 consignment_terms: None,
                 notes: Some("internal only".to_owned()),
                 image: None,
+                reason: Some("test product status change".to_owned()),
             },
         )
         .await
@@ -310,6 +311,7 @@ async fn cross_tenant_product_mutation_is_not_found(pool: PgPool) {
                 consignment_terms: None,
                 notes: None,
                 image: None,
+                reason: None,
             },
         )
         .await
