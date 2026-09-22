@@ -39,6 +39,25 @@ self.addEventListener('push', (event) => {
   }
 
   const isIncomingCall = payload.type === 'incoming_call';
+  const isCallCleanup = payload.type === 'call_end';
+
+  if (isCallCleanup) {
+    const tag =
+      typeof payload.tag === 'string' && payload.tag
+        ? payload.tag
+        : typeof payload.call_id === 'string' && payload.call_id
+          ? 'incoming-call:' + payload.call_id
+          : '';
+
+    event.waitUntil(
+      self.registration
+        .getNotifications(tag ? { tag } : undefined)
+        .then(notifications => {
+          notifications.forEach(notification => notification.close());
+        }),
+    );
+    return;
+  }
 
   event.waitUntil(
     self.registration.showNotification(payload.title || fallback.title, {
@@ -62,6 +81,10 @@ self.addEventListener('push', (event) => {
         call_id: payload.call_id,
         room_id: payload.room_id,
         call_type: payload.call_type,
+        url:
+          typeof payload.url === 'string' && payload.url
+            ? payload.url
+            : payload.data?.url || fallback.data.url,
       },
     }),
   );
@@ -107,7 +130,7 @@ self.addEventListener('notificationclick', (event) => {
         if ('focus' in client) {
           try {
             const url = new URL(client.url);
-            const desired = new URL(targetUrl, self.location.origin);
+            const desired = new URL(resolvedTargetUrl, self.location.origin);
 
             if (url.origin === desired.origin) {
               if ('navigate' in client) {
