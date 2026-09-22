@@ -75,17 +75,19 @@ export default async function NewsIndexPage({ params, searchParams }: PageProps)
 
   return (
     <main className="page-shell page-rhythm pb-12 pt-5 sm:pt-6">
-      <section className="overflow-hidden rounded-[26px] border border-emerald-100 bg-[linear-gradient(135deg,#f0fdf4_0%,#ffffff_52%,#fffaf2_100%)] shadow-[0_20px_60px_-48px_rgba(15,23,42,0.3)] dark:border-white/10 dark:bg-[linear-gradient(135deg,#06261b_0%,#0f172a_62%,#1c1917_100%)]">
-        <div className="grid gap-5 p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_240px] lg:items-end lg:p-7">
+      <section className="overflow-hidden rounded-[22px] border border-emerald-100 bg-[linear-gradient(135deg,#f0fdf4_0%,#ffffff_52%,#fffaf2_100%)] shadow-[0_20px_60px_-48px_rgba(15,23,42,0.3)] dark:border-white/10 dark:bg-[linear-gradient(135deg,#06261b_0%,#0f172a_62%,#1c1917_100%)]">
+        <div className="grid gap-5 p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_220px] lg:items-end lg:p-6">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <span className="grid h-9 w-9 place-items-center rounded-[12px] bg-emerald-700 text-sm font-black text-white shadow-sm">L</span>
+              <span className="grid h-9 w-9 place-items-center rounded-[12px] border border-emerald-100 bg-white p-2 shadow-sm dark:border-emerald-400/20 dark:bg-white/10">
+                <img src="/logo.svg" alt="" className="h-5 w-auto object-contain" />
+              </span>
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300">Lajukan</p>
                 <p className="text-xs font-bold text-slate-500 dark:text-slate-400">News</p>
               </div>
             </div>
-            <h1 className="mt-3 max-w-3xl text-[30px] font-black leading-[1.08] tracking-[-0.055em] text-slate-950 dark:text-white sm:text-4xl">
+            <h1 className="mt-3 max-w-3xl text-[28px] font-black leading-[1.08] tracking-[-0.055em] text-slate-950 dark:text-white sm:text-[38px]">
               {isId ? 'Berita yang membantu usaha bergerak.' : 'News that helps businesses move.'}
             </h1>
             <p className="mt-2.5 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300 sm:text-[15px]">
@@ -141,7 +143,7 @@ export default async function NewsIndexPage({ params, searchParams }: PageProps)
         </button>
       </form>
 
-      <div className="flex min-h-5 items-center justify-between gap-3">
+      <div className="flex min-h-5 items-center justify-between gap-3 border-b border-slate-100 pb-2 dark:border-white/10">
         <div className="min-w-0 truncate text-xs font-semibold text-slate-500 dark:text-slate-400">
           {query ? (isId ? `Hasil untuk “${query}”` : `Results for “${query}”`) : (isId ? 'Berita terbaru' : 'Latest stories')}
         </div>
