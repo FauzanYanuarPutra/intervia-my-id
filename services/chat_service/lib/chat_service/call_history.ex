@@ -16,6 +16,7 @@ defmodule ChatService.CallHistory do
     else
       {:error, reason} ->
         _ = delete_record(call_id)
+        _ = delete_user_rows(call_id, caller_id_bin, callee_id_bin, started_at)
         {:error, reason}
     end
   end
@@ -188,6 +189,26 @@ defmodule ChatService.CallHistory do
       {:error, reason} ->
         {:error, reason}
     end
+  end
+
+  defp delete_user_rows(call_id, caller_id_bin, callee_id_bin, started_at) do
+    bucket_value = bucket(started_at)
+
+    [caller_id_bin, callee_id_bin]
+    |> Enum.filter(&is_binary/1)
+    |> Enum.each(fn user_id_bin ->
+      _ =
+        Repo.execute(
+          "DELETE FROM call_history_by_user WHERE user_id = ? AND bucket = ? AND call_id = ?",
+          [
+            {"uuid", user_id_bin},
+            {"int", bucket_value},
+            {"uuid", call_id}
+          ]
+        )
+    end)
+
+    :ok
   end
 
   defp delete_record(call_id) do
