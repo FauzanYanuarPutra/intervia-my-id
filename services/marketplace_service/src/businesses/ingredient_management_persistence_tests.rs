@@ -120,6 +120,7 @@ fn update_request() -> UpdateIngredientRequest {
         waste_percent: Decimal::from(5),
         minimum_stock: Decimal::from(500),
         supplier_name: Some("Pasar Induk".into()),
+        reason: Some("test ingredient update".into()),
     }
 }
 
@@ -201,7 +202,8 @@ async fn active_recipe_blocks_archive(pool: PgPool) {
             seeded.business_id,
             seeded.organization_id,
             seeded.ingredient_id,
-        )
+            "test archive reason",
+            )
         .await
         .unwrap_err();
 
@@ -274,7 +276,8 @@ async fn effective_published_recipe_version_blocks_archive_even_without_legacy_r
             seeded.business_id,
             seeded.organization_id,
             seeded.ingredient_id,
-        )
+            "test archive reason",
+            )
         .await
         .unwrap_err();
 
@@ -295,7 +298,8 @@ async fn unused_ingredient_can_be_archived_without_deleting_history(pool: PgPool
             seeded.business_id,
             seeded.organization_id,
             seeded.ingredient_id,
-        )
+            "test archive reason",
+            )
         .await
         .unwrap();
 
