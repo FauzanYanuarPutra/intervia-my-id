@@ -36,6 +36,7 @@ import {
 } from '@/lib/super-app/umkm-storefront-products';
 import { serializeJsonLd } from '@/lib/seo/jsonLd';
 import { StorefrontProductOrderAction } from './StorefrontProductOrderAction';
+import { StorefrontOrderCart } from './StorefrontOrderCart';
 import { resolveStorefrontBrandMedia } from '@/lib/super-app/storefront-brand-media';
 import { ReportBusinessButton } from '@/components/umkm/ReportBusinessButton';
 
@@ -128,10 +129,12 @@ function ProductCard({
   product,
   isId,
   onlineOrderEnabled,
+  cartEnabled,
 }: {
   product: UmkmProduct;
   isId: boolean;
   onlineOrderEnabled: boolean;
+  cartEnabled: boolean;
 }) {
   const stockStatus = getStorefrontProductStockStatus(product);
   const image = productImage(product);
@@ -213,6 +216,8 @@ function ProductCard({
             storeId={product.store_id}
             productId={product.id}
             productName={product.name}
+            productPriceCents={product.price_cents}
+            cartEnabled={cartEnabled}
             onlineOrderEnabled={onlineOrderEnabled}
             productAvailable={available}
             isId={isId}
@@ -503,7 +508,7 @@ export default async function TokoPage({ params }: PageProps) {
 
       <main
         data-layout="compact-food-storefront"
-        className="min-h-screen bg-white pb-8 text-slate-950 dark:bg-slate-950 dark:text-slate-50 sm:bg-slate-50 sm:py-4 sm:dark:bg-slate-950 lg:py-6"
+        className="min-h-screen bg-white pb-24 text-slate-950 dark:bg-slate-950 dark:text-slate-50 sm:bg-slate-50 sm:py-4 sm:dark:bg-slate-950 lg:py-6"
       >
         <div className="mx-auto w-full max-w-[960px] sm:px-4 lg:px-5">
 
@@ -617,7 +622,7 @@ export default async function TokoPage({ params }: PageProps) {
             </div>
           </section>
 
-          <section
+          <StorefrontOrderCart storeId={store.id} isId={isId} locale={locale} />\n\n      <section
             id="produk"
             className="mt-1.5 bg-white dark:bg-slate-900 sm:mt-3 sm:overflow-hidden sm:rounded-3xl sm:border sm:border-slate-200 sm:shadow-sm sm:dark:border-slate-800"
             data-testid="storefront-products"
@@ -698,6 +703,7 @@ export default async function TokoPage({ params }: PageProps) {
                             product={product}
                             isId={isId}
                             onlineOrderEnabled={store.online_order_enabled}
+                            cartEnabled={store.online_order_enabled}
                           />
                         ))}
                       </div>
