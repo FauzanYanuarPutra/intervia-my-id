@@ -7722,27 +7722,37 @@ export default function ChatRoomPage() {
                               </div>
                             ) : msg.message_type === 'image' &&
                               msg.attachments?.[0] ? (
-                              <div className="space-y-2">
-                                {msg.attachments.map((rawUrl, index) => {
-                                  const imageUrl =
-                                    normalizeAttachmentUrl(rawUrl);
-                                  if (!imageUrl) return null;
-                                  return (
-                                    <img
-                                      key={`${msg.id}-img-${index}`}
-                                      src={imageUrl}
-                                      alt={
-                                        (msg.attachments?.length ?? 0) > 1
-                                          ? `Image ${index + 1}`
-                                          : 'Image'
-                                      }
-                                      className="mx-auto block max-h-[min(48dvh,420px)] max-w-full rounded-[12px] border border-black/[0.06] bg-black/95 object-contain shadow-sm dark:border-white/[0.08] sm:max-h-[460px]"
-                                      loading="lazy"
-                                    />
-                                  );
-                                })}
+                              <div className="space-y-1.5">
+                                {msg.attachments.length === 1 ? (
+                                  <img
+                                    src={normalizeAttachmentUrl(msg.attachments[0])}
+                                    alt="Image"
+                                    className="mx-auto block max-h-[min(48dvh,420px)] max-w-full rounded-[11px] border border-black/[0.06] bg-black/95 object-contain shadow-sm dark:border-white/[0.08] sm:max-h-[460px]"
+                                    loading="lazy"
+                                  />
+                                ) : (
+                                  <div className="grid grid-cols-2 gap-1 overflow-hidden rounded-[11px] bg-[#0b141a]">
+                                    {msg.attachments.map((rawUrl, index) => {
+                                      const imageUrl = normalizeAttachmentUrl(rawUrl);
+                                      if (!imageUrl) return null;
+                                      return (
+                                        <img
+                                          key={`${msg.id}-img-${index}`}
+                                          src={imageUrl}
+                                          alt={
+                                            (msg.attachments?.length ?? 0) > 1
+                                              ? `Image ${index + 1}`
+                                              : 'Image'
+                                          }
+                                          className="aspect-square h-full min-h-0 w-full object-cover"
+                                          loading="lazy"
+                                        />
+                                      );
+                                    })}
+                                  </div>
+                                )}
                                 {displayContent && (
-                                  <span className="block">{displayContent}</span>
+                                  <span className="block px-0.5">{displayContent}</span>
                                 )}
                               </div>
                             ) : msg.message_type === 'video' &&
