@@ -27,22 +27,44 @@ defmodule ChatService.CallHistory do
     end
   end
 
-  def accept(call_id) do
+  def accept(call_id, actor_user_id_bin) do
     update_from_record(call_id, fn record, now ->
-      update_record(record, "connecting", nil, nil, now, nil)
+      cond do
+        record["callee_id"] != actor_user_id_bin ->
+          {:error, :forbidden}
+
+        record["status"] != "ringing" ->
+          {:error, :call_no_longer_available}
+
+        true ->
+          update_record(record, "connecting", nil, nil, now, nil)
+      end
     end)
   end
 
   def connected(call_id) do
     update_from_record(call_id, fn record, now ->
-      connected_at = record["connected_at"] || now
-      update_record(record, "connected", connected_at, nil, now, nil)
+      if record["status"] in ["connecting", "connected"] do
+        connected_at = record["connected_at"] || now
+        update_record(record, "connected", connected_at, nil, now, nil)
+      else
+        {:error, :call_no_longer_available}
+      end
     end)
   end
 
-  def reject(call_id, reason \\ "rejected") do
+  def reject(call_id, actor_user_id_bin, reason \\ "rejected") do
     update_from_record(call_id, fn record, now ->
-      update_record(record, "declined", nil, now, now, reason)
+      cond do
+        record["callee_id"] != actor_user_id_bin ->
+          {:error, :forbidden}
+
+        record["status"] != "ringing" ->
+          {:error, :call_no_longer_available}
+
+        true ->
+          update_record(record, "declined", nil, now, now, reason)
+      end
     end)
   end
 
@@ -157,11 +179,16 @@ defmodule ChatService.CallHistory do
          ) do
       {:ok, [record | _]} ->
         now = DateTime.utc_now()
-        updated = updater.(record, now)
 
-        with :ok <- persist_record(updated),
-             :ok <- sync_user_rows(updated) do
-          {:ok, updated}
+        case updater.(record, now) do
+          {:error, reason} ->
+            {:error, reason}
+
+          updated ->
+            with :ok <- persist_record(updated),
+                 :ok <- sync_user_rows(updated) do
+              {:ok, updated}
+            end
         end
 
       {:ok, []} ->
