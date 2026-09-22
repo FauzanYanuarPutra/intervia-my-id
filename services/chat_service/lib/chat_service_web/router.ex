@@ -42,6 +42,9 @@ defmodule ChatServiceWeb.Router do
     post("/rooms/:room_id/read", MessageController, :read)
     post("/rooms/:room_id/reports", TrustSafetyController, :report)
 
+    # Call history belongs to the authenticated user; no room id is required.
+    get("/calls", CallController, :index)
+
     # Endpoint untuk daftar chat di sidebar (inbox)
     get("/inbox", InboxController, :index)
   end
