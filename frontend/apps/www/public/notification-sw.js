@@ -38,6 +38,8 @@ self.addEventListener('push', (event) => {
     }
   }
 
+  const isIncomingCall = payload.type === 'incoming_call';
+
   event.waitUntil(
     self.registration.showNotification(payload.title || fallback.title, {
       body: payload.body || '',
@@ -46,7 +48,21 @@ self.addEventListener('push', (event) => {
       tag: payload.tag,
       renotify: Boolean(payload.renotify),
       requireInteraction: Boolean(payload.requireInteraction),
-      data: payload.data || fallback.data,
+      ...(isIncomingCall
+        ? {
+            actions: [
+              { action: 'accept', title: 'Jawab' },
+              { action: 'reject', title: 'Tolak' },
+            ],
+          }
+        : {}),
+      data: {
+        ...(payload.data || fallback.data),
+        type: payload.type,
+        call_id: payload.call_id,
+        room_id: payload.room_id,
+        call_type: payload.call_type,
+      },
     }),
   );
 });
@@ -55,7 +71,30 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
   const data = event.notification.data || {};
-  const targetUrl = typeof data.url === 'string' && data.url ? data.url : '/id/notifications';
+  const targetUrl =
+    typeof data.url === 'string' && data.url
+      ? data.url
+      : '/id/notifications';
+
+  let resolvedTargetUrl = targetUrl;
+  if (
+    data.type === 'incoming_call' &&
+    typeof data.room_id === 'string' &&
+    data.room_id &&
+    typeof data.call_id === 'string' &&
+    data.call_id
+  ) {
+    const desired = new URL(targetUrl, self.location.origin);
+    desired.searchParams.set('incomingCall', '1');
+    desired.searchParams.set(
+      'callAction',
+      event.action === 'accept' || event.action === 'reject'
+        ? event.action
+        : 'show',
+    );
+    desired.searchParams.set('callId', data.call_id);
+    resolvedTargetUrl = desired.pathname + desired.search;
+  }
 
   event.waitUntil(
     (async () => {
@@ -84,7 +123,7 @@ self.addEventListener('notificationclick', (event) => {
       }
 
       if (self.clients.openWindow) {
-        await self.clients.openWindow(targetUrl);
+        await self.clients.openWindow(resolvedTargetUrl);
       }
     })(),
   );

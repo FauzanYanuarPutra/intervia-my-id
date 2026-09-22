@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { Phone, Video, X } from 'lucide-react';
 import { profileAvatarSrc } from '@/lib/profile/avatar';
+import { readCallAlertPreferences } from '@/lib/callPreferences';
 import { soundManager } from '@/lib/soundManager';
 
 interface IncomingCallProps {
@@ -29,11 +30,19 @@ export function IncomingCall({
   const acceptedRef = useRef(false);
 
   useEffect(() => {
-    soundManager.play('callAlert');
-    soundManager.startLoop('incomingRing');
+    const preferences = readCallAlertPreferences();
+    const shouldRing = preferences.enabled && preferences.ringtone;
+
+    if (shouldRing) {
+      soundManager.play('callAlert');
+      soundManager.startLoop('incomingRing');
+    }
+
     return () => {
-      soundManager.stopLoop('incomingRing');
-      if (!acceptedRef.current) {
+      if (shouldRing) {
+        soundManager.stopLoop('incomingRing');
+      }
+      if (!acceptedRef.current && shouldRing) {
         soundManager.play('callEnd');
       }
     };

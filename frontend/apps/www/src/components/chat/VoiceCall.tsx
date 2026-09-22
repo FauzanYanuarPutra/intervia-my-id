@@ -227,6 +227,11 @@ export function VoiceCall({ roomId, userId, callId, channel, isCaller = false, u
           console.log('[VoiceCall] Peer state:', state);
           if (state === 'connected') {
             setIsRemoteAudioEnabled(true);
+            try {
+              channel.push('call_connected', { call_id: callId });
+            } catch {
+              // Best effort; peer connection remains authoritative locally.
+            }
           }
           if (state === 'failed') {
             setConnectionStatus('failed');

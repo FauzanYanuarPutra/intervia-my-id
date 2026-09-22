@@ -747,6 +747,8 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
       MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:-}
       CHAT_MEDIA_ALLOWED_ORIGINS: ${CHAT_MEDIA_ALLOWED_ORIGINS:-}
+      INTERNAL_PUSH_URL: ${INTERNAL_PUSH_URL:-http://www:3000/api/internal/notifications/call}
+      INTERNAL_PUSH_SECRET: ${INTERNAL_PUSH_SECRET:-}
     depends_on:
       scylla_keyspace_setup: { condition: service_completed_successfully }
       redis_cache: { condition: service_healthy }
@@ -899,6 +901,10 @@ services:
       INTERNAL_COMMUNITY_URL: http://community_service:8082
       COMMUNITY_SERVICE_URL: http://community_service:8082
       INTERNAL_CHAT_URL: http://chat_service:4000
+      PUSH_DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@domain_db:5432/profile_db
+      INTERNAL_PUSH_SECRET: ${INTERNAL_PUSH_SECRET:-}
+      WEB_PUSH_VAPID_PRIVATE_KEY: ${WEB_PUSH_VAPID_PRIVATE_KEY:-}
+      WEB_PUSH_VAPID_SUBJECT: ${WEB_PUSH_VAPID_SUBJECT:-mailto:admin@lajukan.com}
       INTERNAL_AI_URL: http://ai_service:8080
       AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN}
       AI_LEARNING_ENABLED: ${AI_LEARNING_ENABLED:-false}
@@ -963,6 +969,8 @@ services:
       SMTP_FROM: ${SMTP_FROM:-}
       FROM_EMAIL: ${FROM_EMAIL:-}
       FROM_NAME: ${FROM_NAME:-Lajukan}
+    depends_on:
+      domain_db: { condition: service_healthy }
     volumes:
       - www_runtime:/app/apps/www/.runtime
     expose: ["3000"]
@@ -972,7 +980,7 @@ services:
       timeout: 8s
       retries: 10
       start_period: 45s
-    networks: [app, cache, media]
+    networks: [app, cache, media, data]
 
   cms:
     <<: *service-defaults
