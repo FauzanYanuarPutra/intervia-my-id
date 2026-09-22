@@ -13,8 +13,8 @@ use std::{net::IpAddr, sync::Arc};
 use uuid::Uuid;
 
 use crate::{
-    auth_claims_from_headers, has_cms_access, make_slug,
-    push_notification_best_effort, user_id_from_auth, AppState,
+    auth_claims_from_headers, has_cms_access, make_slug, push_notification_best_effort,
+    user_id_from_auth, AppState,
 };
 
 const PUBLIC_NEWS_MAX_OFFSET: i64 = 10_000;
@@ -26,7 +26,10 @@ pub(crate) fn router() -> Router<Arc<AppState>> {
         .route("/v1/news/submissions/mine", get(list_my_news_submissions))
         .route("/v1/news/submissions/{id}", patch(update_news_submission))
         .route("/v1/news/editorial/queue", get(list_editorial_queue))
-        .route("/v1/news/editorial/reviewers", get(list_editorial_reviewers))
+        .route(
+            "/v1/news/editorial/reviewers",
+            get(list_editorial_reviewers),
+        )
         .route("/v1/news/{id}/editorial/edit", patch(edit_news_editorial))
         .route("/v1/news/editorial/metrics", get(get_editorial_metrics))
         .route("/v1/news/{id}/editorial", get(list_editorial_history))
@@ -2415,7 +2418,7 @@ async fn list_editorial_reviewers(
                 })),
             )
                 .into_response()
-        },
+        }
         Err(error) => {
             tracing::error!("list_editorial_reviewers query error: {:?}", error);
             response_error(
@@ -3096,7 +3099,10 @@ async fn create_source_review_request(
     {
         Ok(value) => value,
         Err(error) => {
-            tracing::error!("create_source_review_request reviewer eligibility check error: {:?}", error);
+            tracing::error!(
+                "create_source_review_request reviewer eligibility check error: {:?}",
+                error
+            );
             return response_error(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "failed to validate reviewer eligibility",
