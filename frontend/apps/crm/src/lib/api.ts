@@ -1097,6 +1097,50 @@ export const newsApi = {
     );
   },
 
+  reviewers: async (token: string) => {
+    return fetchJson<{
+      data: Array<{
+        id: string;
+        email: string;
+        username?: string | null;
+        full_name?: string | null;
+        is_active: boolean;
+        roles: string[];
+      }>;
+      meta?: { page: number; limit: number; total: number };
+    }>(IDENTITY_API_URL + '/users?limit=100&application=cms', {
+      method: 'GET',
+      token,
+    });
+  },
+
+  requestIndependentReview: async (
+    token: string,
+    contentId: string,
+    data: {
+      requested_reviewer_id: string;
+      note?: string;
+    },
+  ) => {
+    return fetchJson<{
+      id: string;
+      content_id: string;
+      requested_by: string;
+      requested_reviewer_id: string;
+      status: 'pending' | 'completed' | 'cancelled';
+      note?: string | null;
+      created_at: string;
+      completed_at?: string | null;
+    }>(
+      MARKETPLACE_URL + '/v1/news/' + encodeURIComponent(contentId) + '/source-review-requests',
+      {
+        method: 'POST',
+        token,
+        body: JSON.stringify(data),
+      },
+    );
+  },
+
   moderate: async (
     token: string,
     id: string,
