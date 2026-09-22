@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Image from 'next/image';
 import { ArrowLeft, BookOpenText, CalendarDays, ExternalLink, Hash, MapPin, Newspaper, Timer } from 'lucide-react';
 import { notFound, permanentRedirect } from 'next/navigation';
 import { Link } from '@/i18n/navigation';
@@ -156,13 +157,15 @@ export default async function NewsArticlePage({ params }: PageProps) {
           </Link>
         </div>
         <div className="hidden items-center gap-2 sm:flex">
-          <span className="grid h-8 w-8 place-items-center rounded-[10px] bg-emerald-700 text-xs font-black text-white shadow-sm">L</span>
+          <span className="grid h-8 w-8 place-items-center rounded-[10px] border border-emerald-100 bg-white p-1.5 shadow-sm dark:border-emerald-400/20 dark:bg-white/10">
+            <Image src="/logo.svg" alt="" width={72} height={24} className="h-4.5 w-auto object-contain" />
+          </span>
           <span className="text-xs font-black text-slate-500 dark:text-slate-400">Lajukan News</span>
         </div>
       </nav>
 
-      <article id="news-article" className="mt-3 overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_24px_68px_-54px_rgba(15,23,42,0.42)] dark:border-white/10 dark:bg-slate-900">
-        <header className="bg-[linear-gradient(135deg,#f8fafc_0%,#ecfdf5_56%,#fff7ed_100%)] p-4 dark:bg-[linear-gradient(135deg,#0f172a_0%,#052e24_58%,#1c1917_100%)] sm:p-6 lg:p-7">
+      <article id="news-article" className="mt-3 overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_24px_68px_-54px_rgba(15,23,42,0.42)] dark:border-white/10 dark:bg-slate-900">
+        <header className="bg-[linear-gradient(135deg,#f8fafc_0%,#ecfdf5_56%,#fff7ed_100%)] p-4 dark:bg-[linear-gradient(135deg,#0f172a_0%,#052e24_58%,#1c1917_100%)] sm:p-6 lg:p-8">
           <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.12em]">
             <span className="rounded-full bg-emerald-700 px-2.5 py-1.5 text-white">{article.category}</span>
             <span className="rounded-full border border-slate-200 bg-white/80 px-2.5 py-1.5 text-slate-600 dark:border-white/10 dark:bg-white/10 dark:text-slate-300">{typeLabel(article.articleKind, isId)}</span>
@@ -171,7 +174,7 @@ export default async function NewsArticlePage({ params }: PageProps) {
             ) : null}
           </div>
 
-          <h1 className="mt-3 max-w-4xl text-[31px] font-black leading-[1.06] tracking-[-0.055em] text-slate-950 dark:text-white sm:text-[46px] sm:leading-[1.04]">
+          <h1 className="mt-3 max-w-4xl text-[31px] font-black leading-[1.06] tracking-[-0.055em] text-slate-950 dark:text-white sm:text-[44px] sm:leading-[1.05]">
             {article.title}
           </h1>
 
@@ -224,7 +227,7 @@ export default async function NewsArticlePage({ params }: PageProps) {
           </div>
         </header>
 
-        <div className="grid gap-7 p-4 sm:p-6 lg:grid-cols-[minmax(0,760px)_270px] lg:gap-8 lg:p-7">
+        <div className="grid gap-7 p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_280px] lg:max-w-[1180px] lg:gap-9 lg:p-8">
           <div className="min-w-0">
             {isRetracted ? (
               <section className="rounded-[20px] border border-rose-200 bg-rose-50 p-4 dark:border-rose-400/20 dark:bg-rose-400/10">
