@@ -7,6 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { joinRoom } from '@/lib/chat';
 import { soundManager } from '@/lib/soundManager';
 import { closeBrowserNotificationsByTag } from '@/lib/browserNotifications';
+import { readCallAlertPreferences } from '@/lib/callPreferences';
 import { IncomingCall } from './IncomingCall';
 
 type IncomingCallState = {
@@ -94,6 +95,7 @@ export function GlobalIncomingCallController() {
     }
 
     const onIncoming = (event: Event) => {
+      if (!readCallAlertPreferences().enabled) return;
       const detail = (event as CustomEvent<Record<string, unknown>>).detail;
       if (!detail || !detail.call_id || !detail.room_id || !detail.caller_id) {
         return;
@@ -151,6 +153,13 @@ export function GlobalIncomingCallController() {
       }
     };
 
+    const onPreferenceChange = () => {
+      if (!readCallAlertPreferences().enabled) {
+        writePendingCall(null);
+        setIncomingCall(null);
+      }
+    };
+
     window.addEventListener(
       'chat:incoming-call',
       onIncoming as EventListener,
@@ -158,6 +167,10 @@ export function GlobalIncomingCallController() {
     window.addEventListener(
       'chat:call-lifecycle',
       onLifecycle as EventListener,
+    );
+    window.addEventListener(
+      'lajukan:call-alert-preferences-changed',
+      onPreferenceChange as EventListener,
     );
 
     return () => {
@@ -168,6 +181,10 @@ export function GlobalIncomingCallController() {
       window.removeEventListener(
         'chat:call-lifecycle',
         onLifecycle as EventListener,
+      );
+      window.removeEventListener(
+        'lajukan:call-alert-preferences-changed',
+        onPreferenceChange as EventListener,
       );
     };
   }, [user?.id]);
