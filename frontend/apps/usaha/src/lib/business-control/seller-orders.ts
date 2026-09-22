@@ -69,6 +69,7 @@ export const sellerOrderStatusLabel: Record<SellerOrderStatus, string> = {
 };
 
 export function sellerOrderActionLabel(status: SellerOrderStatus) {
+  if (status === 'PAID') return 'Konfirmasi pembayaran';
   if (status === 'REJECTED') return 'Tolak pesanan';
   if (status === 'PROCESSING') return 'Terima & proses';
   if (status === 'SHIPPED') return 'Tandai dikirim';
