@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth, useRequireAuth } from '@/context/AuthContext';
 import { newsApi } from '@/lib/api';
 import { Button, Card } from '@/ui';
-import { Alert } from 'lajukan-ui';
+import { Alert, isSafeExternalHttpUrl as isSafeExternalSourceUrl } from 'lajukan-ui';
 
 type EditorialEvent = {
   id: string;
@@ -87,54 +87,6 @@ function readRecord(value: unknown): Record<string, unknown> {
 
 function readString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
-}
-
-function isSafeExternalSourceUrl(value: string): boolean {
-  try {
-    const url = new URL(value);
-    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) {
-      return false;
-    }
-    const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, '');
-    if (
-      !host ||
-      host === 'localhost' ||
-      host.endsWith('.localhost') ||
-      host.endsWith('.local')
-    ) {
-      return false;
-    }
-    if (
-      host.includes(':') &&
-      (host === '::' ||
-        host === '::1' ||
-        host.startsWith('fc') ||
-        host.startsWith('fd') ||
-        /^fe[89ab]/.test(host))
-    ) {
-      return false;
-    }
-    const parts = host.split('.').map(Number);
-    if (
-      parts.length === 4 &&
-      parts.every(part => Number.isInteger(part) && part >= 0 && part <= 255)
-    ) {
-      const [a, b] = parts;
-      if (
-        a === 10 ||
-        a === 127 ||
-        (a === 169 && b === 254) ||
-        (a === 172 && b >= 16 && b <= 31) ||
-        (a === 192 && b === 168) ||
-        a === 0
-      ) {
-        return false;
-      }
-    }
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 function formatDate(value?: string | null) {
