@@ -19,7 +19,6 @@ type StorefrontProductOrderActionProps = {
   productName: string;
   productPriceCents?: number;
   productMetadata?: Record<string, unknown>;
-  productPriceCents?: number;
   cartEnabled?: boolean;
   onlineOrderEnabled: boolean;
   productAvailable: boolean;
