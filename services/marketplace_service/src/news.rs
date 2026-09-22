@@ -13,7 +13,7 @@ use std::{net::{IpAddr, Ipv4Addr, Ipv6Addr}, sync::Arc};
 use uuid::Uuid;
 
 use crate::{
-    auth_claims_from_headers, fetch_user_read_model_brief, has_cms_access, make_slug,
+    auth_claims_from_headers, has_cms_access, make_slug,
     push_notification_best_effort, user_id_from_auth, AppState,
 };
 
