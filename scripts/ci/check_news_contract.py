@@ -62,6 +62,12 @@ require(
         "''::text AS body",
         "search query is too long",
         "news cursor is too long",
+        "PUBLIC_NEWS_MAX_OFFSET: i64 = 1_000",
+        "cursor cannot be combined with offset",
+        "is_public_news_source_ipv4",
+        "is_public_news_source_ipv6",
+        "to_ipv4_mapped",
+        "is_multicast",
         "public_verified_source_urls",
         "verification_status = 'verified'",
         "unsupported news source URL",
@@ -316,7 +322,7 @@ require(
         "Berita dan analisis membutuhkan minimal satu URL sumber.",
         "topics",
         "editorial_status: 'pending_review'",
-        "isPrivateSourceHost",
+        "normalizeSafeExternalHttpUrl",
         "language,",
     ),
 )
@@ -328,7 +334,7 @@ require(
         "source_urls",
         "topics",
         "evaluateTrustSafety",
-        "isPrivateSourceHost",
+        "normalizeSafeExternalHttpUrl",
         "rich_body",
         "cover_image",
         "sanitizeRichText",
@@ -373,7 +379,7 @@ require(
         "Source provenance",
         "hasVerifiedSource",
         "requiresVerifiedSource",
-        "isSafeExternalSourceUrl",
+        "isSafeExternalHttpUrl as isSafeExternalSourceUrl",
         "requiresVerifiedSource && !hasVerifiedSource",
         "wouldBreakPublishedProvenance",
         "Verifikasi sumber pengganti atau retract artikel",
@@ -409,6 +415,8 @@ require(
         "options.topic?.trim()",
         "options.location?.trim()",
         "next: { revalidate: 30 }",
+        "Math.min(1_000",
+        "offset > 0 && !cursor",
         "cache: 'no-store'",
         "getRelatedNewsArticles",
         "isAccessibleForFree",
@@ -489,3 +497,7 @@ if errors:
     raise SystemExit(1)
 
 print("News editorial and SEO contract OK")
+
+require("frontend/packages/index.ts", ("isSafeExternalHttpUrl", "normalizeSafeExternalHttpUrl"));
+require("frontend/packages/utils/externalUrl.ts", ("isSafeExternalHttpUrl", "normalizeSafeExternalHttpUrl", "100 && b >= 64 && b <= 127", "198 && (b === 18 || b === 19)", "2001:db8:", "64:ff9b:"));
+require("frontend/packages/test/external-url.test.ts", ("::ffff:127.0.0.1", "169.254.169.254", "198.51.100.1", "2001:db8::1"));
