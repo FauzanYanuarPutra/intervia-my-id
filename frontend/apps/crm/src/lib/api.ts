@@ -1108,7 +1108,7 @@ export const newsApi = {
         roles: string[];
       }>;
       meta?: { page: number; limit: number; total: number };
-    }>(IDENTITY_API_URL + '/users?limit=100&application=cms', {
+    }>(IDENTITY_API_URL + '/users?limit=100', {
       method: 'GET',
       token,
     });
