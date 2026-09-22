@@ -2,3 +2,4 @@ import { RouteGroupLoadingSkeleton } from '@/components/system/feedback/RouteSke
 
 export default function AuthRouteLoading() {
   return <RouteGroupLoadingSkeleton tone="auth" />;
+}
