@@ -171,3 +171,27 @@ export async function ensureWebPushSubscription(deviceLabel?: string) {
     return false;
   }
 }
+
+
+export async function disableWebPushSubscription() {
+  if (!isBrowserNotificationSupported()) return false;
+
+  try {
+    const registration = await ensureNotificationServiceWorkerRegistered();
+    const subscription = await registration?.pushManager?.getSubscription();
+    if (!subscription) return true;
+
+    await fetch('/api/notifications/push/subscriptions', {
+      method: 'DELETE',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ endpoint: subscription.endpoint }),
+    }).catch(() => null);
+
+    await subscription.unsubscribe().catch(() => false);
+    return true;
+  } catch (error) {
+    console.warn('[Notifications] push subscription disable failed', error);
+    return false;
+  }
+}
