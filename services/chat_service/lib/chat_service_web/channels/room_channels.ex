@@ -5,8 +5,10 @@ defmodule ChatServiceWeb.RoomChannel do
   alias ChatService.{
     AidaBot,
     AttachmentPolicy,
+    CallHistory,
     CallSignaling,
     IdentityClient,
+    PushNotifier,
     MessagePersistence,
     RateLimiter,
     Repo,
@@ -115,26 +117,45 @@ defmodule ChatServiceWeb.RoomChannel do
       call_type = normalize_call_type(Map.get(payload, "call_type"))
       profile = current_user_profile(socket)
 
-      broadcast_from!(socket, "call_incoming", %{
-        call_id: call_id,
-        caller_id: socket.assigns.user_id,
-        caller_username: profile.username,
-        caller_avatar: profile.avatar,
-        caller_avatar_style: profile.avatar_style,
-        call_type: call_type
-      })
+      case CallHistory.start(call_id, socket.assigns.room_id, socket.assigns.user_id_bin, call_type) do
+        {:ok, started_at} ->
+          broadcast_from!(socket, "call_incoming", %{
+            call_id: call_id,
+            caller_id: socket.assigns.user_id,
+            caller_username: profile.username,
+            caller_avatar: profile.avatar,
+            caller_avatar_style: profile.avatar_style,
+            call_type: call_type
+          })
 
-      broadcast_call_event(socket, "incoming_call", %{
-        call_id: call_id,
-        room_id: socket.assigns.room_id,
-        caller_id: socket.assigns.user_id,
-        caller_username: profile.username,
-        caller_avatar: profile.avatar,
-        caller_avatar_style: profile.avatar_style,
-        call_type: call_type
-      })
+          incoming_payload = %{
+            call_id: call_id,
+            room_id: socket.assigns.room_id,
+            caller_id: socket.assigns.user_id,
+            caller_username: profile.username,
+            caller_avatar: profile.avatar,
+            caller_avatar_style: profile.avatar_style,
+            call_type: call_type,
+            started_at: DateTime.to_iso8601(started_at),
+            url: "/id/chat/" <> URI.encode(socket.assigns.room_id)
+          }
 
-      {:reply, {:ok, %{call_id: call_id, call_type: call_type}}, socket}
+          broadcast_call_event(socket, "incoming_call", incoming_payload)
+
+          Task.Supervisor.start_child(ChatService.TaskSupervisor, fn ->
+            case PushNotifier.incoming_call(incoming_payload) do
+              :ok -> :ok
+              :disabled -> :ok
+              {:error, reason} -> Logger.debug("[PushNotifier] call push skipped: #{inspect(reason)}")
+            end
+          end)
+
+          {:reply, {:ok, %{call_id: call_id, call_type: call_type, started_at: DateTime.to_iso8601(started_at)}}, socket}
+
+        {:error, reason} ->
+          Logger.error("[CallHistory] start failed: #{inspect(reason)}")
+          call_error(socket, :storage_unavailable)
+      end}
     else
       {:error, reason} ->
         call_error(socket, reason)
@@ -145,18 +166,25 @@ defmodule ChatServiceWeb.RoomChannel do
   def handle_in("call_accept", payload, socket) when is_map(payload) do
     with :ok <- authorize_call_event(socket, :control),
          {:ok, call_id} <- CallSignaling.call_id(Map.get(payload, "call_id")) do
-      broadcast_from!(socket, "call_accepted", %{
-        call_id: call_id,
-        user_id: socket.assigns.user_id
-      })
+      case CallHistory.accept(call_id) do
+        {:ok, _} ->
+          broadcast_from!(socket, "call_accepted", %{
+            call_id: call_id,
+            user_id: socket.assigns.user_id
+          })
 
-      broadcast_call_event(socket, "call_accepted", %{
-        call_id: call_id,
-        room_id: socket.assigns.room_id,
-        user_id: socket.assigns.user_id
-      })
+          broadcast_call_event(socket, "call_accepted", %{
+            call_id: call_id,
+            room_id: socket.assigns.room_id,
+            user_id: socket.assigns.user_id
+          })
 
-      {:reply, {:ok, %{call_id: call_id}}, socket}
+          {:reply, {:ok, %{call_id: call_id}}, socket}
+
+        {:error, reason} ->
+          Logger.error("[CallHistory] accept failed: #{inspect(reason)}")
+          call_error(socket, :storage_unavailable)
+      end}
     else
       {:error, reason} -> call_error(socket, reason)
     end
@@ -166,18 +194,53 @@ defmodule ChatServiceWeb.RoomChannel do
   def handle_in("call_reject", payload, socket) when is_map(payload) do
     with :ok <- authorize_call_event(socket, :control),
          {:ok, call_id} <- CallSignaling.call_id(Map.get(payload, "call_id")) do
-      broadcast_from!(socket, "call_rejected", %{
-        call_id: call_id,
-        user_id: socket.assigns.user_id
-      })
+      case CallHistory.reject(call_id) do
+        {:ok, _} ->
+          broadcast_from!(socket, "call_rejected", %{
+            call_id: call_id,
+            user_id: socket.assigns.user_id
+          })
 
-      broadcast_call_event(socket, "call_rejected", %{
-        call_id: call_id,
-        room_id: socket.assigns.room_id,
-        user_id: socket.assigns.user_id
-      })
+          broadcast_call_event(socket, "call_rejected", %{
+            call_id: call_id,
+            room_id: socket.assigns.room_id,
+            user_id: socket.assigns.user_id
+          })
 
-      {:reply, {:ok, %{call_id: call_id}}, socket}
+          {:reply, {:ok, %{call_id: call_id}}, socket}
+
+        {:error, reason} ->
+          Logger.error("[CallHistory] reject failed: #{inspect(reason)}")
+          call_error(socket, :storage_unavailable)
+      end}
+    else
+      {:error, reason} -> call_error(socket, reason)
+    end
+  end
+
+  @impl true
+  def handle_in("call_connected", payload, socket) when is_map(payload) do
+    with :ok <- authorize_call_event(socket, :control),
+         {:ok, call_id} <- CallSignaling.call_id(Map.get(payload, "call_id")) do
+      case CallHistory.connected(call_id) do
+        {:ok, _history} ->
+          broadcast_from!(socket, "call_connected", %{
+            call_id: call_id,
+            user_id: socket.assigns.user_id
+          })
+
+          broadcast_call_event(socket, "call_connected", %{
+            call_id: call_id,
+            room_id: socket.assigns.room_id,
+            user_id: socket.assigns.user_id
+          })
+
+          {:reply, {:ok, %{call_id: call_id}}, socket}
+
+        {:error, reason} ->
+          Logger.error("[CallHistory] connected failed: #{inspect(reason)}")
+          call_error(socket, :storage_unavailable)
+      end
     else
       {:error, reason} -> call_error(socket, reason)
     end
@@ -187,18 +250,25 @@ defmodule ChatServiceWeb.RoomChannel do
   def handle_in("call_end", payload, socket) when is_map(payload) do
     with :ok <- authorize_call_event(socket, :control),
          {:ok, call_id} <- CallSignaling.call_id(Map.get(payload, "call_id")) do
-      broadcast_from!(socket, "call_ended", %{
-        call_id: call_id,
-        user_id: socket.assigns.user_id
-      })
+      case CallHistory.end_call(call_id, socket.assigns.user_id_bin) do
+        {:ok, history} ->
+          payload = %{
+            call_id: call_id,
+            room_id: socket.assigns.room_id,
+            user_id: socket.assigns.user_id,
+            status: history["status"],
+            duration_seconds: history["duration_seconds"] || 0
+          }
 
-      broadcast_call_event(socket, "call_ended", %{
-        call_id: call_id,
-        room_id: socket.assigns.room_id,
-        user_id: socket.assigns.user_id
-      })
+          broadcast_from!(socket, "call_ended", payload)
+          broadcast_call_event(socket, "call_ended", payload)
 
-      {:reply, {:ok, %{call_id: call_id}}, socket}
+          {:reply, {:ok, payload}, socket}
+
+        {:error, reason} ->
+          Logger.error("[CallHistory] end failed: #{inspect(reason)}")
+          call_error(socket, :storage_unavailable)
+      end}
     else
       {:error, reason} -> call_error(socket, reason)
     end
@@ -264,6 +334,7 @@ defmodule ChatServiceWeb.RoomChannel do
              "call_accept",
              "call_reject",
              "call_end",
+             "call_connected",
              "call_offer",
              "call_answer",
              "call_ice_candidate"
