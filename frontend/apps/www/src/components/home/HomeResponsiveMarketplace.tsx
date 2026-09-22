@@ -5999,7 +5999,9 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
                 }
               />
               <PublicReferencesSection isId={isId} items={publicReferences} />
-              {recommendations.length > 0 ? (
+              {recommendationsLoading ? (
+                <RecommendationsLoadingSkeleton isId={isId} />
+              ) : recommendations.length > 0 ? (
                 <RecommendationsSection isId={isId} items={recommendations} />
               ) : null}
               <HomeNewsSection locale={locale} items={homeNewsItems} />
