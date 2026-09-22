@@ -4952,7 +4952,7 @@ export function HomeNewsLoadingSkeleton() {
   );
 }
 
-function HomeLoadingState({ isId = true }: { isId?: boolean } = {}) {
+export function HomeLoadingState({ isId = true }: { isId?: boolean } = {}) {
   return (
     <MarketplacePageFrame loading>
       <div
