@@ -670,7 +670,7 @@ function normalizeAttachmentUrl(raw: unknown): string {
   // media proxy. Convert known storage shapes to the same-origin proxy before
   // rendering or sending them back to the chat API.
   const toProxyPath = (pathname: string): string => {
-    const clean = pathname.replace(/^\\/+/, '/').replace(/\\/+$/, '');
+    const clean = pathname.replace(/^\/+/, '/').replace(/\/+$/, '');
     if (clean.startsWith('/api/chat/media/')) return clean;
 
     const segments = clean.split('/').filter(Boolean);
