@@ -87,6 +87,39 @@ defmodule ChatService.CallHistory do
     end)
   end
 
+  def get_for_user(call_id, user_id_bin) do
+    case Repo.execute(
+           "SELECT * FROM call_records_by_id WHERE call_id = ? LIMIT 1",
+           [{"uuid", call_id}]
+         ) do
+      {:ok, [record | _]} ->
+        if record["caller_id"] == user_id_bin or record["callee_id"] == user_id_bin do
+          {:ok,
+           %{
+             call_id: uuid_to_string(record["call_id"]),
+             room_id: record["room_id"],
+             caller_id: uuid_to_string(record["caller_id"]),
+             callee_id: uuid_to_string(record["callee_id"]),
+             call_type: normalize_call_type(record["call_type"]),
+             status: normalize_status(record["status"]),
+             started_at: iso(record["started_at"]),
+             connected_at: iso(record["connected_at"]),
+             ended_at: iso(record["ended_at"]),
+             duration_seconds: max(to_int(record["duration_seconds"]), 0),
+             end_reason: record["end_reason"]
+           }}
+        else
+          {:error, :forbidden}
+        end
+
+      {:ok, []} ->
+        {:error, :not_found}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
   def list_for_user(user_id_bin, limit \\ 100) do
     buckets = recent_buckets(@history_buckets)
 
