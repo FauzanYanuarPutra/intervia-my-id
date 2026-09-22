@@ -68,7 +68,6 @@ export function ContactWorkspace({
 
   useEffect(() => {
     if (selectedId && !users.some(user => user.id === selectedId)) {
-      setSelectedId('');
       writeUserUrl('', 'replace');
     }
   }, [selectedId, users]);
