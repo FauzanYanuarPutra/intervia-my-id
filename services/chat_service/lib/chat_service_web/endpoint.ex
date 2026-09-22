@@ -1,47 +1,51 @@
 defmodule ChatServiceWeb.Endpoint do
   use Phoenix.Endpoint, otp_app: :chat_service
 
-  @production_origins [
-    "https://lajukan.com",
-    "https://www.lajukan.com",
-    "https://chat.lajukan.com",
-    "https://usaha.lajukan.com"
-  ]
-  @development_origins [
-    "http://127.0.0.1",
-    "http://127.0.0.1:3000",
-    "http://127.0.0.1:3001",
-    "http://127.0.0.1:3002",
-    "http://localhost",
-    "http://localhost:3000",
-    "http://localhost:3001",
-    "http://localhost:3002"
-  ]
-
-  @production_socket_origins [
-    "//lajukan.com",
-    "//www.lajukan.com",
-    "//chat.lajukan.com",
-    "//usaha.lajukan.com"
-  ]
-  @development_socket_origins [
-    "//127.0.0.1",
-    "//127.0.0.1:3000",
-    "//127.0.0.1:3001",
-    "//127.0.0.1:3002",
-    "//localhost",
-    "//localhost:3000",
-    "//localhost:3001",
-    "//localhost:3002"
-  ]
   @allowed_origins if Mix.env() == :prod,
-                     do: @production_origins,
-                     else: @production_origins ++ @development_origins
-  @socket_allowed_origins if Mix.env() == :prod,
-                            do: @production_socket_origins,
-                            else: @production_socket_origins ++ @development_socket_origins
+                     do: [
+                       "https://lajukan.com",
+                       "https://www.lajukan.com",
+                       "https://chat.lajukan.com",
+                       "https://usaha.lajukan.com"
+                     ],
+                     else: [
+                       "https://lajukan.com",
+                       "https://www.lajukan.com",
+                       "https://chat.lajukan.com",
+                       "https://usaha.lajukan.com",
+                       "http://127.0.0.1",
+                       "http://127.0.0.1:3000",
+                       "http://127.0.0.1:3001",
+                       "http://127.0.0.1:3002",
+                       "http://localhost",
+                       "http://localhost:3000",
+                       "http://localhost:3001",
+                       "http://localhost:3002"
+                     ]
 
-  socket("/socket", ChatServiceWeb.UserSocket,
+  @socket_allowed_origins if Mix.env() == :prod,
+                            do: [
+                              "//lajukan.com",
+                              "//www.lajukan.com",
+                              "//chat.lajukan.com",
+                              "//usaha.lajukan.com"
+                            ],
+                            else: [
+                              "//lajukan.com",
+                              "//www.lajukan.com",
+                              "//chat.lajukan.com",
+                              "//usaha.lajukan.com",
+                              "//127.0.0.1",
+                              "//127.0.0.1:3000",
+                              "//127.0.0.1:3001",
+                              "//127.0.0.1:3002",
+                              "//localhost",
+                              "//localhost:3000",
+                              "//localhost:3001",
+                              "//localhost:3002"
+                            ]
+
+ socket("/socket", ChatServiceWeb.UserSocket,
     websocket: [
       check_origin: @socket_allowed_origins,
       connect_info: [:peer_data, :x_headers],
