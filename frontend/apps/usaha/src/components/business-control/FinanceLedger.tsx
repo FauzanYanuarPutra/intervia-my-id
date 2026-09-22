@@ -513,6 +513,12 @@ export function FinanceLedger({ businessId, initialEntries, channels = [] }: Pro
     }
   }
 
+  const parsedTransferAmount = Math.round(Number(transferAmount));
+  const transferReady =
+    Number.isFinite(parsedTransferAmount) &&
+    parsedTransferAmount > 0 &&
+    transferFrom !== transferTo;
+
   async function transferAccounts() {
     const parsedAmount = Math.round(Number(transferAmount));
     if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
@@ -834,13 +840,14 @@ export function FinanceLedger({ businessId, initialEntries, channels = [] }: Pro
         <div className="p-4 sm:p-5">
           <h2 className="text-base font-black text-portal-ink">Transfer antar akun</h2>
           <p className="mt-1 text-xs leading-5 text-portal-soft">Kas → Bank, Bank → E-wallet, dan perpindahan antar saldo tidak dihitung sebagai pemasukan atau biaya.</p>
+          <p className="mt-2 rounded-xl bg-[#f7f9f6] px-3 py-2 text-[11px] leading-5 text-portal-soft">Belum ada transaksi yang dibuat sampai kamu menekan <strong className="font-black text-portal-ink">Simpan transfer</strong>.</p>
           <div className="mt-4 grid gap-3">
             <div><p className="text-xs font-semibold text-portal-soft">Dari</p><div className="mt-1.5"><ChoiceChips value={transferFrom} onChange={setTransferFrom} ariaLabel="Akun sumber" options={liquidAccountOptions.filter(item => item.value !== transferTo)} /></div></div>
             <div><p className="text-xs font-semibold text-portal-soft">Ke</p><div className="mt-1.5"><ChoiceChips value={transferTo} onChange={setTransferTo} ariaLabel="Akun tujuan" options={liquidAccountOptions.filter(item => item.value !== transferFrom)} /></div></div>
             <label className="text-xs font-semibold text-portal-soft">Nominal<RupiahInput min={1} value={transferAmount ? Number(transferAmount) : null} onValueChange={value => setTransferAmount(value == null ? '' : String(value))} className="mt-1 min-h-11 w-full rounded-xl border border-portal-line bg-white px-3 text-base font-bold" placeholder="Masukkan nominal" /></label>
             <label className="text-xs font-semibold text-portal-soft">Tanggal<input type="date" value={transferDate} onChange={event => setTransferDate(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3 text-sm" /></label>
             <label className="text-xs font-semibold text-portal-soft">Catatan <span className="font-normal">(opsional)</span><input value={transferNote} onChange={event => setTransferNote(event.target.value)} placeholder="Contoh: setor hasil penjualan ke bank" className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3 text-sm" /></label>
-            <button type="button" onClick={transferAccounts} disabled={transferring || transferFrom === transferTo} className="portal-button-primary min-h-11 justify-center disabled:opacity-60">{transferring ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowLeftRight className="h-4 w-4" />} Simpan transfer</button>
+            <button type="button" onClick={transferAccounts} disabled={transferring || !transferReady} className="portal-button-primary min-h-11 justify-center disabled:opacity-60">{transferring ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowLeftRight className="h-4 w-4" />} Simpan transfer</button>
           </div>
         </div>
       </ModalSurface>
