@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   ArrowDownLeft,
   ArrowLeft,
@@ -80,6 +80,7 @@ function formatDuration(seconds: number) {
 }
 
 export default function CallsPage() {
+  const pathname = usePathname();
   const router = useRouter();
   const { user, authFetch } = useAuth();
   const { rooms } = useChatInbox();
@@ -89,10 +90,7 @@ export default function CallsPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const locale =
-    typeof window !== 'undefined'
-      ? localeFromPath(window.location.pathname)
-      : 'id';
+  const locale = localeFromPath(pathname || '/id');
   const isId = locale === 'id';
 
   const roomMap = useMemo(() => {
@@ -147,7 +145,7 @@ export default function CallsPage() {
   useEffect(() => {
     if (!user?.id) return;
     void load();
-  }, [user?.id]);
+  }, [authFetch, isId, user?.id]);
 
   const filtered = useMemo(
     () => items.filter(item => filter === 'all' || item.call_type === filter),
