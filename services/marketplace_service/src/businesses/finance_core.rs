@@ -1200,6 +1200,7 @@ async fn account_balance_tx(
     .map_err(Into::into)
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn insert_transfer_entry(
     tx: &mut Transaction<'_, Postgres>,
     id: Uuid,
