@@ -68,17 +68,17 @@ const PERSONAL_AI_MAX_FILE_TEXT_CHARS = cleanInteger(
 const PERSONAL_AI_MAX_HISTORY_MESSAGES = cleanInteger(
   process.env.PERSONAL_AI_MAX_HISTORY_MESSAGES ||
     process.env.PERSONAL_AI_MAX_HISTORY,
-  14,
-  2,
   18,
+  4,
+  24,
 );
 
 const PERSONAL_AI_MAX_OUTPUT_TOKENS = cleanInteger(
   process.env.PERSONAL_AI_MAX_OUTPUT_TOKENS ||
     process.env.AI_MAX_OUTPUT_TOKENS,
-  800,
-  128,
-  1_600,
+  1_200,
+  256,
+  2_400,
 );
 
 const PERSONAL_AI_USE_RAG =
@@ -678,33 +678,59 @@ async function callAiService(input: {
     headers.Authorization = `Bearer ${AI_SERVICE_TOKEN.trim()}`;
   }
 
-  const response = await fetch(`${trimBaseUrl(INTERNAL_AI_URL)}/v1/chat`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      task: 'chat',
-      message: input.message,
-      messages: input.messages,
-      locale: input.locale,
-      agent: {
-        id: cleanText(input.agent.id, 160),
-        name: cleanText(input.agent.name, 160),
-        instructions: cleanText(input.agent.instructions, 5_000),
-        tone: cleanText(input.agent.tone, 160),
-      },
-      memory: buildSafeMemory(input.memory),
-      context: input.context,
-      media: input.media,
-      temperature: Math.max(
-        0,
-        Math.min(1, Number(input.agent.temperature) || 0),
-      ),
-      max_tokens: PERSONAL_AI_MAX_OUTPUT_TOKENS,
-      response_mode: 'text',
-      use_rag: PERSONAL_AI_USE_RAG,
-    }),
-    signal: AbortSignal.timeout(INTERNAL_AI_TIMEOUT_MS),
-  });
+  let response: Response | undefined;
+  let lastFetchError: unknown;
+
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      const candidate = await fetch(`${trimBaseUrl(INTERNAL_AI_URL)}/v1/chat`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          task: 'chat',
+          message: input.message,
+          messages: input.messages,
+          locale: input.locale,
+          agent: {
+            id: cleanText(input.agent.id, 160),
+            name: cleanText(input.agent.name, 160),
+            instructions: cleanText(input.agent.instructions, 5_000),
+            tone: cleanText(input.agent.tone, 160),
+          },
+          memory: buildSafeMemory(input.memory),
+          context: input.context,
+          media: input.media,
+          temperature: Math.max(
+            0,
+            Math.min(1, Number(input.agent.temperature) || 0),
+          ),
+          max_tokens: PERSONAL_AI_MAX_OUTPUT_TOKENS,
+          response_mode: 'text',
+          use_rag: PERSONAL_AI_USE_RAG,
+        }),
+        signal: AbortSignal.timeout(INTERNAL_AI_TIMEOUT_MS),
+      });
+
+      const transient = [502, 503, 504].includes(candidate.status);
+      if (!transient || attempt >= 3) {
+        response = candidate;
+        break;
+      }
+
+      await candidate.body?.cancel().catch(() => undefined);
+      await new Promise(resolve => setTimeout(resolve, 350 * attempt));
+    } catch (error) {
+      lastFetchError = error;
+      if (attempt >= 3) break;
+      await new Promise(resolve => setTimeout(resolve, 350 * attempt));
+    }
+  }
+
+  if (!response) {
+    throw lastFetchError instanceof Error
+      ? lastFetchError
+      : new Error('ai-service:network_error');
+  }
 
   const data = (await response.json().catch(() => ({}))) as GatewayResponse;
   const text = cleanText(data.response || data.message, 20_000);
