@@ -2833,8 +2833,8 @@ export default function CreateListingWizard({
               ),
             );
 
-            const metadata = {
-              ...(editingContentMetadata || {}),
+            const metadata: Record<string, unknown> = {
+              ...valueAsRecord(editingContentMetadata),
               form_values: savePayload.values,
               media: persistedMedia,
               image_urls: imageUrls,
@@ -2955,12 +2955,12 @@ export default function CreateListingWizard({
               );
             }
 
+            const payloadRecord = valueAsRecord(payload);
             const updatedRecord =
-              valueAsRecord(payload?.item) ||
-              valueAsRecord(payload?.content) ||
-              valueAsRecord(payload?.data) ||
-              valueAsRecord(payload) ||
-              {};
+              valueAsRecord(payloadRecord.item) ||
+              valueAsRecord(payloadRecord.content) ||
+              valueAsRecord(payloadRecord.data) ||
+              payloadRecord;
             if (updatedRecord.metadata) {
               setEditingContentMetadata(
                 valueAsRecord(updatedRecord.metadata) ||
