@@ -47,7 +47,7 @@ export function TransactionWorkspace({transactions}:{transactions:CrmTransaction
     } finally {
       setBusy(false);
     }
-  }
+  }, [accessToken]);
 
   useEffect(() => {
     const handlePopState = () => setSelectedId(readOrderIdFromUrl());
