@@ -54,7 +54,7 @@ function sanitizeRichText(value: string, maxLength: number) {
   html = html.replace(/<a([^>]*)href\s*=\s*(['"])(.*?)\2([^>]*)>/gi, (_m, before, _q, href, after) => {
     try {
       const url = new URL(href);
-      if (!['http:', 'https:'].includes(url.protocol) || isPrivateSourceHost(url.hostname)) return '<a>';
+      if (!['http:', 'https:'].includes(url.protocol) || !normalizeSafeExternalHttpUrl(url.toString())) return '<a>';
       return '<a' + before + ' href="' + url.toString().replace(/"/g, '&quot;') + '" target="_blank" rel="noopener noreferrer nofollow"' + after + '>';
     } catch {
       return '<a>';
