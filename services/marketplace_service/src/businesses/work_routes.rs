@@ -23,14 +23,8 @@ use super::{
 
 pub(crate) fn router() -> Router<Arc<AppState>> {
     Router::new()
-        .route(
-            "/v1/businesses/{business_id}/work",
-            get(list).post(create),
-        )
-        .route(
-            "/v1/businesses/{business_id}/work/sync",
-            post(sync),
-        )
+.route("/v1/businesses/{business_id}/work", get(list).post(create))
+        .route("/v1/businesses/{business_id}/work/sync", post(sync))
         .route(
             "/v1/businesses/{business_id}/work/{work_id}",
             axum::routing::patch(update),
@@ -146,11 +140,7 @@ async fn sync(
         .sync_suggestions(actor_id, business_id, organization.id)
         .await
     {
-        Ok(created) => (
-            StatusCode::OK,
-            Json(json!({"data":{"created":created}})),
-        )
-            .into_response(),
+        Ok(created) => (StatusCode::OK, Json(json!({"data":{"created":created}}))).into_response(),
         Err(error) => work_error_response(error),
     }
 }
@@ -189,11 +179,7 @@ async fn update(
         )
         .await
     {
-        Ok(work) => (
-            StatusCode::OK,
-            Json(json!({"data":{"work":work}})),
-        )
-            .into_response(),
+        Ok(work) => (StatusCode::OK, Json(json!({"data":{"work":work}}))).into_response(),
         Err(error) => work_error_response(error),
     }
 }
@@ -230,9 +216,7 @@ fn service_error_response(error: BusinessServiceError) -> Response {
         BusinessServiceError::AccessDenied => {
             api_error(StatusCode::FORBIDDEN, "business_access_denied")
         }
-        BusinessServiceError::NotFound => {
-            api_error(StatusCode::NOT_FOUND, "business_not_found")
-        }
+        BusinessServiceError::NotFound => api_error(StatusCode::NOT_FOUND, "business_not_found"),
         _ => api_error(
             StatusCode::SERVICE_UNAVAILABLE,
             "business_context_unavailable",
@@ -243,8 +227,12 @@ fn service_error_response(error: BusinessServiceError) -> Response {
 fn work_error_response(error: WorkRepositoryError) -> Response {
     match error {
         WorkRepositoryError::Validation(code) => api_error(StatusCode::BAD_REQUEST, code),
-        WorkRepositoryError::Forbidden => api_error(StatusCode::FORBIDDEN, "business_work_forbidden"),
-        WorkRepositoryError::NotFound => api_error(StatusCode::NOT_FOUND, "business_work_not_found"),
+        WorkRepositoryError::Forbidden => {
+            api_error(StatusCode::FORBIDDEN, "business_work_forbidden")
+        }
+        WorkRepositoryError::NotFound => {
+            api_error(StatusCode::NOT_FOUND, "business_work_not_found")
+        }
         WorkRepositoryError::Conflict => api_error(StatusCode::CONFLICT, "business_work_conflict"),
         WorkRepositoryError::Database => api_error(
             StatusCode::SERVICE_UNAVAILABLE,
