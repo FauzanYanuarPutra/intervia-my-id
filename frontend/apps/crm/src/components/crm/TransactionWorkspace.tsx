@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Card, EmptyState, PageHeader, StatusBadge } from 'lajukan-ui';
 import { useAuth } from '@/context/AuthContext';
 import { superAppApi, type SuperAppOrderDetail } from '@/lib/api';
@@ -33,7 +33,7 @@ export function TransactionWorkspace({transactions}:{transactions:CrmTransaction
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
 
-  async function openOrder(id:string) {
+  const openOrder = useCallback(async (id:string) => {
     if (!accessToken) return;
     setSelectedId(id);
     writeOrderUrl(id);
@@ -66,7 +66,7 @@ export function TransactionWorkspace({transactions}:{transactions:CrmTransaction
     if (!detail && !busy && accessToken) {
       void openOrder(selectedId);
     }
-  }, [accessToken, busy, detail, items, selectedId]);
+  }, [accessToken, busy, detail, items, selectedId, openOrder]);
 
   return <div className="space-y-4">
     <PageHeader title="Order & risiko" description="Pantau status, nominal, dan event transaksi."/>
