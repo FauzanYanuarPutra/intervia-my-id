@@ -38,11 +38,32 @@ export async function POST(req: NextRequest) {
 
   try {
     const subscriptions = await listPushSubscriptions(targetUserId);
+    const isCleanup = body?.type === 'call_end';
     let sent = 0;
     let expired = 0;
 
     for (const subscription of subscriptions) {
       try {
+        if (isCleanup) {
+          const result = await sendWebPush(subscription, {
+            type: 'call_end',
+            call_id: body?.call_id,
+            room_id: body?.room_id,
+            tag:
+              typeof body?.call_id === 'string'
+                ? `incoming-call:${body.call_id}`
+                : 'incoming-call',
+          });
+
+          if (result === 'ok') {
+            sent += 1;
+          } else {
+            expired += 1;
+            await deletePushEndpoint(subscription.endpoint);
+          }
+          continue;
+        }
+
         const result = await sendWebPush(subscription, {
           type: 'incoming_call',
           call_id: body?.call_id,
