@@ -1454,9 +1454,8 @@ function ListingsPage({
   return (
     <div className="space-y-4">
       <PageHeader
-        label="Moderasi Listing"
-        title="Tinjau laporan, listing nakal, dan tindakan ke pemilik."
-        body="Bukan CMS biasa. Halaman ini fokus report user, status listing, dan action trust agar marketplace tetap aman."
+        title="Moderasi Listing"
+        description="Tinjau laporan, status listing, dan tindakan trust agar marketplace tetap aman."
       />
       <FilterBar
         filters={[
