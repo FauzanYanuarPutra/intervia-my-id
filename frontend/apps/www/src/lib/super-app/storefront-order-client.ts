@@ -40,6 +40,7 @@ export type StorefrontProductOrderInput = {
   quantity?: number;
   selectedOptions?: StorefrontModifierSelection[];
   note?: string;
+  orderNote?: string;
   items?: StorefrontOrderLineInput[];
   fulfillmentMode?: StorefrontOrderFulfillmentMode;
 };
@@ -146,6 +147,7 @@ export async function submitStorefrontProductOrder(
         };
       }),
       fulfillment_mode: input.fulfillmentMode ?? 'pickup',
+      ...(input.orderNote?.trim() ? { notes: input.orderNote.trim() } : {}),
     }),
   });
 
