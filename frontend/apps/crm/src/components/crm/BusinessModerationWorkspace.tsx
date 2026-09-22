@@ -373,7 +373,7 @@ export default function BusinessModerationWorkspace() {
           )}
           <button
             type="button"
-            onClick={() => void loadBusinesses(query)
+            onClick={() => void loadBusinesses(query)}
             className="min-h-11 rounded-xl bg-slate-950 px-4 text-sm font-bold text-white"
           >
             Refresh
