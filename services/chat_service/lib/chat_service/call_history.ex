@@ -6,8 +6,8 @@ defmodule ChatService.CallHistory do
   @history_buckets 18
   @missed_after_seconds 45
 
-  @type call_type :: "voice" | "video"
-  @type status :: "ringing" | "connecting" | "connected" | "completed" | "cancelled" | "declined" | "missed" | "failed"
+  @type call_type :: String.t()
+  @type status :: String.t()
 
   def start(call_id, room_id, caller_id_bin, call_type) do
     with {:ok, members} <- room_members(room_id),
