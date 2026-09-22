@@ -528,6 +528,10 @@ export function ChatInboxProvider({ children }: { children: ReactNode }) {
     let isMounted = true;
     let inboxUpdatedRef: number | null = null;
     let incomingCallRef: number | null = null;
+    const callLifecycleRefs: Array<{
+      event: 'call_accepted' | 'call_rejected' | 'call_ended' | 'call_connected';
+      ref: number;
+    }> = [];
 
     const setupChannel = async () => {
       try {
@@ -561,6 +565,47 @@ export function ChatInboxProvider({ children }: { children: ReactNode }) {
             }
           }, 250);
         }) as number;
+
+        for (const event of [
+          'call_accepted',
+          'call_rejected',
+          'call_ended',
+          'call_connected',
+        ] as const) {
+          const ref = joinedChannel.on(event, (payload: Record<string, unknown>) => {
+            if (!isMounted || typeof window === 'undefined') return;
+
+            window.dispatchEvent(
+              new CustomEvent('chat:call-lifecycle', {
+                detail: {
+                  event,
+                  call_id:
+                    typeof payload.call_id === 'string'
+                      ? payload.call_id.trim()
+                      : '',
+                  room_id:
+                    typeof payload.room_id === 'string'
+                      ? payload.room_id.trim()
+                      : '',
+                  user_id:
+                    typeof payload.user_id === 'string'
+                      ? payload.user_id.trim()
+                      : '',
+                  status:
+                    typeof payload.status === 'string'
+                      ? payload.status
+                      : undefined,
+                  duration_seconds:
+                    typeof payload.duration_seconds === 'number'
+                      ? payload.duration_seconds
+                      : undefined,
+                },
+              }),
+            );
+          }) as number;
+
+          callLifecycleRefs.push({ event, ref });
+        }
 
         incomingCallRef = joinedChannel.on(
           'incoming_call',
@@ -619,6 +664,9 @@ export function ChatInboxProvider({ children }: { children: ReactNode }) {
           }
           if (incomingCallRef !== null) {
             activeChannel.off('incoming_call', incomingCallRef);
+          }
+          for (const { event, ref } of callLifecycleRefs) {
+            activeChannel.off(event, ref);
           }
           activeChannel.leave();
         } catch {
