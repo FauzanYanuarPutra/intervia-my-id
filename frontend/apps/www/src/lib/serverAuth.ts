@@ -4,7 +4,6 @@ import {
   importSPKI,
   jwtVerify,
   type JWTPayload,
-  type KeyLike,
 } from 'jose';
 
 export type AuthContext = {
@@ -20,7 +19,7 @@ export type AuthGuardResult =
   | { ok: false; res: NextResponse };
 
 let cachedPublicKeySource = '';
-let cachedPublicKey: Promise<KeyLike> | null = null;
+let cachedPublicKey: ReturnType<typeof importSPKI> | null = null;
 
 function getAppEnv(): string {
   return process.env.ENV || process.env.APP_ENV || process.env.NODE_ENV || 'development';
@@ -80,7 +79,7 @@ function publicKeyPem(): string | undefined {
   return value || undefined;
 }
 
-function getPublicKey(pem: string): Promise<KeyLike> {
+function getPublicKey(pem: string): ReturnType<typeof importSPKI> {
   if (!cachedPublicKey || cachedPublicKeySource !== pem) {
     cachedPublicKeySource = pem;
     cachedPublicKey = importSPKI(pem, 'RS256');
