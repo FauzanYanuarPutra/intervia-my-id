@@ -42,6 +42,7 @@ struct Config {
     vllm_models_url: String,
     vllm_api_key: String,
     vllm_model: String,
+    vllm_fallback_model: String,
     vllm_structured_model: String,
     vllm_vision_model: String,
     vllm_kyc_model: String,
@@ -450,6 +451,9 @@ impl Config {
                 .unwrap_or_else(|| vllm_model.clone()),
             vllm_kyc_model: non_empty_env("VLLM_KYC_MODEL").unwrap_or_else(|| vllm_model.clone()),
             vllm_model,
+            vllm_fallback_model: non_empty_env("VLLM_FALLBACK_MODEL")
+                .or_else(|| non_empty_env("AI_FALLBACK_MODEL"))
+                .unwrap_or_else(|| "qwen3:4b".to_string()),
             vllm_structured_outputs: env_bool("VLLM_STRUCTURED_OUTPUTS", true),
             vllm_reasoning_effort: env::var("VLLM_REASONING_EFFORT")
                 .unwrap_or_else(|_| "none".to_string())
@@ -535,24 +539,50 @@ async fn handle_ready(State(state): State<Arc<AppState>>) -> Response {
         .await;
 
     match probe {
-        Ok(response) if response.status().is_success() => json_response(
-            StatusCode::OK,
-            json!({
-                "status": "ready",
-                "service": SERVICE_NAME,
-                "vllm": "ready",
-                "latency_ms": started.elapsed().as_millis(),
-            }),
-        ),
-        Ok(response) => json_response(
-            StatusCode::SERVICE_UNAVAILABLE,
-            json!({
-                "status": "not_ready",
-                "service": SERVICE_NAME,
-                "vllm": format!("http_{}", response.status().as_u16()),
-                "latency_ms": started.elapsed().as_millis(),
-            }),
-        ),
+        Ok(response) => {
+            let status = response.status();
+            let payload = response.text().await.unwrap_or_default();
+            if !status.is_success() {
+                return json_response(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    json!({
+                        "status": "not_ready",
+                        "service": SERVICE_NAME,
+                        "vllm": format!("http_{}", status.as_u16()),
+                        "latency_ms": started.elapsed().as_millis(),
+                    }),
+                );
+            }
+
+            let parsed = serde_json::from_str::<Value>(&payload).unwrap_or_else(|_| json!({}));
+            let primary_ready = model_list_contains(&parsed, &state.config.vllm_model);
+            let fallback_ready = model_list_contains(&parsed, &state.config.vllm_fallback_model);
+
+            if !primary_ready && !fallback_ready {
+                return json_response(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    json!({
+                        "status": "not_ready",
+                        "service": SERVICE_NAME,
+                        "vllm": "model_unavailable",
+                        "model": state.config.vllm_model,
+                        "fallback_model": state.config.vllm_fallback_model,
+                        "latency_ms": started.elapsed().as_millis(),
+                    }),
+                );
+            }
+
+            json_response(
+                StatusCode::OK,
+                json!({
+                    "status": "ready",
+                    "service": SERVICE_NAME,
+                    "vllm": "ready",
+                    "model": if primary_ready { "primary" } else { "fallback" },
+                    "latency_ms": started.elapsed().as_millis(),
+                }),
+            )
+        }
         Err(_error) => json_response(
             StatusCode::SERVICE_UNAVAILABLE,
             json!({
@@ -565,6 +595,7 @@ async fn handle_ready(State(state): State<Arc<AppState>>) -> Response {
         ),
     }
 }
+
 
 async fn handle_capabilities() -> Json<Value> {
     Json(json!({
@@ -1863,6 +1894,31 @@ fn task_data_schema(task: AiTask) -> Value {
     }
 }
 
+fn model_list_contains(payload: &Value, requested_model: &str) -> bool {
+    let wanted = requested_model.trim();
+    if wanted.is_empty() {
+        return false;
+    }
+
+    let models = payload
+        .get("data")
+        .or_else(|| payload.get("models"))
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+
+    models.iter().any(|item| {
+        let name = item
+            .get("id")
+            .or_else(|| item.get("name"))
+            .or_else(|| item.get("model"))
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .trim();
+        name == wanted
+            || name.trim_end_matches(":latest") == wanted.trim_end_matches(":latest")
+    })
+}
 fn parse_structured_ai_response(raw: &str) -> Option<Value> {
     let trimmed = raw
         .trim()
@@ -3090,7 +3146,7 @@ fn normalize_locale(value: Option<&str>) -> &'static str {
 
 fn default_tokens_for_task(task: AiTask) -> u32 {
     match task {
-        AiTask::Chat | AiTask::ChatReply => 900,
+        AiTask::Chat | AiTask::ChatReply => 1_200,
         AiTask::SearchIntent
         | AiTask::Moderation
         | AiTask::SupportTriage
