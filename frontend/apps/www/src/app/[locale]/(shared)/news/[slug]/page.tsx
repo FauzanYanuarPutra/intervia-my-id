@@ -14,6 +14,7 @@ import {
 import { serializeJsonLd } from '@/lib/seo/jsonLd';
 import NewsAnalytics from './NewsAnalytics';
 import NewsShareActions from './NewsShareActions';
+import { NewsArticleMedia } from '@/components/news/NewsMedia';
 
 type PageProps = {
   params: Promise<{ locale: string; slug: string }>;
@@ -89,23 +90,6 @@ function readingMinutes(text: string): number {
   return Math.max(1, Math.ceil(words / 220));
 }
 
-function NewsMediaFallback({ article, isId }: { article: { category: string }; isId: boolean }) {
-  return (
-    <div className="flex min-h-36 items-center justify-between gap-5 bg-[linear-gradient(135deg,#ecfdf5_0%,#f8fafc_58%,#fff7ed_100%)] p-5 dark:bg-[linear-gradient(135deg,#06261b_0%,#0f172a_62%,#1c1917_100%)] sm:min-h-40 sm:p-7">
-      <div className="min-w-0">
-        <div className="flex h-10 w-10 items-center justify-center rounded-[13px] bg-emerald-700 text-sm font-black text-white shadow-sm">L</div>
-        <p className="mt-2 text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800 dark:text-emerald-300">Lajukan News</p>
-        <p className="mt-1 text-sm font-black text-slate-700 dark:text-slate-200">{article.category}</p>
-        <p className="mt-1 max-w-lg text-xs font-semibold leading-5 text-slate-500 dark:text-slate-400">
-          {isId ? 'Artikel ini tidak menggunakan gambar sampul.' : 'This article does not use a cover image.'}
-        </p>
-      </div>
-      <Newspaper className="h-12 w-12 shrink-0 text-emerald-700/20 dark:text-emerald-300/20" />
-    </div>
-  );
-}
-
-
 export default async function NewsArticlePage({ params }: PageProps) {
   const { locale, slug } = await params;
   const isId = locale === 'id';
@@ -159,32 +143,9 @@ export default async function NewsArticlePage({ params }: PageProps) {
           </div>
           <h1 className="mt-4 max-w-4xl text-[30px] font-black leading-[1.08] tracking-[-0.055em] text-slate-950 dark:text-white sm:text-5xl">{article.title}</h1>
           {!isRetracted && article.summary ? <p className="mt-3 max-w-3xl text-sm font-semibold leading-7 sm:text-base sm:leading-8 text-slate-600 dark:text-slate-300">{article.summary}</p> : null}
-          <figure className="mt-6 overflow-hidden rounded-[24px] border border-emerald-100 bg-slate-100 dark:border-white/10 dark:bg-slate-800">
-            {article.coverImage ? (
-              <>
-                <img
-                  src={article.coverImage}
-                  alt={article.title}
-                  className="aspect-[16/9] w-full object-cover"
-                  loading="eager"
-                  decoding="async"
-                  onError={event => {
-                    event.currentTarget.style.display = 'none';
-                    const fallback = event.currentTarget.parentElement?.querySelector('[data-news-detail-fallback]');
-                    if (fallback instanceof HTMLElement) fallback.classList.remove('hidden');
-                  }}
-                />
-                <div data-news-detail-fallback className="hidden">
-                  <NewsMediaFallback article={article} isId={isId} />
-                </div>
-                <figcaption className="px-4 py-2.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                  {isId ? 'Media utama artikel' : 'Article featured media'}
-                </figcaption>
-              </>
-            ) : (
-              <NewsMediaFallback article={article} isId={isId} />
-            )}
-          </figure>
+          <div className="mt-6">
+            <NewsArticleMedia article={article} isId={isId} />
+          </div>
           <div className="mt-5 grid gap-2 text-xs font-bold text-slate-600 dark:text-slate-300 sm:flex sm:flex-wrap">
             <span className="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-white px-3 dark:bg-white/10">
               <CalendarDays className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-300" />
