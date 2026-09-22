@@ -62,6 +62,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { SocialDistributionSettings } from './SocialDistributionSettings';
+import { CallNotificationSettings } from './CallNotificationSettings';
 
 type ActionState = 'idle' | 'loading' | 'success' | 'error';
 
@@ -727,6 +728,12 @@ export default function SettingsPage() {
         icon: BellRing,
         label: isId ? 'Pusat notifikasi' : 'Notification center',
         description: isId ? 'Inbox semua update' : 'Inbox for all updates',
+      },
+      {
+        href: '/calls',
+        icon: Phone,
+        label: isId ? 'Riwayat panggilan' : 'Call history',
+        description: isId ? 'Telepon & video call' : 'Voice & video calls',
       },
     ],
     [isId],
@@ -1495,6 +1502,8 @@ export default function SettingsPage() {
                     </PreferenceRow>
                   ))}
                 </div>
+
+                <CallNotificationSettings locale={locale} />
 
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">
                   <PreferenceRow
