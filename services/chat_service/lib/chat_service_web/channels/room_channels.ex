@@ -241,7 +241,7 @@ defmodule ChatServiceWeb.RoomChannel do
         {:error, reason} ->
           Logger.error("[CallHistory] accept failed: #{inspect(reason)}")
           call_error(socket, :storage_unavailable)
-      end}
+      end
     else
       {:error, reason} -> call_error(socket, reason)
     end
@@ -269,7 +269,7 @@ defmodule ChatServiceWeb.RoomChannel do
         {:error, reason} ->
           Logger.error("[CallHistory] reject failed: #{inspect(reason)}")
           call_error(socket, :storage_unavailable)
-      end}
+      end
     else
       {:error, reason} -> call_error(socket, reason)
     end
@@ -326,7 +326,7 @@ defmodule ChatServiceWeb.RoomChannel do
         {:error, reason} ->
           Logger.error("[CallHistory] end failed: #{inspect(reason)}")
           call_error(socket, :storage_unavailable)
-      end}
+      end
     else
       {:error, reason} -> call_error(socket, reason)
     end
