@@ -96,7 +96,18 @@ export function SupportWorkspace({tickets,failed=false}:{tickets:SupportTicket[]
 
       <Card className={`p-4 sm:p-5 ${selectedId ? "order-1 xl:order-2" : "order-2 xl:order-2"}`}>
         {!selectedId ? <EmptyState title="Pilih tiket" description="Pilih tiket di kiri untuk melihat detail, riwayat balasan, dan tindakan."/> :
-        loadingDetail ? <div className="rounded-2xl bg-[color:var(--color-surface-muted)] p-6 text-sm font-semibold">Memuat detail tiket...</div> :
+        loadingDetail ? (
+          <div className="space-y-3" aria-busy="true">
+            <div className="h-5 w-2/3 animate-pulse rounded bg-slate-200" />
+            <div className="h-3 w-1/2 animate-pulse rounded bg-slate-100" />
+            <div className="h-24 animate-pulse rounded-2xl bg-[color:var(--color-surface-muted)]" />
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div className="h-10 animate-pulse rounded-xl bg-slate-100" />
+              <div className="h-10 animate-pulse rounded-xl bg-slate-100" />
+            </div>
+            <div className="h-28 animate-pulse rounded-2xl bg-slate-50" />
+          </div>
+        ) :
         detail ? <div>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
