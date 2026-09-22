@@ -192,6 +192,8 @@ async fn logo_and_banner_updates_are_validated_and_projected_atomically(pool: Pg
             width: 1600,
             height: 600,
         }),
+        metadata_patch: None,
+        reason: Some("test profile update".to_owned()),
     })
     .unwrap();
 
