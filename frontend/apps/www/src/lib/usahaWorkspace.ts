@@ -1,12 +1,11 @@
 import {
   buildUsahaPortalHref,
+  getUsahaPortalBaseUrl,
   type UsahaRouteId,
 } from '@/lib/umkmSurface';
 
-const DEFAULT_USAHA_ORIGIN = 'http://localhost:3003';
-
 export function getUsahaWorkspaceUrl(path = '/', query?: Record<string, string | number | null | undefined>) {
-  const origin = (process.env.NEXT_PUBLIC_USAHA_URL || DEFAULT_USAHA_ORIGIN).replace(/\/$/, '');
+  const origin = getUsahaPortalBaseUrl();
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
   const url = new URL(`${origin}${normalizedPath}`);
   if (query) {
