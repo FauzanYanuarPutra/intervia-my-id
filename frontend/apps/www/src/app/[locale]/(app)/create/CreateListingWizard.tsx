@@ -3362,6 +3362,13 @@ export default function CreateListingWizard({
           },
         );
 
+        setFieldErrors(previous => {
+          const keys = ['location', 'address'];
+          const next = { ...previous };
+          for (const key of keys) delete next[key];
+          return next;
+        });
+
         setSaveStatus(
           'dirty',
         );
@@ -3614,16 +3621,6 @@ export default function CreateListingWizard({
     },
     [firstValidationMessage, focusValidationError],
   );
-
-  const validateStep = useCallback(
-    (step: number): string => {
-      return firstValidationMessage(
-        getStepValidationErrors(step),
-      );
-    },
-    [firstValidationMessage, getStepValidationErrors],
-  );
-
 
   const ensureServerDraftForEditing =
     useCallback(
@@ -5937,7 +5934,6 @@ export default function CreateListingWizard({
     ) {
       return (
         <div
-          id={`create-${field.key}-field`}
           key={field.key}
           className={cn(
             'space-y-2 rounded-xl',
