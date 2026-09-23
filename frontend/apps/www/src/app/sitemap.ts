@@ -1,6 +1,6 @@
 import { MetadataRoute } from 'next';
 import { buildContentHref } from '@/lib/content/routes';
-import { BLOG_ARTICLES, isBlogArticleIndexable } from '@/lib/seo/blog';
+import { getAllPublishedBlogArticlesForSitemap } from '@/lib/blog';
 import { LAJUKAN_EXPLORE_CATEGORIES } from '@/lib/discovery/lajukanCategories';
 import { buildNewsFacetUrl, buildNewsUrl, getNewsForSitemap } from '@/lib/news';
 import { listUmkmStores } from '@/lib/super-app/umkm-commerce.service';
@@ -15,7 +15,7 @@ export const fetchCache = 'force-no-store';
 const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://www.lajukan.com').replace(/\/+$/, '');
 const marketplaceBase = (process.env.INTERNAL_MARKETPLACE_URL || process.env.NEXT_PUBLIC_MARKETPLACE_URL || 'http://localhost:8081').replace(/\/+$/, '');
 const locales = ['id', 'en'] as const;
-const CONTENT_SITEMAP_LIMIT = 200;
+const CONTENT_SITEMAP_LIMIT = 100;
 const CONTENT_SITEMAP_MAX_ITEMS = 1000;
 const CONTENT_SITEMAP_FETCH_TIMEOUT_MS = 2500;
 
@@ -145,23 +145,29 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ),
   );
 
-  BLOG_ARTICLES.filter(isBlogArticleIndexable).forEach(article => {
-    const lastModified = safeDate(article.updatedAt);
-    locales.forEach(lang =>
-      sitemapEntries.push({
-        url: `${baseUrl}/${lang}/blog/${article.slug}`,
-        lastModified,
-        changeFrequency: 'monthly',
-        priority: 0.76,
-        alternates: {
-          languages: {
-            id: `${baseUrl}/id/blog/${article.slug}`,
-            en: `${baseUrl}/en/blog/${article.slug}`,
-            'x-default': `${baseUrl}/id/blog/${article.slug}`,
-          },
-        },
-      }),
-    );
+  const blogItems = await getAllPublishedBlogArticlesForSitemap();
+  const blogBySlug = new Map<string, { id?: typeof blogItems[number]; en?: typeof blogItems[number] }>();
+  blogItems.forEach(article => {
+    const current = blogBySlug.get(article.slug) || {};
+    current[article.language] = article;
+    blogBySlug.set(article.slug, current);
+  });
+
+  blogBySlug.forEach(group => {
+    const article = group.id || group.en;
+    if (!article) return;
+    const url = `${baseUrl}/${article.language}/blog/${encodeURIComponent(article.slug)}`;
+    const languages: Record<string, string> = {};
+    if (group.id) languages.id = `${baseUrl}/id/blog/${encodeURIComponent(article.slug)}`;
+    if (group.en) languages.en = `${baseUrl}/en/blog/${encodeURIComponent(article.slug)}`;
+    languages['x-default'] = languages.id || languages.en;
+    sitemapEntries.push({
+      url,
+      lastModified: safeDate(article.updatedAt),
+      changeFrequency: 'weekly',
+      priority: 0.8,
+      alternates: { languages },
+    });
   });
 
   const seenContentPaths = new Set<string>();
@@ -194,7 +200,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // while each /toko/:slug page contains the LocalBusiness entity details.
   const umkmStores = await listUmkmStores({
     activeOnly: true,
-    limit: 500,
+    limit: 200,
   }).catch(() => []);
   umkmStores
     .filter(isPublicUmkmStoreVisible)
