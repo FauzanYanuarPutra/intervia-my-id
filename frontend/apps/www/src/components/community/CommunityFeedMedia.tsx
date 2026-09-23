@@ -2,7 +2,7 @@
 
 import { LajukanImage as Image } from '@/components/common/LajukanImage';
 import { MediaPreviewCarousel } from '@/components/common/MediaPreviewCarousel';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Expand, ImageIcon, PlayCircle, X } from 'lucide-react';
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 import type { CommunityFeedMedia } from '@/lib/community/types';
@@ -308,35 +308,101 @@ export function CommunityMediaGalleryPreview({
       </div>
 
       {lightboxIndex != null ? (
-        <div className="ui-layer-preview fixed inset-0 flex h-[var(--app-visual-viewport-height)] w-screen items-center justify-center overflow-hidden bg-black/95 px-2 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-[calc(env(safe-area-inset-top)+0.75rem)] sm:px-2">
-          <button
-            type="button"
-            onClick={() => setLightboxIndex(null)}
-            className="absolute right-3 top-[calc(env(safe-area-inset-top)+0.75rem)] z-[2] inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/12 text-white shadow-[0_18px_48px_-28px_rgba(0,0,0,0.85)] ring-1 ring-white/15 transition hover:bg-white/22 sm:right-4"
-            aria-label={isId ? 'Tutup preview' : 'Close preview'}
-          >
-            <X className="h-6 w-6" />
-          </button>
-
-          <div className="h-[min(78vh,calc(var(--app-visual-viewport-height)-5.5rem))] w-full max-w-6xl sm:h-[min(84vh,calc(var(--app-visual-viewport-height)-5rem))]">
-            <MediaPreviewCarousel
-              items={items}
-              alt={title}
-              aspectClassName="h-full w-full"
-              className="rounded-[18px] bg-black shadow-[0_28px_90px_-34px_rgba(0,0,0,0.92)] ring-1 ring-white/10"
-              viewportClassName="rounded-[18px]"
-              sizes="100vw"
-              controls
-              lightbox={false}
-              showCounter
-              showDots
-              objectFit="contain"
-              initialIndex={lightboxIndex}
-            />
-          </div>
-        </div>
+        <CommunityMediaLightbox
+          items={items}
+          title={title}
+          isId={isId}
+          initialIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+          onIndexChange={setLightboxIndex}
+        />
       ) : null}
     </>
+  );
+}
+
+function CommunityMediaLightbox({
+  items,
+  title,
+  isId,
+  initialIndex,
+  onClose,
+  onIndexChange,
+}: {
+  items: CommunityFeedMedia[];
+  title: string;
+  isId: boolean;
+  initialIndex: number;
+  onClose: () => void;
+  onIndexChange: (index: number) => void;
+}) {
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  return (
+    <div
+      className="ui-layer-preview fixed inset-0 z-[100] flex h-[var(--app-visual-viewport-height)] w-screen items-center justify-center overflow-hidden bg-black/96"
+      role="dialog"
+      aria-modal="true"
+      aria-label={isId ? 'Preview media' : 'Media preview'}
+      onMouseDown={event => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-[2] h-24 bg-gradient-to-b from-black/75 to-transparent" />
+
+      <header className="absolute inset-x-0 top-0 z-[3] flex items-center gap-3 px-3 pb-4 pt-[calc(env(safe-area-inset-top)+0.75rem)] text-white sm:px-5">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-bold tracking-[-0.01em] sm:text-[15px]">
+            {title}
+          </p>
+          <p className="mt-0.5 text-[11px] font-medium text-white/65">
+            {initialIndex + 1} / {items.length}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/12 text-white ring-1 ring-white/15 backdrop-blur-md transition hover:bg-white/20 active:scale-95"
+          aria-label={isId ? 'Tutup preview' : 'Close preview'}
+        >
+          <X className="h-6 w-6" />
+        </button>
+      </header>
+
+      <div className="h-[calc(var(--app-visual-viewport-height)-7.5rem)] w-full max-w-[1500px] px-0 sm:h-[calc(var(--app-visual-viewport-height)-8.5rem)] sm:px-8">
+        <MediaPreviewCarousel
+          items={items}
+          alt={title}
+          aspectClassName="h-full w-full"
+          className="rounded-none bg-transparent sm:rounded-[18px]"
+          viewportClassName="rounded-none sm:rounded-[18px]"
+          sizes="100vw"
+          controls
+          lightbox={false}
+          keyboardControls
+          showCounter={false}
+          showDots
+          objectFit="contain"
+          initialIndex={initialIndex}
+          onIndexChange={onIndexChange}
+        />
+      </div>
+
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-8">
+        <span className="rounded-full bg-black/45 px-3 py-1.5 text-[10px] font-semibold text-white/75 ring-1 ring-white/10 backdrop-blur-md">
+          {items.length} {isId ? 'media' : 'media'}
+        </span>
+      </div>
+    </div>
   );
 }
 
