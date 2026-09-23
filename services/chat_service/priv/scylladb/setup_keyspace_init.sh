@@ -56,15 +56,24 @@ fi
 # so rerunning them is safe during rolling/local restarts while new migrations
 # become effective without rewriting init.cql.
 MIGRATIONS_DIR="/scylladb/migrations"
+cqlsh --request-timeout=60 -e "CREATE TABLE IF NOT EXISTS ${KEYSPACE}.chat_schema_migrations (migration_name text PRIMARY KEY, applied_at timestamp);" "$HOST"
+
 if [ -d "$MIGRATIONS_DIR" ]; then
     for migration in "$MIGRATIONS_DIR"/*.cql; do
         [ -f "$migration" ] || continue
-        echo "Applying Scylla migration: $(basename "$migration")"
+        migration_name="$(basename "$migration")"
+        applied="$(cqlsh --request-timeout=60 -e "SELECT migration_name FROM ${KEYSPACE}.chat_schema_migrations WHERE migration_name = '$migration_name';" "$HOST" 2>/dev/null | grep -F "$migration_name" | head -n 1 || true)"
+        if [ -n "$applied" ]; then
+            echo "Skipping Scylla migration (already applied): $migration_name"
+            continue
+        fi
+        echo "Applying Scylla migration: $migration_name"
         tmp_migration="$(mktemp)"
         printf 'USE %s;\n' "$KEYSPACE" > "$tmp_migration"
         cat "$migration" >> "$tmp_migration"
         cqlsh --request-timeout=60 -f "$tmp_migration" "$HOST"
         rm -f "$tmp_migration"
+        cqlsh --request-timeout=60 -e "INSERT INTO ${KEYSPACE}.chat_schema_migrations (migration_name, applied_at) VALUES ('$migration_name', toTimestamp(now()));" "$HOST"
     done
 fi
 
