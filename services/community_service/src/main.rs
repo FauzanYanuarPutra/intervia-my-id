@@ -3719,7 +3719,6 @@ async fn list_group_members(
     if requested_status.as_deref() != Some("pending")
         && requested_status.as_deref() != Some("blocked")
     {
-        // Keep the public modal focused on active members by default.
     } else if !group.viewer_can_manage && !actor.as_ref().is_some_and(is_moderator) {
         return Err(ApiError::new(StatusCode::FORBIDDEN, "Forbidden"));
     }
