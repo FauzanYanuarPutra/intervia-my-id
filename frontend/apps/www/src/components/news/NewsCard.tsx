@@ -67,6 +67,7 @@ export function NewsCard({
         </div>
       </Link>
     );
+  }
 
   if (variant === 'mobile') {
     return (
@@ -117,8 +118,6 @@ export function NewsCard({
         </div>
       </Link>
     );
-  }
-
   }
 
   if (variant === 'hero') {
