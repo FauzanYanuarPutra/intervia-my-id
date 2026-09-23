@@ -39,7 +39,7 @@ export function PortalShell({
     : availableBusinesses;
 
   return (
-    <div className="min-h-screen bg-[#f7f8f6] text-portal-ink">
+    <div className="min-h-screen min-w-0 overflow-x-clip bg-[#f7f8f6] text-portal-ink">
       <a href="#portal-content" className="portal-skip-link">Langsung ke konten</a>
 
       <aside className="fixed inset-y-0 left-0 z-[var(--portal-layer-shell)] hidden w-[224px] flex-col border-r border-portal-line/80 bg-white px-3 py-3 lg:flex">
@@ -88,9 +88,9 @@ export function PortalShell({
         </div>
       </aside>
 
-      <div className="min-h-screen lg:pl-[224px]">
+      <div className="min-h-screen min-w-0 lg:pl-[224px]">
         <header className="sticky top-0 z-[var(--portal-layer-shell)] border-b border-portal-line/80 bg-white/95 backdrop-blur-xl">
-          <div className="mx-auto flex min-h-14 w-full max-w-[1600px] items-center justify-between gap-2 px-2 sm:px-5 lg:px-6">
+          <div className="mx-auto flex min-h-[58px] w-full max-w-[1600px] items-center justify-between gap-2 px-2.5 sm:px-5 lg:px-6">
             {!accountPage && activeBusiness ? (
               <div className="min-w-0 flex-1 lg:hidden">
                 <BusinessSwitcher
@@ -124,7 +124,7 @@ export function PortalShell({
           </div>
         </header>
 
-        <main id="portal-content" tabIndex={-1} className="portal-mobile-content-clearance mx-auto w-full max-w-[1600px] px-3 pt-3 outline-none sm:px-5 sm:pt-4 lg:px-6 lg:pb-8">
+        <main id="portal-content" tabIndex={-1} className="portal-mobile-content-clearance mx-auto w-full max-w-[1600px] min-w-0 px-3 pt-3 outline-none sm:px-5 sm:pt-4 lg:px-6 lg:pb-8">
           <div className="min-w-0 space-y-4">{activeBusiness && !accountPage ? <UsahaFlowGuide business={activeBusiness} currentSection={currentSection} /> : null}{children}</div>
         </main>
       </div>
