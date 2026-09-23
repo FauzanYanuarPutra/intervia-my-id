@@ -23,6 +23,10 @@ if config_env() == :prod do
     |> String.trim()
     |> String.upcase()
 
+  jwt_secret = System.get_env("JWT_SECRET")
+  jwt_public_key_pem = nil
+  jwt_allow_legacy_hs256 = false
+
   {jwt_guardian_key, jwt_allowed_algos} =
     case jwt_algorithm do
       "RS256" ->
@@ -42,6 +46,7 @@ if config_env() == :prod do
             raise "JWT_SECRET must be at least 32 characters for development HS256"
           end
 
+          jwt_allow_legacy_hs256 = true
           {JOSE.JWK.from_oct(jwt_secret), ["HS256"]}
         else
           raise "HS256 access tokens are disabled in production; configure RS256"
