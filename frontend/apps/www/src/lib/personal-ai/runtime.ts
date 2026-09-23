@@ -678,60 +678,55 @@ async function callAiService(input: {
     headers.Authorization = `Bearer ${AI_SERVICE_TOKEN.trim()}`;
   }
 
-  let response: Response | undefined;
-  let lastFetchError: unknown;
+  let response: Response;
 
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
-    try {
-      const candidate = await fetch(`${trimBaseUrl(INTERNAL_AI_URL)}/v1/chat`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          task: 'chat',
-          message: input.message,
-          messages: input.messages,
-          locale: input.locale,
-          agent: {
-            id: cleanText(input.agent.id, 160),
-            name: cleanText(input.agent.name, 160),
-            instructions: cleanText(input.agent.instructions, 5_000),
-            tone: cleanText(input.agent.tone, 160),
-          },
-          memory: buildSafeMemory(input.memory),
-          context: input.context,
-          media: input.media,
-          temperature: Math.max(
-            0,
-            Math.min(1, Number(input.agent.temperature) || 0),
-          ),
-          max_tokens: PERSONAL_AI_MAX_OUTPUT_TOKENS,
-          response_mode: 'text',
-          use_rag: PERSONAL_AI_USE_RAG,
-        }),
-        signal: AbortSignal.timeout(INTERNAL_AI_TIMEOUT_MS),
-      });
+  const request = () =>
+    fetch(`${trimBaseUrl(INTERNAL_AI_URL)}/v1/chat`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        task: 'chat',
+        message: input.message,
+        messages: input.messages,
+        locale: input.locale,
+        agent: {
+          id: cleanText(input.agent.id, 160),
+          name: cleanText(input.agent.name, 160),
+          instructions: cleanText(input.agent.instructions, 5_000),
+          tone: cleanText(input.agent.tone, 160),
+        },
+        memory: buildSafeMemory(input.memory),
+        context: input.context,
+        media: input.media,
+        temperature: Math.max(
+          0,
+          Math.min(1, Number(input.agent.temperature) || 0),
+        ),
+        max_tokens: PERSONAL_AI_MAX_OUTPUT_TOKENS,
+        response_mode: 'text',
+        use_rag: PERSONAL_AI_USE_RAG,
+      }),
+      signal: AbortSignal.timeout(INTERNAL_AI_TIMEOUT_MS),
+    );
 
-      const transient = [502, 503, 504].includes(candidate.status);
-      if (!transient || attempt >= 3) {
-        response = candidate;
-        break;
-      }
-
-      if (candidate.body) {
-        await candidate.body.cancel().catch(() => undefined);
-      }
-      await new Promise(resolve => setTimeout(resolve, 350 * attempt));
-    } catch (error) {
-      lastFetchError = error;
-      if (attempt >= 3) break;
-      await new Promise(resolve => setTimeout(resolve, 350 * attempt));
+  try {
+    response = await request();
+  } catch (error) {
+    // Retry only transport failures. HTTP 4xx/5xx are deterministic gateway
+    // responses and must not multiply provider load or duplicate side effects.
+    if (!(error instanceof TypeError) && !(error instanceof DOMException)) {
+      throw error;
     }
-  }
 
-  if (!response) {
-    throw lastFetchError instanceof Error
-      ? lastFetchError
-      : new Error('ai-service:network_error');
+    await new Promise(resolve => setTimeout(resolve, 350));
+
+    try {
+      response = await request();
+    } catch (retryError) {
+      throw retryError instanceof Error
+        ? retryError
+        : new Error('ai-service:network_error');
+    }
   }
 
   const data = (await response.json().catch(() => ({}))) as GatewayResponse;
