@@ -70,42 +70,33 @@ try {
             [string[]]$Arguments
         )
 
-        # Docker Compose intentionally writes its normal BuildKit progress to
-        # native stderr. Merging stderr with stdout (2>&1) makes PowerShell
-        # render ordinary Compose progress as NativeCommandError records.
-        # Capture the two streams separately, then return plain strings so the
-        # launcher can decide whether a failure is real from the exit code.
-        $StderrPath = [System.IO.Path]::GetTempFileName()
+        # Stream Docker stdout/stderr directly so long BuildKit operations do not
+        # look frozen while the launcher waits for the command to finish.
+        # Native stderr is intentionally merged into the PowerShell success stream
+        # for live display; callers only rely on the combined Output + ExitCode.
+        $PreviousErrorActionPreference = $ErrorActionPreference
+        $Output = @()
+        $ExitCode = 1
         try {
-            $PreviousErrorActionPreference = $ErrorActionPreference
-            $Stdout = @()
-            $ExitCode = 1
-            try {
-                $ErrorActionPreference = "Continue"
-                $Stdout = @(& docker @Arguments 1> $StderrPath)
-                $ExitCode = $LASTEXITCODE
-            }
-            finally {
-                $ErrorActionPreference = $PreviousErrorActionPreference
-            }
-
-            $Stderr = @()
-            if (Test-Path -LiteralPath $StderrPath) {
-                $RawStderr = Get-Content -Raw -LiteralPath $StderrPath
-                if (-not [string]::IsNullOrEmpty($RawStderr)) {
-                    $Stderr = @($RawStderr -split "\r?\n" | Where-Object { $_ -ne "" })
+            $ErrorActionPreference = "Continue"
+            $Output = @(
+                & docker @Arguments 2>&1 | ForEach-Object {
+                    $Line = "$_"
+                    Write-Host $Line
+                    $Line
                 }
-            }
-
-            [pscustomobject]@{
-                ExitCode = $ExitCode
-                Output = @($Stdout) + @($Stderr)
-                Stdout = @($Stdout)
-                Stderr = @($Stderr)
-            }
+            )
+            $ExitCode = $LASTEXITCODE
         }
         finally {
-            Remove-Item -LiteralPath $StderrPath -Force -ErrorAction SilentlyContinue
+            $ErrorActionPreference = $PreviousErrorActionPreference
+        }
+
+        [pscustomobject]@{
+            ExitCode = $ExitCode
+            Output = @($Output)
+            Stdout = @($Output)
+            Stderr = @()
         }
     }
 
