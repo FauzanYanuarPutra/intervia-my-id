@@ -1,0 +1,1 @@
+-- Intentionally non-destructive: this migration repairs shared Personal AI schema and must not drop live user data during rollback.
