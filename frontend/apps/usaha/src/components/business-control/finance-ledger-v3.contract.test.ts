@@ -12,6 +12,8 @@ describe('finance ledger UX V3', () => {
     expect(source).not.toMatch(/<select[\s\S]*?value=\{allocationBucket\}/);
     expect(source).not.toMatch(/<select[\s\S]*?value=\{allocationFrom\}/);
     expect(source).not.toMatch(/<select[\s\S]*?value=\{allocationTo\}/);
+    expect(source).toContain('SearchPicker');
+    expect(source).not.toMatch(/<select[\s\S]*?value=\{channelKey\}/);
     expect(source).toContain('Saldo setelah dipindah');
   });
 
