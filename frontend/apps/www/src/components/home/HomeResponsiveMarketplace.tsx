@@ -73,7 +73,7 @@ import {
   PlayCircleIcon,
   GlobeAltIcon,
 } from '@heroicons/react/24/solid';
-import { HomeUmkmMapPreview } from '@/components/home/HomeUmkmMapPreview';
+import { HomeBusinessMapSection } from '@/components/home/HomeBusinessMapSection';
 import { useViewerLocation } from '@/components/super-app/useViewerLocation';
 import { DailyLoginRewardCard } from '@/components/rewards/DailyLoginRewardCard';
 import { SearchInput } from '@/components/ui/SearchInput';
@@ -1545,10 +1545,10 @@ const QUICK_CATEGORY_UI: Record<
     offsetY: -16,
     imageSize: 70,
   },
-  map: {
+  all: {
     tone: 'blue',
     flip: false,
-    scale: 1.12,
+    scale: 1.08,
     rotate: 3,
     offsetX: -24,
     offsetY: -16,
@@ -1573,22 +1573,20 @@ export function getQuickCategories(isId: boolean): QuickCategory[] {
   }));
 
   return [
-    ...categories.slice(0, 4),
+    ...categories,
     {
-      id: 'business-map',
-      label: isId ? 'Peta Usaha' : 'Business Map',
+      id: 'all',
+      label: isId ? 'Semua' : 'All',
       description: isId
-        ? 'Lihat usaha terdekat berdasarkan lokasi.'
-        : 'Find nearby businesses by location.',
-      href: `${UMKM_DISCOVERY_PATH}?view=map`,
-      image: '/images/hero/menu/map-01.png',
-      badge: isId ? 'Dekat' : 'Nearby',
-      ...QUICK_CATEGORY_UI.map,
+        ? 'Lihat semua kategori, kebutuhan, dan peluang usaha.'
+        : 'Browse every category, business need, and opportunity.',
+      href: '/explore',
+      image: '/images/hero/menu/semua-01.png',
+      badge: isId ? 'Semua' : 'All',
+      ...QUICK_CATEGORY_UI.all,
     },
-    ...categories.slice(4),
   ];
 }
-
 function HomeAvatarSprite({
   scene,
   isId,
@@ -5590,6 +5588,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
           />
         ) : null}
         <QuickCategoriesSection isId={isId} />
+        <HomeBusinessMapSection locale={locale} />
         {!isAuthenticated ? (
           <GameProgressCard
             isId={isId}
@@ -5605,16 +5604,6 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
         <DailyLoginRewardCard locale={locale} compact />
         <TrendingSearchSection isId={isId} />
 
-        <HomeUmkmMapPreview
-          locale={locale}
-          viewerLocation={viewerLocationState.viewerLocation}
-          locating={viewerLocationState.locating}
-          locationError={viewerLocationState.locationError}
-          locationEnabled={viewerLocationState.locationEnabled}
-          locationPromptDismissed={viewerLocationState.locationPromptDismissed}
-          requestViewerLocation={viewerLocationState.requestViewerLocation}
-          dismissLocationPrompt={viewerLocationState.dismissLocationPrompt}
-        />
         <PublicReferencesSection isId={isId} items={publicReferences} />
         {recommendationsLoading ? (
           <RecommendationsLoadingSkeleton isId={isId} />
@@ -5693,6 +5682,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
                 />
               ) : null}
               <QuickCategoriesSection isId={isId} />
+        <HomeBusinessMapSection locale={locale} />
               {!isAuthenticated ? (
                 <GameProgressCard
                   isId={isId}
@@ -5708,22 +5698,6 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
               <DailyLoginRewardCard locale={locale} compact />
               <TrendingSearchSection isId={isId} />
 
-              <HomeUmkmMapPreview
-                locale={locale}
-                viewerLocation={viewerLocationState.viewerLocation}
-                locating={viewerLocationState.locating}
-                locationError={viewerLocationState.locationError}
-                locationEnabled={viewerLocationState.locationEnabled}
-                locationPromptDismissed={
-                  viewerLocationState.locationPromptDismissed
-                }
-                requestViewerLocation={
-                  viewerLocationState.requestViewerLocation
-                }
-                dismissLocationPrompt={
-                  viewerLocationState.dismissLocationPrompt
-                }
-              />
               <PublicReferencesSection isId={isId} items={publicReferences} />
               {recommendationsLoading ? (
                 <RecommendationsLoadingSkeleton isId={isId} />
