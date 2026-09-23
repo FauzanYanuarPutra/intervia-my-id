@@ -55,20 +55,42 @@ export function HomeNewsSection({
 
       {visibleItems.length ? (
         <>
-          <div className="mt-3 hidden gap-3 px-3 sm:grid sm:px-4 md:px-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
-            <NewsCard article={visibleItems[0]} locale={locale} variant="hero" priority />
+          <div className="mt-3 grid gap-3 px-3 md:grid-cols-[minmax(0,1.08fr)_minmax(260px,0.92fr)] sm:px-4 md:px-5">
+            <NewsCard
+              article={visibleItems[0]}
+              locale={locale}
+              variant="hero"
+              priority
+            />
             <div className="grid min-w-0 gap-2.5 sm:gap-3">
               {visibleItems.slice(1).map(item => (
-                <NewsCard key={item.id} article={item} locale={locale} variant="compact" />
+                <NewsCard
+                  key={item.id}
+                  article={item}
+                  locale={locale}
+                  variant="compact"
+                />
               ))}
             </div>
           </div>
 
-          <div className="mt-2.5 flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-3 pb-0.5 [scrollbar-width:none] sm:hidden">
-            {visibleItems.map(item => (
-              <div key={item.id} className="min-w-[82vw] max-w-[360px] shrink-0 snap-start">
-                <NewsCard article={item} locale={locale} variant="hero" priority={item.id === visibleItems[0]?.id} />
-              </div>
+          <div className="mt-3 grid gap-2.5 px-3 md:hidden sm:px-4">
+            {visibleItems.slice(0, 1).map(item => (
+              <NewsCard
+                key={item.id}
+                article={item}
+                locale={locale}
+                variant="mobile"
+                priority
+              />
+            ))}
+            {visibleItems.slice(1).map(item => (
+              <NewsCard
+                key={item.id}
+                article={item}
+                locale={locale}
+                variant="compact"
+              />
             ))}
           </div>
         </>
