@@ -1,19 +1,11 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import {
-  ArrowUpRight,
-  Building2,
-  Globe2,
-  MapPinned,
-  Radio,
-  Store,
-  Waypoints,
-} from 'lucide-react';
-import { Link } from '@/i18n/navigation';
+import type { KeyboardEvent, MouseEvent } from 'react';
+import { ArrowUpRight, MapPinned } from 'lucide-react';
+import { Link, useRouter } from '@/i18n/navigation';
 import { UMKM_DISCOVERY_PATH } from '@/lib/umkmSurface';
 import { UmkmStoreMap, type UmkmMapStore } from '@/components/super-app/UmkmStoreMap';
-import { Skeleton } from '@/components/ui/Skeleton';
 
 type HomeBusinessMapSectionProps = {
   locale: string;
@@ -67,9 +59,12 @@ export function HomeBusinessMapSection({
   locale,
 }: HomeBusinessMapSectionProps) {
   const isId = locale === 'id';
+  const router = useRouter();
   const [stores, setStores] = useState<UmkmMapStore[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const mapHref = `${UMKM_DISCOVERY_PATH}?view=map`;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -86,9 +81,7 @@ export function HomeBusinessMapSection({
             signal: controller.signal,
           },
         );
-        const payload = (await response
-          .json()
-          .catch(() => ({}))) as StoresResponse;
+        const payload = (await response.json().catch(() => ({}))) as StoresResponse;
 
         if (!response.ok || !payload.data?.items) {
           throw new Error(
@@ -126,143 +119,103 @@ export function HomeBusinessMapSection({
     [stores],
   );
 
+  const openMap = () => router.push(mapHref);
+
+  const handleMapClick = (event: MouseEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest('a,button')) return;
+    openMap();
+  };
+
+  const handleMapKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      openMap();
+    }
+  };
+
   return (
     <section
-      className="overflow-hidden rounded-[28px] border border-emerald-100/70 bg-slate-950 shadow-[0_26px_70px_-44px_rgba(15,23,42,0.62)]"
+      className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_20px_55px_-42px_rgba(15,23,42,0.34)]"
       data-testid="home-business-map-section"
       aria-label={
         isId ? 'Sebaran usaha Indonesia' : 'Indonesia business coverage map'
       }
     >
-      <div className="relative overflow-hidden px-4 py-4 sm:px-5 sm:py-5">
-        <div
-          className="pointer-events-none absolute -right-16 -top-24 h-56 w-56 rounded-full bg-emerald-400/20 blur-3xl"
-          aria-hidden="true"
-        />
-        <div
-          className="pointer-events-none absolute -left-12 bottom-[-6rem] h-48 w-48 rounded-full bg-cyan-400/15 blur-3xl"
-          aria-hidden="true"
-        />
-
-        <div className="relative flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.08] px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.12em] text-emerald-200">
-              <Radio className="h-3 w-3" />
-              {isId ? 'Jangkauan Indonesia' : 'Indonesia-wide network'}
-            </div>
-            <h2 className="mt-2 text-[18px] font-black tracking-tight text-white sm:text-[21px]">
-              {isId ? 'Usaha Indonesia, makin dekat.' : 'Indonesia businesses, closer.'}
-            </h2>
-            <p className="mt-1 max-w-2xl text-[11px] font-medium leading-5 text-slate-300 sm:text-xs">
-              {isId
-                ? 'Lihat sebaran titik usaha dan referensi publik dalam satu peta. Zoom untuk menemukan area yang ramai usaha.'
-                : 'See business locations and public references in one map. Zoom in to discover where business activity clusters.'}
-            </p>
-          </div>
-
-          <Link
-            href={`${UMKM_DISCOVERY_PATH}?view=map`}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.08] px-3 py-2 text-[10px] font-bold text-white transition hover:bg-white/[0.14] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
-          >
+      <div className="flex items-center justify-between gap-3 px-3.5 py-3 sm:px-4">
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.12em] text-emerald-700">
             <MapPinned className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">
-              {isId ? 'Buka peta' : 'Open map'}
-            </span>
-            <ArrowUpRight className="h-3.5 w-3.5" />
-          </Link>
+            {isId ? 'Sebaran UMKM' : 'Business map'}
+          </div>
+          <h2 className="mt-1 truncate text-[14px] font-black tracking-tight text-slate-950 sm:text-[15px]">
+            {isId ? 'UMKM Indonesia dalam satu peta' : 'Indonesian businesses on one map'}
+          </h2>
+          <p className="mt-0.5 text-[10px] font-medium text-slate-500 sm:text-[11px]">
+            {loading
+              ? isId
+                ? 'Menyiapkan peta…'
+                : 'Preparing the map…'
+              : isId
+                ? `${summary.businessCount} usaha terpetakan`
+                : `${summary.businessCount} businesses mapped`}
+          </p>
         </div>
 
-        <div className="relative mt-4 grid grid-cols-3 gap-2">
-          <div className="rounded-2xl border border-white/10 bg-white/[0.06] px-2.5 py-2.5">
-            <div className="flex items-center gap-1.5 text-emerald-200">
-              <Store className="h-3.5 w-3.5" />
-              <span className="text-[9px] font-bold uppercase tracking-[0.08em]">
-                {isId ? 'Usaha' : 'Businesses'}
-              </span>
-            </div>
-            <strong className="mt-1 block text-lg font-black text-white">
-              {loading ? '—' : summary.businessCount}
-            </strong>
-          </div>
-          <div className="rounded-2xl border border-white/10 bg-white/[0.06] px-2.5 py-2.5">
-            <div className="flex items-center gap-1.5 text-cyan-200">
-              <Building2 className="h-3.5 w-3.5" />
-              <span className="text-[9px] font-bold uppercase tracking-[0.08em]">
-                {isId ? 'Area' : 'Areas'}
-              </span>
-            </div>
-            <strong className="mt-1 block text-lg font-black text-white">
-              {loading ? '—' : summary.cityCount}
-            </strong>
-          </div>
-          <div className="rounded-2xl border border-white/10 bg-white/[0.06] px-2.5 py-2.5">
-            <div className="flex items-center gap-1.5 text-amber-200">
-              <Globe2 className="h-3.5 w-3.5" />
-              <span className="text-[9px] font-bold uppercase tracking-[0.08em]">
-                {isId ? 'Referensi' : 'References'}
-              </span>
-            </div>
-            <strong className="mt-1 block text-lg font-black text-white">
-              {loading ? '—' : summary.referenceCount}
-            </strong>
-          </div>
-        </div>
+        <Link
+          href={mapHref}
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-2 text-[10px] font-bold text-emerald-800 transition hover:border-emerald-300 hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+        >
+          <span className="hidden sm:inline">
+            {isId ? 'Buka peta' : 'Open map'}
+          </span>
+          <ArrowUpRight className="h-3.5 w-3.5" />
+        </Link>
       </div>
 
-      <div className="relative mx-2 mb-2 overflow-hidden rounded-[22px] border border-white/10 bg-slate-900 shadow-[0_18px_46px_-34px_rgba(0,0,0,0.72)] sm:mx-3 sm:mb-3">
-        {loading && stores.length === 0 ? (
-          <div className="grid min-h-[360px] place-items-center bg-[radial-gradient(circle_at_50%_30%,rgba(16,185,129,0.12),transparent_42%),linear-gradient(160deg,#0f172a,#111827)]">
-            <div className="w-[min(80%,18rem)] space-y-2">
-              <Skeleton className="h-3 w-28 bg-white/10" />
-              <Skeleton className="h-7 w-2/3 bg-white/10" />
-              <Skeleton className="h-3 w-full bg-white/10" />
-              <Skeleton className="h-[220px] w-full rounded-[22px] bg-white/5" />
-            </div>
-          </div>
-        ) : summary.validStores.length > 0 ? (
-          <UmkmStoreMap
-            stores={summary.validStores}
-            isId={isId}
-            interactive
-            theme="light"
-            focusMode="stores"
-            className="h-[360px] w-full sm:h-[430px]"
-          />
-        ) : (
-          <div className="grid min-h-[360px] place-items-center bg-[radial-gradient(circle_at_50%_30%,rgba(16,185,129,0.12),transparent_42%),linear-gradient(160deg,#0f172a,#111827)] px-5 text-center">
-            <div className="max-w-md">
-              <Waypoints className="mx-auto h-9 w-9 text-emerald-300" />
-              <h3 className="mt-3 text-sm font-black text-white">
-                {isId
-                  ? 'Belum ada titik usaha yang bisa dipetakan.'
-                  : 'No business points to map yet.'}
-              </h3>
-              <p className="mt-1 text-[11px] leading-5 text-slate-300">
-                {isId
-                  ? 'Saat usaha sudah menambahkan koordinat, titiknya akan muncul di sini.'
-                  : 'Business locations will appear here once coordinates are available.'}
-              </p>
-              <Link
-                href={isId ? '/create' : '/register'}
-                className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-emerald-500 px-3.5 py-2 text-[10px] font-bold text-slate-950 transition hover:bg-emerald-400"
-              >
-                {isId ? 'Tambahkan usaha' : 'Add a business'}
-                <ArrowUpRight className="h-3.5 w-3.5" />
-              </Link>
-            </div>
-          </div>
-        )}
+      <div
+        className="relative mx-2 mb-2 cursor-pointer overflow-hidden rounded-[20px] border border-slate-200 bg-slate-100 outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 sm:mx-2.5 sm:mb-2.5"
+        role="link"
+        tabIndex={0}
+        aria-label={
+          isId ? 'Buka peta UMKM Lajukan' : 'Open the Lajukan business map'
+        }
+        onClick={handleMapClick}
+        onKeyDown={handleMapKeyDown}
+      >
+        <UmkmStoreMap
+          stores={summary.validStores}
+          isId={isId}
+          interactive={false}
+          controls={false}
+          theme="default"
+          focusMode="indonesia"
+          className="h-[205px] w-full sm:h-[220px]"
+        />
+
+        <div className="pointer-events-none absolute inset-x-3 top-3 flex items-start justify-between gap-2">
+          <span className="rounded-full border border-white/80 bg-white/90 px-2.5 py-1.5 text-[9px] font-bold text-slate-700 shadow-sm backdrop-blur">
+            {isId
+              ? 'Indonesia · klik untuk lihat semua UMKM'
+              : 'Indonesia · click to explore all businesses'}
+          </span>
+          {summary.referenceCount > 0 ? (
+            <span className="rounded-full border border-white/80 bg-white/90 px-2.5 py-1.5 text-[9px] font-bold text-slate-600 shadow-sm backdrop-blur">
+              +{summary.referenceCount} {isId ? 'referensi' : 'references'}
+            </span>
+          ) : null}
+        </div>
 
         {error && !loading ? (
-          <div className="absolute inset-x-3 top-3 z-[1200] rounded-2xl border border-rose-200/40 bg-slate-950/86 px-3 py-2 text-[10px] font-semibold text-rose-100 shadow-lg backdrop-blur">
+          <div className="absolute inset-x-3 bottom-3 rounded-xl border border-rose-200/80 bg-white/92 px-2.5 py-2 text-[9px] font-semibold text-rose-700 shadow-sm backdrop-blur">
             {error}
           </div>
         ) : null}
 
-        {summary.validStores.length > 0 ? (
-          <div className="pointer-events-none absolute bottom-3 left-3 z-[1200] hidden items-center gap-2 rounded-full border border-white/40 bg-white/88 px-2.5 py-1.5 text-[9px] font-bold text-slate-700 shadow-lg backdrop-blur sm:flex">
-            <span className="inline-flex h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_0_4px_rgba(16,185,129,0.12)]" />
-            {isId ? 'Titik usaha aktif' : 'Active business points'}
+        {loading ? (
+          <div className="pointer-events-none absolute inset-x-3 bottom-3 flex items-center gap-2 rounded-xl border border-white/80 bg-white/88 px-2.5 py-2 text-[9px] font-semibold text-slate-600 shadow-sm backdrop-blur">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
+            {isId ? 'Memuat titik usaha…' : 'Loading business points…'}
           </div>
         ) : null}
       </div>
