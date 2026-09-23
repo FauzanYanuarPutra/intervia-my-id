@@ -433,7 +433,7 @@ export function OpenSourceTripMapClient({
       zoom={14}
       scrollWheelZoom
       className={className || 'h-64 w-full'}
-      attributionControl
+      attributionControl={false}
       zoomControl={false}
     >
       <ZoomControl position="bottomleft" />
