@@ -1,7 +1,5 @@
 use std::env;
 
-use crate::PostRow;
-
 pub(crate) fn upload_dir() -> String {
     env::var("COMMUNITY_UPLOAD_DIR").unwrap_or_else(|_| "./uploads/forum".to_string())
 }
