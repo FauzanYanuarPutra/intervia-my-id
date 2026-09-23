@@ -257,7 +257,7 @@ describe('Personal AI runtime gateway boundary', () => {
       ],
     });
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(result.provider).toBe('safe-fallback');
     expect(result.provider_errors.join(' ')).toContain('ai-service:PROVIDER_DOWN');
   }, AI_RUNTIME_TEST_TIMEOUT_MS);
