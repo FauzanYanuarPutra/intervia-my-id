@@ -50,8 +50,9 @@ type UmkmStoreMapClientProps = {
   routeToStoreId?: string | null;
   showRoute?: boolean;
   onRouteResolved?: (route: UmkmMapRouteSummary) => void;
-  focusMode?: 'stores' | 'viewer' | 'route' | 'selected';
+  focusMode?: 'stores' | 'viewer' | 'route' | 'selected' | 'indonesia';
   focusNonce?: number;
+  controls?: boolean;
   focusOffset?: UmkmMapFocusOffset;
   onBoundsChange?: (bounds: UmkmMapBounds) => void;
 };
@@ -475,6 +476,7 @@ function StorePreviewCard({
   selectable?: boolean;
   onClick?: () => void;
   isId: boolean;
+  interactive: boolean;
 }) {
   const locationLabel =
     ui.distanceLabel ||
@@ -974,7 +976,7 @@ function MapFocusController({
   viewerLocation?: LatLng | null;
   routeDestination?: UmkmMapStore | null;
   routePoints?: Array<[number, number]> | null;
-  focusMode?: 'stores' | 'viewer' | 'route' | 'selected';
+  focusMode?: 'stores' | 'viewer' | 'route' | 'selected' | 'indonesia';
   focusNonce?: number;
   focusOffset?: UmkmMapFocusOffset;
 }) {
@@ -998,6 +1000,19 @@ function MapFocusController({
       return;
 
     try {
+      if (focusMode === 'indonesia') {
+        const indonesiaBounds = latLngBounds(
+          [-11.5, 94.5],
+          [7.5, 142.5],
+        );
+        map.fitBounds(indonesiaBounds, {
+          padding: [18, 18],
+          maxZoom: 5,
+        });
+        handledFocusKeyRef.current = focusKey;
+        return;
+      }
+
       if (focusMode === 'selected' && validSelectedStore) {
         map.flyTo(
           [validSelectedStore.lat, validSelectedStore.lng],
@@ -1173,6 +1188,7 @@ function StoreMarkersLayer({
   onSelectStore,
   onMarkerFocus,
   isId,
+  interactive,
 }: {
   storePresentations: StorePresentation[];
   selectedStoreId?: string | null;
@@ -1266,6 +1282,7 @@ function StoreMarkersLayer({
             <Marker
               key={store.id}
               position={[store.lat, store.lng]}
+              interactive={interactive}
               icon={buildStoreMarkerIcon({
                 kind: ui.kind,
                 ratingLabel: ui.ratingLabel,
@@ -1319,6 +1336,7 @@ function StoreMarkersLayer({
           <Marker
             key={cluster.id}
             position={[cluster.lat, cluster.lng]}
+            interactive={interactive}
             icon={buildClusterMarkerIcon({
               count: cluster.items.length,
               selected: cluster.selected,
@@ -1416,6 +1434,7 @@ export function UmkmStoreMapClient({
   focusNonce = 0,
   focusOffset,
   onBoundsChange,
+  controls = true,
 }: UmkmStoreMapClientProps) {
   const activeTheme = MAP_THEME_CONFIG[theme];
   const tileUrl =
@@ -1587,7 +1606,7 @@ export function UmkmStoreMapClient({
       doubleClickZoom={interactive}
       boxZoom={interactive}
       keyboard={interactive}
-      zoomControl={false}
+      zoomControl={controls}
       className={`${className || 'h-[360px] w-full rounded-3xl'} max-w-full`}
       attributionControl={false}
     >
@@ -1658,6 +1677,7 @@ export function UmkmStoreMapClient({
         onSelectStore={onSelectStore}
         onMarkerFocus={handleMarkerFocus}
         isId={isId}
+        interactive={interactive}
       />
 
       {routePositions ? (
