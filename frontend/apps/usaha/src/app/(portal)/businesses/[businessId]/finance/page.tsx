@@ -34,7 +34,7 @@ export default async function BusinessFinancePage({ params, searchParams }: Page
       ])
     : [[], [], [], null, []];
   const enabledChannels = channels.filter(channel => channel.enabled);
-  const showSettlement = canView;
+  const showSettlement = canView && enabledChannels.length > 0 && settlements.length > 0;
   const requested = query.view;
   const activeView = requested === 'plan' ? 'plan' : requested === 'transfers' && showSettlement ? 'transfers' : 'activity';
   const tabs = [
