@@ -151,6 +151,15 @@ export type PersonalAiQuotaResource = 'threads' | 'messages';
  * distinguish a storage quota from an availability failure without parsing
  * localized copy.
  */
+export class PersonalAiAgentQuotaExceededError extends Error {
+  readonly code = 'personal_ai_agent_quota_exceeded';
+
+  constructor(readonly limit: number) {
+    super(`Batas ${limit} AI pribadi tercapai.`);
+    this.name = 'PersonalAiAgentQuotaExceededError';
+  }
+}
+
 export class PersonalAiQuotaExceededError extends Error {
   readonly code = 'personal_ai_quota_exceeded';
 
@@ -1010,7 +1019,7 @@ export async function createPersonalAiAgent(
           [userId],
         );
         if (Number(count.rows[0]?.count || 0) >= MAX_AGENTS_PER_USER) {
-          throw new Error('Batas AI pribadi tercapai.');
+          throw new PersonalAiAgentQuotaExceededError(MAX_AGENTS_PER_USER);
         }
         await client.query(
           `INSERT INTO personal_ai_agents
@@ -1054,7 +1063,7 @@ export async function createPersonalAiAgent(
     state.agents.filter(item => item.owner_id === userId).length >=
     MAX_AGENTS_PER_USER
   ) {
-    throw new Error('Batas AI pribadi tercapai.');
+    throw new PersonalAiAgentQuotaExceededError(MAX_AGENTS_PER_USER);
   }
   state.agents.push(agent);
   await writeFileState(state);
