@@ -207,7 +207,7 @@ fn actor_and_authorization(
         .map(str::trim)
         .filter(|value| value.starts_with("Bearer ") && value.len() > 7)
         .map(str::to_owned)
-        .ok_or_else(|| api_error(StatusCode::UNAUTHORIZED, "auth_required"))?;
+        .ok_or_else(|| Box::new(api_error(StatusCode::UNAUTHORIZED, "auth_required")))?;
     Ok((actor_id, authorization))
 }
 
