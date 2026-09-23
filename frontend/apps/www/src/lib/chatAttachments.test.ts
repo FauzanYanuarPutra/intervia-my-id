@@ -6,6 +6,18 @@ import {
 } from './chatAttachments';
 
 describe('chat attachment policy', () => {
+  it('accepts up to 100 media attachments and rejects 101', () => {
+    const attachments = Array.from({ length: 100 }, (_, index) => `/api/chat/media/laju-chat/chat/dm_a_b/asset-${index + 1}.webp`);
+    expect(normalizeChatAttachments('image', attachments)).toEqual({
+      ok: true,
+      attachments,
+    });
+    expect(normalizeChatAttachments('image', [...attachments, '/api/chat/media/laju-chat/chat/dm_a_b/asset-101.webp'])).toEqual({
+      ok: false,
+      error: 'invalid_attachments',
+    });
+  });
+
   it('accepts controlled media paths and rejects third-party or traversal URLs', () => {
     const chatUrl = '/api/chat/media/laju-chat/chat/dm_a_b/asset.webp';
     expect(normalizeChatAttachments('image', [chatUrl])).toEqual({
