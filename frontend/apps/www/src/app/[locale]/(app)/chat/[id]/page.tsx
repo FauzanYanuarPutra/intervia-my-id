@@ -555,7 +555,7 @@ function createMessageReference(
     sender_name: getSenderLabel?.(message),
     content: summarizeMessageForAction(message),
     message_type: message.message_type,
-    attachments: message.attachments?.slice(0, 1),
+    attachments: message.attachments?.slice(0, 4),
     created_at: message.created_at,
   };
 }
@@ -647,7 +647,7 @@ function readMessageReference(raw: Record<string, unknown>, content: string): Me
         ? String(candidate?.message_type ?? candidate?.type)
         : undefined,
     attachments: Array.isArray(candidate?.attachments)
-      ? candidate.attachments.map(String).slice(0, 1)
+      ? candidate.attachments.map(String).slice(0, 4)
       : undefined,
     created_at:
       candidate?.created_at != null
@@ -704,6 +704,108 @@ function normalizeAttachmentUrl(raw: unknown): string {
   } catch {
     return '';
   }
+}
+
+function ChatReferenceMediaPreview({
+  attachments,
+  messageType,
+  isOwn,
+  locale,
+  compact = false,
+}: {
+  attachments?: string[];
+  messageType?: string;
+  isOwn: boolean;
+  locale: 'id' | 'en';
+  compact?: boolean;
+}) {
+  const urls = (attachments || [])
+    .map(normalizeAttachmentUrl)
+    .filter(Boolean)
+    .slice(0, 4);
+  if (!urls.length) return null;
+
+  const kind = String(messageType || '').toLowerCase();
+  const frameClass = compact
+    ? 'mt-1.5 overflow-hidden rounded-[9px] bg-black/10 dark:bg-white/10'
+    : 'mt-1.5 overflow-hidden rounded-[11px] bg-black/[0.04] dark:bg-white/[0.06]';
+
+  if (kind === 'image') {
+    return (
+      <div className={frameClass}>
+        <div className="flex max-h-28 gap-1 overflow-hidden">
+          {urls.slice(0, 2).map((url, index) => (
+            <div key={url} className="relative min-w-0 flex-1">
+              <img
+                src={url}
+                alt=""
+                className="h-20 w-full object-cover sm:h-24"
+                loading="lazy"
+              />
+              {index === 1 && urls.length > 2 ? (
+                <span className="absolute inset-0 flex items-center justify-center bg-black/45 text-xs font-bold text-white">
+                  +{urls.length - 1}
+                </span>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (kind === 'video') {
+    return (
+      <div className={frameClass + ' relative'}>
+        <video
+          src={urls[0]}
+          muted
+          playsInline
+          preload="metadata"
+          className="h-20 w-full object-cover sm:h-24"
+          aria-label={locale === 'id' ? 'Pratinjau video yang dibalas' : 'Preview of replied video'}
+        />
+        <span className="absolute inset-0 flex items-center justify-center bg-black/25">
+          <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white shadow">
+            <Video className="h-4 w-4" aria-hidden="true" />
+          </span>
+        </span>
+      </div>
+    );
+  }
+
+  const label =
+    kind === 'audio'
+      ? locale === 'id'
+        ? 'Pesan suara'
+        : 'Voice message'
+      : kind === 'file'
+        ? 'File'
+        : locale === 'id'
+          ? 'Lampiran media'
+          : 'Media attachment';
+
+  return (
+    <div
+      className={
+        frameClass +
+        ' flex items-center gap-2 px-2.5 py-2 ' +
+        (isOwn
+          ? 'text-[#54656f] dark:text-[#c9d4d8]'
+          : 'text-[#54656f] dark:text-[#c7d0d4]')
+      }
+    >
+      {kind === 'audio' ? (
+        <Mic className="h-4 w-4 shrink-0" aria-hidden="true" />
+      ) : (
+        <Paperclip className="h-4 w-4 shrink-0" aria-hidden="true" />
+      )}
+      <span className="min-w-0 truncate text-[11px] font-semibold">{label}</span>
+      {urls.length > 1 ? (
+        <span className="shrink-0 text-[10px] font-bold opacity-75">{urls.length}x</span>
+      ) : null}
+    </div>
+  );
 }
 
 function extractChatUploadPayload(payload: unknown): {
@@ -7095,7 +7197,14 @@ export default function ChatRoomPage() {
                                     ? ` · ${messageReference.sender_name}`
                                     : ''}
                                 </span>
-                                <span className={`mt-0.5 block max-h-9 overflow-hidden text-[11px] leading-4 ${isOwn ? 'text-[#54656f] dark:text-[#c9d4d8]' : 'text-[#54656f] dark:text-[#c7d0d4]'}`}>
+                                <ChatReferenceMediaPreview
+                                  attachments={messageReference.attachments}
+                                  messageType={messageReference.message_type}
+                                  isOwn={isOwn}
+                                  locale={chatLocale}
+                                  compact
+                                />
+                                <span className="mt-1 block max-h-9 overflow-hidden text-[11px] leading-4 text-[#54656f] dark:text-[#c9d4d8]">
                                   {messageReference.content ||
                                     (messageReference.attachments?.length
                                       ? chatLocale === 'id'
@@ -8316,7 +8425,14 @@ export default function ChatRoomPage() {
                       ? `Mengutip ${getMessageSenderLabel(composerAction.message)}`
                       : `Quoting ${getMessageSenderLabel(composerAction.message)}`}
                 </p>
-                <p className="mt-0.5 line-clamp-2 break-words text-xs font-medium leading-5 text-[#54656f] dark:text-[#aebac1]">
+                <ChatReferenceMediaPreview
+                  attachments={composerAction.message.attachments}
+                  messageType={composerAction.message.message_type}
+                  isOwn={composerAction.message.sender_id === user?.id}
+                  locale={chatLocale}
+                  compact
+                />
+                <p className="mt-1 line-clamp-2 break-words text-xs font-medium leading-5 text-[#54656f] dark:text-[#aebac1]">
                   {summarizeMessageForAction(composerAction.message)}
                 </p>
               </div>
