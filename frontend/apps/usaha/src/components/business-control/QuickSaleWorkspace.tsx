@@ -21,6 +21,7 @@ import {
 import type { ProductModifierGroup, ProductModifierSelection } from 'lajukan-ui';
 import { SensitiveActionConfirm } from '@/components/interaction/SensitiveActionConfirm';
 import { RupiahInput } from '@/components/forms/RupiahInput';
+import { MoneyValue } from '@/components/portal/MoneyValue';
 import { businessApiErrorMessage } from '@/lib/business-api-error';
 import { QuickSaleProductConfigurator } from './QuickSaleProductConfigurator';
 import {
@@ -201,10 +202,10 @@ function CartLines({ lines, onQuantity, onEdit }: { lines: DraftLine[]; onQuanti
                 <p className="truncate text-sm font-bold text-portal-ink">{line.productName}</p>
                 {line.configurationSummary ? <p className="mt-0.5 text-xs font-semibold text-portal-forest">{line.configurationSummary}</p> : null}
                 {line.note ? <p className="mt-0.5 text-[11px] text-portal-soft">Catatan: {line.note}</p> : null}
-                <p className="mt-0.5 text-xs text-portal-soft">{money.format(Number(line.unitPricePreviewAmount ?? line.unitPriceAmount ?? line.basePriceAmount ?? 0))} × {line.quantity}</p>
+                <p className="mt-0.5 text-xs text-portal-soft"><MoneyValue value={Number(line.unitPricePreviewAmount ?? line.unitPriceAmount ?? line.basePriceAmount ?? 0)} compact /> × {line.quantity}</p>
                 {editable ? <button type="button" className="mt-1.5 text-[11px] font-bold text-portal-forest hover:underline" onClick={() => onEdit(line)}>Edit racikan</button> : null}
               </div>
-              <p className="shrink-0 text-sm font-black tabular-nums text-portal-ink">{money.format(subtotal)}</p>
+              <p className="shrink-0 text-sm font-black tabular-nums text-portal-ink"><MoneyValue value={subtotal} compact /></p>
             </div>
             <div className="mt-2.5 flex items-center justify-between gap-2">
               <QuantityControl line={line} onQuantity={onQuantity} />
@@ -437,8 +438,8 @@ export function QuickSaleWorkspace({ businessId, products, channels = [], locati
         </div>
         <div className="min-h-32 flex-1 overflow-y-auto p-4"><CartLines lines={lines} onQuantity={setQuantity} onEdit={editLine} /></div>
         <div className="space-y-3 border-t border-portal-line bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-          <div className="flex items-end justify-between gap-3"><div><p className="text-xs font-semibold text-portal-soft">Total bayar</p><p className="mt-0.5 text-2xl font-black tabular-nums text-portal-ink">{money.format(total)}</p></div><span className="pb-1 text-xs font-semibold text-portal-soft">{itemCount} item</span></div>
-          <button type="button" className="portal-button-primary w-full justify-center py-3.5 text-base" disabled={!lines.length || total <= 0} onClick={openCheckout}>Bayar · {money.format(total)}</button>
+          <div className="flex items-end justify-between gap-3"><div><p className="text-xs font-semibold text-portal-soft">Total bayar</p><p className="mt-0.5 text-2xl font-black tabular-nums text-portal-ink"><MoneyValue value={total} /></p></div><span className="pb-1 text-xs font-semibold text-portal-soft">{itemCount} item</span></div>
+          <button type="button" className="portal-button-primary w-full justify-center py-3.5 text-base" disabled={!lines.length || total <= 0} onClick={openCheckout}>Bayar · <MoneyValue value={total} /></button>
         </div>
       </div>
         <SensitiveActionConfirm
@@ -459,7 +460,7 @@ export function QuickSaleWorkspace({ businessId, products, channels = [], locati
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="flex items-start gap-3 border-b border-portal-line px-4 py-3.5">
           <button type="button" aria-label="Kembali ke pesanan" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-portal-line text-portal-soft" disabled={saving} onClick={backFromWorkspace}><ArrowLeft className="h-4 w-4" /></button>
-          <div><p className="text-xs font-bold uppercase tracking-wide text-portal-soft">Total bayar</p><p className="mt-1 text-3xl font-black tabular-nums text-portal-ink">{money.format(total)}</p></div>
+          <div><p className="text-xs font-bold uppercase tracking-wide text-portal-soft">Total bayar</p><p className="mt-1 text-3xl font-black tabular-nums text-portal-ink"><MoneyValue value={total} /></p></div>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4">
           <div className="grid grid-cols-2 gap-2">
@@ -483,7 +484,7 @@ export function QuickSaleWorkspace({ businessId, products, channels = [], locati
                 />
               </div>
               <div className="mt-2.5 grid grid-cols-3 gap-2">{cashPresets.slice(0, 6).map(amount => { const exact = amount === total; const active = tenderedAmount === amount; return <button key={amount} type="button" className={`min-h-11 rounded-xl border px-2 py-2 text-xs font-black transition active:scale-95 ${active ? 'border-portal-ink bg-portal-ink text-white' : 'border-portal-line bg-white text-portal-ink hover:bg-[#fafbf9]'}`} onClick={() => setTenderedAmount(amount)}>{exact ? 'Uang pas' : money.format(amount).replace(',00', '')}</button>; })}</div>
-              <div className="mt-3 flex items-center justify-between border-t border-portal-line pt-3"><span className="text-sm font-semibold text-portal-soft">Kembalian</span><span className="text-2xl font-black tabular-nums text-portal-ink">{money.format(cashChange)}</span></div>
+              <div className="mt-3 flex items-center justify-between border-t border-portal-line pt-3"><span className="text-sm font-semibold text-portal-soft">Kembalian</span><span className="text-2xl font-black tabular-nums text-portal-ink"><MoneyValue value={cashChange} /></span></div>
             </div>
           ) : (
             <div className="mt-4 rounded-2xl bg-[#f5f7f3] p-4"><div className="flex items-center justify-between gap-3"><div><p className="text-sm font-bold text-portal-ink">{paymentOptions.find(option => option.value === accountKey)?.label}</p><p className="mt-0.5 text-xs leading-5 text-portal-soft">Pastikan pembayaran sudah diterima sebelum menyelesaikan transaksi.</p></div><CheckCircle2 className="h-5 w-5 shrink-0 text-portal-soft" /></div></div>
@@ -496,10 +497,10 @@ export function QuickSaleWorkspace({ businessId, products, channels = [], locati
               <label className="grid gap-1 text-xs font-semibold text-portal-soft">Tanggal<input className="portal-input" type="date" value={occurredOn} onChange={event => { changed(); setOccurredOn(event.target.value); }} /></label>
             </div>
           </details>
-          {accountKey === 'cash' && tenderedAmount < total ? <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">Uang diterima masih kurang {money.format(total - tenderedAmount)}.</p> : null}
+          {accountKey === 'cash' && tenderedAmount < total ? <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">Uang diterima masih kurang <MoneyValue value={total - tenderedAmount} compact />.</p> : null}
           {feedback?.tone === 'error' ? <p role="alert" aria-live="assertive" className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">{feedback.text}</p> : null}
         </div>
-        <div className="shrink-0 border-t border-portal-line bg-white px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3"><button type="button" className="portal-button-primary w-full justify-center py-3.5 text-base" disabled={saving || !canPay} onClick={submit}>{saving ? 'Menyimpan…' : accountKey === 'cash' ? `Terima · ${money.format(total)}` : `Selesaikan ${paymentOptions.find(option => option.value === accountKey)?.label ?? ''}`}</button></div>
+        <div className="shrink-0 border-t border-portal-line bg-white px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3"><button type="button" className="portal-button-primary w-full justify-center py-3.5 text-base" disabled={saving || !canPay} onClick={submit}>{saving ? 'Menyimpan…' : accountKey === 'cash' ? `Terima · $<MoneyValue value={total} />` : `Selesaikan ${paymentOptions.find(option => option.value === accountKey)?.label ?? ''}`}</button></div>
       </div>
     );
   }
@@ -610,7 +611,7 @@ export function QuickSaleWorkspace({ businessId, products, channels = [], locati
 
       {mobileStage === 'workspace' ? <section className="fixed inset-0 z-[var(--portal-layer-modal)] flex min-h-0 flex-col bg-white pb-[calc(var(--portal-mobile-nav-height)+env(safe-area-inset-bottom))] lg:hidden">{renderWorkspace()}</section> : null}
 
-      {mobileStage === 'catalog' && lines.length ? <div className="fixed inset-x-3 bottom-[calc(var(--portal-mobile-nav-height)+env(safe-area-inset-bottom)+.75rem)] z-[var(--portal-layer-action)] rounded-2xl border border-portal-line bg-white p-2 shadow-2xl lg:hidden"><div className="flex items-center gap-2"><button type="button" className="min-w-0 flex-1 rounded-xl px-2.5 py-1.5 text-left active:bg-[#f7f8f5]" onClick={() => { setWorkspaceMode('cart'); setMobileStage('workspace'); }}><p className="truncate text-xs font-semibold text-portal-soft">{itemCount} item · Lihat pesanan</p><p className="truncate text-lg font-black tabular-nums text-portal-ink">{money.format(total)}</p></button><button type="button" className="portal-button-primary shrink-0 justify-center px-6 py-3.5" onClick={openCheckout}>Bayar</button></div></div> : null}
+      {mobileStage === 'catalog' && lines.length ? <div className="fixed inset-x-3 bottom-[calc(var(--portal-mobile-nav-height)+env(safe-area-inset-bottom)+.75rem)] z-[var(--portal-layer-action)] rounded-2xl border border-portal-line bg-white p-2 shadow-2xl lg:hidden"><div className="flex items-center gap-2"><button type="button" className="min-w-0 flex-1 rounded-xl px-2.5 py-1.5 text-left active:bg-[#f7f8f5]" onClick={() => { setWorkspaceMode('cart'); setMobileStage('workspace'); }}><p className="truncate text-xs font-semibold text-portal-soft">{itemCount} item · Lihat pesanan</p><p className="truncate text-lg font-black tabular-nums text-portal-ink"><MoneyValue value={total} /></p></button><button type="button" className="portal-button-primary shrink-0 justify-center px-6 py-3.5" onClick={openCheckout}>Bayar</button></div></div> : null}
 
       {feedback && feedback.tone === 'success' ? <p role="status" className="lg:col-span-2 text-sm font-semibold text-emerald-700">{feedback.text}</p> : null}
     </div>
