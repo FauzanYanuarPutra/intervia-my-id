@@ -49,7 +49,17 @@ export const UMKM_ACTIVE_STORE_STORAGE_KEY = 'usaha.activeStoreId';
 export const LEGACY_UMKM_DISCOVERY_PATH = '/super-app/umkm';
 export const LEGACY_UMKM_OWNER_PATH = '/super-app/umkm/manage';
 export const LEGACY_UMKM_SCAN_PATH = '/super-app/umkm/scan';
-const DEFAULT_USAHA_PORTAL_URL = 'http://localhost:3003';
+const PRODUCTION_USAHA_PORTAL_URL = 'https://usaha.lajukan.com';
+const DEVELOPMENT_USAHA_PORTAL_URL = 'http://localhost:3003';
+
+function isLocalhostUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+  } catch {
+    return false;
+  }
+}
 
 const UMKM_SURFACE_COPY = {
   id: {
@@ -123,7 +133,20 @@ export function getUmkmSurfaceCopy(locale: string) {
 
 export function getUsahaPortalBaseUrl(): string {
   const configuredUrl = process.env.NEXT_PUBLIC_USAHA_URL?.trim();
-  return trimTrailingSlash(configuredUrl || DEFAULT_USAHA_PORTAL_URL);
+  const isDevelopment = process.env.NODE_ENV === 'development';
+
+  if (!configuredUrl) {
+    return isDevelopment
+      ? DEVELOPMENT_USAHA_PORTAL_URL
+      : PRODUCTION_USAHA_PORTAL_URL;
+  }
+
+  // Never allow a production build to send users to a local machine.
+  if (!isDevelopment && isLocalhostUrl(configuredUrl)) {
+    return PRODUCTION_USAHA_PORTAL_URL;
+  }
+
+  return trimTrailingSlash(configuredUrl);
 }
 
 export function buildUmkmDiscoveryPath(
