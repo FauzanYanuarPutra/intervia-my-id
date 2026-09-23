@@ -224,7 +224,7 @@ export function HomeBusinessMapSection({
             stores={summary.validStores}
             isId={isId}
             interactive
-            theme="default"
+            theme="light"
             focusMode="stores"
             className="h-[360px] w-full sm:h-[430px]"
           />
