@@ -116,19 +116,18 @@ export function normalizeCommunityMediaItems(
 }
 
 export function getFeedMediaItems(item: CommunityFeedItem): CommunityFeedMedia[] {
-  const directItems = normalizeCommunityMediaItems(
-    item.mediaItems || [],
+  // Use the same canonical media ordering everywhere:
+  // explicit mediaItems -> imageUrls -> single legacy media fallback.
+  // normalizeCommunityMediaItems dedupes URLs, so mixed legacy/new payloads
+  // cannot create duplicate slides.
+  return normalizeCommunityMediaItems(
+    [
+      ...(item.mediaItems || []),
+      ...(item.imageUrls || []),
+      item.media,
+    ],
     item.title,
   );
-  if (directItems.length > 0) return directItems;
-
-  const imageItems = normalizeCommunityMediaItems(
-    item.imageUrls || [],
-    item.title,
-  );
-  if (imageItems.length > 0) return imageItems;
-
-  return normalizeCommunityMediaItems([item.media], item.title);
 }
 
 export function readCommunitySearchKind(value: string | null): CommunitySearchKind {
