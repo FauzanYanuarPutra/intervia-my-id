@@ -6,6 +6,8 @@ import {
   createPersonalAiAgent,
   listPersonalAiAgents,
   personalAiLimits,
+  PersonalAiAgentQuotaExceededError,
+  PersonalAiStorageUnavailableError,
 } from '@/lib/personal-ai/store';
 
 export const runtime = 'nodejs';
@@ -138,17 +140,55 @@ export async function POST(req: NextRequest) {
         ? error.message
         : 'Gagal membuat AI pribadi.';
 
-    console.warn('[PERSONAL_AI_AGENT_CREATE_REJECTED]', {
+    if (error instanceof PersonalAiAgentQuotaExceededError) {
+      return jsonNoStore(
+        {
+          error: message,
+          code: error.code,
+          quota: {
+            resource: 'agents',
+            limit: error.limit,
+          },
+        },
+        {
+          status: 409,
+        },
+      );
+    }
+
+    if (error instanceof PersonalAiStorageUnavailableError) {
+      console.error('[PERSONAL_AI_AGENT_STORAGE_UNAVAILABLE]', {
+        userId: auth.ctx.userId,
+        error: message,
+      });
+
+      return jsonNoStore(
+        {
+          error:
+            'Penyimpanan AI sedang tidak tersedia. Coba lagi sebentar lagi.',
+          code: error.code,
+        },
+        {
+          status: 503,
+        },
+      );
+    }
+
+    // Database/schema/runtime failures must not be reported as user input
+    // errors. Keep the technical detail in server logs and return a stable
+    // 500 so the client can offer a retry instead of blaming the form.
+    console.error('[PERSONAL_AI_AGENT_CREATE_FAILED]', {
       userId: auth.ctx.userId,
       error: message,
     });
 
     return jsonNoStore(
       {
-        error: message,
+        error: 'AI pribadi belum bisa dibuat. Coba lagi sebentar lagi.',
+        code: 'personal_ai_agent_create_failed',
       },
       {
-        status: 400,
+        status: 500,
       },
     );
   }
