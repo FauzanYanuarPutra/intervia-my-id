@@ -54,10 +54,10 @@ export function MobileNav({ business, currentSection }: MobileNavProps) {
   return (
     <>
       <nav
-        className="fixed inset-x-0 bottom-0 z-[var(--portal-layer-nav)] border-t border-portal-line/80 bg-white/97 px-2 pb-[max(.5rem,env(safe-area-inset-bottom))] pt-1.5 shadow-[0_-8px_30px_-24px_rgba(15,23,42,.45)] backdrop-blur-xl lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-[var(--portal-layer-nav)] min-h-[calc(var(--portal-mobile-nav-height)+env(safe-area-inset-bottom))] border-t border-portal-line/80 bg-white/97 px-2 pb-[max(.625rem,env(safe-area-inset-bottom))] pt-1.5 shadow-[0_-8px_30px_-24px_rgba(15,23,42,.45)] backdrop-blur-xl lg:hidden"
         aria-label="Navigasi usaha mobile"
       >
-        <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
+        <div className="mx-auto grid w-full max-w-none grid-cols-5 gap-1">
           {primary.map(item => {
             const visual = portalSectionVisual[item.id];
             const Icon = visual.icon;
@@ -67,14 +67,14 @@ export function MobileNav({ business, currentSection }: MobileNavProps) {
                 key={item.id}
                 href={buildSectionHref(activeBusiness.id, item.id)}
                 aria-current={active ? 'page' : undefined}
-                className={`flex min-h-[54px] flex-col items-center justify-center gap-1 rounded-xl px-1 text-[11px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-forest/20 ${
+                className={`flex min-h-[56px] min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[11px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-forest/20 ${
                   active ? visual.activeNavClass : 'text-portal-soft hover:bg-[#f5f7f4]'
                 }`}
               >
                 <span className={`inline-flex h-7 w-7 items-center justify-center rounded-[10px] ${visual.iconClass}`}>
                   <Icon className="h-[18px] w-[18px]" />
                 </span>
-                {item.label}
+                <span className="max-w-full truncate">{item.label}</span>
               </Link>
             );
           })}
@@ -93,7 +93,7 @@ export function MobileNav({ business, currentSection }: MobileNavProps) {
             <span className="inline-flex h-7 w-7 items-center justify-center rounded-[10px] bg-[#f1f4f2] text-portal-soft">
               <Menu className="h-[18px] w-[18px]" />
             </span>
-            Lainnya
+            <span className="max-w-full truncate">Lainnya</span>
           </button>
         </div>
       </nav>
