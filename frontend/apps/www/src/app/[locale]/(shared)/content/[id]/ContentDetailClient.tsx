@@ -22,6 +22,7 @@ import {
   Flag,
   Gift,
   Globe2,
+  Bookmark,
   Heart,
   Handshake,
   MapPin,
@@ -895,6 +896,10 @@ export default function ContentDetailClient({
   const [shareError, setShareError] = useState<string | null>(null);
   const [contentLiked, setContentLiked] = useState(false);
   const [contentLikeCount, setContentLikeCount] = useState<number | null>(null);
+  const [contentSaved, setContentSaved] = useState(false);
+  const [contentSaveCount, setContentSaveCount] = useState<number | null>(null);
+  const [likeActionLoading, setLikeActionLoading] = useState(false);
+  const [saveActionLoading, setSaveActionLoading] = useState(false);
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [relatedTx, setRelatedTx] = useState<RelatedTransaction | null>(null);
   const [relatedTxLoading, setRelatedTxLoading] = useState(false);
@@ -1095,64 +1100,72 @@ export default function ContentDetailClient({
   }, [showReportModal]);
 
   useEffect(() => {
-    if (!resolvedContentId) return;
+    if (!resolvedContentId) {
+      setContentLiked(false);
+      setContentLikeCount(null);
+      setContentSaved(false);
+      setContentSaveCount(null);
+      return;
+    }
 
     let active = true;
-    const loadLikeState = async () => {
-      try {
-        const res = await authFetch(
+
+    const loadEngagementState = async () => {
+      const [likeResult, saveResult] = await Promise.allSettled([
+        authFetch(
           `/api/content/${encodeURIComponent(resolvedContentId)}/like`,
           {
             cache: 'no-store',
             headers: { Accept: 'application/json' },
           },
-        );
+        ),
+        authFetch(
+          `/api/content/${encodeURIComponent(resolvedContentId)}/save`,
+          {
+            cache: 'no-store',
+            headers: { Accept: 'application/json' },
+          },
+        ),
+      ]);
+
+      if (!active) return;
+
+      if (likeResult.status === 'fulfilled') {
+        const res = likeResult.value;
         const data = (await res.json().catch(() => ({}))) as {
           liked?: unknown;
           likeCount?: unknown;
           like_count?: unknown;
         };
-
-        if (!active || !res.ok) return;
-
-        setContentLiked(Boolean(data.liked));
-        setContentLikeCount(
-          readPositiveInteger(data.likeCount ?? data.like_count),
-        );
-        return;
-      } catch {
-        // Fall back to local storage below if the backend is unavailable.
+        if (res.ok) {
+          setContentLiked(Boolean(data.liked));
+          setContentLikeCount(
+            readPositiveInteger(data.likeCount ?? data.like_count),
+          );
+        }
       }
 
-      if (!active) return;
-      try {
-        if (typeof window === 'undefined') return;
-        const storageKey = `lajukan:content-like:${resolvedContentId}`;
-        setContentLiked(window.localStorage.getItem(storageKey) === '1');
-      } catch {
-        setContentLiked(false);
+      if (saveResult.status === 'fulfilled') {
+        const res = saveResult.value;
+        const data = (await res.json().catch(() => ({}))) as {
+          saved?: unknown;
+          saveCount?: unknown;
+          save_count?: unknown;
+        };
+        if (res.ok) {
+          setContentSaved(Boolean(data.saved));
+          setContentSaveCount(
+            readPositiveInteger(data.saveCount ?? data.save_count),
+          );
+        }
       }
     };
 
-    void loadLikeState();
+    void loadEngagementState();
     return () => {
       active = false;
     };
   }, [authFetch, resolvedContentId]);
-
-  useEffect(() => {
-    if (!resolvedContentId || typeof window === 'undefined') return;
-    const storageKey = `lajukan:content-like:${resolvedContentId}`;
-    try {
-      if (contentLiked) {
-        window.localStorage.setItem(storageKey, '1');
-      } else {
-        window.localStorage.removeItem(storageKey);
-      }
-    } catch {
-      // ignore storage failures
-    }
-  }, [contentLiked, resolvedContentId]);
 
   useEffect(() => {
     setShowFullDescription(false);
@@ -4445,8 +4458,8 @@ export default function ContentDetailClient({
       // Native share and clipboard can be cancelled by the user.
     }
   };
-  const toggleListingLike = async () => {
-    if (!resolvedContentId) return;
+  const toggleContentLike = async () => {
+    if (!resolvedContentId || likeActionLoading) return;
     if (!user) {
       const callbackUrl = `/${locale}/content/${contentId || resolvedContentId}`;
       router.push(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
@@ -4455,7 +4468,8 @@ export default function ContentDetailClient({
 
     const previousLiked = contentLiked;
     const previousCount = contentLikeCount ?? resolveListingLikeCount(item);
-    const nextLiked = !contentLiked;
+    const nextLiked = !previousLiked;
+    setLikeActionLoading(true);
     setContentLiked(nextLiked);
     setContentLikeCount(Math.max(previousCount + (nextLiked ? 1 : -1), 0));
 
@@ -4476,7 +4490,7 @@ export default function ContentDetailClient({
       };
 
       if (!response.ok) {
-        throw new Error(payload.error || 'Gagal menyimpan like');
+        throw new Error(payload.error || 'Gagal mengubah suka');
       }
 
       setContentLiked(Boolean(payload.liked));
@@ -4484,7 +4498,7 @@ export default function ContentDetailClient({
         readPositiveInteger(payload.likeCount ?? payload.like_count),
       );
 
-      if (nextLiked) {
+      if (Boolean(payload.liked) && !previousLiked) {
         try {
           const targetUserId = String(
             item.owner_id || item.owner_profile?.id || '',
@@ -4524,14 +4538,64 @@ export default function ContentDetailClient({
             },
           });
         } catch {
-          // Analytics is best-effort and should never undo the like itself.
+          // Analytics is best-effort and should never undo the like.
         }
       }
     } catch {
       setContentLiked(previousLiked);
       setContentLikeCount(previousCount);
+    } finally {
+      setLikeActionLoading(false);
     }
   };
+
+  const toggleContentSave = async () => {
+    if (!resolvedContentId || saveActionLoading) return;
+    if (!user) {
+      const callbackUrl = `/${locale}/content/${contentId || resolvedContentId}`;
+      router.push(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
+      return;
+    }
+
+    const previousSaved = contentSaved;
+    const previousCount = contentSaveCount ?? 0;
+    const nextSaved = !previousSaved;
+    setSaveActionLoading(true);
+    setContentSaved(nextSaved);
+    setContentSaveCount(Math.max(previousCount + (nextSaved ? 1 : -1), 0));
+
+    try {
+      const response = await authFetch(
+        `/api/content/${encodeURIComponent(resolvedContentId)}/save`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ saved: nextSaved }),
+        },
+      );
+      const payload = (await response.json().catch(() => ({}))) as {
+        saved?: unknown;
+        saveCount?: unknown;
+        save_count?: unknown;
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.error || 'Gagal mengubah simpanan');
+      }
+
+      setContentSaved(Boolean(payload.saved));
+      setContentSaveCount(
+        readPositiveInteger(payload.saveCount ?? payload.save_count),
+      );
+    } catch {
+      setContentSaved(previousSaved);
+      setContentSaveCount(previousCount);
+    } finally {
+      setSaveActionLoading(false);
+    }
+  };
+
   const detailSurfaceClass =
     'overflow-hidden rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] shadow-[0_16px_34px_-32px_rgba(15,23,42,0.28)] sm:rounded-[22px]';
   const mediaAspectClassName =
@@ -4628,35 +4692,67 @@ export default function ContentDetailClient({
                       </span>
                     </div>
                     <div className="flex shrink-0 items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => void toggleListingLike()}
-                        aria-pressed={contentLiked}
-                        aria-label={
-                          contentLiked
-                            ? locale === 'id'
-                              ? 'Hapus dari tersimpan'
-                              : 'Remove from saved'
-                            : locale === 'id'
-                              ? 'Simpan listing'
-                              : 'Save listing'
-                        }
-                        className={`inline-flex min-h-10 items-center gap-1.5 rounded-full px-3 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] ${
-                          contentLiked
-                            ? 'bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)]'
-                            : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)]'
-                        }`}
-                      >
-                        <Heart
-                          className={`h-4 w-4 ${contentLiked ? 'fill-current' : ''}`}
-                        />
-                        <span>{locale === 'id' ? 'Simpan' : 'Save'}</span>
-                        {listingLikeCount > 0 ? (
-                          <span className="font-semibold text-[color:var(--app-text-soft)]">
-                            {listingLikeCount}
-                          </span>
-                        ) : null}
-                      </button>
+                      <div className="flex flex-wrap items-center justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => void toggleContentLike()}
+                          disabled={likeActionLoading}
+                          aria-pressed={contentLiked}
+                          aria-busy={likeActionLoading}
+                          aria-label={
+                            contentLiked
+                              ? locale === 'id'
+                                ? `Batalkan suka, ${listingLikeCount} suka`
+                                : `Unlike, ${listingLikeCount} likes`
+                              : locale === 'id'
+                                ? `Suka, ${listingLikeCount} suka`
+                                : `Like, ${listingLikeCount} likes`
+                          }
+                          className={`inline-flex min-h-10 items-center gap-1.5 rounded-full px-3 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] disabled:cursor-wait disabled:opacity-60 ${
+                            contentLiked
+                              ? 'bg-rose-50 text-rose-700 ring-1 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-500/20'
+                              : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)]'
+                          }`}
+                        >
+                          <Heart className={`h-4 w-4 ${contentLiked ? 'fill-current' : ''}`} />
+                          <span>{locale === 'id' ? 'Suka' : 'Like'}</span>
+                          {listingLikeCount > 0 ? (
+                            <span className="font-semibold text-[color:var(--app-text-soft)]">
+                              {listingLikeCount}
+                            </span>
+                          ) : null}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => void toggleContentSave()}
+                          disabled={saveActionLoading}
+                          aria-pressed={contentSaved}
+                          aria-busy={saveActionLoading}
+                          aria-label={
+                            contentSaved
+                              ? locale === 'id'
+                                ? `Hapus dari tersimpan, ${contentSaveCount || 0} tersimpan`
+                                : `Remove from saved, ${contentSaveCount || 0} saves`
+                              : locale === 'id'
+                                ? `Simpan listing, ${contentSaveCount || 0} tersimpan`
+                                : `Save listing, ${contentSaveCount || 0} saves`
+                          }
+                          className={`inline-flex min-h-10 items-center gap-1.5 rounded-full px-3 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] disabled:cursor-wait disabled:opacity-60 ${
+                            contentSaved
+                              ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20'
+                              : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)]'
+                          }`}
+                        >
+                          <Bookmark className={`h-4 w-4 ${contentSaved ? 'fill-current' : ''}`} />
+                          <span>{contentSaved ? (locale === 'id' ? 'Tersimpan' : 'Saved') : (locale === 'id' ? 'Simpan' : 'Save')}</span>
+                          {contentSaveCount && contentSaveCount > 0 ? (
+                            <span className="font-semibold text-[color:var(--app-text-soft)]">
+                              {contentSaveCount}
+                            </span>
+                          ) : null}
+                        </button>
+                      </div>
                     </div>
                   </div>
 
