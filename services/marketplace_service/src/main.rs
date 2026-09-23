@@ -269,6 +269,19 @@ struct ContentLikeResponse {
     like_count: i64,
 }
 
+#[derive(Debug, Deserialize)]
+struct ContentSaveRequest {
+    saved: bool,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ContentSaveResponse {
+    content_id: Uuid,
+    saved: bool,
+    save_count: i64,
+}
+
 #[derive(Debug, Serialize, FromRow)]
 #[serde(rename_all = "camelCase")]
 struct ContentLikerRow {
@@ -2214,6 +2227,10 @@ async fn main() -> anyhow::Result<()> {
             get(get_content_like_state).put(update_content_like),
         )
         .route("/v1/content/{id}/likes", get(list_content_likes))
+        .route(
+            "/v1/content/{id}/save",
+            get(get_content_save_state).put(update_content_save),
+        )
         .route("/v1/content/{id}/reviews", get(list_reviews))
         .route("/v1/content/{id}/offers", post(create_offer))
         .route("/v1/events", post(collect_events))
@@ -11204,6 +11221,194 @@ async fn fetch_content_like_state(
         content_id,
         liked,
         like_count,
+    })
+}
+
+async fn get_content_save_state(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    let content_id = match Uuid::parse_str(id.trim()) {
+        Ok(value) => value,
+        Err(_) => return err(StatusCode::BAD_REQUEST, "invalid content id").into_response(),
+    };
+
+    match find_content(&state.db, &content_id.to_string()).await {
+        Ok(Some(_)) => {}
+        Ok(None) => return err(StatusCode::NOT_FOUND, "content not found").into_response(),
+        Err(error) => {
+            tracing::error!("get_content_save_state load error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load content")
+                .into_response();
+        }
+    };
+
+    match fetch_content_save_state(
+        &state.db,
+        content_id,
+        user_id_from_auth(&headers, &state.jwt_secret),
+    )
+    .await
+    {
+        Ok(state) => (StatusCode::OK, Json(state)).into_response(),
+        Err(error) => {
+            tracing::error!("get_content_save_state error: {:?}", error);
+            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load save state").into_response()
+        }
+    }
+}
+
+async fn update_content_save(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    Json(payload): Json<ContentSaveRequest>,
+) -> impl IntoResponse {
+    let actor_user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+
+    let content_id = match Uuid::parse_str(id.trim()) {
+        Ok(value) => value,
+        Err(_) => return err(StatusCode::BAD_REQUEST, "invalid content id").into_response(),
+    };
+
+    match find_content(&state.db, &content_id.to_string()).await {
+        Ok(Some(_)) => {}
+        Ok(None) => return err(StatusCode::NOT_FOUND, "content not found").into_response(),
+        Err(error) => {
+            tracing::error!("update_content_save load error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load content")
+                .into_response();
+        }
+    };
+
+    if let Err(error) = ensure_user_read_model_exists(&state.db, actor_user_id).await {
+        tracing::error!("update_content_save ensure user read model error: {:?}", error);
+        return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update save")
+            .into_response();
+    }
+
+    let mut tx = match state.db.begin().await {
+        Ok(tx) => tx,
+        Err(error) => {
+            tracing::error!("update_content_save begin tx error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update save")
+                .into_response();
+        }
+    };
+
+    if payload.saved {
+        if let Err(error) = sqlx::query(
+            r#"
+            INSERT INTO content_item_saves (
+              content_id, user_id, created_at, updated_at
+            )
+            VALUES ($1, $2, now(), now())
+            ON CONFLICT (content_id, user_id)
+            DO UPDATE SET updated_at = EXCLUDED.updated_at
+            "#,
+        )
+        .bind(content_id)
+        .bind(actor_user_id)
+        .execute(&mut *tx)
+        .await
+        {
+            tracing::error!("update_content_save insert error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update save")
+                .into_response();
+        }
+    } else if let Err(error) = sqlx::query(
+        r#"
+        DELETE FROM content_item_saves
+        WHERE content_id = $1 AND user_id = $2
+        "#,
+    )
+    .bind(content_id)
+    .bind(actor_user_id)
+    .execute(&mut *tx)
+    .await
+    {
+        tracing::error!("update_content_save delete error: {:?}", error);
+        return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update save")
+            .into_response();
+    }
+
+    let save_count: i64 = match sqlx::query_scalar(
+        r#"
+        SELECT COUNT(*)::bigint
+        FROM content_item_saves
+        WHERE content_id = $1
+        "#,
+    )
+    .bind(content_id)
+    .fetch_one(&mut *tx)
+    .await
+    {
+        Ok(value) => value,
+        Err(error) => {
+            tracing::error!("update_content_save count error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update save")
+                .into_response();
+        }
+    };
+
+    if let Err(error) = tx.commit().await {
+        tracing::error!("update_content_save commit error: {:?}", error);
+        return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update save").into_response();
+    }
+
+    (
+        StatusCode::OK,
+        Json(ContentSaveResponse {
+            content_id,
+            saved: payload.saved,
+            save_count,
+        }),
+    )
+        .into_response()
+}
+
+async fn fetch_content_save_state(
+    db: &PgPool,
+    content_id: Uuid,
+    actor_user_id: Option<Uuid>,
+) -> Result<ContentSaveResponse, sqlx::Error> {
+    let save_count: i64 = sqlx::query_scalar(
+        r#"
+        SELECT COUNT(*)::bigint
+        FROM content_item_saves
+        WHERE content_id = $1
+        "#,
+    )
+    .bind(content_id)
+    .fetch_one(db)
+    .await?;
+
+    let saved = if let Some(user_id) = actor_user_id {
+        sqlx::query_scalar::<_, bool>(
+            r#"
+            SELECT EXISTS(
+              SELECT 1
+              FROM content_item_saves
+              WHERE content_id = $1 AND user_id = $2
+            )
+            "#,
+        )
+        .bind(content_id)
+        .bind(user_id)
+        .fetch_one(db)
+        .await?
+    } else {
+        false
+    };
+
+    Ok(ContentSaveResponse {
+        content_id,
+        saved,
+        save_count,
     })
 }
 
