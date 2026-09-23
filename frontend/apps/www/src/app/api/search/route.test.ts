@@ -49,6 +49,43 @@ describe('GET /api/search', () => {
     }
   });
 
+  it('excludes editorial content from marketplace search results even if the source returns it', async () => {
+    let contentRequest: URL | null = null;
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+      const url = new URL(String(input));
+      if (url.pathname === '/api/content') {
+        contentRequest = url;
+        return Response.json({
+          items: [
+            {
+              id: 'news-1',
+              type: 'news',
+              title: 'AA bisnis terbaru',
+              metadata: { news: { article_kind: 'news' } },
+            },
+            {
+              id: 'product-1',
+              type: 'product',
+              title: 'AA kemasan usaha',
+              metadata: { market_side: 'supply' },
+            },
+          ],
+        });
+      }
+      throw new TypeError('source unavailable');
+    });
+
+    const response = await GET(searchRequest('q=aa&tab=all&side=supply'));
+    const payload = await response.json();
+    const productIds = payload.groups.products.items.map((item: { id: string }) => item.id);
+
+    expect(contentRequest?.searchParams.get('marketplace_only')).toBe('true');
+    expect(contentRequest?.searchParams.get('database_only')).toBe('1');
+    expect(productIds).toEqual(['product-1']);
+    expect(productIds).not.toContain('news-1');
+  });
+
   it('keeps partial results available when only some sources fail', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
       const url = new URL(String(input));
