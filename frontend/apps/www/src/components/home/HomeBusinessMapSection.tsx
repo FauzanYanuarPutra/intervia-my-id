@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import type { KeyboardEvent, MouseEvent } from 'react';
 import { ArrowUpRight, MapPinned } from 'lucide-react';
 import { Link, useRouter } from '@/i18n/navigation';
 import { UMKM_DISCOVERY_PATH } from '@/lib/umkmSurface';
@@ -120,13 +121,13 @@ export function HomeBusinessMapSection({
 
   const openMap = () => router.push(mapHref);
 
-  const handleMapClick = (event: React.MouseEvent<HTMLDivElement>) => {
+  const handleMapClick = (event: MouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement | null;
     if (target?.closest('a,button')) return;
     openMap();
   };
 
-  const handleMapKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+  const handleMapKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       openMap();
