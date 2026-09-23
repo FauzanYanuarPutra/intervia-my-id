@@ -1195,6 +1195,7 @@ function StoreMarkersLayer({
   onSelectStore?: (storeId: string) => void;
   onMarkerFocus?: (target: Omit<MarkerFocusTarget, 'nonce'>) => void;
   isId: boolean;
+  interactive: boolean;
 }) {
   const map = useMap();
   const [zoom, setZoom] = useState(() => map.getZoom());
@@ -1598,7 +1599,7 @@ export function UmkmStoreMapClient({
     <MapContainer
       center={defaultCenter}
       zoom={12}
-      minZoom={4}
+      minZoom={3}
       maxZoom={18}
       scrollWheelZoom={interactive}
       dragging={interactive}
@@ -1625,7 +1626,7 @@ export function UmkmStoreMapClient({
       <ManualMarkerFocusController target={manualMarkerFocus} />
       <TileLayer url={tileUrl} attribution={tileAttribution} />
       <AttributionControl position="bottomright" prefix={false} />
-      <ZoomControl position="bottomright" />
+      {controls ? <ZoomControl position="bottomright" /> : null}
 
       {validViewerLocation ? (
         <>
