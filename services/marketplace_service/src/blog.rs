@@ -255,6 +255,8 @@ async fn update_submission(State(state): State<Arc<AppState>>, headers: HeaderMa
     let topics=match normalize_topics(payload.topics){Ok(v)=>v,Err(m)=>return error(StatusCode::BAD_REQUEST,m).into_response()};
     let publication_mode=clean(payload.publication_mode).unwrap_or_else(||"review".to_string()).to_lowercase();
     if publication_mode!="review"&&publication_mode!="instant" {return error(StatusCode::BAD_REQUEST,"publication_mode must be review or instant").into_response();}
+    let can_instant=auth_claims_from_headers(&headers,&state.jwt_secret).is_some_and(|claims| has_cms_access(&claims));
+    if publication_mode=="instant" && !can_instant {return error(StatusCode::FORBIDDEN,"instant publication requires editorial access").into_response();}
     let author_name=clean(payload.author_name).unwrap_or_else(||"Lajukan Community".to_string()).chars().take(MAX_AUTHOR_LEN).collect::<String>();
     let rich_body=sanitize_rich_body(payload.rich_body.as_deref().unwrap_or(&format!("<p>{}</p>",body)));
     let is_instant=publication_mode=="instant"; let next_status=if is_instant{"published"}else{"pending_review"}; let content_status=if is_instant{"active"}else{"draft"};
