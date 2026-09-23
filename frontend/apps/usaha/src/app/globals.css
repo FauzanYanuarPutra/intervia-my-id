@@ -14,6 +14,18 @@
     --portal-layer-popover: 60;
     --portal-layer-toast: 80;
     --portal-layer-skip: 100;
+
+    --portal-page: #f5f7f5;
+    --portal-surface: #ffffff;
+    --portal-surface-soft: #f8faf8;
+    --portal-success: #15803d;
+    --portal-success-soft: #ecfdf3;
+    --portal-danger: #b91c1c;
+    --portal-danger-soft: #fef2f2;
+    --portal-warning: #a16207;
+    --portal-warning-soft: #fffbeb;
+    --portal-info: #1d4ed8;
+    --portal-info-soft: #eff6ff;
   }
 
   * {
@@ -22,13 +34,13 @@
 
   html {
     font-family: "Segoe UI Variable", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
-    background: #f7f8f6;
+    background: var(--portal-page);
   }
 
   body {
     margin: 0;
     color: #17211c;
-    background: #f7f8f6;
+    background: var(--portal-page);
   }
 
   a {
@@ -42,6 +54,24 @@
   select,
   summary {
     font: inherit;
+  }
+
+  button,
+  a,
+  input,
+  textarea,
+  select {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  select {
+    color-scheme: light;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: #7b877f;
+    opacity: 1;
   }
 
   ::selection {
@@ -66,11 +96,13 @@
 
 @layer components {
   .merchant-surface {
-    @apply rounded-[18px] bg-white;
+    @apply rounded-[16px] bg-white;
+    box-shadow: 0 10px 30px -28px rgba(15, 23, 42, 0.34);
   }
 
   .merchant-surface-bordered {
-    @apply rounded-[18px] border border-portal-line bg-white;
+    @apply rounded-[16px] border border-portal-line bg-white;
+    box-shadow: 0 10px 30px -30px rgba(15, 23, 42, 0.30);
   }
 
   .merchant-section {
@@ -78,11 +110,62 @@
   }
 
   .merchant-chip {
-    @apply inline-flex min-h-9 shrink-0 items-center justify-center rounded-full border border-portal-line bg-white px-3 text-xs font-bold text-portal-soft transition hover:border-portal-forest/25 hover:text-portal-ink;
+    @apply inline-flex min-h-9 shrink-0 items-center justify-center rounded-xl border border-portal-line bg-white px-3 text-xs font-bold text-portal-soft transition hover:border-portal-forest/25 hover:bg-portal-mist hover:text-portal-ink;
   }
 
   .merchant-chip-active {
-    @apply border-portal-forest bg-portal-mist text-portal-forest;
+    @apply border-portal-forest/30 bg-portal-mist text-portal-forest;
+    box-shadow: inset 0 0 0 1px rgba(23, 97, 61, 0.05);
+  }
+
+  .portal-select {
+    @apply min-h-11 w-full appearance-none rounded-[12px] border border-portal-line bg-white px-3.5 py-2.5 text-sm font-semibold text-portal-ink outline-none transition;
+    background-image: linear-gradient(45deg, transparent 50%, #66736c 50%), linear-gradient(135deg, #66736c 50%, transparent 50%);
+    background-position: calc(100% - 16px) 50%, calc(100% - 11px) 50%;
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+    padding-right: 2.75rem;
+  }
+
+  .portal-select:focus {
+    @apply border-portal-forest ring-2 ring-portal-forest/15;
+  }
+
+  .portal-money {
+    @apply tabular-nums font-black tracking-[-0.025em];
+  }
+
+  .portal-money-positive {
+    color: var(--portal-success);
+  }
+
+  .portal-money-negative {
+    color: var(--portal-danger);
+  }
+
+  .portal-money-neutral {
+    color: #33413a;
+  }
+
+  .portal-state-success {
+    @apply border rounded-xl;
+    color: var(--portal-success);
+    background: var(--portal-success-soft);
+    border-color: rgba(21, 128, 61, 0.16);
+  }
+
+  .portal-state-danger {
+    @apply border rounded-xl;
+    color: var(--portal-danger);
+    background: var(--portal-danger-soft);
+    border-color: rgba(185, 28, 28, 0.16);
+  }
+
+  .portal-state-warning {
+    @apply border rounded-xl;
+    color: var(--portal-warning);
+    background: var(--portal-warning-soft);
+    border-color: rgba(161, 98, 7, 0.16);
   }
 
   .merchant-action-row {
@@ -110,11 +193,12 @@
   }
 
   .portal-panel {
-    @apply rounded-[18px] border border-portal-line bg-white;
+    @apply rounded-[16px] border border-portal-line bg-white;
+    box-shadow: 0 10px 30px -30px rgba(15, 23, 42, 0.30);
   }
 
   .portal-panel-muted {
-    @apply rounded-[16px] border border-portal-line bg-white/80;
+    @apply rounded-[14px] border border-portal-line bg-white/85;
   }
 
   .portal-panel-soft {
@@ -122,7 +206,8 @@
   }
 
   .portal-stat-card {
-    @apply rounded-[16px] border border-portal-line bg-white p-4;
+    @apply rounded-[14px] border border-portal-line bg-white p-4;
+    box-shadow: 0 8px 22px -28px rgba(15, 23, 42, 0.28);
   }
 
   .portal-icon-tile {
@@ -139,6 +224,7 @@
 
   .portal-input {
     @apply min-h-11 rounded-[12px] border border-portal-line bg-white px-3.5 py-2.5 text-sm text-portal-ink outline-none transition placeholder:text-portal-soft/80 focus:border-portal-forest focus:ring-2 focus:ring-portal-forest/15;
+    box-shadow: 0 1px 0 rgba(15, 23, 42, 0.02);
   }
 
   .portal-textarea {
@@ -147,10 +233,12 @@
 
   .portal-button-primary {
     @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-[12px] bg-portal-forest px-4 py-2.5 text-sm font-bold text-white transition hover:bg-portal-forestDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-forest/30 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60;
+    box-shadow: 0 10px 24px -18px rgba(16, 76, 48, 0.85);
   }
 
   .portal-button-secondary {
     @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-[12px] border border-portal-line bg-white px-4 py-2.5 text-sm font-semibold text-portal-ink transition hover:border-portal-forest/25 hover:bg-portal-mist focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-forest/20 disabled:cursor-not-allowed disabled:opacity-60;
+    box-shadow: 0 4px 14px -14px rgba(15, 23, 42, 0.5);
   }
 
   .portal-button-ghost {
