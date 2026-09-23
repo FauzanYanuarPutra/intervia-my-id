@@ -23,14 +23,15 @@ if config_env() == :prod do
     |> String.trim()
     |> String.upcase()
 
-  {jwt_guardian_key, jwt_allowed_algos} =
+  {jwt_guardian_key, jwt_allowed_algos, jwt_public_key_pem, jwt_legacy_secret,
+   jwt_allow_legacy_hs256} =
     case jwt_algorithm do
       "RS256" ->
         public_key_pem =
           System.fetch_env!("JWT_PUBLIC_KEY_PEM")
           |> String.replace("\\n", "\n")
 
-        {JOSE.JWK.from_pem(public_key_pem), ["RS256"]}
+        {JOSE.JWK.from_pem(public_key_pem), ["RS256"], public_key_pem, nil, false}
 
       "HS256" ->
         if System.get_env("ENV") == "development" do
@@ -42,7 +43,7 @@ if config_env() == :prod do
             raise "JWT_SECRET must be at least 32 characters for development HS256"
           end
 
-          {JOSE.JWK.from_oct(jwt_secret), ["HS256"]}
+          {JOSE.JWK.from_oct(jwt_secret), ["HS256"], nil, jwt_secret, true}
         else
           raise "HS256 access tokens are disabled in production; configure RS256"
         end
@@ -76,7 +77,7 @@ if config_env() == :prod do
   config :chat_service,
     jwt_issuer: jwt_issuer,
     jwt_audiences: jwt_audiences,
-    jwt_legacy_secret: jwt_secret,
+    jwt_legacy_secret: jwt_legacy_secret,
     jwt_public_key_pem: jwt_public_key_pem,
     jwt_allow_legacy_hs256: jwt_allow_legacy_hs256,
     identity_service_url:
