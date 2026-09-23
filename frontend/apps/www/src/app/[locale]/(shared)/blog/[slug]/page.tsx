@@ -1,247 +1,150 @@
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
+import Link from 'next/link';
+import { CalendarDays, Clock3, ArrowLeft, ArrowRight } from 'lucide-react';
 import {
-  ArrowLeft,
-  ArrowRight,
-  CalendarDays,
-  CheckCircle2,
-  Clock,
-  Sparkles,
-} from 'lucide-react';
-import { Link } from '@/i18n/navigation';
-import {
-  BLOG_ARTICLES,
   buildBlogArticleJsonLd,
+  buildBlogBreadcrumbJsonLd,
+  buildBlogCanonicalAlternates,
   buildBlogPath,
   buildBlogRobots,
   buildBlogUrl,
-} from '@/lib/seo/blog';
-import {
   getPublishedBlogArticle,
   getPublishedBlogArticles,
-} from '@/lib/seo/blogContent';
+  getRelatedBlogArticles,
+} from '@/lib/blog';
 import { serializeJsonLd } from '@/lib/seo/jsonLd';
 
-type PageProps = {
-  params: Promise<{ locale: string; slug: string }>;
-};
+type PageProps = { params: Promise<{ locale: string; slug: string }> };
 
-export function generateStaticParams() {
-  return BLOG_ARTICLES.flatMap(article => [
-    { locale: 'id', slug: article.slug },
-    { locale: 'en', slug: article.slug },
-  ]);
+function formatDate(value: string | null, locale: string): string {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat(locale === 'id' ? 'id-ID' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' }).format(date);
 }
 
-export async function generateMetadata({
-  params,
-}: PageProps): Promise<Metadata> {
+function safeRichBody(html: string): string {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<iframe[\s\S]*?<\/iframe>/gi, '')
+    .replace(/\son[a-z]+\s*=\s*("[^"]*"|'[^']*')/gi, '');
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { locale, slug } = await params;
   const article = await getPublishedBlogArticle(slug, locale);
-  if (!article) return {};
+  if (!article) return { robots: { index: false, follow: true } };
 
   return {
-    title: article.localized.title,
-    description: article.localized.description,
-    keywords: article.keywords,
+    title: article.title + ' | Lajukan Blog',
+    description: article.summary || article.body.slice(0, 160),
+    keywords: article.topics,
     robots: buildBlogRobots(article),
-    alternates: {
-      canonical: buildBlogUrl(locale, article.slug),
-      languages: {
-        id: buildBlogUrl('id', article.slug),
-        en: buildBlogUrl('en', article.slug),
-        'x-default': buildBlogUrl('id', article.slug),
-      },
-    },
+    alternates: buildBlogCanonicalAlternates(article),
     openGraph: {
-      title: article.localized.title,
-      description: article.localized.description,
-      url: buildBlogUrl(locale, article.slug),
+      title: article.title,
+      description: article.summary || article.body.slice(0, 160),
+      url: buildBlogUrl(article.language, article.slug),
       siteName: 'Lajukan',
       type: 'article',
-      locale: locale === 'en' ? 'en_US' : 'id_ID',
-      publishedTime: article.publishedAt,
+      locale: article.language === 'en' ? 'en_US' : 'id_ID',
+      publishedTime: article.publishedAt || article.createdAt,
       modifiedTime: article.updatedAt,
-      images: [
-        {
-          url: article.image,
-          width: 1200,
-          height: 630,
-          alt: article.localized.title,
-        },
-      ],
+      images: [{ url: article.coverImage || 'https://www.lajukan.com/opengraph-image.png', alt: article.title }],
     },
     twitter: {
       card: 'summary_large_image',
-      title: article.localized.title,
-      description: article.localized.description,
-      images: [article.image],
+      title: article.title,
+      description: article.summary || article.body.slice(0, 160),
+      images: [article.coverImage || 'https://www.lajukan.com/opengraph-image.png'],
     },
   };
 }
 
 export default async function BlogArticlePage({ params }: PageProps) {
   const { locale, slug } = await params;
-  const isId = locale === 'id';
+  const requestedLanguage = locale === 'en' ? 'en' : 'id';
   const article = await getPublishedBlogArticle(slug, locale);
   if (!article) notFound();
+  if (article.language !== requestedLanguage) {
+    permanentRedirect('/' + article.language + buildBlogPath(article.slug));
+  }
 
-  const related = (await getPublishedBlogArticles(locale))
-    .filter(item => item.slug !== article.slug)
-    .slice(0, 3);
-  const jsonLd = buildBlogArticleJsonLd(article, locale);
-  const dateFormatter = new Intl.DateTimeFormat(isId ? 'id-ID' : 'en-US', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
-  const publishedDate = dateFormatter.format(new Date(article.publishedAt));
+  const sameLanguage = await getPublishedBlogArticles(article.language, { limit: 24 });
+  const related = getRelatedBlogArticles(article, sameLanguage.items, 4);
+  const richBody = article.richBody
+    ? safeRichBody(article.richBody)
+    : article.body
+        .split(/\n{2,}/)
+        .filter(Boolean)
+        .map(paragraph => '<p>' + paragraph.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</p>')
+        .join('');
 
   return (
     <main className="page-shell page-shell-readable page-rhythm pb-12 pt-6">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd([buildBlogArticleJsonLd(article), buildBlogBreadcrumbJsonLd(article)]) }}
       />
-
-      <nav aria-label="Breadcrumb" className="flex flex-wrap gap-2 text-sm">
-        <Link
-          href="/blog"
-          className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 font-bold text-slate-700 transition hover:border-emerald-200 hover:text-emerald-700 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" />
-          {isId ? 'Blog' : 'Blog'}
+      <div className="mb-3 flex items-center gap-2 text-xs font-bold text-slate-500">
+        <Link href={buildBlogPath()} className="inline-flex items-center gap-1 rounded-full border px-3 py-1.5">
+          <ArrowLeft className="h-3.5 w-3.5" />Blog
         </Link>
-      </nav>
+        <span>/</span>
+        <span className="text-emerald-700">{article.category}</span>
+      </div>
 
-      <article className="overflow-hidden rounded-[34px] border border-emerald-100 bg-white shadow-[0_24px_68px_-50px_rgba(15,23,42,0.38)] dark:border-white/10 dark:bg-slate-900">
+      <article className="overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-slate-900">
         <header className="bg-[linear-gradient(135deg,#fffdf6_0%,#effdf5_54%,#fff7ed_100%)] p-5 dark:bg-[linear-gradient(135deg,#0f172a_0%,#052e24_58%,#1c1917_100%)] sm:p-8 lg:p-10">
-          <p className="inline-flex items-center gap-2 rounded-full bg-emerald-700 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-white">
-            <Sparkles className="h-3.5 w-3.5" />
-            {article.localized.eyebrow}
-          </p>
-          <h1 className="mt-5 max-w-4xl text-3xl font-bold tracking-[-0.06em] text-slate-950 dark:text-white sm:text-5xl">
-            {article.localized.title}
-          </h1>
-          <p className="mt-4 max-w-3xl text-base font-semibold leading-8 text-slate-600 dark:text-slate-300">
-            {article.localized.hero}
-          </p>
-          <div className="mt-5 flex flex-wrap gap-2 text-xs font-bold text-slate-600 dark:text-slate-300">
-            <span className="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-white px-3 dark:bg-white/10">
-              <CalendarDays className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-300" />
-              {publishedDate}
-            </span>
-            <span className="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-white px-3 dark:bg-white/10">
-              <Clock className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-300" />
-              {article.localized.readTime}
-            </span>
-            <span className="inline-flex min-h-8 items-center rounded-full bg-emerald-50 px-3 text-emerald-800 dark:bg-emerald-400/10 dark:text-emerald-100">
-              {article.localized.category}
-            </span>
+          <div className="flex flex-wrap items-center gap-2 text-[10px] font-black uppercase tracking-[0.14em]">
+            <span className="rounded-full bg-emerald-700 px-2.5 py-1.5 text-white">{article.category}</span>
+            <span className="rounded-full bg-white/80 px-2.5 py-1.5 text-slate-600 dark:bg-white/10 dark:text-slate-300">{article.authorName}</span>
           </div>
+          <h1 className="mt-4 max-w-5xl text-3xl font-black tracking-[-0.06em] text-slate-950 dark:text-white sm:text-5xl">{article.title}</h1>
+          {article.summary ? <p className="mt-4 max-w-3xl text-base font-semibold leading-8 text-slate-600 dark:text-slate-300">{article.summary}</p> : null}
+          <div className="mt-4 flex flex-wrap gap-3 text-xs font-bold text-slate-500">
+            <span className="inline-flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5" />{formatDate(article.publishedAt || article.createdAt, article.language)}</span>
+            <span className="inline-flex items-center gap-1.5"><Clock3 className="h-3.5 w-3.5" />{Math.max(1, Math.ceil(article.body.trim().split(/\s+/).filter(Boolean).length / 220))} menit baca</span>
+          </div>
+          {article.coverImage ? <img src={article.coverImage} alt={article.title} className="mt-6 aspect-[16/8] w-full rounded-2xl object-cover" fetchPriority="high" /> : null}
         </header>
 
-        <div className="grid gap-6 p-5 sm:p-8 lg:grid-cols-[minmax(0,1fr)_320px] lg:p-10">
+        <div className="grid gap-8 p-5 sm:p-8 lg:grid-cols-[minmax(0,1fr)_280px] lg:p-10">
           <div className="min-w-0">
-            <section className="rounded-[26px] border border-slate-200 bg-[#f8f5ee] p-4 dark:border-white/10 dark:bg-white/[0.04]">
-              <h2 className="text-base font-bold text-slate-950 dark:text-white">
-                {isId ? 'Inti artikel' : 'Key takeaways'}
-              </h2>
-              <div className="mt-3 grid gap-2">
-                {article.localized.takeaways.map(item => (
-                  <div
-                    key={item}
-                    className="flex gap-2 rounded-[18px] bg-white px-3 py-2 text-sm font-semibold leading-6 text-slate-700 dark:bg-slate-950/42 dark:text-slate-200"
-                  >
-                    <CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-emerald-700 dark:text-emerald-300" />
-                    <span>{item}</span>
-                  </div>
+            <div className="prose prose-slate max-w-none dark:prose-invert [&_h2]:mt-9 [&_h2]:text-2xl [&_h2]:font-black [&_h3]:mt-7 [&_h3]:text-xl [&_h3]:font-black [&_a]:font-semibold [&_a]:text-emerald-700 [&_img]:rounded-2xl" dangerouslySetInnerHTML={{ __html: richBody }} />
+            {article.topics.length ? (
+              <div className="mt-8 flex flex-wrap gap-1.5">
+                {article.topics.map(topic => (
+                  <Link key={topic} href={'/blog?category=' + encodeURIComponent(article.category)} className="rounded-full border px-3 py-1.5 text-[11px] font-bold text-slate-600 dark:border-white/10 dark:text-slate-300">#{topic}</Link>
                 ))}
               </div>
-            </section>
+            ) : null}
 
-            <div className="mt-7 space-y-8">
-              {article.localized.sections.map(section => (
-                <section key={section.heading}>
-                  <h2 className="text-2xl font-bold tracking-[-0.04em] text-slate-950 dark:text-white">
-                    {section.heading}
-                  </h2>
-                  <div className="mt-3 space-y-4 text-[15px] font-semibold leading-8 text-slate-700 dark:text-slate-300">
-                    {section.body.map(paragraph => (
-                      <p key={paragraph}>{paragraph}</p>
-                    ))}
-                  </div>
-                  {section.bullets?.length ? (
-                    <ul className="mt-4 grid gap-2">
-                      {section.bullets.map(item => (
-                        <li
-                          key={item}
-                          className="rounded-[18px] border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold leading-6 text-slate-700 dark:border-white/10 dark:bg-slate-950/40 dark:text-slate-200"
-                        >
-                          {item}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
-                </section>
-              ))}
-            </div>
-
-            <section className="mt-8 rounded-[28px] border border-emerald-100 bg-emerald-50 p-5 dark:border-emerald-400/20 dark:bg-emerald-400/10 sm:p-6">
-              <h2 className="text-xl font-bold tracking-[-0.04em] text-slate-950 dark:text-white">
-                {article.localized.ctaTitle}
-              </h2>
-              <p className="mt-2 text-sm font-semibold leading-7 text-slate-600 dark:text-slate-300">
-                {article.localized.ctaDescription}
-              </p>
-              <Link
-                href={article.localized.ctaHref}
-                className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-full bg-emerald-700 px-5 text-sm font-bold text-white transition hover:bg-emerald-800"
-              >
-                {article.localized.ctaLabel}
-                <ArrowRight className="h-4 w-4" />
-              </Link>
+            <section className="mt-8 rounded-[22px] border border-emerald-100 bg-emerald-50 p-5 dark:border-emerald-400/20 dark:bg-emerald-400/10">
+              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-700">Lajukan</p>
+              <p className="mt-2 text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">Temukan supplier, jasa, UMKM, dan kebutuhan usaha di Lajukan.</p>
+              <Link href="/explore" className="mt-3 inline-flex items-center gap-2 rounded-full bg-emerald-700 px-4 py-2 text-xs font-black text-white">Jelajahi Lajukan<ArrowRight className="h-3.5 w-3.5" /></Link>
             </section>
           </div>
 
-          <aside className="space-y-3 lg:sticky lg:top-[calc(88px+env(safe-area-inset-top))] lg:self-start">
-            <section className="rounded-[26px] border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/[0.04]">
-              <p className="text-sm font-bold text-slate-950 dark:text-white">
-                {isId ? 'Topik terkait' : 'Related topics'}
-              </p>
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                {article.keywords.slice(0, 6).map(keyword => (
-                  <span
-                    key={keyword}
-                    className="rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-slate-600 dark:bg-slate-950/42 dark:text-slate-300"
-                  >
-                    {keyword}
-                  </span>
-                ))}
-              </div>
+          <aside className="space-y-3 lg:sticky lg:top-24 lg:self-start">
+            <section className="rounded-[22px] border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/[0.04]">
+              <p className="text-sm font-black text-slate-950 dark:text-white">Tentang artikel</p>
+              <dl className="mt-3 grid gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                <div><dt>Penulis</dt><dd className="text-slate-950 dark:text-white">{article.authorName}</dd></div>
+                <div><dt>Dipublikasikan</dt><dd>{formatDate(article.publishedAt || article.createdAt, article.language)}</dd></div>
+                <div><dt>Diperbarui</dt><dd>{formatDate(article.updatedAt, article.language)}</dd></div>
+              </dl>
             </section>
-
-            <section className="rounded-[26px] border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-slate-900">
-              <p className="text-sm font-bold text-slate-950 dark:text-white">
-                {isId ? 'Baca juga' : 'Read next'}
-              </p>
-              <div className="mt-3 grid gap-2">
-                {related.map(item => (
-                  <Link
-                    key={item.slug}
-                    href={buildBlogPath(item.slug)}
-                    className="group rounded-[18px] border border-slate-200 bg-slate-50 px-3 py-3 transition hover:border-emerald-200 dark:border-white/10 dark:bg-white/[0.04]"
-                  >
-                    <span className="block text-sm font-bold leading-5 text-slate-900 group-hover:text-emerald-800 dark:text-white dark:group-hover:text-emerald-200">
-                      {item.localized.title}
-                    </span>
-                    <span className="mt-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">
-                      {item.localized.readTime}
-                    </span>
-                  </Link>
-                ))}
-              </div>
-            </section>
+            {related.length ? (
+              <section className="rounded-[22px] border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-slate-900">
+                <p className="text-sm font-black text-slate-950 dark:text-white">Artikel terkait</p>
+                <div className="mt-3 grid gap-2">
+                  {related.map(item => <Link key={item.id} href={buildBlogPath(item.slug)} className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm font-bold hover:border-emerald-200 dark:border-white/10 dark:bg-white/[0.03] dark:text-white">{item.title}</Link>)}
+                </div>
+              </section>
+            ) : null}
           </aside>
         </div>
       </article>
