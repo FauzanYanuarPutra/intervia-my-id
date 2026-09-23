@@ -276,6 +276,7 @@ defmodule ChatService.MessagePersistence do
          content,
          message_type,
          attachments,
+         reference,
          client_ref,
          reservation
        ) do
