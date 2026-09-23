@@ -64,6 +64,16 @@ export async function GET(
         content?: string;
         message_type?: string;
         attachments?: string[];
+        reference?: {
+          message_id?: string;
+          mode?: 'reply' | 'quote';
+          sender_id?: string;
+          sender_name?: string;
+          content?: string;
+          message_type?: string;
+          attachments?: string[];
+          created_at?: string;
+        } | null;
         sent_at?: string;
       }>;
       room_name?: string;
@@ -84,6 +94,22 @@ export async function GET(
             m.attachments,
             attachmentOptions,
           ),
+          reference: m.reference
+            ? {
+                message_id: m.reference.message_id ?? '',
+                mode: m.reference.mode === 'quote' ? 'quote' : 'reply',
+                sender_id: m.reference.sender_id ?? '',
+                sender_name: m.reference.sender_name ?? '',
+                content: m.reference.content ?? '',
+                message_type: m.reference.message_type ?? 'text',
+                attachments: safeStoredChatAttachments(
+                  m.reference.message_type ?? 'text',
+                  m.reference.attachments,
+                  attachmentOptions,
+                ),
+                created_at: m.reference.created_at ?? '',
+              }
+            : null,
           created_at: m.sent_at ?? '',
         };
       });
@@ -221,6 +247,15 @@ export async function POST(
         type: messageType,
         attachments,
         client_ref: clientRef,
+        reply_to: clientPayload.reply_to ?? clientPayload.reference ?? undefined,
+        reply_to_message_id:
+          typeof clientPayload.reply_to_message_id === 'string'
+            ? clientPayload.reply_to_message_id
+            : undefined,
+        reply_mode:
+          clientPayload.reply_mode === 'quote' || clientPayload.reply_mode === 'reply'
+            ? clientPayload.reply_mode
+            : undefined,
       }),
     });
 
@@ -233,6 +268,16 @@ export async function POST(
         content?: string;
         message_type?: string;
         attachments?: string[];
+        reference?: {
+          message_id?: string;
+          mode?: 'reply' | 'quote';
+          sender_id?: string;
+          sender_name?: string;
+          content?: string;
+          message_type?: string;
+          attachments?: string[];
+          created_at?: string;
+        } | null;
         sent_at?: string;
         deduplicated?: boolean;
       };
@@ -251,6 +296,23 @@ export async function POST(
         sender_id: data.data.sender_id ?? '',
         message_type,
         attachments: responseAttachments,
+        reference: data.data.reference
+          ? {
+              message_id: data.data.reference.message_id ?? '',
+              mode:
+                data.data.reference.mode === 'quote' ? 'quote' : 'reply',
+              sender_id: data.data.reference.sender_id ?? '',
+              sender_name: data.data.reference.sender_name ?? '',
+              content: data.data.reference.content ?? '',
+              message_type: data.data.reference.message_type ?? 'text',
+              attachments: safeStoredChatAttachments(
+                data.data.reference.message_type ?? 'text',
+                data.data.reference.attachments,
+                attachmentPolicyOptions(req),
+              ),
+              created_at: data.data.reference.created_at ?? '',
+            }
+          : null,
         created_at: data.data.sent_at ?? new Date().toISOString(),
         deduplicated: data.data.deduplicated === true,
       };
@@ -259,6 +321,7 @@ export async function POST(
         client_ref: data.data.client_ref ?? clientRef,
         message_type,
         attachments: responseAttachments,
+        reference: msg.reference,
       };
       return NextResponse.json({ message: msg, data: dataPayload }, { status: res.status });
     }
