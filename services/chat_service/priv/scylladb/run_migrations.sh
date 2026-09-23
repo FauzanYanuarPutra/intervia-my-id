@@ -9,6 +9,8 @@ if [ -z "${SCYLLA_NODES:-}" ]; then
   exit 1
 fi
 
+SCYLLA_KEYSPACE="${SCYLLA_KEYSPACE:-laju_chat}"
+
 FIRST_NODE=$(printf '%s' "$SCYLLA_NODES" | cut -d',' -f1 | tr -d ' ')
 case "$FIRST_NODE" in
   *:*)
@@ -62,7 +64,11 @@ for migration in /scylladb/migrations/*.cql; do
   migration_name=$(basename "$migration")
   echo "Applying Chat migration: $migration_name"
   sed 's/\r$//' "$migration" > /tmp/chat_migration.cql
-  run_cql -f /tmp/chat_migration.cql
+  {
+    printf 'USE %s;\n' "$SCYLLA_KEYSPACE"
+    cat /tmp/chat_migration.cql
+  } > /tmp/chat_migration_with_keyspace.cql
+  run_cql -f /tmp/chat_migration_with_keyspace.cql
 done
 
 if [ "$found" -ne 1 ]; then
