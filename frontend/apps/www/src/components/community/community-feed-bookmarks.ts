@@ -23,7 +23,6 @@ export function useCommunityBookmark(
 
   useEffect(() => {
     if (!enabled || !threadId) {
-      setState(EMPTY_STATE);
       return;
     }
 
@@ -58,9 +57,12 @@ export function useCommunityBookmark(
     };
   }, [authFetch, enabled, threadId]);
 
+  const effectiveState =
+    enabled && threadId ? state : EMPTY_STATE;
+
   return {
-    bookmarked: state.bookmarked,
-    bookmarkCount: state.bookmarkCount,
+    bookmarked: effectiveState.bookmarked,
+    bookmarkCount: effectiveState.bookmarkCount,
     setBookmarked: (value: boolean) =>
       setState(current => ({ ...current, bookmarked: value })),
     setBookmarkCount: (value: number | ((current: number) => number)) =>
