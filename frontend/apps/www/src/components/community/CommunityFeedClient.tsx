@@ -20,6 +20,7 @@ import {
 import { createPortal } from 'react-dom';
 import {
   BarChart3,
+  Bookmark,
   CheckCircle2,
   ChevronRight,
   Crown,
@@ -223,7 +224,7 @@ function createdThreadToFeedItem(
     stats: {
       reactions: Math.max(thread.voteScore || thread.likeCount || 0, 0),
       comments: thread.replyCount || 0,
-      shares: thread.bookmarkCount || 0,
+      shares: 0,
       views: thread.views || 0,
     },
     viewerVote: thread.viewerVote || 0,
@@ -2194,6 +2195,9 @@ export function CommunityPostCard({
   const [reactionCount, setReactionCount] = useState(item.stats.reactions);
   const [commentCount, setCommentCount] = useState(item.stats.comments);
   const [likeSaving, setLikeSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [saveCount, setSaveCount] = useState(0);
+  const [saveLoading, setSaveLoading] = useState(false);
 
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
@@ -2286,6 +2290,43 @@ export function CommunityPostCard({
     setLocalVote(item.viewerVote || 0);
     setReactionCount(item.stats.reactions);
   }, [item.id, item.stats.reactions, item.viewerVote]);
+
+  useEffect(() => {
+    if (item.kind !== 'discussion' || !item.threadId) {
+      setSaved(false);
+      setSaveCount(0);
+      return;
+    }
+
+    let active = true;
+    const loadBookmark = async () => {
+      try {
+        const response = await authFetch(
+          `/api/forum/threads/${encodeURIComponent(item.threadId)}/bookmark`,
+          { cache: 'no-store', headers: { Accept: 'application/json' } },
+        );
+        const payload = (await response.json().catch(() => ({}))) as {
+          bookmarked?: unknown;
+          bookmarkCount?: unknown;
+        };
+        if (!active || !response.ok) return;
+        setSaved(Boolean(payload.bookmarked));
+        setSaveCount(
+          Math.max(
+            0,
+            readPositiveInteger(payload.bookmarkCount),
+          ),
+        );
+      } catch {
+        // Bookmark state is best-effort and can be retried by the user.
+      }
+    };
+
+    void loadBookmark();
+    return () => {
+      active = false;
+    };
+  }, [authFetch, item.kind, item.threadId]);
 
   useEffect(() => {
     setCommentCount(item.stats.comments);
@@ -2666,6 +2707,57 @@ export function CommunityPostCard({
     }
   };
 
+  const handleSave = async () => {
+    if (item.kind !== 'discussion' || !item.threadId || saveLoading) return;
+
+    if (!isAuthenticated) {
+      router.push(loginHref);
+      return;
+    }
+
+    const previousSaved = saved;
+    const previousCount = saveCount;
+    const nextSaved = !previousSaved;
+
+    setSaveLoading(true);
+    setSaved(nextSaved);
+    setSaveCount(Math.max(0, previousCount + (nextSaved ? 1 : -1)));
+
+    try {
+      const response = await authFetch(
+        `/api/forum/threads/${encodeURIComponent(item.threadId)}/bookmark`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ active: nextSaved }),
+        },
+      );
+      const payload = (await response.json().catch(() => ({}))) as {
+        bookmarked?: unknown;
+        bookmarkCount?: unknown;
+        error?: string;
+      };
+      if (!response.ok) {
+        throw new Error(payload.error || 'Gagal menyimpan postingan');
+      }
+
+      setSaved(Boolean(payload.bookmarked));
+      setSaveCount(Math.max(0, Number(payload.bookmarkCount) || 0));
+    } catch {
+      setSaved(previousSaved);
+      setSaveCount(previousCount);
+      notify({
+        title: isId ? 'Simpan gagal' : 'Save failed',
+        description: isId
+          ? 'Postingan belum berhasil disimpan.'
+          : 'The post could not be saved.',
+        variant: 'error',
+      });
+    } finally {
+      setSaveLoading(false);
+    }
+  };
+
   /* ================= SHARE ================= */
 
   const handleShare = async () => {
@@ -2998,7 +3090,7 @@ export function CommunityPostCard({
 
       {/* ================= ACTION BAR ================= */}
 
-      <div className="grid grid-cols-3 border-t border-[color:var(--app-border)] px-2 py-1.5 text-xs font-semibold text-[color:var(--app-text-soft)]">
+      <div className="grid grid-cols-4 border-t border-[color:var(--app-border)] px-2 py-1.5 text-xs font-semibold text-[color:var(--app-text-soft)]">
         {/* LIKE */}
 
         <button
@@ -3055,6 +3147,37 @@ export function CommunityPostCard({
             <span className="tabular-nums">
               {compactNumber(commentCount)}
             </span>
+          ) : null}
+        </button>
+
+        {/* SAVE */}
+
+        <button
+          type="button"
+          onClick={() => void handleSave()}
+          disabled={saveLoading}
+          aria-pressed={saved}
+          aria-busy={saveLoading}
+          aria-label={
+            saved
+              ? isId
+                ? `Hapus simpanan, ${saveCount} tersimpan`
+                : `Remove save, ${saveCount} saves`
+              : isId
+                ? `Simpan, ${saveCount} tersimpan`
+                : `Save, ${saveCount} saves`
+          }
+          title={isId ? 'Simpan' : 'Save'}
+          className={cn(
+            'inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[12px] px-2 transition disabled:cursor-wait disabled:opacity-60',
+            saved
+              ? 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200'
+              : 'hover:bg-slate-50 hover:text-[color:var(--app-accent)]',
+          )}
+        >
+          <Bookmark className={cn('h-4 w-4 shrink-0', saved && 'fill-current')} />
+          {saveCount > 0 ? (
+            <span className="tabular-nums">{compactNumber(saveCount)}</span>
           ) : null}
         </button>
 
