@@ -16,6 +16,7 @@ import {
   X,
 } from 'lucide-react';
 import { ChoiceChips } from '@/components/interaction/ChoiceChips';
+import { SearchPicker } from '@/components/interaction/SearchPicker';
 import { FeedbackNotice, type FeedbackTone } from '@/components/interaction/FeedbackNotice';
 import { resolveIdempotencyAttempt, type ClientIdempotencyAttempt } from '@/lib/client-idempotency';
 import { businessApiErrorMessage } from '@/lib/business-api-error';
@@ -185,6 +186,7 @@ export function FinanceLedger({ businessId, initialEntries, channels = [] }: Pro
   const [accountKey, setAccountKey] = useState('cash');
   const [note, setNote] = useState('');
   const [channelKey, setChannelKey] = useState('');
+  const [channelQuery, setChannelQuery] = useState('');
   const [allocationBucket, setAllocationBucket] = useState('');
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -781,9 +783,20 @@ export function FinanceLedger({ businessId, initialEntries, channels = [] }: Pro
                 {channelChoices.length <= 6 ? (
                   <ChoiceChips value={channelKey} onChange={setChannelKey} ariaLabel="Kanal" options={channelChoices} />
                 ) : (
-                  <select className="min-h-10 w-full rounded-lg border border-portal-line bg-white px-3 text-sm" value={channelKey} onChange={event => setChannelKey(event.target.value)}>
-                    {channelChoices.map(choice => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
-                  </select>
+                  <SearchPicker
+                    items={channelChoices}
+                    value={channelKey}
+                    query={channelQuery}
+                    onQueryChange={setChannelQuery}
+                    onChange={setChannelKey}
+                    getKey={item => item.value}
+                    getLabel={item => item.label}
+                    placeholder="Cari kanal"
+                    emptyLabel="Kanal tidak ditemukan."
+                    ariaLabel="Pilih kanal"
+                    mode="modal"
+                    maxVisible={50}
+                  />
                 )}
               </div>
               <label className="text-xs font-semibold text-portal-soft">
