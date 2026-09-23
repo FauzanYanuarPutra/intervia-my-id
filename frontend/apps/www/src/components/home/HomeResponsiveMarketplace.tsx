@@ -1981,7 +1981,205 @@ function MobileAppDownloadSection({ isId }: { isId: boolean }) {
   );
 }
 
-function HeroVisualStage({\n  isId,\n  className,\n  query,\n  onQueryChange,\n  onSubmit,\n  onOpenFilters,\n}: {\n  isId: boolean;\n  className?: string;\n  query: string;\n  onQueryChange: (value: string) => void;\n  onSubmit: (submittedQuery: string) => void;\n  onOpenFilters: () => void;\n}) {\n  const { user, isAuthenticated } = useAuth();\n\n  const displayName =\n    user?.username ||\n    user?.fullName ||\n    user?.full_name ||\n    'Sobat Bisnis';\n\n  const heroCategories = LAJUKAN_EXPLORE_CATEGORIES.slice(0, 5);\n\n  return (\n    <section\n      className={cn(\n        'mx-auto w-full max-w-7xl px-0 pb-4 pt-2 sm:pb-5 sm:pt-3',\n        className,\n      )}\n      aria-labelledby="home-main-heading"\n    >\n      <div\n        className={cn(\n          'relative isolate overflow-hidden rounded-[28px] border border-emerald-100',\n          'bg-[linear-gradient(135deg,#f0fdf4_0%,#ecfdf5_54%,#ffffff_100%)]',\n          'px-3.5 py-4 sm:px-6 sm:py-5 lg:px-8 lg:py-6',\n          'dark:border-emerald-900/60',\n          'dark:bg-[linear-gradient(135deg,#09090b_0%,#071510_58%,#09090b_100%)]',\n        )}\n      >\n        {!isAuthenticated ? (\n          <div\n            aria-hidden="true"\n            className="pointer-events-none absolute inset-y-0 right-0 z-0 hidden w-[58%] sm:block"\n          >\n            <div className="absolute inset-0 bg-gradient-to-r from-[#f0fdf4] via-[#f0fdf4]/88 to-transparent dark:from-[#09090b] dark:via-[#09090b]/90" />\n            <div className="absolute inset-y-3 right-3 grid w-[44%] grid-cols-2 gap-2 opacity-[0.16] blur-[0.2px] grayscale-[0.15] sm:inset-y-4 sm:right-4">\n              {heroCategories.slice(0, 4).map(category => (\n                <div\n                  key={category.id}\n                  className="overflow-hidden rounded-2xl border border-white/70 bg-white/40 shadow-sm dark:border-white/5 dark:bg-white/5"\n                >\n                  <Image\n                    src={category.image}\n                    alt=""\n                    width={220}\n                    height={160}\n                    className="h-full w-full object-cover"\n                    sizes="180px"\n                  />\n                </div>\n              ))}\n            </div>\n          </div>\n        ) : null}\n\n        <div className="relative z-10">\n          {isAuthenticated ? (\n            <div className="max-w-3xl">\n              <p className="mb-1 text-[10px] font-extrabold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-400 sm:text-xs">\n                {isId ? 'Selamat datang kembali' : 'Welcome back'}\n              </p>\n              <h1\n                id="home-main-heading"\n                className="text-[clamp(1.4rem,3vw,2.4rem)] font-black leading-[1] tracking-[-0.055em] text-zinc-950 dark:text-white"\n              >\n                {isId ? 'Halo, ' : 'Hi, '}\n                <span className="text-emerald-700 dark:text-emerald-400">\n                  {displayName}\n                </span>\n                <span aria-hidden="true"> 👋</span>\n              </h1>\n              <p className="mt-2 max-w-2xl text-xs font-semibold leading-5 text-zinc-700 dark:text-zinc-300 sm:text-sm sm:leading-6">\n                {isId\n                  ? 'Cari produk, supplier, jasa, bahan usaha, mesin, tempat usaha, dan peluang yang cocok untuk kebutuhan bisnismu.'\n                  : 'Find products, suppliers, services, business supplies, equipment, places, and opportunities that fit your business.'}\n              </p>\n            </div>\n          ) : (\n            <div className="max-w-3xl">\n              <p className="mb-1.5 text-[10px] font-extrabold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-400 sm:text-xs">\n                {isId\n                  ? 'Tempat cari kebutuhan usaha'\n                  : 'Find what your business needs'}\n              </p>\n              <h1\n                id="home-main-heading"\n                className="max-w-[760px] text-[clamp(1.45rem,4vw,2.55rem)] font-black leading-[1.02] tracking-[-0.055em] text-zinc-950 dark:text-white"\n              >\n                {isId ? (\n                  <>\n                    Cari supplier, jasa, mesin,{' '}\n                    <span className="text-emerald-700 dark:text-emerald-400">\n                      bahan & kebutuhan usaha.\n                    </span>\n                  </>\n                ) : (\n                  <>\n                    Find suppliers, services, equipment,{' '}\n                    <span className="text-emerald-700 dark:text-emerald-400">\n                      materials & business needs.\n                    </span>\n                  </>\n                )}\n              </h1>\n              <p className="mt-2 max-w-2xl text-[11px] font-medium leading-5 text-zinc-700 dark:text-zinc-300 sm:text-[13px] sm:leading-5">\n                {isId\n                  ? 'Temukan bahan usaha, supplier, jasa profesional, mesin, tempat usaha, dan peluang bisnis dari berbagai daerah di Indonesia.'\n                  : 'Find business supplies, suppliers, professional services, equipment, business places, and opportunities across Indonesia.'}\n              </p>\n              <div className="mt-3 flex min-w-0 items-center gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">\n                {heroCategories.map(category => (\n                  <Link\n                    key={category.id}\n                    href={buildExploreCategoryHref(category)}\n                    className="inline-flex min-h-8 shrink-0 items-center rounded-full border border-white/80 bg-white/75 px-2.5 text-[10px] font-bold text-zinc-700 shadow-sm backdrop-blur transition hover:border-emerald-300 hover:bg-white hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 dark:border-white/10 dark:bg-zinc-900/70 dark:text-zinc-300 dark:hover:border-emerald-800 dark:hover:bg-zinc-900 dark:hover:text-emerald-300 sm:min-h-9 sm:px-3 sm:text-[11px]"\n                  >\n                    {isId ? category.shortLabelId : category.shortLabelEn}\n                  </Link>\n                ))}\n                <Link\n                  href={UMKM_DISCOVERY_PATH + '?view=map'}\n                  className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-full border border-blue-200 bg-blue-50/85 px-2.5 text-[10px] font-bold text-blue-700 shadow-sm backdrop-blur transition hover:border-blue-300 hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:border-blue-900/60 dark:bg-blue-950/50 dark:text-blue-300 dark:hover:bg-blue-950/80 sm:min-h-9 sm:px-3 sm:text-[11px]"\n                >\n                  <MapPin className="h-3 w-3" aria-hidden="true" />\n                  {isId ? 'Usaha sekitar' : 'Nearby'}\n                </Link>\n              </div>\n            </div>\n          )}\n\n          <form\n            role="search"\n            aria-label={isId ? 'Cari kebutuhan usaha' : 'Search business needs'}\n            onSubmit={event => {\n              event.preventDefault();\n              onSubmit(query.trim());\n            }}\n            className="mt-4 flex h-12 w-full max-w-4xl items-center gap-2 rounded-2xl border border-zinc-200 bg-white/95 px-3 shadow-[0_18px_45px_-28px_rgba(15,23,42,0.45)] backdrop-blur transition focus-within:border-emerald-400 focus-within:shadow-[0_20px_50px_-28px_rgba(5,150,105,0.32)] sm:h-13 sm:px-3.5 dark:border-zinc-700 dark:bg-zinc-900/95"\n          >\n            <Search className="h-4 w-4 shrink-0 text-emerald-600 sm:h-5 sm:w-5 dark:text-emerald-400" aria-hidden="true" />\n            <input\n              type="search"\n              name="q"\n              enterKeyHint="search"\n              autoComplete="off"\n              value={query}\n              onChange={event => onQueryChange(event.target.value)}\n              placeholder={\n                isAuthenticated\n                  ? isId\n                    ? 'Cari apa yang kamu butuhkan hari ini...'\n                    : 'What do you need today?'\n                  : isId\n                    ? 'Cari supplier, produk, jasa, mesin...'\n                    : 'Search suppliers, products, services...'\n              }\n              className="min-w-0 flex-1 bg-transparent text-sm font-semibold text-zinc-900 outline-none placeholder:text-zinc-400 dark:text-white dark:placeholder:text-zinc-500"\n            />\n            <button\n              type="submit"\n              className="hidden h-9 shrink-0 items-center justify-center rounded-xl bg-emerald-600 px-4 text-xs font-extrabold text-white transition hover:bg-emerald-700 active:scale-[0.98] sm:inline-flex"\n            >\n              {isId ? 'Cari' : 'Search'}\n            </button>\n            <button\n              type="button"\n              onClick={onOpenFilters}\n              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900 sm:h-9 sm:w-9 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white"\n              aria-label={isId ? 'Filter pencarian' : 'Search filters'}\n            >\n              <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />\n            </button>\n          </form>\n        </div>\n      </div>\n\n      {!isAuthenticated ? (\n        <p className="mx-auto mt-1.5 max-w-3xl px-3 text-center text-[10px] font-medium leading-4 text-zinc-500 sm:hidden dark:text-zinc-400">\n          {isId\n            ? 'Bahan • Supplier • Jasa • Mesin • Tempat Usaha • Peluang'\n            : 'Materials • Suppliers • Services • Equipment • Places • Opportunities'}\n        </p>\n      ) : null}\n    </section>\n  );\n}
+function HeroVisualStage({
+  isId,
+  className,
+  query,
+  onQueryChange,
+  onSubmit,
+  onOpenFilters,
+}: {
+  isId: boolean;
+  className?: string;
+  query: string;
+  onQueryChange: (value: string) => void;
+  onSubmit: (submittedQuery: string) => void;
+  onOpenFilters: () => void;
+}) {
+  const { user, isAuthenticated } = useAuth();
+
+  const displayName =
+    user?.username ||
+    user?.fullName ||
+    user?.full_name ||
+    'Sobat Bisnis';
+
+  const heroCategories = LAJUKAN_EXPLORE_CATEGORIES.slice(0, 5);
+
+  return (
+    <section
+      className={cn(
+        'mx-auto w-full max-w-7xl px-0 pb-4 pt-2 sm:pb-5 sm:pt-3',
+        className,
+      )}
+      aria-labelledby="home-main-heading"
+    >
+      <div
+        className={cn(
+          'relative isolate overflow-hidden rounded-[28px] border border-emerald-100',
+          'bg-[linear-gradient(135deg,#f0fdf4_0%,#ecfdf5_54%,#ffffff_100%)]',
+          'px-3.5 py-4 sm:px-6 sm:py-5 lg:px-8 lg:py-6',
+          'dark:border-emerald-900/60',
+          'dark:bg-[linear-gradient(135deg,#09090b_0%,#071510_58%,#09090b_100%)]',
+        )}
+      >
+        {!isAuthenticated ? (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 right-0 z-0 hidden w-[58%] sm:block"
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-[#f0fdf4] via-[#f0fdf4]/88 to-transparent dark:from-[#09090b] dark:via-[#09090b]/90" />
+            <div className="absolute inset-y-3 right-3 grid w-[44%] grid-cols-2 gap-2 opacity-[0.16] blur-[0.2px] grayscale-[0.15] sm:inset-y-4 sm:right-4">
+              {heroCategories.slice(0, 4).map(category => (
+                <div
+                  key={category.id}
+                  className="overflow-hidden rounded-2xl border border-white/70 bg-white/40 shadow-sm dark:border-white/5 dark:bg-white/5"
+                >
+                  <Image
+                    src={category.image}
+                    alt=""
+                    width={220}
+                    height={160}
+                    className="h-full w-full object-cover"
+                    sizes="180px"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        <div className="relative z-10">
+          {isAuthenticated ? (
+            <div className="max-w-3xl">
+              <p className="mb-1 text-[10px] font-extrabold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-400 sm:text-xs">
+                {isId ? 'Selamat datang kembali' : 'Welcome back'}
+              </p>
+              <h1
+                id="home-main-heading"
+                className="text-[clamp(1.4rem,3vw,2.4rem)] font-black leading-[1] tracking-[-0.055em] text-zinc-950 dark:text-white"
+              >
+                {isId ? 'Halo, ' : 'Hi, '}
+                <span className="text-emerald-700 dark:text-emerald-400">
+                  {displayName}
+                </span>
+                <span aria-hidden="true"> 👋</span>
+              </h1>
+              <p className="mt-2 max-w-2xl text-xs font-semibold leading-5 text-zinc-700 dark:text-zinc-300 sm:text-sm sm:leading-6">
+                {isId
+                  ? 'Cari produk, supplier, jasa, bahan usaha, mesin, tempat usaha, dan peluang yang cocok untuk kebutuhan bisnismu.'
+                  : 'Find products, suppliers, services, business supplies, equipment, places, and opportunities that fit your business.'}
+              </p>
+            </div>
+          ) : (
+            <div className="max-w-3xl">
+              <p className="mb-1.5 text-[10px] font-extrabold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-400 sm:text-xs">
+                {isId
+                  ? 'Tempat cari kebutuhan usaha'
+                  : 'Find what your business needs'}
+              </p>
+              <h1
+                id="home-main-heading"
+                className="max-w-[760px] text-[clamp(1.45rem,4vw,2.55rem)] font-black leading-[1.02] tracking-[-0.055em] text-zinc-950 dark:text-white"
+              >
+                {isId ? (
+                  <>
+                    Cari supplier, jasa, mesin,{' '}
+                    <span className="text-emerald-700 dark:text-emerald-400">
+                      bahan & kebutuhan usaha.
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    Find suppliers, services, equipment,{' '}
+                    <span className="text-emerald-700 dark:text-emerald-400">
+                      materials & business needs.
+                    </span>
+                  </>
+                )}
+              </h1>
+              <p className="mt-2 max-w-2xl text-[11px] font-medium leading-5 text-zinc-700 dark:text-zinc-300 sm:text-[13px] sm:leading-5">
+                {isId
+                  ? 'Temukan bahan usaha, supplier, jasa profesional, mesin, tempat usaha, dan peluang bisnis dari berbagai daerah di Indonesia.'
+                  : 'Find business supplies, suppliers, professional services, equipment, business places, and opportunities across Indonesia.'}
+              </p>
+              <div className="mt-3 flex min-w-0 items-center gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {heroCategories.map(category => (
+                  <Link
+                    key={category.id}
+                    href={buildExploreCategoryHref(category)}
+                    className="inline-flex min-h-8 shrink-0 items-center rounded-full border border-white/80 bg-white/75 px-2.5 text-[10px] font-bold text-zinc-700 shadow-sm backdrop-blur transition hover:border-emerald-300 hover:bg-white hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 dark:border-white/10 dark:bg-zinc-900/70 dark:text-zinc-300 dark:hover:border-emerald-800 dark:hover:bg-zinc-900 dark:hover:text-emerald-300 sm:min-h-9 sm:px-3 sm:text-[11px]"
+                  >
+                    {isId ? category.shortLabelId : category.shortLabelEn}
+                  </Link>
+                ))}
+                <Link
+                  href={UMKM_DISCOVERY_PATH + '?view=map'}
+                  className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-full border border-blue-200 bg-blue-50/85 px-2.5 text-[10px] font-bold text-blue-700 shadow-sm backdrop-blur transition hover:border-blue-300 hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:border-blue-900/60 dark:bg-blue-950/50 dark:text-blue-300 dark:hover:bg-blue-950/80 sm:min-h-9 sm:px-3 sm:text-[11px]"
+                >
+                  <MapPin className="h-3 w-3" aria-hidden="true" />
+                  {isId ? 'Usaha sekitar' : 'Nearby'}
+                </Link>
+              </div>
+            </div>
+          )}
+
+          <form
+            role="search"
+            aria-label={isId ? 'Cari kebutuhan usaha' : 'Search business needs'}
+            onSubmit={event => {
+              event.preventDefault();
+              onSubmit(query.trim());
+            }}
+            className="mt-4 flex h-12 w-full max-w-4xl items-center gap-2 rounded-2xl border border-zinc-200 bg-white/95 px-3 shadow-[0_18px_45px_-28px_rgba(15,23,42,0.45)] backdrop-blur transition focus-within:border-emerald-400 focus-within:shadow-[0_20px_50px_-28px_rgba(5,150,105,0.32)] sm:h-13 sm:px-3.5 dark:border-zinc-700 dark:bg-zinc-900/95"
+          >
+            <Search className="h-4 w-4 shrink-0 text-emerald-600 sm:h-5 sm:w-5 dark:text-emerald-400" aria-hidden="true" />
+            <input
+              type="search"
+              name="q"
+              enterKeyHint="search"
+              autoComplete="off"
+              value={query}
+              onChange={event => onQueryChange(event.target.value)}
+              placeholder={
+                isAuthenticated
+                  ? isId
+                    ? 'Cari apa yang kamu butuhkan hari ini...'
+                    : 'What do you need today?'
+                  : isId
+                    ? 'Cari supplier, produk, jasa, mesin...'
+                    : 'Search suppliers, products, services...'
+              }
+              className="min-w-0 flex-1 bg-transparent text-sm font-semibold text-zinc-900 outline-none placeholder:text-zinc-400 dark:text-white dark:placeholder:text-zinc-500"
+            />
+            <button
+              type="submit"
+              className="hidden h-9 shrink-0 items-center justify-center rounded-xl bg-emerald-600 px-4 text-xs font-extrabold text-white transition hover:bg-emerald-700 active:scale-[0.98] sm:inline-flex"
+            >
+              {isId ? 'Cari' : 'Search'}
+            </button>
+            <button
+              type="button"
+              onClick={onOpenFilters}
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900 sm:h-9 sm:w-9 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white"
+              aria-label={isId ? 'Filter pencarian' : 'Search filters'}
+            >
+              <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </form>
+        </div>
+      </div>
+
+      {!isAuthenticated ? (
+        <p className="mx-auto mt-1.5 max-w-3xl px-3 text-center text-[10px] font-medium leading-4 text-zinc-500 sm:hidden dark:text-zinc-400">
+          {isId
+            ? 'Bahan • Supplier • Jasa • Mesin • Tempat Usaha • Peluang'
+            : 'Materials • Suppliers • Services • Equipment • Places • Opportunities'}
+        </p>
+      ) : null}
+    </section>
+  );
+}
 function GameProgressLoadingSkeleton({ compact = false }: { compact?: boolean }) {
   return (
     <section
