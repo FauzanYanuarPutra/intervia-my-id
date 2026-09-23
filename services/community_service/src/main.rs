@@ -4877,6 +4877,7 @@ async fn delete_thread(
     Path(thread_id): Path<String>,
 ) -> ApiResult<Json<Value>> {
     let actor = require_actor(&headers, &state)?;
+    mutation_rate_limit(&state, &headers, &actor, "forum:thread-vote", 240, 90).await?;
     let forum_user = ensure_forum_user(&state.db, &actor).await?;
     let thread = get_thread_row(&state.db, &thread_id).await?;
     if thread.author_id != forum_user.id && !is_moderator(&actor) {
@@ -5316,6 +5317,7 @@ async fn vote_post(
     Json(payload): Json<VoteRequest>,
 ) -> ApiResult<Json<VotePostResponse>> {
     let actor = require_actor(&headers, &state)?;
+    mutation_rate_limit(&state, &headers, &actor, "forum:post-vote", 240, 90).await?;
     let forum_user = ensure_forum_user(&state.db, &actor).await?;
     let post = get_post_row(&state.db, &post_id).await?;
     if post.author_id == forum_user.id {
@@ -5548,6 +5550,9 @@ fn parse_vote_value(value: &Value) -> ApiResult<i32> {
     if value == &json!(-1) || value == &json!("-1") {
         return Ok(-1);
     }
+    if value == &json!(0) || value == &json!("0") {
+        return Ok(0);
+    }
     Err(ApiError::new(StatusCode::BAD_REQUEST, "Invalid vote value"))
 }
 
@@ -5573,16 +5578,18 @@ async fn upsert_vote(
     .map_err(internal_error)?;
     let previous = existing.map(|row| row.0).unwrap_or(0);
 
-    if previous == value {
-        sqlx::query(
-            "DELETE FROM forum.lajukan_forum_votes WHERE target_type = $1 AND target_id = $2 AND user_id = $3",
-        )
-        .bind(target_type)
-        .bind(target_id)
-        .bind(user_id)
-        .execute(db)
-        .await
-        .map_err(internal_error)?;
+    if value == 0 || previous == value {
+        if previous != 0 {
+            sqlx::query(
+                "DELETE FROM forum.lajukan_forum_votes WHERE target_type = $1 AND target_id = $2 AND user_id = $3",
+            )
+            .bind(target_type)
+            .bind(target_id)
+            .bind(user_id)
+            .execute(db)
+            .await
+            .map_err(internal_error)?;
+        }
         return Ok((previous, 0));
     }
 
