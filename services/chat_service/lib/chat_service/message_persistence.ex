@@ -118,6 +118,7 @@ defmodule ChatService.MessagePersistence do
       end
     else
       {:error, :invalid_client_ref} = error -> error
+      {:error, :invalid_reference} = error -> error
       {:error, :invalid_attachments} = error -> error
       {:error, :client_ref_conflict} = error -> error
       _ -> {:error, :storage_unavailable}
@@ -458,11 +459,11 @@ defmodule ChatService.MessagePersistence do
          created_at: row["sent_at"]
        }}
     else
-      _ -> {:ok, nil}
+      _ -> {:error, :invalid_reference}
     end
   end
 
-  defp normalize_reference(_reference, _room_id), do: {:ok, nil}
+  defp normalize_reference(_reference, _room_id), do: {:error, :invalid_reference}
 
   defp fetch_reference_row(room_id, bucket, message_id_bin) do
     case Repo.execute(
