@@ -16,6 +16,7 @@ type ChoiceChipsProps<T extends string> = {
   onChange: (value: T) => void;
   disabled?: boolean;
   ariaLabel: string;
+  mode?: 'auto' | 'modal' | 'chips';
 };
 
 export function ChoiceChips<T extends string>({
@@ -24,10 +25,11 @@ export function ChoiceChips<T extends string>({
   onChange,
   disabled = false,
   ariaLabel,
+  mode = 'auto',
 }: ChoiceChipsProps<T>) {
   const [open, setOpen] = useState(false);
   const selected = options.find(option => option.value === value);
-  const usePicker = options.length > 4;
+  const usePicker = mode === 'modal' || (mode === 'auto' && options.length > 4);
 
   if (usePicker) {
     return (
