@@ -22,7 +22,7 @@ BEGIN
   NEW.updated_at = NOW();
   RETURN NEW;
 END;
-$$
+$;
 
 CREATE TABLE business_work_items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
