@@ -8,7 +8,7 @@ defmodule ChatService.AttachmentPolicy do
   is shared by HTTP and websocket sends so retries hash the same payload.
   """
 
-  @max_attachments 10
+  @max_attachments 100
   @max_media_url_bytes 2_048
   @max_structured_bytes 32 * 1_024
   @max_depth 8
