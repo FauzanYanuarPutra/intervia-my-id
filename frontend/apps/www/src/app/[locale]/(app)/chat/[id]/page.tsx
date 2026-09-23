@@ -8195,7 +8195,6 @@ export default function ChatRoomPage() {
                                 ) : null}
                               </div>
                             ) : (
-                            ) : (
                               <span>
                                 {displayContent}
                                 {isTextOnlyMessage ? (
