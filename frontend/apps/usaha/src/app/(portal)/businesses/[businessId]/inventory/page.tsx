@@ -66,6 +66,7 @@ export default async function BusinessInventoryPage({ params, searchParams }: Pa
   if (!business) notFound();
 
   const canView = hasPermission(business, 'viewInventory');
+  const canManageProducts = hasPermission(business, 'manageProducts');
   const canViewIngredientCosts = hasPermission(business, 'viewCosting');
   const canManageIngredients = hasPermission(business, 'manageInventory') || hasPermission(business, 'manageCosting');
   const activeTab: InventoryTab = requestedTab !== 'stock' && !canViewIngredientCosts ? 'stock' : requestedTab;
@@ -103,7 +104,7 @@ export default async function BusinessInventoryPage({ params, searchParams }: Pa
         title={copy.title}
         description={copy.description}
         action={
-          canView && activeTab === 'stock' ? (
+          canView && canManageProducts && activeTab === 'stock' ? (
             <Link
               href={`/businesses/${business.id}/products`}
               className="portal-button-primary inline-flex min-h-10 items-center gap-2 px-3.5 text-sm"
