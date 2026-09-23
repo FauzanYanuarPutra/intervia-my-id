@@ -45,6 +45,11 @@ async function resolveAccessibleRoom(
   const direct = await canAccessRoom(token, roomReference);
   if (direct.ok) return roomReference;
 
+  // Only legacy-looking room references that the chat service reports as
+  // not-found are resolved through the authenticated inbox. A 5xx/timeout
+  // must not be converted into a successful-looking legacy lookup.
+  if (direct.status !== 404) return null;
+
   // Legacy chat objects used safeRoomKey(roomId) in the URL. Resolve those
   // opaque-looking path segments only against the authenticated user's inbox,
   // never by guessing arbitrary rooms.
@@ -139,15 +144,33 @@ function extractRoomId(pathSegments: string[]): string | null {
   return decoded[chatIdx + 1] || null;
 }
 
-async function canAccessRoom(token: string, roomId: string): Promise<boolean> {
-  const encoded = encodeURIComponent(roomId);
-  const res = await fetch(`${CHAT_URL}/api/v1/rooms/${encoded}/messages?limit=1`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    cache: 'no-store',
-  });
-  return res.ok;
+async function canAccessRoom(
+  token: string,
+  roomId: string,
+): Promise<{ ok: boolean; status: number }> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8_000);
+
+  try {
+    const encoded = encodeURIComponent(roomId);
+    const res = await fetch(
+      `${CHAT_URL}/api/v1/rooms/${encoded}/messages?limit=1`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+        },
+        cache: 'no-store',
+        signal: controller.signal,
+      },
+    );
+
+    return { ok: res.ok, status: res.status };
+  } catch {
+    return { ok: false, status: 503 };
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 export async function GET(
@@ -172,7 +195,10 @@ export async function GET(
   const roomId = await resolveAccessibleRoom(token, roomReference);
 
   if (!roomId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return NextResponse.json(
+      { error: 'Media is unavailable or you do not have access to this room.' },
+      { status: 403 },
+    );
   }
 
   // Local filesystem fallback path:
