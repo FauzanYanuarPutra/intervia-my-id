@@ -34,6 +34,47 @@ function decodeSafe(segment: string): string {
   }
 }
 
+function safeRoomStorageKey(roomId: string): string {
+  return roomId.replace(/[^a-zA-Z0-9._-]/g, '_');
+}
+
+async function resolveAccessibleRoom(
+  token: string,
+  roomReference: string,
+): Promise<string | null> {
+  const direct = await canAccessRoom(token, roomReference);
+  if (direct.ok) return roomReference;
+
+  // Legacy chat objects used safeRoomKey(roomId) in the URL. Resolve those
+  // opaque-looking path segments only against the authenticated user's inbox,
+  // never by guessing arbitrary rooms.
+  try {
+    const inboxResponse = await fetch(
+      `${CHAT_URL}/api/v1/inbox?limit=100`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+        },
+        cache: 'no-store',
+      },
+    );
+    if (!inboxResponse.ok) return null;
+    const payload = (await inboxResponse.json().catch(() => ({}))) as {
+      data?: Array<{ room_id?: unknown }>;
+    };
+    const rows = Array.isArray(payload.data) ? payload.data : [];
+    const match = rows.find(
+      row =>
+        typeof row.room_id === 'string' &&
+        safeRoomStorageKey(row.room_id) === roomReference,
+    );
+    return typeof match?.room_id === 'string' ? match.room_id : null;
+  } catch {
+    return null;
+  }
+}
+
 function contentTypeForPath(filePath: string, fallback?: string): string {
   if (fallback && fallback !== 'application/octet-stream') return fallback;
   const cleanPath = filePath.split(/[?#]/, 1)[0]?.toLowerCase() ?? '';
@@ -122,17 +163,20 @@ export async function GET(
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
-  const roomId = extractRoomId(pathSegments);
-  if (!roomId) {
+  const roomReference = extractRoomId(pathSegments);
+  if (!roomReference) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
-  const allowed = await canAccessRoom(token, roomId);
-  if (!allowed) {
+  const bucket = decodeSafe(pathSegments[0]);
+  const roomId =
+    bucket === 'local'
+      ? await resolveAccessibleRoom(token, roomReference)
+      : await resolveAccessibleRoom(token, roomReference);
+
+  if (!roomId) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
-
-  const bucket = decodeSafe(pathSegments[0]);
 
   // Local filesystem fallback path:
   // /api/chat/media/local/uploads/chat/{room}/{file}
@@ -166,7 +210,12 @@ export async function GET(
     return NextResponse.json({ error: 'Storage not configured' }, { status: 503 });
   }
 
-  const key = pathSegments.slice(1).map(decodeSafe).join('/');
+  const decodedKeySegments = pathSegments.slice(1).map(decodeSafe);
+  const chatIndex = decodedKeySegments.indexOf('chat');
+  if (chatIndex >= 0 && decodedKeySegments.length > chatIndex + 2) {
+    decodedKeySegments[chatIndex + 1] = safeRoomStorageKey(roomId);
+  }
+  const key = decodedKeySegments.join('/');
   if (
     bucket !== configuredBucket ||
     !SAFE_BUCKET.test(bucket) ||
