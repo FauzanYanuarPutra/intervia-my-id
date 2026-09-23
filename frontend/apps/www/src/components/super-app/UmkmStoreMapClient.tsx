@@ -1140,6 +1140,41 @@ function MapInteractivityController({ interactive }: { interactive: boolean }) {
   return null;
 }
 
+function MapSizeStabilizer() {
+  const map = useMap();
+
+  useEffect(() => {
+    const container = map.getContainer();
+    let frame = 0;
+
+    const invalidateSize = () => {
+      if (frame) window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        map.invalidateSize({ pan: false, debounceMoveend: true });
+      });
+    };
+
+    invalidateSize();
+    const timer = window.setTimeout(invalidateSize, 120);
+    const observer =
+      typeof ResizeObserver !== 'undefined'
+        ? new ResizeObserver(invalidateSize)
+        : null;
+
+    observer?.observe(container);
+    window.addEventListener('resize', invalidateSize);
+
+    return () => {
+      window.clearTimeout(timer);
+      window.cancelAnimationFrame(frame);
+      observer?.disconnect();
+      window.removeEventListener('resize', invalidateSize);
+    };
+  }, [map]);
+
+  return null;
+}
+
 function MapBoundsReporter({
   onBoundsChange,
 }: {
@@ -1611,6 +1646,7 @@ export function UmkmStoreMapClient({
       className={`${className || 'h-[360px] w-full rounded-3xl'} max-w-full`}
       attributionControl={false}
     >
+      <MapSizeStabilizer />
       <MapInteractivityController interactive={interactive} />
       <MapBoundsReporter onBoundsChange={onBoundsChange} />
       <MapFocusController
