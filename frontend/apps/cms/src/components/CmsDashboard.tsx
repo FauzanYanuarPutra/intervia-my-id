@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth, useRequireAuth } from '@/context/AuthContext';
 import { contentApi, sectorApi, bannerApi } from '@/lib/api';
-import { Button, Card, Input } from '@/ui';
+import { Button, Card, Input, SelectField } from '@/ui';
 import { Alert, ConfirmDialog, GuidedTour, StatusBadge, useGuidedTour, type TourStep } from 'lajukan-ui';
 import { CmsOverview } from './cms/CmsOverview';
 import { getCmsQueueSummary, getContentStatusTone } from './cms/contentPresentation';
@@ -929,7 +929,7 @@ export default function CmsDashboard() {
               />
               <div>
                 <label className="block text-sm font-medium text-[color:var(--color-text)] mb-1">Status</label>
-                <select
+                <SelectField
                   value={contentFilters.status}
                   onChange={(e) => setContentFilters((prev) => ({ ...prev, status: e.target.value }))}
                   className="w-full rounded-xl border px-3 py-2 text-sm bg-[color:var(--color-surface)] border-[color:var(--color-border)]"
@@ -940,11 +940,11 @@ export default function CmsDashboard() {
                       {opt.label}
                     </option>
                   ))}
-                </select>
+                </SelectField>
               </div>
               <div>
                 <label className="block text-sm font-medium text-[color:var(--color-text)] mb-1">Tipe</label>
-                <select
+                <SelectField
                   value={contentFilters.type}
                   onChange={(e) => setContentFilters((prev) => ({ ...prev, type: e.target.value }))}
                   className="w-full rounded-xl border px-3 py-2 text-sm bg-[color:var(--color-surface)] border-[color:var(--color-border)]"
@@ -955,7 +955,7 @@ export default function CmsDashboard() {
                       {opt.label}
                     </option>
                   ))}
-                </select>
+                </SelectField>
               </div>
               <Input
                 label="Sector"
@@ -1059,7 +1059,7 @@ export default function CmsDashboard() {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-sm font-medium text-[color:var(--color-text)] mb-1">Tipe</label>
-                  <select
+                  <SelectField
                     value={contentForm.type}
                     onChange={(e) => setContentForm((prev) => ({ ...prev, type: e.target.value }))}
                     className="w-full rounded-xl border px-3 py-2 text-sm bg-[color:var(--color-surface)] border-[color:var(--color-border)]"
@@ -1069,11 +1069,11 @@ export default function CmsDashboard() {
                         {opt.label}
                       </option>
                     ))}
-                  </select>
+                  </SelectField>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-[color:var(--color-text)] mb-1">Status</label>
-                  <select
+                  <SelectField
                     value={contentForm.status}
                     onChange={(e) => setContentForm((prev) => ({ ...prev, status: e.target.value }))}
                     className="w-full rounded-xl border px-3 py-2 text-sm bg-[color:var(--color-surface)] border-[color:var(--color-border)]"
@@ -1083,7 +1083,7 @@ export default function CmsDashboard() {
                         {opt.label}
                       </option>
                     ))}
-                  </select>
+                  </SelectField>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2">
@@ -1365,7 +1365,7 @@ export default function CmsDashboard() {
               />
               <div>
                 <label className="block text-sm font-medium text-[color:var(--color-text)] mb-1">Lokasi</label>
-                <select
+                <SelectField
                   value={bannerForm.location}
                   onChange={(e) => setBannerForm((prev) => ({ ...prev, location: e.target.value }))}
                   className="w-full rounded-xl border px-3 py-2 text-sm bg-[color:var(--color-surface)] border-[color:var(--color-border)]"
@@ -1376,11 +1376,11 @@ export default function CmsDashboard() {
                       {loc}
                     </option>
                   ))}
-                </select>
+                </SelectField>
               </div>
               <div>
                 <label className="block text-sm font-medium text-[color:var(--color-text)] mb-1">Status</label>
-                <select
+                <SelectField
                   value={bannerForm.status}
                   onChange={(e) => setBannerForm((prev) => ({ ...prev, status: e.target.value }))}
                   className="w-full rounded-xl border px-3 py-2 text-sm bg-[color:var(--color-surface)] border-[color:var(--color-border)]"
@@ -1390,7 +1390,7 @@ export default function CmsDashboard() {
                       {opt.label}
                     </option>
                   ))}
-                </select>
+                </SelectField>
               </div>
               <Input
                 label="Image URL"
