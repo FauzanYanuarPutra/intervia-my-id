@@ -66,6 +66,7 @@ defmodule ChatServiceWeb.MessageController do
                 row["message_type"] || "text",
                 row["attachments"] || []
               ),
+            reference: message_reference_from_row(row),
             is_edited: row["is_edited"] || false,
             is_deleted: row["is_deleted"] || false,
             sent_at: row["sent_at"]
@@ -95,6 +96,13 @@ defmodule ChatServiceWeb.MessageController do
     user_id_bin = conn.assigns.current_user_id_bin
     raw_content = params["content"] || conn.body_params["content"] || ""
     client_ref = params["client_ref"] || conn.body_params["client_ref"]
+    reference =
+      params["reply_to"] ||
+        params["reference"] ||
+        if(params["reply_to_message_id"], do: %{
+          "message_id" => params["reply_to_message_id"],
+          "mode" => params["reply_mode"] || "reply"
+        }, else: nil)
 
     # Media support: optional type + attachments
     raw_type = params["type"] || conn.body_params["type"] || "text"
@@ -149,7 +157,8 @@ defmodule ChatServiceWeb.MessageController do
                    client_ref: normalized_client_ref,
                    content: content,
                    message_type: message_type,
-                   attachments: attachments
+                   attachments: attachments,
+                   reference: reference
                  }) do
               {:ok, status, message} ->
                 payload = %{
@@ -174,6 +183,7 @@ defmodule ChatServiceWeb.MessageController do
                   content: message.content,
                   message_type: message.message_type,
                   attachments: message.attachments,
+                  reference: message.reference,
                   sent_at: DateTime.to_iso8601(message.sent_at),
                   deduplicated: status == :duplicate
                 }
@@ -195,7 +205,8 @@ defmodule ChatServiceWeb.MessageController do
                     sender_id: sender_id_str,
                     content: message.content,
                     message_type: message.message_type,
-                    attachments: message.attachments
+                    attachments: message.attachments,
+                    reference: message.reference
                   })
                 end
 
@@ -662,6 +673,27 @@ defmodule ChatServiceWeb.MessageController do
   end
 
   defp valid_bucket?(_bucket), do: false
+
+  defp message_reference_from_row(row) when is_map(row) do
+    case row["reply_to_message_id"] do
+      message_id when is_binary(message_id) and message_id != "" ->
+        %{
+          message_id: message_id,
+          mode: if(row["reply_mode"] == "quote", do: "quote", else: "reply"),
+          sender_id: uuid_to_string(row["reply_to_sender_id"]),
+          sender_name: row["reply_to_sender_name"],
+          content: row["reply_to_content"] || "",
+          message_type: row["reply_to_message_type"] || "text",
+          attachments: row["reply_to_attachments"] || [],
+          created_at: row["reply_to_created_at"]
+        }
+
+      _ ->
+        nil
+    end
+  end
+
+  defp message_reference_from_row(_row), do: nil
 
   defp storage_unavailable(conn) do
     conn
