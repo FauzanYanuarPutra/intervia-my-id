@@ -1,7 +1,16 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { MapContainer, Marker, TileLayer, Tooltip, ZoomControl, useMap, useMapEvents } from 'react-leaflet';
+import {
+  AttributionControl,
+  MapContainer,
+  Marker,
+  TileLayer,
+  Tooltip,
+  ZoomControl,
+  useMap,
+  useMapEvents,
+} from 'react-leaflet';
 import { divIcon, type DivIcon } from 'leaflet';
 import { geocodeLocation } from '@/lib/location-search';
 import {
@@ -190,11 +199,13 @@ export function BusinessLocationMapClient({
         zoom={15}
         minZoom={4}
         zoomControl={false}
+        attributionControl={false}
         scrollWheelZoom={interactive}
         dragging
         className={heightClassName}
       >
         <TileLayer attribution={TILE_ATTRIBUTION} url={TILE_URL} />
+        <AttributionControl position="bottomright" prefix={false} />
         <ZoomControl position="bottomright" />
         <MapCenterController point={point} interactive={interactive} />
         <MapClickController onPick={onChange} />
