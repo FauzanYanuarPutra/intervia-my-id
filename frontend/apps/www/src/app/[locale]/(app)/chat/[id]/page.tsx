@@ -22,6 +22,8 @@ import {
   ChevronUp,
   Clock,
   Copy,
+  Download,
+  FileText,
   Loader2,
   Mic,
   MoreVertical,
@@ -177,6 +179,13 @@ type DraftAttachment = {
   previewUrl?: string;
   serverUrl?: string;
   status: 'uploading' | 'uploaded' | 'error';
+};
+
+type MediaViewerState = {
+  attachments: string[];
+  messageType: string;
+  index: number;
+  title?: string;
 };
 
 const MAX_COMPOSER_ATTACHMENTS = 100;
@@ -808,6 +817,115 @@ function ChatReferenceMediaPreview({
   );
 }
 
+function resolveAttachmentKind(
+  messageType: string | undefined,
+  rawUrl: string,
+): AttachmentKind {
+  const type = String(messageType || '').toLowerCase();
+  if (type === 'image' || type === 'video' || type === 'audio') return type;
+  const path = rawUrl.split('?')[0].toLowerCase();
+  if (/\.(png|jpe?g|gif|webp|avif|heic|heif)$/.test(path)) return 'image';
+  if (/\.(mp4|webm|mov|m4v|avi|mkv|3gp)$/.test(path)) return 'video';
+  if (/\.(mp3|wav|ogg|m4a|aac|opus)$/.test(path)) return 'audio';
+  return 'file';
+}
+
+function ChatMediaGallery({
+  attachments,
+  messageType,
+  locale,
+  onOpen,
+}: {
+  attachments?: string[];
+  messageType?: string;
+  locale: 'id' | 'en';
+  onOpen: (index: number) => void;
+}) {
+  const urls = (attachments || []).map(normalizeAttachmentUrl).filter(Boolean);
+  if (!urls.length) return null;
+
+  const tile = (url: string, index: number, className = '') => {
+    const kind = resolveAttachmentKind(messageType, url);
+    return (
+      <button
+        key={url + index}
+        type="button"
+        onClick={() => onOpen(index)}
+        className={'group relative min-w-0 overflow-hidden bg-[#0b141a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#25d366] ' + className}
+        aria-label={(locale === 'id' ? 'Buka media ' : 'Open media ') + String(index + 1)}
+      >
+        {kind === 'image' ? (
+          <img src={url} alt="" loading="lazy" className="h-full min-h-[118px] w-full object-cover transition duration-200 group-hover:scale-[1.015]" />
+        ) : kind === 'video' ? (
+          <>
+            <video src={url} muted playsInline preload="metadata" className="h-full min-h-[118px] w-full object-cover" />
+            <span className="absolute inset-0 flex items-center justify-center bg-black/15">
+              <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white shadow-lg"><Video className="h-5 w-5" aria-hidden="true" /></span>
+            </span>
+          </>
+        ) : kind === 'audio' ? (
+          <div className="flex min-h-[118px] h-full w-full flex-col items-center justify-center gap-2 bg-[#111b21] px-3 text-white">
+            <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-[#00a884]/20 text-[#25d366]"><Mic className="h-5 w-5" aria-hidden="true" /></span>
+            <span className="max-w-full truncate text-[10px] font-semibold text-white/80">{locale === 'id' ? 'Pesan suara' : 'Voice message'}</span>
+          </div>
+        ) : (
+          <div className="flex min-h-[118px] h-full w-full flex-col items-center justify-center gap-2 bg-[#f0f2f5] px-3 text-[#54656f] dark:bg-[#202c33] dark:text-[#c7d0d4]">
+            <FileText className="h-7 w-7" aria-hidden="true" />
+            <span className="max-w-full truncate text-[11px] font-bold">File</span>
+          </div>
+        )}
+        {urls.length > 4 && index === 3 ? (
+          <span className="absolute inset-0 flex items-center justify-center bg-black/45 text-xl font-extrabold text-white">+{urls.length - 4}</span>
+        ) : null}
+      </button>
+    );
+  };
+
+  if (urls.length === 1) return <div className="space-y-1.5">{tile(urls[0], 0, 'max-h-[min(58dvh,520px)] [&>img]:object-contain [&>img]:bg-black/95 [&>img]:max-h-[min(58dvh,520px)]')}</div>;
+  if (urls.length === 2) return <div className="grid grid-cols-2 gap-1 overflow-hidden rounded-[11px]">{urls.map((url, index) => tile(url, index))}</div>;
+  if (urls.length === 3) return <div className="grid grid-cols-2 gap-1 overflow-hidden rounded-[11px]">{tile(urls[0], 0, 'row-span-2 min-h-[240px]')}{tile(urls[1], 1)}{tile(urls[2], 2)}</div>;
+  return <div className="grid grid-cols-2 gap-1 overflow-hidden rounded-[11px]">{urls.slice(0, 4).map((url, index) => tile(url, index))}</div>;
+}
+
+function ChatMediaLightbox({
+  viewer,
+  locale,
+  onClose,
+  onIndexChange,
+}: {
+  viewer: MediaViewerState | null;
+  locale: 'id' | 'en';
+  onClose: () => void;
+  onIndexChange: (index: number) => void;
+}) {
+  useEffect(() => {
+    if (!viewer) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+      if (event.key === 'ArrowLeft' && viewer.attachments.length > 1) onIndexChange((viewer.index - 1 + viewer.attachments.length) % viewer.attachments.length);
+      if (event.key === 'ArrowRight' && viewer.attachments.length > 1) onIndexChange((viewer.index + 1) % viewer.attachments.length);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose, onIndexChange, viewer]);
+  if (!viewer) return null;
+  const url = normalizeAttachmentUrl(viewer.attachments[viewer.index] || '');
+  if (!url) return null;
+  const kind = resolveAttachmentKind(viewer.messageType, url);
+  return (
+    <div className="fixed inset-0 z-[12000] flex h-[100dvh] w-screen flex-col bg-black/96 text-white" role="dialog" aria-modal="true" onClick={onClose}>
+      <div className="flex shrink-0 items-center justify-between gap-3 px-3 py-2.5 sm:px-5">
+        <div className="min-w-0"><p className="truncate text-xs font-bold">{viewer.title || (locale === 'id' ? 'Media' : 'Media')}</p>{viewer.attachments.length > 1 ? <p className="text-[10px] font-semibold text-white/55">{viewer.index + 1}/{viewer.attachments.length}</p> : null}</div>
+        <button type="button" onClick={onClose} className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/10"><X className="h-5 w-5" /></button>
+      </div>
+      <div className="relative flex min-h-0 flex-1 items-center justify-center px-3 pb-3 sm:px-8" onClick={event => event.stopPropagation()}>
+        {kind === 'image' ? <img src={url} alt="" className="max-h-full max-w-full object-contain" /> : kind === 'video' ? <video src={url} controls autoPlay playsInline className="max-h-full max-w-full rounded-lg bg-black object-contain" /> : kind === 'audio' ? <div className="flex w-full max-w-lg flex-col items-center gap-4 rounded-2xl bg-white/8 p-6"><Mic className="h-10 w-10 text-[#25d366]" /><audio src={url} controls className="w-full" /></div> : <div className="flex max-w-lg flex-col items-center gap-4 rounded-2xl bg-white/8 p-6 text-center"><FileText className="h-12 w-12 text-white/75" /><p className="text-sm font-bold">{locale === 'id' ? 'Lampiran file' : 'File attachment'}</p><a href={url} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#25d366] px-4 text-sm font-bold text-[#0b141a]"><Download className="h-4 w-4" />{locale === 'id' ? 'Buka file' : 'Open file'}</a></div>}
+        {viewer.attachments.length > 1 ? <><button type="button" onClick={() => onIndexChange((viewer.index - 1 + viewer.attachments.length) % viewer.attachments.length)} className="absolute left-2 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 sm:left-5"><ChevronLeft className="h-5 w-5" /></button><button type="button" onClick={() => onIndexChange((viewer.index + 1) % viewer.attachments.length)} className="absolute right-2 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 sm:right-5"><ChevronRight className="h-5 w-5" /></button></> : null}
+      </div>
+      {viewer.attachments.length > 1 ? <div className="flex shrink-0 gap-1.5 overflow-x-auto px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-1 sm:px-5">{viewer.attachments.slice(0, 20).map((rawUrl, index) => { const thumb = normalizeAttachmentUrl(rawUrl); const thumbKind = resolveAttachmentKind(viewer.messageType, thumb); return <button key={rawUrl + index} type="button" onClick={() => onIndexChange(index)} className={'h-14 w-14 shrink-0 overflow-hidden rounded-lg border ' + (index === viewer.index ? 'border-[#25d366] ring-2 ring-[#25d366]/35' : 'border-white/10 opacity-70')}>{thumbKind === 'image' ? <img src={thumb} alt="" className="h-full w-full object-cover" /> : thumbKind === 'video' ? <video src={thumb} muted playsInline className="h-full w-full object-cover" /> : thumbKind === 'audio' ? <div className="flex h-full w-full items-center justify-center bg-white/10"><Mic className="h-4 w-4 text-[#25d366]" /></div> : <div className="flex h-full w-full items-center justify-center bg-white/10"><FileText className="h-4 w-4 text-white/70" /></div>}</button>; })}</div> : null}
+    </div>
+  );
+}
 function extractChatUploadPayload(payload: unknown): {
   url: string;
   type?: AttachmentKind;
