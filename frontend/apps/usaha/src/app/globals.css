@@ -5,7 +5,7 @@
 @layer base {
   :root {
     color-scheme: light;
-    --portal-mobile-nav-height: 4.5rem;
+    --portal-mobile-nav-height: 4.75rem;
     --portal-layer-content: 0;
     --portal-layer-sticky: 10;
     --portal-layer-action: 20;
@@ -39,8 +39,10 @@
 
   body {
     margin: 0;
+    min-width: 320px;
     color: #17211c;
     background: var(--portal-page);
+    overflow-x: clip;
   }
 
   a {
@@ -277,7 +279,31 @@
   }
 
   .portal-mobile-content-clearance {
-    padding-bottom: calc(var(--portal-mobile-nav-height) + env(safe-area-inset-bottom) + 1rem);
+    padding-bottom: calc(var(--portal-mobile-nav-height) + env(safe-area-inset-bottom) + 1.25rem);
+  }
+
+  .workspace-tab-scroller {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scroll-behavior: smooth;
+    scroll-padding-inline: 1rem;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x;
+  }
+
+  .workspace-tab-scroller::-webkit-scrollbar {
+    display: none;
+  }
+
+  @media (min-width: 1024px) {
+    .portal-mobile-content-clearance {
+      padding-bottom: 2rem;
+    }
   }
 
   .portal-modal {
