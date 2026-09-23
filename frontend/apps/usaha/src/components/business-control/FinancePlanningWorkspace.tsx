@@ -5,6 +5,7 @@ import { Loader2, Plus, ShieldCheck, WalletCards } from 'lucide-react';
 import { ChoiceChips } from '@/components/interaction/ChoiceChips';
 import { FeedbackNotice, type FeedbackTone } from '@/components/interaction/FeedbackNotice';
 import { RupiahInput } from '@/components/forms/RupiahInput';
+import { MoneyValue } from '@/components/portal/MoneyValue';
 import { resolveIdempotencyAttempt, type ClientIdempotencyAttempt } from '@/lib/client-idempotency';
 import { businessApiErrorMessage } from '@/lib/business-api-error';
 import type {
@@ -304,23 +305,23 @@ export function FinancePlanningWorkspace({
         <div className="grid gap-4 sm:grid-cols-[1.4fr_1fr_1fr] sm:items-end">
           <div>
             <div className="flex items-center gap-2 text-portal-forest"><ShieldCheck className="h-4 w-4" /><p className="text-xs font-bold">Bebas setelah tagihan dekat</p></div>
-            <p className="mt-1 text-3xl font-black text-portal-ink">{money.format(freeAfterNearBills)}</p>
+            <p className="mt-1 text-3xl"><MoneyValue value={freeAfterNearBills} /></p>
             <p className="mt-1 text-[11px] leading-5 text-portal-soft">Dihitung dari uang yang belum masuk kantong, lalu dikurangi tagihan yang jatuh tempo dekat. Saldo kantong terlindungi tidak ikut dianggap bebas.</p>
           </div>
-          <div><p className="text-[11px] font-semibold text-portal-soft">Kas authoritative</p><p className="mt-1 text-base font-black text-portal-ink">{summary ? money.format(summary.liquid_cash) : 'Memuat…'}</p></div>
-          <div><p className="text-[11px] font-semibold text-portal-soft">Belum dibagi</p><p className="mt-1 text-base font-black text-portal-ink">{summary ? money.format(unallocatedCash) : 'Memuat…'}</p></div>
+          <div><p className="text-[11px] font-semibold text-portal-soft">Kas authoritative</p><p className="mt-1 text-base"><MoneyValue value={summary?.liquid_cash ?? null} compact /></p></div>
+          <div><p className="text-[11px] font-semibold text-portal-soft">Belum dibagi</p><p className="mt-1 text-base"><MoneyValue value={summary ? unallocatedCash : null} compact /></p></div>
         </div>
       </section>
 
       <section className="portal-panel p-4 sm:p-5">
         <div className="flex items-center gap-2"><WalletCards className="h-4 w-4 text-portal-forest" /><p className="font-black text-portal-ink">Saldo kantong saat ini</p></div>
         <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
-          {(summary?.allocations ?? []).map(item => <div key={item.bucket} className="rounded-xl bg-[#f7f9f6] p-3"><p className="text-[10px] font-bold text-portal-soft">{bucketLabels[item.bucket] ?? item.bucket}</p><p className="mt-1 text-sm font-black text-portal-ink">{money.format(item.balance)}</p></div>)}
+          {(summary?.allocations ?? []).map(item => <div key={item.bucket} className="rounded-xl bg-[#f7f9f6] p-3"><p className="text-[10px] font-bold text-portal-soft">{bucketLabels[item.bucket] ?? item.bucket}</p><p className="mt-1"><MoneyValue value={item.balance} compact /></p></div>)}
         </div>
         <p className="mt-3 text-[11px] text-portal-soft">Persentase di bawah hanya target pembagian ke depan. Memindahkan nominal dilakukan dari tab Aktivitas → Kantong uang nyata.</p>
       </section>
 
-      {activeObligations.length ? <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-xs text-portal-soft"><span>Perkiraan biaya rutin 30 hari <strong className="text-portal-ink">{money.format(obligationSummary.monthlyForecast)}</strong></span><span>Tagihan dekat <strong className="text-portal-ink">{money.format(dueSoonAmount)}</strong></span>{obligationSummary.nextDueOn ? <span>Jadwal terdekat {obligationSummary.nextDueOn}</span> : null}</div> : null}
+      {activeObligations.length ? <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-xs text-portal-soft"><span>Perkiraan biaya rutin 30 hari <MoneyValue value={obligationSummary.monthlyForecast} compact /></span><span>Tagihan dekat <MoneyValue value={dueSoonAmount} compact /></span>{obligationSummary.nextDueOn ? <span>Jadwal terdekat {obligationSummary.nextDueOn}</span> : null}</div> : null}
 
       <section className="portal-panel p-4 sm:p-5">
         <div><p className="font-bold text-portal-ink">Target pembagian uang baru</p><p className="mt-1 text-xs text-portal-soft">Mengubah target tidak mengubah saldo kantong yang sudah terkumpul.</p></div>
