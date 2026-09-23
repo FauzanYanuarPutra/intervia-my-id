@@ -11079,6 +11079,76 @@ export default function ChatRoomPage() {
           />
         )}
 
+      {showDraftMediaPreview && draftAttachments.length > 0 && activeDraftAttachment ? (
+        <div
+          className="fixed inset-0 z-[11500] flex h-[100dvh] w-screen flex-col bg-[#0b141a] text-white"
+          role="dialog"
+          aria-modal="true"
+          aria-label={chatLocale === 'id' ? 'Pratinjau media sebelum dikirim' : 'Media preview before sending'}
+        >
+          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 px-3 py-2.5 sm:px-5">
+            <div className="min-w-0">
+              <p className="text-sm font-bold">{chatLocale === 'id' ? 'Pratinjau media' : 'Media preview'}</p>
+              <p className="text-[10px] font-semibold text-white/55">
+                {activeDraftAttachmentIndex + 1}/{draftAttachments.length}
+                {isUploadingAttachments ? (chatLocale === 'id' ? ' · Mengunggah…' : ' · Uploading…') : ''}
+              </p>
+            </div>
+            <button type="button" onClick={() => setShowDraftMediaPreview(false)} className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/10" aria-label={chatLocale === 'id' ? 'Tutup pratinjau' : 'Close preview'}>
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          <div className="flex min-h-0 flex-1 items-center justify-center px-3 py-3 sm:px-8">
+            <div className="relative flex h-full w-full max-w-5xl items-center justify-center overflow-hidden rounded-2xl bg-black/35">
+              {activeDraftAttachment.type === 'image' && activeDraftAttachment.previewUrl ? (
+                <img src={activeDraftAttachment.previewUrl} alt={activeDraftAttachment.name} className="max-h-full max-w-full object-contain" />
+              ) : activeDraftAttachment.type === 'video' && activeDraftAttachment.previewUrl ? (
+                <video src={activeDraftAttachment.previewUrl} controls playsInline className="max-h-full max-w-full object-contain" />
+              ) : activeDraftAttachment.type === 'audio' && activeDraftAttachment.previewUrl ? (
+                <div className="flex w-full max-w-xl flex-col items-center gap-4 rounded-2xl bg-white/8 p-6">
+                  <Mic className="h-10 w-10 text-[#25d366]" />
+                  <audio src={activeDraftAttachment.previewUrl} controls className="w-full" />
+                </div>
+              ) : (
+                <div className="flex max-w-md flex-col items-center gap-3 rounded-2xl bg-white/8 p-6 text-center">
+                  <FileText className="h-12 w-12 text-white/70" />
+                  <p className="text-sm font-bold">{activeDraftAttachment.name}</p>
+                  <p className="text-xs text-white/55">{formatFileSize(activeDraftAttachment.size)}</p>
+                </div>
+              )}
+              {draftAttachments.length > 1 ? (
+                <>
+                  <button type="button" onClick={() => showDraftAttachmentAtOffset(-1)} className="absolute left-2 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/55" aria-label={chatLocale === 'id' ? 'Media sebelumnya' : 'Previous media'}><ChevronLeft className="h-5 w-5" /></button>
+                  <button type="button" onClick={() => showDraftAttachmentAtOffset(1)} className="absolute right-2 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/55" aria-label={chatLocale === 'id' ? 'Media berikutnya' : 'Next media'}><ChevronRight className="h-5 w-5" /></button>
+                </>
+              ) : null}
+            </div>
+          </div>
+          <div className="shrink-0 border-t border-white/10 bg-[#111b21] px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2.5 sm:px-5">
+            <div className="mx-auto flex w-full max-w-5xl gap-2 overflow-x-auto pb-2">
+              {draftAttachments.map((attachment, index) => (
+                <button key={attachment.id} type="button" onClick={() => setActiveDraftAttachmentId(attachment.id)} className={'relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border ' + (attachment.id === activeDraftAttachment.id ? 'border-[#25d366] ring-2 ring-[#25d366]/35' : 'border-white/10 opacity-70')} aria-label={(chatLocale === 'id' ? 'Pilih media ' : 'Select media ') + String(index + 1)}>
+                  {attachment.type === 'image' && attachment.previewUrl ? <img src={attachment.previewUrl} alt="" className="h-full w-full object-cover" /> : attachment.type === 'video' && attachment.previewUrl ? <video src={attachment.previewUrl} muted playsInline className="h-full w-full object-cover" /> : attachment.type === 'audio' ? <div className="flex h-full w-full items-center justify-center bg-[#0b141a] text-[#25d366]"><Mic className="h-4 w-4" /></div> : <div className="flex h-full w-full items-center justify-center bg-white/8 text-white/70"><FileText className="h-4 w-4" /></div>}
+                  {attachment.status === 'uploading' ? <span className="absolute inset-0 flex items-center justify-center bg-black/40"><Loader2 className="h-3.5 w-3.5 animate-spin" /></span> : null}
+                </button>
+              ))}
+            </div>
+            <div className="mx-auto flex w-full max-w-5xl items-end gap-2">
+              <textarea value={newMessage} onChange={event => setNewMessage(event.target.value)} rows={2} placeholder={chatLocale === 'id' ? 'Tambahkan keterangan…' : 'Add a caption…'} className="min-h-11 min-w-0 flex-1 resize-none rounded-2xl border border-white/10 bg-[#202c33] px-3 py-2 text-sm font-medium text-white outline-none placeholder:text-white/40 focus:border-[#25d366]" />
+              <button type="button" onClick={() => void handleSend()} disabled={sending || isUploadingAttachments || isPeerBlocked || roomReadOnly} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#25d366] text-[#0b141a] disabled:cursor-not-allowed disabled:opacity-45" aria-label={chatLocale === 'id' ? 'Kirim media' : 'Send media'}>
+                {sending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <ChatMediaLightbox
+        viewer={mediaViewer}
+        locale={chatLocale}
+        onClose={() => setMediaViewer(null)}
+        onIndexChange={index => setMediaViewer(current => (current ? { ...current, index } : null))}
+      />
       {/* Camera */}
       {showCameraModal ? (
         <CameraCaptureModal
