@@ -4152,9 +4152,17 @@ export default function ChatRoomPage() {
       setDraftAttachments(prev => [...prev, ...nextAttachments]);
       setActiveDraftAttachmentId(current => current || nextAttachments[0]?.id);
       setShowDraftMediaPreview(true);
-      nextAttachments.forEach(attachment => {
-        if (attachment.file) uploadAttachment(attachment.file, attachment.id);
-      });
+      const uploadQueue = [...nextAttachments];
+      const workerCount = Math.min(4, uploadQueue.length);
+      void Promise.all(
+        Array.from({ length: workerCount }, async () => {
+          while (uploadQueue.length > 0) {
+            const attachment = uploadQueue.shift();
+            if (!attachment?.file) continue;
+            await uploadAttachment(attachment.file, attachment.id);
+          }
+        }),
+      );
 
       setShowEmojiPicker(false);
       setShowStickerPanel(false);
