@@ -173,6 +173,7 @@ struct ListContentQuery {
     sub_sector: Option<String>,
     status: Option<String>,
     owner_id: Option<Uuid>,
+    marketplace_only: Option<bool>,
     limit: Option<i64>,
     offset: Option<i64>,
 }
@@ -10757,6 +10758,7 @@ async fn list_content(
     .bind(min_price)
     .bind(max_price)
     .bind(side)
+    .bind(query.marketplace_only)
     .bind(limit + 1)
     .bind(offset)
     .fetch_all(&state.db)
