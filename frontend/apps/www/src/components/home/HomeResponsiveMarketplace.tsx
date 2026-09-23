@@ -411,7 +411,6 @@ type HomeWalletBalancesResponse = {
 };
 
 const HERO_TAGS = ['Bahan Lokal', 'Siap Ekspor', 'Kemasan', 'Mesin UMKM'];
-const HOME_HERO_IMAGE = '/images/hero/logo-grow.webp';
 
 type HomeAvatarProp =
   | 'crate'
