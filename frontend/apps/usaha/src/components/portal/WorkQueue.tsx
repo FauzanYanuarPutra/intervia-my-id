@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from 'react';
 import { Check, Loader2, RefreshCw, UserRoundPlus } from 'lucide-react';
+import { ChoiceChips } from '@/components/interaction/ChoiceChips';
+import { SearchPicker } from '@/components/interaction/SearchPicker';
 import { FeedbackNotice } from '@/components/interaction/FeedbackNotice';
 import type { BusinessWorkItem } from '@/lib/business-work-server';
 import { organizationRoleLabel } from '@/lib/business-collaboration';
@@ -82,7 +84,8 @@ export function WorkQueue({
   const [description, setDescription] = useState('');
   const [workType, setWorkType] = useState('custom');
   const [assignee, setAssignee] = useState('');
-  const [priority, setPriority] = useState('50');
+  const [priority, setPriority] = useState<'90' | '70' | '50' | '30'>('50');
+  const [assigneeQuery, setAssigneeQuery] = useState('');
   const [message, setMessage] = useState('');
 
   const filtered = useMemo(() => items.filter(item => {
@@ -227,24 +230,54 @@ export function WorkQueue({
               <label className="text-xs font-bold text-portal-soft sm:col-span-2">Catatan
                 <textarea value={description} onChange={event => setDescription(event.target.value)} className="mt-1 min-h-20 w-full rounded-xl border border-portal-line bg-white px-3 py-2 text-sm text-portal-ink" placeholder="Apa yang harus selesai?" />
               </label>
-              <label className="text-xs font-bold text-portal-soft">Jenis
-                <select value={workType} onChange={event => setWorkType(event.target.value)} className="mt-1 min-h-11 w-full rounded-xl border border-portal-line bg-white px-3 text-sm">
-                  {Object.entries(workTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                </select>
-              </label>
-              <label className="text-xs font-bold text-portal-soft">Prioritas
-                <select value={priority} onChange={event => setPriority(event.target.value)} className="mt-1 min-h-11 w-full rounded-xl border border-portal-line bg-white px-3 text-sm">
-                  <option value="90">Penting</option><option value="70">Normal</option><option value="50">Biasa</option><option value="30">Rendah</option>
-                </select>
-              </label>
-              <label className="text-xs font-bold text-portal-soft sm:col-span-2">Tugaskan ke
-                <select value={assignee} onChange={event => setAssignee(event.target.value)} className="mt-1 min-h-11 w-full rounded-xl border border-portal-line bg-white px-3 text-sm">
-                  <option value="">Belum ditugaskan</option>
-                  {members.filter(member => member.status === 'active').map(member => (
-                    <option key={member.userId} value={member.userId}>{memberLabel(member)} · {organizationRoleLabel(member.role)}</option>
-                  ))}
-                </select>
-              </label>
+              <div className="text-xs font-bold text-portal-soft">
+                <span className="block">Jenis</span>
+                <div className="mt-1.5">
+                  <ChoiceChips
+                    value={workType}
+                    options={Object.entries(workTypeLabels).map(([value, label]) => ({ value, label }))}
+                    onChange={setWorkType}
+                    ariaLabel="Jenis pekerjaan"
+                    mode="modal"
+                  />
+                </div>
+              </div>
+              <div className="text-xs font-bold text-portal-soft">
+                <span className="block">Prioritas</span>
+                <div className="mt-1.5">
+                  <ChoiceChips
+                    value={priority}
+                    options={[
+                      { value: '90', label: 'Penting' },
+                      { value: '70', label: 'Normal' },
+                      { value: '50', label: 'Biasa' },
+                      { value: '30', label: 'Rendah' },
+                    ]}
+                    onChange={setPriority}
+                    ariaLabel="Prioritas pekerjaan"
+                  />
+                </div>
+              </div>
+              <div className="text-xs font-bold text-portal-soft sm:col-span-2">
+                <span className="block">Tugaskan ke</span>
+                <div className="mt-1.5">
+                  <SearchPicker
+                    items={members.filter(member => member.status === 'active')}
+                    value={assignee}
+                    query={assigneeQuery}
+                    onQueryChange={setAssigneeQuery}
+                    onChange={setAssignee}
+                    getKey={member => member.userId}
+                    getLabel={memberLabel}
+                    getMeta={member => organizationRoleLabel(member.role)}
+                    placeholder="Belum ditugaskan"
+                    emptyLabel="Anggota tidak ditemukan."
+                    ariaLabel="Penanggung jawab"
+                    maxVisible={40}
+                    mode="modal"
+                  />
+                </div>
+              </div>
             </div>
             <div className="mt-3 flex justify-end gap-2">
               <button type="button" onClick={() => setShowCreate(false)} className="portal-button-secondary">Batal</button>
@@ -278,18 +311,24 @@ export function WorkQueue({
                   </div>
                   <div className="flex flex-wrap items-center gap-2 lg:justify-end">
                     {canManage ? (
-                      <select
-                        value={item.assignee_user_id || ''}
-                        onChange={event => void updateItem(item.id, { assignee_user_id: event.target.value || null })}
-                        disabled={savingId === item.id}
-                        className="min-h-10 rounded-xl border border-portal-line bg-white px-2.5 text-xs font-semibold text-portal-ink"
-                        aria-label="Tugaskan pekerjaan"
-                      >
-                        <option value="">Belum ditugaskan</option>
-                        {members.filter(member => member.status === 'active').map(member => (
-                          <option key={member.userId} value={member.userId}>{memberLabel(member)}</option>
-                        ))}
-                      </select>
+                      <div className="min-w-[190px] sm:min-w-[220px]">
+                        <SearchPicker
+                          items={members.filter(member => member.status === 'active')}
+                          value={item.assignee_user_id || ''}
+                          query={assigneeQuery}
+                          onQueryChange={setAssigneeQuery}
+                          onChange={value => void updateItem(item.id, { assignee_user_id: value || null })}
+                          getKey={member => member.userId}
+                          getLabel={memberLabel}
+                          getMeta={member => organizationRoleLabel(member.role)}
+                          placeholder="Belum ditugaskan"
+                          emptyLabel="Anggota tidak ditemukan."
+                          ariaLabel="Tugaskan pekerjaan"
+                          maxVisible={40}
+                          mode="modal"
+                          disabled={savingId === item.id}
+                        />
+                      </div>
                     ) : null}
                     {canFinish && nextStatus ? (
                       <button type="button" onClick={() => void updateItem(item.id, { status: nextStatus })} disabled={savingId === item.id} className="portal-button-primary">
