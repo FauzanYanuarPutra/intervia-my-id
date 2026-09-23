@@ -26,9 +26,11 @@ function formatDate(value: string | null, locale: string): string {
 
 function safeRichBody(html: string): string {
   return html
+    .replace(/<!--[\s\S]*?-->/g, '')
     .replace(/<script[\s\S]*?<\/script>/gi, '')
     .replace(/<iframe[\s\S]*?<\/iframe>/gi, '')
-    .replace(/\son[a-z]+\s*=\s*("[^"]*"|'[^']*')/gi, '');
+    .replace(/\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    .replace(/(href|src)\s*=\s*(['"]?)\s*(javascript:|data:|vbscript:)[^'">\s]*\2/gi, '$1=$2$2');
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
