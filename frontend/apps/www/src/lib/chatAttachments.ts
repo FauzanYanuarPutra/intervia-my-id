@@ -51,6 +51,7 @@ const SAFE_INTERNAL_EXACT = new Set([
 
 const UNSAFE_OBJECT_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
 const SAFE_MEDIA_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]{0,180}$/;
+const SAFE_CHAT_ROOM_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,240}$/;
 
 export type ChatAttachmentPolicyOptions = {
   appOrigins?: readonly string[];
@@ -123,7 +124,13 @@ function safeMediaShape(segments: string[]): boolean {
     segments[4] === 'uploads' &&
     segments[5] === 'chat'
   ) {
-    return segments.slice(3).every(segment => SAFE_MEDIA_SEGMENT.test(segment));
+    return (
+      SAFE_MEDIA_SEGMENT.test(segments[3]) &&
+      SAFE_MEDIA_SEGMENT.test(segments[4]) &&
+      SAFE_MEDIA_SEGMENT.test(segments[5]) &&
+      SAFE_CHAT_ROOM_SEGMENT.test(segments[6]) &&
+      SAFE_MEDIA_SEGMENT.test(segments[7])
+    );
   }
 
   if (
@@ -133,7 +140,12 @@ function safeMediaShape(segments: string[]): boolean {
     segments[2] === 'media' &&
     segments[4] === 'chat'
   ) {
-    return segments.slice(3).every(segment => SAFE_MEDIA_SEGMENT.test(segment));
+    return (
+      SAFE_MEDIA_SEGMENT.test(segments[3]) &&
+      segments[4] === 'chat' &&
+      SAFE_CHAT_ROOM_SEGMENT.test(segments[5]) &&
+      SAFE_MEDIA_SEGMENT.test(segments[6])
+    );
   }
 
   if (
