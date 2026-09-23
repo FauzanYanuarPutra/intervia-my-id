@@ -45,7 +45,7 @@ mod schema_contract;
 use auth::{is_moderator, optional_actor, request_ip, require_actor, AuthActor};
 use health::{health, ready, root, service_metrics};
 use media::{
-    content_type_for_filename, extension_for, first_feed_media_url, has_valid_media_signature,
+    content_type_for_filename, extension_for, has_valid_media_signature,
     is_allowed_media_type, is_allowed_video_type, is_video_url, media_public_path, safe_file_name,
     upload_dir,
 };
