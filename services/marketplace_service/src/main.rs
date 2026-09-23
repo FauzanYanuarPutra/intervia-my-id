@@ -173,6 +173,7 @@ struct ListContentQuery {
     sub_sector: Option<String>,
     status: Option<String>,
     owner_id: Option<Uuid>,
+    marketplace_only: Option<bool>,
     limit: Option<i64>,
     offset: Option<i64>,
 }
@@ -10684,6 +10685,13 @@ async fn list_content(
           AND ($12::bigint IS NULL OR price_cents >= $12)
           AND ($13::bigint IS NULL OR price_cents <= $13)
           AND (
+              NOT COALESCE($15::bool, FALSE)
+              OR content_type IN (
+                  'product', 'service', 'job', 'property', 'auction', 'tender',
+                  'material', 'tool_rental', 'business_transfer', 'request'
+              )
+          )
+          AND (
               $14::text IS NULL OR
               (
                 CASE
@@ -10740,7 +10748,7 @@ async fn list_content(
           updated_at DESC,
           created_at DESC,
           id ASC
-        LIMIT $15 OFFSET $16
+        LIMIT $16 OFFSET $17
         "#,
     )
     .bind(typ)
@@ -10757,6 +10765,7 @@ async fn list_content(
     .bind(min_price)
     .bind(max_price)
     .bind(side)
+    .bind(query.marketplace_only)
     .bind(limit + 1)
     .bind(offset)
     .fetch_all(&state.db)
