@@ -169,10 +169,6 @@ fn editorial_status(row: &BlogRow) -> String {
         .unwrap_or(if row.content_status=="active"{"published"}else{"draft"}).to_string()
 }
 
-fn public_filter_sql() -> &'static str {
-    "content_type='article' AND content_status='active' AND COALESCE(metadata->'blog'->>'editorial_status','published')='published' AND (published_at IS NULL OR published_at<=NOW())"
-}
-
 async fn list_blog(State(state): State<Arc<AppState>>, Query(query): Query<PublicBlogQuery>) -> impl IntoResponse {
     let limit=query.limit.unwrap_or(24).clamp(1,100);
     let offset=query.offset.unwrap_or(0);
@@ -182,8 +178,8 @@ async fn list_blog(State(state): State<Arc<AppState>>, Query(query): Query<Publi
     let language=clean(query.language).map(|v|v.to_lowercase());
     if language.as_deref().is_some_and(|v|v!="id"&&v!="en") { return error(StatusCode::BAD_REQUEST,"language must be id or en").into_response(); }
     let q=clean(query.q);
-    let sql=format!("SELECT id,owner_id,slug,title,summary,body,tags,cover_image,metadata,content_status,published_at,created_at,updated_at FROM content_items WHERE {} AND ($1::text IS NULL OR metadata->'blog'->>'category'=$1) AND ($2::text IS NULL OR $2=ANY(tags)) AND ($3::text IS NULL OR metadata->'blog'->>'language'=$3) AND ($4::text IS NULL OR title ILIKE ('%'||$4||'%') OR COALESCE(summary,'') ILIKE ('%'||$4||'%') OR body ILIKE ('%'||$4||'%') OR COALESCE(array_to_string(tags,' '),'') ILIKE ('%'||$4||'%')) ORDER BY COALESCE(published_at,created_at) DESC,id DESC LIMIT $5 OFFSET $6", public_filter_sql());
-    match sqlx::query_as::<_,BlogRow>(&sql).bind(category).bind(topic).bind(language).bind(q).bind(limit+1).bind(offset).fetch_all(&state.db).await {
+    match sqlx::query_as::<_,BlogRow>("SELECT id,owner_id,slug,title,summary,body,tags,cover_image,metadata,content_status,published_at,created_at,updated_at FROM content_items WHERE content_type='article' AND content_status='active' AND COALESCE(metadata->'blog'->>'editorial_status','published')='published' AND (published_at IS NULL OR published_at<=NOW()) AND ($1::text IS NULL OR metadata->'blog'->>'category'=$1) AND ($2::text IS NULL OR $2=ANY(tags)) AND ($3::text IS NULL OR metadata->'blog'->>'language'=$3) AND ($4::text IS NULL OR title ILIKE ('%'||$4||'%') OR COALESCE(summary,'') ILIKE ('%'||$4||'%') OR body ILIKE ('%'||$4||'%') OR COALESCE(array_to_string(tags,' '),'') ILIKE ('%'||$4||'%')) ORDER BY COALESCE(published_at,created_at) DESC,id DESC LIMIT $5 OFFSET $6")
+        .bind(category).bind(topic).bind(language).bind(q).bind(limit+1).bind(offset).fetch_all(&state.db).await {
         Ok(mut items)=>{
             let has_more=items.len() as i64>limit;
             if has_more {items.truncate(limit as usize);}
@@ -197,7 +193,8 @@ async fn list_blog(State(state): State<Arc<AppState>>, Query(query): Query<Publi
 }
 
 async fn get_blog(State(state): State<Arc<AppState>>, Path(slug): Path<String>) -> impl IntoResponse {
-    let item=sqlx::query_as::<_,BlogRow>(&format!("SELECT id,owner_id,slug,title,summary,body,tags,cover_image,metadata,content_status,published_at,created_at,updated_at FROM content_items WHERE {} AND slug=$1 LIMIT 1",public_filter_sql())).bind(slug.trim()).fetch_optional(&state.db).await;
+    let item=sqlx::query_as::<_,BlogRow>("SELECT id,owner_id,slug,title,summary,body,tags,cover_image,metadata,content_status,published_at,created_at,updated_at FROM content_items WHERE content_type='article' AND content_status='active' AND COALESCE(metadata->'blog'->>'editorial_status','published')='published' AND (published_at IS NULL OR published_at<=NOW()) AND slug=$1 LIMIT 1")
+        .bind(slug.trim()).fetch_optional(&state.db).await;
     match item { Ok(Some(item))=>(StatusCode::OK,Json(item)).into_response(), Ok(None)=>error(StatusCode::NOT_FOUND,"blog article not found").into_response(), Err(e)=>{tracing::error!("get_blog error: {:?}",e);error(StatusCode::INTERNAL_SERVER_ERROR,"failed to load blog article").into_response()} }
 }
 
