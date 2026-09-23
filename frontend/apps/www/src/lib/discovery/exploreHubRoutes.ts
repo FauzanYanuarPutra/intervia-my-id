@@ -1,6 +1,21 @@
 export type ExploreHubIntent = 'supply' | 'demand';
 export type ExploreHubLocale = 'id' | 'en';
 
+export function normalizeExploreHubIntent(
+  value: string | null | undefined,
+): ExploreHubIntent {
+  return value === 'demand' ? 'demand' : 'supply';
+}
+
+export function buildExploreHubIntentHref(
+  locale: ExploreHubLocale,
+  intent: ExploreHubIntent,
+): string {
+  return intent === 'demand'
+    ? `/${locale}/explore?intent=demand`
+    : `/${locale}/explore`;
+}
+
 function normalizeQuery(value: string): string {
   return value.replace(/\s+/g, ' ').trim();
 }
