@@ -23,19 +23,33 @@ if config_env() == :prod do
     |> String.trim()
     |> String.upcase()
 
+  jwt_secret = System.get_env("JWT_SECRET")
+
+  jwt_public_key_pem =
+    case System.get_env("JWT_PUBLIC_KEY_PEM") do
+      value when is_binary(value) and byte_size(value) > 0 ->
+        String.replace(value, "\\n", "\n")
+
+      _ ->
+        nil
+    end
+
+  jwt_allow_legacy_hs256 =
+    jwt_algorithm == "HS256" and System.get_env("ENV") == "development"
+
   {jwt_guardian_key, jwt_allowed_algos} =
     case jwt_algorithm do
       "RS256" ->
         public_key_pem =
-          System.fetch_env!("JWT_PUBLIC_KEY_PEM")
-          |> String.replace("\\n", "\n")
+          jwt_public_key_pem ||
+            raise "missing JWT_PUBLIC_KEY_PEM for RS256"
 
         {JOSE.JWK.from_pem(public_key_pem), ["RS256"]}
 
       "HS256" ->
         if System.get_env("ENV") == "development" do
           jwt_secret =
-            System.get_env("JWT_SECRET") ||
+            jwt_secret ||
               raise "missing JWT_SECRET for development HS256"
 
           if byte_size(jwt_secret) < 32 do
