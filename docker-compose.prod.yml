@@ -250,6 +250,7 @@ services:
     environment:
       SCYLLA_NODES: ${SCYLLA_NODES:?SCYLLA_NODES must point to the production Scylla cluster}
       SCYLLA_PORT: ${SCYLLA_PORT:-9042}
+      SCYLLA_KEYSPACE: ${SCYLLA_KEYSPACE:-laju_chat}
       SCYLLA_USERNAME: ${SCYLLA_USERNAME:-}
       SCYLLA_PASSWORD: ${SCYLLA_PASSWORD:-}
       SCYLLA_SSL: ${SCYLLA_SSL:-0}
