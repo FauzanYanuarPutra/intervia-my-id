@@ -155,18 +155,6 @@ export default async function BusinessProductsPage({ params, searchParams }: Pag
               )}
             </section>
 
-            {canManage ? (
-              <section className="merchant-surface-bordered flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
-                <div>
-                  <p className="font-black text-portal-ink">Tambah produk</p>
-                  <p className="mt-1 text-xs leading-5 text-portal-soft">
-                    Buka form di jendela terpisah supaya daftar produk tetap rapi.
-                  </p>
-                </div>
-                <ProductCreateModal businessId={business.id} />
-              </section>
-            ) : null}
-
             {(canViewCosting || canViewChannels) ? (
               <section className="grid gap-2 sm:grid-cols-2">
                 {canViewCosting ? (
