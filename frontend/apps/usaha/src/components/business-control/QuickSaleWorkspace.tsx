@@ -500,7 +500,7 @@ export function QuickSaleWorkspace({ businessId, products, channels = [], locati
           {accountKey === 'cash' && tenderedAmount < total ? <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">Uang diterima masih kurang <MoneyValue value={total - tenderedAmount} compact />.</p> : null}
           {feedback?.tone === 'error' ? <p role="alert" aria-live="assertive" className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">{feedback.text}</p> : null}
         </div>
-        <div className="shrink-0 border-t border-portal-line bg-white px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3"><button type="button" className="portal-button-primary w-full justify-center py-3.5 text-base" disabled={saving || !canPay} onClick={submit}>{saving ? 'Menyimpan…' : accountKey === 'cash' ? `Terima · $<MoneyValue value={total} />` : `Selesaikan ${paymentOptions.find(option => option.value === accountKey)?.label ?? ''}`}</button></div>
+        <div className="shrink-0 border-t border-portal-line bg-white px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3"><button type="button" className="portal-button-primary w-full justify-center py-3.5 text-base" disabled={saving || !canPay} onClick={submit}>{saving ? 'Menyimpan…' : accountKey === 'cash' ? 'Terima · ' : `Selesaikan ${paymentOptions.find(option => option.value === accountKey)?.label ?? ''}`}{!saving && accountKey === 'cash' ? <MoneyValue value={total} /> : null}</button></div>
       </div>
     );
   }
