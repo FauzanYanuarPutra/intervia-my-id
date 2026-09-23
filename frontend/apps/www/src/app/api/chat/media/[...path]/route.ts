@@ -169,10 +169,7 @@ export async function GET(
   }
 
   const bucket = decodeSafe(pathSegments[0]);
-  const roomId =
-    bucket === 'local'
-      ? await resolveAccessibleRoom(token, roomReference)
-      : await resolveAccessibleRoom(token, roomReference);
+  const roomId = await resolveAccessibleRoom(token, roomReference);
 
   if (!roomId) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
@@ -197,7 +194,8 @@ export async function GET(
         headers: {
           'Content-Type': contentType,
           'Content-Disposition': 'inline',
-          'Cache-Control': 'public, max-age=31536000, immutable',
+          'Cache-Control': 'private, max-age=31536000, immutable',
+          'Content-Length': String(file.byteLength),
         },
       });
     } catch {
@@ -236,14 +234,16 @@ export async function GET(
     const bytes = await res.Body.transformToByteArray();
     const contentType = contentTypeForPath(key, res.ContentType);
     const buffer = Buffer.from(bytes);
+    const headers: Record<string, string> = {
+      'Content-Type': contentType,
+      'Content-Disposition': 'inline',
+      'Cache-Control': 'private, max-age=31536000, immutable',
+      'Content-Length': String(buffer.byteLength),
+    };
+    if (res.ETag) headers.ETag = res.ETag;
+    if (res.LastModified) headers['Last-Modified'] = res.LastModified.toUTCString();
 
-    return new NextResponse(buffer, {
-      headers: {
-        'Content-Type': contentType,
-        'Content-Disposition': 'inline',
-        'Cache-Control': 'public, max-age=31536000, immutable',
-      },
-    });
+    return new NextResponse(buffer, { headers });
   } catch (error) {
     if (!isMissingObjectError(error)) {
       console.error('[CHAT_MEDIA_GET_ERROR]', error);
