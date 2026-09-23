@@ -733,6 +733,7 @@ struct CommunityFeedItem {
     group: Option<ForumGroup>,
     tags: Vec<CommunityFeedTag>,
     media: Option<CommunityFeedMedia>,
+    image_urls: Vec<String>,
     stats: CommunityFeedStats,
     viewer_vote: i32,
     is_pinned: bool,
@@ -8217,7 +8218,14 @@ async fn build_feed_items(
                 root.map(|post| post.content.as_str())
                     .unwrap_or(&thread.title),
             );
-            let media_src = first_feed_media_url(&thread.image_urls, root);
+            // The root post is the canonical source for post media after edits.
+            // Fall back to the thread media only for legacy rows where the root
+            // post has no media yet. This keeps feed cards and thread detail in sync.
+            let image_urls = root
+                .filter(|post| !post.image_urls.is_empty())
+                .map(|post| post.image_urls.clone())
+                .unwrap_or_else(|| thread.image_urls.clone());
+            let media_src = image_urls.first().cloned();
             let author = thread.author.clone().unwrap_or_else(system_user);
             let category = thread.category.clone();
             let group = thread
@@ -8248,6 +8256,7 @@ async fn build_feed_items(
                     src: src.clone(),
                     alt: thread.title.clone(),
                 }),
+                image_urls,
                 stats: CommunityFeedStats {
                     reactions: thread.vote_score.max(thread.like_count),
                     comments: thread.reply_count,
