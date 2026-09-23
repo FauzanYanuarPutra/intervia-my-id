@@ -161,9 +161,9 @@ function mapToJobDetail(
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ locale: string; slug: string }>;
 }): Promise<Metadata> {
-  const { slug } = await params;
+  const { locale, slug } = await params;
   const item = await fetchJobContent(slug);
 
   if (!item) {
@@ -174,6 +174,7 @@ export async function generateMetadata({
   return {
     title: `${job.title} at ${job.company} | Lajukan`,
     description: `${job.title} - ${job.location}. ${job.salary}.`,
+    alternates: { canonical: `https://www.lajukan.com/${locale}/jobs/${job.slug}`, languages: { id: `https://www.lajukan.com/id/jobs/${job.slug}`, en: `https://www.lajukan.com/en/jobs/${job.slug}`, 'x-default': `https://www.lajukan.com/id/jobs/${job.slug}` } },
     openGraph: {
       title: `${job.title} - ${job.company}`,
       description: job.companyDescription || job.description[0] || '',
@@ -214,6 +215,7 @@ export default async function JobDetailPage({
     },
     datePosted: job.postedAt,
     employmentType: job.type.toUpperCase().replace(/\s+/g, '_'),
+    url: `https://www.lajukan.com/${locale}/jobs/${job.slug}`,
     hiringOrganization: {
       '@type': 'Organization',
       name: job.company,

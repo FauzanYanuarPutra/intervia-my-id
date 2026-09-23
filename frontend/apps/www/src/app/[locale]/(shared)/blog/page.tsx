@@ -1,220 +1,98 @@
 import type { Metadata } from 'next';
-import {
-  ArrowRight,
-  BookOpenText,
-  Search,
-  Sparkles,
-  Store,
-} from 'lucide-react';
+import { BookOpenText, Search, Send, ArrowRight } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
-import {
-  buildBlogIndexJsonLd,
-  buildBlogPath,
-  buildBlogUrl,
-} from '@/lib/seo/blog';
-import { getPublishedBlogArticles } from '@/lib/seo/blogContent';
+import { buildBlogIndexJsonLd, buildBlogPath, buildBlogUrl, getPublishedBlogArticles } from '@/lib/blog';
 import { serializeJsonLd } from '@/lib/seo/jsonLd';
 
 type PageProps = {
   params: Promise<{ locale: string }>;
+  searchParams: Promise<{ q?: string; category?: string; page?: string }>;
 };
 
-export async function generateMetadata({
-  params,
-}: PageProps): Promise<Metadata> {
-  const { locale } = await params;
-  const isId = locale === 'id';
-  const title = isId
-    ? 'Blog Lajukan | Panduan UMKM, Supplier Lokal, AI Bisnis'
-    : 'Lajukan Blog | SME, Local Supplier, and Business AI Guides';
-  const description = isId
-    ? 'Panduan praktis untuk UMKM Indonesia: cari supplier lokal, rapikan profil usaha, pakai AI dengan aman, local SEO, dan substitusi impor.'
-    : 'Practical guides for Indonesian SMEs: local suppliers, business profiles, safe AI use, local SEO, and import substitution.';
+const CATEGORIES = ['UMKM','Bisnis','Supplier','Operasional','Teknologi','AI','Pemasaran','Keuangan','Produksi','Inspirasi'] as const;
 
+function pageNumber(raw?: string): number {
+  const value = Number(raw || '1');
+  return Number.isFinite(value) ? Math.min(100, Math.max(1, Math.floor(value))) : 1;
+}
+
+export async function generateMetadata({ params, searchParams }: PageProps): Promise<Metadata> {
+  const { locale } = await params;
+  const filters = await searchParams;
+  const isId = locale !== 'en';
+  const filtered = Boolean(filters.q?.trim() || filters.category?.trim() || pageNumber(filters.page) > 1);
+  const title = isId ? 'Blog Lajukan | Panduan UMKM & Bisnis' : 'Lajukan Blog | SME & Business Guides';
+  const description = isId
+    ? 'Panduan praktis untuk UMKM dan pelaku usaha Indonesia: supplier, operasional, teknologi, pemasaran, AI, dan keuangan.'
+    : 'Practical guides for Indonesian SMEs and business owners: suppliers, operations, technology, marketing, AI, and finance.';
   return {
     title,
     description,
-    alternates: {
-      canonical: buildBlogUrl(locale),
-      languages: {
-        id: buildBlogUrl('id'),
-        en: buildBlogUrl('en'),
-        'x-default': buildBlogUrl('id'),
-      },
-    },
-    openGraph: {
-      title,
-      description,
-      url: buildBlogUrl(locale),
-      siteName: 'Lajukan',
-      type: 'website',
-      locale: isId ? 'id_ID' : 'en_US',
-      images: [
-        {
-          url: 'https://www.lajukan.com/opengraph-image.png',
-          width: 1200,
-          height: 630,
-          alt: isId ? 'Blog Lajukan' : 'Lajukan Blog',
-        },
-      ],
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title,
-      description,
-      images: ['https://www.lajukan.com/opengraph-image.png'],
-    },
+    robots: filtered ? { index: false, follow: true } : { index: true, follow: true, googleBot: { index: true, follow: true, 'max-image-preview': 'large' } },
+    alternates: { canonical: buildBlogUrl(locale), languages: { id: buildBlogUrl('id'), en: buildBlogUrl('en'), 'x-default': buildBlogUrl('id') } },
+    openGraph: { title, description, url: buildBlogUrl(locale), siteName: 'Lajukan', type: 'website', images: [{ url: 'https://www.lajukan.com/opengraph-image.png', width: 1200, height: 630, alt: 'Lajukan Blog' }] },
   };
 }
 
-export default async function BlogIndexPage({ params }: PageProps) {
+export default async function BlogIndexPage({ params, searchParams }: PageProps) {
   const { locale } = await params;
-  const isId = locale === 'id';
-  const articles = await getPublishedBlogArticles(locale);
-  const featured = articles[0];
-  const rest = articles.slice(1);
-  const jsonLd = buildBlogIndexJsonLd(locale);
-
-  const topicLinks = [
-    {
-      href: '/explore?type=product&side=supply&q=supplier',
-      label: isId ? 'Cari supplier' : 'Find suppliers',
-      icon: Search,
-    },
-    {
-      href: '/usaha',
-      label: isId ? 'Kelola usaha' : 'Manage business',
-      icon: Store,
-    },
-    {
-      href: '/umkm',
-      label: isId ? 'Peta UMKM' : 'UMKM map',
-      icon: Sparkles,
-    },
-  ];
+  const filters = await searchParams;
+  const page = pageNumber(filters.page);
+  const { items, hasMore } = await getPublishedBlogArticles(locale, { query: filters.q, category: filters.category, offset: (page - 1) * 24, limit: 24 });
+  const isId = locale !== 'en';
+  const featured = page === 1 ? items[0] || null : null;
+  const rest = featured ? items.slice(1) : items;
 
   return (
     <main className="page-shell page-rhythm pb-12 pt-6">
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
-      />
-
-      <section className="overflow-hidden rounded-[32px] border border-emerald-100 bg-[linear-gradient(135deg,#fffdf6_0%,#effdf5_48%,#fff7ed_100%)] p-5 shadow-[0_24px_64px_-48px_rgba(15,23,42,0.34)] dark:border-white/10 dark:bg-[linear-gradient(135deg,#0f172a_0%,#052e24_58%,#1c1917_100%)] sm:p-8">
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-end">
-          <div className="min-w-0">
-            <p className="inline-flex items-center gap-2 rounded-full bg-emerald-700 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-white">
-              <BookOpenText className="h-3.5 w-3.5" />
-              {isId ? 'Knowledge hub' : 'Knowledge hub'}
-            </p>
-            <h1 className="mt-4 max-w-4xl text-3xl font-bold tracking-[-0.06em] text-slate-950 dark:text-white sm:text-5xl">
-              {isId
-                ? 'Panduan praktis supaya usaha lebih mudah ditemukan.'
-                : 'Practical guides to make businesses easier to discover.'}
-            </h1>
-            <p className="mt-4 max-w-2xl text-sm font-semibold leading-7 text-slate-600 dark:text-slate-300 sm:text-base">
-              {isId
-                ? 'Blog Lajukan berisi panduan supplier lokal, UMKM digital, AI untuk bisnis, local SEO, dan pasokan Indonesia. Fokusnya bukan konten massal, tapi jawaban yang bisa dipakai owner.'
-                : 'The Lajukan Blog covers local suppliers, digital SME profiles, business AI, local SEO, and Indonesian supply. The focus is not bulk content, but answers owners can use.'}
-            </p>
-            <div className="mt-5 flex flex-wrap gap-2">
-              {topicLinks.map(item => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className="inline-flex min-h-10 items-center gap-2 rounded-full border border-emerald-100 bg-white px-3.5 text-sm font-bold text-emerald-800 transition hover:bg-emerald-50 dark:border-emerald-400/20 dark:bg-white/10 dark:text-emerald-100"
-                >
-                  <item.icon className="h-4 w-4" />
-                  {item.label}
-                </Link>
-              ))}
-            </div>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(buildBlogIndexJsonLd(locale, items)) }} />
+      <section className="overflow-hidden rounded-[30px] border border-emerald-100 bg-[linear-gradient(135deg,#fffdf6_0%,#effdf5_48%,#fff7ed_100%)] p-5 shadow-sm dark:border-white/10 dark:bg-slate-950 sm:p-8">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-3xl">
+            <p className="inline-flex items-center gap-2 rounded-full bg-emerald-700 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.16em] text-white"><BookOpenText className="h-3.5 w-3.5" />Lajukan Blog</p>
+            <h1 className="mt-4 text-3xl font-black tracking-[-0.055em] text-slate-950 dark:text-white sm:text-5xl">{isId ? 'Panduan yang membantu usaha bergerak.' : 'Guides that help businesses move.'}</h1>
+            <p className="mt-3 text-sm font-semibold leading-7 text-slate-600 dark:text-slate-300">{isId ? 'Konten dari komunitas, pelaku usaha, dan tim Lajukan. Artikel bisa dikirim untuk review atau diterbitkan langsung sesuai hak publikasi.' : 'Content from the community, business owners, and Lajukan. Articles can go through review or be published instantly when permitted.'}</p>
           </div>
-
-          <aside className="rounded-[26px] border border-white/80 bg-white/86 p-4 shadow-[0_20px_54px_-42px_rgba(15,23,42,0.42)]  dark:border-white/10 dark:bg-slate-950/60">
-            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300">
-              {isId ? 'Fokus SEO sehat' : 'Healthy SEO focus'}
-            </p>
-            <div className="mt-3 grid gap-2 text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">
-              <p>
-                {isId
-                  ? 'Konten harus membantu orang beli, jual, atau menjalankan usaha.'
-                  : 'Content should help people buy, sell, or operate a business.'}
-              </p>
-              <p>
-                {isId
-                  ? 'Setiap artikel punya internal link ke fitur Lajukan yang relevan.'
-                  : 'Each article links internally to relevant Lajukan features.'}
-              </p>
-            </div>
-          </aside>
+          <Link href="/blog/submit" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-emerald-700 px-5 text-sm font-black text-white hover:bg-emerald-800"><Send className="h-4 w-4" />{isId ? 'Tulis artikel' : 'Write article'}</Link>
         </div>
       </section>
 
-      {featured ? (
-        <section className="grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-          <Link
-            href={buildBlogPath(featured.slug)}
-            className="group overflow-hidden rounded-[30px] border border-slate-200 bg-white p-5 shadow-[0_22px_54px_-44px_rgba(15,23,42,0.32)] transition hover:-translate-y-0.5 hover:border-emerald-200 dark:border-white/10 dark:bg-slate-900 sm:p-6"
-          >
-            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300">
-              {isId ? 'Artikel utama' : 'Featured article'}
-            </p>
-            <h2 className="mt-3 text-2xl font-bold tracking-[-0.05em] text-slate-950 group-hover:text-emerald-800 dark:text-white dark:group-hover:text-emerald-200 sm:text-3xl">
-              {featured.localized.title}
-            </h2>
-            <p className="mt-3 text-sm font-semibold leading-7 text-slate-600 dark:text-slate-300">
-              {featured.localized.description}
-            </p>
-            <div className="mt-5 flex flex-wrap items-center gap-2 text-xs font-bold text-slate-500 dark:text-slate-400">
-              <span className="rounded-full bg-emerald-50 px-3 py-1 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
-                {featured.localized.category}
-              </span>
-              <span>{featured.localized.readTime}</span>
-            </div>
-          </Link>
+      <nav aria-label={isId ? 'Kategori blog' : 'Blog categories'} className="flex gap-1.5 overflow-x-auto py-2">
+        <Link href="/blog" className={!filters.category ? 'rounded-full bg-emerald-700 px-3 py-1.5 text-xs font-black text-white' : 'rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold dark:border-white/10 dark:bg-slate-900 dark:text-white'}>{isId ? 'Semua' : 'All'}</Link>
+        {CATEGORIES.map(category => <Link key={category} href={'/blog?category=' + encodeURIComponent(category)} className={filters.category?.toLowerCase() === category.toLowerCase() ? 'rounded-full bg-emerald-700 px-3 py-1.5 text-xs font-black text-white' : 'rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold dark:border-white/10 dark:bg-slate-900 dark:text-white'}>{category}</Link>)}
+      </nav>
 
-          <div className="rounded-[30px] border border-slate-200 bg-[#f8f5ee] p-5 dark:border-white/10 dark:bg-white/[0.04] sm:p-6">
-            <p className="text-sm font-bold text-slate-950 dark:text-white">
-              {isId ? 'Kenapa blog penting?' : 'Why a blog matters'}
-            </p>
-            <p className="mt-3 text-sm font-semibold leading-7 text-slate-600 dark:text-slate-300">
-              {isId
-                ? 'Blog membuat Lajukan punya halaman yang menjawab pertanyaan calon pengguna sebelum mereka siap daftar. Ini bantu discovery, internal link, dan kepercayaan brand.'
-                : 'A blog gives Lajukan pages that answer potential users before they are ready to sign up. It supports discovery, internal links, and brand trust.'}
-            </p>
+      <form method="get" className="flex gap-2">
+        {filters.category ? <input type="hidden" name="category" value={filters.category} /> : null}
+        <label htmlFor="blog-search" className="sr-only">{isId ? 'Cari artikel' : 'Search articles'}</label>
+        <div className="relative min-w-0 flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input id="blog-search" name="q" defaultValue={filters.q} maxLength={120} placeholder={isId ? 'Cari topik, judul, atau panduan…' : 'Search topics, titles, or guides…'} className="min-h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-sm font-semibold outline-none focus:border-emerald-500 dark:border-white/10 dark:bg-slate-900 dark:text-white" /></div>
+        <button type="submit" className="min-h-11 rounded-xl bg-slate-950 px-4 text-sm font-black text-white dark:bg-white dark:text-slate-950">{isId ? 'Cari' : 'Search'}</button>
+      </form>
+
+      {!items.length ? (
+        <section className="rounded-[24px] border border-dashed border-slate-300 bg-white p-8 text-center dark:border-white/10 dark:bg-slate-900"><h2 className="text-lg font-black">{isId ? 'Belum ada artikel untuk filter ini.' : 'No articles for this filter yet.'}</h2></section>
+      ) : (
+        <>
+          {featured ? (
+            <Link href={buildBlogPath(featured.slug)} className="group block overflow-hidden rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-slate-900 sm:p-7">
+              <div className="grid gap-5 lg:grid-cols-[220px_minmax(0,1fr)]">
+                <div className="overflow-hidden rounded-2xl bg-slate-100 aspect-[4/3]">{featured.coverImage ? <img src={featured.coverImage} alt={featured.title} className="h-full w-full object-cover" /> : <div className="h-full w-full bg-gradient-to-br from-emerald-50 to-slate-100 dark:from-emerald-950/40 dark:to-slate-900" />}</div>
+                <div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">{featured.category}</p><h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950 dark:text-white sm:text-3xl">{featured.title}</h2><p className="mt-3 text-sm font-semibold leading-7 text-slate-600 dark:text-slate-300">{featured.summary}</p><div className="mt-4 text-xs font-bold text-slate-500">{featured.authorName} · {new Date(featured.publishedAt || featured.updatedAt).toLocaleDateString(isId ? 'id-ID' : 'en-US')}</div></div>
+              </div>
+            </Link>
+          ) : null}
+          <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {rest.map(article => <Link key={article.id} href={buildBlogPath(article.slug)} className="group flex min-h-[260px] flex-col overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-sm hover:border-emerald-200 dark:border-white/10 dark:bg-slate-900">
+              {article.coverImage ? <img src={article.coverImage} alt={article.title} className="aspect-[16/9] w-full object-cover" loading="lazy" /> : <div className="aspect-[16/9] bg-gradient-to-br from-emerald-50 to-slate-100 dark:from-emerald-950/40 dark:to-slate-900" />}
+              <div className="flex flex-1 flex-col p-4"><p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-700">{article.category}</p><h2 className="mt-2 line-clamp-3 text-lg font-black text-slate-950 dark:text-white">{article.title}</h2><p className="mt-2 line-clamp-3 text-sm font-medium leading-6 text-slate-600 dark:text-slate-300">{article.summary}</p><div className="mt-auto pt-4 text-xs font-bold text-slate-500">{article.authorName} · {new Date(article.publishedAt || article.updatedAt).toLocaleDateString(isId ? 'id-ID' : 'en-US')}</div></div>
+            </Link>)}
+          </section>
+          <div className="flex items-center justify-center gap-2 pt-2">
+            {page > 1 ? <Link href={'/blog?' + new URLSearchParams({ ...(filters.q ? { q: filters.q } : {}), ...(filters.category ? { category: filters.category } : {}), page: String(page - 1) }).toString()} rel="prev" className="rounded-full border px-4 py-2 text-xs font-bold">{isId ? 'Sebelumnya' : 'Previous'}</Link> : null}
+            {hasMore ? <Link href={'/blog?' + new URLSearchParams({ ...(filters.q ? { q: filters.q } : {}), ...(filters.category ? { category: filters.category } : {}), page: String(page + 1) }).toString()} rel="next" className="inline-flex items-center gap-1 rounded-full bg-emerald-700 px-4 py-2 text-xs font-bold text-white">{isId ? 'Berikutnya' : 'Next'}<ArrowRight className="h-3.5 w-3.5" /></Link> : null}
           </div>
-        </section>
-      ) : null}
-
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {rest.map(article => (
-          <Link
-            key={article.slug}
-            href={buildBlogPath(article.slug)}
-            className="group flex min-h-[260px] flex-col rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_18px_44px_-40px_rgba(15,23,42,0.3)] transition hover:-translate-y-0.5 hover:border-emerald-200 dark:border-white/10 dark:bg-slate-900"
-          >
-            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300">
-              {article.localized.eyebrow}
-            </p>
-            <h2 className="mt-3 text-xl font-bold tracking-[-0.04em] text-slate-950 group-hover:text-emerald-800 dark:text-white dark:group-hover:text-emerald-200">
-              {article.localized.title}
-            </h2>
-            <p className="mt-3 line-clamp-4 text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">
-              {article.localized.description}
-            </p>
-            <div className="mt-auto flex items-center justify-between gap-3 pt-5 text-xs font-bold">
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600 dark:bg-white/10 dark:text-slate-300">
-                {article.localized.readTime}
-              </span>
-              <span className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-300">
-                {isId ? 'Baca' : 'Read'}
-                <ArrowRight className="h-3.5 w-3.5" />
-              </span>
-            </div>
-          </Link>
-        ))}
-      </section>
+        </>
+      )}
     </main>
   );
 }

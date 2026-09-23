@@ -165,9 +165,9 @@ function mapToPropertyDetail(
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ locale: string; slug: string }>;
 }): Promise<Metadata> {
-  const { slug } = await params;
+  const { locale, slug } = await params;
   const item = await fetchPropertyContent(slug);
   if (!item) return { title: 'Property Not Found | Lajukan' };
 
@@ -175,6 +175,7 @@ export async function generateMetadata({
   return {
     title: `${property.title} | Lajukan Property`,
     description: `${property.location}. ${property.price}.`,
+    alternates: { canonical: `https://www.lajukan.com/${locale}/property/${property.slug}`, languages: { id: `https://www.lajukan.com/id/property/${property.slug}`, en: `https://www.lajukan.com/en/property/${property.slug}`, 'x-default': `https://www.lajukan.com/id/property/${property.slug}` } },
     openGraph: {
       title: property.title,
       description: property.description[0] || '',
@@ -207,7 +208,7 @@ export default async function PropertyDetailPage({
     '@type': 'RealEstateListing',
     name: property.title,
     description: property.description.join(' '),
-    url: `https://lajukan.id/property/${property.slug}`,
+    url: `https://www.lajukan.com/${locale}/property/${property.slug}`,
     image: property.images,
     address: {
       '@type': 'PostalAddress',
