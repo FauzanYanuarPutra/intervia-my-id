@@ -891,6 +891,7 @@ export function IngredientWorkspace({
                     {actionMessage ? <p className="mt-3 text-xs font-semibold text-portal-soft" role="status">{actionMessage}</p> : null}
                     </div>
                   </div>
+                  </div>
                 ) : null}
               </div>
             );
