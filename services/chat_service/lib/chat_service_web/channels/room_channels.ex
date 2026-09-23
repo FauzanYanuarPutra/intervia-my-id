@@ -551,6 +551,9 @@ defmodule ChatServiceWeb.RoomChannel do
         {:error, :invalid_attachments} ->
           {:reply, {:error, %{reason: "invalid_attachments"}}, socket}
 
+        {:error, :invalid_reference} ->
+          {:reply, {:error, %{reason: "referenced_message_not_found"}}, socket}
+
         {:error, :client_ref_conflict} ->
           {:reply, {:error, %{reason: "client_ref_conflict"}}, socket}
 
