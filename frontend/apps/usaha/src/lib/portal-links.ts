@@ -1,6 +1,16 @@
 import { buildGoogleMapsPlaceUrl, buildGoogleMapsSearchUrl, parseLatLngFromMapsInput, toLatLng } from '@/lib/maps';
 
-const DEFAULT_WWW_BASE_URL = 'http://localhost:3000';
+const PRODUCTION_WWW_BASE_URL = 'https://www.lajukan.com';
+const DEVELOPMENT_WWW_BASE_URL = 'http://localhost:3000';
+
+function isLocalhostUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+  } catch {
+    return false;
+  }
+}
 
 function trimTrailingSlash(value: string) {
   return value.replace(/\/+$/, '');
@@ -12,7 +22,18 @@ function cleanText(value: string | null | undefined) {
 
 export function getPublicWwwBaseUrl() {
   const configuredUrl = cleanText(process.env.NEXT_PUBLIC_WWW_URL);
-  return trimTrailingSlash(configuredUrl || DEFAULT_WWW_BASE_URL);
+  const isDevelopment = process.env.NODE_ENV === 'development';
+
+  if (!configuredUrl) {
+    return isDevelopment ? DEVELOPMENT_WWW_BASE_URL : PRODUCTION_WWW_BASE_URL;
+  }
+
+  // Never let a production build publish storefront links to localhost.
+  if (!isDevelopment && isLocalhostUrl(configuredUrl)) {
+    return PRODUCTION_WWW_BASE_URL;
+  }
+
+  return trimTrailingSlash(configuredUrl);
 }
 
 export function buildPublicStorefrontUrl(slug: string) {
