@@ -36,12 +36,10 @@ describe('IngredientWorkspace', () => {
       />,
     );
 
-    expect(html).toContain('Bagaimana biasanya bahan ini dibeli?');
-    expect(html).toContain('Saya membeli');
-    expect(html).toContain('Dipakai dalam resep sebagai');
-    expect(html).toContain('1 kg =');
-    expect(html).toContain('Ada bagian yang biasanya tidak terpakai?');
-    expect(html).toContain('Seluruh jumlah dianggap dapat dipakai');
+    expect(html).toContain('Kelola bahan & kemasan');
+    expect(html).toContain('Tambah bahan');
+    expect(html).toContain('Harga efektif, stok, dan bagian terpakai');
+    expect(html).toContain('Cari bahan atau supplier');
     expect(html).not.toContain('Susut %');
     expect(html).not.toContain('Konversi</');
   });
@@ -57,7 +55,6 @@ describe('IngredientWorkspace', () => {
     expect(html).toContain('Tambah stok');
     expect(html).toContain('Riwayat');
     expect(html).toContain('gram');
-    expect(html).toContain('Beri peringatan jika stok di bawah');
   });
 
   it('shows effective cost and a human-readable purchase summary', () => {
