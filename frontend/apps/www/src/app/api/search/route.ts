@@ -434,6 +434,28 @@ function contentKind(
   return 'products';
 }
 
+const NON_MARKETPLACE_CONTENT_TYPES = new Set([
+  'news',
+  'article',
+  'guide',
+  'image',
+]);
+
+function isMarketplaceSearchContent(item: JsonRecord): boolean {
+  const metadata = asRecord(item.metadata);
+  const contentType = firstString(
+    item.content_type,
+    item.type,
+    item.category,
+    metadata?.content_type,
+    metadata?.type,
+  )
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
+
+  return !NON_MARKETPLACE_CONTENT_TYPES.has(contentType);
+}
+
 function mapContentItem(
   item: JsonRecord,
 ): GlobalSearchItem | null {
@@ -1586,6 +1608,8 @@ export async function GET(
     new URLSearchParams({
       status: 'active',
       include_owner: '1',
+      marketplace_only: 'true',
+      database_only: '1',
       limit:
         state.side === 'all'
           ? '24'
@@ -2028,6 +2052,7 @@ export async function GET(
 
   const contentItems =
     rawContentItems
+      .filter(isMarketplaceSearchContent)
       .map(mapContentItem)
       .filter(
         (
