@@ -131,6 +131,8 @@ export function onMessage(
     sent_at?: string;
     message_type?: string;
     attachments?: string[];
+    reference?: ChatMessageReference | null;
+    reply_to?: ChatMessageReference | null;
   }) => void
 ): () => void {
   const ref = channel.on('new_message', callback);
