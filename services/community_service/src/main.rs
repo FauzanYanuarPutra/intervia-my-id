@@ -45,7 +45,7 @@ mod schema_contract;
 use auth::{is_moderator, optional_actor, request_ip, require_actor, AuthActor};
 use health::{health, ready, root, service_metrics};
 use media::{
-    content_type_for_filename, extension_for, has_valid_media_signature,
+    content_type_for_filename, extension_for, first_feed_media_url, has_valid_media_signature,
     is_allowed_media_type, is_allowed_video_type, is_video_url, media_public_path, safe_file_name,
     upload_dir,
 };
@@ -8365,14 +8365,15 @@ async fn build_feed_items(
                 root.map(|post| post.content.as_str())
                     .unwrap_or(&thread.title),
             );
-            // The root post is the canonical source for post media after edits.
-            // Fall back to the thread media only for legacy rows where the root
-            // post has no media yet. This keeps feed cards and thread detail in sync.
-            let image_urls = root
-                .filter(|post| !post.image_urls.is_empty())
-                .map(|post| post.image_urls.clone())
-                .unwrap_or_else(|| thread.image_urls.clone());
-            let media_src = image_urls.first().cloned();
+            let root_post_image_urls = root
+                .map(|post| post.image_urls.as_slice())
+                .unwrap_or(&[]);
+            let image_urls = if root_post_image_urls.is_empty() {
+                thread.image_urls.clone()
+            } else {
+                root_post_image_urls.to_vec()
+            };
+            let media_src = first_feed_media_url(&thread.image_urls, root_post_image_urls);
             let author = thread.author.clone().unwrap_or_else(system_user);
             let category = thread.category.clone();
             let group = thread
@@ -8407,7 +8408,7 @@ async fn build_feed_items(
                 stats: CommunityFeedStats {
                     reactions: thread.vote_score.max(thread.like_count),
                     comments: thread.reply_count,
-                    shares: thread.bookmark_count,
+                    shares: 0,
                     views: thread.views,
                 },
                 viewer_vote: thread.viewer_vote,
