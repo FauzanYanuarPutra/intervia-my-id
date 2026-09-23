@@ -221,6 +221,7 @@ defmodule ChatServiceWeb.MessageController do
                     content: message.content,
                     message_type: message.message_type,
                     attachments: message.attachments,
+                    reference: message.reference,
                     sent_at: DateTime.to_iso8601(message.sent_at),
                     deduplicated: status == :duplicate
                   }
