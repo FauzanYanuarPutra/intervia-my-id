@@ -10685,6 +10685,13 @@ async fn list_content(
           AND ($12::bigint IS NULL OR price_cents >= $12)
           AND ($13::bigint IS NULL OR price_cents <= $13)
           AND (
+              NOT COALESCE($15::bool, FALSE)
+              OR content_type IN (
+                  'product', 'service', 'job', 'property', 'auction', 'tender',
+                  'material', 'tool_rental', 'business_transfer', 'request'
+              )
+          )
+          AND (
               $14::text IS NULL OR
               (
                 CASE
@@ -10741,7 +10748,7 @@ async fn list_content(
           updated_at DESC,
           created_at DESC,
           id ASC
-        LIMIT $15 OFFSET $16
+        LIMIT $16 OFFSET $17
         "#,
     )
     .bind(typ)
