@@ -1479,7 +1479,7 @@ function buildGameSnapshot(
 }
 
 const QUICK_CATEGORY_UI: Record<
-  LajukanExploreCategoryId | 'map',
+  LajukanExploreCategoryId | 'all',
   QuickCategoryUiConfig
 > = {
   equipment: {
