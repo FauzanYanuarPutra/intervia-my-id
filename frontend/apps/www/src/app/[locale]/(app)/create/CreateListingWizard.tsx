@@ -1255,19 +1255,86 @@ async function readResponseJson(
   return valueAsRecord(value);
 }
 
+function normalizeServerFieldKey(value: string): string {
+  return value
+    .trim()
+    .replace(/^values\./, '')
+    .replace(/^metadata\./, '');
+}
+
+function extractServerFieldErrors(
+  payload: Record<string, unknown>,
+): Record<string, string> {
+  const result: Record<string, string> = {};
+
+  const assign = (key: unknown, message: unknown) => {
+    if (typeof key !== 'string' || typeof message !== 'string') return;
+    const normalizedKey = normalizeServerFieldKey(key);
+    const normalizedMessage = message.trim();
+    if (normalizedKey && normalizedMessage) {
+      result[normalizedKey] = normalizedMessage;
+    }
+  };
+
+  for (const sourceKey of ['field_errors', 'errors']) {
+    const source = valueAsRecord(payload[sourceKey]);
+    for (const [key, value] of Object.entries(source)) {
+      if (typeof value === 'string') {
+        assign(key, value);
+      } else {
+        const record = valueAsRecord(value);
+        assign(
+          key,
+          valueAsString(record.message) ||
+            valueAsString(record.error),
+        );
+      }
+    }
+  }
+
+  const issues = payload.issues;
+  if (Array.isArray(issues)) {
+    for (const issue of issues) {
+      if (typeof issue === 'string') continue;
+      const record = valueAsRecord(issue);
+      assign(
+        valueAsString(record.field) ||
+          valueAsString(record.key) ||
+          valueAsString(record.path),
+        valueAsString(record.message) ||
+          valueAsString(record.error) ||
+          valueAsString(record.detail),
+      );
+    }
+  }
+
+  return result;
+}
+
 function responseErrorMessage(
   payload: Record<string, unknown>,
   fallback: string,
 ): string {
-  return (
-    valueAsString(
-      payload.error,
-    ) ||
-    valueAsString(
-      payload.message,
-    ) ||
-    fallback
-  );
+  const direct =
+    valueAsString(payload.error) ||
+    valueAsString(payload.message);
+
+  const issues = Array.isArray(payload.issues)
+    ? payload.issues
+        .map(issue =>
+          typeof issue === 'string'
+            ? issue.trim()
+            : valueAsString(valueAsRecord(issue).message),
+        )
+        .filter(Boolean)
+        .slice(0, 3)
+    : [];
+
+  if (direct && issues.length) {
+    return `${direct} ${issues.join(' ')}`;
+  }
+
+  return direct || issues.join(' ') || fallback;
 }
 
 function isVersionConflict(
@@ -4706,6 +4773,13 @@ export default function CreateListingWizard({
           if (
             !response.ok
           ) {
+            const serverFieldErrors =
+              extractServerFieldErrors(payload);
+
+            if (Object.keys(serverFieldErrors).length) {
+              showValidationErrors(serverFieldErrors);
+            }
+
             throw new Error(
               responseErrorMessage(
                 payload,
