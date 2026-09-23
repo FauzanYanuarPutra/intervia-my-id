@@ -6394,6 +6394,7 @@ export default function CreateListingWizard({
               ),
             )}
           </select>
+          {fieldErrorText}
         </label>
       );
     }
@@ -6430,6 +6431,7 @@ export default function CreateListingWizard({
           />
 
           <span className="relative h-7 w-12 shrink-0 rounded-full bg-slate-300 transition after:absolute after:left-1 after:top-1 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow-sm after:transition-transform after:content-[''] peer-checked:bg-emerald-600 peer-checked:after:translate-x-5 peer-focus-visible:ring-2 peer-focus-visible:ring-emerald-500 peer-focus-visible:ring-offset-2 dark:bg-slate-700" />
+          {fieldErrorText}
         </label>
       );
     }
