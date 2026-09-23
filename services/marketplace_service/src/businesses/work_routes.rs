@@ -45,7 +45,7 @@ async fn list(
 ) -> Response {
     let (_actor_id, authorization) = match actor_and_authorization(&state, &headers) {
         Ok(value) => value,
-        Err(response) => return response,
+        Err(response) => return *response,
     };
 
     let organization = match service(&state)
@@ -86,7 +86,7 @@ async fn create(
 ) -> Response {
     let (actor_id, authorization) = match actor_and_authorization(&state, &headers) {
         Ok(value) => value,
-        Err(response) => return response,
+        Err(response) => return *response,
     };
 
     let organization = match service(&state)
@@ -121,7 +121,7 @@ async fn sync(
 ) -> Response {
     let (actor_id, authorization) = match actor_and_authorization(&state, &headers) {
         Ok(value) => value,
-        Err(response) => return response,
+        Err(response) => return *response,
     };
 
     let organization = match service(&state)
@@ -153,7 +153,7 @@ async fn update(
 ) -> Response {
     let (actor_id, authorization) = match actor_and_authorization(&state, &headers) {
         Ok(value) => value,
-        Err(response) => return response,
+        Err(response) => return *response,
     };
 
     let organization = match service(&state)
@@ -198,9 +198,9 @@ fn service(state: &AppState) -> BusinessService {
 fn actor_and_authorization(
     state: &AppState,
     headers: &HeaderMap,
-) -> Result<(Uuid, String), Response> {
+) -> Result<(Uuid, String), Box<Response>> {
     let actor_id = user_id_from_auth(headers, &state.jwt_secret)
-        .ok_or_else(|| api_error(StatusCode::UNAUTHORIZED, "auth_required"))?;
+        .ok_or_else(|| Box::new(api_error(StatusCode::UNAUTHORIZED, "auth_required")))?;
     let authorization = headers
         .get(header::AUTHORIZATION)
         .and_then(|value| value.to_str().ok())
