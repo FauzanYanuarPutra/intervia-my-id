@@ -4,6 +4,15 @@ defmodule ChatService.AttachmentPolicyTest do
   alias ChatService.AttachmentPolicy
 
   describe "normalize/2 media policy" do
+    test "accepts a batch of up to 100 media attachments" do
+      attachments = Enum.map(1..100, fn index -> "/api/chat/media/laju-chat/chat/dm_a_b/asset-#{index}.webp" end)
+
+      assert {:ok, normalized} = AttachmentPolicy.normalize("image", attachments)
+      assert length(normalized) == 100
+      assert {:error, :invalid_attachments} =
+               AttachmentPolicy.normalize("image", attachments ++ ["/api/chat/media/laju-chat/chat/dm_a_b/asset-101.webp"])
+    end
+
     test "accepts only controlled chat and content media paths" do
       chat_url = "/api/chat/media/laju-chat/chat/dm_a_b/asset.webp"
       content_url = "/api/content/media/laju-chat/content/cover.jpg"
