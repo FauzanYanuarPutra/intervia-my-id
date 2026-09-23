@@ -11,6 +11,7 @@ param(
     # shorthand/alias parsing on some Windows shells.
     [switch]$Build,
     [switch]$Buildclear,
+    [switch]$ForceRecreate,
     [switch]$Pull,
     [switch]$Down,
     [switch]$Fresh,
@@ -494,9 +495,7 @@ try {
             $BuildTargets = @($Services)
         }
         else {
-            # Resolve only services that define build sections. Building one
-            # service per Compose invocation avoids opening the entire BuildKit
-            # graph against Docker Desktop at once.
+            # Resolve only services that define build sections.
             $ServiceProbe = Get-DockerComposeConfigJson -ComposeArguments $ComposeArgs
             if ($ServiceProbe.ExitCode -ne 0) {
                 $ServiceProbeText = ($ServiceProbe.Output -join [Environment]::NewLine)
@@ -510,17 +509,13 @@ try {
             if ($ServiceProbe.ExitCode -ne 0) {
                 throw "Docker Compose gagal membaca daftar service build sebelum build dimulai."
             }
+
             try {
                 if ([string]::IsNullOrWhiteSpace($ServiceProbe.Json)) {
                     $Diagnostic = ($ServiceProbe.Error -join " ").Trim()
                     throw "Compose menghasilkan JSON kosong. $Diagnostic"
                 }
 
-                # Do not parse the merged Compose JSON with ConvertFrom-Json here.
-                # Large Compose models are not reliably handled across the
-                # PowerShell/JSON runtime versions used by Windows developers.
-                # Python already owns the repository's JSON contract validation,
-                # so use the same runtime to extract build-capable services.
                 $BuildTargetOutput = @(
                     $ServiceProbe.Json |
                         & $PythonCommand.Source "scripts/config/compose_build_targets.py" 2>&1
@@ -553,15 +548,10 @@ try {
             Write-Host "Tidak ada service build yang dipilih; melewati tahap image build." -ForegroundColor Yellow
         }
         else {
-            Write-Host "Building Docker images in adaptive batches (Bake disabled, cache-friendly)..." -ForegroundColor Cyan
+            Write-Host "Building Docker images in one cache-friendly BuildKit pass..." -ForegroundColor Cyan
             $BuildOriginalParallelLimit = $env:COMPOSE_PARALLEL_LIMIT
-
-            # Do not force every service through a separate Compose invocation.
-            # That is stable but unnecessarily slow when Docker/BuildKit already
-            # has warm cache layers. Build a bounded batch in one invocation so
-            # independent services can progress concurrently, while keeping a
-            # deterministic upper bound on Docker Engine pressure.
             $AdaptiveLimit = $ParallelLimit
+
             try {
                 $HostCpu = [Environment]::ProcessorCount
                 $HostRamGb = 0
@@ -592,58 +582,36 @@ try {
                 $env:COMPOSE_PARALLEL_LIMIT = $AdaptiveLimit.ToString()
                 Write-Host "Adaptive build parallelism: $AdaptiveLimit (host CPU=$HostCpu, RAM=$HostRamGb GB, requested=$ParallelLimit)" -ForegroundColor DarkGray
 
-                for ($BatchStart = 0; $BatchStart -lt $BuildTargets.Count; $BatchStart += $AdaptiveLimit) {
-                    $Batch = @(
-                        $BuildTargets |
-                            Select-Object -Skip $BatchStart -First $AdaptiveLimit
-                    )
-                    $BatchLabel = $Batch -join ", "
-                    Write-Host "Building batch [$BatchLabel]..." -ForegroundColor Cyan
+                $BuildArgs = @("build") + $BuildTargets
+                $BuildProbe = Invoke-DockerNative -Arguments (@($ComposeArgs) + $BuildArgs)
+                $BuildProbe.Output | ForEach-Object { Write-Output $_ }
 
-                    $PreBuildProbe = Invoke-DockerNative -Arguments @("info", "--format", "{{json .ServerVersion}}")
-                    if ($PreBuildProbe.ExitCode -ne 0) {
-                        if (-not (Invoke-DockerEngineRecovery -Reason "pre-build batch [$BatchLabel]")) {
-                            $Details = ($PreBuildProbe.Output -join " ").Trim()
-                            throw "Docker Engine tidak sehat sebelum build batch [$BatchLabel]: $Details"
-                        }
-                    }
-
-                    $BatchBuildArgs = @("build") + $Batch
-                    $BatchBuildProbe = Invoke-DockerNative -Arguments (@($ComposeArgs) + $BatchBuildArgs)
-                    $BatchBuildOutput = @($BatchBuildProbe.Output)
-                    $BatchBuildOutput | ForEach-Object { Write-Output $_ }
-
-                    if ($BatchBuildProbe.ExitCode -eq 0) {
-                        Write-Host "Build batch completed: $BatchLabel" -ForegroundColor Green
-                        continue
-                    }
-
-                    $BatchBuildText = ($BatchBuildOutput -join [Environment]::NewLine)
-                    $EngineFailure = Test-DockerEngineFailure -OutputText $BatchBuildText
+                if ($BuildProbe.ExitCode -eq 0) {
+                    Write-Host "Docker image build completed successfully for $($BuildTargets.Count) services." -ForegroundColor Green
+                }
+                else {
+                    $BuildText = ($BuildProbe.Output -join [Environment]::NewLine)
+                    $EngineFailure = Test-DockerEngineFailure -OutputText $BuildText
                     $PostBuildProbe = Invoke-DockerNative -Arguments @("info", "--format", "{{json .ServerVersion}}")
                     if ($PostBuildProbe.ExitCode -ne 0) {
                         $EngineFailure = $true
                     }
 
                     if ($EngineFailure) {
-                        Write-Warning "Parallel build batch [$BatchLabel] hit a Docker Engine failure. Recovering and retrying this batch sequentially..."
-                        if (-not (Invoke-DockerEngineRecovery -Reason "parallel build batch [$BatchLabel]")) {
-                            throw "Docker Engine gagal saat build batch [$BatchLabel] dan recovery tidak berhasil."
+                        Write-Warning "Full-stack build hit a Docker Engine failure. Recovering, then retrying safely with bounded sequential builds..."
+                        if (-not (Invoke-DockerEngineRecovery -Reason "full-stack build")) {
+                            throw "Docker Engine gagal saat build full stack dan recovery tidak berhasil."
                         }
 
-                        # Recovery fallback is intentionally sequential. It isolates
-                        # the failing service and prevents a second concurrent storm.
                         $env:COMPOSE_PARALLEL_LIMIT = "1"
-                        foreach ($ServiceName in $Batch) {
+                        foreach ($ServiceName in $BuildTargets) {
                             $ServiceBuildSucceeded = $false
-                            for ($ServiceAttempt = 1; $ServiceAttempt -le 3; $ServiceAttempt++) {
-                                Write-Host "Retrying service [$ServiceName] (attempt $ServiceAttempt/3)..." -ForegroundColor Yellow
+                            for ($ServiceAttempt = 1; $ServiceAttempt -le 2; $ServiceAttempt++) {
+                                Write-Host "Retrying service [$ServiceName] (attempt $ServiceAttempt/2)..." -ForegroundColor Yellow
                                 $ServiceBuildProbe = Invoke-DockerNative -Arguments (@($ComposeArgs) + @("build", $ServiceName))
                                 $ServiceBuildProbe.Output | ForEach-Object { Write-Output $_ }
-
                                 if ($ServiceBuildProbe.ExitCode -eq 0) {
                                     $ServiceBuildSucceeded = $true
-                                    Write-Host "Service [$ServiceName] image build completed." -ForegroundColor Green
                                     break
                                 }
 
@@ -654,7 +622,7 @@ try {
                                     $RetryEngineFailure = $true
                                 }
 
-                                if ($RetryEngineFailure -and $ServiceAttempt -lt 3) {
+                                if ($RetryEngineFailure -and $ServiceAttempt -lt 2) {
                                     if (Invoke-DockerEngineRecovery -Reason "retry build service $ServiceName") {
                                         continue
                                     }
@@ -667,88 +635,69 @@ try {
                                 throw "Service '$ServiceName' tidak berhasil dibangun setelah recovery attempts."
                             }
                         }
-
-                        $env:COMPOSE_PARALLEL_LIMIT = $AdaptiveLimit.ToString()
                     }
-                    elseif (Test-DockerRegistryFailure -OutputText $BatchBuildText) {
-                        # Docker Hub/registry outages and TLS timeouts are transient.
-                        # Retry the same batch without restarting Docker Desktop.
-                        # Reduce concurrency progressively so registry connection
-                        # pressure drops on flaky/slow networks.
+                    elseif (Test-DockerRegistryFailure -OutputText $BuildText) {
                         $RegistryRetrySucceeded = $false
                         for ($RegistryAttempt = 1; $RegistryAttempt -le 3; $RegistryAttempt++) {
                             if ($RegistryAttempt -gt 1 -and $AdaptiveLimit -gt 1) {
                                 $AdaptiveLimit = [math]::Max(1, [math]::Ceiling($AdaptiveLimit / 2))
                             }
                             $env:COMPOSE_PARALLEL_LIMIT = $AdaptiveLimit.ToString()
-                            Write-Warning "Docker registry/network transient detected for batch [$BatchLabel]. Retry $RegistryAttempt/3 dengan paralelisme $AdaptiveLimit..."
+                            Write-Warning "Docker registry/network transient detected. Retry $RegistryAttempt/3 dengan paralelisme $AdaptiveLimit..."
+                            Start-Sleep -Seconds ([math]::Min(15, $RegistryAttempt * 4))
 
-                            Start-Sleep -Seconds ([math]::Min(20, $RegistryAttempt * 5))
-                            $RegistryRetryProbe = Invoke-DockerNative -Arguments (@($ComposeArgs) + $BatchBuildArgs)
+                            $RegistryRetryProbe = Invoke-DockerNative -Arguments (@($ComposeArgs) + $BuildArgs)
                             $RegistryRetryProbe.Output | ForEach-Object { Write-Output $_ }
-
                             if ($RegistryRetryProbe.ExitCode -eq 0) {
                                 $RegistryRetrySucceeded = $true
-                                Write-Host "Build batch completed after registry/network retry: $BatchLabel" -ForegroundColor Green
                                 break
                             }
 
                             $RegistryRetryText = ($RegistryRetryProbe.Output -join [Environment]::NewLine)
                             if (-not (Test-DockerRegistryFailure -OutputText $RegistryRetryText)) {
-                                throw "Docker Compose build gagal pada batch [$BatchLabel] setelah registry retry karena error non-network. Periksa error build di atas."
+                                throw "Docker Compose build gagal karena error non-network. Periksa error build di atas."
                             }
                         }
 
                         if (-not $RegistryRetrySucceeded) {
-                            throw "Docker Compose build gagal pada batch [$BatchLabel] karena Docker registry/network tetap tidak tersedia setelah 3 retry bertahap. Periksa koneksi internet/Docker Hub lalu ulangi launcher."
+                            throw "Docker Compose build gagal karena Docker registry/network tetap tidak tersedia setelah 3 retry."
                         }
                     }
-                    elseif ((Test-DockerResourceFailure -OutputText $BatchBuildText) -and ($AdaptiveLimit -gt 1)) {
-                        # Resource exhaustion is different from a broken Dockerfile.
-                        # Do not restart Desktop; reduce concurrency and retry only
-                        # the same batch. This keeps the fast path fast while giving
-                        # smaller machines a deterministic safety valve.
+                    elseif ((Test-DockerResourceFailure -OutputText $BuildText) -and ($AdaptiveLimit -gt 1)) {
                         $ReducedLimit = [math]::Max(1, [math]::Floor($AdaptiveLimit / 2))
-                        Write-Warning "Build batch [$BatchLabel] terlihat kehabisan resource. Menurunkan paralelisme $AdaptiveLimit -> $ReducedLimit dan mengulang batch..."
+                        Write-Warning "Build full stack terlihat kehabisan resource. Menurunkan paralelisme $AdaptiveLimit -> $ReducedLimit dan mengulang..."
                         $AdaptiveLimit = $ReducedLimit
                         $env:COMPOSE_PARALLEL_LIMIT = $AdaptiveLimit.ToString()
 
-                        $RetryBatchArgs = @("build") + $Batch
-                        $RetryBatchProbe = Invoke-DockerNative -Arguments (@($ComposeArgs) + $RetryBatchArgs)
-                        $RetryBatchProbe.Output | ForEach-Object { Write-Output $_ }
-
-                        if ($RetryBatchProbe.ExitCode -ne 0) {
-                            $RetryText = ($RetryBatchProbe.Output -join [Environment]::NewLine)
+                        $RetryBuildProbe = Invoke-DockerNative -Arguments (@($ComposeArgs) + $BuildArgs)
+                        $RetryBuildProbe.Output | ForEach-Object { Write-Output $_ }
+                        if ($RetryBuildProbe.ExitCode -ne 0) {
+                            $RetryText = ($RetryBuildProbe.Output -join [Environment]::NewLine)
                             if ((Test-DockerResourceFailure -OutputText $RetryText) -and ($AdaptiveLimit -gt 1)) {
                                 $AdaptiveLimit = 1
                                 $env:COMPOSE_PARALLEL_LIMIT = "1"
-                                Write-Warning "Resource masih penuh; retry terakhir batch [$BatchLabel] dengan paralelisme 1..."
-                                $FinalRetryProbe = Invoke-DockerNative -Arguments (@($ComposeArgs) + $RetryBatchArgs)
+                                Write-Warning "Resource masih penuh; retry terakhir dengan paralelisme 1..."
+                                $FinalRetryProbe = Invoke-DockerNative -Arguments (@($ComposeArgs) + $BuildArgs)
                                 $FinalRetryProbe.Output | ForEach-Object { Write-Output $_ }
                                 if ($FinalRetryProbe.ExitCode -ne 0) {
-                                    throw "Docker Compose build gagal pada batch [$BatchLabel] setelah fallback resource-safe ke paralelisme 1."
+                                    throw "Docker Compose build gagal setelah fallback resource-safe ke paralelisme 1."
                                 }
                             }
                             else {
-                                throw "Docker Compose build gagal pada batch [$BatchLabel] setelah penurunan paralelisme. Periksa error build di atas."
+                                throw "Docker Compose build gagal setelah penurunan paralelisme."
                             }
-                        }
-                        else {
-                            Write-Host "Build batch completed after resource-safe fallback: $BatchLabel" -ForegroundColor Green
                         }
                     }
                     else {
-                        # A normal application/Dockerfile/package error should not
-                        # trigger a Docker Desktop restart or hide the real failure.
-                        throw "Docker Compose build gagal pada batch [$BatchLabel] (exit code $($BatchBuildProbe.ExitCode)). Periksa error build di atas."
+                        throw "Docker Compose build gagal (exit code $($BuildProbe.ExitCode)). Periksa error build di atas."
                     }
+
+                    Write-Host "Docker image build completed after fallback handling." -ForegroundColor Green
                 }
             }
             finally {
                 $env:COMPOSE_PARALLEL_LIMIT = $BuildOriginalParallelLimit
             }
-
-            Write-Host "Docker image build completed successfully for $($BuildTargets.Count) services." -ForegroundColor Green
         }
     }
 
@@ -759,8 +708,10 @@ try {
     $LocalAiRequested = $RequestedProfiles -contains "local-ai"
     $OllamaSelected = $LocalAiRequested -or ($Services.Count -eq 0) -or ($Services -contains "ollama")
     if ($Environment -eq "development" -and $LocalAiRequested -and $OllamaSelected) {
-        Write-Host "Starting Ollama readiness container before application startup..." -ForegroundColor Cyan
-        $OllamaUpArgs = @("up", "-d", "--remove-orphans", "--wait", "--wait-timeout", "180", "ollama")
+        Write-Host "Starting Ollama container for model provisioning..." -ForegroundColor Cyan
+        # Do not block on Ollama's healthcheck here. The model provisioner already
+        # retries until the API is reachable, avoiding a duplicated readiness wait.
+        $OllamaUpArgs = @("up", "-d", "--remove-orphans", "ollama")
         & docker @ComposeArgs @OllamaUpArgs
         if ($LASTEXITCODE -ne 0) {
             throw "Ollama container gagal siap sebelum Personal AI provisioning."
@@ -775,10 +726,12 @@ try {
 
     $UpArgs = @("up", "-d", "--remove-orphans", "--wait", "--wait-timeout", "420")
     if ($Build.IsPresent) {
-        # A freshly built image must never keep running behind a stale container
-        # health state. Volumes remain preserved; only service containers are recreated.
-        $UpArgs += "--force-recreate"
+        # Compose already detects changed image IDs and recreates only affected
+        # services. Avoid forcing every container to restart after a cached build.
         $UpArgs += "--no-build"
+    }
+    if ($ForceRecreate.IsPresent) {
+        $UpArgs += "--force-recreate"
     }
     if ($Services.Count -gt 0) {
         $UpArgs += $Services
