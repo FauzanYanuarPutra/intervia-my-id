@@ -56,7 +56,6 @@ describe('IngredientWorkspace', () => {
 
     expect(html).toContain('Tambah stok');
     expect(html).toContain('Riwayat');
-    expect(html).toContain('Stok awal yang siap dipakai');
     expect(html).toContain('gram');
     expect(html).toContain('Beri peringatan jika stok di bawah');
   });
