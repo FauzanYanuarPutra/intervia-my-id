@@ -45,7 +45,7 @@ async fn list(
 ) -> Response {
     let (_actor_id, authorization) = match actor_and_authorization(&state, &headers) {
         Ok(value) => value,
-        Err(response) => return response,
+        Err(code) => return api_error(StatusCode::UNAUTHORIZED, code),
     };
 
     let organization = match service(&state)
@@ -86,7 +86,7 @@ async fn create(
 ) -> Response {
     let (actor_id, authorization) = match actor_and_authorization(&state, &headers) {
         Ok(value) => value,
-        Err(response) => return response,
+        Err(code) => return api_error(StatusCode::UNAUTHORIZED, code),
     };
 
     let organization = match service(&state)
@@ -198,16 +198,15 @@ fn service(state: &AppState) -> BusinessService {
 fn actor_and_authorization(
     state: &AppState,
     headers: &HeaderMap,
-) -> Result<(Uuid, String), Response> {
-    let actor_id = user_id_from_auth(headers, &state.jwt_secret)
-        .ok_or_else(|| api_error(StatusCode::UNAUTHORIZED, "auth_required"))?;
+) -> Result<(Uuid, String), &'static str> {
+    let actor_id = user_id_from_auth(headers, &state.jwt_secret).ok_or("auth_required")?;
     let authorization = headers
         .get(header::AUTHORIZATION)
         .and_then(|value| value.to_str().ok())
         .map(str::trim)
         .filter(|value| value.starts_with("Bearer ") && value.len() > 7)
         .map(str::to_owned)
-        .ok_or_else(|| api_error(StatusCode::UNAUTHORIZED, "auth_required"))?;
+        .ok_or("auth_required")?;
     Ok((actor_id, authorization))
 }
 
