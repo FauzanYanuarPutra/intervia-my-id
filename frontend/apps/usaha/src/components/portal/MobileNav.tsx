@@ -84,7 +84,7 @@ export function MobileNav({ business, currentSection }: MobileNavProps) {
             aria-haspopup="dialog"
             aria-expanded={moreOpen}
             onClick={() => setMoreOpen(true)}
-            className={`flex min-h-[54px] flex-col items-center justify-center gap-1 rounded-xl px-1 text-[11px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-forest/20 ${
+            className={`flex min-h-[56px] min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[11px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-forest/20 ${
               more.some(item => item.id === currentSection)
                 ? 'bg-[#f1f4f2] text-portal-ink'
                 : 'text-portal-soft hover:bg-[#f5f7f4]'
