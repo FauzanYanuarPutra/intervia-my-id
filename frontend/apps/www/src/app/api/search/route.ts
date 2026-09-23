@@ -451,7 +451,7 @@ function isMarketplaceSearchContent(item: JsonRecord): boolean {
     metadata?.type,
   )
     .toLowerCase()
-    .replace(/[\\s-]+/g, '_');
+    .replace(/[\s-]+/g, '_');
 
   return !NON_MARKETPLACE_CONTENT_TYPES.has(contentType);
 }
