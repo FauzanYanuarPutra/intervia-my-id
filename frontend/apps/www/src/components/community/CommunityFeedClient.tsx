@@ -3502,14 +3502,15 @@ export function CommunityDetailModal({
       0,
     0,
   );
-  const rootMediaUrls = [
-    ...(thread?.imageUrls || []),
-    ...(rootPost?.imageUrls || []),
-  ]
-    .map(url => resolveCommunityMediaSrc(url))
-    .filter(
-      (url, index, source) => Boolean(url) && source.indexOf(url) === index,
-    );
+  const rootMediaUrls = normalizeCommunityMediaItems(
+    [
+      ...(rootPost?.imageUrls || []),
+      ...(thread?.imageUrls || []),
+    ],
+    thread?.title || '',
+  )
+    .map(item => item.src)
+    .slice(0, 12);
 
   const submitComment = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
