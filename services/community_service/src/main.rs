@@ -1196,7 +1196,6 @@ async fn main() -> anyhow::Result<()> {
     // Identity enrichment is best-effort and must not delay Community readiness.
     // Event consumers keep the projection fresh. Bulk HTTP reconciliation is an
     // explicit repair operation so every replica does not create a startup
-    // thundering herd against Identity.
     let startup_identity_reconcile = env::var("COMMUNITY_STARTUP_IDENTITY_RECONCILE_ENABLED")
         .ok()
         .map(|value| {
