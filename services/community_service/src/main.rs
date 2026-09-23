@@ -8180,9 +8180,14 @@ async fn build_reel_community_items(
             }],
             media: Some(CommunityFeedMedia {
                 media_type: row.media_type,
-                src: row.media_url,
+                src: row.media_url.clone(),
                 alt: row.title,
             }),
+            image_urls: if is_video_url(&row.media_url) {
+                Vec::new()
+            } else {
+                vec![row.media_url.clone()]
+            },
             stats: CommunityFeedStats {
                 reactions: row.likes_count.min(i32::MAX as i64) as i32,
                 comments: row.comments_count.min(i32::MAX as i64) as i32,
