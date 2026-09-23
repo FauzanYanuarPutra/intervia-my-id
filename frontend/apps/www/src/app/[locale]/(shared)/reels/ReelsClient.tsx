@@ -3767,7 +3767,6 @@
           reel={reel}
           actionState={actionState}
           muted={muted}
-          soundUnlocked={soundUnlocked}
           onToggleSound={onToggleSound}
           onOpenComments={onOpenComments}
           onOpenShare={onOpenShare}
@@ -3937,7 +3936,6 @@
     reel,
     actionState,
     muted,
-    soundUnlocked,
     onToggleSound,
     onOpenComments,
     onOpenShare,
@@ -3948,7 +3946,6 @@
     reel: LajukanReel;
     actionState: ReelActionState;
     muted: boolean;
-    soundUnlocked: boolean;
     onToggleSound: () => void;
     onOpenComments: () => void;
     onOpenShare: () => void;
