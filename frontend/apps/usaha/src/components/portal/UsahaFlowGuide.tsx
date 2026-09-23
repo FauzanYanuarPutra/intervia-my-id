@@ -109,30 +109,40 @@ function stepsFor(business: BusinessRecord, section: PortalSection): GuideStep[]
 export function UsahaFlowGuide({ business, currentSection }: UsahaFlowGuideProps) {
   const steps = stepsFor(business, currentSection);
 
+  const expandedByDefault = currentSection === 'home';
+
   return (
-    <section className="merchant-surface-bordered overflow-hidden" aria-label="Alur kerja usaha">
-      <div className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+    <details
+      className="merchant-surface-bordered overflow-hidden group"
+      aria-label="Alur kerja usaha"
+      open={expandedByDefault}
+    >
+      <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 sm:px-5 [&::-webkit-details-marker]:hidden">
         <div className="min-w-0">
           <p className="text-[10px] font-black uppercase tracking-[.12em] text-portal-forest">Cara kerja</p>
-          <p className="mt-0.5 text-sm font-black text-portal-ink">Kerjakan dari kiri ke kanan. Detail bisa belakangan.</p>
+          <p className="mt-0.5 truncate text-sm font-black text-portal-ink">3 langkah untuk halaman ini</p>
         </div>
-        <p className="text-xs font-semibold text-portal-soft">3 langkah inti</p>
-      </div>
+        <span className="shrink-0 text-xs font-bold text-portal-forest group-open:hidden">Buka</span>
+        <span className="hidden shrink-0 text-xs font-bold text-portal-soft group-open:inline">Tutup</span>
+      </summary>
 
       <div className="border-t border-portal-line/70 px-3 py-2 sm:px-4">
+        <p className="px-1 pb-2 text-[11px] leading-5 text-portal-soft">
+          Kerjakan dari kiri ke kanan. Detail bisa dibuka saat datanya sudah siap.
+        </p>
         <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {steps.map((step, index) => (
             <Link
               key={step.id}
               href={step.href ?? '#'}
-              className="group min-w-[205px] flex-1 rounded-xl border border-portal-line/70 bg-white px-3 py-2.5 transition hover:border-portal-forest/25 hover:bg-portal-mist/40"
+              className="group min-w-[190px] flex-1 rounded-xl border border-portal-line/70 bg-white px-3 py-2.5 transition hover:border-portal-forest/25 hover:bg-portal-mist/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-forest/20"
             >
               <div className="flex items-start gap-2">
                 <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-portal-mist text-[10px] font-black text-portal-forest">
                   {index + 1}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-black text-portal-ink">{step.label}</p>
+                  <p className="truncate text-xs font-black text-portal-ink">{step.label}</p>
                   <p className="mt-0.5 text-[11px] leading-4 text-portal-soft">{step.hint}</p>
                 </div>
                 <ArrowRight className="mt-1 h-3.5 w-3.5 shrink-0 text-portal-soft transition group-hover:translate-x-0.5 group-hover:text-portal-forest" />
@@ -141,6 +151,6 @@ export function UsahaFlowGuide({ business, currentSection }: UsahaFlowGuideProps
           ))}
         </div>
       </div>
-    </section>
+    </details>
   );
 }
