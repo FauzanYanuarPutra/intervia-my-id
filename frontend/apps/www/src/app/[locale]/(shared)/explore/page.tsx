@@ -9,6 +9,7 @@ import {
 } from '@/lib/discovery/lajukanCategories';
 import { serializeJsonLd } from '@/lib/seo/jsonLd';
 import { firstParam, hasExploreResultState, retainedCategorySearch, type ExploreSearchParams } from '@/lib/search/searchState';
+import { normalizeExploreHubIntent } from '@/lib/discovery/exploreHubRoutes';
 
 type PageProps = {
   params: Promise<{ locale: string }>;
@@ -27,6 +28,16 @@ function exploreMetadataCopy(
   const query = firstParam(searchParams.q);
   const tab = firstParam(searchParams.tab);
   const side = firstParam(searchParams.side);
+  const intent = firstParam(searchParams.intent);
+
+  if (intent === 'demand') {
+    return {
+      title: isId ? 'Temukan Calon Pembeli | Lajukan' : 'Find Potential Buyers | Lajukan',
+      description: isId
+        ? 'Temukan kebutuhan pembeli berdasarkan kategori, produk, jasa, dan lokasi.'
+        : 'Find buyer needs by category, product, service, and location.',
+    };
+  }
 
   if (tab === 'references') {
     return {
@@ -258,6 +269,10 @@ export default async function ExplorePage({
       resolvedSearchParams,
     );
 
+  const hubIntent = normalizeExploreHubIntent(
+    firstParam(resolvedSearchParams.intent),
+  );
+
   const isId = locale === 'id';
 
   /**
@@ -275,8 +290,8 @@ export default async function ExplorePage({
       : 'Explore Lajukan',
 
     description: isId
-      ? 'Pusat penemuan produk, jasa, kebutuhan, komunitas, video, dan referensi usaha di Lajukan.'
-      : 'Discovery hub for products, services, needs, communities, videos, news, and business references on Lajukan.',
+      ? 'Pusat penemuan produk, jasa, kebutuhan, komunitas, video, orang, dan referensi usaha di Lajukan.'
+      : 'Discovery hub for products, services, needs, communities, videos, people, and business references on Lajukan.',
 
     url:
       `https://www.lajukan.com/${locale}/explore`,
@@ -336,6 +351,7 @@ export default async function ExplorePage({
       ) : (
         <ExploreHubPage
           locale={locale}
+          initialIntent={hubIntent}
         />
       )}
     </>
