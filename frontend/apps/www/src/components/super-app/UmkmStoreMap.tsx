@@ -70,8 +70,9 @@ type UmkmStoreMapProps = {
   routeToStoreId?: string | null;
   showRoute?: boolean;
   onRouteResolved?: (route: UmkmMapRouteSummary) => void;
-  focusMode?: 'stores' | 'viewer' | 'route' | 'selected';
+  focusMode?: 'stores' | 'viewer' | 'route' | 'selected' | 'indonesia';
   focusNonce?: number;
+  controls?: boolean;
   focusOffset?: UmkmMapFocusOffset;
   onBoundsChange?: (bounds: UmkmMapBounds) => void;
 };
