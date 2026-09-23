@@ -8,8 +8,8 @@ export type PortalNavigationItem = {
 
 const labels: Record<PortalSection, string> = {
   home: 'Beranda',
-  orders: 'Jualan',
-  products: 'Produk',
+  orders: 'Jual',
+  products: 'Barang',
   inventory: 'Stok',
   finance: 'Uang',
   reports: 'Laporan',
