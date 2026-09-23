@@ -2311,12 +2311,8 @@ export function CommunityPostCard({
         };
         if (!active || !response.ok) return;
         setSaved(Boolean(payload.bookmarked));
-        setSaveCount(
-          Math.max(
-            0,
-            readPositiveInteger(payload.bookmarkCount),
-          ),
-        );
+        const bookmarkCount = Number(payload.bookmarkCount);
+        setSaveCount(Number.isFinite(bookmarkCount) ? Math.max(0, bookmarkCount) : 0);
       } catch {
         // Bookmark state is best-effort and can be retried by the user.
       }
