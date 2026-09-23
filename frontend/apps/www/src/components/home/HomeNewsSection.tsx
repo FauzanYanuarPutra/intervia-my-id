@@ -18,7 +18,7 @@ export function HomeNewsSection({
 
   return (
     <section
-      className="w-full overflow-hidden rounded-[24px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] py-3.5 shadow-[0_16px_34px_-30px_rgba(15,23,42,0.22)]"
+      className="w-full min-w-0 overflow-hidden rounded-[24px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] py-3.5 shadow-[0_16px_34px_-30px_rgba(15,23,42,0.22)]"
       aria-labelledby="home-news-title"
       data-testid="home-news-section"
     >
@@ -55,7 +55,7 @@ export function HomeNewsSection({
 
       {visibleItems.length ? (
         <>
-          <div className="mt-3 grid gap-3 px-3 md:grid-cols-[minmax(0,1.08fr)_minmax(260px,0.92fr)] sm:px-4 md:px-5">
+          <div className="mt-3 hidden min-w-0 gap-3 px-3 sm:px-4 lg:grid lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)] lg:px-5">
             <NewsCard
               article={visibleItems[0]}
               locale={locale}
@@ -74,7 +74,7 @@ export function HomeNewsSection({
             </div>
           </div>
 
-          <div className="mt-3 grid gap-2.5 px-3 md:hidden sm:px-4">
+          <div className="mt-3 grid min-w-0 gap-2.5 px-3 sm:px-4 lg:hidden">
             {visibleItems.slice(0, 1).map(item => (
               <NewsCard
                 key={item.id}
