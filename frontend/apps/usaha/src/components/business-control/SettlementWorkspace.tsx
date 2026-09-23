@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from 'react';
 import { CheckCircle2, Loader2, Save, TriangleAlert } from 'lucide-react';
 import { ChoiceChips } from '@/components/interaction/ChoiceChips';
 import { RupiahInput } from '@/components/forms/RupiahInput';
+import { MoneyValue } from '@/components/portal/MoneyValue';
 import { FeedbackNotice, type FeedbackTone } from '@/components/interaction/FeedbackNotice';
 import { resolveIdempotencyAttempt, type ClientIdempotencyAttempt } from '@/lib/client-idempotency';
 import { businessApiErrorMessage } from '@/lib/business-api-error';
@@ -203,9 +204,9 @@ export function SettlementWorkspace({ businessId, initialSettlements, initialCha
           </label>
         </div>
         <div className="grid gap-3 border-t border-portal-line bg-[#fafbf9] p-4 sm:grid-cols-3 sm:p-5">
-          <div><p className="portal-label">Seharusnya diterima</p><p className="mt-1 text-xl font-bold text-portal-ink">{preview ? money.format(preview.expectedTransfer) : '—'}</p></div>
-          <div><p className="portal-label">Transfer aktual</p><p className="mt-1 text-xl font-bold text-portal-ink">{money.format(actualTransfer)}</p></div>
-          <div><p className="portal-label">Selisih</p><p className={`mt-1 text-xl font-bold ${preview?.difference === 0 ? 'text-portal-forest' : 'text-amber-700'}`}>{preview ? money.format(preview.difference) : 'Periksa angka'}</p></div>
+          <div><p className="portal-label">Seharusnya diterima</p><p className="mt-1 text-xl"><MoneyValue value={preview ? preview.expectedTransfer : null} /></p></div>
+          <div><p className="portal-label">Transfer aktual</p><p className="mt-1 text-xl"><MoneyValue value={actualTransfer} /></p></div>
+          <div><p className="portal-label">Selisih</p><p className="mt-1 text-xl"><MoneyValue value={preview ? preview.difference : null} /></p></div>
         </div>
         <div className="flex flex-col gap-3 border-t border-portal-line p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
           <div className="text-xs leading-5 text-portal-soft">{preview?.status === 'matched' ? 'Angka cocok.' : preview ? 'Ada selisih. Simpan agar bisa ditindaklanjuti.' : 'Total potongan melebihi omzet kotor.'}</div>
