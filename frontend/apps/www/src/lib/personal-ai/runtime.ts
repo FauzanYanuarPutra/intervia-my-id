@@ -705,9 +705,8 @@ async function callAiService(input: {
         max_tokens: PERSONAL_AI_MAX_OUTPUT_TOKENS,
         response_mode: 'text',
         use_rag: PERSONAL_AI_USE_RAG,
-      }),
       signal: AbortSignal.timeout(INTERNAL_AI_TIMEOUT_MS),
-    );
+    });
 
   try {
     response = await request();
