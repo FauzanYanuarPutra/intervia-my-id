@@ -3533,6 +3533,10 @@ export function CommunityDetailModal({
   const [comment, setComment] = useState('');
   const [replyTarget, setReplyTarget] = useState<ForumPostDetail | null>(null);
   const [saving, setSaving] = useState(false);
+  const [voteSaving, setVoteSaving] = useState(false);
+  const [threadSaved, setThreadSaved] = useState(false);
+  const [threadSaveCount, setThreadSaveCount] = useState(0);
+  const [bookmarkSaving, setBookmarkSaving] = useState(false);
   const [solutionSavingId, setSolutionSavingId] = useState<string | null>(null);
   const trackedThreadViewRef = useRef<string | null>(null);
   const commentInputRef = useRef<HTMLInputElement>(null);
@@ -3593,6 +3597,39 @@ export function CommunityDetailModal({
       alive = false;
     };
   }, [threadId]);
+
+  useEffect(() => {
+    if (!thread?.id) {
+      setThreadSaved(false);
+      setThreadSaveCount(0);
+      return;
+    }
+
+    let active = true;
+    const loadBookmark = async () => {
+      try {
+        const response = await authFetch(
+          `/api/forum/threads/${encodeURIComponent(thread.id)}/bookmark`,
+          { cache: 'no-store', headers: { Accept: 'application/json' } },
+        );
+        const payload = (await response.json().catch(() => ({}))) as {
+          bookmarked?: unknown;
+          bookmarkCount?: unknown;
+        };
+        if (!active || !response.ok) return;
+        setThreadSaved(Boolean(payload.bookmarked));
+        const count = Number(payload.bookmarkCount);
+        setThreadSaveCount(Number.isFinite(count) ? Math.max(0, count) : 0);
+      } catch {
+        // Best effort.
+      }
+    };
+
+    void loadBookmark();
+    return () => {
+      active = false;
+    };
+  }, [authFetch, thread?.id]);
 
   useEffect(() => {
     if (!thread?.id || !thread.author?.id || !isAuthenticated) return;
@@ -3767,34 +3804,45 @@ export function CommunityDetailModal({
   };
 
   const voteThread = async () => {
-    if (!isAuthenticated) {
-      router.push(loginHref);
+    if (!isAuthenticated || !thread || voteSaving) {
+      if (!isAuthenticated) router.push(loginHref);
       return;
     }
 
-    const response = await authFetch(
-      `/api/forum/threads/${encodeURIComponent(threadId)}/vote`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ value: 1 }),
-      },
-    );
-    const payload = await response.json().catch(() => ({}));
-    if (response.ok && payload.thread) {
+    const nextVote = thread.viewerVote === 1 ? 0 : 1;
+    setVoteSaving(true);
+    try {
+      const response = await authFetch(
+        `/api/forum/threads/${encodeURIComponent(threadId)}/vote`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ value: nextVote }),
+        },
+      );
+      const payload = (await response.json().catch(() => ({}))) as {
+        thread?: ForumThreadDetail;
+        error?: string;
+      };
+
+      if (!response.ok || !payload.thread) {
+        throw new Error(payload.error || 'Gagal mengubah suka');
+      }
+
       setThread(payload.thread);
+
       const actorId = String(user?.id || '').trim();
-      const targetUserId = String(thread?.author?.id || '').trim();
-      if (actorId && targetUserId && actorId !== targetUserId) {
+      const targetUserId = String(payload.thread.author?.id || '').trim();
+      if (nextVote === 1 && actorId && targetUserId && actorId !== targetUserId) {
         void trackLajukanEvent('content.liked', {
           entityType: 'content',
           entityId: threadId,
           page: `/community?thread=${encodeURIComponent(threadId)}`,
           properties: {
-            entity_label: thread?.title || '',
+            entity_label: payload.thread.title || '',
             target_user_id: targetUserId,
-            target_username: thread?.author?.name || '',
-            target_name: thread?.author?.name || '',
+            target_username: payload.thread.author?.name || '',
+            target_name: payload.thread.author?.name || '',
             target_href: `/community?thread=${encodeURIComponent(threadId)}`,
             actor_user_id: actorId,
             actor_username: String(user?.username || '').trim(),
@@ -3812,6 +3860,62 @@ export function CommunityDetailModal({
         });
       }
       onChanged();
+    } catch (error) {
+      notify({
+        title: isId ? 'Suka gagal' : 'Like failed',
+        description: error instanceof Error ? error.message : undefined,
+        variant: 'error',
+      });
+    } finally {
+      setVoteSaving(false);
+    }
+  };
+
+  const toggleThreadBookmark = async () => {
+    if (!isAuthenticated || !thread || bookmarkSaving) {
+      if (!isAuthenticated) router.push(loginHref);
+      return;
+    }
+
+    const previousSaved = threadSaved;
+    const previousCount = threadSaveCount;
+    const nextSaved = !previousSaved;
+    setBookmarkSaving(true);
+    setThreadSaved(nextSaved);
+    setThreadSaveCount(Math.max(0, previousCount + (nextSaved ? 1 : -1)));
+
+    try {
+      const response = await authFetch(
+        `/api/forum/threads/${encodeURIComponent(threadId)}/bookmark`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ active: nextSaved }),
+        },
+      );
+      const payload = (await response.json().catch(() => ({}))) as {
+        bookmarked?: unknown;
+        bookmarkCount?: unknown;
+        error?: string;
+      };
+      if (!response.ok) {
+        throw new Error(payload.error || 'Gagal menyimpan postingan');
+      }
+
+      setThreadSaved(Boolean(payload.bookmarked));
+      const count = Number(payload.bookmarkCount);
+      setThreadSaveCount(Number.isFinite(count) ? Math.max(0, count) : 0);
+      onChanged();
+    } catch (error) {
+      setThreadSaved(previousSaved);
+      setThreadSaveCount(previousCount);
+      notify({
+        title: isId ? 'Simpan gagal' : 'Save failed',
+        description: error instanceof Error ? error.message : undefined,
+        variant: 'error',
+      });
+    } finally {
+      setBookmarkSaving(false);
     }
   };
 
@@ -4077,12 +4181,14 @@ export function CommunityDetailModal({
                     </span>
                   ))}
                 </div>
-                <div className="mt-4 grid grid-cols-3 border-y border-[color:var(--app-border)] py-1 text-xs font-semibold text-[color:var(--app-text-soft)]">
+                <div className="mt-4 grid grid-cols-4 border-y border-[color:var(--app-border)] py-1 text-xs font-semibold text-[color:var(--app-text-soft)]">
                   {/* LIKE */}
                   <button
                     type="button"
                     onClick={() => void voteThread()}
+                    disabled={voteSaving}
                     aria-pressed={thread.viewerVote === 1}
+                    aria-busy={voteSaving}
                     aria-label={
                       thread.viewerVote === 1
                         ? isId
@@ -4145,6 +4251,38 @@ export function CommunityDetailModal({
                     {comments.length > 0 ? (
                       <span className="tabular-nums">
                         {compactNumber(comments.length)}
+                      </span>
+                    ) : null}
+                  </button>
+
+                  {/* SAVE */}
+                  <button
+                    type="button"
+                    onClick={() => void toggleThreadBookmark()}
+                    disabled={bookmarkSaving}
+                    aria-pressed={threadSaved}
+                    aria-busy={bookmarkSaving}
+                    aria-label={
+                      threadSaved
+                        ? isId
+                          ? `Hapus simpanan, ${threadSaveCount} tersimpan`
+                          : `Remove save, ${threadSaveCount} saves`
+                        : isId
+                          ? `Simpan, ${threadSaveCount} tersimpan`
+                          : `Save, ${threadSaveCount} saves`
+                    }
+                    title={isId ? 'Simpan' : 'Save'}
+                    className={cn(
+                      'inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[12px] px-2 transition disabled:cursor-wait disabled:opacity-60',
+                      threadSaved
+                        ? 'bg-amber-50 text-amber-700'
+                        : 'hover:bg-slate-50 hover:text-[color:var(--app-accent)]',
+                    )}
+                  >
+                    <Bookmark className={cn('h-4 w-4 shrink-0', threadSaved && 'fill-current')} />
+                    {threadSaveCount > 0 ? (
+                      <span className="tabular-nums">
+                        {compactNumber(threadSaveCount)}
                       </span>
                     ) : null}
                   </button>
