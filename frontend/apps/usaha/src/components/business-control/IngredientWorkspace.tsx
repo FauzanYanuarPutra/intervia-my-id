@@ -626,7 +626,7 @@ export function IngredientWorkspace({
             <div className="text-xs font-semibold text-portal-soft">
               <span>Kategori</span>
               <div className="mt-1">
-                <ChoiceChips value={kind} onChange={setKind} ariaLabel="Kategori bahan" options={kindOptions} />
+                <ChoiceChips value={kind} onChange={setKind} ariaLabel="Kategori bahan" options={kindOptions} mode="modal" />
               </div>
             </div>
           </div>
@@ -652,57 +652,70 @@ export function IngredientWorkspace({
             </div>
           </div>
 
-          <div className="mt-3 rounded-xl border border-portal-line p-4">
-            <p className="text-sm font-bold text-portal-ink">Pemakaian</p>
-            <div className="mt-3 grid gap-4 sm:grid-cols-2">
-              <label className="text-xs font-semibold text-portal-soft">
-                Dipakai dalam resep sebagai
-                <input list="ingredient-common-units" value={recipeUnit} onChange={event => setRecipeUnit(event.target.value)} className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm text-portal-ink" />
-              </label>
-              <label className="text-xs font-semibold text-portal-soft">
-                Isi setiap {purchaseUnit || 'unit pembelian'}
-                <div className="mt-1 flex min-h-11 items-center gap-2 rounded-xl border border-portal-line px-3 text-sm">
-                  <span>1 {purchaseUnit || 'unit'} =</span>
-                  <input type="number" min="0.0001" step="any" value={conversionFactor} onChange={event => setConversionFactor(event.target.value)} className="min-w-0 flex-1 border-0 bg-transparent text-right font-bold text-portal-ink outline-none" />
-                  <span className="text-portal-soft">{recipeUnit || 'unit'}</span>
-                </div>
-              </label>
-            </div>
+          <details className="mt-3 overflow-hidden rounded-xl border border-portal-line">
+            <summary className="cursor-pointer list-none bg-white p-4">
+              <span className="text-sm font-bold text-portal-ink">Perhitungan resep & stok</span>
+              <span className="mt-1 block text-xs font-normal leading-5 text-portal-soft">
+                Buka hanya kalau satuan resep, susut bahan, stok awal, batas minimum, atau supplier perlu diatur.
+              </span>
+            </summary>
 
-            <div className="mt-4 rounded-xl bg-[#fafbf9] p-3">
-              <label className="flex cursor-pointer items-center justify-between gap-3 text-sm font-semibold text-portal-ink">
-                <span>Ada bagian yang biasanya tidak terpakai?</span>
-                <input type="checkbox" checked={hasLoss} onChange={event => {
-                  setHasLoss(event.target.checked);
-                  setYieldPercent(event.target.checked ? '90' : '100');
-                }} className="h-4 w-4" />
-              </label>
-              {hasLoss ? (
-                <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,220px)_1fr] sm:items-end">
-                  <label className="text-xs font-semibold text-portal-soft">Bagian yang dapat digunakan
-                    <div className="mt-1 flex min-h-11 items-center rounded-xl border border-portal-line bg-white px-3">
-                      <input type="number" min="1" max="100" step="any" value={yieldPercent} onChange={event => setYieldPercent(event.target.value)} className="min-w-0 flex-1 border-0 bg-transparent text-sm outline-none" />
-                      <span className="text-sm text-portal-soft">%</span>
-                    </div>
-                  </label>
-                  <p className="pb-2 text-xs text-portal-soft">Artinya sekitar <strong>{number.format(lossFromYield(yieldPercent))}%</strong> tidak terpakai. Lajukan memasukkan ini satu kali saja ke HPP.</p>
-                </div>
-              ) : <p className="mt-2 text-xs text-portal-soft">Seluruh jumlah dianggap dapat dipakai. Aktifkan jika ada kulit, biji, potongan, atau hasil bersih yang lebih sedikit.</p>}
-            </div>
-          </div>
+            <div className="border-t border-portal-line bg-[#fafbf9] p-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="text-xs font-semibold text-portal-soft">
+                  Dipakai dalam resep sebagai
+                  <input list="ingredient-common-units" value={recipeUnit} onChange={event => setRecipeUnit(event.target.value)} className="mt-1 min-h-11 w-full rounded-xl border border-portal-line bg-white px-3 text-sm text-portal-ink" />
+                </label>
+                <label className="text-xs font-semibold text-portal-soft">
+                  Isi setiap {purchaseUnit || 'unit pembelian'}
+                  <div className="mt-1 flex min-h-11 items-center gap-2 rounded-xl border border-portal-line bg-white px-3 text-sm">
+                    <span>1 {purchaseUnit || 'unit'} =</span>
+                    <input type="number" min="0.0001" step="any" value={conversionFactor} onChange={event => setConversionFactor(event.target.value)} className="min-w-0 flex-1 border-0 bg-transparent text-right font-bold text-portal-ink outline-none" />
+                    <span className="text-portal-soft">{recipeUnit || 'unit'}</span>
+                  </div>
+                </label>
+              </div>
 
-          <div className="mt-3 grid gap-4 rounded-xl border border-portal-line p-4 sm:grid-cols-3">
-            <label className="text-xs font-semibold text-portal-soft">Stok awal yang siap dipakai ({recipeUnit || 'unit'})
-              <input type="number" min="0" step="any" value={stockQuantity} onChange={event => setStockQuantity(event.target.value)} className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm text-portal-ink" />
-              <span className="mt-1 block font-normal">Masukkan dalam satuan pemakaian agar stok dan resep memakai angka yang sama.</span>
-            </label>
-            <label className="text-xs font-semibold text-portal-soft">Beri peringatan jika stok di bawah ({recipeUnit || 'unit'})
-              <input type="number" min="0" step="any" value={minimumStock} onChange={event => setMinimumStock(event.target.value)} className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm text-portal-ink" />
-            </label>
-            <label className="text-xs font-semibold text-portal-soft">Supplier <span className="font-normal">(opsional)</span>
-              <input value={supplier} onChange={event => setSupplier(event.target.value)} placeholder="Contoh: Pasar Induk" className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm text-portal-ink" />
-            </label>
-          </div>
+              <div className="mt-4 rounded-xl bg-white p-3">
+                <label className="flex cursor-pointer items-center justify-between gap-3 text-sm font-semibold text-portal-ink">
+                  <span>Ada bagian yang biasanya tidak terpakai?</span>
+                  <input type="checkbox" checked={hasLoss} onChange={event => {
+                    setHasLoss(event.target.checked);
+                    setYieldPercent(event.target.checked ? '90' : '100');
+                  }} className="h-4 w-4" />
+                </label>
+                {hasLoss ? (
+                  <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,220px)_1fr] sm:items-end">
+                    <label className="text-xs font-semibold text-portal-soft">Bagian yang dapat digunakan
+                      <div className="mt-1 flex min-h-11 items-center rounded-xl border border-portal-line bg-white px-3">
+                        <input type="number" min="1" max="100" step="any" value={yieldPercent} onChange={event => setYieldPercent(event.target.value)} className="min-w-0 flex-1 border-0 bg-transparent text-sm outline-none" />
+                        <span className="text-sm text-portal-soft">%</span>
+                      </div>
+                    </label>
+                    <p className="pb-2 text-xs text-portal-soft">Artinya sekitar <strong>{number.format(lossFromYield(yieldPercent))}%</strong> tidak terpakai. Lajukan memasukkan ini satu kali saja ke HPP.</p>
+                  </div>
+                ) : (
+                  <p className="mt-2 text-xs text-portal-soft">Seluruh jumlah dianggap dapat dipakai. Aktifkan jika ada kulit, biji, potongan, atau hasil bersih yang lebih sedikit.</p>
+                )}
+              </div>
+
+              <div className="mt-3 grid gap-4 rounded-xl border border-portal-line bg-white p-4 sm:grid-cols-3">
+                <label className="text-xs font-semibold text-portal-soft">
+                  Stok awal yang siap dipakai ({recipeUnit || 'unit'})
+                  <input type="number" min="0" step="any" value={stockQuantity} onChange={event => setStockQuantity(event.target.value)} className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm text-portal-ink" />
+                  <span className="mt-1 block font-normal">Masukkan dalam satuan pemakaian agar stok dan resep memakai angka yang sama.</span>
+                </label>
+                <label className="text-xs font-semibold text-portal-soft">
+                  Batas peringatan stok ({recipeUnit || 'unit'})
+                  <input type="number" min="0" step="any" value={minimumStock} onChange={event => setMinimumStock(event.target.value)} className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm text-portal-ink" />
+                </label>
+                <label className="text-xs font-semibold text-portal-soft">
+                  Supplier <span className="font-normal">(opsional)</span>
+                  <input value={supplier} onChange={event => setSupplier(event.target.value)} placeholder="Contoh: Pasar Induk" className="mt-1 min-h-11 w-full rounded-xl border border-portal-line bg-white px-3 text-sm text-portal-ink" />
+                </label>
+              </div>
+            </div>
+          </details>
 
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <button type="button" disabled={saving || !canManage} onClick={() => void save()} className="portal-button-primary min-h-11 disabled:opacity-60">
@@ -802,7 +815,7 @@ export function IngredientWorkspace({
                       <div className="mt-4 space-y-4">
                         <div className="grid gap-3 sm:grid-cols-2">
                           <label className="text-xs font-semibold text-portal-soft">Nama<input value={editDraft.name} onChange={event => setEditDraft(current => current ? { ...current, name: event.target.value } : current)} className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm" /></label>
-                          <div className="text-xs font-semibold text-portal-soft"><span>Kategori</span><div className="mt-1"><ChoiceChips value={editDraft.kind} onChange={value => setEditDraft(current => current ? { ...current, kind: value } : current)} ariaLabel="Kategori bahan" options={kindOptions} /></div></div>
+                          <div className="text-xs font-semibold text-portal-soft"><span>Kategori</span><div className="mt-1"><ChoiceChips value={editDraft.kind} onChange={value => setEditDraft(current => current ? { ...current, kind: value } : current)} ariaLabel="Kategori bahan" options={kindOptions} mode="modal" /></div></div>
                         </div>
                         <div className="rounded-xl border border-portal-line bg-white p-4">
                           <p className="text-xs font-bold text-portal-soft">Cara membeli</p>
@@ -846,9 +859,9 @@ export function IngredientWorkspace({
                     {activePanel.mode === 'stock' ? (
                       <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
                         <div className="grid gap-3 sm:grid-cols-2">
-                          <div className="text-xs font-semibold text-portal-soft"><span>Alasan perubahan</span><div className="mt-1"><ChoiceChips value={stockAction} onChange={setStockAction} ariaLabel="Alasan perubahan stok" options={stockActionOptions} /></div></div>
+                          <div className="text-xs font-semibold text-portal-soft"><span>Alasan perubahan</span><div className="mt-1"><ChoiceChips value={stockAction} onChange={setStockAction} ariaLabel="Alasan perubahan stok" options={stockActionOptions} mode="modal" /></div></div>
                           <label className="text-xs font-semibold text-portal-soft">Jumlah ({item.recipe_unit})<input type="number" min="0.000001" step="any" value={stockQuantityInput} onChange={event => setStockQuantityInput(event.target.value)} className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm" /></label>
-                          {stockAction === 'correction' ? <div className="text-xs font-semibold text-portal-soft"><span>Arah koreksi</span><div className="mt-1"><ChoiceChips value={correctionDirection} onChange={setCorrectionDirection} ariaLabel="Arah koreksi stok" options={correctionDirectionOptions} /></div></div> : null}
+                          {stockAction === 'correction' ? <div className="text-xs font-semibold text-portal-soft"><span>Arah koreksi</span><div className="mt-1"><ChoiceChips value={correctionDirection} onChange={setCorrectionDirection} ariaLabel="Arah koreksi stok" options={correctionDirectionOptions} mode="modal" /></div></div> : null}
                           <label className="text-xs font-semibold text-portal-soft sm:col-span-2">Catatan <span className="font-normal">(opsional)</span><input value={stockNote} onChange={event => setStockNote(event.target.value)} placeholder="Contoh: Belanja Pasar Induk" className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm" /></label>
                         </div>
                         <div className="rounded-xl border border-portal-line bg-white p-4">
