@@ -50,6 +50,7 @@ import {
   type GlobalSearchTab,
 } from '@/lib/search/globalSearch';
 import { exploreCategoryCopy } from '@/components/explore/ExploreCopy';
+import { Skeleton, SkeletonStack } from '@/components/ui/Skeleton';
 import { cn } from '@/lib/utils';
 
 function appendSearchParams(
@@ -167,29 +168,189 @@ function withResolvedSide(
   };
 }
 
-function SectionSkeleton() {
-  return (
-    <section
-      className="py-4 sm:py-5"
-      aria-hidden="true"
-    >
-      <div className="h-5 w-48 animate-pulse rounded bg-[color:var(--app-border)]" />
 
-      <div className="mt-4 w-full min-w-0 overflow-hidden">
-        <div className="flex gap-3">
-          {Array.from({ length: 5 }).map(
-            (_, index) => (
-              <div
-                key={index}
-                className="min-w-0 shrink-0 flex-[0_0_47%] sm:flex-[0_0_31%] lg:flex-[0_0_24%]"
-              >
-                <div className="h-48 animate-pulse rounded-2xl bg-[color:var(--app-border)]" />
-              </div>
-            ),
-          )}
+type CategorySkeletonKind =
+  | 'listing'
+  | 'business'
+  | 'need'
+  | 'community'
+  | 'video';
+
+function CategorySkeletonCard({
+  kind,
+}: {
+  kind: CategorySkeletonKind;
+}) {
+  if (kind === 'business') {
+    return (
+      <article className="flex min-h-[126px] overflow-hidden rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)]">
+        <Skeleton variant="block" className="h-[126px] w-[96px] shrink-0 rounded-none" />
+        <div className="flex min-w-0 flex-1 flex-col p-2.5">
+          <Skeleton variant="line" className="h-3 w-24" />
+          <Skeleton variant="line" className="mt-1 h-4 w-4/5" />
+          <Skeleton variant="line" className="mt-1 h-3 w-full" />
+          <Skeleton variant="line" className="mt-2 h-3 w-28" />
+          <Skeleton variant="line" className="mt-auto h-3 w-20 pt-2" />
         </div>
+      </article>
+    );
+  }
+
+  if (kind === 'need') {
+    return (
+      <article className="flex min-h-[164px] flex-col rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3">
+        <div className="flex items-center justify-between gap-2">
+          <Skeleton variant="line" className="h-3 w-28" />
+          <Skeleton variant="chip" className="h-6 w-20" />
+        </div>
+        <Skeleton variant="line" className="mt-2 h-4 w-4/5" />
+        <SkeletonStack lines={2} className="mt-2" />
+        <div className="mt-2 flex flex-wrap gap-1.5 border-t border-[color:var(--app-border)] pt-2">
+          <Skeleton variant="chip" className="h-7 w-20" />
+          <Skeleton variant="chip" className="h-7 w-24" />
+        </div>
+        <Skeleton variant="line" className="mt-auto h-3 w-20 pt-2" />
+      </article>
+    );
+  }
+
+  if (kind === 'video') {
+    return (
+      <article className="h-full overflow-hidden rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)]">
+        <Skeleton variant="block" className="aspect-[9/12] w-full rounded-none" />
+        <div className="p-2.5">
+          <Skeleton variant="line" className="h-4 w-4/5" />
+          <div className="mt-1.5 flex items-center justify-between gap-2">
+            <Skeleton variant="line" className="h-3 w-20" />
+            <Skeleton variant="line" className="h-3 w-10" />
+          </div>
+        </div>
+      </article>
+    );
+  }
+
+  if (kind === 'community') {
+    return (
+      <article className="h-full overflow-hidden rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)]">
+        <Skeleton variant="block" className="aspect-[3/1] w-full rounded-none" />
+        <div className="p-2.5">
+          <Skeleton variant="line" className="mb-1 h-3 w-24" />
+          <Skeleton variant="line" className="h-4 w-4/5" />
+          <Skeleton variant="line" className="mt-1 h-3 w-full" />
+          <div className="mt-2 flex items-center gap-3">
+            <Skeleton variant="line" className="h-3 w-12" />
+            <Skeleton variant="line" className="h-3 w-10" />
+          </div>
+        </div>
+      </article>
+    );
+  }
+
+  return (
+    <article className="flex h-full flex-col overflow-hidden rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)]">
+      <div className="relative">
+        <Skeleton
+          variant="block"
+          className="aspect-[4/3] w-full rounded-none sm:aspect-[16/10]"
+        />
+        <Skeleton variant="chip" className="absolute left-2 top-2 h-7 w-24" />
       </div>
-    </section>
+      <div className="flex flex-1 min-w-0 flex-col p-2.5 sm:p-3">
+        <Skeleton variant="line" className="h-3 w-24" />
+        <Skeleton variant="line" className="mt-1.5 h-4 w-4/5" />
+        <Skeleton variant="line" className="mt-1.5 h-4 w-24" />
+        <div className="mt-2 min-h-9 space-y-1">
+          <Skeleton variant="line" className="h-3 w-28" />
+          <Skeleton variant="line" className="h-3 w-24" />
+        </div>
+        <Skeleton variant="line" className="mt-auto h-3 w-20 pt-2" />
+      </div>
+    </article>
+  );
+}
+
+function SectionSkeleton({
+  category,
+}: {
+  category: LajukanExploreCategory;
+}) {
+  const configs: Array<{
+    kind: CategorySkeletonKind;
+    title: string;
+    count: number;
+  }> = [];
+
+  for (const section of category.sections) {
+    if (section.key === 'guides' || section.key === 'faq') continue;
+    if (section.key === 'latest-needs') {
+      configs.push({
+        kind: 'need',
+        title: section.titleId,
+        count: 3,
+      });
+      continue;
+    }
+    if (section.key === 'featured-providers') {
+      configs.push({
+        kind: 'business',
+        title: section.titleId,
+        count: 3,
+      });
+      continue;
+    }
+    if (section.key === 'latest-listings') {
+      configs.push({
+        kind:
+          category.id === 'video'
+            ? 'video'
+            : category.id === 'community'
+              ? 'community'
+              : 'listing',
+        title: section.titleId,
+        count: category.id === 'video' ? 8 : 6,
+      });
+    }
+  }
+
+  const visibleConfigs =
+    configs.length > 0
+      ? configs.slice(0, 3)
+      : [{ kind: 'listing' as const, title: 'Hasil', count: 6 }];
+
+  return (
+    <div aria-hidden="true" data-skeleton-route="explore-category">
+      {visibleConfigs.map((config, sectionIndex) => {
+        const gridClass =
+          config.kind === 'video'
+            ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4'
+            : config.kind === 'listing'
+              ? 'grid-cols-2 md:grid-cols-3 xl:grid-cols-4'
+              : 'sm:grid-cols-2 lg:grid-cols-3';
+
+        return (
+          <section
+            key={config.title + '-' + sectionIndex}
+            className="mt-3 rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 sm:p-4"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <Skeleton variant="line" className="h-4 w-36" />
+                <Skeleton variant="line" className="mt-1 h-3 w-48" />
+              </div>
+              <Skeleton variant="chip" className="h-8 w-20 shrink-0" />
+            </div>
+            <div className={cn('mt-2.5 grid gap-3', gridClass)}>
+              {Array.from({ length: config.count }).map((_, index) => (
+                <CategorySkeletonCard
+                  key={config.kind + '-' + index}
+                  kind={config.kind}
+                />
+              ))}
+            </div>
+          </section>
+        );
+      })}
+    </div>
   );
 }
 
@@ -1982,7 +2143,7 @@ export function ExploreCategoryClient({
         {!isFilteredSearchMode &&
         loading &&
         !payload ? (
-          <SectionSkeleton />
+          <SectionSkeleton category={category} />
         ) : null}
 
         {!isFilteredSearchMode &&
