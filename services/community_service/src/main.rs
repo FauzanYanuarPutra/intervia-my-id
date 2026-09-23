@@ -1192,6 +1192,7 @@ async fn main() -> anyhow::Result<()> {
     let db = connect_database_pool(&database_url, DatabasePoolPurpose::Application).await?;
 
     schema_contract::verify_schema_contract(&db).await?;
+    // Identity enrichment is best-effort and must not delay Community readiness.
 
     let startup_identity_reconcile = env::var("COMMUNITY_STARTUP_IDENTITY_RECONCILE_ENABLED")
         .ok()
@@ -1261,9 +1262,6 @@ async fn main() -> anyhow::Result<()> {
     } else {
         cors = cors.allow_origin([
             "http://localhost:3000".parse::<HeaderValue>()?,
-            "http://localhost:3001".parse::<HeaderValue>()?,
-            "http://localhost:3002".parse::<HeaderValue>()?,
-            "http://localhost:3003".parse::<HeaderValue>()?,
         ]);
     }
 
