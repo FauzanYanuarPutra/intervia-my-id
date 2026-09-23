@@ -11,6 +11,19 @@ INSERT INTO business_permissions (permission_key, description) VALUES
   ('work.manage', 'Create, assign, prioritize and manage operational work')
 ON CONFLICT (permission_key) DO NOTHING;
 
+-- Keep the timestamp trigger dependency self-contained and idempotent.
+-- This migration is the first consumer of public.update_timestamp() in the
+-- current marketplace migration chain, so define it before creating the trigger.
+CREATE OR REPLACE FUNCTION public.update_timestamp()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$;
+
 CREATE TABLE business_work_items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id UUID NOT NULL,
