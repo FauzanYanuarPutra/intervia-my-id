@@ -126,28 +126,41 @@ export default async function BusinessProductsPage({ params, searchParams }: Pag
             <section className="merchant-list border border-portal-line/80">
               {visibleProducts.length ? visibleProducts.map(product => {
                 const selected = product.id === selectedProduct?.id;
-                return (
-                  <article key={product.id} className={`border-b border-portal-line/70 last:border-b-0 ${selected ? 'bg-portal-mist/60' : ''}`}>
-                    <div className="flex items-center gap-3 px-3 py-3 sm:px-4">
-                      <ProductThumb name={product.name} imageUrl={product.imageUrl} size="lg" />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h2 className="truncate text-sm font-black text-portal-ink sm:text-[15px]">{product.name}</h2>
-                          {product.status !== 'live' ? <StatusBadge tone="neutral">Diarsipkan</StatusBadge> : null}
-                        </div>
-                        <p className="mt-0.5 text-[11px] text-portal-soft">{product.category}</p>
-                        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-                          <strong className="text-sm text-portal-ink">{product.priceLabel || 'Belum ada harga'}</strong>
-                          <span className="text-xs text-portal-soft">{product.stockLabel} {product.stockUnit ?? ''}</span>
-                          <StatusBadge tone={stockTone(product.stockHealth)}>{stockLabel(product.stockHealth)}</StatusBadge>
-                        </div>
+                const row = (
+                  <div className="flex items-center gap-3 px-3 py-3 sm:px-4">
+                    <ProductThumb name={product.name} imageUrl={product.imageUrl} size="lg" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h2 className="truncate text-sm font-black text-portal-ink sm:text-[15px]">{product.name}</h2>
+                        {product.status !== 'live' ? <StatusBadge tone="neutral">Diarsipkan</StatusBadge> : null}
                       </div>
-                      {canManage ? (
-                        <Link href={productsHref({ edit: product.id })} className={selected ? 'merchant-chip merchant-chip-active' : 'portal-button-ghost'}>
-                          {selected ? 'Dipilih' : 'Kelola'}
-                        </Link>
-                      ) : null}
+                      <p className="mt-0.5 text-[11px] text-portal-soft">{product.category}</p>
+                      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <strong className="text-sm text-portal-ink">{product.priceLabel || 'Belum ada harga'}</strong>
+                        <span className="text-xs text-portal-soft">{product.stockLabel} {product.stockUnit ?? ''}</span>
+                        <StatusBadge tone={stockTone(product.stockHealth)}>{stockLabel(product.stockHealth)}</StatusBadge>
+                      </div>
                     </div>
+                    {canManage ? (
+                      <span className={selected ? 'merchant-chip merchant-chip-active' : 'portal-button-ghost'}>
+                        {selected ? 'Dipilih' : 'Kelola'}
+                      </span>
+                    ) : null}
+                  </div>
+                );
+
+                return canManage ? (
+                  <Link
+                    key={product.id}
+                    href={productsHref({ edit: product.id })}
+                    aria-label={`Kelola produk ${product.name}`}
+                    className={`block border-b border-portal-line/70 last:border-b-0 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-portal-forest/25 hover:bg-portal-mist/30 ${selected ? 'bg-portal-mist/60' : ''}`}
+                  >
+                    {row}
+                  </Link>
+                ) : (
+                  <article key={product.id} className="border-b border-portal-line/70 last:border-b-0">
+                    {row}
                   </article>
                 );
               }) : (
