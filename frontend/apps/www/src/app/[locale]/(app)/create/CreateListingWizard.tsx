@@ -4983,7 +4983,6 @@ export default function CreateListingWizard({
         intent,
         router,
         saveServerDraft,
-        validateStep,
         values,
         subcategorySlug,
       ],
