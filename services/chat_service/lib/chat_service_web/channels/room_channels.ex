@@ -63,8 +63,8 @@ defmodule ChatServiceWeb.RoomChannel do
   # --- MESSAGE HANDLER ---
   @impl true
   def handle_in("send_message", payload, socket) when is_map(payload) do
-    {body, ref, message_type, attachments} = extract_message_payload(payload)
-    process_send_message(body, ref, message_type, attachments, socket)
+    {body, ref, message_type, attachments, reference} = extract_message_payload(payload)
+    process_send_message(body, ref, message_type, attachments, reference, socket)
   end
 
   # Backward-compatible alias used by older WWW clients.
@@ -472,7 +472,7 @@ defmodule ChatServiceWeb.RoomChannel do
   defp safe_call_error(:invalid_call_payload), do: "invalid_call_payload"
   defp safe_call_error(_reason), do: "invalid_call_request"
 
-  defp process_send_message(body, ref, message_type, attachments, socket) do
+  defp process_send_message(body, ref, message_type, attachments, reference, socket) do
     normalized_type = normalize_message_type(message_type)
 
     with {:ok, normalized_attachments} <-
@@ -494,7 +494,8 @@ defmodule ChatServiceWeb.RoomChannel do
         client_ref: ref,
         content: clean_body,
         message_type: normalized_type,
-        attachments: normalized_attachments
+        attachments: normalized_attachments,
+        reference: reference
       }
 
       case MessagePersistence.persist(persistence_attrs) do
@@ -518,6 +519,7 @@ defmodule ChatServiceWeb.RoomChannel do
             content: message.content,
             message_type: message.message_type,
             attachments: message.attachments,
+            reference: message.reference,
             sent_at: message.sent_at,
             is_scam: scan_result == :warn,
             deduplicated: status == :duplicate
@@ -663,7 +665,15 @@ defmodule ChatServiceWeb.RoomChannel do
     message_type = Map.get(payload, "message_type") || Map.get(payload, "type") || "text"
     attachments = Map.get(payload, "attachments") || []
 
-    {body, ref, message_type, attachments}
+    reference =
+      Map.get(payload, "reply_to") ||
+        Map.get(payload, "reference") ||
+        if(Map.get(payload, "reply_to_message_id"), do: %{
+          "message_id" => Map.get(payload, "reply_to_message_id"),
+          "mode" => Map.get(payload, "reply_mode") || "reply"
+        }, else: nil)
+
+    {body, ref, message_type, attachments, reference}
   end
 
   defp normalize_message_type(type) when is_binary(type) do
