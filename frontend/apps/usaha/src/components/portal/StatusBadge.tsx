@@ -9,12 +9,12 @@ type StatusBadgeProps = {
 
 const toneClass: Record<Tone, string> = {
   neutral: 'border-portal-line bg-white text-portal-ink',
-  success: 'border-emerald-200 bg-emerald-50 text-emerald-800',
-  warning: 'border-amber-200 bg-amber-50 text-amber-800',
-  danger: 'border-red-200 bg-red-50 text-red-700',
-  info: 'border-sky-200 bg-sky-50 text-sky-800',
+  success: 'border-portal-success/20 bg-portal-successTint text-portal-success',
+  warning: 'border-portal-warning/20 bg-portal-warningTint text-portal-warning',
+  danger: 'border-portal-danger/20 bg-portal-dangerTint text-portal-danger',
+  info: 'border-portal-info/20 bg-portal-infoTint text-portal-info',
 };
 
 export function StatusBadge({ children, tone = 'neutral' }: StatusBadgeProps) {
-  return <span className={`inline-flex min-h-7 items-center rounded-full border px-2.5 py-1 text-[11px] font-bold ${toneClass[tone]}`}>{children}</span>;
+  return <span className={`inline-flex min-h-8 items-center rounded-full border px-2.5 py-1 text-[11px] font-bold ${toneClass[tone]}`}>{children}</span>;
 }
