@@ -50,12 +50,12 @@ describe('GET /api/search', () => {
   });
 
   it('excludes editorial content from marketplace search results even if the source returns it', async () => {
-    let contentRequest: URL | null = null;
+    const contentRequest: { url: URL | null } = { url: null };
 
     vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
       const url = new URL(String(input));
       if (url.pathname === '/api/content') {
-        contentRequest = url;
+        contentRequest.url = url;
         return Response.json({
           items: [
             {
@@ -80,8 +80,8 @@ describe('GET /api/search', () => {
     const payload = await response.json();
     const productIds = payload.groups.products.items.map((item: { id: string }) => item.id);
 
-    expect(contentRequest?.searchParams.get('marketplace_only')).toBe('true');
-    expect(contentRequest?.searchParams.get('database_only')).toBe('1');
+    expect(contentRequest.url?.searchParams.get('marketplace_only')).toBe('true');
+    expect(contentRequest.url?.searchParams.get('database_only')).toBe('1');
     expect(productIds).toEqual(['product-1']);
     expect(productIds).not.toContain('news-1');
   });
