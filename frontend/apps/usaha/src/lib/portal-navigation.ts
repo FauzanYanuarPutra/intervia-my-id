@@ -1,6 +1,7 @@
 import { visiblePortalSections } from './portal-logic';
 import type { PermissionId, PortalSection } from './portal-types';
 
+// Keep first-level labels focused on everyday merchant tasks.
 export type PortalNavigationItem = {
   id: PortalSection;
   label: string;
