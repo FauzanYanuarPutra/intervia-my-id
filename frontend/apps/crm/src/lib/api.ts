@@ -829,21 +829,6 @@ export const businessModerationApi = {
     });
   },
 
-  requestIndependentReview: async (
-    token: string,
-    id: string,
-    data: { requested_reviewer_id: string; note?: string },
-  ) => {
-    return fetchJson(
-      `${MARKETPLACE_URL}/v1/news/${encodeURIComponent(id)}/source-review-requests`,
-      {
-        method: 'POST',
-        token,
-        body: JSON.stringify(data),
-      },
-    );
-  },
-
   moderate: async (
     token: string,
     id: string,
