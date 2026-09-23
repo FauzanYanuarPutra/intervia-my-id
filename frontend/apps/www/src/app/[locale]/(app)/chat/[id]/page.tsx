@@ -8107,17 +8107,39 @@ export default function ChatRoomPage() {
                                   </p>
                                 )}
                               </div>
-                            ) : msg.message_type === 'image' &&
-                              msg.attachments?.[0] ? (
+                            ) : msg.message_type === 'sticker' &&
+                              displayContent ? (
+                              <span
+                                role="img"
+                                aria-label={
+                                  chatLocale === 'id' ? 'Stiker' : 'Sticker'
+                                }
+                                className="block px-2 py-1 text-center text-7xl leading-none"
+                              >
+                                {displayContent}
+                              </span>
+                            ) : msg.attachments?.length ? (
                               <div className="space-y-1.5">
-                                {msg.attachments.length === 1 ? (
-                                  <img
-                                    src={normalizeAttachmentUrl(msg.attachments[0])}
-                                    alt="Image"
-                                    className="mx-auto block max-h-[min(48dvh,420px)] max-w-full rounded-[11px] border border-black/[0.06] bg-black/95 object-contain shadow-sm dark:border-white/[0.08] sm:max-h-[460px]"
-                                    loading="lazy"
-                                  />
-                                ) : (
+                                <ChatMediaGallery
+                                  attachments={msg.attachments}
+                                  messageType={msg.message_type}
+                                  locale={chatLocale}
+                                  onOpen={index =>
+                                    openMediaViewer(
+                                      msg.attachments || [],
+                                      msg.message_type,
+                                      index,
+                                      roomName,
+                                    )
+                                  }
+                                />
+                                {displayContent ? (
+                                  <span className="block px-0.5">
+                                    {displayContent}
+                                  </span>
+                                ) : null}
+                              </div>
+                            ) : (
                                   <div className="grid grid-cols-2 gap-1 overflow-hidden rounded-[11px] bg-[#0b141a]">
                                     {msg.attachments.map((rawUrl, index) => {
                                       const imageUrl = normalizeAttachmentUrl(rawUrl);
