@@ -1075,6 +1075,39 @@ async fn connect_database_pool(
     Ok(options.connect(database_url).await?)
 }
 
+const COMMUNITY_MIGRATION_RETRY_DELAYS_MS: [u64; 3] = [250, 750, 1_500];
+
+fn is_migration_unique_conflict_message(message: &str) -> bool {
+    message.contains("duplicate key value violates unique constraint")
+        && message.contains("_sqlx_migrations_pkey")
+}
+
+async fn run_community_migrations_with_retry(
+    migrator: &sqlx::migrate::Migrator,
+    pool: &PgPool,
+) -> Result<(), sqlx::migrate::MigrateError> {
+    for (attempt, delay_ms) in COMMUNITY_MIGRATION_RETRY_DELAYS_MS.iter().enumerate() {
+        match migrator.run(pool).await {
+            Ok(()) => return Ok(()),
+            Err(error)
+                if attempt + 1 < COMMUNITY_MIGRATION_RETRY_DELAYS_MS.len()
+                    && is_migration_unique_conflict_message(&error.to_string()) =>
+            {
+                tracing::warn!(
+                    attempt = attempt + 1,
+                    retry_in_ms = *delay_ms,
+                    error = %error,
+                    "Community migration hit a concurrent _sqlx_migrations conflict; retrying",
+                );
+                sleep(Duration::from_millis(*delay_ms)).await;
+            }
+            Err(error) => return Err(error),
+        }
+    }
+
+    unreachable!("community migration retry loop must return on the final attempt");
+}
+
 fn init_tracing() {
     let app_env = env::var("ENV")
         .or_else(|_| env::var("APP_ENV"))
@@ -1161,23 +1194,28 @@ async fn main() -> anyhow::Result<()> {
         if !strict_migrations {
             migrator.set_ignore_missing(true);
         }
-        if let Err(error) = migrator.run(&migration_db).await {
-            let message = error.to_string();
-            let checksum_mismatch =
-                message.contains("was previously applied but has been modified");
-            let missing_migration = message
-                .contains("was previously applied but is missing in the resolved migrations");
 
-            if !strict_migrations && (checksum_mismatch || missing_migration) {
-                tracing::warn!(
-                    "Community migration drift in {} (ignored): {}",
-                    app_env,
-                    message
-                );
-            } else {
-                return Err(error.into());
+        match run_community_migrations_with_retry(&migrator, &migration_db).await {
+            Ok(()) => {}
+            Err(error) => {
+                let message = error.to_string();
+                let checksum_mismatch =
+                    message.contains("was previously applied but has been modified");
+                let missing_migration = message
+                    .contains("was previously applied but is missing in the resolved migrations");
+
+                if !strict_migrations && (checksum_mismatch || missing_migration) {
+                    tracing::warn!(
+                        "Community migration drift in {} (ignored): {}",
+                        app_env,
+                        message
+                    );
+                } else {
+                    return Err(error.into());
+                }
             }
         }
+
         schema_contract::verify_schema_contract(&migration_db).await?;
         migration_db.close().await;
     } else {
@@ -8951,7 +8989,8 @@ mod security_tests {
         apply_reel_privacy_metadata, clean_store_reference, database_session_setup,
         has_valid_media_signature, normalize_reel_action, normalize_trust_report_reason,
         parse_media_range, resolve_reel_privacy, safe_public_display_name, sanitize_reel_metadata,
-        sanitize_report_details, DatabasePoolPurpose, MAX_MEDIA_RANGE_BYTES,
+        sanitize_report_details, is_migration_unique_conflict_message,
+        DatabasePoolPurpose, MAX_MEDIA_RANGE_BYTES,
     };
     use serde_json::json;
 
@@ -8962,6 +9001,19 @@ mod security_tests {
             database_session_setup(DatabasePoolPurpose::Application),
             Some("SET search_path TO forum, reel, public, events")
         );
+    }
+
+    #[test]
+    fn migration_unique_conflict_is_retried_only_for_the_sqlx_migration_tracker() {
+        assert!(is_migration_unique_conflict_message(
+            "duplicate key value violates unique constraint \"_sqlx_migrations_pkey\""
+        ));
+        assert!(!is_migration_unique_conflict_message(
+            "duplicate key value violates unique constraint \"some_other_table_pkey\""
+        ));
+        assert!(!is_migration_unique_conflict_message(
+            "was previously applied but has been modified"
+        ));
     }
 
     #[test]
