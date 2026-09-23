@@ -144,7 +144,7 @@ export async function uploadToMinIO(
       ? publicUrl
         ? `${publicUrl.replace(/\/$/, '')}/${bucket}/${key}`
         : `/api/content/media/${encodeURIComponent(bucket)}/${key.split('/').map(encodeURIComponent).join('/')}`
-      : `/api/chat/media/${encodeURIComponent(bucket)}/${key.split('/').map(encodeURIComponent).join('/')}`;
+      : `/api/chat/media/${encodeURIComponent(bucket)}/chat/${encodeURIComponent(roomId)}/${contentHash}${ext}`;
 
   return { url, key };
 }
