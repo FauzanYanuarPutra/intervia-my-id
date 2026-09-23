@@ -179,7 +179,7 @@ type DraftAttachment = {
   status: 'uploading' | 'uploaded' | 'error';
 };
 
-const MAX_COMPOSER_ATTACHMENTS = 10;
+const MAX_COMPOSER_ATTACHMENTS = 100;
 const CHAT_FIELD_LABEL_CLASS =
   'block text-[12px] font-bold tracking-[0.005em] text-[color:var(--app-text)]';
 const CHAT_CONTROL_CLASS =
