@@ -256,6 +256,90 @@ def check_tailwind_content_globs() -> None:
                 )
 
 
+def check_call_notification_contract() -> None:
+    settings = (
+        FRONTEND
+        / "apps"
+        / "www"
+        / "src"
+        / "app"
+        / "[locale]"
+        / "(app)"
+        / "settings"
+        / "page.tsx"
+    )
+    browser_notifications = (
+        FRONTEND / "apps" / "www" / "src" / "lib" / "browserNotifications.ts"
+    )
+    duplicate_upload_route = (
+        FRONTEND
+        / "apps"
+        / "www"
+        / "src"
+        / "app"
+        / "api"
+        / "chat"
+        / "rooms"
+        / "[roomId]"
+        / "upload"
+        / "route.ts"
+    )
+    call_history = (
+        ROOT
+        / "services"
+        / "chat_service"
+        / "lib"
+        / "chat_service"
+        / "call_history.ex"
+    )
+    scylla_bootstrap = (
+        ROOT
+        / "services"
+        / "chat_service"
+        / "priv"
+        / "scylladb"
+        / "setup_keyspace_init.sh"
+    )
+
+    settings_source = settings.read_text(encoding="utf-8")
+    if "Phone," not in settings_source:
+        fail("settings/page.tsx must import the Phone icon used by call history settings")
+    if "CallNotificationSettings" not in settings_source:
+        fail("settings/page.tsx must mount CallNotificationSettings")
+
+    browser_source = browser_notifications.read_text(encoding="utf-8")
+    if "function urlBase64ToArrayBuffer(value: string): ArrayBuffer" not in browser_source:
+        fail(
+            "browserNotifications.ts must return a real ArrayBuffer for "
+            "PushManager.subscribe(applicationServerKey)"
+        )
+    if "applicationServerKey: urlBase64ToArrayBuffer(" not in browser_source:
+        fail(
+            "browserNotifications.ts must pass the ArrayBuffer helper to "
+            "PushManager.subscribe"
+        )
+
+    if duplicate_upload_route.exists():
+        fail(
+            "duplicate dynamic chat upload route [roomId]/upload still exists; "
+            "keep canonical [id]/upload to avoid Next.js route collisions"
+        )
+
+    call_history_source = call_history.read_text(encoding="utf-8")
+    if '@type call_type :: "voice" | "video"' in call_history_source:
+        fail("call_history.ex contains invalid string-literal typespec")
+    if '@type status :: "ringing"' in call_history_source:
+        fail("call_history.ex contains invalid string-literal status typespec")
+
+    bootstrap_source = scylla_bootstrap.read_text(encoding="utf-8")
+    if 'MIGRATIONS_DIR="/scylladb/migrations"' not in bootstrap_source:
+        fail("Scylla bootstrap must execute additive versioned migrations")
+    if "cqlsh --request-timeout=60 -f" not in bootstrap_source:
+        fail("Scylla bootstrap must execute migration files with cqlsh")
+
+
+
+
 def main() -> int:
     check_node_runtime_alignment()
     check_shared_package()
@@ -263,6 +347,7 @@ def main() -> int:
         check_app(app)
     check_client_module_boundaries()
     check_tailwind_content_globs()
+    check_call_notification_contract()
     print(
         "Frontend runtime contract OK: Node 22, www, usaha, cms, crm, "
         "client module debt ceilings, and bounded Tailwind content scans"

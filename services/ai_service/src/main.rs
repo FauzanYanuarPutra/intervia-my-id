@@ -596,7 +596,6 @@ async fn handle_ready(State(state): State<Arc<AppState>>) -> Response {
     }
 }
 
-
 async fn handle_capabilities() -> Json<Value> {
     Json(json!({
         "service": SERVICE_NAME,
@@ -1555,7 +1554,17 @@ async fn call_vllm(
     max_tokens: u32,
     schema: Option<&Value>,
 ) -> Result<(String, String, Vec<String>), String> {
-    match call_vllm_single(state, request_id, model, messages, temperature, max_tokens, schema).await {
+    match call_vllm_single(
+        state,
+        request_id,
+        model,
+        messages,
+        temperature,
+        max_tokens,
+        schema,
+    )
+    .await
+    {
         Ok(result) => Ok(result),
         Err(primary_error)
             if model != state.config.vllm_vision_model
@@ -1973,8 +1982,7 @@ fn model_list_contains(payload: &Value, requested_model: &str) -> bool {
             .and_then(Value::as_str)
             .unwrap_or("")
             .trim();
-        name == wanted
-            || name.trim_end_matches(":latest") == wanted.trim_end_matches(":latest")
+        name == wanted || name.trim_end_matches(":latest") == wanted.trim_end_matches(":latest")
     })
 }
 fn parse_structured_ai_response(raw: &str) -> Option<Value> {
@@ -3360,6 +3368,8 @@ mod tests {
     fn identifies_model_not_found_errors_without_treating_timeouts_as_model_failures() {
         assert!(is_model_unavailable_error("vllm_http_404: model not found"));
         assert!(is_model_unavailable_error("unknown model qwen3:8b"));
-        assert!(!is_model_unavailable_error("vllm_timeout: request timed out"));
+        assert!(!is_model_unavailable_error(
+            "vllm_timeout: request timed out"
+        ));
     }
 }

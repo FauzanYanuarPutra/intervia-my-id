@@ -152,7 +152,10 @@ fn validate_work_type(value: &str) -> Result<String, WorkRepositoryError> {
 
 fn validate_status(value: &str) -> Result<String, WorkRepositoryError> {
     let value = value.trim();
-    if matches!(value, "todo" | "in_progress" | "done" | "snoozed" | "cancelled") {
+    if matches!(
+        value,
+        "todo" | "in_progress" | "done" | "snoozed" | "cancelled"
+    ) {
         Ok(value.to_owned())
     } else {
         Err(WorkRepositoryError::Validation("invalid_work_status"))
@@ -237,7 +240,9 @@ impl WorkRepository {
         if active {
             Ok(())
         } else {
-            Err(WorkRepositoryError::Validation("assignee_not_business_member"))
+            Err(WorkRepositoryError::Validation(
+                "assignee_not_business_member",
+            ))
         }
     }
 
@@ -362,17 +367,14 @@ impl WorkRepository {
             None => None,
         };
         let priority = request.priority.map(validate_priority).transpose()?;
-        let status = request
-            .status
-            .as_deref()
-            .map(validate_status)
-            .transpose()?;
+        let status = request.status.as_deref().map(validate_status).transpose()?;
 
         let assignee = if can_manage {
             match request.assignee_user_id {
                 None => existing.assignee_user_id,
                 Some(value) => {
-                    self.ensure_assignee(business_id, organization_id, value).await?;
+                    self.ensure_assignee(business_id, organization_id, value)
+                        .await?;
                     value
                 }
             }
@@ -514,7 +516,7 @@ impl WorkRepository {
               AND closed_at IS NULL
             ORDER BY opened_at DESC
             LIMIT 1
-            "#
+            "#,
         )
         .bind(business_id)
         .bind(organization_id)

@@ -9,12 +9,15 @@ use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
-use std::{net::{IpAddr, Ipv4Addr, Ipv6Addr}, sync::Arc};
+use std::{
+    net::{IpAddr, Ipv4Addr, Ipv6Addr},
+    sync::Arc,
+};
 use uuid::Uuid;
 
 use crate::{
-    auth_claims_from_headers, has_cms_access, make_slug,
-    push_notification_best_effort, user_id_from_auth, AppState,
+    auth_claims_from_headers, has_cms_access, make_slug, push_notification_best_effort,
+    user_id_from_auth, AppState,
 };
 
 const PUBLIC_NEWS_MAX_OFFSET: i64 = 1_000;
@@ -439,19 +442,41 @@ fn public_news_row(
 }
 
 fn is_public_news_source_ipv4(ip: Ipv4Addr) -> bool {
-    let [a,b,c,_] = ip.octets();
-    !(a == 0 || a == 10 || a == 127 || (a == 100 && (64..=127).contains(&b)) || (a == 169 && b == 254)
-      || (a == 172 && (16..=31).contains(&b)) || (a == 192 && b == 0 && c == 0)
-      || (a == 192 && b == 0 && c == 2) || (a == 192 && b == 88 && c == 99)
-      || (a == 192 && b == 168) || (a == 198 && matches!(b,18|19))
-      || (a == 198 && b == 51 && c == 100) || (a == 203 && b == 0 && c == 113) || a >= 224)
+    let [a, b, c, _] = ip.octets();
+    !(a == 0
+        || a == 10
+        || a == 127
+        || (a == 100 && (64..=127).contains(&b))
+        || (a == 169 && b == 254)
+        || (a == 172 && (16..=31).contains(&b))
+        || (a == 192 && b == 0 && c == 0)
+        || (a == 192 && b == 0 && c == 2)
+        || (a == 192 && b == 88 && c == 99)
+        || (a == 192 && b == 168)
+        || (a == 198 && matches!(b, 18 | 19))
+        || (a == 198 && b == 51 && c == 100)
+        || (a == 203 && b == 0 && c == 113)
+        || a >= 224)
 }
 fn is_public_news_source_ipv6(ip: Ipv6Addr) -> bool {
-    if let Some(mapped) = ip.to_ipv4_mapped() { return is_public_news_source_ipv4(mapped); }
-    if ip.is_loopback() || ip.is_unspecified() || ip.is_unique_local() || ip.is_unicast_link_local() || ip.is_multicast() { return false; }
-    let s=ip.segments();
-    if s[0] == 0x2001 && s[1] == 0x0db8 { return false; }
-    if s[0] == 0x0064 && s[1] == 0xff9b { return false; }
+    if let Some(mapped) = ip.to_ipv4_mapped() {
+        return is_public_news_source_ipv4(mapped);
+    }
+    if ip.is_loopback()
+        || ip.is_unspecified()
+        || ip.is_unique_local()
+        || ip.is_unicast_link_local()
+        || ip.is_multicast()
+    {
+        return false;
+    }
+    let s = ip.segments();
+    if s[0] == 0x2001 && s[1] == 0x0db8 {
+        return false;
+    }
+    if s[0] == 0x0064 && s[1] == 0xff9b {
+        return false;
+    }
     true
 }
 
@@ -489,7 +514,7 @@ fn is_allowed_news_source_url(raw: &str) -> bool {
     if let Ok(ip) = ip_literal.parse::<IpAddr>() {
         return match ip {
             IpAddr::V4(ip) => is_public_news_source_ipv4(ip),
-            IpAddr::V6(ip) => is_public_news_source_ipv6(ip)
+            IpAddr::V6(ip) => is_public_news_source_ipv6(ip),
         };
     }
     true
@@ -1330,7 +1355,10 @@ async fn list_news(
         Err(message) => return response_error(StatusCode::BAD_REQUEST, message),
     };
     if cursor.is_some() && offset != 0 {
-        return response_error(StatusCode::BAD_REQUEST, "cursor cannot be combined with offset");
+        return response_error(
+            StatusCode::BAD_REQUEST,
+            "cursor cannot be combined with offset",
+        );
     }
     let cursor_at = cursor.as_ref().map(|value| value.0);
     let cursor_id = cursor.as_ref().map(|value| value.1);
