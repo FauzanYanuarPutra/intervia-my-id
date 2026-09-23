@@ -48,7 +48,9 @@ type MediaPreviewCarouselProps = {
   showDots?: boolean;
   objectFit?: 'cover' | 'contain';
   overlay?: ReactNode;
-  initialIndex?: number; // Ditambahkan agar Lightbox sinkron dengan slide utama
+  initialIndex?: number;
+  onIndexChange?: (index: number) => void;
+  keyboardControls?: boolean;
 };
 
 type NormalizedMedia = {
@@ -132,6 +134,8 @@ export function MediaPreviewCarousel({
   objectFit = 'cover',
   overlay,
   initialIndex = 0,
+  onIndexChange,
+  keyboardControls = false,
 }: MediaPreviewCarouselProps) {
   const mediaItems = useMemo(
     () => normalizeMediaItems(items, alt),
@@ -188,10 +192,10 @@ export function MediaPreviewCarousel({
   useBodyScrollLock(lightboxOpen);
 
   useEffect(() => {
-    if (!lightboxOpen) return;
+    if (!lightboxOpen && !keyboardControls) return;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        setLightboxOpen(false);
+        if (lightboxOpen) setLightboxOpen(false);
         return;
       }
       if (event.key === 'ArrowLeft') {
@@ -208,7 +212,11 @@ export function MediaPreviewCarousel({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [active, lightboxOpen, scrollToIndex]);
+  }, [active, keyboardControls, lightboxOpen, scrollToIndex]);
+
+  useEffect(() => {
+    onIndexChange?.(active);
+  }, [active, onIndexChange]);
 
   const updateIndexFromScroll = () => {
     if (isScrolling.current) return;
