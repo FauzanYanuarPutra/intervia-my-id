@@ -4,12 +4,12 @@ import { RupiahInput } from '@/components/forms/RupiahInput';
 import { useMemo, useRef, useState } from 'react';
 import {
   Archive,
-  ChevronDown,
   History,
   Loader2,
   Pencil,
   Plus,
   Search,
+  X,
 } from 'lucide-react';
 import { ChoiceChips } from '@/components/interaction/ChoiceChips';
 import {
@@ -227,6 +227,7 @@ export function IngredientWorkspace({
   const [supplier, setSupplier] = useState('');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [createOpen, setCreateOpen] = useState(false);
 
   const [activePanel, setActivePanel] = useState<{ id: string; mode: PanelMode } | null>(null);
   const [editDraft, setEditDraft] = useState<EditDraft | null>(null);
@@ -356,6 +357,7 @@ export function IngredientWorkspace({
       if (!response.ok) throw new Error(responseError(payload, 'Gagal menyimpan bahan.'));
       await reload();
       resetCreateForm();
+      setCreateOpen(false);
       setMessage('Tersimpan. Bahan ini sekarang bisa dipakai di resep HPP.');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Gagal menyimpan bahan.');
@@ -565,16 +567,57 @@ export function IngredientWorkspace({
         </div>
       </section>
 
-      <details className="rounded-xl border border-portal-line bg-white group">
-        <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 sm:px-5">
-          <div>
-            <p className="font-bold text-portal-ink">Tambah bahan</p>
-            <p className="mt-0.5 text-xs text-portal-soft">Buka hanya saat mau menambah bahan baru.</p>
-          </div>
-          <ChevronDown className="h-4 w-4 text-portal-soft transition group-open:rotate-180" />
-        </summary>
+      <section className="portal-panel flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+        <div className="min-w-0">
+          <p className="font-bold text-portal-ink">Kelola bahan & kemasan</p>
+          <p className="mt-0.5 text-xs leading-5 text-portal-soft">Tambah atau ubah detail lewat panel terpisah supaya daftar stok tetap ringkas.</p>
+        </div>
+        <button
+          type="button"
+          disabled={!canManage}
+          onClick={() => {
+            setMessage('');
+            resetCreateForm();
+            setCreateOpen(true);
+          }}
+          className="portal-button-primary min-h-11 w-full justify-center disabled:opacity-50 sm:w-auto"
+        >
+          <Plus className="h-4 w-4" />
+          Tambah bahan
+        </button>
+      </section>
 
-        <div className="border-t border-portal-line p-4 sm:p-5">
+      {createOpen ? (
+        <div
+          className="fixed inset-0 z-[70] flex items-end justify-center bg-slate-950/35 p-0 sm:items-center sm:p-4"
+          role="presentation"
+          onMouseDown={event => {
+            if (event.target === event.currentTarget) setCreateOpen(false);
+          }}
+        >
+          <div
+            className="max-h-[94vh] w-full max-w-4xl overflow-y-auto rounded-t-2xl border border-portal-line bg-white shadow-2xl sm:rounded-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="inventory-add-ingredient-title"
+            onMouseDown={event => event.stopPropagation()}
+          >
+            <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-portal-line bg-white px-4 py-3 sm:px-5">
+              <div className="min-w-0">
+                <p id="inventory-add-ingredient-title" className="font-bold text-portal-ink">Tambah bahan atau kemasan</p>
+                <p className="mt-0.5 text-xs text-portal-soft">Isi yang penting dulu. Detail rumit bisa dilengkapi nanti dari Edit.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCreateOpen(false)}
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-portal-soft hover:bg-portal-mist hover:text-portal-ink"
+                aria-label="Tutup tambah bahan"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="p-4 sm:p-5">
+
           <div className="grid gap-4 lg:grid-cols-2">
             <label className="text-xs font-semibold text-portal-soft">
               Nama
@@ -667,8 +710,11 @@ export function IngredientWorkspace({
             </button>
             {message ? <p className="text-xs font-semibold text-portal-soft" role="status">{message}</p> : null}
           </div>
+
+            </div>
+          </div>
         </div>
-      </details>
+      ) : null}
 
       <section className="overflow-hidden rounded-xl border border-portal-line bg-white">
         <div className="border-b border-portal-line p-4 sm:p-5">
@@ -723,14 +769,35 @@ export function IngredientWorkspace({
                 </div>
 
                 {panelOpen ? (
-                  <div className="border-t border-portal-line bg-portal-mist/40 p-4 sm:p-5">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="font-bold text-portal-ink">
+                  <div
+                    className="fixed inset-0 z-[70] flex items-end justify-center bg-slate-950/35 p-0 sm:items-center sm:p-4"
+                    role="presentation"
+                    onMouseDown={event => {
+                      if (event.target === event.currentTarget) setActivePanel(null);
+                    }}
+                  >
+                    <div
+                      className="max-h-[94vh] w-full max-w-4xl overflow-y-auto rounded-t-2xl border border-portal-line bg-portal-mist shadow-2xl sm:rounded-2xl"
+                      role="dialog"
+                      aria-modal="true"
+                      aria-labelledby={`inventory-action-title-${item.id}`}
+                      onMouseDown={event => event.stopPropagation()}
+                    >
+                    <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-portal-line bg-portal-mist px-4 py-3 sm:px-5">
+                      <p id={`inventory-action-title-${item.id}`} className="font-bold text-portal-ink">
                         {activePanel.mode === 'edit' ? `Edit ${item.name}` : activePanel.mode === 'stock' ? `Ubah stok ${item.name}` : activePanel.mode === 'history' ? `Riwayat ${item.name}` : `Arsipkan ${item.name}`}
                       </p>
-                      <button type="button" onClick={() => setActivePanel(null)} className="min-h-10 rounded-lg px-3 text-xs font-semibold text-portal-soft hover:bg-white">Tutup</button>
+                      <button
+                        type="button"
+                        onClick={() => setActivePanel(null)}
+                        className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-portal-soft hover:bg-white hover:text-portal-ink"
+                        aria-label="Tutup panel"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
                     </div>
 
+                    <div className="p-4 sm:p-5">
                     {activePanel.mode === 'edit' && editDraft ? (
                       <div className="mt-4 space-y-4">
                         <div className="grid gap-3 sm:grid-cols-2">
@@ -809,6 +876,7 @@ export function IngredientWorkspace({
                     ) : null}
 
                     {actionMessage ? <p className="mt-3 text-xs font-semibold text-portal-soft" role="status">{actionMessage}</p> : null}
+                    </div>
                   </div>
                 ) : null}
               </div>
