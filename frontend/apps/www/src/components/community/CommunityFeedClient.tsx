@@ -2298,11 +2298,12 @@ export function CommunityPostCard({
       return;
     }
 
+    const threadId = item.threadId;
     let active = true;
     const loadBookmark = async () => {
       try {
         const response = await authFetch(
-          `/api/forum/threads/${encodeURIComponent(item.threadId)}/bookmark`,
+          `/api/forum/threads/${encodeURIComponent(threadId)}/bookmark`,
           { cache: 'no-store', headers: { Accept: 'application/json' } },
         );
         const payload = (await response.json().catch(() => ({}))) as {
