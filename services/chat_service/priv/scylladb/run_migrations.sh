@@ -55,6 +55,11 @@ until run_cql -e "DESCRIBE CLUSTER" >/dev/null 2>&1; do
   sleep 2
 done
 
+run_cql -e "CREATE TABLE IF NOT EXISTS $SCYLLA_KEYSPACE.chat_schema_migrations (
+  migration_name text PRIMARY KEY,
+  applied_at timestamp
+);"
+
 found=0
 for migration in /scylladb/migrations/*.cql; do
   if [ ! -f "$migration" ]; then
@@ -62,6 +67,18 @@ for migration in /scylladb/migrations/*.cql; do
   fi
   found=1
   migration_name=$(basename "$migration")
+
+  applied="$(
+    run_cql -e "SELECT migration_name FROM $SCYLLA_KEYSPACE.chat_schema_migrations WHERE migration_name = '$migration_name';" 2>/dev/null |
+      grep -F "$migration_name" |
+      head -n 1 || true
+  )"
+
+  if [ -n "$applied" ]; then
+    echo "Skipping Chat migration (already applied): $migration_name"
+    continue
+  fi
+
   echo "Applying Chat migration: $migration_name"
   sed 's/\r$//' "$migration" > /tmp/chat_migration.cql
   {
@@ -69,6 +86,7 @@ for migration in /scylladb/migrations/*.cql; do
     cat /tmp/chat_migration.cql
   } > /tmp/chat_migration_with_keyspace.cql
   run_cql -f /tmp/chat_migration_with_keyspace.cql
+  run_cql -e "INSERT INTO $SCYLLA_KEYSPACE.chat_schema_migrations (migration_name, applied_at) VALUES ('$migration_name', toTimestamp(now()));"
 done
 
 if [ "$found" -ne 1 ]; then
