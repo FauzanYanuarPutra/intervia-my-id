@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MapPin } from 'lucide-react';
 import {
+  AttributionControl,
   Circle,
   MapContainer,
   Marker,
@@ -68,6 +69,10 @@ type RoutingResponse = {
 
 const FALLBACK_TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 const FALLBACK_TILE_ATTRIBUTION = '&copy; OpenStreetMap contributors';
+
+function normalizeMapAttribution(value: string): string {
+  return value.replace(/^\s*Leaflet\s*\|\s*/i, '').trim();
+}
 const MARKER_CLUSTER_DISTANCE_PX = 72;
 const MARKER_CLUSTER_MAX_ZOOM = 18;
 const MARKER_CLUSTER_PICKER_ZOOM = 17;
@@ -1417,10 +1422,11 @@ export function UmkmStoreMapClient({
     theme === 'default'
       ? process.env.NEXT_PUBLIC_OSM_TILE_URL || activeTheme.url
       : activeTheme.url;
-  const tileAttribution =
+  const tileAttribution = normalizeMapAttribution(
     theme === 'default'
       ? process.env.NEXT_PUBLIC_OSM_TILE_ATTRIBUTION || activeTheme.attribution
-      : activeTheme.attribution;
+      : activeTheme.attribution,
+  );
   const validViewerLocation = hasValidLatLng(viewerLocation)
     ? viewerLocation
     : null;
@@ -1583,7 +1589,7 @@ export function UmkmStoreMapClient({
       keyboard={interactive}
       zoomControl={false}
       className={`${className || 'h-[360px] w-full rounded-3xl'} max-w-full`}
-      attributionControl
+      attributionControl={false}
     >
       <MapInteractivityController interactive={interactive} />
       <MapBoundsReporter onBoundsChange={onBoundsChange} />
@@ -1599,6 +1605,7 @@ export function UmkmStoreMapClient({
       />
       <ManualMarkerFocusController target={manualMarkerFocus} />
       <TileLayer url={tileUrl} attribution={tileAttribution} />
+      <AttributionControl position="bottomright" prefix={false} />
       <ZoomControl position="bottomright" />
 
       {validViewerLocation ? (
