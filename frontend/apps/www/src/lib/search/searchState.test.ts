@@ -6,6 +6,7 @@ describe('Explore search state',()=>{
     expect(hasExploreResultState({})).toBe(false);
     expect(hasExploreResultState({tab:'all',sort:'relevance',side:'supply'})).toBe(false);
     expect(hasExploreResultState({q:'a'})).toBe(false);
+    expect(hasExploreResultState({intent:'demand'})).toBe(false);
   });
   it('recognizes meaningful result modes',()=>{
     expect(hasExploreResultState({q:'mesin'})).toBe(true);
