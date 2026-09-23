@@ -271,6 +271,7 @@ export function StockPurchaseYieldWorkspace({
               placeholder="Cari bahan / kemasan"
               emptyLabel="Bahan tidak ditemukan"
               ariaLabel="Pilih bahan belanja"
+              mode="modal"
               disabled={!canManage}
             />
           </div>
@@ -414,6 +415,7 @@ export function StockPurchaseYieldWorkspace({
                 placeholder="Cari bahan"
                 emptyLabel="Bahan tidak ditemukan"
                 ariaLabel="Pilih bahan hasil nyata"
+              mode="modal"
                 disabled={!canManage}
               />
             </div>
@@ -439,6 +441,7 @@ export function StockPurchaseYieldWorkspace({
                   placeholder="Cari produk (opsional)"
                   emptyLabel="Produk tidak ditemukan"
                   ariaLabel="Pilih produk hasil nyata"
+              mode="modal"
                   disabled={!canManage}
                 />
               </div>
@@ -505,6 +508,7 @@ export function StockPurchaseYieldWorkspace({
                       placeholder="Cari produk"
                       emptyLabel="Produk tidak ditemukan"
                       ariaLabel="Pilih produk bahan utama"
+              mode="modal"
                       disabled={!canManage}
                     />
                   </div>
@@ -522,6 +526,7 @@ export function StockPurchaseYieldWorkspace({
                       placeholder="Cari bahan utama"
                       emptyLabel="Bahan tidak ditemukan"
                       ariaLabel="Pilih bahan utama"
+              mode="modal"
                       disabled={!canManage}
                     />
                   </div>
