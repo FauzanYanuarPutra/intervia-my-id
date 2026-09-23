@@ -36,7 +36,7 @@ describe('IngredientWorkspace', () => {
       />,
     );
 
-    expect(html).toContain('Kelola bahan & kemasan');
+    expect(html).toContain('Kelola bahan &amp; kemasan');
     expect(html).toContain('Tambah bahan');
     expect(html).toContain('Harga efektif, stok, dan bagian terpakai');
     expect(html).toContain('Cari bahan atau supplier');
