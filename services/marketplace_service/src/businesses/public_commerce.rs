@@ -335,8 +335,8 @@ impl PublicCommerceRepository {
         }
 
         let mut resolved_items = Vec::with_capacity(request.items.len());
-        let mut subtotal_money = Money::idr(0)
-            .map_err(|_| PublicCommerceError::Validation("invalid_money_contract"))?;
+        let mut subtotal_money =
+            Money::idr(0).map_err(|_| PublicCommerceError::Validation("invalid_money_contract"))?;
         for item in &request.items {
             let product = products
                 .get(&item.product_id)
