@@ -23,7 +23,8 @@ if config_env() == :prod do
     |> String.trim()
     |> String.upcase()
 
-  {jwt_guardian_key, jwt_allowed_algos, jwt_public_key_pem, jwt_legacy_secret, jwt_allow_legacy_hs256} =
+  {jwt_guardian_key, jwt_allowed_algos, jwt_public_key_pem, jwt_legacy_secret,
+   jwt_allow_legacy_hs256} =
     case jwt_algorithm do
       "RS256" ->
         public_key_pem =
