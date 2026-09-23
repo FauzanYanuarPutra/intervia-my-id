@@ -129,6 +129,7 @@ import {
   COMMUNITY_MODAL_SURFACE_CLASS,
   communityComposerFocusableElements,
 } from './community-feed-focus';
+import { useCommunityBookmark } from './community-feed-bookmarks';
 
 const TABS: Array<{
   id: CommunityFeedTab;
@@ -2195,8 +2196,6 @@ export function CommunityPostCard({
   const [reactionCount, setReactionCount] = useState(item.stats.reactions);
   const [commentCount, setCommentCount] = useState(item.stats.comments);
   const [likeSaving, setLikeSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [saveCount, setSaveCount] = useState(0);
   const [saveLoading, setSaveLoading] = useState(false);
 
   const [optionsOpen, setOptionsOpen] = useState(false);
@@ -2291,39 +2290,16 @@ export function CommunityPostCard({
     setReactionCount(item.stats.reactions);
   }, [item.id, item.stats.reactions, item.viewerVote]);
 
-  useEffect(() => {
-    if (item.kind !== 'discussion' || !item.threadId) {
-      setSaved(false);
-      setSaveCount(0);
-      return;
-    }
-
-    const threadId = item.threadId;
-    let active = true;
-    const loadBookmark = async () => {
-      try {
-        const response = await authFetch(
-          `/api/forum/threads/${encodeURIComponent(threadId)}/bookmark`,
-          { cache: 'no-store', headers: { Accept: 'application/json' } },
-        );
-        const payload = (await response.json().catch(() => ({}))) as {
-          bookmarked?: unknown;
-          bookmarkCount?: unknown;
-        };
-        if (!active || !response.ok) return;
-        setSaved(Boolean(payload.bookmarked));
-        const bookmarkCount = Number(payload.bookmarkCount);
-        setSaveCount(Number.isFinite(bookmarkCount) ? Math.max(0, bookmarkCount) : 0);
-      } catch {
-        // Bookmark state is best-effort and can be retried by the user.
-      }
-    };
-
-    void loadBookmark();
-    return () => {
-      active = false;
-    };
-  }, [authFetch, item.kind, item.threadId]);
+  const {
+    bookmarked: saved,
+    bookmarkCount: saveCount,
+    setBookmarked: setSaved,
+    setBookmarkCount: setSaveCount,
+  } = useCommunityBookmark(
+    authFetch,
+    item.threadId,
+    item.kind === 'discussion',
+  );
 
   useEffect(() => {
     setCommentCount(item.stats.comments);
@@ -3535,8 +3511,6 @@ export function CommunityDetailModal({
   const [replyTarget, setReplyTarget] = useState<ForumPostDetail | null>(null);
   const [saving, setSaving] = useState(false);
   const [voteSaving, setVoteSaving] = useState(false);
-  const [threadSaved, setThreadSaved] = useState(false);
-  const [threadSaveCount, setThreadSaveCount] = useState(0);
   const [bookmarkSaving, setBookmarkSaving] = useState(false);
   const [solutionSavingId, setSolutionSavingId] = useState<string | null>(null);
   const trackedThreadViewRef = useRef<string | null>(null);
@@ -3599,38 +3573,16 @@ export function CommunityDetailModal({
     };
   }, [threadId]);
 
-  useEffect(() => {
-    if (!thread?.id) {
-      setThreadSaved(false);
-      setThreadSaveCount(0);
-      return;
-    }
-
-    let active = true;
-    const loadBookmark = async () => {
-      try {
-        const response = await authFetch(
-          `/api/forum/threads/${encodeURIComponent(thread.id)}/bookmark`,
-          { cache: 'no-store', headers: { Accept: 'application/json' } },
-        );
-        const payload = (await response.json().catch(() => ({}))) as {
-          bookmarked?: unknown;
-          bookmarkCount?: unknown;
-        };
-        if (!active || !response.ok) return;
-        setThreadSaved(Boolean(payload.bookmarked));
-        const count = Number(payload.bookmarkCount);
-        setThreadSaveCount(Number.isFinite(count) ? Math.max(0, count) : 0);
-      } catch {
-        // Best effort.
-      }
-    };
-
-    void loadBookmark();
-    return () => {
-      active = false;
-    };
-  }, [authFetch, thread?.id]);
+  const {
+    bookmarked: threadSaved,
+    bookmarkCount: threadSaveCount,
+    setBookmarked: setThreadSaved,
+    setBookmarkCount: setThreadSaveCount,
+  } = useCommunityBookmark(
+    authFetch,
+    thread?.id,
+    Boolean(thread?.id),
+  );
 
   useEffect(() => {
     if (!thread?.id || !thread.author?.id || !isAuthenticated) return;
