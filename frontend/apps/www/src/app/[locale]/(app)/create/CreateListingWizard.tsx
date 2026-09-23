@@ -1434,6 +1434,9 @@ export default function CreateListingWizard({
   const [error, setError] =
     useState('');
 
+  const [fieldErrors, setFieldErrors] =
+    useState<Record<string, string>>({});
+
   const [subcategories, setSubcategories] =
     useState<TaxonomyItem[]>([]);
 
@@ -1618,6 +1621,7 @@ export default function CreateListingWizard({
         );
 
         setError('');
+        setFieldErrors({});
         setAiCopyError('');
         setTaxonomyQuery('');
         setShowAllTaxonomy(false);
@@ -3236,6 +3240,13 @@ export default function CreateListingWizard({
         }),
       );
 
+      setFieldErrors(previous => {
+        if (!previous[key]) return previous;
+        const next = { ...previous };
+        delete next[key];
+        return next;
+      });
+
       setSaveStatus(
         'dirty',
       );
@@ -3265,6 +3276,13 @@ export default function CreateListingWizard({
               point,
           }),
         );
+
+        setFieldErrors(previous => {
+          const keys = ['location', 'address'];
+          const next = { ...previous };
+          for (const key of keys) delete next[key];
+          return next;
+        });
 
         setSaveStatus(
           'dirty',
@@ -3351,191 +3369,261 @@ export default function CreateListingWizard({
       [],
     );
 
-  const validateStep =
-    useCallback(
-      (step: number): string => {
-        if (
-          step === 1 &&
-          !intent
-        ) {
-          return text(
-            locale,
-            'Pilih dulu: mau menawarkan atau sedang mencari.',
-            'Choose whether you want to offer something or request something.',
-          );
+  const getStepValidationErrors = useCallback(
+    (step: number): Record<string, string> => {
+      const errors: Record<string, string> = {};
+
+      const setErrorFor = (
+        key: string,
+        messageId: string,
+        messageEn: string,
+      ) => {
+        if (!errors[key]) {
+          errors[key] = text(locale, messageId, messageEn);
         }
+      };
 
-        if (
-          step === 2 &&
-          !categorySlug
-        ) {
-          return text(
-            locale,
-            'Pilih kategori dulu.',
-            'Choose a category first.',
-          );
-        }
+      if (step === 1 && !intent) {
+        setErrorFor(
+          '__intent',
+          'Pilih dulu: mau menawarkan atau sedang mencari.',
+          'Choose whether you want to offer something or request something.',
+        );
+        return errors;
+      }
 
-        if (
-          step === 3 &&
-          !subcategorySlug
-        ) {
-          return text(
-            locale,
-            'Pilih satu jenis yang paling sesuai.',
-            'Choose the type that fits best.',
-          );
-        }
+      if (step === 2 && !categorySlug) {
+        setErrorFor(
+          '__category',
+          'Pilih kategori dulu.',
+          'Choose a category first.',
+        );
+        return errors;
+      }
 
-        const requiredFields =
-          fieldSchema.filter(
-            field =>
-              field.step ===
-                step &&
-              field.required,
-          );
+      if (step === 3 && !subcategorySlug) {
+        setErrorFor(
+          '__subcategory',
+          'Pilih satu jenis yang paling sesuai.',
+          'Choose the type that fits best.',
+        );
+        return errors;
+      }
 
-        const missing =
-          requiredFields.find(
-            field => {
-              if (
-                field.type ===
-                'toggle'
-              ) {
-                return false;
-              }
+      const stepFieldsForValidation = fieldSchema.filter(
+        field => field.step === step,
+      );
 
-              const value =
-                values[
-                  field.key
-                ];
+      for (const field of stepFieldsForValidation) {
+        const value = values[field.key];
 
-              if (
-                Array.isArray(
-                  value,
-                )
-              ) {
-                return (
-                  value.length === 0
-                );
-              }
+        if (field.required && field.type !== 'toggle') {
+          const missing = Array.isArray(value)
+            ? value.length === 0
+            : value === undefined ||
+              value === null ||
+              String(value).trim() === '';
 
-              return (
-                value ===
-                  undefined ||
-                value ===
-                  null ||
-                String(
-                  value,
-                ).trim() ===
-                  ''
-              );
-            },
-          );
-
-        if (missing) {
-          return text(
-            locale,
-            `Isi ${missing.labelId}.`,
-            `Fill ${missing.labelEn}.`,
-          );
-        }
-
-        const invalidLength = fieldSchema
-          .filter(field => field.step === step)
-          .find(field => {
-            const value = values[field.key];
-            if (typeof value !== 'string' || !value.trim()) return false;
-            const length = value.trim().length;
-            return Boolean(
-              (field.validation?.minLength &&
-                length < field.validation.minLength) ||
-                (field.validation?.maxLength &&
-                  length > field.validation.maxLength),
+          if (missing) {
+            setErrorFor(
+              field.key,
+              `Isi ${field.labelId}.`,
+              `Fill ${field.labelEn}.`,
             );
-          });
+            continue;
+          }
+        }
 
-        if (invalidLength) {
-          const length = String(values[invalidLength.key] || '').trim().length;
-          const minimum = invalidLength.validation?.minLength;
-          const maximum = invalidLength.validation?.maxLength;
+        if (typeof value === 'string' && value.trim()) {
+          const length = value.trim().length;
+          const minimum = field.validation?.minLength;
+          const maximum = field.validation?.maxLength;
+
           if (minimum && length < minimum) {
-            return text(
-              locale,
-              `${invalidLength.labelId} minimal ${minimum} karakter.`,
-              `${invalidLength.labelEn} must be at least ${minimum} characters.`,
+            setErrorFor(
+              field.key,
+              `${field.labelId} minimal ${minimum} karakter.`,
+              `${field.labelEn} must be at least ${minimum} characters.`,
             );
+            continue;
           }
+
           if (maximum && length > maximum) {
-            return text(
-              locale,
-              `${invalidLength.labelId} maksimal ${maximum} karakter.`,
-              `${invalidLength.labelEn} must be at most ${maximum} characters.`,
+            setErrorFor(
+              field.key,
+              `${field.labelId} maksimal ${maximum} karakter.`,
+              `${field.labelEn} must be at most ${maximum} characters.`,
             );
+            continue;
           }
         }
 
-        const locationField =
-          requiredFields.find(
-            field =>
-              STRUCTURED_LOCATION_FIELD_KEYS.has(
-                field.key,
-              ),
-          );
+        const numericField =
+          field.type === 'number' ||
+          field.type === 'currency' ||
+          field.key === 'minimum_order' ||
+          field.key === 'quantity';
 
         if (
-          locationField &&
-          !readSelectedLocationFromValues(
-            values,
-          )
+          numericField &&
+          value !== undefined &&
+          value !== null &&
+          String(value).trim() !== ''
         ) {
-          return text(
-            locale,
-            'Pilih lokasi dari hasil pencarian supaya alamat dan titik peta tersimpan dengan benar.',
-            'Choose a location from the search results so the address and map point are saved correctly.',
+          const numericValue = Number(
+            String(value).replace(/[^0-9.-]/g, ''),
           );
+
+          if (!Number.isFinite(numericValue)) {
+            setErrorFor(
+              field.key,
+              `${field.labelId} harus berupa angka yang valid.`,
+              `${field.labelEn} must be a valid number.`,
+            );
+            continue;
+          }
+
+          if (
+            field.validation?.min !== undefined &&
+            numericValue < field.validation.min
+          ) {
+            setErrorFor(
+              field.key,
+              `${field.labelId} minimal ${field.validation.min}.`,
+              `${field.labelEn} must be at least ${field.validation.min}.`,
+            );
+            continue;
+          }
+
+          if (
+            field.validation?.max !== undefined &&
+            numericValue > field.validation.max
+          ) {
+            setErrorFor(
+              field.key,
+              `${field.labelId} maksimal ${field.validation.max}.`,
+              `${field.labelEn} must be at most ${field.validation.max}.`,
+            );
+          }
         }
+      }
 
-        if (
-          step === 6 &&
-          media.some(item => item.status === 'uploading')
-        ) {
-          return text(
-            locale,
+      const requiredLocationField = fieldSchema.find(
+        field =>
+          field.step === step &&
+          field.required &&
+          STRUCTURED_LOCATION_FIELD_KEYS.has(field.key),
+      );
+
+      if (
+        requiredLocationField &&
+        !readSelectedLocationFromValues(values)
+      ) {
+        setErrorFor(
+          requiredLocationField.key,
+          'Pilih lokasi dari hasil pencarian supaya alamat dan titik peta tersimpan dengan benar.',
+          'Choose a location from the search results so the address and map point are saved correctly.',
+        );
+      }
+
+      if (step === 6) {
+        if (media.some(item => item.status === 'uploading')) {
+          setErrorFor(
+            '__media',
             'Tunggu semua foto selesai diunggah sebelum lanjut.',
             'Wait for all photo uploads to finish before continuing.',
           );
         }
 
         if (
-          step === 6 &&
           requiresPrimaryImage &&
-          media.filter(
-            item =>
-              item.status ===
-              'uploaded',
-          ).length === 0
+          media.filter(item => item.status === 'uploaded').length === 0
         ) {
-          return text(
-            locale,
+          setErrorFor(
+            '__media',
             'Tambahkan minimal satu foto produk atau referensi.',
             'Add at least one product or reference photo.',
           );
         }
+      }
 
-        return '';
-      },
-      [
-        categorySlug,
-        fieldSchema,
-        intent,
-        locale,
-        media,
-        requiresPrimaryImage,
-        subcategorySlug,
-        values,
-      ],
-    );
+      return errors;
+    },
+    [
+      categorySlug,
+      fieldSchema,
+      intent,
+      locale,
+      media,
+      requiresPrimaryImage,
+      subcategorySlug,
+      values,
+    ],
+  );
+
+  const firstValidationMessage = useCallback(
+    (errors: Record<string, string>): string => {
+      return Object.values(errors)[0] || '';
+    },
+    [],
+  );
+
+  const focusValidationError = useCallback((key: string) => {
+    if (typeof window === 'undefined') return;
+
+    window.requestAnimationFrame(() => {
+      const direct =
+        document.getElementById(`create-${key}`) ||
+        document.getElementById(`create-${key}-field`) ||
+        document.querySelector(
+          `[aria-labelledby="create-${key}-label"] button`,
+        );
+
+      if (direct instanceof HTMLElement) {
+        direct.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+        });
+        if (typeof direct.focus === 'function') {
+          direct.focus({ preventScroll: true });
+        }
+        return;
+      }
+
+      const field =
+        document.getElementById('create-validation-summary') ||
+        document.querySelector('[role="alert"]');
+
+      if (field instanceof HTMLElement) {
+        field.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+        });
+      }
+    });
+  }, []);
+
+  const showValidationErrors = useCallback(
+    (errors: Record<string, string>) => {
+      setFieldErrors(errors);
+      const firstKey = Object.keys(errors)[0];
+      if (firstKey) {
+        focusValidationError(firstKey);
+      }
+      setError(firstValidationMessage(errors));
+    },
+    [firstValidationMessage, focusValidationError],
+  );
+
+  const validateStep = useCallback(
+    (step: number): string => {
+      return firstValidationMessage(
+        getStepValidationErrors(step),
+      );
+    },
+    [firstValidationMessage, getStepValidationErrors],
+  );
+
 
   const ensureServerDraftForEditing =
     useCallback(
@@ -3555,14 +3643,13 @@ export default function CreateListingWizard({
     useCallback(
       async () => {
         setError('');
+        setFieldErrors({});
 
-        const message =
-          validateStep(
-            currentStep,
-          );
+        const validationErrors =
+          getStepValidationErrors(currentStep);
 
-        if (message) {
-          setError(message);
+        if (Object.keys(validationErrors).length) {
+          showValidationErrors(validationErrors);
           return;
         }
 
@@ -3617,7 +3704,8 @@ export default function CreateListingWizard({
         isAuthenticated,
         locale,
         saveServerDraft,
-        validateStep,
+        getStepValidationErrors,
+        showValidationErrors,
       ],
     );
 
@@ -4533,21 +4621,19 @@ export default function CreateListingWizard({
         try {
         setError('');
 
+        setFieldErrors({});
+
         for (
           let step = 1;
           step <= 8;
           step += 1
         ) {
-          const message =
-            validateStep(
-              step,
-            );
+          const validationErrors =
+            getStepValidationErrors(step);
 
-          if (message) {
-            setCurrentStep(
-              step,
-            );
-            setError(message);
+          if (Object.keys(validationErrors).length) {
+            setCurrentStep(step);
+            showValidationErrors(validationErrors);
             return;
           }
         }
@@ -5290,20 +5376,41 @@ export default function CreateListingWizard({
     'target_move',
   ]);
 
-  const stepFields =
-    currentStep === 5
-      ? fieldsForStep(fieldSchema, 5)
-          .filter(field => showMoreDetails || field.group !== 'additional')
-          .slice(0, showMoreDetails ? 12 : 5)
-      : currentStep === 4
-        ? orderMainStepFields(fieldsForStep(fieldSchema, 4))
-            .filter(field => field.required || quickMainFieldKeys.has(field.key))
-            .slice(0, 6)
-        : currentStep === 7
-          ? fieldsForStep(fieldSchema, 7).slice(0, 4)
-          : currentStep === 8
-            ? fieldsForStep(fieldSchema, 8).slice(0, 4)
-            : [];
+  const stepFields = (() => {
+    if (![4, 5, 7, 8].includes(currentStep)) return [];
+
+    const allFields = fieldsForStep(fieldSchema, currentStep as 4 | 5 | 7 | 8);
+    const ordered =
+      currentStep === 4
+        ? orderMainStepFields(allFields)
+        : allFields;
+    const required = ordered.filter(field => field.required);
+    const optional = ordered.filter(field => !field.required);
+
+    const visibleOptional =
+      currentStep === 5
+        ? optional.filter(
+            field => showMoreDetails || field.group !== 'additional',
+          )
+        : optional;
+
+    const limit =
+      currentStep === 5
+        ? showMoreDetails
+          ? 12
+          : 5
+        : currentStep === 4
+          ? 7
+          : 4;
+
+    const requiredKeys = new Set(required.map(field => field.key));
+    const optionalSlots = Math.max(0, limit - required.length);
+    const compactOptional = visibleOptional
+      .filter(field => !requiredKeys.has(field.key))
+      .slice(0, optionalSlots);
+
+    return [...required, ...compactOptional];
+  })();
 
   const progressByStep = [
     10,
@@ -5746,8 +5853,27 @@ export default function CreateListingWizard({
           )
         : '');
 
+    const fieldError = fieldErrors[field.key];
+
     const common =
-      'w-full rounded-[14px] border border-slate-200 bg-white px-3.5 py-3 text-[16px] font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-50 dark:placeholder:text-slate-500 sm:text-sm';
+      'w-full rounded-[14px] border bg-white px-3.5 py-3 text-[16px] font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:ring-2 dark:bg-slate-950 dark:text-slate-50 dark:placeholder:text-slate-500 sm:text-sm';
+
+    const commonWithError = cn(
+      common,
+      fieldError
+        ? 'border-red-500 focus:border-red-500 focus:ring-red-100 dark:border-red-500'
+        : 'border-slate-200 focus:border-emerald-500 focus:ring-emerald-100 dark:border-slate-700',
+    );
+
+    const fieldErrorText = fieldError ? (
+      <p
+        id={`${id}-error`}
+        role="alert"
+        className="text-xs font-semibold leading-5 text-red-600 dark:text-red-300"
+      >
+        {fieldError}
+      </p>
+    ) : null;
 
     const labelBlock = (
       <span
@@ -5755,7 +5881,12 @@ export default function CreateListingWizard({
         className="block"
         title={help || undefined}
       >
-        <span className="text-sm font-black text-slate-800 dark:text-slate-100">
+        <span className={cn(
+          'text-sm font-black',
+          fieldError
+            ? 'text-red-700 dark:text-red-300'
+            : 'text-slate-800 dark:text-slate-100',
+        )}>
           {label}
           {field.required ? (
             <span className="ml-1 text-red-600" aria-label={text(locale, 'Wajib', 'Required')}>
@@ -5806,8 +5937,12 @@ export default function CreateListingWizard({
     ) {
       return (
         <div
+          id={`create-${field.key}-field`}
           key={field.key}
-          className="space-y-2"
+          className={cn(
+            'space-y-2 rounded-xl',
+            fieldError && 'border border-red-300 bg-red-50/30 p-2 dark:border-red-900/70 dark:bg-red-950/20',
+          )}
         >
           {labelBlock}
 
@@ -5860,6 +5995,7 @@ export default function CreateListingWizard({
           />
 
           {locationPickerControl}
+          {fieldErrorText}
         </div>
       );
     }
@@ -5877,12 +6013,14 @@ export default function CreateListingWizard({
 
           <textarea
             id={id}
+            aria-invalid={Boolean(fieldError)}
+            aria-describedby={fieldError ? `${id}-error` : undefined}
             rows={4}
             required={
               field.required
             }
             className={cn(
-              common,
+              commonWithError,
               'min-w-0 resize-y',
             )}
             value={valueAsString(
@@ -5925,10 +6063,11 @@ export default function CreateListingWizard({
           <div
             role="radiogroup"
             aria-labelledby={`${id}-label`}
-            aria-required={
-              field.required
-            }
-            className="flex flex-wrap gap-2"
+            aria-required={field.required}
+            className={cn(
+              'flex flex-wrap gap-2 rounded-xl',
+              fieldError && 'border border-red-300 bg-red-50/30 p-2 dark:border-red-900/70 dark:bg-red-950/20',
+            )}
           >
             {field.options?.map(
               option => {
@@ -5973,6 +6112,7 @@ export default function CreateListingWizard({
               },
             )}
           </div>
+          {fieldErrorText}
         </div>
       );
     }
@@ -6072,7 +6212,10 @@ export default function CreateListingWizard({
           <div
             role="group"
             aria-labelledby={`${id}-label`}
-            className="flex flex-wrap gap-2"
+            className={cn(
+              'flex flex-wrap gap-2 rounded-xl',
+              fieldError && 'border border-red-300 bg-red-50/30 p-2 dark:border-red-900/70 dark:bg-red-950/20',
+            )}
           >
             {field.options?.map(
               option => {
@@ -6194,6 +6337,7 @@ export default function CreateListingWizard({
               </button>
             </div>
           ) : null}
+          {fieldErrorText}
         </div>
       );
     }
@@ -6214,7 +6358,9 @@ export default function CreateListingWizard({
             required={
               field.required
             }
-            className={common}
+            aria-invalid={Boolean(fieldError)}
+            aria-describedby={fieldError ? `${id}-error` : undefined}
+            className={commonWithError}
             value={valueAsString(
               values[field.key],
             )}
@@ -6263,7 +6409,12 @@ export default function CreateListingWizard({
       return (
         <label
           key={field.key}
-          className="flex min-h-[60px] cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3.5 py-3 dark:border-slate-700 dark:bg-slate-900"
+          className={cn(
+            'flex min-h-[60px] cursor-pointer items-center justify-between gap-3 rounded-xl border px-3.5 py-3 dark:bg-slate-900',
+            fieldError
+              ? 'border-red-500 bg-red-50/30 dark:border-red-500 dark:bg-red-950/20'
+              : 'border-slate-200 bg-white dark:border-slate-700',
+          )}
         >
           {labelBlock}
 
@@ -6298,7 +6449,12 @@ export default function CreateListingWizard({
         >
           {labelBlock}
 
-          <div className="flex items-center overflow-hidden rounded-xl border border-slate-200 bg-white text-sm text-slate-900 transition focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50">
+          <div className={cn(
+            'flex items-center overflow-hidden rounded-xl border bg-white text-sm text-slate-900 transition focus-within:ring-2 dark:bg-slate-900 dark:text-slate-50',
+            fieldError
+              ? 'border-red-500 focus-within:border-red-500 focus-within:ring-red-100 dark:border-red-500'
+              : 'border-slate-200 focus-within:border-emerald-500 focus-within:ring-emerald-100 dark:border-slate-700',
+          )}>
             <span className="shrink-0 border-r border-slate-200 px-3.5 py-3 font-bold text-slate-500 dark:border-slate-700 dark:text-slate-400">
               Rp
             </span>
@@ -6311,6 +6467,8 @@ export default function CreateListingWizard({
               required={
                 field.required
               }
+              aria-invalid={Boolean(fieldError)}
+              aria-describedby={fieldError ? `${id}-error` : undefined}
               className="min-w-0 flex-1 bg-transparent px-3.5 py-3 outline-none"
               value={formatRupiahNumber(
                 values[field.key],
@@ -6326,6 +6484,7 @@ export default function CreateListingWizard({
               }
             />
           </div>
+          {fieldErrorText}
         </label>
       );
     }
@@ -6348,9 +6507,16 @@ export default function CreateListingWizard({
         >
           {labelBlock}
 
-          <div className="flex items-center overflow-hidden rounded-xl border border-slate-200 bg-white text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50">
+          <div className={cn(
+            'flex items-center overflow-hidden rounded-xl border bg-white text-sm text-slate-900 dark:bg-slate-900 dark:text-slate-50',
+            fieldError
+              ? 'border-red-500 dark:border-red-500'
+              : 'border-slate-200 dark:border-slate-700',
+          )}>
             <input
               id={id}
+              aria-invalid={Boolean(fieldError)}
+              aria-describedby={fieldError ? `${id}-error` : undefined}
               type="text"
               inputMode="decimal"
               autoComplete="off"
@@ -6392,6 +6558,7 @@ export default function CreateListingWizard({
                 )}
             </span>
           </div>
+          {fieldErrorText}
         </label>
       );
     }
@@ -6409,9 +6576,16 @@ export default function CreateListingWizard({
         >
           {labelBlock}
 
-          <div className="flex items-center overflow-hidden rounded-xl border border-slate-200 bg-white text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50">
+          <div className={cn(
+            'flex items-center overflow-hidden rounded-xl border bg-white text-sm text-slate-900 dark:bg-slate-900 dark:text-slate-50',
+            fieldError
+              ? 'border-red-500 dark:border-red-500'
+              : 'border-slate-200 dark:border-slate-700',
+          )}>
             <input
               id={id}
+              aria-invalid={Boolean(fieldError)}
+              aria-describedby={fieldError ? `${id}-error` : undefined}
               type="number"
               inputMode="decimal"
               required={
@@ -6461,6 +6635,7 @@ export default function CreateListingWizard({
               )}
             </span>
           </div>
+          {fieldErrorText}
         </label>
       );
     }
@@ -6474,9 +6649,9 @@ export default function CreateListingWizard({
 
         <input
           id={id}
-          required={
-            field.required
-          }
+          aria-invalid={Boolean(fieldError)}
+          aria-describedby={fieldError ? `${id}-error` : undefined}
+          required={field.required}
           type={
             field.type ===
             'date'
@@ -6486,7 +6661,7 @@ export default function CreateListingWizard({
                 ? 'number'
                 : 'text'
           }
-          className={common}
+          className={commonWithError}
           value={valueAsString(
             values[field.key],
           )}
@@ -6515,6 +6690,7 @@ export default function CreateListingWizard({
             )
           }
         />
+        {fieldErrorText}
       </label>
     );
   }
@@ -6535,6 +6711,7 @@ export default function CreateListingWizard({
 
     return (
       <div
+        id={`create-${field.key}-field`}
         key={field.key}
         className={cn(
           shouldSpan &&
@@ -6607,8 +6784,9 @@ export default function CreateListingWizard({
             ) : null}
           </header>
 
-          {error ? (
+          {error && Object.keys(fieldErrors).length === 0 ? (
             <div
+              id="create-validation-summary"
               role="alert"
               className="mb-4 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200"
             >
@@ -6619,7 +6797,13 @@ export default function CreateListingWizard({
 
           {/* STEP 1 */}
           {currentStep === 1 ? (
-            <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+            <div
+              id="create-__intent-field"
+              className={cn(
+                'grid grid-cols-2 gap-2.5 sm:gap-3 rounded-2xl',
+                fieldErrors.__intent && 'border border-red-300 bg-red-50/30 p-1.5 dark:border-red-900/70 dark:bg-red-950/20',
+              )}
+            >
               {[
                 {
                   value: 'request' as const,
@@ -6643,6 +6827,11 @@ export default function CreateListingWizard({
                   type="button"
                   onClick={() => {
                     setIntent(item.value);
+                    setFieldErrors(previous => {
+                      const next = { ...previous };
+                      delete next.__intent;
+                      return next;
+                    });
                     setCurrentStep(2);
                     setError('');
                     setSaveStatus('dirty');
@@ -6671,11 +6860,22 @@ export default function CreateListingWizard({
                 </button>
               ))}
             </div>
+            {fieldErrors.__intent ? (
+              <p className="mt-2 text-xs font-semibold text-red-600 dark:text-red-300" role="alert">
+                {fieldErrors.__intent}
+              </p>
+            ) : null}
           ) : null}
 
           {/* STEP 2 */}
           {currentStep === 2 ? (
-            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3">
+            <div
+              id="create-__category-field"
+              className={cn(
+                'grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 rounded-2xl',
+                fieldErrors.__category && 'border border-red-300 bg-red-50/30 p-1.5 dark:border-red-900/70 dark:bg-red-950/20',
+              )}
+            >
               {CREATE_BUSINESS_CATEGORIES.map(item => {
                 const visual = getCreateBusinessCategoryImage(item.id);
                 const selected = categorySlug === item.slugEn;
@@ -6687,6 +6887,12 @@ export default function CreateListingWizard({
                     onClick={() => {
                       setCategorySlug(item.slugEn);
                       setSubcategorySlug(undefined);
+                      setFieldErrors(previous => {
+                        const next = { ...previous };
+                        delete next.__category;
+                        delete next.__subcategory;
+                        return next;
+                      });
                       setTaxonomyQuery('');
                       setShowAllTaxonomy(false);
                       setShowIndustryChoices(false);
@@ -6732,11 +6938,22 @@ export default function CreateListingWizard({
                 );
               })}
             </div>
+            {fieldErrors.__category ? (
+              <p className="mt-2 text-xs font-semibold text-red-600 dark:text-red-300" role="alert">
+                {fieldErrors.__category}
+              </p>
+            ) : null}
           ) : null}
 
           {/* STEP 3 */}
           {currentStep === 3 ? (
-            <div className="mx-auto max-w-2xl space-y-3">
+            <div
+              id="create-__subcategory-field"
+              className={cn(
+                'mx-auto max-w-2xl space-y-3 rounded-2xl',
+                fieldErrors.__subcategory && 'border border-red-300 bg-red-50/30 p-2 dark:border-red-900/70 dark:bg-red-950/20',
+              )}
+            >
               <div className="flex min-h-12 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100 dark:border-slate-700 dark:bg-slate-950">
                 <Search className="h-4 w-4 shrink-0 text-slate-400" />
                 <input
@@ -6774,6 +6991,11 @@ export default function CreateListingWizard({
                         aria-pressed={selected}
                         onClick={() => {
                           setSubcategorySlug(item.slug);
+                          setFieldErrors(previous => {
+                            const next = { ...previous };
+                            delete next.__subcategory;
+                            return next;
+                          });
                           setError('');
                           setSaveStatus('dirty');
                         }}
@@ -6799,6 +7021,11 @@ export default function CreateListingWizard({
                 >
                   {text(locale, 'Lihat semua jenis', 'View all types')}
                 </button>
+              ) : null}
+              {fieldErrors.__subcategory ? (
+                <p className="text-xs font-semibold text-red-600 dark:text-red-300" role="alert">
+                  {fieldErrors.__subcategory}
+                </p>
               ) : null}
             </div>
           ) : null}
@@ -6860,7 +7087,12 @@ export default function CreateListingWizard({
           {currentStep ===
           6 ? (
             <div className="mx-auto max-w-2xl space-y-4">
-              <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950">
+              <div className={cn(
+                'rounded-2xl border border-dashed bg-slate-50 p-4 dark:bg-slate-950',
+                fieldErrors.__media
+                  ? 'border-red-400 bg-red-50/30 dark:border-red-900/70 dark:bg-red-950/20'
+                  : 'border-slate-300 dark:border-slate-700',
+              )}>
                 <div className="text-center">
                   <Images className="mx-auto mb-2 h-7 w-7 text-emerald-600" />
 
@@ -6930,6 +7162,12 @@ export default function CreateListingWizard({
                     />
                   </label>
                 </div>
+
+                {fieldErrors.__media ? (
+                  <p role="alert" className="mt-3 text-center text-xs font-semibold text-red-600 dark:text-red-300">
+                    {fieldErrors.__media}
+                  </p>
+                ) : null}
 
                 <p className="mt-3 text-center text-[11px] font-semibold text-slate-500">
                   {text(
