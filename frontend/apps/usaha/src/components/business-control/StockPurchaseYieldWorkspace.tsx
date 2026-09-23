@@ -315,6 +315,7 @@ export function StockPurchaseYieldWorkspace({
               onChange={setAccountKey}
               ariaLabel="Dibayar lewat"
               options={paymentOptions}
+              mode="modal"
               disabled={!canManage}
             />
           </div>
