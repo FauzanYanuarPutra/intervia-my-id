@@ -27,6 +27,16 @@ describe('chat attachment policy', () => {
     });
   });
 
+  it('accepts encoded canonical room ids in protected media URLs', () => {
+    const url =
+      '/api/chat/media/laju-chat/chat/dm%3A11111111-1111-4111-8111-111111111111%3A22222222-2222-4222-8222-222222222222/file.webp';
+
+    expect(safeChatMediaReference(url)).toBe(url);
+    expect(
+      normalizeChatAttachments('image', [url]),
+    ).toEqual({ ok: true, attachments: [url] });
+  });
+
   it('canonicalizes configured app and MinIO URLs to same-origin proxy paths', () => {
     expect(
       safeChatMediaReference(
