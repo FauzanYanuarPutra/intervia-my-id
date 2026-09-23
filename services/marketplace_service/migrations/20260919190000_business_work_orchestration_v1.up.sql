@@ -17,12 +17,12 @@ ON CONFLICT (permission_key) DO NOTHING;
 CREATE OR REPLACE FUNCTION public.update_timestamp()
 RETURNS trigger
 LANGUAGE plpgsql
-AS $$
+AS $function$
 BEGIN
   NEW.updated_at = NOW();
   RETURN NEW;
 END;
-$;
+$function$;
 
 CREATE TABLE business_work_items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
