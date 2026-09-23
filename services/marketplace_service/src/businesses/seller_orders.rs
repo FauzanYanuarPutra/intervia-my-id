@@ -512,7 +512,10 @@ fn normalize_transition_metadata(
     if next_status != OrderState::Paid {
         return Ok(Value::Object(object.clone()));
     }
-    let Some(confirmation) = object.get("payment_confirmation").and_then(Value::as_object) else {
+    let Some(confirmation) = object
+        .get("payment_confirmation")
+        .and_then(Value::as_object)
+    else {
         return Err(SellerOrderRepositoryError::Validation(
             "manual_payment_confirmation_required",
         ));
@@ -522,7 +525,10 @@ fn normalize_transition_metadata(
             "manual_payment_confirmation_required",
         ));
     }
-    let method = confirmation.get("method").and_then(Value::as_str).unwrap_or("");
+    let method = confirmation
+        .get("method")
+        .and_then(Value::as_str)
+        .unwrap_or("");
     if !matches!(method, "cash" | "bank_transfer" | "qris_manual") {
         return Err(SellerOrderRepositoryError::Validation(
             "invalid_manual_payment_method",

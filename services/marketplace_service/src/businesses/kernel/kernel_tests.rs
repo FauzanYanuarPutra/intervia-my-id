@@ -90,10 +90,7 @@ fn money_rejects_negative_insufficient_and_overflow_values() {
         .unwrap()
         .checked_add(Money::idr(1).unwrap())
         .is_err());
-    assert!(Money::idr(i64::MAX)
-        .unwrap()
-        .checked_mul_i64(2)
-        .is_err());
+    assert!(Money::idr(i64::MAX).unwrap().checked_mul_i64(2).is_err());
     assert!(Money::idr(1).unwrap().checked_mul_i64(-1).is_err());
 }
 

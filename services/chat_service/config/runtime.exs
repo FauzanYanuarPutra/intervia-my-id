@@ -24,6 +24,7 @@ if config_env() == :prod do
     |> String.upcase()
 
   jwt_secret = System.get_env("JWT_SECRET")
+
   jwt_public_key_pem =
     if jwt_algorithm == "RS256" do
       System.fetch_env!("JWT_PUBLIC_KEY_PEM")
