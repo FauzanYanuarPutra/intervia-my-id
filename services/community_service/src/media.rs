@@ -143,3 +143,12 @@ pub(crate) fn is_video_url(value: &str) -> bool {
         || lower.ends_with(".mkv")
         || lower.ends_with(".3gp")
 }
+
+
+/// Returns the first feed media URL, preferring the canonical root post media over legacy thread media.
+pub(crate) fn first_feed_media_url(thread_image_urls: &[String], root_post_image_urls: &[String]) -> Option<String> {
+    root_post_image_urls
+        .first()
+        .cloned()
+        .or_else(|| thread_image_urls.first().cloned())
+}
