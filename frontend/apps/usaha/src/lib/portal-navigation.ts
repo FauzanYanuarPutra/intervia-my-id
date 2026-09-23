@@ -13,7 +13,7 @@ const labels: Record<PortalSection, string> = {
   inventory: 'Stok',
   finance: 'Uang',
   reports: 'Laporan',
-  channels: 'Kanal Jual',
+  channels: 'Jual Online',
   info: 'Pengaturan Usaha',
   locations: 'Lokasi & Outlet',
   operations: 'Jam & Operasional',
