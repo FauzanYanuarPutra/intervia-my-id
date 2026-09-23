@@ -77,7 +77,7 @@ if config_env() == :prod do
   config :chat_service,
     jwt_issuer: jwt_issuer,
     jwt_audiences: jwt_audiences,
-    jwt_legacy_secret: jwt_secret,
+    jwt_legacy_secret: jwt_legacy_secret,
     jwt_public_key_pem: jwt_public_key_pem,
     jwt_allow_legacy_hs256: jwt_allow_legacy_hs256,
     identity_service_url:
