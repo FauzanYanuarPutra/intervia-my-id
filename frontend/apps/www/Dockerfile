@@ -56,10 +56,21 @@ COPY packages /app/packages
 
 RUN set -eux; \
     cd /app/packages; \
+    retry_npm() { \
+      attempt=1; \
+      while [ "$attempt" -le 5 ]; do \
+        "$@" && return 0; \
+        echo "npm command failed, retry ${attempt}/5"; \
+        npm cache verify || true; \
+        sleep $((attempt * 10)); \
+        attempt=$((attempt + 1)); \
+      done; \
+      return 1; \
+    }; \
     if [ -f package-lock.json ]; then \
-      npm ci --legacy-peer-deps --include=dev --prefer-offline --no-audit --no-fund; \
+      retry_npm npm ci --legacy-peer-deps --include=dev --prefer-offline --no-audit --no-fund; \
     else \
-      npm install --legacy-peer-deps --include=dev --prefer-offline --no-audit --no-fund; \
+      retry_npm npm install --legacy-peer-deps --include=dev --prefer-offline --no-audit --no-fund; \
     fi; \
     ./node_modules/.bin/tsc -p tsconfig.build.json
 
