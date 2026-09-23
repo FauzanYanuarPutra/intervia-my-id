@@ -3192,7 +3192,7 @@
           </button>
 
           <div className="flex min-w-0 items-center justify-center">
-            <div className="inline-flex max-w-full min-w-0 items-center rounded-full bg-black/34 p-1 ring-1 ring-white/10 xl:hidden">
+            <div className="inline-flex max-w-full min-w-0 items-center gap-3 px-1 pt-1 xl:hidden">
               {tabs.map(tab => {
                 const active = feedTab === tab.id;
                 return (
@@ -3202,10 +3202,12 @@
                     onClick={() => onFeedTabChange(tab.id)}
                     aria-pressed={active}
                     className={cn(
-                      'relative min-h-8 min-w-0 rounded-full px-1.5 text-[10px] font-bold transition min-[360px]:px-2 min-[390px]:px-2.5 min-[390px]:text-[11px]',
+                      'relative min-h-9 min-w-0 shrink-0 px-0.5 text-[10px] font-extrabold tracking-[-0.01em] transition min-[360px]:text-[11px]',
                       active
-                        ? 'bg-white text-slate-950 shadow-sm'
-                        : 'text-white/70 hover:text-white',
+                        ? 'text-white'
+                        : 'text-white/58 hover:text-white/85',
+                      active &&
+                        'after:absolute after:-bottom-0.5 after:left-1/2 after:h-[2px] after:w-5 after:-translate-x-1/2 after:rounded-full after:bg-white',
                     )}
                   >
                     {isId ? tab.idLabel : tab.enLabel}
@@ -3764,6 +3766,9 @@
           locale={locale}
           reel={reel}
           actionState={actionState}
+          muted={muted}
+          soundUnlocked={soundUnlocked}
+          onToggleSound={onToggleSound}
           onOpenComments={onOpenComments}
           onOpenShare={onOpenShare}
           onOpenActions={onOpenActions}
@@ -3772,7 +3777,7 @@
 
         {likeBurst ? (
           <div className="pointer-events-none absolute inset-0 z-30 grid place-items-center">
-            <Heart className="h-24 w-24 fill-white text-white drop-shadow-[0_10px_28px_rgba(0,0,0,0.38)] animate-[ping_650ms_ease-out_1]" />
+            <Heart className="h-24 w-24 fill-rose-400 text-rose-400 drop-shadow-[0_10px_28px_rgba(0,0,0,0.48)] animate-[ping_650ms_ease-out_1]" />
           </div>
         ) : null}
 
@@ -3931,6 +3936,9 @@
     locale,
     reel,
     actionState,
+    muted,
+    soundUnlocked,
+    onToggleSound,
     onOpenComments,
     onOpenShare,
     onOpenActions,
@@ -3939,6 +3947,9 @@
     locale: string;
     reel: LajukanReel;
     actionState: ReelActionState;
+    muted: boolean;
+    soundUnlocked: boolean;
+    onToggleSound: () => void;
     onOpenComments: () => void;
     onOpenShare: () => void;
     onOpenActions: () => void;
@@ -3984,6 +3995,11 @@
       },
       {
         key: 'save',
+        label: actionState.saved
+          ? isId
+            ? 'Tersimpan'
+            : 'Saved'
+          : undefined,
         ariaLabel: actionState.saved
           ? isId
             ? 'Hapus dari tersimpan'
@@ -4002,6 +4018,19 @@
         ariaLabel: isId ? 'Bagikan Reels' : 'Share Reel',
         icon: Forward,
         onClick: onOpenShare,
+      },
+      {
+        key: 'sound',
+        ariaLabel: muted
+          ? isId
+            ? 'Nyalakan suara'
+            : 'Turn on sound'
+          : isId
+            ? 'Matikan suara'
+            : 'Mute sound',
+        icon: muted ? VolumeX : Volume2,
+        active: !muted,
+        onClick: onToggleSound,
       },
       {
         key: 'more',
@@ -4076,9 +4105,16 @@
             >
               <span
                 className={cn(
-                  '!grid !h-10 !w-10 place-items-center rounded-full !bg-black/[0.34] !text-white shadow-md shadow-black/25 ring-1 ring-white/10 transition min-[390px]:!h-11 min-[390px]:!w-11',
-                  action.key === 'like' && action.active && '!text-rose-500',
-                  action.key === 'save' && action.active && '!text-yellow-300',
+                  '!grid !h-10 !w-10 place-items-center rounded-full !bg-black/[0.34] !text-white shadow-md shadow-black/25 ring-1 ring-white/10 transition duration-200 min-[390px]:!h-11 min-[390px]:!w-11',
+                  action.key === 'like' &&
+                    action.active &&
+                    '!bg-rose-500/18 !text-rose-300 !ring-rose-300/25 scale-[1.06]',
+                  action.key === 'save' &&
+                    action.active &&
+                    '!bg-amber-400/16 !text-amber-200 !ring-amber-200/25 scale-[1.06]',
+                  action.key === 'sound' &&
+                    action.active &&
+                    '!bg-white/14 !text-white !ring-white/20',
                 )}
               >
                 {action.loading ? (
@@ -4087,7 +4123,9 @@
                   <ActionIcon
                     className={cn(
                       '!h-5 !w-5 fill-none stroke-current stroke-[2.45] min-[390px]:!h-[22px] min-[390px]:!w-[22px]',
-                      action.active && 'fill-current',
+                      action.active &&
+                        action.key !== 'sound' &&
+                        'fill-current',
                     )}
                   />
                 )}
