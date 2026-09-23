@@ -230,6 +230,9 @@ defmodule ChatServiceWeb.MessageController do
               {:error, :invalid_client_ref} ->
                 conn |> put_status(:bad_request) |> json(%{error: "invalid client_ref"})
 
+              {:error, :invalid_reference} ->
+                conn |> put_status(:bad_request) |> json(%{error: "referenced message not found"})
+
               {:error, :invalid_attachments} ->
                 conn |> put_status(:bad_request) |> json(%{error: "invalid attachments"})
 
