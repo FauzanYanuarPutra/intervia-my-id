@@ -121,7 +121,7 @@ async fn sync(
 ) -> Response {
     let (actor_id, authorization) = match actor_and_authorization(&state, &headers) {
         Ok(value) => value,
-        Err(response) => return response,
+        Err(code) => return api_error(StatusCode::UNAUTHORIZED, code),
     };
 
     let organization = match service(&state)
@@ -153,7 +153,7 @@ async fn update(
 ) -> Response {
     let (actor_id, authorization) = match actor_and_authorization(&state, &headers) {
         Ok(value) => value,
-        Err(response) => return response,
+        Err(code) => return api_error(StatusCode::UNAUTHORIZED, code),
     };
 
     let organization = match service(&state)
