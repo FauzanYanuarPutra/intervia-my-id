@@ -2193,6 +2193,7 @@ export function CommunityPostCard({
   const [localVote, setLocalVote] = useState(item.viewerVote || 0);
   const [reactionCount, setReactionCount] = useState(item.stats.reactions);
   const [commentCount, setCommentCount] = useState(item.stats.comments);
+  const [likeSaving, setLikeSaving] = useState(false);
 
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
@@ -2280,6 +2281,11 @@ export function CommunityPostCard({
   };
 
   /* ================= COMMENT DATA ================= */
+
+  useEffect(() => {
+    setLocalVote(item.viewerVote || 0);
+    setReactionCount(item.stats.reactions);
+  }, [item.id, item.stats.reactions, item.viewerVote]);
 
   useEffect(() => {
     setCommentCount(item.stats.comments);
@@ -2585,7 +2591,7 @@ export function CommunityPostCard({
   /* ================= POST LIKE ================= */
 
   const handleLike = async () => {
-    if (item.kind !== 'discussion' || !item.threadId) return;
+    if (item.kind !== 'discussion' || !item.threadId || likeSaving) return;
 
     if (!isAuthenticated) {
       router.push(loginHref);
@@ -2593,31 +2599,70 @@ export function CommunityPostCard({
     }
 
     const wasLiked = localVote === 1;
+    const nextVote = wasLiked ? 0 : 1;
+    const previousVote = localVote;
+    const previousCount = reactionCount;
 
-    setLocalVote(wasLiked ? 0 : 1);
+    setLikeSaving(true);
+    setLocalVote(nextVote);
     setReactionCount(current =>
-      Math.max(0, current + (wasLiked ? -1 : 1)),
+      Math.max(0, current + (nextVote === 1 ? 1 : previousVote === 1 ? -1 : 0)),
     );
 
-    const response = await authFetch(
-      `/api/forum/threads/${encodeURIComponent(item.threadId)}/vote`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ value: 1 }),
-      },
-    );
-
-    if (!response.ok) {
-      setLocalVote(wasLiked ? 1 : 0);
-      setReactionCount(current =>
-        Math.max(0, current + (wasLiked ? 1 : -1)),
+    try {
+      const response = await authFetch(
+        `/api/forum/threads/${encodeURIComponent(item.threadId)}/vote`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ value: nextVote }),
+        },
       );
-      return;
-    }
 
-    if (!wasLiked) {
-      trackCommunityEvent('content.liked', 'like');
+      const payload = (await response.json().catch(() => ({}))) as {
+        currentVote?: unknown;
+        previousVote?: unknown;
+        thread?: {
+          voteScore?: unknown;
+          likeCount?: unknown;
+          viewerVote?: unknown;
+        };
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.error || 'Gagal mengubah reaksi');
+      }
+
+      const serverVote = Number(
+        payload.currentVote ?? payload.thread?.viewerVote ?? nextVote,
+      );
+      const serverScore = Number(
+        payload.thread?.voteScore ?? payload.thread?.likeCount,
+      );
+
+      setLocalVote(
+        Number.isFinite(serverVote) ? (serverVote > 0 ? 1 : serverVote < 0 ? -1 : 0) : nextVote,
+      );
+      if (Number.isFinite(serverScore)) {
+        setReactionCount(Math.max(0, serverScore));
+      }
+
+      if (nextVote === 1 && previousVote !== 1) {
+        trackCommunityEvent('content.liked', 'like');
+      }
+    } catch {
+      setLocalVote(previousVote);
+      setReactionCount(previousCount);
+      notify({
+        title: isId ? 'Reaksi gagal' : 'Reaction failed',
+        description: isId
+          ? 'Like belum berhasil disimpan. Coba lagi.'
+          : 'Your reaction could not be saved. Try again.',
+        variant: 'error',
+      });
+    } finally {
+      setLikeSaving(false);
     }
   };
 
