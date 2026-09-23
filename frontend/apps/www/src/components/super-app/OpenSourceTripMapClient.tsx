@@ -1,7 +1,16 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { MapContainer, Marker, Polyline, TileLayer, Tooltip, ZoomControl, useMap } from 'react-leaflet';
+import {
+  AttributionControl,
+  MapContainer,
+  Marker,
+  Polyline,
+  TileLayer,
+  Tooltip,
+  ZoomControl,
+  useMap,
+} from 'react-leaflet';
 import { divIcon, type DivIcon, type LatLngBoundsExpression, type LatLngExpression } from 'leaflet';
 import { LatLng } from '@/lib/super-app/maps';
 
@@ -299,9 +308,10 @@ export function OpenSourceTripMapClient({
 
   const tileUrl =
     process.env.NEXT_PUBLIC_OSM_TILE_URL || 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-  const tileAttribution =
+  const tileAttribution = (
     process.env.NEXT_PUBLIC_OSM_TILE_ATTRIBUTION ||
-    '&copy; OpenStreetMap contributors';
+    '&copy; OpenStreetMap contributors'
+  ).replace(/^\s*Leaflet\s*\|\s*/i, '').trim();
 
   const query = useMemo(() => {
     if (!resolvedDestination) return null;
@@ -433,6 +443,7 @@ export function OpenSourceTripMapClient({
         fitPaddingBottom={fitPaddingBottom}
       />
       <TileLayer url={tileUrl} attribution={tileAttribution} />
+      <AttributionControl position="bottomright" prefix={false} />
 
       {polyline.length > 1 ? (
         <Polyline
