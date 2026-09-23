@@ -186,6 +186,8 @@ type QuickCategoryUiConfig = Pick<
   'tone' | 'flip' | 'scale' | 'rotate' | 'offsetX' | 'offsetY' | 'imageSize'
 >;
 
+type QuickCategoryUiId = LajukanExploreCategoryId | 'all';
+
 type TrendingSearchItem = {
   label: string;
   href: string;
@@ -1478,10 +1480,7 @@ function buildGameSnapshot(
   };
 }
 
-const QUICK_CATEGORY_UI: Record<
-  LajukanExploreCategoryId | 'all',
-  QuickCategoryUiConfig
-> = {
+const QUICK_CATEGORY_UI: Record<QuickCategoryUiId, QuickCategoryUiConfig> = {
   equipment: {
     tone: 'emerald',
     flip: true,
