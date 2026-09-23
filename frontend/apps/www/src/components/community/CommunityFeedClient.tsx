@@ -2283,8 +2283,6 @@ export function CommunityPostCard({
     }
   };
 
-  /* ================= COMMENT DATA ================= */
-
   useEffect(() => {
     setLocalVote(item.viewerVote || 0);
     setReactionCount(item.stats.reactions);
@@ -2352,11 +2350,6 @@ export function CommunityPostCard({
         if (!alive) return;
 
         const posts = payload.data || [];
-
-        /*
-         * Sama persis dengan pola CommunityDetailModal:
-         * post pertama tanpa replyToPostId dianggap root post.
-         */
         const rootPost =
           posts.find(post => !post.replyToPostId) || posts[0] || null;
 
@@ -2373,11 +2366,6 @@ export function CommunityPostCard({
         setComments(cacheEntry.comments);
         setCommentsLoaded(true);
       } catch {
-        /*
-         * Preview komentar adalah enhancement.
-         * Kalau request gagal, card tetap bisa digunakan dan
-         * "Lihat semua komentar" masih membuka detail.
-         */
         if (alive) {
           setCommentsLoaded(true);
         }
