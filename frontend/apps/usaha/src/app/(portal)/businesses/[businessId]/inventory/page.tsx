@@ -98,7 +98,22 @@ export default async function BusinessInventoryPage({ params, searchParams }: Pa
 
   return (
     <PortalShell activeBusiness={business} availableBusinesses={businesses} viewerName={account?.name ?? null} currentSection="inventory">
-      <PageHeader eyebrow={copy.eyebrow} title={copy.title} description={copy.description} />
+      <PageHeader
+        eyebrow={copy.eyebrow}
+        title={copy.title}
+        description={copy.description}
+        action={
+          canView && activeTab === 'stock' ? (
+            <Link
+              href={`/businesses/${business.id}/products`}
+              className="portal-button-primary inline-flex min-h-10 items-center gap-2 px-3.5 text-sm"
+            >
+              <PackagePlus className="h-4 w-4" aria-hidden="true" />
+              Tambah produk
+            </Link>
+          ) : null
+        }
+      />
 
       {canView ? (
         <>
@@ -128,15 +143,21 @@ export default async function BusinessInventoryPage({ params, searchParams }: Pa
 
               <section className="merchant-list border border-portal-line/80">
                 {sortedProducts.length ? sortedProducts.map(product => (
-                  <article key={product.id} className="merchant-action-row">
+                  <Link
+                    key={product.id}
+                    href={`/businesses/${business.id}/products`}
+                    aria-label={`Buka produk ${product.name}`}
+                    className="merchant-action-row transition hover:bg-[#fbfcfb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-forest/20 focus-visible:ring-inset"
+                  >
                     <ProductThumb name={product.name} imageUrl={product.imageUrl} size="md" />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-black text-portal-ink">{product.name}</p>
                       <p className="mt-0.5 text-[11px] text-portal-soft">{product.stockLabel} {product.stockUnit ?? 'pcs'}</p>
                     </div>
                     <StatusBadge tone={stockTone(product.stockHealth)}>{stockLabel(product.stockHealth)}</StatusBadge>
-                    <Link href={`/businesses/${business.id}/products`} className="portal-button-ghost hidden sm:inline-flex">Lihat</Link>
-                  </article>
+                    <span className="portal-button-ghost hidden sm:inline-flex">Buka</span>
+                    <span aria-hidden="true" className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-portal-soft sm:hidden">›</span>
+                  </Link>
                 )) : (
                   <EmptyState title="Belum ada produk" description="Tambahkan produk dulu agar stok bisa dipantau." icon={Boxes} />
                 )}

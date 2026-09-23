@@ -8,12 +8,12 @@ export type PortalNavigationItem = {
 
 const labels: Record<PortalSection, string> = {
   home: 'Beranda',
-  orders: 'Jual',
-  products: 'Barang',
+  orders: 'Jualan',
+  products: 'Produk',
   inventory: 'Stok',
   finance: 'Uang',
   reports: 'Laporan',
-  channels: 'Jual Online',
+  channels: 'Kanal Jual',
   info: 'Pengaturan Usaha',
   locations: 'Lokasi & Outlet',
   operations: 'Jam & Operasional',

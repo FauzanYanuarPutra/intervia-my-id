@@ -71,12 +71,12 @@ describe('portal navigation', () => {
     );
 
     expect(labels.home).toBe('Beranda');
-    expect(labels.orders).toBe('Jual');
-    expect(labels.products).toBe('Barang');
+    expect(labels.orders).toBe('Jualan');
+    expect(labels.products).toBe('Produk');
     expect(labels.inventory).toBe('Stok');
     expect(labels.finance).toBe('Uang');
     expect(labels.reports).toBe('Laporan');
-    expect(labels.channels).toBe('Jual Online');
+    expect(labels.channels).toBe('Kanal Jual');
     expect(labels.info).toBe('Pengaturan Usaha');
     expect(labels.team).toBe('Tim & Akses');
     expect(labels.buyerPage).toBe('Tampilan Toko');

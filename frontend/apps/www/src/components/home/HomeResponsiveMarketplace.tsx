@@ -2425,6 +2425,33 @@ function HeroVisualStage({
           </button>
         </form>
 
+        <div
+          className="-mx-1 mt-2 flex min-w-0 items-center gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          aria-label={isId ? 'Pencarian cepat' : 'Quick searches'}
+        >
+          {[
+            { label: isId ? 'Supplier' : 'Suppliers', query: 'supplier' },
+            { label: isId ? 'Jasa' : 'Services', query: 'jasa usaha' },
+            { label: isId ? 'Mesin & alat' : 'Equipment', query: 'mesin usaha' },
+          ].map(item => (
+            <button
+              key={item.query}
+              type="button"
+              onClick={() => onSubmit(item.query)}
+              className="inline-flex min-h-9 shrink-0 items-center rounded-full border border-zinc-200 bg-white px-3 text-[10px] font-bold text-zinc-600 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-emerald-800 dark:hover:bg-emerald-950/40 dark:hover:text-emerald-300 sm:min-h-8 sm:text-[11px]"
+            >
+              {item.label}
+            </button>
+          ))}
+          <Link
+            href={UMKM_DISCOVERY_PATH + '?view=map'}
+            className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-3 text-[10px] font-bold text-blue-700 shadow-sm transition hover:border-blue-300 hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/70 sm:min-h-8 sm:text-[11px]"
+          >
+            <MapPin className="h-3 w-3" aria-hidden="true" />
+            {isId ? 'Usaha sekitar' : 'Nearby businesses'}
+          </Link>
+        </div>
+
         {/* MOBILE SUPPORTING COPY */}
         {!isAuthenticated ? (
           <p
@@ -5665,10 +5692,10 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
           },
           {
             id: 'explore',
-            label: isId ? 'Peta Usaha' : 'Business Map',
-            caption: isId ? 'Usaha sekitar' : 'Nearby businesses',
-            href: UMKM_DISCOVERY_PATH,
-            icon: MapPin,
+            label: isId ? 'Jelajahi' : 'Explore',
+            caption: isId ? 'Cari usaha, produk, dan jasa' : 'Find businesses, products, and services',
+            href: '/explore',
+            icon: Search,
           },
           {
             id: 'community',
@@ -5751,10 +5778,10 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
           },
           {
             id: 'explore',
-            label: isId ? 'Peta Usaha' : 'Business Map',
-            caption: isId ? 'Usaha sekitar' : 'Nearby businesses',
-            href: UMKM_DISCOVERY_PATH,
-            icon: MapPin,
+            label: isId ? 'Jelajahi' : 'Explore',
+            caption: isId ? 'Cari usaha, produk, dan jasa' : 'Find businesses, products, and services',
+            href: '/explore',
+            icon: Search,
           },
           {
             id: 'supplier',
