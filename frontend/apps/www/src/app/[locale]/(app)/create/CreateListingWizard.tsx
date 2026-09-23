@@ -6931,12 +6931,12 @@ export default function CreateListingWizard({
                   </p>
                 </button>
               ))}
+              {fieldErrors.__intent ? (
+                <p className="col-span-2 mt-2 text-xs font-semibold text-red-600 dark:text-red-300 sm:col-span-2" role="alert">
+                  {fieldErrors.__intent}
+                </p>
+              ) : null}
             </div>
-            {fieldErrors.__intent ? (
-              <p className="mt-2 text-xs font-semibold text-red-600 dark:text-red-300" role="alert">
-                {fieldErrors.__intent}
-              </p>
-            ) : null}
           ) : null}
 
           {/* STEP 2 */}
