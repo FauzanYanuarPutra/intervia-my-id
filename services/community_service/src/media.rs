@@ -145,36 +145,3 @@ pub(crate) fn is_video_url(value: &str) -> bool {
         || lower.ends_with(".mkv")
         || lower.ends_with(".3gp")
 }
-
-pub(crate) fn clean_feed_media_url(value: &str) -> Option<String> {
-    let clean = value.trim();
-    if clean.is_empty() || clean.len() > 2_000 {
-        return None;
-    }
-
-    let lower = clean.to_ascii_lowercase();
-    if lower.contains("/images/company/")
-        || lower.contains("placeholder")
-        || lower.contains("no-image")
-        || lower.contains("image-not-available")
-        || lower.contains("default_image")
-    {
-        return None;
-    }
-
-    Some(clean.to_string())
-}
-
-pub(crate) fn first_feed_media_url(
-    thread_urls: &[String],
-    root_post: Option<&PostRow>,
-) -> Option<String> {
-    thread_urls
-        .iter()
-        .chain(
-            root_post
-                .into_iter()
-                .flat_map(|post| post.image_urls.iter()),
-        )
-        .find_map(|url| clean_feed_media_url(url))
-}
