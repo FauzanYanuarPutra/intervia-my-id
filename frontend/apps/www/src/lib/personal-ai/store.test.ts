@@ -7,6 +7,7 @@ import {
   hashPersonalAiChatRequest,
   normalizePersonalAiClientRef,
   personalAiLimits,
+  PersonalAiAgentQuotaExceededError,
   PersonalAiQuotaExceededError,
   resolvePersonalAiFileStorePolicy,
   resolvePersonalAiQuickButtonInstruction,
@@ -354,6 +355,16 @@ describe('personal AI filesystem storage policy', () => {
 });
 
 describe('personal AI canonical-history quotas', () => {
+  it('uses a typed quota for agent creation limits', () => {
+    const error = new PersonalAiAgentQuotaExceededError(12);
+
+    expect(error).toMatchObject({
+      code: 'personal_ai_agent_quota_exceeded',
+      limit: 12,
+    });
+    expect(error.message).toBe('Batas 12 AI pribadi tercapai.');
+  });
+
   it('accepts writes at the boundary without trimming existing history', () => {
     expect(() =>
       assertPersonalAiQuotaAvailable({
