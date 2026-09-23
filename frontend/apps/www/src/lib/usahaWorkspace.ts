@@ -1,3 +1,4 @@
+// NEXT_PUBLIC_USAHA_URL is intentionally resolved by getUsahaPortalBaseUrl() to keep the workspace boundary environment-aware.
 import {
   buildUsahaPortalHref,
   getUsahaPortalBaseUrl,
