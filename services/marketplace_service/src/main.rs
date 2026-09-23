@@ -30,6 +30,7 @@ use tower_http::cors::CorsLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use uuid::Uuid;
 
+mod blog;
 mod auth;
 mod business_moderation;
 mod businesses;
@@ -2141,6 +2142,7 @@ async fn main() -> anyhow::Result<()> {
     }
 
     let app = Router::new()
+        .merge(blog::router())
         .merge(businesses::router())
         .merge(business_moderation::router())
         .merge(news::router())
