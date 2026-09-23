@@ -1,0 +1,4 @@
+DROP INDEX IF EXISTS idx_content_items_blog_language_publication;
+DROP INDEX IF EXISTS idx_content_items_blog_editorial_status;
+DROP INDEX IF EXISTS idx_blog_editorial_events_content_created;
+DROP TABLE IF EXISTS blog_editorial_events;
