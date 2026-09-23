@@ -2717,6 +2717,7 @@ export default function ChatRoomPage() {
   const [activeCallIsCaller, setActiveCallIsCaller] = useState(false);
   const [composerFocused, setComposerFocused] = useState(false);
   const [showAttachmentActions, setShowAttachmentActions] = useState(false);
+  const [isDraggingFiles, setIsDraggingFiles] = useState(false);
 
   const messagesViewportRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -6782,7 +6783,53 @@ export default function ChatRoomPage() {
       ) : null}
 
       {/* Messages */}
-      <main className="flex min-h-0 min-w-0 flex-1 basis-0 flex-col overflow-hidden bg-[#efeae2] dark:bg-[#0b141a]">
+      <main
+        className="relative flex min-h-0 min-w-0 flex-1 basis-0 flex-col overflow-hidden bg-[#efeae2] dark:bg-[#0b141a]"
+        onDragEnter={event => {
+          if (isPeerBlocked || roomReadOnly) return;
+          if (Array.from(event.dataTransfer.types).includes('Files')) {
+            event.preventDefault();
+            setIsDraggingFiles(true);
+          }
+        }}
+        onDragOver={event => {
+          if (isPeerBlocked || roomReadOnly) return;
+          if (Array.from(event.dataTransfer.types).includes('Files')) {
+            event.preventDefault();
+          }
+        }}
+        onDragLeave={event => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+            setIsDraggingFiles(false);
+          }
+        }}
+        onDrop={event => {
+          if (isPeerBlocked || roomReadOnly) return;
+          const files = Array.from(event.dataTransfer.files || []);
+          if (!files.length) return;
+          event.preventDefault();
+          setIsDraggingFiles(false);
+          handleFilesSelected(files);
+        }}
+      >
+        {isDraggingFiles ? (
+          <div className="pointer-events-none absolute inset-3 z-40 flex items-center justify-center rounded-3xl border-2 border-dashed border-[#25d366]/70 bg-[#0b141a]/65 backdrop-blur-sm">
+            <div className="rounded-2xl bg-[#111b21]/95 px-5 py-4 text-center shadow-2xl">
+              <Paperclip className="mx-auto h-7 w-7 text-[#25d366]" />
+              <p className="mt-2 text-sm font-bold text-white">
+                {chatLocale === 'id'
+                  ? 'Lepaskan media untuk dikirim'
+                  : 'Drop media to send'}
+              </p>
+              <p className="mt-1 text-[11px] text-white/55">
+                {chatLocale === 'id'
+                  ? 'Foto, video, audio, atau file'
+                  : 'Photos, videos, audio, or files'}
+              </p>
+            </div>
+          </div>
+        ) : null}
+
         <div className="relative flex min-h-0 flex-1 flex-col">
           <div
             className="pointer-events-none absolute inset-0 opacity-70 dark:opacity-35"
