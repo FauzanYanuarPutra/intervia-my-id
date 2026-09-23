@@ -20,6 +20,7 @@ import { buildOperationsPriorities } from "./operationsPriority";
 import { CRM_NAV_ITEMS } from "./navigation";
 import type { IconName, PageId } from "./types";
 import { useAuth, useRequireAuth } from "@/context/AuthContext";
+import { SelectField } from "@/ui";
 import {
   activityApi,
   businessModerationApi,
@@ -1671,7 +1672,7 @@ function FilterBar({
         {filters.map(filter => (
           <label key={filter.label} className="flex min-w-0 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600 sm:min-w-[170px]">
             <span>{filter.label}</span>
-            <select
+            <SelectField
               value={filter.value}
               onChange={event => filter.onChange(event.target.value)}
               className="min-w-0 max-w-[68%] bg-transparent text-xs font-bold text-slate-900 outline-none"
@@ -1681,7 +1682,7 @@ function FilterBar({
                   {filterOptionLabel(option)}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </label>
         ))}
       </div>
