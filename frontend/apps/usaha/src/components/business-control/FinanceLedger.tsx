@@ -20,6 +20,7 @@ import { FeedbackNotice, type FeedbackTone } from '@/components/interaction/Feed
 import { resolveIdempotencyAttempt, type ClientIdempotencyAttempt } from '@/lib/client-idempotency';
 import { businessApiErrorMessage } from '@/lib/business-api-error';
 import { EffectPreview } from '@/components/interaction/EffectPreview';
+import { MoneyValue } from '@/components/portal/MoneyValue';
 import { ModalSurface } from '@/components/interaction/ModalSurface';
 import {
   financeChannelOptions,
@@ -633,7 +634,7 @@ export function FinanceLedger({ businessId, initialEntries, channels = [] }: Pro
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-portal-soft">Saldo authoritative</p>
-            <p className="mt-1 text-3xl font-black text-portal-ink">{money.format(liquidCash)}</p>
+            <p className="mt-1 text-3xl"><MoneyValue value={liquidCash} /></p>
             <p className="mt-1 text-xs text-portal-soft">Kas + bank + e-wallet dari seluruh ledger, bukan daftar transaksi yang sedang tampil.</p>
           </div>
           <button type="button" onClick={() => reloadAll().catch(error => { setMessageTone('error'); setMessage(error instanceof Error ? error.message : 'Gagal memuat ulang.'); })} disabled={refreshing} className="portal-button-secondary px-3 disabled:opacity-50">
@@ -642,10 +643,10 @@ export function FinanceLedger({ businessId, initialEntries, channels = [] }: Pro
           </button>
         </div>
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div className="rounded-xl bg-[#f7f9f6] p-3"><p className="text-[10px] font-bold text-portal-soft">ARUS KAS NETO</p><p className={`mt-1 font-black ${cashMovement >= 0 ? 'text-portal-forest' : 'text-red-700'}`}>{money.format(cashMovement)}</p></div>
-          <div className="rounded-xl bg-[#f7f9f6] p-3"><p className="text-[10px] font-bold text-portal-soft">PIUTANG</p><p className="mt-1 font-black text-portal-ink">{money.format(summary?.receivable ?? 0)}</p></div>
-          <div className="rounded-xl bg-[#f7f9f6] p-3"><p className="text-[10px] font-bold text-portal-soft">UTANG</p><p className="mt-1 font-black text-portal-ink">{money.format(summary?.payable ?? 0)}</p></div>
-          <div className="rounded-xl bg-[#f7f9f6] p-3"><p className="text-[10px] font-bold text-portal-soft">BELANJA STOK</p><p className="mt-1 font-black text-portal-ink">{money.format(summary?.inventory_purchases ?? legacySummary.inventoryPurchases)}</p><p className="mt-0.5 text-[10px] text-portal-soft">Bukan OPEX saat dibeli</p></div>
+          <div className="rounded-xl bg-[#f7f9f6] p-3"><p className="text-[10px] font-bold text-portal-soft">ARUS KAS NETO</p><p className="mt-1"><MoneyValue value={cashMovement} compact /></p></div>
+          <div className="rounded-xl bg-[#f7f9f6] p-3"><p className="text-[10px] font-bold text-portal-soft">PIUTANG</p><p className="mt-1"><MoneyValue value={summary?.receivable ?? 0} compact /></p></div>
+          <div className="rounded-xl bg-[#f7f9f6] p-3"><p className="text-[10px] font-bold text-portal-soft">UTANG</p><p className="mt-1"><MoneyValue value={summary?.payable ?? 0} compact /></p></div>
+          <div className="rounded-xl bg-[#f7f9f6] p-3"><p className="text-[10px] font-bold text-portal-soft">BELANJA STOK</p><p className="mt-1"><MoneyValue value={summary?.inventory_purchases ?? legacySummary.inventoryPurchases} compact /></p><p className="mt-0.5 text-[10px] text-portal-soft">Bukan OPEX saat dibeli</p></div>
         </div>
       </section>
 
