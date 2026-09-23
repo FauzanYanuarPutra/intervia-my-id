@@ -6153,7 +6153,6 @@ function SearchPersonResult({
   );
 }
 
-// Kept only for older payload experiments; community UI no longer renders this card.
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 function LegacySearchVideoResult({
   item,
