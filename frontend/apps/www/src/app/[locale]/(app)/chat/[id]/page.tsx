@@ -2601,6 +2601,10 @@ export default function ChatRoomPage() {
   const [activeDraftAttachmentId, setActiveDraftAttachmentId] = useState<
     string | null
   >(null);
+  const [showDraftMediaPreview, setShowDraftMediaPreview] = useState(false);
+  const [mediaViewer, setMediaViewer] = useState<MediaViewerState | null>(
+    null,
+  );
   const isUploadingAttachments = draftAttachments.some(
     att => att.status === 'uploading',
   );
@@ -4147,6 +4151,7 @@ export default function ChatRoomPage() {
       });
       setDraftAttachments(prev => [...prev, ...nextAttachments]);
       setActiveDraftAttachmentId(current => current || nextAttachments[0]?.id);
+      setShowDraftMediaPreview(true);
       nextAttachments.forEach(attachment => {
         if (attachment.file) uploadAttachment(attachment.file, attachment.id);
       });
@@ -4193,7 +4198,29 @@ export default function ChatRoomPage() {
       prev.forEach(att => cleanupPreviewUrl(att.previewUrl));
       return [];
     });
+    setShowDraftMediaPreview(false);
   }, [cleanupPreviewUrl]);
+
+  const openMediaViewer = useCallback(
+    (
+      attachments: string[],
+      messageType: string | undefined,
+      index = 0,
+      title?: string,
+    ) => {
+      const normalized = attachments
+        .map(normalizeAttachmentUrl)
+        .filter(Boolean);
+      if (!normalized.length) return;
+      setMediaViewer({
+        attachments: normalized,
+        messageType: messageType || 'file',
+        index: Math.max(0, Math.min(index, normalized.length - 1)),
+        title,
+      });
+    },
+    [],
+  );
 
   const showDraftAttachmentAtOffset = useCallback(
     (offset: number) => {
