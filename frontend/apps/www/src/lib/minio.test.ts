@@ -53,6 +53,28 @@ describe('uploadToMinIO durability', () => {
     expect(result.key).toBe(put.input.Key);
   });
 
+  it('returns a reversible room URL while keeping the storage key safe', async () => {
+    send
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({ ContentLength: 3, ContentType: 'image/jpeg' });
+
+    const { uploadToMinIO } = await import('./minio');
+    const result = await uploadToMinIO(
+      'dm:11111111-1111-4111-8111-111111111111:22222222-2222-4222-8222-222222222222',
+      Buffer.from([1, 2, 3]),
+      'image/jpeg',
+      'photo.jpg',
+    );
+
+    expect(result.key).toMatch(
+      /^chat\/dm_11111111-1111-4111-8111-111111111111_22222222-2222-4222-8222-222222222222\/[a-f0-9]{64}\.jpg$/,
+    );
+    expect(result.url).toMatch(
+      /^\/api\/chat\/media\/laju-chat\/chat\/dm%3A11111111-1111-4111-8111-111111111111%3A22222222-2222-4222-8222-222222222222\/[a-f0-9]{64}\.jpg$/,
+    );
+  });
+
   it('rejects an upload when post-PUT verification reports an empty object', async () => {
     send
       .mockResolvedValueOnce({})
