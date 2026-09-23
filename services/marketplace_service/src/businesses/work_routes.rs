@@ -195,6 +195,7 @@ fn service(state: &AppState) -> BusinessService {
     )
 }
 
+#[allow(clippy::result_large_err)]
 fn actor_and_authorization(
     state: &AppState,
     headers: &HeaderMap,
