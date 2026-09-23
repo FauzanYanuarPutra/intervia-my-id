@@ -70,8 +70,8 @@ defmodule ChatServiceWeb.RoomChannel do
   # Backward-compatible alias used by older WWW clients.
   @impl true
   def handle_in("relay_message", payload, socket) when is_map(payload) do
-    {body, ref, message_type, attachments} = extract_message_payload(payload)
-    process_send_message(body, ref, message_type, attachments, socket)
+    {body, ref, message_type, attachments, reference} = extract_message_payload(payload)
+    process_send_message(body, ref, message_type, attachments, reference, socket)
   end
 
   @impl true
