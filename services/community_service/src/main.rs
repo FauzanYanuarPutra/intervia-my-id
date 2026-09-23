@@ -454,6 +454,20 @@ struct VoteRequest {
     value: Value,
 }
 
+#[derive(Debug, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct BookmarkRequest {
+    active: Option<bool>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct BookmarkResponse {
+    thread_id: String,
+    bookmarked: bool,
+    bookmark_count: i64,
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct PollVoteRequest {
@@ -1335,6 +1349,10 @@ async fn main() -> anyhow::Result<()> {
             get(list_posts).post(create_post),
         )
         .route("/v1/forum/threads/{thread_id}/vote", post(vote_thread))
+        .route(
+            "/v1/forum/threads/{thread_id}/bookmark",
+            get(get_thread_bookmark).post(set_thread_bookmark),
+        )
         .route("/v1/forum/threads/{thread_id}/report", post(report_thread))
         .route(
             "/v1/forum/threads/{thread_id}/poll-vote",
@@ -5369,6 +5387,123 @@ async fn vote_post(
         post: enriched.remove(0),
         previous_vote: previous,
         current_vote: current,
+    }))
+}
+
+async fn get_thread_bookmark(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(thread_id): Path<String>,
+) -> ApiResult<Json<BookmarkResponse>> {
+    let _thread = get_thread_row(&state.db, &thread_id).await?;
+    let actor = optional_actor(&headers, &state);
+    let viewer_id = actor.as_ref().map(forum_user_id);
+
+    let bookmark_count: i64 = sqlx::query_scalar(
+        r#"
+        SELECT COUNT(*)::bigint
+        FROM forum.lajukan_forum_thread_bookmarks
+        WHERE thread_id = $1
+        "#,
+    )
+    .bind(&thread_id)
+    .fetch_one(&state.db)
+    .await
+    .map_err(internal_error)?;
+
+    let bookmarked = if let Some(user_id) = viewer_id.as_deref() {
+        sqlx::query_scalar::<_, bool>(
+            r#"
+            SELECT EXISTS(
+              SELECT 1
+              FROM forum.lajukan_forum_thread_bookmarks
+              WHERE thread_id = $1 AND user_id = $2
+            )
+            "#,
+        )
+        .bind(&thread_id)
+        .bind(user_id)
+        .fetch_one(&state.db)
+        .await
+        .map_err(internal_error)?
+    } else {
+        false
+    };
+
+    Ok(Json(BookmarkResponse {
+        thread_id,
+        bookmarked,
+        bookmark_count,
+    }))
+}
+
+async fn set_thread_bookmark(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(thread_id): Path<String>,
+    Json(payload): Json<BookmarkRequest>,
+) -> ApiResult<Json<BookmarkResponse>> {
+    let actor = require_actor(&headers, &state)?;
+    mutation_rate_limit(&state, &headers, &actor, "forum:thread-bookmark", 240, 90).await?;
+    let forum_user = ensure_forum_user(&state.db, &actor).await?;
+    let _thread = get_thread_row(&state.db, &thread_id).await?;
+    let active = payload.active.unwrap_or(true);
+
+    if active {
+        sqlx::query(
+            r#"
+            INSERT INTO forum.lajukan_forum_thread_bookmarks (
+              thread_id, user_id, created_at, updated_at
+            )
+            VALUES ($1, $2, now(), now())
+            ON CONFLICT (thread_id, user_id)
+            DO UPDATE SET updated_at = EXCLUDED.updated_at
+            "#,
+        )
+        .bind(&thread_id)
+        .bind(&forum_user.id)
+        .execute(&state.db)
+        .await
+        .map_err(internal_error)?;
+    } else {
+        sqlx::query(
+            r#"
+            DELETE FROM forum.lajukan_forum_thread_bookmarks
+            WHERE thread_id = $1 AND user_id = $2
+            "#,
+        )
+        .bind(&thread_id)
+        .bind(&forum_user.id)
+        .execute(&state.db)
+        .await
+        .map_err(internal_error)?;
+    }
+
+    let bookmark_count: i64 = sqlx::query_scalar(
+        r#"
+        SELECT COUNT(*)::bigint
+        FROM forum.lajukan_forum_thread_bookmarks
+        WHERE thread_id = $1
+        "#,
+    )
+    .bind(&thread_id)
+    .fetch_one(&state.db)
+    .await
+    .map_err(internal_error)?;
+
+    sqlx::query(
+        "UPDATE forum.lajukan_forum_threads SET bookmark_count = $2 WHERE id = $1",
+    )
+    .bind(&thread_id)
+    .bind(bookmark_count)
+    .execute(&state.db)
+    .await
+    .map_err(internal_error)?;
+
+    Ok(Json(BookmarkResponse {
+        thread_id,
+        bookmarked: active,
+        bookmark_count,
     }))
 }
 
