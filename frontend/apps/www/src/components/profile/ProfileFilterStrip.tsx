@@ -88,7 +88,10 @@ export function ProfileFilterStrip<T extends string>({
           </span>
         </button>
 
-        <div className="relative hidden min-w-0 overflow-x-auto overscroll-x-contain pr-3 [scrollbar-width:none] sm:block [&::-webkit-scrollbar]:hidden">
+        <div
+          data-filter-strip-fade="true"
+          className="relative hidden min-w-0 overflow-x-auto overscroll-x-contain pr-3 [scrollbar-width:none] sm:block [&::-webkit-scrollbar]:hidden"
+        >
           <div className="flex min-w-max items-center gap-1.5">
             {items.map(item => {
               const active = item.key === activeKey;
