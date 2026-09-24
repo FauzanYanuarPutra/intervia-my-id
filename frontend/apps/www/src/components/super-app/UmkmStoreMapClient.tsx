@@ -532,8 +532,9 @@ function StorePreviewCard({
       <div className="mt-1.5 grid grid-cols-2 gap-1">
         <a
           href={buildUmkmMapPlacePath(store)}
-          className="inline-flex min-h-[28px] items-center justify-center rounded-full bg-emerald-600 px-2 text-[9.5px] font-bold text-white transition hover:bg-emerald-700"
+          className="inline-flex min-h-[30px] items-center justify-center gap-1 rounded-[10px] bg-emerald-600 px-2 text-[9.5px] font-bold text-white transition hover:bg-emerald-700 active:scale-[0.98]"
         >
+          <Store className="h-3 w-3" aria-hidden="true" />
           {isId ? 'Detail' : 'Details'}
         </a>
         {selectable ? (
@@ -560,8 +561,9 @@ function StorePreviewCard({
             href={ui.googleMapsDirectionsUrl}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex min-h-[28px] items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-2 text-[9.5px] font-bold text-slate-700 transition hover:border-slate-300"
+            className="inline-flex min-h-[30px] items-center justify-center gap-1 rounded-[10px] border border-slate-200 bg-slate-50 px-2 text-[9.5px] font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-100 active:scale-[0.98]"
           >
+            <Navigation className="h-3 w-3" aria-hidden="true" />
             {isId ? 'Rute' : 'Route'}
           </a>
         )}
@@ -617,11 +619,6 @@ function StorePopupSummary({
             <StoreKindChip ui={ui} compact />
             <span className='truncate text-[10px] font-semibold text-slate-500'>{ui.kindLabel}</span>
           </div>
-          </div>
-
-          <h3 className='min-w-0 flex-1 truncate text-[13px] font-bold leading-tight text-slate-950'>
-            {store.name}
-          </h3>
           <span
             className={isOpen
               ? 'inline-flex min-h-[20px] shrink-0 items-center rounded-full bg-emerald-50 px-1.5 text-[9.5px] font-bold text-emerald-700'
@@ -630,6 +627,10 @@ function StorePopupSummary({
             {statusLabel}
           </span>
         </div>
+
+        <h3 className='min-w-0 truncate text-[13px] font-bold leading-tight text-slate-950'>
+          {store.name}
+        </h3>
 
         <div className='mt-1.5 flex min-w-0 items-start gap-1.5 text-[10px] leading-4 text-slate-500'>
           <MapPin className='mt-0.5 h-3 w-3 shrink-0 text-slate-400' aria-hidden='true' />
