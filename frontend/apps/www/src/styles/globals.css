@@ -382,6 +382,41 @@ html {
   max-width: 100%;
 }
 
+.leaflet-home-map {
+  isolation: isolate;
+  position: relative;
+  z-index: 0;
+}
+
+.leaflet-home-map .leaflet-pane {
+  z-index: 1;
+}
+
+.leaflet-home-map .leaflet-tile-pane {
+  z-index: 1;
+}
+
+.leaflet-home-map .leaflet-overlay-pane {
+  z-index: 2;
+}
+
+.leaflet-home-map .leaflet-shadow-pane {
+  z-index: 3;
+}
+
+.leaflet-home-map .leaflet-marker-pane {
+  z-index: 4;
+}
+
+.leaflet-home-map .leaflet-tooltip-pane,
+.leaflet-home-map .leaflet-popup-pane,
+.leaflet-home-map .leaflet-control-container,
+.leaflet-home-map .leaflet-top,
+.leaflet-home-map .leaflet-bottom {
+  z-index: 5;
+}
+
+
 .leaflet-location-picker-map {
   isolation: isolate;
   position: relative;
