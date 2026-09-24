@@ -980,6 +980,9 @@ function FilterRail({
           ? 'Pilih satu jenis postingan. Daftar akan langsung menyesuaikan.'
           : 'Choose one content type. The storefront updates immediately.'
       }
+      mobileDoneLabel={isId ? 'Selesai' : 'Done'}
+      mobileCloseLabel={isId ? 'Tutup' : 'Close'}
+      mobileCountSuffix={isId ? 'item' : 'items'}
       items={items}
       onChange={onChange}
     />
