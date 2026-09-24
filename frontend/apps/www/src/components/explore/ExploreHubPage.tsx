@@ -175,7 +175,36 @@ export function ExploreHubPage({ locale, initialIntent = 'supply' }: { locale: L
                 {intent === 'demand' ? <><input type="hidden" name="side" value="demand" /><input type="hidden" name="tab" value="needs" /></> : null}
                 <button type="submit" disabled={query.trim().length < 2} className={cn('inline-flex h-9 min-w-[58px] shrink-0 items-center justify-center rounded-[10px] bg-zinc-950 px-2.5 text-[10px] font-black text-white','transition hover:bg-emerald-700 disabled:pointer-events-none dark:bg-white dark:text-zinc-950 dark:hover:bg-emerald-300','sm:h-10 sm:min-w-[68px] sm:px-3.5 sm:text-xs',query.trim().length < 2 && 'opacity-40')}>{isId ? 'Cari' : 'Search'}</button>
               </form>
-              <div ref={examplesRailRef} className="mt-2.5 w-full min-w-0 cursor-grab overflow-hidden active:cursor-grabbing" aria-label={isId ? 'Contoh pencarian' : 'Search examples'}><div className="flex touch-pan-y gap-1.5">{examples.map(example => <div key={example} className="shrink-0"><button type="button" onClick={() => { setQuery(example); submitSearch(example); }} className="inline-flex h-8 max-w-[190px] items-center rounded-full border border-zinc-200 bg-white px-2.5 text-[9.5px] font-semibold text-zinc-500 transition hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400 dark:hover:border-zinc-700 dark:hover:text-white sm:max-w-[240px] sm:px-3 sm:text-[10.5px]"><span className="truncate">{example}</span></button></div>)}</div></div>
+              <div className="mt-2.5 flex items-center gap-1.5 px-0.5" aria-hidden="true">
+                <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400">
+                  <Search className="h-3 w-3" />
+                </span>
+                <span className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 sm:text-[10.5px]">
+                  {isId ? 'Coba cari' : 'Try searching'}
+                </span>
+                <span className="hidden truncate text-[9.5px] font-medium text-zinc-400 sm:inline dark:text-zinc-500">
+                  {isId ? 'pilih contoh untuk langsung mencari' : 'pick an example to search instantly'}
+                </span>
+              </div>
+              <div ref={examplesRailRef} className="mt-1.5 w-full min-w-0 cursor-grab overflow-hidden active:cursor-grabbing" aria-label={isId ? 'Contoh pencarian' : 'Search examples'}>
+                <div className="flex touch-pan-y gap-1.5 [backface-visibility:hidden] [will-change:transform]">
+                  {examples.map(example => (
+                    <div key={example} className="shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setQuery(example);
+                          submitSearch(example);
+                        }}
+                        className="group inline-flex h-8 max-w-[190px] items-center rounded-full border border-zinc-200/90 bg-white px-2.5 text-[9.5px] font-semibold text-zinc-600 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,background-color,color,transform,box-shadow] duration-150 hover:border-emerald-200 hover:bg-emerald-50/70 hover:text-emerald-800 hover:shadow-sm active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/20 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:border-emerald-800 dark:hover:bg-emerald-950/40 dark:hover:text-emerald-200 sm:max-w-[240px] sm:px-3 sm:text-[10.5px]"
+                        aria-label={isId ? `Cari ${example}` : `Search ${example}`}
+                      >
+                        <span className="truncate">{example}</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </ExploreSurface>
