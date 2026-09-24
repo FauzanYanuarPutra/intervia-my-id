@@ -134,15 +134,16 @@ export function getUmkmSurfaceCopy(locale: string) {
 export function getUsahaPortalBaseUrl(): string {
   const configuredUrl = process.env.NEXT_PUBLIC_USAHA_URL?.trim();
   const isDevelopment = process.env.NODE_ENV === 'development';
+  const isTest = process.env.NODE_ENV === 'test';
 
   if (!configuredUrl) {
-    return isDevelopment
+    return isDevelopment || isTest
       ? DEVELOPMENT_USAHA_PORTAL_URL
       : PRODUCTION_USAHA_PORTAL_URL;
   }
 
   // Never allow a production build to send users to a local machine.
-  if (!isDevelopment && isLocalhostUrl(configuredUrl)) {
+  if (!isDevelopment && !isTest && isLocalhostUrl(configuredUrl)) {
     return PRODUCTION_USAHA_PORTAL_URL;
   }
 
