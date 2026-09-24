@@ -125,9 +125,6 @@ export function NewsArticleMedia({
           <Newspaper className="h-12 w-12 shrink-0 text-emerald-700/20 dark:text-emerald-300/20" />
         </div>
       )}
-      <figcaption className="border-t border-slate-200 px-4 py-2 text-[10px] font-semibold text-slate-400 dark:border-white/10 dark:text-slate-500">
-        {isId ? 'Lajukan News' : 'Lajukan News'}
-      </figcaption>
     </figure>
   );
 }
