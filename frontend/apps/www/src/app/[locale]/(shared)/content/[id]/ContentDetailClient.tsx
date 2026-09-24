@@ -2222,7 +2222,7 @@ export default function ContentDetailClient({
   const sectorObj = sectorId ? getSectorById(sectorId) : null;
   const images = getImages(item);
   const documents = getDocuments(item);
-  const contentType = item.type || item.content_type || 'product';
+  const contentType = item.type || item.content_type || 'other';
   const rawType = String(contentType || '').toLowerCase();
   const isOpportunityType =
     rawType.includes('opportun') ||
@@ -2254,7 +2254,7 @@ export default function ContentDetailClient({
                     rawType.includes('mentor') ||
                     rawType.includes('expert')
                   ? 'profile'
-                  : 'product';
+                  : 'other';
   const dealKind: DealKind =
     displayType === 'job'
       ? 'job'
