@@ -476,7 +476,6 @@ function StorePreviewCard({
   selectable?: boolean;
   onClick?: () => void;
   isId: boolean;
-  interactive: boolean;
 }) {
   const locationLabel =
     ui.distanceLabel ||
