@@ -59,7 +59,7 @@ export function NewsMedia({
             <div className="flex h-10 w-10 items-center justify-center rounded-[13px] border border-emerald-100 bg-white p-2 shadow-sm dark:border-emerald-400/20 dark:bg-white/10">
               <Image src="/logo.svg" alt="" width={72} height={24} className="h-5 w-auto object-contain" />
             </div>
-            <p className="mt-2 text-[9px] font-black uppercase tracking-[0.12em] text-emerald-800 dark:text-emerald-300">Lajukan News</p>
+            {/* <p className="mt-2 text-[9px] font-black uppercase tracking-[0.12em] text-emerald-800 dark:text-emerald-300">Lajukan News</p> */}
             <p className="mt-1 truncate text-xs font-bold text-slate-600 dark:text-slate-300">{article.category}</p>
           </div>
           <Newspaper className="h-9 w-9 shrink-0 text-emerald-700/20 dark:text-emerald-300/20" />
