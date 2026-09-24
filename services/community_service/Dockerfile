@@ -41,16 +41,16 @@ RUN if [ ! -d migrations ]; then \
     fi
 
 # SQLx uses migration version as the primary key in _sqlx_migrations.
-# Fail the image build early when multiple "up" migrations reuse a version.
+# Fail the image build early when simple/reversible-up migrations reuse a version.
 RUN set -eu; \
-    duplicate_versions="$(find migrations -maxdepth 1 -type f -name '*.up.sql' -printf '%f\n' \
+    duplicate_versions="$(find migrations -maxdepth 1 -type f -name '*.sql' ! -name '*.down.sql' -printf '%f\n' \
       | awk -F_ '{print $1}' \
       | sort \
       | uniq -d)"; \
     if [ -n "$duplicate_versions" ]; then \
       echo "ERROR: duplicate SQLx migration version(s):"; \
       printf '%s\n' "$duplicate_versions"; \
-      echo "Each migration version must be unique within community_service."; \
+      echo "Every migration version must be unique across simple and reversible UP migrations in community_service."; \
       exit 1; \
     fi
 
