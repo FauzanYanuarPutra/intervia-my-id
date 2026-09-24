@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { NextRequest } from 'next/server';
 
-import { GET } from '@/app/api/content/route';
+import { GET, isEditorialContentRecord } from '@/app/api/content/route';
 
 describe('public content status boundary', () => {
   it.each(['draft', 'archived', 'deleted'])(
@@ -31,4 +31,26 @@ describe('public content status boundary', () => {
       });
     },
   );
+});
+
+
+describe('editorial content boundary', () => {
+  it.each([
+    { content_type: 'news' },
+    { type: 'article' },
+    { content_type: 'guide' },
+    { type: 'product', metadata: { news: { article_kind: 'news', slug: 'contoh-berita' } } },
+  ])('recognizes $content_type$type as editorial content', item => {
+    expect(isEditorialContentRecord(item)).toBe(true);
+  });
+
+  it('keeps normal marketplace content outside the editorial boundary', () => {
+    expect(
+      isEditorialContentRecord({
+        id: 'product-1',
+        content_type: 'product',
+        metadata: { market_side: 'supply' },
+      }),
+    ).toBe(false);
+  });
 });
