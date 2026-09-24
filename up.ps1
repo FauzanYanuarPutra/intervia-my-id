@@ -6,9 +6,8 @@ param(
     [string[]]$Profile = @(),
     [string[]]$Services = @(),
 
-    # Rebuild flag. "-Buildclear" is kept as an explicit compatibility
-    # parameter because PowerShell parameter binding can be ambiguous with
-    # shorthand/alias parsing on some Windows shells.
+    # Rebuild controls image compilation. "-Buildclear" additionally disables
+    # Docker build cache so local development cannot keep serving an older image.
     [switch]$Build,
     [switch]$Buildclear,
     [switch]$ForceRecreate,
@@ -26,7 +25,8 @@ param(
     [int]$ParallelLimit = 4
 )
 
-if ($Buildclear.IsPresent) {
+$ClearBuildCache = $Buildclear.IsPresent
+if ($ClearBuildCache) {
     $Build = $true
 }
 
@@ -51,6 +51,12 @@ $PreviousComposeAnsi = $env:COMPOSE_ANSI
 Push-Location $RepoRoot
 
 try {
+    Write-Host "Lajukan launcher starting..." -ForegroundColor Cyan
+    Write-Host "  Repository: $RepoRoot" -ForegroundColor DarkGray
+    Write-Host "  Environment: $Environment" -ForegroundColor DarkGray
+    Write-Host "  Profiles: $($Profile -join ",")" -ForegroundColor DarkGray
+    Write-Host "  Build: $($Build.IsPresent) | Buildclear: $($ClearBuildCache)" -ForegroundColor DarkGray
+
     if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
         throw "Docker CLI tidak ditemukan. Install/start Docker Desktop atau Docker Engine terlebih dahulu."
     }
@@ -539,7 +545,12 @@ try {
             Write-Host "Tidak ada service build yang dipilih; melewati tahap image build." -ForegroundColor Yellow
         }
         else {
-            Write-Host "Building Docker images in one cache-friendly BuildKit pass..." -ForegroundColor Cyan
+            if ($ClearBuildCache) {
+                Write-Host "Building Docker images with cache disabled (-Buildclear)..." -ForegroundColor Yellow
+            }
+            else {
+                Write-Host "Building Docker images in one cache-friendly BuildKit pass..." -ForegroundColor Cyan
+            }
             $BuildOriginalParallelLimit = $env:COMPOSE_PARALLEL_LIMIT
             $AdaptiveLimit = $ParallelLimit
 
@@ -573,7 +584,13 @@ try {
                 $env:COMPOSE_PARALLEL_LIMIT = $AdaptiveLimit.ToString()
                 Write-Host "Adaptive build parallelism: $AdaptiveLimit (host CPU=$HostCpu, RAM=$HostRamGb GB, requested=$ParallelLimit)" -ForegroundColor DarkGray
 
-                $BuildArgs = @("build") + $BuildTargets
+                $BuildArgs = @("build")
+                if ($ClearBuildCache) {
+                    $BuildArgs += "--no-cache"
+                    $BuildArgs += "--pull"
+                }
+                $BuildArgs += $BuildTargets
+                Write-Host "Docker build command: docker compose build $((if ($ClearBuildCache) { '--no-cache --pull ' } else { '' }))$($BuildTargets -join ' ')" -ForegroundColor DarkGray
                 $BuildProbe = Invoke-DockerNative -Arguments (@($ComposeArgs) + $BuildArgs)
                 $BuildProbe.Output | ForEach-Object { Write-Output $_ }
 
@@ -599,7 +616,13 @@ try {
                             $ServiceBuildSucceeded = $false
                             for ($ServiceAttempt = 1; $ServiceAttempt -le 2; $ServiceAttempt++) {
                                 Write-Host "Retrying service [$ServiceName] (attempt $ServiceAttempt/2)..." -ForegroundColor Yellow
-                                $ServiceBuildProbe = Invoke-DockerNative -Arguments (@($ComposeArgs) + @("build", $ServiceName))
+                                $ServiceBuildArgs = @("build")
+                                if ($ClearBuildCache) {
+                                    $ServiceBuildArgs += "--no-cache"
+                                    $ServiceBuildArgs += "--pull"
+                                }
+                                $ServiceBuildArgs += $ServiceName
+                                $ServiceBuildProbe = Invoke-DockerNative -Arguments (@($ComposeArgs) + $ServiceBuildArgs)
                                 $ServiceBuildProbe.Output | ForEach-Object { Write-Output $_ }
                                 if ($ServiceBuildProbe.ExitCode -eq 0) {
                                     $ServiceBuildSucceeded = $true
@@ -717,9 +740,12 @@ try {
 
     $UpArgs = @("up", "-d", "--remove-orphans", "--wait", "--wait-timeout", "420")
     if ($Build.IsPresent) {
-        # Compose already detects changed image IDs and recreates only affected
-        # services. Avoid forcing every container to restart after a cached build.
+        # The image was already compiled above. Prevent Compose from rebuilding it
+        # a second time and, for -Buildclear, recreate containers from the fresh image.
         $UpArgs += "--no-build"
+        if ($ClearBuildCache) {
+            $UpArgs += "--force-recreate"
+        }
     }
     if ($ForceRecreate.IsPresent) {
         $UpArgs += "--force-recreate"
