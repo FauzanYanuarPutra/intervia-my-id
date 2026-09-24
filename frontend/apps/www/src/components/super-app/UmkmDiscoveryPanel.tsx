@@ -803,12 +803,12 @@ export function PublicReferenceResultCard({
           alt={place.store.name}
           className={cn(
             'rounded-[14px]',
-            compact ? 'h-[74px]' : 'h-[72px] sm:h-[82px] xl:h-[88px]',
+            compact ? 'h-[52px] w-[52px] sm:h-[56px] sm:w-[56px]' : 'h-[72px] sm:h-[82px] xl:h-[88px]',
           )}
         />
         <span className="min-w-0">
           <PublicReferenceBadge isId={isId} />
-          <span className="mt-1 line-clamp-2 text-[13px] font-bold leading-tight text-[color:var(--app-text)] sm:text-[14px]">
+          <span className="mt-0.5 line-clamp-1 text-[12px] font-bold leading-tight text-[color:var(--app-text)] sm:text-[13px]">
             {place.store.name}
           </span>
           {provenanceText ? (
@@ -816,7 +816,7 @@ export function PublicReferenceResultCard({
               {provenanceText}
             </span>
           ) : null}
-          <span className="mt-0.5 flex min-w-0 items-center gap-1 text-[11px] text-[color:var(--app-text-soft)]">
+          <span className="mt-0.5 flex min-w-0 items-center gap-1 text-[10px] text-[color:var(--app-text-soft)]">
             <MapPin className="h-3 w-3 shrink-0 text-[color:var(--app-accent)]" />
             <span className="truncate">
               {getPlaceLocationLabel(place, isId)}
@@ -828,13 +828,13 @@ export function PublicReferenceResultCard({
         </span>
       </button>
       {provenance?.sourceUrl || routeHref ? (
-        <div className="flex flex-wrap items-center gap-2 border-t border-sky-100 px-2 py-1.5 dark:border-sky-900/50">
+        <div className="flex flex-wrap items-center gap-1.5 border-t border-sky-100 px-1.5 py-1 dark:border-sky-900/50">
           {provenance?.sourceUrl ? (
             <a
               href={provenance.sourceUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex min-h-[28px] items-center gap-1 rounded-full bg-sky-50 px-2.5 text-[10px] font-bold text-sky-700 transition hover:bg-sky-100 dark:bg-sky-950/50 dark:text-sky-200"
+              className="inline-flex min-h-[26px] items-center gap-1 rounded-full bg-sky-50 px-2 text-[9.5px] font-bold text-sky-700 transition hover:bg-sky-100 dark:bg-sky-950/50 dark:text-sky-200"
             >
               <ExternalLink className="h-3 w-3" />
               {isId ? 'Sumber asli' : 'Original source'}
@@ -845,7 +845,7 @@ export function PublicReferenceResultCard({
               href={routeHref}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex min-h-[28px] items-center gap-1 rounded-full bg-slate-100 px-2.5 text-[10px] font-bold text-slate-700 transition hover:text-[color:var(--app-accent)] dark:bg-slate-800 dark:text-slate-100"
+              className="inline-flex min-h-[26px] items-center gap-1 rounded-full bg-slate-100 px-2 text-[9.5px] font-bold text-slate-700 transition hover:text-[color:var(--app-accent)] dark:bg-slate-800 dark:text-slate-100"
             >
               <Navigation className="h-3 w-3" />
               {isId ? 'Rute' : 'Route'}
@@ -2199,7 +2199,7 @@ export function UmkmDiscoveryPanel({
                           <PlaceThumb
                             src={item.ui.gallery[0] || item.ui.coverImage}
                             alt={item.store.name}
-                            className="h-14 w-14 shrink-0 rounded-xl"
+                            className="h-12 w-12 shrink-0 rounded-xl sm:h-14 sm:w-14"
                           />
                           <span className="min-w-0">
                             <span className="line-clamp-1 text-[12.5px] font-bold leading-tight text-[color:var(--app-text)]">
@@ -2226,24 +2226,26 @@ export function UmkmDiscoveryPanel({
                                 />
                               ) : null}
                             </span>
-                            <span
-                              className={cn(
-                                'mt-1 inline-flex items-center gap-1.5 text-[11px] font-semibold',
-                                openStatus.textClassName,
-                              )}
-                            >
+                            <span className="mt-0.5 flex min-w-0 items-center gap-2 text-[10px]">
                               <span
                                 className={cn(
-                                  'h-2 w-2 rounded-full',
-                                  openStatus.dotClassName,
+                                  'inline-flex shrink-0 items-center gap-1.5 font-semibold',
+                                  openStatus.textClassName,
                                 )}
-                              />
-                              {openStatus.label}
-                            </span>
-                            <span className="mt-0.5 flex min-w-0 items-center gap-1 text-[11px] text-[color:var(--app-text-soft)]">
-                              <MapPin className="h-3 w-3 shrink-0 text-[color:var(--app-accent)]" />
-                              <span className="truncate">
-                                {getPlaceLocationLabel(item, isId)}
+                              >
+                                <span
+                                  className={cn(
+                                    'h-1.5 w-1.5 rounded-full',
+                                    openStatus.dotClassName,
+                                  )}
+                                />
+                                {openStatus.label}
+                              </span>
+                              <span className="flex min-w-0 items-center gap-1 text-[color:var(--app-text-soft)]">
+                                <MapPin className="h-3 w-3 shrink-0 text-[color:var(--app-accent)]" />
+                                <span className="truncate">
+                                  {getPlaceLocationLabel(item, isId)}
+                                </span>
                               </span>
                             </span>
                           </span>
