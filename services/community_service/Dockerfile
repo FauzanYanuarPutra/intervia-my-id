@@ -36,12 +36,22 @@ RUN cargo build --release --locked || true
 
 COPY . .
 
-# SQLx uses migration version as the primary key in _sqlx_migrations.
-# Fail the image build early when multiple up/simple migrations reuse a version.
-RUN set -eu;     duplicate_versions="$(find migrations -maxdepth 1 -type f \( -name '*.up.sql' -o -name '*.sql' \) ! -name '*.down.sql' -printf '%f\n'       | sed -E 's/^([0-9]+)_.*/\\1/'       | sort | uniq -d)";     if [ -n "$duplicate_versions" ]; then       echo "ERROR: duplicate SQLx migration version(s):";       printf '%s\n' "$duplicate_versions";       echo "Each migration version must be unique within community_service.";       exit 1;     fi
-
 RUN if [ ! -d migrations ]; then \
     mkdir -p migrations && touch migrations/.keep; \
+    fi
+
+# SQLx uses migration version as the primary key in _sqlx_migrations.
+# Fail the image build early when multiple "up" migrations reuse a version.
+RUN set -eu; \
+    duplicate_versions="$(find migrations -maxdepth 1 -type f -name '*.up.sql' -printf '%f\n' \
+      | awk -F_ '{print $1}' \
+      | sort \
+      | uniq -d)"; \
+    if [ -n "$duplicate_versions" ]; then \
+      echo "ERROR: duplicate SQLx migration version(s):"; \
+      printf '%s\n' "$duplicate_versions"; \
+      echo "Each migration version must be unique within community_service."; \
+      exit 1; \
     fi
 
 RUN find src -type f -name '*.rs' -exec touch {} +
