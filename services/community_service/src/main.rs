@@ -1080,38 +1080,74 @@ async fn connect_database_pool(
 fn validate_community_migration_versions(
     migrator: &sqlx::migrate::Migrator,
 ) -> anyhow::Result<()> {
-    let mut versions = HashMap::<i64, Vec<String>>::new();
+    #[derive(Default)]
+    struct MigrationVersionState {
+        up: Vec<String>,
+        down: Vec<String>,
+        simple: Vec<String>,
+    }
+
+    let mut versions = HashMap::<i64, MigrationVersionState>::new();
 
     for migration in migrator.iter() {
-        versions
-            .entry(migration.version)
-            .or_default()
-            .push(format!(
-                "{} ({:?})",
-                migration.description, migration.migration_type
-            ));
+        let entry = versions.entry(migration.version).or_default();
+        let label = format!("{} ({:?})", migration.description, migration.migration_type);
+
+        if migration.migration_type.is_up_migration() {
+            entry.up.push(label);
+        } else if migration.migration_type.is_down_migration() {
+            entry.down.push(label);
+        } else {
+            entry.simple.push(label);
+        }
     }
 
-    let duplicates = versions
+    let mut invalid = versions
         .into_iter()
-        .filter(|(_, migrations)| migrations.len() > 1)
+        .filter_map(|(version, state)| {
+            let has_reversible = !state.up.is_empty() || !state.down.is_empty();
+            let duplicate_up = state.up.len() > 1;
+            let duplicate_down = state.down.len() > 1;
+            let mixed_simple_and_reversible =
+                !state.simple.is_empty() && has_reversible;
+            let incomplete_reversible =
+                !state.up.is_empty() && state.down.is_empty()
+                    || state.up.is_empty() && !state.down.is_empty();
+
+            if !(duplicate_up
+                || duplicate_down
+                || mixed_simple_and_reversible
+                || incomplete_reversible
+                || state.simple.len() > 1)
+            {
+                return None;
+            }
+
+            let mut parts = Vec::new();
+            if !state.simple.is_empty() {
+                parts.push(format!("simple=[{}]", state.simple.join(", ")));
+            }
+            if !state.up.is_empty() {
+                parts.push(format!("up=[{}]", state.up.join(", ")));
+            }
+            if !state.down.is_empty() {
+                parts.push(format!("down=[{}]", state.down.join(", ")));
+            }
+
+            Some(format!("version {version}: {}", parts.join("; ")))
+        })
         .collect::<Vec<_>>();
 
-    if duplicates.is_empty() {
-        return Ok(());
+    invalid.sort();
+
+    if invalid.is_empty() {
+        Ok(())
+    } else {
+        anyhow::bail!(
+            "invalid SQLx migration version(s) embedded in community_service: {}.              Each version must be either one simple .sql migration or exactly one matching .up.sql/.down.sql pair.",
+            invalid.join("; ")
+        );
     }
-
-    let detail = duplicates
-        .into_iter()
-        .map(|(version, migrations)| {
-            format!("version {version}: {}", migrations.join(", "))
-        })
-        .collect::<Vec<_>>()
-        .join("; ");
-
-    anyhow::bail!(
-        "duplicate SQLx migration version(s) embedded in community_service: {detail}. Fix the migration filenames so every numeric version is unique."
-    );
 }
 
 fn init_tracing() {
