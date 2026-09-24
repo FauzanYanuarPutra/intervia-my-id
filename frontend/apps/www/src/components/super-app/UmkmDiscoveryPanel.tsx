@@ -803,12 +803,12 @@ export function PublicReferenceResultCard({
           alt={place.store.name}
           className={cn(
             'rounded-[14px]',
-            compact ? 'h-[74px]' : 'h-[72px] sm:h-[82px] xl:h-[88px]',
+            compact ? 'h-[52px] w-[52px] sm:h-[56px] sm:w-[56px]' : 'h-[72px] sm:h-[82px] xl:h-[88px]',
           )}
         />
         <span className="min-w-0">
           <PublicReferenceBadge isId={isId} />
-          <span className="mt-1 line-clamp-2 text-[13px] font-bold leading-tight text-[color:var(--app-text)] sm:text-[14px]">
+          <span className="mt-0.5 line-clamp-1 text-[12px] font-bold leading-tight text-[color:var(--app-text)] sm:text-[13px]">
             {place.store.name}
           </span>
           {provenanceText ? (
@@ -816,7 +816,7 @@ export function PublicReferenceResultCard({
               {provenanceText}
             </span>
           ) : null}
-          <span className="mt-0.5 flex min-w-0 items-center gap-1 text-[11px] text-[color:var(--app-text-soft)]">
+          <span className="mt-0.5 flex min-w-0 items-center gap-1 text-[10px] text-[color:var(--app-text-soft)]">
             <MapPin className="h-3 w-3 shrink-0 text-[color:var(--app-accent)]" />
             <span className="truncate">
               {getPlaceLocationLabel(place, isId)}
@@ -828,13 +828,13 @@ export function PublicReferenceResultCard({
         </span>
       </button>
       {provenance?.sourceUrl || routeHref ? (
-        <div className="flex flex-wrap items-center gap-2 border-t border-sky-100 px-2 py-1.5 dark:border-sky-900/50">
+        <div className="flex flex-wrap items-center gap-1.5 border-t border-sky-100 px-1.5 py-1 dark:border-sky-900/50">
           {provenance?.sourceUrl ? (
             <a
               href={provenance.sourceUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex min-h-[28px] items-center gap-1 rounded-full bg-sky-50 px-2.5 text-[10px] font-bold text-sky-700 transition hover:bg-sky-100 dark:bg-sky-950/50 dark:text-sky-200"
+              className="inline-flex min-h-[26px] items-center gap-1 rounded-full bg-sky-50 px-2 text-[9.5px] font-bold text-sky-700 transition hover:bg-sky-100 dark:bg-sky-950/50 dark:text-sky-200"
             >
               <ExternalLink className="h-3 w-3" />
               {isId ? 'Sumber asli' : 'Original source'}
@@ -845,7 +845,7 @@ export function PublicReferenceResultCard({
               href={routeHref}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex min-h-[28px] items-center gap-1 rounded-full bg-slate-100 px-2.5 text-[10px] font-bold text-slate-700 transition hover:text-[color:var(--app-accent)] dark:bg-slate-800 dark:text-slate-100"
+              className="inline-flex min-h-[26px] items-center gap-1 rounded-full bg-slate-100 px-2 text-[9.5px] font-bold text-slate-700 transition hover:text-[color:var(--app-accent)] dark:bg-slate-800 dark:text-slate-100"
             >
               <Navigation className="h-3 w-3" />
               {isId ? 'Rute' : 'Route'}
@@ -1930,18 +1930,18 @@ export function UmkmDiscoveryPanel({
         {!error && !mapOnly ? (
           <div
             className={cn(
-              'absolute inset-x-0 bottom-0 z-[1250] mx-auto flex max-w-[760px] flex-col overflow-hidden rounded-t-[22px] border border-slate-200/90 bg-white/98 shadow-[0_-20px_55px_-32px_rgba(15,23,42,0.45)] backdrop-blur-xl transition-all duration-300 dark:border-slate-800 dark:bg-slate-950/96',
+              'absolute inset-x-0 bottom-0 z-[1250] mx-auto flex w-full max-w-[760px] flex-col overflow-hidden rounded-t-[18px] border border-slate-200/90 bg-white/98 pb-[env(safe-area-inset-bottom)] shadow-[0_-18px_48px_-30px_rgba(15,23,42,0.42)] backdrop-blur-xl transition-all duration-300 sm:rounded-t-[22px] dark:border-slate-800 dark:bg-slate-950/96',
               'lg:inset-x-auto lg:bottom-3 lg:left-3 lg:top-[calc(env(safe-area-inset-top)+6.85rem)] lg:mx-0 lg:w-[400px] lg:max-w-none lg:rounded-[16px] lg:shadow-[0_18px_42px_-24px_rgba(15,23,42,0.42)]',
               sheetExpanded
-                ? 'max-h-[min(46vh,calc(var(--app-viewport-height)-9.5rem))] lg:max-h-[calc(var(--app-viewport-height)-7.15rem)]'
-                : 'max-h-[118px] min-h-[118px] lg:max-h-[calc(var(--app-viewport-height)-7.15rem)] lg:min-h-0',
+                ? 'max-h-[min(58svh,calc(var(--app-viewport-height)-8.5rem))] lg:max-h-[calc(var(--app-viewport-height)-7.15rem)]'
+                : 'max-h-[106px] min-h-[106px] lg:max-h-[calc(var(--app-viewport-height)-7.15rem)] lg:min-h-0',
             )}
             data-testid="umkm-results-sheet"
           >
             <button
               type="button"
               onClick={() => setSheetExpanded(current => !current)}
-              className="mx-auto mb-1 flex h-7 w-14 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-100 lg:hidden"
+              className="mx-auto mb-0.5 flex h-6 w-12 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-100 lg:hidden"
               aria-expanded={sheetExpanded}
               aria-label={
                 sheetExpanded
@@ -1960,9 +1960,9 @@ export function UmkmDiscoveryPanel({
               )}
             </button>
 
-            <div className="flex min-w-0 shrink-0 items-center justify-between gap-2 px-1 pb-1">
+            <div className="flex min-w-0 shrink-0 items-center justify-between gap-2 px-2 pb-1 sm:px-1">
               <div className="min-w-0">
-                <h1 className="line-clamp-2 text-[1.02rem] font-bold leading-tight tracking-[-0.035em] text-[color:var(--app-text)] sm:text-lg">
+                <h1 className="line-clamp-1 text-sm font-bold leading-tight tracking-[-0.035em] text-[color:var(--app-text)] sm:text-lg">
                   {sheetTitle}
                 </h1>
                 <p className="mt-0.5 hidden line-clamp-1 text-[10px] font-medium leading-4 text-[color:var(--app-text-soft)] lg:block">
@@ -1970,13 +1970,13 @@ export function UmkmDiscoveryPanel({
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-1.5">
-                <span className="inline-flex max-w-[92px] items-center justify-center truncate rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-bold leading-none text-slate-600 sm:max-w-none">
+                <span className="inline-flex max-w-[86px] items-center justify-center truncate rounded-full border border-slate-200 bg-white px-2 py-1 text-[9.5px] font-bold leading-none text-slate-600 sm:max-w-none">
                   {totalLabel}
                 </span>
               </div>
             </div>
 
-            <div className="shrink-0 px-1 pb-1.5">
+            <div className="shrink-0 px-2 pb-1.5 sm:px-1">
               <DiscoveryScopeControl
                 scope={discoveryScope}
                 isId={isId}
@@ -2157,7 +2157,7 @@ export function UmkmDiscoveryPanel({
                         key={index}
                         className="flex gap-3 border-b border-slate-200/80 py-3 dark:border-slate-800"
                       >
-                        <Skeleton className="h-14 w-14 shrink-0 rounded-xl" />
+                        <Skeleton className="h-12 w-12 shrink-0 rounded-xl sm:h-14 sm:w-14" />
                         <div className="min-w-0 flex-1 py-0.5">
                           <Skeleton variant="line" className="h-4 w-2/3" />
                           <Skeleton variant="line" className="mt-2 h-3 w-1/2" />
@@ -2167,7 +2167,7 @@ export function UmkmDiscoveryPanel({
                     ))}
                   </div>
                 ) : paginatedListedPlaces.length > 0 ? (
-                  <div className="grid min-h-0 min-w-0 flex-1 auto-rows-min gap-2 overflow-y-auto overscroll-contain pr-0.5 [scrollbar-gutter:stable]">
+                  <div className="grid min-h-0 min-w-0 flex-1 auto-rows-min gap-0 overflow-y-auto overscroll-contain px-2 pr-1 [scrollbar-gutter:stable] [scrollbar-width:thin] sm:px-1">
                     {paginatedListedPlaces.map(item => {
                       if (isUmkmMapPublicReference(item.store)) {
                         return (
@@ -2193,19 +2193,19 @@ export function UmkmDiscoveryPanel({
                           key={item.store.id}
                           type="button"
                           onClick={() => handleSelectStore(item.store.id)}
-                          className="group flex min-w-0 w-full items-center gap-3 border-b border-slate-200/80 py-2.5 text-left transition hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900/60"
+                          className="group flex min-w-0 w-full items-center gap-2.5 border-b border-slate-200/80 px-1 py-2 text-left transition hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900/60"
                           data-testid="umkm-business-card"
                         >
                           <PlaceThumb
                             src={item.ui.gallery[0] || item.ui.coverImage}
                             alt={item.store.name}
-                            className="h-14 w-14 shrink-0 rounded-xl"
+                            className="h-12 w-12 shrink-0 rounded-xl sm:h-14 sm:w-14"
                           />
                           <span className="min-w-0">
-                            <span className="line-clamp-2 text-[13px] font-bold leading-tight text-[color:var(--app-text)]">
+                            <span className="line-clamp-1 text-[12.5px] font-bold leading-tight text-[color:var(--app-text)]">
                               {item.store.name}
                             </span>
-                            <span className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[10.5px] font-semibold text-[color:var(--app-text-soft)]">
+                            <span className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[9.5px] font-semibold text-[color:var(--app-text-soft)]">
                               {item.ui.ratingNumber > 0 ? (
                                 <RatingStars
                                   rating={item.ui.ratingNumber}
@@ -2226,28 +2226,30 @@ export function UmkmDiscoveryPanel({
                                 />
                               ) : null}
                             </span>
-                            <span
-                              className={cn(
-                                'mt-1 inline-flex items-center gap-1.5 text-[11px] font-semibold',
-                                openStatus.textClassName,
-                              )}
-                            >
+                            <span className="mt-0.5 flex min-w-0 items-center gap-2 text-[10px]">
                               <span
                                 className={cn(
-                                  'h-2 w-2 rounded-full',
-                                  openStatus.dotClassName,
+                                  'inline-flex shrink-0 items-center gap-1.5 font-semibold',
+                                  openStatus.textClassName,
                                 )}
-                              />
-                              {openStatus.label}
-                            </span>
-                            <span className="mt-0.5 flex min-w-0 items-center gap-1 text-[11px] text-[color:var(--app-text-soft)]">
-                              <MapPin className="h-3 w-3 shrink-0 text-[color:var(--app-accent)]" />
-                              <span className="truncate">
-                                {getPlaceLocationLabel(item, isId)}
+                              >
+                                <span
+                                  className={cn(
+                                    'h-1.5 w-1.5 rounded-full',
+                                    openStatus.dotClassName,
+                                  )}
+                                />
+                                {openStatus.label}
+                              </span>
+                              <span className="flex min-w-0 items-center gap-1 text-[color:var(--app-text-soft)]">
+                                <MapPin className="h-3 w-3 shrink-0 text-[color:var(--app-accent)]" />
+                                <span className="truncate">
+                                  {getPlaceLocationLabel(item, isId)}
+                                </span>
                               </span>
                             </span>
                           </span>
-                          <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition group-hover:bg-[color:var(--app-accent)] group-hover:text-white dark:bg-slate-800 dark:text-slate-200">
+                          <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition group-hover:bg-[color:var(--app-accent)] group-hover:text-white dark:bg-slate-800 dark:text-slate-200">
                             <ChevronDown className="-rotate-90 h-4 w-4" />
                           </span>
                         </button>
@@ -2260,7 +2262,7 @@ export function UmkmDiscoveryPanel({
                         data-testid="umkm-load-more"
                         onClick={handleLoadMore}
                         disabled={loadingMoreForScope}
-                        className="inline-flex min-h-[38px] items-center justify-center rounded-full border border-slate-200 bg-white px-3 text-[11px] font-bold text-slate-700 transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)] dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+                        className="mx-1 my-2 inline-flex min-h-[34px] items-center justify-center rounded-full border border-slate-200 bg-white px-3 text-[10px] font-bold text-slate-700 transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)] dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
                       >
                         {loadingMoreForScope
                           ? isId
