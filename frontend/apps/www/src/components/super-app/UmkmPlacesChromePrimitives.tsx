@@ -344,10 +344,10 @@ export function MapQuickControls({
       ) : null}
       <div
         className={cn(
-          'inline-flex bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(248,250,252,0.82))] shadow-[0_16px_30px_-22px_rgba(15,23,42,0.3)] ',
+          'inline-flex border border-slate-200/80 bg-white/95 shadow-[0_12px_28px_-20px_rgba(15,23,42,0.34)] backdrop-blur-md',
           compact
-            ? 'flex-col gap-1 rounded-[24px] p-1'
-            : 'items-center gap-1 rounded-[18px] p-1.5',
+            ? 'flex-col gap-1 rounded-full p-1'
+            : 'items-center gap-1 rounded-full p-1',
         )}
       >
         <button
