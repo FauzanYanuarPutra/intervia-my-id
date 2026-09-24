@@ -12,7 +12,7 @@ import {
 } from 'react-leaflet';
 import { divIcon, type DivIcon } from 'leaflet';
 import type { ContentMapPoint } from './ContentLocationMap';
-import { OPEN_MAP_OPEN_MAP_TILE_ATTRIBUTION, OPEN_MAP_OPEN_MAP_TILE_URL } from '@/lib/super-app/maps';
+import { OPEN_MAP_TILE_ATTRIBUTION, OPEN_MAP_TILE_URL } from '@/lib/super-app/maps';
 
 type ContentLocationMapClientProps = {
   point: ContentMapPoint;
