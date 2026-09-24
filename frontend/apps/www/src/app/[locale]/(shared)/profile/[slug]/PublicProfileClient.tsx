@@ -2270,7 +2270,7 @@ export default function PublicProfileClient({
 
         <main className="mx-auto w-full max-w-[1080px] px-0 py-0 sm:px-4 sm:py-4 lg:px-5 lg:py-5">
           <section className="overflow-hidden border-y border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] sm:rounded-[24px] sm:border sm:shadow-sm">
-            <div className="relative h-28 overflow-hidden sm:h-40">
+            <div className="relative h-24 overflow-hidden sm:h-32 lg:h-36">
               {coverUrl ? (
                 <Image src={coverUrl} alt="" fill priority unoptimized sizes="(max-width: 640px) 100vw, 1080px" className="object-cover" />
               ) : (
@@ -2299,9 +2299,9 @@ export default function PublicProfileClient({
               </div>
             </div>
 
-            <div className="px-3 pb-4 sm:px-6 sm:pb-5">
-              <div className="-mt-10 flex min-w-0 items-end gap-3 sm:-mt-12 sm:gap-4">
-                <div className="relative h-[78px] w-[78px] shrink-0 overflow-hidden rounded-full border-[4px] border-[color:var(--app-surface-strong)] bg-[color:var(--app-surface-muted)] shadow-md sm:h-24 sm:w-24 sm:border-[5px]">
+            <div className="px-3 pb-3.5 sm:px-6 sm:pb-4">
+              <div className="-mt-9 flex min-w-0 items-end gap-3 sm:-mt-11 sm:gap-4">
+                <div className="relative h-[72px] w-[72px] shrink-0 overflow-hidden rounded-full border-[4px] border-[color:var(--app-surface-strong)] bg-[color:var(--app-surface-muted)] shadow-md sm:h-[88px] sm:w-[88px] sm:border-[5px]">
                   <Image src={avatarUrl} alt={detail.displayName} fill priority unoptimized sizes="96px" className="object-cover" />
                 </div>
                 <div className="min-w-0 flex-1 pb-0.5">
@@ -2313,15 +2313,15 @@ export default function PublicProfileClient({
                 </div>
               </div>
 
-              <div className="mt-3 flex min-w-0 flex-wrap gap-1.5">
+              <div className="mt-2 flex min-w-0 flex-wrap gap-1.5">
                 {businessCategory ? <span className="inline-flex max-w-full items-center rounded-full bg-[color:var(--app-accent-soft)] px-2.5 py-1 text-[10px] font-bold text-[color:var(--app-accent)] sm:text-[11px]"><span className="truncate">{businessCategory}</span></span> : null}
                 {profile.location ? <span className="inline-flex max-w-full items-center gap-1 rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[10px] font-medium text-[color:var(--app-text-soft)] sm:text-[11px]"><MapPin className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{profile.location}</span></span> : null}
               </div>
 
-              {detail.headline ? <p className="mt-3 text-[13px] font-extrabold leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-sm">{detail.headline}</p> : null}
-              <p className="mt-1 line-clamp-3 max-w-3xl text-[12px] leading-5 text-[color:var(--app-text-soft)] sm:text-[13px] sm:leading-6">{detail.summary}</p>
+              {detail.headline ? <p className="mt-2.5 text-[13px] font-extrabold leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-sm">{detail.headline}</p> : null}
+              <p className="mt-0.5 line-clamp-3 max-w-3xl text-[12px] leading-5 text-[color:var(--app-text-soft)] sm:text-[13px] sm:leading-6">{detail.summary}</p>
 
-              <div className="mt-4 grid grid-cols-3 divide-x divide-[color:var(--app-border)] rounded-2xl border border-[color:var(--app-border)] py-2.5 sm:max-w-[560px]">
+              <div className="mt-3 grid grid-cols-3 divide-x divide-[color:var(--app-border)] rounded-2xl border border-[color:var(--app-border)] py-2.5 sm:max-w-[560px]">
                 <button type="button" onClick={() => setActiveProfileTab('posts')} className="min-w-0 px-2 text-center transition hover:bg-[color:var(--app-surface-muted)] sm:px-4">
                   <span className="block text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">{formatCompactNumber(listings.length, localeCode)}</span>
                   <span className="mt-0.5 block truncate text-[9px] font-semibold text-[color:var(--app-text-soft)] sm:text-[11px]">{localeCode === 'id' ? 'Etalase' : 'Items'}</span>
@@ -2336,7 +2336,7 @@ export default function PublicProfileClient({
                 </button>
               </div>
 
-              <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+              <div className="mt-2.5 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
                 {isOwnProfile ? (
                   <>
                     <Link href="/profile/edit" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 text-xs font-black text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)] dark:text-[color:var(--app-text-inverse)]"><Edit3 className="h-4 w-4" />{copy.editProfile}</Link>
@@ -2359,7 +2359,7 @@ export default function PublicProfileClient({
                     >
                       {followLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : isFollowingProfile ? <UserCheck className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}{followLoading ? copy.followLoading : isFollowingProfile ? copy.followingAction : copy.followAction}
                     </button>
-                    {whatsAppHref ? <a href={whatsAppHref} target="_blank" rel="noreferrer noopener" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 text-xs font-black text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)] dark:text-[color:var(--app-text-inverse)]"><PhoneCall className="h-4 w-4 text-emerald-600" />{copy.whatsapp}</a> : null}
+                    {whatsAppHref ? <a href={whatsAppHref} target="_blank" rel="noreferrer noopener" className="col-span-2 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 text-xs font-black text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)] dark:text-[color:var(--app-text-inverse)] sm:col-span-1"><PhoneCall className="h-4 w-4 text-emerald-600" />{copy.whatsapp}</a> : null}
                   </>
                 )}
               </div>
@@ -2370,7 +2370,7 @@ export default function PublicProfileClient({
               </div> : null}
 
               {publicTrustSignals.length > 0 ? (
-                <div className="mt-3 flex flex-wrap gap-1.5">
+                <div className="mt-2.5 flex min-w-0 gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                   {publicTrustSignals.map(item => {
                     const Icon = item.icon;
                     return <span key={item.key} className="inline-flex min-h-7 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300"><Icon className="h-3.5 w-3.5" />{item.label}</span>;
@@ -2385,7 +2385,7 @@ export default function PublicProfileClient({
               <div
                 role="tablist"
                 aria-label={localeCode === 'id' ? 'Navigasi profil' : 'Profile navigation'}
-                className="flex min-w-0 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                className="grid min-w-0 grid-cols-3 px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
               >
                 {profileTabs.map(tab => {
                   const active = activeProfileTab === tab.key;
@@ -2396,14 +2396,14 @@ export default function PublicProfileClient({
                       role="tab"
                       onClick={() => setActiveProfileTab(tab.key)}
                       aria-selected={active}
-                      className={`relative min-h-12 shrink-0 whitespace-nowrap px-4 text-[12px] font-bold transition sm:min-h-14 sm:text-sm ${
+                      className={`relative min-h-11 min-w-0 px-2 text-center text-[12px] font-bold transition sm:min-h-14 sm:px-4 sm:text-sm ${
                         active
                           ? 'text-emerald-700 dark:text-emerald-300'
                           : 'text-[color:var(--app-text-soft)] hover:text-[color:var(--app-text)]'
                       }`}
                     >
                       {tab.label}
-                      {active ? <span className="absolute inset-x-4 bottom-0 h-0.5 rounded-full bg-emerald-600" /> : null}
+                      {active ? <span className="absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-emerald-600 sm:inset-x-4" /> : null}
                     </button>
                   );
                 })}
