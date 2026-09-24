@@ -12,10 +12,14 @@ type Item = {
   cover_image?: string | null;
   metadata?: Record<string, unknown>;
   content_status?: string | null;
+  published_at?: string | null;
+  created_at?: string;
   updated_at: string;
 };
 
-const STATUSES = ['pending_review', 'needs_revision', 'published', 'rejected', 'retracted', 'all'];
+const STATUSES = ['pending_review', 'needs_revision', 'published', 'rejected', 'retracted', 'all'] as const;
+type EditorialStatus = (typeof STATUSES)[number];
+type EditorialAction = 'approve' | 'correct' | 'needs_revision' | 'reject' | 'retract';
 
 function meta(item: Item) {
   const raw = item.metadata?.blog;
@@ -25,14 +29,14 @@ function meta(item: Item) {
 }
 
 export default function BlogEditorial() {
-  const [status, setStatus] = useState('pending_review');
+  const [status, setStatus] = useState<EditorialStatus>('pending_review');
   const [items, setItems] = useState<Item[]>([]);
   const [selected, setSelected] = useState<Item | null>(null);
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
-  async function load(next = status) {
+  async function load(next: EditorialStatus = status) {
     setError('');
     try {
       const r = await fetch('/api/blog/editorial?status=' + encodeURIComponent(next));
@@ -51,7 +55,7 @@ export default function BlogEditorial() {
     void load();
   }, [status]);
 
-  async function moderate(action: string) {
+  async function moderate(action: EditorialAction) {
     if (!selected) return;
 
     if (action !== 'approve' && action !== 'correct' && !note.trim()) {
