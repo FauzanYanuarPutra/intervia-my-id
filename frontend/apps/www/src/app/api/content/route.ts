@@ -293,7 +293,7 @@ function asObject(value: unknown): ContentRecord | null {
     : null;
 }
 
-export function isEditorialContentRecord(item: ContentRecord): boolean {
+function isEditorialContentRecord(item: ContentRecord): boolean {
   const metadata = asObject(item.metadata);
   const news = asObject(metadata?.news);
   if (news && Object.keys(news).length > 0) return true;
