@@ -1,4 +1,4 @@
-import { ArrowRight, Clock3, MapPin } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Clock3, MapPin } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import type { LajukanNewsArticle } from '@/lib/news';
 import { buildNewsPath } from '@/lib/news';
@@ -40,7 +40,7 @@ export function NewsCard({
     return (
       <Link
         href={href}
-        className="group grid min-w-0 grid-cols-[84px_minmax(0,1fr)] items-stretch gap-2.5 rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] p-2.5 text-left transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface-muted)] hover:shadow-[0_12px_24px_-22px_rgba(15,23,42,0.3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/20 sm:grid-cols-[96px_minmax(0,1fr)] sm:gap-3"
+        className="group grid min-w-0 grid-cols-[96px_minmax(0,1fr)] items-center gap-3 rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] p-2 text-left transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/20 sm:grid-cols-[118px_minmax(0,1fr)] sm:gap-3.5 sm:p-2.5"
       >
         <NewsMedia
           article={article}
@@ -48,19 +48,28 @@ export function NewsCard({
           showLabels={false}
           className="w-full rounded-[12px]"
         />
-        <div className="flex min-w-0 flex-col justify-center py-0.5">
+
+        <div className="min-w-0 py-0.5">
           <div className="flex min-w-0 items-center gap-1.5">
-            <span className="max-w-[52%] truncate text-[9px] font-black uppercase tracking-[0.09em] text-[color:var(--app-accent)]">
+            <span className="min-w-0 truncate text-[9px] font-extrabold uppercase tracking-[0.1em] text-[color:var(--app-accent)]">
               {article.category}
             </span>
-            <span className="truncate text-[9px] font-semibold text-[color:var(--app-text-soft)]">
+            <span className="shrink-0 text-[8px] font-bold text-[color:var(--app-text-soft)]">•</span>
+            <span className="shrink-0 text-[9px] font-semibold text-[color:var(--app-text-soft)]">
               {kindLabel(article, isId)}
             </span>
           </div>
-          <h3 className="mt-1 line-clamp-2 text-[12px] font-extrabold leading-[17px] tracking-[-0.018em] text-[color:var(--app-text)] group-hover:text-[color:var(--app-accent)] sm:text-[13px] sm:leading-[18px]">
-            {article.title}
-          </h3>
-          <div className="mt-1.5 flex min-w-0 items-center gap-1 text-[9px] font-semibold text-[color:var(--app-text-soft)]">
+
+          <div className="mt-1 flex min-w-0 items-start gap-2">
+            <h3 className="line-clamp-2 min-w-0 flex-1 text-[13px] font-extrabold leading-[18px] tracking-[-0.02em] text-[color:var(--app-text)] transition-colors group-hover:text-[color:var(--app-accent)] sm:text-[14px] sm:leading-[19px]">
+              {article.title}
+            </h3>
+            <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[color:var(--app-border)] text-[color:var(--app-text-soft)] transition group-hover:border-[color:var(--app-accent-border)] group-hover:text-[color:var(--app-accent)]">
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </span>
+          </div>
+
+          <div className="mt-2 flex min-w-0 items-center gap-1.5 text-[9px] font-semibold text-[color:var(--app-text-soft)]">
             <Clock3 className="h-3 w-3 shrink-0" />
             <span className="truncate">{formatDate(article.publishedAt, locale) || (isId ? 'Terbaru' : 'Latest')}</span>
           </div>
