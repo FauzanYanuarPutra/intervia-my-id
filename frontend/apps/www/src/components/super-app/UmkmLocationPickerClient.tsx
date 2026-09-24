@@ -11,6 +11,7 @@ import {
   useMapEvents,
 } from 'react-leaflet';
 import { divIcon, type DivIcon } from 'leaflet';
+import { OPEN_MAP_OPEN_MAP_TILE_ATTRIBUTION, OPEN_MAP_OPEN_MAP_TILE_URL } from '@/lib/super-app/maps';
 import { MapPin } from 'lucide-react';
 import { LocationAutocomplete } from '@/components/location/LocationAutocomplete';
 import { cn } from '@/lib/utils';
@@ -33,9 +34,6 @@ type UmkmLocationPickerClientProps = {
 };
 
 const DEFAULT_POINT: LatLng = { lat: -6.2, lng: 106.816666 };
-const TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-const TILE_ATTRIBUTION = '&copy; OpenStreetMap contributors';
-
 function buildPickerMarkerIcon(): DivIcon {
   return divIcon({
     className: 'leaflet-superapp-marker-host',
@@ -185,7 +183,7 @@ export function UmkmLocationPickerClient({
           scrollWheelZoom
           className="leaflet-location-picker-map relative z-0 h-full min-h-[340px] w-full sm:min-h-[460px]"
         >
-          <TileLayer attribution={TILE_ATTRIBUTION} url={TILE_URL} />
+          <TileLayer attribution={OPEN_MAP_TILE_ATTRIBUTION} url={OPEN_MAP_TILE_URL} />
           <ZoomControl position="bottomright" />
           <MapCenterController point={point} />
           <MapClickController onPick={reversePoint} />
