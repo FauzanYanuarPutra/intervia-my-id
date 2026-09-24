@@ -1,4 +1,4 @@
-SET search_path = forum, reel, public, events;
+SET LOCAL search_path = forum, reel, public, events;
 
 CREATE TABLE IF NOT EXISTS forum.lajukan_forum_thread_bookmarks (
   thread_id text NOT NULL REFERENCES forum.lajukan_forum_threads(id) ON DELETE CASCADE,
