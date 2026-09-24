@@ -12,6 +12,7 @@ import {
 } from 'react-leaflet';
 import { divIcon, type DivIcon } from 'leaflet';
 import type { ContentMapPoint } from './ContentLocationMap';
+import { OPEN_MAP_OPEN_MAP_TILE_ATTRIBUTION, OPEN_MAP_OPEN_MAP_TILE_URL } from '@/lib/super-app/maps';
 
 type ContentLocationMapClientProps = {
   point: ContentMapPoint;
@@ -19,9 +20,6 @@ type ContentLocationMapClientProps = {
   address?: string;
   className?: string;
 };
-
-const TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-const TILE_ATTRIBUTION = '&copy; OpenStreetMap contributors';
 
 function buildContentMarkerIcon(): DivIcon {
   return divIcon({
@@ -91,7 +89,7 @@ export function ContentLocationMapClient({
         className="leaflet-content-location-map h-full w-full"
       >
         <ContentMapCenter point={point} />
-        <TileLayer attribution={TILE_ATTRIBUTION} url={TILE_URL} />
+        <TileLayer attribution={OPEN_MAP_TILE_ATTRIBUTION} url={OPEN_MAP_TILE_URL} />
         <AttributionControl position="bottomleft" prefix={false} />
         <ZoomControl position="bottomright" />
         <Marker position={position} icon={markerIcon}>
