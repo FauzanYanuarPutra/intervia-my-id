@@ -1075,37 +1075,41 @@ async fn connect_database_pool(
     Ok(options.connect(database_url).await?)
 }
 
-const COMMUNITY_MIGRATION_RETRY_DELAYS_MS: [u64; 3] = [250, 750, 1_500];
-
-fn is_migration_unique_conflict_message(message: &str) -> bool {
-    message.contains("duplicate key value violates unique constraint")
-        && message.contains("_sqlx_migrations_pkey")
-}
-
-async fn run_community_migrations_with_retry(
+fn validate_community_migration_versions(
     migrator: &sqlx::migrate::Migrator,
-    pool: &PgPool,
-) -> Result<(), sqlx::migrate::MigrateError> {
-    for (attempt, delay_ms) in COMMUNITY_MIGRATION_RETRY_DELAYS_MS.iter().enumerate() {
-        match migrator.run(pool).await {
-            Ok(()) => return Ok(()),
-            Err(error)
-                if attempt + 1 < COMMUNITY_MIGRATION_RETRY_DELAYS_MS.len()
-                    && is_migration_unique_conflict_message(&error.to_string()) =>
-            {
-                tracing::warn!(
-                    attempt = attempt + 1,
-                    retry_in_ms = *delay_ms,
-                    error = %error,
-                    "Community migration hit a concurrent _sqlx_migrations conflict; retrying",
-                );
-                sleep(Duration::from_millis(*delay_ms)).await;
-            }
-            Err(error) => return Err(error),
-        }
+) -> anyhow::Result<()> {
+    let mut versions = HashMap::<i64, Vec<String>>::new();
+
+    for migration in migrator.iter() {
+        versions
+            .entry(migration.version)
+            .or_default()
+            .push(format!(
+                "{} ({:?})",
+                migration.description, migration.migration_type
+            ));
     }
 
-    unreachable!("community migration retry loop must return on the final attempt");
+    let duplicates = versions
+        .into_iter()
+        .filter(|(_, migrations)| migrations.len() > 1)
+        .collect::<Vec<_>>();
+
+    if duplicates.is_empty() {
+        return Ok(());
+    }
+
+    let detail = duplicates
+        .into_iter()
+        .map(|(version, migrations)| {
+            format!("version {version}: {}", migrations.join(", "))
+        })
+        .collect::<Vec<_>>()
+        .join("; ");
+
+    anyhow::bail!(
+        "duplicate SQLx migration version(s) embedded in community_service: {detail}. Fix the migration filenames so every numeric version is unique."
+    );
 }
 
 fn init_tracing() {
@@ -1189,30 +1193,28 @@ async fn main() -> anyhow::Result<()> {
 
     if run_migrations_on_startup {
         let mut migrator = sqlx::migrate!("./migrations");
+        validate_community_migration_versions(&migrator)?;
         let migration_db =
             connect_database_pool(&database_url, DatabasePoolPurpose::Migration).await?;
         if !strict_migrations {
             migrator.set_ignore_missing(true);
         }
 
-        match run_community_migrations_with_retry(&migrator, &migration_db).await {
-            Ok(()) => {}
-            Err(error) => {
-                let message = error.to_string();
-                let checksum_mismatch =
-                    message.contains("was previously applied but has been modified");
-                let missing_migration = message
-                    .contains("was previously applied but is missing in the resolved migrations");
+        if let Err(error) = migrator.run(&migration_db).await {
+            let message = error.to_string();
+            let checksum_mismatch =
+                message.contains("was previously applied but has been modified");
+            let missing_migration = message
+                .contains("was previously applied but is missing in the resolved migrations");
 
-                if !strict_migrations && (checksum_mismatch || missing_migration) {
-                    tracing::warn!(
-                        "Community migration drift in {} (ignored): {}",
-                        app_env,
-                        message
-                    );
-                } else {
-                    return Err(error.into());
-                }
+            if !strict_migrations && (checksum_mismatch || missing_migration) {
+                tracing::warn!(
+                    "Community migration drift in {} (ignored): {}",
+                    app_env,
+                    message
+                );
+            } else {
+                return Err(error.into());
             }
         }
 
