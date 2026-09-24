@@ -171,7 +171,6 @@ export function HomeBusinessMapSection({
           <ArrowUpRight className="h-3.5 w-3.5" />
         </Link>
       </div>
-      </div>
 
       <div
         className="relative mx-1.5 mb-1.5 cursor-pointer overflow-hidden rounded-[16px] border border-slate-200 bg-slate-100 outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 sm:mx-2 sm:mb-2"
