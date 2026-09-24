@@ -1,7 +1,8 @@
 import type { Metadata, Viewport } from 'next';
 
 export const SITE_URL = 'https://www.lajukan.com';
-export const DEFAULT_OG_IMAGE = `${SITE_URL}/og-image-home.png`;
+export const DEFAULT_OG_IMAGE = `${SITE_URL}/opengraph-image.png`;
+export const BRAND_LOGO = `${SITE_URL}/favicon.png`;
 
 export const rootViewport: Viewport = {
   width: 'device-width',
@@ -17,10 +18,10 @@ export const rootMetadata: Metadata = {
   manifest: '/manifest.json',
   icons: {
     icon: [
-      { url: '/favicon.svg', type: 'image/svg+xml' },
       { url: '/favicon.png', sizes: '512x512', type: 'image/png' },
+      { url: '/favicon.ico', type: 'image/x-icon' },
     ],
-    shortcut: [{ url: '/favicon.svg', type: 'image/svg+xml' }],
+    shortcut: [{ url: '/favicon.png', sizes: '512x512', type: 'image/png' }],
     apple: [{ url: '/favicon.png', sizes: '512x512', type: 'image/png' }],
   },
   title: {
@@ -82,17 +83,29 @@ export const rootMetadata: Metadata = {
 export const organizationSchema = {
   '@context': 'https://schema.org',
   '@type': 'Organization',
+  '@id': `${SITE_URL}/#organization`,
   name: 'Lajukan',
+  alternateName: 'Lajukan',
   url: SITE_URL,
-  logo: `${SITE_URL}/logo.svg`,
+  logo: {
+    '@type': 'ImageObject',
+    url: BRAND_LOGO,
+    contentUrl: BRAND_LOGO,
+    width: 512,
+    height: 512,
+  },
+  image: BRAND_LOGO,
   sameAs: [SITE_URL],
 };
 
 export const websiteSchema = {
   '@context': 'https://schema.org',
   '@type': 'WebSite',
+  '@id': `${SITE_URL}/#website`,
   name: 'Lajukan',
   url: SITE_URL,
+  image: BRAND_LOGO,
+  publisher: { '@id': `${SITE_URL}/#organization` },
   potentialAction: {
     '@type': 'SearchAction',
     target: `${SITE_URL}/id/explore?q={search_term_string}`,
