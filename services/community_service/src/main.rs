@@ -1029,7 +1029,15 @@ enum DatabasePoolPurpose {
 
 fn database_session_setup(purpose: DatabasePoolPurpose) -> Option<&'static str> {
     match purpose {
-        DatabasePoolPurpose::Migration => None,
+        // SQLx normally protects migrations with its own Postgres advisory lock, but
+        // development can legitimately have an old migration container overlap a
+        // freshly recreated one. Keep the release-owned migration pool itself
+        // single-connection and hold a dedicated session advisory lock for the
+        // entire migration run. This makes the migration step safe even when
+        // Compose is started twice or an old container is still winding down.
+        DatabasePoolPurpose::Migration => Some(
+            "SELECT pg_advisory_lock(725384901234567890)",
+        ),
         DatabasePoolPurpose::Application => Some("SET search_path TO forum, reel, public, events"),
     }
 }
@@ -1040,9 +1048,17 @@ async fn connect_database_pool(
 ) -> anyhow::Result<PgPool> {
     let options = match purpose {
         DatabasePoolPurpose::Migration => PgPoolOptions::new()
-            .max_connections(2)
+            .max_connections(1)
             .min_connections(0)
-            .acquire_timeout(Duration::from_secs(10)),
+            .acquire_timeout(Duration::from_secs(30))
+            .after_connect(|conn, _meta| {
+                Box::pin(async move {
+                    sqlx::query("SELECT pg_advisory_lock(725384901234567890)")
+                        .execute(conn)
+                        .await?;
+                    Ok(())
+                })
+            }),
         DatabasePoolPurpose::Application => {
             let max_connections = env_u32_bounded("COMMUNITY_DB_MAX_CONNECTIONS", 20, 2, 100);
             let min_connections =
@@ -1061,15 +1077,16 @@ async fn connect_database_pool(
                 .max_lifetime(Duration::from_secs(max_lifetime_seconds))
         }
     };
-    let options = if let Some(statement) = database_session_setup(purpose) {
-        options.after_connect(move |conn, _meta| {
+    let options = match purpose {
+        DatabasePoolPurpose::Migration => options,
+        DatabasePoolPurpose::Application => options.after_connect(|conn, _meta| {
             Box::pin(async move {
-                sqlx::query(statement).execute(conn).await?;
+                sqlx::query("SET search_path TO forum, reel, public, events")
+                    .execute(conn)
+                    .await?;
                 Ok(())
             })
-        })
-    } else {
-        options
+        }),
     };
 
     Ok(options.connect(database_url).await?)
@@ -1200,7 +1217,43 @@ async fn main() -> anyhow::Result<()> {
             migrator.set_ignore_missing(true);
         }
 
-        if let Err(error) = migrator.run(&migration_db).await {
+        let mut migration_error = None;
+        for attempt in 1..=5u32 {
+            match migrator.run(&migration_db).await {
+                Ok(()) => {
+                    migration_error = None;
+                    break;
+                }
+                Err(error) => {
+                    let message = error.to_string();
+                    let concurrent_migration_conflict =
+                        message.contains("duplicate key value violates unique constraint")
+                            && message.contains("_sqlx_migrations_pkey");
+
+                    if concurrent_migration_conflict && attempt < 5 {
+                        let delay_ms = match attempt {
+                            1 => 250,
+                            2 => 750,
+                            3 => 1_500,
+                            _ => 3_000,
+                        };
+                        tracing::warn!(
+                            "Community migration hit a concurrent _sqlx_migrations conflict; retrying attempt={} retry_in_ms={} error={}",
+                            attempt,
+                            delay_ms,
+                            message
+                        );
+                        tokio::time::sleep(Duration::from_millis(delay_ms)).await;
+                        continue;
+                    }
+
+                    migration_error = Some(error);
+                    break;
+                }
+            }
+        }
+
+        if let Some(error) = migration_error {
             let message = error.to_string();
             let checksum_mismatch =
                 message.contains("was previously applied but has been modified");
