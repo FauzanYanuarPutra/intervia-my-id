@@ -144,6 +144,7 @@ services:
   # and keeps schema changes isolated from readiness of the web service.
   community_migration:
     <<: *service-defaults
+    restart: "no"
     build:
       context: ./services/community_service
       dockerfile: Dockerfile
