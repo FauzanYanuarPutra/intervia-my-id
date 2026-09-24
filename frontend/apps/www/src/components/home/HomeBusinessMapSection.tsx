@@ -189,7 +189,7 @@ export function HomeBusinessMapSection({
           controls={false}
           theme="default"
           focusMode="indonesia"
-          className="h-[148px] w-full sm:h-[164px]"
+          className="leaflet-home-map h-[148px] w-full sm:h-[164px]"
         />
 
         <div className="pointer-events-none absolute inset-x-2.5 bottom-2.5 flex items-center justify-between gap-2 sm:inset-x-3 sm:bottom-3">
