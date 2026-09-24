@@ -139,12 +139,36 @@ services:
     ports:
       - "127.0.0.1:${PORT_MARKETPLACE:-8081}:8081"
 
+  # Run Community SQLx migrations in exactly one short-lived container.
+  # The API container itself never migrates on boot, which removes startup races
+  # and keeps schema changes isolated from readiness of the web service.
+  community_migration:
+    <<: *service-defaults
+    build:
+      context: ./services/community_service
+      dockerfile: Dockerfile
+    environment:
+      ENV: development
+      APP_ENV: development
+      RUST_LOG: ${RUST_LOG:-info}
+      COMMUNITY_DATABASE_URL: postgres://${DB_USER:-lajukan}:${DB_PASS:-lajukan-dev-postgres}@community_db:5432/community_db
+      JWT_SECRET: ${JWT_SECRET:-lajukan-development-jwt-secret-change-me-before-sharing}
+      MIGRATE_ONLY: "true"
+      RUN_MIGRATIONS_ON_STARTUP: "true"
+    depends_on:
+      community_db: { condition: service_healthy }
+    networks: [data]
+
   community_service:
     depends_on:
+      community_db: { condition: service_healthy }
+      community_migration: { condition: service_completed_successfully }
       rabbitmq: { condition: service_healthy }
     environment:
       ENV: development
+      APP_ENV: development
       RUST_LOG: ${RUST_LOG:-info}
+      RUN_MIGRATIONS_ON_STARTUP: "false"
     ports:
       - "127.0.0.1:${PORT_COMMUNITY:-8082}:8082"
 
