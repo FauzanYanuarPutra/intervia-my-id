@@ -781,6 +781,11 @@ function formatPrice(
 }
 
 function getListingHref(item: OwnerListing): string {
+  const type = normalizeListingType(item);
+  if (type === 'news' && item.slug) {
+    return `/news/${encodeURIComponent(item.slug)}`;
+  }
+
   return buildContentHref(
     item.id,
     item.title || 'listing',
@@ -956,16 +961,25 @@ function FilterRail({
   activeFilter,
   items,
   onChange,
+  isId,
 }: {
   activeFilter: ListingFilter;
-  items: Array<{ key: ListingFilter; label: string }>;
+  items: Array<{ key: ListingFilter; label: string; count?: number }>;
   onChange: (filter: ListingFilter) => void;
+  isId: boolean;
 }) {
   return (
     <ProfileFilterStrip
       activeKey={activeFilter}
-      ariaLabel="Listing filters"
-      className="flex-1"
+      ariaLabel={isId ? 'Filter postingan' : 'Post filters'}
+      className="w-full"
+      mobileLabel={isId ? 'Jenis postingan' : 'Post type'}
+      mobileTitle={isId ? 'Pilih isi etalase' : 'Choose storefront content'}
+      mobileDescription={
+        isId
+          ? 'Pilih satu jenis postingan. Daftar akan langsung menyesuaikan.'
+          : 'Choose one content type. The storefront updates immediately.'
+      }
       items={items}
       onChange={onChange}
     />
@@ -1245,9 +1259,12 @@ function ListingCard({
   ]);
 
   return (
-    <article className="group relative min-w-0 overflow-hidden rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-[0_16px_36px_-28px_rgba(15,23,42,0.45)]">
-      <LocalizedLink href={getListingHref(item)} className="block min-w-0">
-        <div className="relative aspect-square w-full overflow-hidden bg-[color:var(--app-surface-muted)]">
+    <article className="group relative min-w-0 overflow-hidden rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] transition hover:border-emerald-200 hover:shadow-[0_16px_36px_-28px_rgba(15,23,42,0.45)] sm:flex sm:flex-col">
+      <LocalizedLink
+        href={getListingHref(item)}
+        className="grid min-w-0 grid-cols-[88px_minmax(0,1fr)] gap-3 p-2.5 sm:block sm:p-0"
+      >
+        <div className="relative h-[88px] w-[88px] shrink-0 overflow-hidden rounded-xl bg-[color:var(--app-surface-muted)] sm:h-auto sm:w-full sm:aspect-square sm:rounded-none sm:rounded-t-2xl">
           {imageUrl ? (
             <NextImage
               src={imageUrl}
@@ -1259,7 +1276,7 @@ function ListingCard({
             />
           ) : (
             <div className="flex h-full items-center justify-center text-[color:var(--app-text-soft)]">
-              <Package className="h-9 w-9" />
+              <Package className="h-8 w-8" />
             </div>
           )}
 
@@ -1284,7 +1301,7 @@ function ListingCard({
           </span>
         </div>
 
-        <div className="min-w-0 p-3">
+        <div className="min-w-0 py-0.5 sm:p-3">
           <h3 className="line-clamp-2 min-h-10 text-[13px] font-black leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-sm">
             {item.title || (isId ? 'Tanpa judul' : 'Untitled')}
           </h3>
@@ -2085,16 +2102,16 @@ export default function SuperProfile() {
     { key: 'drafts', label: copy.drafts, count: draftListings.length },
   ];
 
-  const filterItems: Array<{ key: ListingFilter; label: string }> = [
-    { key: 'all', label: copy.all },
-    { key: 'product', label: copy.products },
-    { key: 'service', label: copy.services },
-    { key: 'supplier', label: copy.suppliers },
-    { key: 'place', label: copy.places },
-    { key: 'news', label: copy.news },
-    { key: 'community', label: copy.community },
-    { key: 'reels', label: copy.reelsFilter },
-    { key: 'other', label: copy.others },
+  const filterItems: Array<{ key: ListingFilter; label: string; count: number }> = [
+    { key: 'all', label: copy.all, count: sourceListings.length },
+    { key: 'product', label: copy.products, count: sourceListings.filter(item => normalizeListingType(item) === 'product').length },
+    { key: 'service', label: copy.services, count: sourceListings.filter(item => normalizeListingType(item) === 'service').length },
+    { key: 'supplier', label: copy.suppliers, count: sourceListings.filter(item => normalizeListingType(item) === 'supplier').length },
+    { key: 'place', label: copy.places, count: sourceListings.filter(item => normalizeListingType(item) === 'place').length },
+    { key: 'news', label: copy.news, count: sourceListings.filter(item => normalizeListingType(item) === 'news').length },
+    { key: 'community', label: copy.community, count: sourceListings.filter(item => normalizeListingType(item) === 'community').length },
+    { key: 'reels', label: copy.reelsFilter, count: sourceListings.filter(item => normalizeListingType(item) === 'reels').length },
+    { key: 'other', label: copy.others, count: sourceListings.filter(item => normalizeListingType(item) === 'other').length },
   ];
 
   const sortOptions: Array<{ value: SortMode; label: string }> = [
@@ -2437,7 +2454,12 @@ export default function SuperProfile() {
             />
 
             <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5 border-b border-[color:var(--app-border)]/70 bg-[color:var(--app-surface-strong)] px-2.5 py-2 sm:px-5 sm:py-2.5">
-              <FilterRail activeFilter={activeFilter} items={filterItems} onChange={setActiveFilter} />
+              <FilterRail
+                activeFilter={activeFilter}
+                items={filterItems}
+                onChange={setActiveFilter}
+                isId={isId}
+              />
               <label className="flex h-8 shrink-0 items-center gap-1 rounded-full border border-transparent bg-[color:var(--app-surface-muted)] px-2 text-[color:var(--app-text)] transition hover:bg-emerald-50 dark:bg-white/5 dark:text-[color:var(--app-text-inverse)] dark:hover:bg-emerald-500/10 sm:h-9 sm:px-2.5">
                 <Settings2 className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-300" />
                 <span className="sr-only">{isId ? 'Urutkan berdasarkan' : 'Sort by'}</span>
