@@ -161,6 +161,7 @@ export function HomeBusinessMapSection({
                 : `${summary.businessCount} businesses mapped`}
           </p>
         </div>
+        </div>
 
         <Link
           href={mapHref}
@@ -169,6 +170,7 @@ export function HomeBusinessMapSection({
         >
           <ArrowUpRight className="h-3.5 w-3.5" />
         </Link>
+      </div>
       </div>
 
       <div
