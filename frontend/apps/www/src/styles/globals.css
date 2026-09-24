@@ -491,18 +491,20 @@ html {
 }
 
 .umkm-store-map-popup .leaflet-popup-content-wrapper {
-  max-width: min(320px, calc(100vw - 32px));
+  max-width: min(260px, calc(100vw - 32px));
+  border-radius: 12px;
+  box-shadow: 0 14px 30px -22px rgb(15 23 42 / 0.28);
 }
 
 .umkm-store-map-popup .leaflet-popup-content {
-  width: min(300px, calc(100vw - 72px));
+  width: min(218px, calc(100vw - 72px));
   max-width: 100%;
-  margin: 12px;
+  margin: 10px;
 }
 
 @media (max-width: 640px) {
   .umkm-store-map-popup .leaflet-popup-content {
-    width: min(260px, calc(100vw - 64px));
+    width: min(210px, calc(100vw - 64px));
   }
 }
 

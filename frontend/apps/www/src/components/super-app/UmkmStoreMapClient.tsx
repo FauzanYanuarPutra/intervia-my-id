@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { MapPin } from 'lucide-react';
+import { Check, ExternalLink, MapPin, Navigation, Route, Store } from 'lucide-react';
 import {
   AttributionControl,
   Circle,
@@ -273,14 +273,14 @@ function buildStoreMarkerIcon(input: {
   if (cached) return cached;
 
   const palette = getMarkerPalette(input.markerTone);
-  const height = input.selected ? 38 : 34;
-  const badgeSize = input.selected ? 20 : 18;
-  const fontSize = input.selected ? 11 : 10;
+  const height = input.selected ? 32 : 29;
+  const badgeSize = input.selected ? 19 : 17;
+  const fontSize = input.selected ? 10.5 : 9.5;
   const borderColor =
     input.liveNow === false && !input.selected
       ? '#cbd5e1'
       : input.selected
-        ? '#111827'
+        ? '#059669'
         : '#d1d5db';
   const overlayBg =
     input.locationMode === 'mobile'
@@ -311,9 +311,9 @@ function buildStoreMarkerIcon(input: {
 
   return divIcon({
     className: 'leaflet-superapp-marker-host',
-    iconSize: [72, 48],
-    iconAnchor: [36, 44],
-    tooltipAnchor: [0, -30],
+    iconSize: [58, 40],
+    iconAnchor: [29, 35],
+    tooltipAnchor: [0, -26],
     html: `
       <span
         style="
@@ -322,8 +322,8 @@ function buildStoreMarkerIcon(input: {
           flex-direction:column;
           align-items:center;
           justify-content:flex-start;
-          width:72px;
-          height:48px;
+          width:58px;
+          height:40px;
           font-family:ui-sans-serif,system-ui,sans-serif;
         "
       >
@@ -333,7 +333,7 @@ function buildStoreMarkerIcon(input: {
             align-items:center;
             gap:4px;
             min-height:${height}px;
-            padding:0 9px 0 6px;
+            padding:0 7px 0 5px;
             border-radius:999px;
             border:1px solid ${borderColor};
             background:#ffffff;
@@ -357,6 +357,9 @@ function buildStoreMarkerIcon(input: {
           >${buildMarkerSymbolSvg({ kind: input.kind, selected: input.selected })}</span>
           <span
             style="
+              display:${input.ratingLabel.trim() === '0.0' ? 'none' : 'inline-flex'};
+              align-items:center;
+              gap:2px;
               color:#111827;
               font-size:${fontSize}px;
               font-weight:800;
@@ -380,7 +383,7 @@ function buildStoreMarkerIcon(input: {
             position:absolute;
             right:6px;
             top:0;
-            display:inline-flex;
+            display:none;
             width:20px;
             height:20px;
             align-items:center;
@@ -584,11 +587,12 @@ function StorePopupSummary({
   onSelect?: () => void;
   isId: boolean;
 }) {
-  const locationLabel =
-    ui.distanceLabel ||
-    store.city ||
+  const addressLabel =
     ui.addressLine ||
+    store.address ||
+    store.city ||
     (isId ? 'Lokasi belum lengkap' : 'Location unavailable');
+  const distanceLabel = ui.distanceLabel;
   const isReference = isUmkmMapPublicReference(store);
   const isOpen = ui.openNow === true;
   const statusLabel = isReference
@@ -608,60 +612,62 @@ function StorePopupSummary({
           : 'Not checked';
 
   return (
-    <div className="w-[min(72vw,238px)] space-y-2">
-      <div className="min-w-0">
-        <p className="line-clamp-1 text-[13px] font-bold leading-tight text-slate-950">
-          {store.name}
-        </p>
-
-        <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
-          <span className="inline-flex max-w-full min-w-0 items-center gap-1 rounded-full bg-blue-50 px-2 py-1 text-[10px] font-bold text-blue-700">
-            <MapPin className="h-3 w-3 shrink-0" />
-            <span className="truncate">{locationLabel}</span>
-          </span>
+    <div className='w-[min(68vw,218px)] space-y-1.5'>
+      <div className='min-w-0'>
+        <div className='flex min-w-0 items-center gap-1.5'>
+          <h3 className='min-w-0 flex-1 truncate text-[13px] font-bold leading-tight text-slate-950'>
+            {store.name}
+          </h3>
           <span
-            className={`inline-flex min-h-[22px] items-center rounded-full px-2 text-[10px] font-bold ${
-              isOpen
-                ? 'bg-emerald-50 text-emerald-700'
-                : 'bg-slate-100 text-slate-500'
-            }`}
+            className={isOpen
+              ? 'inline-flex min-h-[20px] shrink-0 items-center rounded-full bg-emerald-50 px-1.5 text-[9.5px] font-bold text-emerald-700'
+              : 'inline-flex min-h-[20px] shrink-0 items-center rounded-full bg-slate-100 px-1.5 text-[9.5px] font-bold text-slate-500'}
           >
             {statusLabel}
           </span>
         </div>
 
-        <p className="mt-1.5 line-clamp-2 text-[10.5px] leading-4 text-slate-500">
-          {ui.addressLine || store.address || store.city}
-        </p>
+        <div className='mt-1.5 flex min-w-0 items-start gap-1.5 text-[10px] leading-4 text-slate-500'>
+          <MapPin className='mt-0.5 h-3 w-3 shrink-0 text-slate-400' aria-hidden='true' />
+          <span className='min-w-0 flex-1 line-clamp-2'>{addressLabel}</span>
+          {distanceLabel ? (
+            <span className='shrink-0 font-bold text-emerald-700'>
+              {distanceLabel}
+            </span>
+          ) : null}
+        </div>
       </div>
 
-      <div
-        className={`grid gap-1.5 ${selectable ? 'grid-cols-3' : 'grid-cols-2'}`}
-      >
+      <div className='flex gap-1.5 pt-0.5'>
         <a
           href={buildUmkmMapPlacePath(store)}
-          className="inline-flex min-h-[28px] items-center justify-center rounded-full bg-emerald-600 px-2 text-[9.5px] font-bold text-white transition hover:bg-emerald-700"
+          aria-label={isId ? `Detail ${store.name}` : `Details for ${store.name}`}
+          className='inline-flex min-h-[30px] flex-1 items-center justify-center gap-1 rounded-full bg-emerald-600 px-2 text-[9.5px] font-bold text-white transition hover:bg-emerald-700'
         >
+          <Store className='h-3 w-3' aria-hidden='true' />
           {isId ? 'Detail' : 'Details'}
+          <ExternalLink className='h-2.5 w-2.5 opacity-75' aria-hidden='true' />
         </a>
         <a
           href={ui.googleMapsDirectionsUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex min-h-[28px] items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-2 text-[9.5px] font-bold text-slate-700 transition hover:border-slate-300"
+          target='_blank'
+          rel='noreferrer'
+          aria-label={isId ? `Rute ke ${store.name}` : `Route to ${store.name}`}
+          className='inline-flex min-h-[30px] flex-1 items-center justify-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 text-[9.5px] font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-100'
         >
+          <Navigation className='h-3 w-3' aria-hidden='true' />
           {isId ? 'Rute' : 'Route'}
         </a>
         {selectable ? (
           <button
-            type="button"
+            type='button'
             onClick={onSelect}
-            className={`inline-flex min-h-[28px] items-center justify-center rounded-full border px-2 text-[9.5px] font-bold transition ${
-              active
-                ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
-                : 'border-slate-200 bg-white text-slate-700 hover:border-emerald-300 hover:text-emerald-700'
-            }`}
+            aria-pressed={active}
+            className={active
+              ? 'inline-flex min-h-[30px] flex-1 items-center justify-center gap-1 rounded-full border border-emerald-500 bg-emerald-50 px-2 text-[9.5px] font-bold text-emerald-700 transition'
+              : 'inline-flex min-h-[30px] flex-1 items-center justify-center gap-1 rounded-full border border-slate-200 bg-white px-2 text-[9.5px] font-bold text-slate-700 transition hover:border-emerald-300 hover:text-emerald-700'}
           >
+            <Check className={active ? 'h-3 w-3' : 'h-3 w-3 opacity-40'} aria-hidden='true' />
             {active
               ? isId
                 ? 'Dipilih'
@@ -675,7 +681,6 @@ function StorePopupSummary({
     </div>
   );
 }
-
 function buildClusterMarkerIcon(input: {
   count: number;
   selected?: boolean;
