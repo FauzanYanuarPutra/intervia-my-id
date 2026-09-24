@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   BadgeCheck,
   ChevronDown,
+  ChevronRight,
   ChevronUp,
   Clock3,
   ExternalLink,
@@ -823,8 +824,8 @@ export function PublicReferenceResultCard({
             </span>
           </span>
         </span>
-        <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sky-50 text-sky-700 transition group-hover:bg-sky-600 group-hover:text-white dark:bg-sky-950/60 dark:text-sky-200">
-          <ChevronDown className="-rotate-90 h-4 w-4" />
+        <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition group-hover:bg-sky-600 group-hover:text-white dark:bg-slate-800 dark:text-slate-200">
+          <ChevronRight className="h-4 w-4" />
         </span>
       </button>
       {provenance?.sourceUrl || routeHref ? (
@@ -2157,7 +2158,7 @@ export function UmkmDiscoveryPanel({
                         key={index}
                         className="flex gap-3 border-b border-slate-200/80 py-3 dark:border-slate-800"
                       >
-                        <Skeleton className="h-12 w-12 shrink-0 rounded-xl sm:h-14 sm:w-14" />
+                        <Skeleton className="h-14 w-14 shrink-0 rounded-[14px] sm:h-16 sm:w-16" />
                         <div className="min-w-0 flex-1 py-0.5">
                           <Skeleton variant="line" className="h-4 w-2/3" />
                           <Skeleton variant="line" className="mt-2 h-3 w-1/2" />
@@ -2167,7 +2168,7 @@ export function UmkmDiscoveryPanel({
                     ))}
                   </div>
                 ) : paginatedListedPlaces.length > 0 ? (
-                  <div className="grid min-h-0 min-w-0 flex-1 auto-rows-min gap-0 overflow-y-auto overscroll-contain px-2 pr-1 [scrollbar-gutter:stable] [scrollbar-width:thin] sm:px-1">
+                  <div className="grid min-h-0 min-w-0 flex-1 auto-rows-min gap-1.5 overflow-y-auto overscroll-contain px-2 pr-1 [scrollbar-gutter:stable] [scrollbar-width:thin] sm:px-1">
                     {paginatedListedPlaces.map(item => {
                       if (isUmkmMapPublicReference(item.store)) {
                         return (
@@ -2193,7 +2194,7 @@ export function UmkmDiscoveryPanel({
                           key={item.store.id}
                           type="button"
                           onClick={() => handleSelectStore(item.store.id)}
-                          className="group flex min-w-0 w-full items-center gap-2.5 border-b border-slate-200/80 px-1 py-2 text-left transition hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900/60"
+                          className="group relative flex min-w-0 w-full items-center gap-3 rounded-[16px] border border-slate-200/80 bg-white px-2.5 py-2.5 text-left shadow-[0_8px_24px_-22px_rgba(15,23,42,0.3)] transition hover:border-slate-300 hover:shadow-[0_14px_30px_-22px_rgba(15,23,42,0.34)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] dark:border-slate-800 dark:bg-slate-950/78 dark:hover:border-slate-700"
                           data-testid="umkm-business-card"
                         >
                           <PlaceThumb
@@ -2202,7 +2203,7 @@ export function UmkmDiscoveryPanel({
                             className="h-12 w-12 shrink-0 rounded-xl sm:h-14 sm:w-14"
                           />
                           <span className="min-w-0">
-                            <span className="line-clamp-1 text-[12.5px] font-bold leading-tight text-[color:var(--app-text)]">
+                            <span className="line-clamp-1 text-[13px] font-bold leading-tight tracking-[-0.015em] text-[color:var(--app-text)]">
                               {item.store.name}
                             </span>
                             <span className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[9.5px] font-semibold text-[color:var(--app-text-soft)]">
@@ -2249,8 +2250,8 @@ export function UmkmDiscoveryPanel({
                               </span>
                             </span>
                           </span>
-                          <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition group-hover:bg-[color:var(--app-accent)] group-hover:text-white dark:bg-slate-800 dark:text-slate-200">
-                            <ChevronDown className="-rotate-90 h-4 w-4" />
+                          <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition group-hover:bg-[color:var(--app-accent)] group-hover:text-white dark:bg-slate-800 dark:text-slate-300">
+                            <ChevronRight className="h-4 w-4" />
                           </span>
                         </button>
                       );

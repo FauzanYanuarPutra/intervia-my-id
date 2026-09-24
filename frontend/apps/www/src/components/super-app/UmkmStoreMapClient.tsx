@@ -532,8 +532,9 @@ function StorePreviewCard({
       <div className="mt-1.5 grid grid-cols-2 gap-1">
         <a
           href={buildUmkmMapPlacePath(store)}
-          className="inline-flex min-h-[28px] items-center justify-center rounded-full bg-emerald-600 px-2 text-[9.5px] font-bold text-white transition hover:bg-emerald-700"
+          className="inline-flex min-h-[30px] items-center justify-center gap-1 rounded-[10px] bg-emerald-600 px-2 text-[9.5px] font-bold text-white transition hover:bg-emerald-700 active:scale-[0.98]"
         >
+          <Store className="h-3 w-3" aria-hidden="true" />
           {isId ? 'Detail' : 'Details'}
         </a>
         {selectable ? (
@@ -560,8 +561,9 @@ function StorePreviewCard({
             href={ui.googleMapsDirectionsUrl}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex min-h-[28px] items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-2 text-[9.5px] font-bold text-slate-700 transition hover:border-slate-300"
+            className="inline-flex min-h-[30px] items-center justify-center gap-1 rounded-[10px] border border-slate-200 bg-slate-50 px-2 text-[9.5px] font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-100 active:scale-[0.98]"
           >
+            <Navigation className="h-3 w-3" aria-hidden="true" />
             {isId ? 'Rute' : 'Route'}
           </a>
         )}
@@ -610,12 +612,13 @@ function StorePopupSummary({
           : 'Not checked';
 
   return (
-    <div className='w-[min(68vw,218px)] space-y-1.5'>
+    <div className='w-[min(78vw,280px)] space-y-2'>
       <div className='min-w-0'>
-        <div className='flex min-w-0 items-center gap-1.5'>
-          <h3 className='min-w-0 flex-1 truncate text-[13px] font-bold leading-tight text-slate-950'>
-            {store.name}
-          </h3>
+        <div className='mb-1 flex min-w-0 items-center justify-between gap-2'>
+          <div className='flex min-w-0 items-center gap-1.5'>
+            <StoreKindChip ui={ui} compact />
+            <span className='truncate text-[10px] font-semibold text-slate-500'>{ui.kindLabel}</span>
+          </div>
           <span
             className={isOpen
               ? 'inline-flex min-h-[20px] shrink-0 items-center rounded-full bg-emerald-50 px-1.5 text-[9.5px] font-bold text-emerald-700'
@@ -624,6 +627,10 @@ function StorePopupSummary({
             {statusLabel}
           </span>
         </div>
+
+        <h3 className='min-w-0 truncate text-[13px] font-bold leading-tight text-slate-950'>
+          {store.name}
+        </h3>
 
         <div className='mt-1.5 flex min-w-0 items-start gap-1.5 text-[10px] leading-4 text-slate-500'>
           <MapPin className='mt-0.5 h-3 w-3 shrink-0 text-slate-400' aria-hidden='true' />
@@ -640,9 +647,9 @@ function StorePopupSummary({
         <a
           href={buildUmkmMapPlacePath(store)}
           aria-label={isId ? `Detail ${store.name}` : `Details for ${store.name}`}
-          className='inline-flex min-h-[30px] flex-1 items-center justify-center gap-1 rounded-full bg-emerald-600 px-2 text-[9.5px] font-bold text-white transition hover:bg-emerald-700'
+          className='inline-flex min-h-[34px] flex-1 items-center justify-center gap-1.5 rounded-[10px] bg-emerald-600 px-2 text-[10px] font-bold text-white transition hover:bg-emerald-700 active:scale-[0.98]'
         >
-          <Store className='h-3 w-3' aria-hidden='true' />
+          <Store className='h-3.5 w-3.5' aria-hidden='true' />
           {isId ? 'Detail' : 'Details'}
           <ExternalLink className='h-2.5 w-2.5 opacity-75' aria-hidden='true' />
         </a>
@@ -651,9 +658,9 @@ function StorePopupSummary({
           target='_blank'
           rel='noreferrer'
           aria-label={isId ? `Rute ke ${store.name}` : `Route to ${store.name}`}
-          className='inline-flex min-h-[30px] flex-1 items-center justify-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 text-[9.5px] font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-100'
+          className='inline-flex min-h-[34px] flex-1 items-center justify-center gap-1.5 rounded-[10px] border border-slate-200 bg-slate-50 px-2 text-[10px] font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-100 active:scale-[0.98]'
         >
-          <Navigation className='h-3 w-3' aria-hidden='true' />
+          <Navigation className='h-3.5 w-3.5' aria-hidden='true' />
           {isId ? 'Rute' : 'Route'}
         </a>
         {selectable ? (
