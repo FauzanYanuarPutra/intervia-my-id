@@ -1168,15 +1168,14 @@ async fn normalize_community_migration_tracking(pool: &PgPool) -> anyhow::Result
     .collect::<Vec<_>>();
 
     for schema in existing_schemas {
-        let table = format!(
-            r#""{}"."_sqlx_migrations""#,
-            schema.replace('"', """")
-        );
-        let rows = sqlx::query_as::<_, CommunityMigrationRecord>(&format!(
+        let escaped_schema = schema.replace('"', """");
+        let table = format!(r#""{}"."_sqlx_migrations""#, escaped_schema);
+        let query = sqlx::AssertSqlSafe(format!(
             "SELECT version, description, installed_on, success, checksum, execution_time FROM {table} ORDER BY version"
-        ))
-        .fetch_all(pool)
-        .await?;
+        ));
+        let rows = sqlx::query_as::<_, CommunityMigrationRecord>(query)
+            .fetch_all(pool)
+            .await?;
 
         for record in rows {
             if !record.success {
