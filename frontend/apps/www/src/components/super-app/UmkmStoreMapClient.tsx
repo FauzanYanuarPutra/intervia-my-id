@@ -280,7 +280,7 @@ function buildStoreMarkerIcon(input: {
     input.liveNow === false && !input.selected
       ? '#cbd5e1'
       : input.selected
-        ? '#111827'
+        ? '#059669'
         : '#d1d5db';
   const overlayBg =
     input.locationMode === 'mobile'
