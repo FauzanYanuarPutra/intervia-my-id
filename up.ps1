@@ -590,7 +590,8 @@ try {
                     $BuildArgs += "--pull"
                 }
                 $BuildArgs += $BuildTargets
-                Write-Host "Docker build command: docker compose build $((if ($ClearBuildCache) { '--no-cache --pull ' } else { '' }))$($BuildTargets -join ' ')" -ForegroundColor DarkGray
+                $BuildCacheLabel = if ($ClearBuildCache) { "--no-cache --pull " } else { "" }
+                Write-Host "Docker build command: docker compose build $BuildCacheLabel$($BuildTargets -join ' ')" -ForegroundColor DarkGray
                 $BuildProbe = Invoke-DockerNative -Arguments (@($ComposeArgs) + $BuildArgs)
                 $BuildProbe.Output | ForEach-Object { Write-Output $_ }
 
