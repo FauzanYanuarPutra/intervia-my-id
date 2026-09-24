@@ -199,7 +199,7 @@ export function ExploreHubPage({ locale, initialIntent = 'supply' }: { locale: L
                         className="group inline-flex h-8 max-w-[190px] items-center rounded-full border border-zinc-200/90 bg-white px-2.5 text-[9.5px] font-semibold text-zinc-600 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,background-color,color,transform,box-shadow] duration-150 hover:border-emerald-200 hover:bg-emerald-50/70 hover:text-emerald-800 hover:shadow-sm active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/20 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:border-emerald-800 dark:hover:bg-emerald-950/40 dark:hover:text-emerald-200 sm:max-w-[240px] sm:px-3 sm:text-[10.5px]"
                         aria-label={isId ? `Cari ${example}` : `Search ${example}`}
                       >
-                        <span className="truncate">{example}</span>
+                        <Search aria-hidden="true" className="mr-1.5 h-3 w-3 shrink-0 text-zinc-400 transition-colors group-hover:text-emerald-600 dark:text-zinc-500 dark:group-hover:text-emerald-400" /><span className="truncate">{example}</span>
                       </button>
                     </div>
                   ))}
