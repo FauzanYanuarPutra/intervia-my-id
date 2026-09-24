@@ -1,3 +1,15 @@
+x-logging: &default-logging
+  driver: local
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  init: true
+  stop_grace_period: 30s
+  logging: *default-logging
+
 services:
   # Ensure every target-domain database exists even when domain_db uses an
   # already-initialized Docker volume. The postgres init directory only runs on
