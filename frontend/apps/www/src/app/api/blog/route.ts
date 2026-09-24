@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPublishedBlogArticles } from '@/lib/seo/blogContent';
+import { getPublishedBlogArticles } from '@/lib/blog';
 
 function readLocale(request: NextRequest) {
   const locale = request.nextUrl.searchParams.get('locale');
@@ -8,11 +8,12 @@ function readLocale(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   const locale = readLocale(request);
-  const articles = await getPublishedBlogArticles(locale);
+  const page = await getPublishedBlogArticles(locale);
 
   return NextResponse.json({
-    items: articles,
-    count: articles.length,
+    items: page.items,
+    count: page.items.length,
+    hasMore: page.hasMore,
     locale,
   });
 }
