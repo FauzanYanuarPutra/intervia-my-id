@@ -108,7 +108,7 @@ export function NewsCarousel({
           {articles.map(article => (
             <div
               key={article.id}
-              className={\`min-w-0 shrink-0 grow-0 pl-3 \${related ? 'basis-[86%] sm:basis-1/2 xl:basis-1/3' : 'basis-[94%] sm:basis-[72%] lg:basis-[58%]'}\`}
+              className={`min-w-0 shrink-0 grow-0 pl-3 ${related ? 'basis-[86%] sm:basis-1/2 xl:basis-1/3' : 'basis-[94%] sm:basis-[72%] lg:basis-[58%]'}`}
             >
               <Link
                 href={'/news/' + article.slug}
@@ -133,13 +133,13 @@ export function NewsCarousel({
                 </div>
                 <div className="p-4 sm:p-5">
                   <h3
-                    className={\`\${related ? 'line-clamp-2 text-[16px] leading-5' : 'line-clamp-3 text-[22px] leading-7 sm:text-[27px] sm:leading-8'} font-black tracking-[-0.035em] text-slate-950 transition group-hover:text-emerald-700 dark:text-white dark:group-hover:text-emerald-300\`}
+                    className={`${related ? 'line-clamp-2 text-[16px] leading-5' : 'line-clamp-3 text-[22px] leading-7 sm:text-[27px] sm:leading-8'} font-black tracking-[-0.035em] text-slate-950 transition group-hover:text-emerald-700 dark:text-white dark:group-hover:text-emerald-300`}
                   >
                     {article.title}
                   </h3>
                   {article.summary ? (
                     <p
-                      className={\`\${related ? 'line-clamp-2 text-xs leading-5' : 'line-clamp-3 text-sm leading-6'} mt-2 font-semibold text-slate-500 dark:text-slate-300\`}
+                      className={`${related ? 'line-clamp-2 text-xs leading-5' : 'line-clamp-3 text-sm leading-6'} mt-2 font-semibold text-slate-500 dark:text-slate-300`}
                     >
                       {article.summary}
                     </p>
@@ -169,9 +169,9 @@ export function NewsCarousel({
             <button
               key={index}
               type="button"
-              aria-label={locale === 'id' ? \`Buka berita \${index + 1}\` : \`Open story \${index + 1}\`}
+              aria-label={locale === 'id' ? `Buka berita ${index + 1}` : `Open story ${index + 1}`}
               onClick={() => emblaApi?.scrollTo(index)}
-              className={\`h-1.5 rounded-full transition-all \${selected === index ? 'w-5 bg-emerald-700 dark:bg-emerald-400' : 'w-1.5 bg-slate-300 dark:bg-slate-700'}\`}
+              className={`h-1.5 rounded-full transition-all ${selected === index ? 'w-5 bg-emerald-700 dark:bg-emerald-400' : 'w-1.5 bg-slate-300 dark:bg-slate-700'}`}
             />
           ))}
           <span className="ml-1 text-[9px] font-bold text-slate-400">
