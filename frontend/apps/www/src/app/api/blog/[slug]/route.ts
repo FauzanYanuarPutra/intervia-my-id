@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPublishedBlogArticle } from '@/lib/seo/blogContent';
+import { getPublishedBlogArticle } from '@/lib/blog';
 
 type RouteContext = {
   params: Promise<{ slug: string }>;
