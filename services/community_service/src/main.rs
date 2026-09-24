@@ -1027,21 +1027,6 @@ enum DatabasePoolPurpose {
     Application,
 }
 
-fn database_session_setup(purpose: DatabasePoolPurpose) -> Option<&'static str> {
-    match purpose {
-        // SQLx normally protects migrations with its own Postgres advisory lock, but
-        // development can legitimately have an old migration container overlap a
-        // freshly recreated one. Keep the release-owned migration pool itself
-        // single-connection and hold a dedicated session advisory lock for the
-        // entire migration run. This makes the migration step safe even when
-        // Compose is started twice or an old container is still winding down.
-        DatabasePoolPurpose::Migration => Some(
-            "SELECT pg_advisory_lock(725384901234567890)",
-        ),
-        DatabasePoolPurpose::Application => Some("SET search_path TO forum, reel, public, events"),
-    }
-}
-
 async fn connect_database_pool(
     database_url: &str,
     purpose: DatabasePoolPurpose,
