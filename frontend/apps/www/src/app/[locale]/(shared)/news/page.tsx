@@ -3,7 +3,7 @@ import { Search, Send, Store, TrendingUp } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { NewsCard } from '@/components/news/NewsCard';
 import { NewsCarousel } from '@/components/news/NewsCarousel';
-import { buildNewsPath, buildNewsUrl, getPublishedNews } from '@/lib/news';
+import { buildNewsUrl, getPublishedNews } from '@/lib/news';
 
 type PageProps = {
   params: Promise<{ locale: string }>;
