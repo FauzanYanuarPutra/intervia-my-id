@@ -40,15 +40,15 @@ export function NewsCard({
     return (
       <Link
         href={href}
-        className="group grid min-w-0 grid-cols-[84px_minmax(0,1fr)] gap-2.5 rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] p-2.5 text-left transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface-muted)] sm:grid-cols-[96px_minmax(0,1fr)] sm:gap-3"
+        className="group grid min-w-0 grid-cols-[84px_minmax(0,1fr)] items-stretch gap-2.5 rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] p-2.5 text-left transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface-muted)] hover:shadow-[0_12px_24px_-22px_rgba(15,23,42,0.3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/20 sm:grid-cols-[96px_minmax(0,1fr)] sm:gap-3"
       >
         <NewsMedia
           article={article}
           variant="thumb"
           showLabels={false}
-          className="w-full rounded-[12px]"
+          className="w-full h-full min-h-[78px] rounded-[12px] sm:min-h-[88px]"
         />
-        <div className="min-w-0 py-0.5">
+        <div className="flex min-w-0 flex-col justify-center py-0.5">
           <div className="flex min-w-0 items-center gap-1.5">
             <span className="max-w-[52%] truncate text-[9px] font-black uppercase tracking-[0.09em] text-[color:var(--app-accent)]">
               {article.category}
@@ -57,7 +57,7 @@ export function NewsCard({
               {kindLabel(article, isId)}
             </span>
           </div>
-          <h3 className="mt-1 line-clamp-2 text-[12px] font-extrabold leading-[17px] tracking-[-0.018em] text-[color:var(--app-text)] group-hover:text-[color:var(--app-accent)] sm:text-[13px]">
+          <h3 className="mt-1 line-clamp-2 text-[12px] font-extrabold leading-[17px] tracking-[-0.018em] text-[color:var(--app-text)] group-hover:text-[color:var(--app-accent)] sm:text-[13px] sm:leading-[18px]">
             {article.title}
           </h3>
           <div className="mt-1.5 flex min-w-0 items-center gap-1 text-[9px] font-semibold text-[color:var(--app-text-soft)]">
@@ -82,7 +82,7 @@ export function NewsCard({
           showLabels={false}
           className="w-full"
         />
-        <div className="p-3.5">
+        <div className="p-3.5 sm:p-4">
           <div className="flex min-w-0 items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.1em]">
             <span className="max-w-[52%] truncate text-[color:var(--app-accent)]">
               {article.category}
@@ -92,7 +92,7 @@ export function NewsCard({
               {kindLabel(article, isId)}
             </span>
           </div>
-          <h2 className="mt-1.5 line-clamp-3 text-[18px] font-black leading-[22px] tracking-[-0.028em] text-[color:var(--app-text)] group-hover:text-[color:var(--app-accent)]">
+          <h2 className="mt-1.5 line-clamp-3 text-[18px] font-black leading-[22px] tracking-[-0.028em] text-[color:var(--app-text)] group-hover:text-[color:var(--app-accent)] sm:text-[20px] sm:leading-[24px]">
             {article.title}
           </h2>
           {article.summary ? (
