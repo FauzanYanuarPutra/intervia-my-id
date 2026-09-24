@@ -459,6 +459,10 @@ function isMarketplaceSearchContent(item: JsonRecord): boolean {
 function mapContentItem(
   item: JsonRecord,
 ): GlobalSearchItem | null {
+  if (!isMarketplaceSearchContent(item)) {
+    return null;
+  }
+
   const id =
     readString(item.id);
 
