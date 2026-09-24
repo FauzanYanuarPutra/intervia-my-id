@@ -50,36 +50,22 @@ describe('UMKM public route helpers', () => {
   });
 
   it('opens owner actions directly in the dedicated Usaha workspace', () => {
-    const previous = process.env.NEXT_PUBLIC_USAHA_URL;
-    process.env.NEXT_PUBLIC_USAHA_URL = 'http://localhost:3003';
-    try {
-      expect(buildUsahaPath('catalog', { storeId: 'store / 1' })).toBe(
-        'http://localhost:3003/businesses/store%20%2F%201/products',
-      );
-      expect(buildUsahaPath('home', { storeId: 'business-1' })).toBe(
-        'http://localhost:3003/?business=business-1',
-      );
-    } finally {
-      if (previous === undefined) delete process.env.NEXT_PUBLIC_USAHA_URL;
-      else process.env.NEXT_PUBLIC_USAHA_URL = previous;
-    }
+    expect(buildUsahaPath('catalog', { storeId: 'store / 1' })).toBe(
+      'https://usaha.lajukan.com/businesses/store%20%2F%201/products',
+    );
+    expect(buildUsahaPath('home', { storeId: 'business-1' })).toBe(
+      'https://usaha.lajukan.com/?business=business-1',
+    );
   });
 
   it('preserves workspace intent and anchors when leaving WWW', () => {
-    const previous = process.env.NEXT_PUBLIC_USAHA_URL;
-    process.env.NEXT_PUBLIC_USAHA_URL = 'http://localhost:3003';
-    try {
-      expect(
-        buildUsahaPathFromWorkspace('operations', {
-          storeId: 'business-1',
-          hash: 'stok-menipis',
-        }),
-      ).toBe(
-        'http://localhost:3003/businesses/business-1/operations#stok-menipis',
-      );
-    } finally {
-      if (previous === undefined) delete process.env.NEXT_PUBLIC_USAHA_URL;
-      else process.env.NEXT_PUBLIC_USAHA_URL = previous;
-    }
+    expect(
+      buildUsahaPathFromWorkspace('operations', {
+        storeId: 'business-1',
+        hash: 'stok-menipis',
+      }),
+    ).toBe(
+      'https://usaha.lajukan.com/businesses/business-1/operations#stok-menipis',
+    );
   });
 });
