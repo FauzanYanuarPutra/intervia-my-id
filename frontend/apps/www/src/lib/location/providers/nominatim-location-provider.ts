@@ -268,7 +268,7 @@ export const nominatimLocationProvider: LocationProvider = {
     });
     applyBias(params, input.bias);
 
-    const payload = await fetchNominatim<NominatimPlace[]>('/explore', params);
+    const payload = await fetchNominatim<NominatimPlace[]>('/search', params);
     if (!Array.isArray(payload)) return setCached(cacheKey, []);
 
     const results = payload
