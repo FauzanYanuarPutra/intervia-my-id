@@ -100,3 +100,37 @@ export const getPublicContent = cache(
     }
   },
 );
+
+export function isPublicEditorialContent(content: ContentRecord): boolean {
+  const metadata = asRecord(content.metadata);
+  const news = asRecord(metadata?.news);
+  if (news && Object.keys(news).length > 0) return true;
+
+  const rawType = [content.content_type, content.type]
+    .map(readString)
+    .join(' ')
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
+
+  return rawType.split(/[^a-z0-9_]+/).some(token =>
+    ['news', 'article', 'guide'].includes(token),
+  );
+}
+
+export function getPublicEditorialSlug(content: ContentRecord): string {
+  const metadata = asRecord(content.metadata);
+  const news = asRecord(metadata?.news);
+  return readString(news?.slug) || readString(content.slug);
+}
+
+export function getPublicEditorialLanguage(
+  content: ContentRecord,
+  fallback: string,
+): 'id' | 'en' {
+  const metadata = asRecord(content.metadata);
+  const news = asRecord(metadata?.news);
+  const language = readString(news?.language).toLowerCase();
+  if (language === 'en') return 'en';
+  if (language === 'id') return 'id';
+  return fallback === 'en' ? 'en' : 'id';
+}
