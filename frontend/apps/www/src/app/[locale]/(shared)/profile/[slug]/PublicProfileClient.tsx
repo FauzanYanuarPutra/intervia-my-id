@@ -659,6 +659,16 @@ function formatReviewDate(value: string, localeCode: 'id' | 'en'): string {
 }
 
 function buildPublicListingHref(item: PublicListing): string {
+  const type = normalizeProfileContentTab({
+    type: item.content_type,
+    category: item.category,
+    metadata: item.metadata || null,
+  });
+
+  if (type === 'news' && item.slug) {
+    return `/news/${encodeURIComponent(item.slug)}`;
+  }
+
   return item.slug
     ? `/content/${encodeURIComponent(item.slug)}-${encodeURIComponent(item.id)}`
     : `/content/${encodeURIComponent(item.id)}`;
@@ -2415,37 +2425,104 @@ export default function PublicProfileClient({
                 <ProfileFilterStrip
                   activeKey={resolvedContentTab}
                   ariaLabel={localeCode === 'id' ? 'Filter etalase' : 'Storefront filter'}
-                  className="-mx-1 px-1 pb-1 sm:mx-0 sm:px-0"
+                  className="w-full"
+                  mobileLabel={localeCode === 'id' ? 'Jenis postingan' : 'Post type'}
+                  mobileTitle={localeCode === 'id' ? 'Pilih isi etalase' : 'Choose storefront content'}
+                  mobileDescription={
+                    localeCode === 'id'
+                      ? 'Pilih satu jenis untuk menyaring postingan profil ini.'
+                      : 'Choose one type to filter this profile storefront.'
+                  }
                   items={availableContentTabs.map(tab => ({
                     key: tab,
                     label: tab === 'all' ? copy.all : getProfileContentTabLabel(tab, localeCode),
+                    count: tab === 'all' ? listings.length : listingGroups[tab].length,
                   }))}
                   onChange={setActiveContentTab}
                 />
 
                 {visibleListings.length > 0 ? (
-                  <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                  <div className="mt-3 grid gap-2.5 sm:grid-cols-2 sm:gap-3 lg:grid-cols-4">
                     {visibleListings.map(item => {
-                      const tab = normalizeProfileContentTab({ type: item.content_type, category: item.category, metadata: item.metadata || null });
+                      const tab = normalizeProfileContentTab({
+                        type: item.content_type,
+                        category: item.category,
+                        metadata: item.metadata || null,
+                      });
                       const location = getListingLocation(item);
                       const href = buildPublicListingHref(item);
 
                       return (
-                        <article key={item.id} className="group flex min-w-0 flex-col overflow-hidden rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] transition hover:-translate-y-0.5 hover:shadow-md">
-                          <Link href={href} className="relative aspect-square w-full overflow-hidden bg-[color:var(--app-surface-muted)]">
-                            {item.cover_image ? <Image src={item.cover_image} alt={item.title || ''} fill unoptimized sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 240px" className="object-cover transition-transform duration-300 group-hover:scale-[1.03]" /> : <div className="flex h-full items-center justify-center text-[color:var(--app-text-soft)]"><Package className="h-8 w-8" /></div>}
-                            <span className="absolute left-2 top-2 max-w-[80%] truncate rounded-md bg-black/55 px-2 py-1 text-[9px] font-bold text-white backdrop-blur-sm">{getProfileContentTabLabel(tab, localeCode)}</span>
+                        <article
+                          key={item.id}
+                          className="group min-w-0 overflow-hidden rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] transition hover:border-emerald-200 hover:shadow-[0_14px_32px_-26px_rgba(15,23,42,0.45)] sm:flex sm:flex-col"
+                        >
+                          <Link
+                            href={href}
+                            className="grid min-w-0 grid-cols-[88px_minmax(0,1fr)] gap-3 p-2.5 sm:block sm:p-0"
+                          >
+                            <div className="relative aspect-square h-[88px] w-[88px] shrink-0 overflow-hidden rounded-xl bg-[color:var(--app-surface-muted)] sm:h-auto sm:w-full sm:rounded-none sm:rounded-t-2xl">
+                              {item.cover_image ? (
+                                <Image
+                                  src={item.cover_image}
+                                  alt={item.title || ''}
+                                  fill
+                                  unoptimized
+                                  sizes="(max-width: 640px) 88px, (max-width: 1024px) 33vw, 260px"
+                                  className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                                />
+                              ) : (
+                                <div className="flex h-full items-center justify-center text-[color:var(--app-text-soft)]">
+                                  <Package className="h-7 w-7" />
+                                </div>
+                              )}
+                              <span className="absolute left-2 top-2 max-w-[80%] truncate rounded-md bg-black/55 px-2 py-1 text-[9px] font-bold text-white backdrop-blur-sm">
+                                {getProfileContentTabLabel(tab, localeCode)}
+                              </span>
+                            </div>
+
+                            <div className="min-w-0 py-0.5 sm:p-3">
+                              <h3 className="line-clamp-2 text-[12px] font-extrabold leading-[17px] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-sm sm:leading-5">
+                                {item.title || (localeCode === 'id' ? 'Postingan' : 'Post')}
+                              </h3>
+                              <p className="mt-1.5 truncate text-[13px] font-black text-emerald-700 dark:text-emerald-300 sm:text-sm">
+                                {formatPublicListingValue(item, localeCode)}
+                              </p>
+                              {location ? (
+                                <p className="mt-1 flex items-center gap-1 truncate text-[9px] font-medium text-[color:var(--app-text-soft)] sm:text-[10px]">
+                                  <MapPin className="h-3 w-3 shrink-0" />
+                                  {location}
+                                </p>
+                              ) : null}
+                            </div>
                           </Link>
-                          <div className="flex min-h-[124px] flex-col p-2.5 sm:p-3">
-                            <Link href={href} className="min-w-0"><h3 className="line-clamp-2 text-[12px] font-extrabold leading-[17px] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-sm sm:leading-5">{item.title || (localeCode === 'id' ? 'Produk/Jasa' : 'Product/Service')}</h3></Link>
-                            <p className="mt-2 truncate text-[13px] font-black text-emerald-700 dark:text-emerald-300 sm:text-sm">{formatPublicListingValue(item, localeCode)}</p>
-                            {location ? <p className="mt-1.5 flex items-center gap-1 truncate text-[9px] font-medium text-[color:var(--app-text-soft)] sm:text-[10px]"><MapPin className="h-3 w-3 shrink-0" />{location}</p> : null}
-                            {!isOwnProfile ? (
-                              <button type="button" onClick={() => void handleOpenChat(buildPublicListingChatQuestion(item, detail.displayName, localeCode), item)} disabled={startingChatKey === item.id} className="mt-auto inline-flex min-h-8 items-center justify-center gap-1 rounded-lg bg-emerald-50 px-2 text-[10px] font-black text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-60 dark:bg-emerald-500/10 dark:text-emerald-300">
-                                {startingChatKey === item.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MessageCircle className="h-3.5 w-3.5" />}{copy.askDetails}
+
+                          {!isOwnProfile ? (
+                            <div className="px-2.5 pb-2.5 sm:px-3 sm:pb-3">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  void handleOpenChat(
+                                    buildPublicListingChatQuestion(
+                                      item,
+                                      detail.displayName,
+                                      localeCode,
+                                    ),
+                                    item,
+                                  )
+                                }
+                                disabled={startingChatKey === item.id}
+                                className="inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-xl bg-emerald-50 px-3 text-[10px] font-black text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-60 dark:bg-emerald-500/10 dark:text-emerald-300"
+                              >
+                                {startingChatKey === item.id ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  <MessageCircle className="h-3.5 w-3.5" />
+                                )}
+                                {copy.askDetails}
                               </button>
-                            ) : null}
-                          </div>
+                            </div>
+                          ) : null}
                         </article>
                       );
                     })}
