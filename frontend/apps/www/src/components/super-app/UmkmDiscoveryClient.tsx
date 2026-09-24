@@ -315,11 +315,27 @@ export function UmkmDiscoveryClient(props: UmkmDiscoveryClientProps) {
                 className="min-w-0 flex-1 border-0 bg-transparent p-0 text-[15px] font-semibold text-[color:var(--app-text)] outline-none ring-0 placeholder:text-[color:var(--app-text-soft)] focus:border-0 focus:outline-none focus:ring-0"
               />
 
+              {query ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQuery('');
+                  }}
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                  aria-label={isId ? 'Hapus pencarian' : 'Clear search'}
+                  title={isId ? 'Hapus pencarian' : 'Clear search'}
+                >
+                  <X className="h-4 w-4" aria-hidden="true" />
+                </button>
+              ) : null}
+
               <button
                 type="submit"
-                className="inline-flex min-h-10 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[color:var(--app-accent)] px-3.5 text-[11px] font-bold text-white shadow-[0_14px_28px_-22px_color-mix(in_srgb,var(--app-accent)_46%,transparent)] transition hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] focus-visible:ring-offset-2 sm:min-h-11 sm:px-4"
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[color:var(--app-accent)] text-white shadow-[0_10px_22px_-16px_color-mix(in_srgb,var(--app-accent)_46%,transparent)] transition hover:brightness-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] focus-visible:ring-offset-2 sm:h-10 sm:w-10"
+                aria-label={isId ? 'Cari' : 'Search'}
+                title={isId ? 'Cari' : 'Search'}
               >
-                {isId ? 'Cari' : 'Search'}
+                <Search className="h-4 w-4" aria-hidden="true" />
               </button>
             </div>
           </form>
@@ -334,7 +350,7 @@ export function UmkmDiscoveryClient(props: UmkmDiscoveryClientProps) {
               onClick={handleClearCityFilter}
               aria-pressed={!cleanedCity}
               className={cn(
-                'inline-flex min-h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-[11px] font-bold shadow-[0_12px_26px_-24px_rgba(15,23,42,0.28)] transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)]',
+                'inline-flex min-h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-[11px] font-bold shadow-[0_8px_20px_-18px_rgba(15,23,42,0.2)] transition hover:border-[color:var(--app-accent-border)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)]',
                 cleanedCity
                   ? 'border-slate-200 bg-white text-slate-700 hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100'
                   : 'border-[color:var(--app-accent-border)] bg-white text-[color:var(--app-accent)] shadow-[0_10px_22px_-18px_rgba(15,23,42,0.24)] dark:border-[color:var(--app-accent-border)] dark:bg-slate-900 dark:text-[color:var(--app-accent)]',
@@ -371,8 +387,8 @@ export function UmkmDiscoveryClient(props: UmkmDiscoveryClientProps) {
                   className={cn(
                     'inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[11px] font-bold shadow-[0_12px_26px_-24px_rgba(15,23,42,0.28)] transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)]',
                     active
-                      ? 'cursor-default border-[color:var(--app-accent-border)] bg-white text-[color:var(--app-accent)] shadow-[0_10px_22px_-18px_rgba(15,23,42,0.24)] dark:bg-slate-900 dark:text-[color:var(--app-accent)]'
-                      : 'cursor-pointer border-slate-200 bg-white text-slate-700 hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100',
+                      ? 'cursor-default border-[color:var(--app-accent)] bg-[color:var(--app-accent)] text-white shadow-[0_10px_22px_-18px_color-mix(in_srgb,var(--app-accent)_45%,transparent)]'
+                      : 'cursor-pointer border-slate-200 bg-white text-slate-700 hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100',
                   )}
                 >
                   <Icon className="h-3.5 w-3.5" />
