@@ -62,7 +62,7 @@ export function HomeNewsSection({
               variant="hero"
               priority
             />
-            <div className="grid min-w-0 gap-2.5 sm:gap-3 sm:grid-cols-2 md:grid-cols-1 md:grid-rows-3">
+            <div className="grid h-full min-w-0 gap-2.5 sm:gap-3 sm:grid-cols-2 md:grid-cols-1 md:grid-rows-3">
               {visibleItems.slice(1).map(item => (
                 <NewsCard
                   key={item.id}
@@ -74,9 +74,6 @@ export function HomeNewsSection({
             </div>
           </div>
 
-          <div className="hidden" aria-hidden="true">
-            {visibleItems.length === 0 ? null : null}
-          </div>
         </>
       ) : (
         <div className="mx-3 mt-3 flex items-center justify-between gap-3 rounded-[16px] border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-3 sm:mx-4 md:mx-5">
