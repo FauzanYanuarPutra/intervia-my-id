@@ -357,6 +357,9 @@ function buildStoreMarkerIcon(input: {
           >${buildMarkerSymbolSvg({ kind: input.kind, selected: input.selected })}</span>
           <span
             style="
+              display:${input.ratingLabel.trim() === '0.0' ? 'none' : 'inline-flex'};
+              align-items:center;
+              gap:2px;
               color:#111827;
               font-size:${fontSize}px;
               font-weight:800;
