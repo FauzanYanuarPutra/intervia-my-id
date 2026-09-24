@@ -1762,8 +1762,8 @@ export function UmkmDiscoveryPanel({
             y:
               !canUseDesktopMapPanel && !mapOnly
                 ? sheetExpanded
-                  ? -140
-                  : -48
+                  ? -190
+                  : -60
                 : 0,
           }
         : undefined;
@@ -1953,6 +1953,97 @@ export function UmkmDiscoveryPanel({
                     : 'Expand list'
               }
             >
+              {sheetExpanded ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <ChevronUp className="h-4 w-4" />
+              )}
+            </button>
+
+            <div className="flex min-w-0 shrink-0 items-center justify-between gap-2 px-1 pb-1">
+              <div className="min-w-0">
+                <h1 className="line-clamp-2 text-[1.02rem] font-bold leading-tight tracking-[-0.035em] text-[color:var(--app-text)] sm:text-lg">
+                  {sheetTitle}
+                </h1>
+                <p className="mt-0.5 hidden line-clamp-1 text-[10px] font-medium leading-4 text-[color:var(--app-text-soft)] lg:block">
+                  {sheetSubtitle}
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-1.5">
+                <span className="inline-flex max-w-[92px] items-center justify-center truncate rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-bold leading-none text-slate-600 sm:max-w-none">
+                  {totalLabel}
+                </span>
+              </div>
+            </div>
+
+            <div className="shrink-0 px-1 pb-1.5">
+              <DiscoveryScopeControl
+                scope={discoveryScope}
+                isId={isId}
+                compact
+                onChange={handleDiscoveryScopeChange}
+              />
+            </div>
+
+            {selectedPlace ? (
+              <div
+                className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain pr-0.5 [scrollbar-gutter:stable] [scrollbar-width:thin]"
+                role="region"
+                tabIndex={0}
+                aria-label={
+                  selectedIsPublicReference
+                    ? `${isId ? 'Detail referensi' : 'Reference details'} ${selectedPlace.store.name}`
+                    : isId
+                      ? `Detail usaha ${selectedPlace.store.name}`
+                      : `${selectedPlace.store.name} business details`
+                }
+              >
+                <article
+                  className="space-y-3 bg-transparent p-0 shadow-none ring-0"
+                  data-testid={
+                    selectedIsPublicReference
+                      ? 'umkm-selected-public-reference'
+                      : 'umkm-selected-business'
+                  }
+                >
+                  <div className="grid min-w-0 grid-cols-[72px_minmax(0,1fr)] gap-2.5 sm:grid-cols-[78px_minmax(0,1fr)]">
+                    <div className="relative">
+                      <PlaceThumb
+                        src={
+                          selectedPlace.ui.gallery[0] ||
+                          selectedPlace.ui.coverImage
+                        }
+                        alt={selectedPlace.store.name}
+                        className="h-[64px] w-[64px] rounded-xl sm:h-[68px] sm:w-[68px]"
+                      />
+                      <span
+                        className={cn(
+                          'absolute -bottom-1 left-1/2 inline-flex -translate-x-1/2 whitespace-nowrap rounded-full px-2 py-0.5 text-[9px] font-bold shadow-sm ',
+                          selectedIsPublicReference
+                            ? 'bg-sky-600/94 text-white'
+                            : selectedPlace.ui.openNow === true
+                              ? 'bg-emerald-500/94 text-white'
+                              : selectedPlace.ui.openNow === false
+                                ? 'bg-slate-700/88 text-white'
+                                : 'bg-amber-100 text-amber-800',
+                        )}
+                      >
+                        {selectedOpenStatus?.label}
+                      </span>
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex min-w-0 items-center gap-1.5 text-[10px] font-bold text-[color:var(--app-text-soft)]">
+                        <span className="truncate rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-200">
+                          {selectedPlace.ui.kindLabel}
+                        </span>
+                        {selectedIsPublicReference ? (
+                          <PublicReferenceBadge isId={isId} />
+                        ) : selectedTrustProfile ? (
+                          <TrustStatusChip
+                            profile={selectedTrustProfile}
+                            compact
+                          />
+                        ) : null}
                         <span className="inline-flex min-w-0 items-center gap-1">
                           <MapPin className="h-3 w-3 shrink-0 text-[color:var(--app-accent)]" />
                           <span className="truncate">
@@ -1982,7 +2073,7 @@ export function UmkmDiscoveryPanel({
                           ? `${isId ? 'Detail referensi' : 'Reference details'} ${selectedPlace.store.name}`
                           : undefined
                       }
-                      className="inline-flex min-h-[38px] min-w-0 items-center justify-center gap-1.5 rounded-full bg-[color:var(--app-accent)] px-3 text-[11px] font-bold text-white"
+                      className="inline-flex min-h-9 min-w-0 items-center justify-center gap-1.5 rounded-full bg-[color:var(--app-accent)] px-3 text-[11px] font-bold text-white"
                     >
                       <Store className="h-3.5 w-3.5 shrink-0" />
                       <span className="truncate">
@@ -2036,57 +2127,6 @@ export function UmkmDiscoveryPanel({
                     ) : null}
                   </div>
 
-                  {sheetExpanded ? (
-                    <div className="mt-2.5 space-y-1.5 border-t border-slate-200/72 pt-2.5 dark:border-slate-800">
-                      <div className="grid gap-1.5 text-[12px] font-semibold leading-5 text-[color:var(--app-text)]">
-                        {selectedIsPublicReference ? (
-                          <PublicReferenceNotice
-                            store={selectedPlace.store}
-                            isId={isId}
-                            compact
-                          />
-                        ) : selectedRiskProfile?.highRisk && selectedTrustProfile ? (
-                          <SafetyNotice
-                            isId={isId}
-                            trustProfile={selectedTrustProfile}
-                            riskProfile={selectedRiskProfile}
-                            reportHref={selectedReportHref}
-                            compact
-                          />
-                        ) : null}
-                        <div className="grid grid-cols-[24px_minmax(0,1fr)] gap-2 rounded-[15px] bg-slate-50 px-2.5 py-2 dark:bg-slate-900/80">
-                          <MapPin className="mt-0.5 h-4 w-4 text-[color:var(--app-accent)]" />
-                          <span className="line-clamp-2">
-                            {selectedPlace.ui.addressLine ||
-                              selectedPlace.store.city ||
-                              (isId
-                                ? 'Alamat belum lengkap'
-                                : 'Address not completed yet')}
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-[24px_minmax(0,1fr)] gap-2 rounded-[15px] bg-slate-50 px-2.5 py-2 dark:bg-slate-900/80">
-                          <Clock3 className="mt-0.5 h-4 w-4 text-[color:var(--app-accent)]" />
-                          <span className="min-w-0">
-                            <span className="font-bold">{isId ? 'Jam operasional' : 'Opening hours'}</span>
-                            <span className="block truncate text-[color:var(--app-text-soft)]">
-                              {publicBusinessHours(selectedPlace.store) || (isId ? 'Belum dipublikasikan usaha' : 'Not published by the business yet')}
-                            </span>
-                          </span>
-                        </div>
-
-                        {[
-                          { label: isId ? 'Area layanan' : 'Service area', value: publicBusinessMetaText(selectedPlace.store, 'service_area', 'service_areas_text', 'delivery_area', 'coverage_area') },
-                          { label: isId ? 'Cara melayani' : 'How it serves', value: publicBusinessMetaText(selectedPlace.store, 'fulfillment_notes', 'service_options', 'order_methods', 'delivery_methods') },
-                          { label: isId ? 'Tentang usaha' : 'About', value: selectedPlace.store.description || publicBusinessMetaText(selectedPlace.store, 'catalog_focus', 'main_offering') },
-                        ].filter(item => item.value).map(item => (
-                          <div key={item.label} className="grid grid-cols-[24px_minmax(0,1fr)] gap-2 rounded-[15px] bg-slate-50 px-2.5 py-2 dark:bg-slate-900/80">
-                            <Store className="mt-0.5 h-4 w-4 text-[color:var(--app-accent)]" />
-                            <span className="min-w-0"><span className="font-bold">{item.label}</span><span className="block line-clamp-2 text-[color:var(--app-text-soft)]">{item.value}</span></span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
                 </article>
               </div>
             ) : (
@@ -2345,19 +2385,6 @@ export function UmkmDiscoveryPanel({
           <>
             <div className="grid min-w-0 gap-3 lg:grid-cols-1 lg:gap-4">
               <div className="min-w-0 space-y-3">
-                 <button
-                   type="button"
-                   onClick={() => {
-                     setSelectedStoreId(null);
-                     setShowRoute(false);
-                     setRouteSummary(null);
-                     setMapFocusMode('stores');
-                     setMapFocusNonce(current => current + 1);
-                   }}
-                   className="mb-2 inline-flex min-h-7 items-center rounded-full bg-slate-100 px-2.5 text-[10px] font-semibold text-slate-600 transition hover:bg-slate-200 hover:text-slate-900 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
-                 >
-                   {isId ? '← Kembali ke hasil' : '← Back to results'}
-                 </button>
                 <article
                   ref={selectedPreviewRef}
                   aria-label={
