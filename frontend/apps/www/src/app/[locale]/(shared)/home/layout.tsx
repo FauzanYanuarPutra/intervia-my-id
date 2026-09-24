@@ -48,9 +48,9 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
       siteName: 'Lajukan',
       type: 'website',
       locale: isId ? 'id_ID' : 'en_US',
-      images: [{ url: 'https://www.lajukan.com/og-image-home.png', width: 1200, height: 630, alt: isId ? 'Lajukan — jelas kebutuhannya, tepat mitranya' : 'Lajukan — clear needs, the right business match' }],
+      images: [{ url: 'https://www.lajukan.com/opengraph-image.png', width: 1200, height: 630, alt: isId ? 'Lajukan — jelas kebutuhannya, tepat mitranya' : 'Lajukan — clear needs, the right business match' }],
     },
-    twitter: { card: 'summary_large_image', title, description, images: ['https://www.lajukan.com/og-image-home.png'] },
+    twitter: { card: 'summary_large_image', title, description, images: ['https://www.lajukan.com/opengraph-image.png'] },
   };
 }
 
