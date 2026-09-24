@@ -72,7 +72,7 @@ describe('portal navigation', () => {
 
     expect(labels.home).toBe('Beranda');
     expect(labels.orders).toBe('Jual');
-    expect(labels.products).toBe('Produk');
+    expect(labels.products).toBe('Barang');
     expect(labels.inventory).toBe('Stok');
     expect(labels.finance).toBe('Uang');
     expect(labels.reports).toBe('Laporan');
