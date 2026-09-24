@@ -124,17 +124,17 @@ export function NewsCarousel({
                     priority={selected === 0 && !related}
                   />
                   <div className="absolute left-3 top-3 flex min-w-0 items-center gap-1.5">
-                    <span className="max-w-[55%] truncate rounded-full bg-white/94 px-2 py-1 text-[9px] font-black uppercase text-emerald-800 shadow-sm backdrop-blur dark:bg-slate-950/90 dark:text-emerald-300">
+                    <span className="max-w-[55%] truncate rounded-full bg-white/[0.94] px-2 py-1 text-[9px] font-black uppercase text-emerald-800 shadow-sm backdrop-blur dark:bg-slate-950/90 dark:text-emerald-300">
                       {article.category}
                     </span>
-                    <span className="truncate rounded-full bg-black/48 px-2 py-1 text-[9px] font-bold text-white backdrop-blur">
+                    <span className="truncate rounded-full bg-black/[0.48] px-2 py-1 text-[9px] font-bold text-white backdrop-blur">
                       {kindLabel(article, locale === 'id')}
                     </span>
                   </div>
                 </div>
                 <div className="p-4 sm:p-5">
                   <h3
-                    className={\`\${related ? 'line-clamp-2 text-[16px] leading-5.5' : 'line-clamp-3 text-[22px] leading-7 sm:text-[27px] sm:leading-8'} font-black tracking-[-0.035em] text-slate-950 transition group-hover:text-emerald-700 dark:text-white dark:group-hover:text-emerald-300\`}
+                    className={\`\${related ? 'line-clamp-2 text-[16px] leading-5' : 'line-clamp-3 text-[22px] leading-7 sm:text-[27px] sm:leading-8'} font-black tracking-[-0.035em] text-slate-950 transition group-hover:text-emerald-700 dark:text-white dark:group-hover:text-emerald-300\`}
                   >
                     {article.title}
                   </h3>
