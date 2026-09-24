@@ -4,7 +4,7 @@ import type { LajukanNewsArticle } from '@/lib/news';
 import { buildNewsPath } from '@/lib/news';
 import { NewsMedia } from '@/components/news/NewsMedia';
 
-type NewsCardVariant = 'hero' | 'grid' | 'compact' | 'mobile';
+type NewsCardVariant = 'hero' | 'grid' | 'compact';
 
 function formatDate(value: string, locale: string) {
   const date = new Date(value);
@@ -46,7 +46,7 @@ export function NewsCard({
           article={article}
           variant="thumb"
           showLabels={false}
-          className="w-full h-full min-h-[78px] rounded-[12px] sm:min-h-[88px]"
+          className="w-full rounded-[12px]"
         />
         <div className="flex min-w-0 flex-col justify-center py-0.5">
           <div className="flex min-w-0 items-center gap-1.5">
@@ -63,57 +63,6 @@ export function NewsCard({
           <div className="mt-1.5 flex min-w-0 items-center gap-1 text-[9px] font-semibold text-[color:var(--app-text-soft)]">
             <Clock3 className="h-3 w-3 shrink-0" />
             <span className="truncate">{formatDate(article.publishedAt, locale) || (isId ? 'Terbaru' : 'Latest')}</span>
-          </div>
-        </div>
-      </Link>
-    );
-  }
-
-  if (variant === 'mobile') {
-    return (
-      <Link
-        href={href}
-        className="group block min-w-0 overflow-hidden rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] text-left shadow-[0_12px_28px_-28px_rgba(15,23,42,0.28)] transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:shadow-[0_18px_34px_-28px_rgba(15,23,42,0.28)]"
-      >
-        <NewsMedia
-          article={article}
-          variant="card"
-          priority={priority}
-          showLabels={false}
-          className="w-full"
-        />
-        <div className="p-3.5 sm:p-4">
-          <div className="flex min-w-0 items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.1em]">
-            <span className="max-w-[52%] truncate text-[color:var(--app-accent)]">
-              {article.category}
-            </span>
-            <span className="text-slate-300">•</span>
-            <span className="truncate text-[color:var(--app-text-soft)]">
-              {kindLabel(article, isId)}
-            </span>
-          </div>
-          <h2 className="mt-1.5 line-clamp-3 text-[18px] font-black leading-[22px] tracking-[-0.028em] text-[color:var(--app-text)] group-hover:text-[color:var(--app-accent)] sm:text-[20px] sm:leading-[24px]">
-            {article.title}
-          </h2>
-          {article.summary ? (
-            <p className="mt-2 line-clamp-2 text-[11px] leading-[18px] text-[color:var(--app-text-soft)]">
-              {article.summary}
-            </p>
-          ) : null}
-          <div className="mt-2.5 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[9px] font-semibold text-[color:var(--app-text-soft)]">
-            <span className="inline-flex items-center gap-1">
-              <Clock3 className="h-3 w-3 shrink-0" />
-              <span className="truncate">
-                {formatDate(article.publishedAt, locale) ||
-                  (isId ? 'Terbaru' : 'Latest')}
-              </span>
-            </span>
-            {article.location ? (
-              <span className="inline-flex min-w-0 items-center gap-1 truncate">
-                <MapPin className="h-3 w-3 shrink-0" />
-                <span className="truncate">{article.location}</span>
-              </span>
-            ) : null}
           </div>
         </div>
       </Link>
