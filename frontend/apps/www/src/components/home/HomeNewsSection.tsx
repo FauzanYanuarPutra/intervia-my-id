@@ -55,14 +55,14 @@ export function HomeNewsSection({
 
       {visibleItems.length ? (
         <>
-          <div className="mt-3 hidden min-w-0 gap-3 px-3 sm:px-4 lg:grid lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)] lg:px-5">
+          <div className="mt-3 grid min-w-0 gap-3 px-3 sm:px-4 md:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)] md:items-stretch lg:px-5">
             <NewsCard
               article={visibleItems[0]}
               locale={locale}
               variant="hero"
               priority
             />
-            <div className="grid min-w-0 gap-2.5 sm:gap-3">
+            <div className="grid min-w-0 gap-2.5 sm:gap-3 sm:grid-cols-2 md:grid-cols-1 md:grid-rows-3">
               {visibleItems.slice(1).map(item => (
                 <NewsCard
                   key={item.id}
@@ -74,24 +74,8 @@ export function HomeNewsSection({
             </div>
           </div>
 
-          <div className="mt-3 grid min-w-0 gap-2.5 px-3 sm:px-4 lg:hidden">
-            {visibleItems.slice(0, 1).map(item => (
-              <NewsCard
-                key={item.id}
-                article={item}
-                locale={locale}
-                variant="mobile"
-                priority
-              />
-            ))}
-            {visibleItems.slice(1).map(item => (
-              <NewsCard
-                key={item.id}
-                article={item}
-                locale={locale}
-                variant="compact"
-              />
-            ))}
+          <div className="hidden" aria-hidden="true">
+            {visibleItems.length === 0 ? null : null}
           </div>
         </>
       ) : (
