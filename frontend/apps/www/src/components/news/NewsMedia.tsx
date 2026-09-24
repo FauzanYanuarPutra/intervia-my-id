@@ -54,15 +54,29 @@ export function NewsMedia({
       ) : null}
 
       {!showImage ? (
-        <div className="absolute inset-0 flex items-center justify-between gap-4 bg-[linear-gradient(135deg,#ecfdf5_0%,#f8fafc_58%,#fff7ed_100%)] p-4 dark:bg-[linear-gradient(135deg,#082319_0%,#0f172a_62%,#1c1917_100%)] sm:p-5">
-          <div className="min-w-0">
-            <div className="flex h-10 w-10 items-center justify-center rounded-[13px] border border-emerald-100 bg-white p-2 shadow-sm dark:border-emerald-400/20 dark:bg-white/10">
-              <Image src="/logo.svg" alt="" width={72} height={24} className="h-5 w-auto object-contain" />
+        <div
+          className={
+            variant === 'thumb'
+              ? 'absolute inset-0 flex items-center justify-center bg-[linear-gradient(145deg,#ecfdf5_0%,#f8fafc_58%,#fff7ed_100%)] dark:bg-[linear-gradient(145deg,#082319_0%,#0f172a_62%,#1c1917_100%)]'
+              : 'absolute inset-0 flex items-center justify-between gap-4 bg-[linear-gradient(135deg,#ecfdf5_0%,#f8fafc_58%,#fff7ed_100%)] p-4 dark:bg-[linear-gradient(135deg,#082319_0%,#0f172a_62%,#1c1917_100%)] sm:p-5'
+          }
+        >
+          {variant === 'thumb' ? (
+            <div className="flex h-9 w-9 items-center justify-center rounded-[11px] border border-emerald-100/90 bg-white/80 shadow-sm dark:border-emerald-400/20 dark:bg-white/10">
+              <Newspaper className="h-4.5 w-4.5 text-emerald-700/70 dark:text-emerald-300/70" />
             </div>
-            {/* <p className="mt-2 text-[9px] font-black uppercase tracking-[0.12em] text-emerald-800 dark:text-emerald-300">Lajukan News</p> */}
-            <p className="mt-1 truncate text-xs font-bold text-slate-600 dark:text-slate-300">{article.category}</p>
-          </div>
-          <Newspaper className="h-9 w-9 shrink-0 text-emerald-700/20 dark:text-emerald-300/20" />
+          ) : (
+            <>
+              <div className="min-w-0">
+                <div className="flex h-10 w-10 items-center justify-center rounded-[13px] border border-emerald-100 bg-white p-2 shadow-sm dark:border-emerald-400/20 dark:bg-white/10">
+                  <Image src="/logo.svg" alt="" width={72} height={24} className="h-5 w-auto object-contain" />
+                </div>
+                {/* <p className="mt-2 text-[9px] font-black uppercase tracking-[0.12em] text-emerald-800 dark:text-emerald-300">Lajukan News</p> */}
+                <p className="mt-1 truncate text-xs font-bold text-slate-600 dark:text-slate-300">{article.category}</p>
+              </div>
+              <Newspaper className="h-9 w-9 shrink-0 text-emerald-700/20 dark:text-emerald-300/20" />
+            </>
+          )}
         </div>
       ) : null}
 
