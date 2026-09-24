@@ -73,7 +73,8 @@ try {
     function Invoke-DockerNative {
         param(
             [Parameter(Mandatory = $true)]
-            [string[]]$Arguments
+            [string[]]$Arguments,
+            [switch]$Silent
         )
 
         # Stream Docker stdout/stderr directly so long BuildKit operations do not
@@ -88,7 +89,9 @@ try {
             $Output = @(
                 & docker @Arguments 2>&1 | ForEach-Object {
                     $Line = "$_"
-                    Write-Host $Line
+                    if (-not $Silent) {
+                        Write-Host $Line
+                    }
                     $Line
                 }
             )
@@ -159,8 +162,12 @@ try {
     if ($DockerDesktopCommand) {
         # `status` can return non-zero when Desktop/Engine is broken, so use
         # `version` as the capability probe and keep status for diagnostics.
-        $DesktopVersionProbe = Invoke-DockerNative -Arguments @("desktop", "version", "--short")
-        $DesktopStatusProbe = Invoke-DockerNative -Arguments @("desktop", "status", "--format", "json")
+        $DesktopVersionProbe = Invoke-DockerNative -Arguments @("desktop", "version", "--short") -Silent
+        $DesktopStatusProbe = Invoke-DockerNative -Arguments @("desktop", "status", "--format", "json") -Silent
+        $DesktopVersionText = ($DesktopVersionProbe.Output -join " ").Trim()
+        if ($DesktopVersionProbe.ExitCode -eq 0 -and $DesktopVersionText) {
+            Write-Host "Docker Desktop CLI: $DesktopVersionText" -ForegroundColor DarkGray
+        }
         $DockerDesktopCliAvailable =
             ($DesktopVersionProbe.ExitCode -eq 0) -or
             ($DesktopStatusProbe.ExitCode -eq 0)
