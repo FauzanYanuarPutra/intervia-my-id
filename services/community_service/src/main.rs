@@ -1144,7 +1144,10 @@ async fn normalize_community_migration_tracking(pool: &PgPool) -> anyhow::Result
     .execute(pool)
     .await?;
 
-    let candidate_schemas = ["forum", "reel", "events"];
+    // Legacy runs could have created _sqlx_migrations under any non-system
+    // schema after a migration changed search_path. Reconcile every such table
+    // into the canonical public tracker so no hidden tracker can cause a
+    // migration to execute twice.
     let existing_schemas = sqlx::query(
         r#"
         SELECT n.nspname
@@ -1152,11 +1155,12 @@ async fn normalize_community_migration_tracking(pool: &PgPool) -> anyhow::Result
         JOIN pg_namespace n ON n.oid = c.relnamespace
         WHERE c.relkind = 'r'
           AND c.relname = '_sqlx_migrations'
-          AND n.nspname = ANY($1)
+          AND n.nspname <> 'public'
+          AND n.nspname <> 'information_schema'
+          AND n.nspname NOT LIKE 'pg_%'
         ORDER BY n.nspname
         "#,
     )
-    .bind(candidate_schemas.as_slice())
     .fetch_all(pool)
     .await?
     .into_iter()
