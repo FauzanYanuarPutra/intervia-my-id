@@ -372,6 +372,15 @@ export default async function NewsArticlePage({ params }: PageProps) {
               title={isId ? 'Berita terkait' : 'Related news'}
               related
             />
+            <div className="mt-3 flex justify-end">
+              <Link
+                href="/news"
+                data-news-action="related_clicked"
+                className="text-xs font-bold text-emerald-700 transition hover:underline dark:text-emerald-300"
+              >
+                {isId ? 'Lihat semua berita' : 'View all news'}
+              </Link>
+            </div>
           </section>
         ) : null}
       </article>

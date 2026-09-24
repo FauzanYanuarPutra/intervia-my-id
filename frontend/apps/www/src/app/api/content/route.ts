@@ -15,6 +15,7 @@ import {
   type LatLng,
 } from '@/lib/super-app/location-guard';
 import { enforceRateLimit, getClientIp } from '@/lib/rateLimit';
+import { isEditorialContentRecord } from '@/lib/server/contentEditorial';
 
 const marketplaceBase =
   process.env.INTERNAL_MARKETPLACE_URL ||
@@ -291,22 +292,6 @@ function asObject(value: unknown): ContentRecord | null {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? (value as ContentRecord)
     : null;
-}
-
-export function isEditorialContentRecord(item: ContentRecord): boolean {
-  const metadata = asObject(item.metadata);
-  const news = asObject(metadata?.news);
-  if (news && Object.keys(news).length > 0) return true;
-
-  const rawType = [item.content_type, item.type]
-    .map(asString)
-    .join(' ')
-    .toLowerCase()
-    .replace(/[\s-]+/g, '_');
-
-  return rawType.split(/[^a-z0-9_]+/).some(token =>
-    ['news', 'article', 'guide'].includes(token),
-  );
 }
 
 function filterEditorialContent(items: ContentRecord[]): ContentRecord[] {

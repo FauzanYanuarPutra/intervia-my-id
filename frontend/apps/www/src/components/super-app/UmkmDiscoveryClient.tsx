@@ -385,7 +385,7 @@ export function UmkmDiscoveryClient(props: UmkmDiscoveryClientProps) {
                   aria-pressed={active}
                   onClick={() => handleLanePick(lane)}
                   className={cn(
-                    'inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[11px] font-bold shadow-[0_12px_26px_-24px_rgba(15,23,42,0.28)] transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)]',
+                    'inline-flex min-h-10 sm:min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[11px] font-bold shadow-[0_12px_26px_-24px_rgba(15,23,42,0.28)] transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)]',
                     active
                       ? 'cursor-default border-[color:var(--app-accent)] bg-[color:var(--app-accent)] text-white shadow-[0_10px_22px_-18px_color-mix(in_srgb,var(--app-accent)_45%,transparent)]'
                       : 'cursor-pointer border-slate-200 bg-white text-slate-700 hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100',
