@@ -12,7 +12,11 @@ import {
   useMap,
 } from 'react-leaflet';
 import { divIcon, type DivIcon, type LatLngBoundsExpression, type LatLngExpression } from 'leaflet';
-import { LatLng } from '@/lib/super-app/maps';
+import {
+  OPEN_MAP_TILE_ATTRIBUTION,
+  OPEN_MAP_TILE_URL,
+  type LatLng,
+} from '@/lib/super-app/maps';
 
 type MapPointKind = 'driver' | 'pickup' | 'destination' | 'customer' | 'neutral';
 
@@ -306,12 +310,8 @@ export function OpenSourceTripMapClient({
   const viaIcon = useMemo(() => buildPointIcon({ kind: 'pickup', size: 28 }), []);
   const destinationIcon = useMemo(() => buildPointIcon({ kind: 'destination', size: 30 }), []);
 
-  const tileUrl =
-    process.env.NEXT_PUBLIC_OSM_TILE_URL || 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-  const tileAttribution = (
-    process.env.NEXT_PUBLIC_OSM_TILE_ATTRIBUTION ||
-    '&copy; OpenStreetMap contributors'
-  ).replace(/^\s*Leaflet\s*\|\s*/i, '').trim();
+  const tileUrl = OPEN_MAP_TILE_URL;
+  const tileAttribution = OPEN_MAP_TILE_ATTRIBUTION;
 
   const query = useMemo(() => {
     if (!resolvedDestination) return null;

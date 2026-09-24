@@ -23,7 +23,11 @@ import {
   type LatLngBoundsExpression,
 } from 'leaflet';
 import { isCoordinateValid } from '@/lib/super-app/location-guard';
-import type { LatLng } from '@/lib/super-app/maps';
+import {
+  OPEN_MAP_TILE_ATTRIBUTION,
+  OPEN_MAP_TILE_URL,
+  type LatLng,
+} from '@/lib/super-app/maps';
 import { buildUmkmPlacePresentation } from '@/lib/super-app/umkm-place-ui';
 import {
   buildUmkmMapPlacePath,
@@ -68,12 +72,6 @@ type RoutingResponse = {
   error?: string;
 };
 
-const FALLBACK_TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-const FALLBACK_TILE_ATTRIBUTION = '&copy; OpenStreetMap contributors';
-
-function normalizeMapAttribution(value: string): string {
-  return value.replace(/^\s*Leaflet\s*\|\s*/i, '').trim();
-}
 const MARKER_CLUSTER_DISTANCE_PX = 72;
 const MARKER_CLUSTER_MAX_ZOOM = 18;
 const MARKER_CLUSTER_PICKER_ZOOM = 17;
@@ -129,16 +127,16 @@ const MAP_THEME_CONFIG: Record<
   { url: string; attribution: string }
 > = {
   default: {
-    url: FALLBACK_TILE_URL,
-    attribution: FALLBACK_TILE_ATTRIBUTION,
+    url: OPEN_MAP_TILE_URL,
+    attribution: OPEN_MAP_TILE_ATTRIBUTION,
   },
   light: {
-    url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-    attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+    url: OPEN_MAP_TILE_URL,
+    attribution: OPEN_MAP_TILE_ATTRIBUTION,
   },
   dark: {
-    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-    attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+    url: OPEN_MAP_TILE_URL,
+    attribution: OPEN_MAP_TILE_ATTRIBUTION,
   },
 };
 
@@ -1477,15 +1475,11 @@ export function UmkmStoreMapClient({
   controls = true,
 }: UmkmStoreMapClientProps) {
   const activeTheme = MAP_THEME_CONFIG[theme];
-  const tileUrl =
-    theme === 'default'
-      ? process.env.NEXT_PUBLIC_OSM_TILE_URL || activeTheme.url
-      : activeTheme.url;
-  const tileAttribution = normalizeMapAttribution(
-    theme === 'default'
-      ? process.env.NEXT_PUBLIC_OSM_TILE_ATTRIBUTION || activeTheme.attribution
-      : activeTheme.attribution,
-  );
+  // Keep every embedded Lajukan map on the key-free OpenStreetMap raster
+  // provider. Do not allow an environment override to accidentally point at
+  // a key-gated provider such as CARTO.
+  const tileUrl = activeTheme.url;
+  const tileAttribution = normalizeMapAttribution(activeTheme.attribution);
   const validViewerLocation = hasValidLatLng(viewerLocation)
     ? viewerLocation
     : null;

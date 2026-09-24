@@ -1,3 +1,6 @@
+export const OPEN_MAP_TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+export const OPEN_MAP_TILE_ATTRIBUTION = '&copy; OpenStreetMap contributors';
+
 export type LatLng = { lat: number; lng: number };
 export type GoogleMapsTravelMode =
   | 'driving'

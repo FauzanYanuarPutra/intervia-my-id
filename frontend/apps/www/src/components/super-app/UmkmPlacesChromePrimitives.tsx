@@ -4,7 +4,6 @@ import type { ReactNode } from 'react';
 import {
   Briefcase,
   Leaf,
-  Layers3,
   Loader2,
   LocateFixed,
   Lock,
@@ -245,17 +244,17 @@ export function MapQuickControls({
   compact?: boolean;
 }) {
   const pillButtonClassName = cn(
-    'pointer-events-auto inline-flex shrink-0 items-center justify-center border font-semibold shadow-[0_10px_22px_-18px_rgba(15,23,42,0.38)]  transition',
+    'pointer-events-auto inline-flex shrink-0 items-center justify-center border font-semibold shadow-[0_8px_20px_-14px_rgba(15,23,42,0.34)] transition active:scale-[0.97]',
     compact
-      ? 'h-10 w-10 rounded-full px-0 text-[0px]'
-      : 'h-8 gap-1.5 rounded-[14px] px-2.5 text-[10px] sm:h-8 sm:px-3',
+      ? 'h-9 w-9 rounded-full px-0 text-[0px]'
+      : 'h-9 gap-1.5 rounded-full px-3 text-[10px] sm:h-8',
   );
   const iconButtonClassName = cn(
-    'pointer-events-auto inline-flex shrink-0 items-center justify-center border shadow-[0_10px_22px_-18px_rgba(15,23,42,0.38)]  transition',
-    compact ? 'h-10 w-10 rounded-full' : 'h-8 w-8 rounded-[14px] sm:h-8 sm:w-8',
+    'pointer-events-auto inline-flex shrink-0 items-center justify-center border shadow-[0_8px_20px_-14px_rgba(15,23,42,0.34)] transition active:scale-[0.97]',
+    compact ? 'h-9 w-9 rounded-full' : 'h-9 w-9 rounded-full sm:h-8 sm:w-8',
   );
   const statusChipClassName =
-    'pointer-events-auto inline-flex min-h-[32px] max-w-[min(76vw,300px)] items-center gap-1.5 rounded-[14px] border px-3 py-1.5 text-left text-[10px] font-semibold leading-[1.35] shadow-[0_12px_24px_-18px_rgba(15,23,42,0.3)] transition hover:brightness-105';
+    'pointer-events-auto inline-flex min-h-[30px] max-w-[min(76vw,300px)] items-center gap-1.5 rounded-full border bg-white/95 px-3 py-1.5 text-left text-[10px] font-semibold leading-[1.25] shadow-[0_10px_24px_-16px_rgba(15,23,42,0.34)] backdrop-blur-md transition hover:bg-white';
   const accuracyMeters =
     typeof locationAccuracyMeters === 'number' &&
     Number.isFinite(locationAccuracyMeters) &&
@@ -345,10 +344,10 @@ export function MapQuickControls({
       ) : null}
       <div
         className={cn(
-          'inline-flex bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(248,250,252,0.82))] shadow-[0_16px_30px_-22px_rgba(15,23,42,0.3)] ',
+          'inline-flex border border-slate-200/80 bg-white/95 shadow-[0_12px_28px_-20px_rgba(15,23,42,0.34)] backdrop-blur-md',
           compact
-            ? 'flex-col gap-1 rounded-[24px] p-1'
-            : 'items-center gap-1 rounded-[18px] p-1.5',
+            ? 'flex-col gap-1 rounded-full p-1'
+            : 'items-center gap-1 rounded-full p-1',
         )}
       >
         <button
@@ -445,20 +444,7 @@ export function MapQuickControls({
         >
           <Route className="h-3 w-3" />
         </button>
-        {onCycleTheme ? (
-          <button
-            type="button"
-            onClick={() => runAction(onCycleTheme, 'CYCLE_THEME')}
-            className={cn(
-              iconButtonClassName,
-              'border-white/80 bg-white/92 text-slate-700 hover:text-[color:var(--app-accent)]',
-            )}
-            title={`${isId ? 'Tema peta' : 'Map theme'}${themeLabel ? `: ${themeLabel}` : ''}`}
-            aria-label={`${isId ? 'Tema peta' : 'Map theme'}${themeLabel ? `: ${themeLabel}` : ''}`}
-          >
-            <Layers3 className="h-3 w-3" />
-          </button>
-        ) : null}
+
       </div>
     </div>
   );
