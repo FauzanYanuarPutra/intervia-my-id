@@ -23,7 +23,5 @@ export function isEditorialContentRecord(item: ContentRecord): boolean {
     .toLowerCase()
     .replace(/[\s-]+/g, '_');
 
-  return rawType.split(/[^a-z0-9_]+/).some(token =>
-    ['news', 'article', 'guide'].includes(token),
-  );
+  return /(?:^|_)(news|article|guide)(?:_|$)/.test(rawType);
 }
