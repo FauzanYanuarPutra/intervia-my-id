@@ -1115,6 +1115,118 @@ fn validate_community_migration_versions(
 }
 
 
+#[derive(Debug, FromRow)]
+struct CommunityMigrationRecord {
+    version: i64,
+    description: String,
+    installed_on: DateTime<Utc>,
+    success: bool,
+    checksum: Vec<u8>,
+    execution_time: i64,
+}
+
+async fn normalize_community_migration_tracking(pool: &PgPool) -> anyhow::Result<()> {
+    // SQLx's default tracking table is public._sqlx_migrations. Community
+    // migrations change search_path, so pin the bookkeeping table explicitly
+    // to public and reconcile any legacy copies created in service schemas.
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS public._sqlx_migrations (
+            version BIGINT PRIMARY KEY,
+            description TEXT NOT NULL,
+            installed_on TIMESTAMPTZ NOT NULL DEFAULT now(),
+            success BOOLEAN NOT NULL,
+            checksum BYTEA NOT NULL,
+            execution_time BIGINT NOT NULL
+        )
+        "#,
+    )
+    .execute(pool)
+    .await?;
+
+    let candidate_schemas = ["forum", "reel", "events"];
+    let existing_schemas = sqlx::query(
+        r#"
+        SELECT n.nspname
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE c.relkind = 'r'
+          AND c.relname = '_sqlx_migrations'
+          AND n.nspname = ANY($1)
+        ORDER BY n.nspname
+        "#,
+    )
+    .bind(candidate_schemas.as_slice())
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .map(|row| row.get::<String, _>("nspname"))
+    .collect::<Vec<_>>();
+
+    for schema in existing_schemas {
+        let table = format!(
+            r#""{}"."_sqlx_migrations""#,
+            schema.replace('"', """")
+        );
+        let rows = sqlx::query_as::<_, CommunityMigrationRecord>(&format!(
+            "SELECT version, description, installed_on, success, checksum, execution_time FROM {table} ORDER BY version"
+        ))
+        .fetch_all(pool)
+        .await?;
+
+        for record in rows {
+            if !record.success {
+                anyhow::bail!(
+                    "community migration tracking is dirty in {} for version {}",
+                    table,
+                    record.version
+                );
+            }
+
+            let existing = sqlx::query(
+                "SELECT description, checksum FROM public._sqlx_migrations WHERE version = $1",
+            )
+            .bind(record.version)
+            .fetch_optional(pool)
+            .await?;
+
+            if let Some(existing) = existing {
+                let existing_checksum: Vec<u8> = existing.get("checksum");
+                let existing_description: String = existing.get("description");
+
+                if existing_checksum != record.checksum {
+                    anyhow::bail!(
+                        "conflicting community migration metadata for version {}: public description={:?}, {} description={:?}",
+                        record.version,
+                        existing_description,
+                        table,
+                        record.description
+                    );
+                }
+
+                continue;
+            }
+
+            sqlx::query(
+                r#"
+                INSERT INTO public._sqlx_migrations
+                    (version, description, installed_on, success, checksum, execution_time)
+                VALUES ($1, $2, $3, TRUE, $4, $5)
+                "#,
+            )
+            .bind(record.version)
+            .bind(&record.description)
+            .bind(record.installed_on)
+            .bind(&record.checksum)
+            .bind(record.execution_time)
+            .execute(pool)
+            .await?;
+        }
+    }
+
+    Ok(())
+}
+
 fn init_tracing() {
     let app_env = env::var("ENV")
         .or_else(|_| env::var("APP_ENV"))
@@ -1199,6 +1311,10 @@ async fn main() -> anyhow::Result<()> {
         validate_community_migration_versions(&migrator)?;
         let migration_db =
             connect_database_pool(&database_url, DatabasePoolPurpose::Migration).await?;
+
+        normalize_community_migration_tracking(&migration_db).await?;
+        migrator.dangerous_set_table_name("public._sqlx_migrations");
+
         if !strict_migrations {
             migrator.set_ignore_missing(true);
         }
