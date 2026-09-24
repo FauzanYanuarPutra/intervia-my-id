@@ -22,6 +22,7 @@ type ProfileFilterStripProps<T extends string> = {
   mobileDescription?: string;
   mobileDoneLabel?: string;
   mobileCloseLabel?: string;
+  mobileCountSuffix?: string;
 };
 
 export function ProfileFilterStrip<T extends string>({
@@ -35,6 +36,7 @@ export function ProfileFilterStrip<T extends string>({
   mobileDescription = 'Tampilkan jenis konten yang ingin kamu lihat.',
   mobileDoneLabel = 'Selesai',
   mobileCloseLabel = 'Tutup',
+  mobileCountSuffix = 'item',
 }: ProfileFilterStripProps<T>) {
   const [open, setOpen] = useState(false);
   const activeItem = items.find(item => item.key === activeKey) || items[0];
@@ -183,7 +185,7 @@ export function ProfileFilterStrip<T extends string>({
                         </span>
                         {typeof item.count === 'number' ? (
                           <span className="mt-0.5 block text-[10px] font-semibold text-[color:var(--app-text-soft)]">
-                            {item.count} posting
+                            {item.count} {mobileCountSuffix}
                           </span>
                         ) : null}
                       </span>
