@@ -293,6 +293,26 @@ function asObject(value: unknown): ContentRecord | null {
     : null;
 }
 
+export function isEditorialContentRecord(item: ContentRecord): boolean {
+  const metadata = asObject(item.metadata);
+  const news = asObject(metadata?.news);
+  if (news && Object.keys(news).length > 0) return true;
+
+  const rawType = [item.content_type, item.type]
+    .map(asString)
+    .join(' ')
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
+
+  return rawType.split(/[^a-z0-9_]+/).some(token =>
+    ['news', 'article', 'guide'].includes(token),
+  );
+}
+
+function filterEditorialContent(items: ContentRecord[]): ContentRecord[] {
+  return items.filter(item => !isEditorialContentRecord(item));
+}
+
 function asStringList(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value
@@ -1350,7 +1370,7 @@ async function fetchExpandedCandidates(
 
     const { response, payload } = await fetchMarketplaceContent(params, req);
     if (!response.ok) return [];
-    return normalizePayload(payload, limit, 0).items || [];
+    return filterEditorialContent(normalizePayload(payload, limit, 0).items || []);
   } catch (error) {
     console.error('[api/content] expanded candidate fetch failed:', error);
     return [];
@@ -1487,7 +1507,8 @@ export async function GET(req: NextRequest) {
       requestedLimit,
       requestedOffset,
     );
-    let resolvedItems = resolvedPayload.items || [];
+    let resolvedItems = filterEditorialContent(resolvedPayload.items || []);
+    resolvedPayload = { ...resolvedPayload, items: resolvedItems };
 
     const shouldIncludeDiscoverCandidates =
       !databaseOnly &&
@@ -1623,6 +1644,11 @@ export async function GET(req: NextRequest) {
         };
       }
     }
+
+    resolvedPayload = {
+      ...resolvedPayload,
+      items: filterEditorialContent(resolvedPayload.items || []),
+    };
 
     return NextResponse.json(resolvedPayload, { status: 200 });
   } catch (err) {
