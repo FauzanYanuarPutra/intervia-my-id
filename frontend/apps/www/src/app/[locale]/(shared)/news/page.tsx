@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
-import { ArrowRight, Search, Send, Store, TrendingUp } from 'lucide-react';
+import { Search, Send, Store, TrendingUp } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { NewsCard } from '@/components/news/NewsCard';
-import { buildNewsPath, buildNewsUrl, getPublishedNews } from '@/lib/news';
+import { NewsCarousel } from '@/components/news/NewsCarousel';
+import { buildNewsUrl, getPublishedNews } from '@/lib/news';
 
 type PageProps = {
   params: Promise<{ locale: string }>;
@@ -68,139 +69,150 @@ export default async function NewsIndexPage({ params, searchParams }: PageProps)
     limit: 36,
   });
 
-  const featured = cursor ? null : items[0] || null;
-  const rest = cursor ? items : items.slice(1);
-  const compact = rest.slice(0, 2);
-  const grid = rest.slice(2);
+  const sliderItems = items.slice(0, 6);
+  const grid = cursor ? items.slice(6) : items.slice(1);
 
   return (
-    <main className="page-shell page-rhythm pb-12 pt-5 sm:pt-6">
-      <section className="overflow-hidden rounded-[22px] border border-emerald-100 bg-[linear-gradient(135deg,#f0fdf4_0%,#ffffff_52%,#fffaf2_100%)] shadow-[0_20px_60px_-48px_rgba(15,23,42,0.3)] dark:border-white/10 dark:bg-[linear-gradient(135deg,#06261b_0%,#0f172a_62%,#1c1917_100%)]">
-        <div className="grid gap-5 p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_220px] lg:items-end lg:p-6">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="grid h-9 w-9 place-items-center rounded-[12px] border border-emerald-100 bg-white p-2 shadow-sm dark:border-emerald-400/20 dark:bg-white/10">
+    <main className="page-shell page-rhythm pb-12 pt-4 sm:pt-6">
+      <section className="overflow-hidden rounded-[28px] border border-emerald-100/80 bg-[linear-gradient(135deg,#effcf5_0%,#ffffff_48%,#fffaf1_100%)] shadow-[0_28px_70px_-58px_rgba(15,23,42,0.35)] dark:border-white/10 dark:bg-[linear-gradient(135deg,#06261b_0%,#0f172a_62%,#1c1917_100%)]">
+        <div className="p-4 sm:p-6 lg:p-7">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[13px] border border-emerald-100 bg-white p-2 shadow-sm dark:border-emerald-400/20 dark:bg-white/10">
                 <img src="/logo.svg" alt="" className="h-5 w-auto object-contain" />
               </span>
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300">Lajukan</p>
-                <p className="text-xs font-bold text-slate-500 dark:text-slate-400">News</p>
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300">Lajukan News</p>
+                <p className="truncate text-xs font-semibold text-slate-500 dark:text-slate-400">
+                  {isId ? 'Berita ekonomi & usaha' : 'Economy & business news'}
+                </p>
               </div>
             </div>
-            <h1 className="mt-3 max-w-3xl text-[28px] font-black leading-[1.08] tracking-[-0.055em] text-slate-950 dark:text-white sm:text-[38px]">
-              {isId ? 'Berita yang membantu usaha bergerak.' : 'News that helps businesses move.'}
+
+            <div className="flex shrink-0 items-center gap-2">
+              <Link
+                href="/news/submit"
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-emerald-200 bg-white/90 px-3 text-xs font-black text-emerald-800 transition hover:border-emerald-300 hover:bg-white dark:border-emerald-400/20 dark:bg-white/[0.04] dark:text-emerald-200"
+              >
+                <Send className="h-3.5 w-3.5" />
+                {isId ? 'Kirim berita' : 'Submit'}
+              </Link>
+              <Link
+                href="/explore"
+                className="hidden min-h-9 items-center gap-1.5 rounded-xl bg-slate-950 px-3 text-xs font-black text-white transition hover:bg-slate-800 sm:inline-flex dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
+              >
+                <Store className="h-3.5 w-3.5" />
+                {isId ? 'Cari usaha' : 'Explore'}
+              </Link>
+            </div>
+          </div>
+
+          <div className="mt-5 max-w-3xl">
+            <h1 className="text-[30px] font-black leading-[1.03] tracking-[-0.055em] text-slate-950 dark:text-white sm:text-[42px]">
+              {isId ? 'Berita yang bantu kamu mengambil langkah.' : 'News that helps you decide what to do next.'}
             </h1>
-            <p className="mt-2.5 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300 sm:text-[15px]">
+            <p className="mt-2.5 max-w-2xl text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300 sm:text-[15px]">
               {isId
-                ? 'Ringkas, jelas, dan relevan untuk memahami apa yang berubah dan apa langkah berikutnya.'
-                : 'Clear, practical updates on what changed and what businesses can do next.'}
+                ? 'Ringkas, jelas, dan fokus pada perubahan yang punya arti untuk usaha.'
+                : 'Clear, practical updates focused on changes that matter to businesses.'}
             </p>
           </div>
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
-            <Link href="/news/submit" className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 text-sm font-black text-white transition hover:bg-emerald-800">
-              <Send className="h-4 w-4" />
-              {isId ? 'Kirim berita' : 'Submit news'}
-            </Link>
-            <Link href="/explore" className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white/80 px-4 text-sm font-bold text-slate-700 transition hover:border-emerald-300 hover:text-emerald-800 dark:border-white/10 dark:bg-slate-950/30 dark:text-slate-200">
-              <Store className="h-4 w-4" />
-              {isId ? 'Cari usaha' : 'Explore'}
-            </Link>
-          </div>
+
+          <form method="get" className="mt-5 flex flex-col gap-2 sm:flex-row" role="search">
+            {category ? <input type="hidden" name="category" value={category} /> : null}
+            <label htmlFor="news-search" className="sr-only">{isId ? 'Cari berita' : 'Search news'}</label>
+            <div className="relative min-w-0 flex-1">
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                id="news-search"
+                name="q"
+                defaultValue={query}
+                maxLength={160}
+                placeholder={isId ? 'Cari berita, topik, atau kategori…' : 'Search stories, topics, or categories…'}
+                className="min-h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-sm font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 dark:border-white/10 dark:bg-slate-950/30 dark:text-white dark:focus:ring-emerald-950"
+              />
+            </div>
+            <button type="submit" className="min-h-11 rounded-xl bg-emerald-700 px-5 text-sm font-black text-white transition hover:bg-emerald-800">
+              {isId ? 'Cari berita' : 'Search'}
+            </button>
+          </form>
         </div>
       </section>
 
-      <nav aria-label={isId ? 'Kategori berita' : 'News categories'} className="-mx-1 flex gap-1.5 overflow-x-auto px-1 py-0.5">
-        <Link href="/news" className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-bold ${!category ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-slate-200 bg-white text-slate-700 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200'}`}>
+      <nav aria-label={isId ? 'Kategori berita' : 'News categories'} className="-mx-1 flex gap-1.5 overflow-x-auto px-1 py-0.5 scrollbar-none">
+        <Link
+          href="/news"
+          className={!category
+            ? 'shrink-0 rounded-full bg-emerald-700 px-3.5 py-2 text-xs font-black text-white shadow-sm'
+            : 'shrink-0 rounded-full border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 transition hover:border-emerald-200 hover:text-emerald-700 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200'}
+        >
           {isId ? 'Semua' : 'All'}
         </Link>
         {CATEGORIES.map(item => (
           <Link
             key={item}
-            href={`/news/category/${item.toLowerCase()}`}
-            className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-bold ${category?.toLowerCase() === item.toLowerCase() ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-slate-200 bg-white text-slate-700 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200'}`}
+            href={buildNewsFacetPath('topic', item)}
+            className={category?.toLowerCase() === item.toLowerCase()
+              ? 'shrink-0 rounded-full bg-emerald-700 px-3.5 py-2 text-xs font-black text-white shadow-sm'
+              : 'shrink-0 rounded-full border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 transition hover:border-emerald-200 hover:text-emerald-700 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200'}
           >
             {item}
           </Link>
         ))}
       </nav>
 
-      <form method="get" className="flex gap-2" role="search">
-        {category ? <input type="hidden" name="category" value={category} /> : null}
-        <label htmlFor="news-search" className="sr-only">{isId ? 'Cari berita' : 'Search news'}</label>
-        <div className="relative min-w-0 flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            id="news-search"
-            name="q"
-            defaultValue={query}
-            maxLength={160}
-            placeholder={isId ? 'Cari judul, topik, atau kategori…' : 'Search title, topic, or category…'}
-            className="min-h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 dark:border-white/10 dark:bg-slate-900 dark:text-white dark:focus:ring-emerald-950"
-          />
-        </div>
-        <button type="submit" className="min-h-11 rounded-xl bg-slate-950 px-4 text-sm font-bold text-white dark:bg-white dark:text-slate-950">
-          {isId ? 'Cari' : 'Search'}
-        </button>
-      </form>
-
-      <div className="flex min-h-5 items-center justify-between gap-3 border-b border-slate-100 pb-2 dark:border-white/10">
-        <div className="min-w-0 truncate text-xs font-semibold text-slate-500 dark:text-slate-400">
-          {query ? (isId ? `Hasil untuk “${query}”` : `Results for “${query}”`) : (isId ? 'Berita terbaru' : 'Latest stories')}
-        </div>
-        <div className="shrink-0 text-[10px] font-bold text-slate-400">
-          {items.length} {isId ? 'artikel' : 'articles'}
-        </div>
-      </div>
-
       {!items.length ? (
         <section className="rounded-[24px] border border-dashed border-slate-300 bg-white p-8 text-center dark:border-white/15 dark:bg-slate-900">
           <TrendingUp className="mx-auto h-7 w-7 text-emerald-700 dark:text-emerald-300" />
-          <h2 className="mt-3 text-lg font-bold text-slate-950 dark:text-white">
-            {isId ? 'Belum ada berita untuk filter ini.' : 'No published news for this filter yet.'}
+          <h2 className="mt-3 text-lg font-black text-slate-950 dark:text-white">
+            {isId ? 'Belum ada berita untuk filter ini.' : 'No stories for this filter yet.'}
           </h2>
           <p className="mt-2 text-sm font-semibold text-slate-600 dark:text-slate-300">
-            {isId ? 'Coba kategori atau kata kunci lain.' : 'Try another category or search term.'}
+            {isId ? 'Coba kata kunci atau kategori lain.' : 'Try another keyword or category.'}
           </p>
         </section>
       ) : null}
 
-      {featured ? (
-        <section className="grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_minmax(300px,0.8fr)]">
-          <NewsCard article={featured} locale={locale} variant="hero" priority />
-          <div className="grid gap-2.5">
-            {compact.map(item => (
-              <NewsCard key={item.id} article={item} locale={locale} variant="compact" />
-            ))}
-            {compact.length < 2 ? (
-              <div className="hidden rounded-[20px] border border-dashed border-slate-200 bg-slate-50 p-4 lg:block dark:border-white/10 dark:bg-white/[0.03]" />
-            ) : null}
-          </div>
-        </section>
+      {sliderItems.length ? (
+        <NewsCarousel
+          articles={sliderItems}
+          locale={locale}
+          eyebrow={query ? (isId ? 'Hasil pencarian' : 'Search results') : (isId ? 'Pilihan terbaru' : 'Latest picks')}
+          title={isId ? 'Cerita yang layak dibaca' : 'Stories worth reading'}
+        />
       ) : null}
 
       {grid.length ? (
-        <section className="space-y-3">
-          <div className="flex items-end justify-between gap-3">
+        <section className="mt-8">
+          <div className="mb-3 flex items-end justify-between gap-3">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300">{isId ? 'Arsip terbaru' : 'Latest updates'}</p>
-              <h2 className="mt-1 text-xl font-black tracking-[-0.03em] text-slate-950 dark:text-white">{isId ? 'Lebih banyak berita' : 'More stories'}</h2>
+              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-300">
+                {isId ? 'Lebih banyak' : 'More stories'}
+              </p>
+              <h2 className="mt-1 text-xl font-black tracking-[-0.03em] text-slate-950 dark:text-white">
+                {isId ? 'Berita terbaru lainnya' : 'More from Lajukan News'}
+              </h2>
             </div>
+            <span className="shrink-0 text-[10px] font-bold text-slate-400">
+              {grid.length} {isId ? 'artikel' : 'stories'}
+            </span>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {grid.map(item => <NewsCard key={item.id} article={item} locale={locale} variant="grid" />)}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {grid.map(item => (
+              <NewsCard key={item.id} article={item} locale={locale} variant="grid" />
+            ))}
           </div>
         </section>
       ) : null}
 
       {nextCursor ? (
-        <nav aria-label={isId ? 'Navigasi berita' : 'News navigation'} className="flex justify-center pt-1">
+        <nav aria-label={isId ? 'Navigasi berita' : 'News navigation'} className="flex justify-center pt-5">
           <Link
             href={buildNewsIndexHref({ category, query, cursor: nextCursor })}
             rel="next"
-            className="inline-flex min-h-10 items-center gap-2 rounded-full border border-slate-200 bg-white px-5 text-xs font-bold text-slate-700 transition hover:border-emerald-300 hover:text-emerald-800 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200"
+            className="inline-flex min-h-10 items-center gap-2 rounded-full border border-slate-200 bg-white px-5 text-xs font-black text-slate-700 transition hover:border-emerald-300 hover:text-emerald-800 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200"
           >
-            {isId ? 'Berita berikutnya' : 'Next articles'}
-            <ArrowRight className="h-4 w-4" />
+            {isId ? 'Berita berikutnya' : 'Next stories'}
           </Link>
         </nav>
       ) : null}
