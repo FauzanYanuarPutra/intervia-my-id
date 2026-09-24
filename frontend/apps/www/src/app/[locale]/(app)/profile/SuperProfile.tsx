@@ -2109,7 +2109,7 @@ export default function SuperProfile() {
         <div className="mx-auto w-full max-w-[1120px] space-y-3 px-0 py-0 sm:space-y-4 sm:px-4 sm:py-4 lg:px-5 lg:py-5">
           {/* PROFILE — identity first, like familiar social/business profiles. */}
           <section className="overflow-hidden border-y border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] sm:rounded-[24px] sm:border sm:shadow-[0_18px_48px_-40px_rgba(15,23,42,0.35)]">
-            <div className="relative h-28 overflow-hidden sm:h-36 lg:h-40">
+            <div className="relative h-24 overflow-hidden sm:h-32 lg:h-36">
               {effectiveCoverUrl ? (
                 <NextImage
                   src={effectiveCoverUrl}
@@ -2160,9 +2160,9 @@ export default function SuperProfile() {
               </div>
             </div>
 
-            <div className="relative px-3 pb-4 sm:px-5 sm:pb-5">
-              <div className="-mt-10 flex min-w-0 items-start gap-3 sm:-mt-12 sm:gap-4">
-                <div className="relative h-20 w-20 shrink-0 rounded-full bg-[color:var(--app-surface-muted)] shadow-lg ring-[4px] ring-[color:var(--app-surface-strong)] sm:h-24 sm:w-24">
+            <div className="relative px-3 pb-3.5 sm:px-5 sm:pb-4">
+              <div className="-mt-9 flex min-w-0 items-end gap-3 sm:-mt-11 sm:gap-4">
+                <div className="relative h-[72px] w-[72px] shrink-0 rounded-full bg-[color:var(--app-surface-muted)] shadow-lg ring-[4px] ring-[color:var(--app-surface-strong)] sm:h-[88px] sm:w-[88px]">
                   <div className="absolute inset-0 overflow-hidden rounded-full">
                     <NextImage
                       src={effectiveAvatarUrl}
@@ -2195,8 +2195,8 @@ export default function SuperProfile() {
                   />
                 </div>
 
-                <div className="min-w-0 flex-1 pb-0.5 sm:pb-1.5 pt-10">
-                  <div className="flex min-w-0 items-center gap-1.5 -mb-[10px]">
+                <div className="min-w-0 flex-1 pb-0.5 sm:pb-1.5">
+                  <div className="flex min-w-0 items-center gap-1.5">
                     <h1 className="min-w-0 truncate text-xl font-black leading-tight tracking-[-0.025em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-2xl">
                       {displayName}
                     </h1>
@@ -2223,7 +2223,7 @@ export default function SuperProfile() {
                 </div>
               </div>
 
-              <div className="mt-3 flex min-w-0 flex-wrap items-center gap-1.5 text-[11px] font-semibold text-[color:var(--app-text-soft)] sm:text-xs">
+              <div className="mt-2 flex min-w-0 flex-wrap items-center gap-1.5 text-[11px] font-semibold text-[color:var(--app-text-soft)] sm:text-xs">
                 {location ? (
                   <span className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1">
                     <MapPin className="h-3.5 w-3.5 shrink-0" />
@@ -2233,7 +2233,7 @@ export default function SuperProfile() {
               </div>
 
               {bio ? (
-                <p className="mt-2.5 line-clamp-2 max-w-2xl text-[12px] font-medium leading-5 text-[color:var(--app-text-soft)] sm:text-sm sm:leading-6">
+                <p className="mt-2 line-clamp-2 max-w-2xl text-[12px] font-medium leading-5 text-[color:var(--app-text-soft)] sm:text-sm sm:leading-6">
                   {bio}
                 </p>
               ) : (
@@ -2246,7 +2246,7 @@ export default function SuperProfile() {
                 </button>
               )}
 
-              <div className="mt-3 flex min-w-0 gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div className="mt-2.5 flex min-w-0 gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {trustSignals
                   .filter(item => item.active)
                   .map(item => {
@@ -2273,7 +2273,7 @@ export default function SuperProfile() {
                 ) : null}
               </div>
 
-              <div className="mt-4 grid grid-cols-3 divide-x divide-[color:var(--app-border)] rounded-2xl border border-[color:var(--app-border)] py-2.5 sm:max-w-[560px]">
+              <div className="mt-3 grid grid-cols-3 divide-x divide-[color:var(--app-border)] rounded-2xl border border-[color:var(--app-border)] py-2.5 sm:max-w-[560px]">
                 <LocalizedLink href={ROUTES.manageListings} className="min-w-0 px-2 text-center transition hover:bg-[color:var(--app-surface-muted)] sm:px-4">
                   <span className="block text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
                     {formatCompactNumber(activePostCount, numberLocale)}
@@ -2301,7 +2301,7 @@ export default function SuperProfile() {
                 </LocalizedLink>
               </div>
 
-              <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+              <div className="mt-2.5 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
                 <button
                   type="button"
                   onClick={() => openEditModal('menu')}
@@ -2381,14 +2381,14 @@ export default function SuperProfile() {
 
           {/* OWNER TOOLS — four actions only. */}
           <section className="border-y border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-3 sm:rounded-[24px] sm:border sm:px-5 sm:py-4">
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {quickActions.map(action => {
                 const Icon = action.icon;
                 return (
                   <LocalizedLink
                     key={action.key}
                     href={action.href}
-                    className="group relative flex min-w-0 flex-col items-center gap-1.5 rounded-xl px-1 py-2.5 text-center transition hover:bg-[color:var(--app-surface-muted)]"
+                    className="group relative flex min-w-0 flex-col items-center justify-center gap-1.5 rounded-xl border border-transparent px-2 py-3 text-center transition hover:border-[color:var(--app-border)] hover:bg-[color:var(--app-surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/30"
                   >
                     <span className={cn('relative grid h-10 w-10 place-items-center rounded-xl', quickActionTone[action.key])}>
                       <Icon className="h-[18px] w-[18px]" />
