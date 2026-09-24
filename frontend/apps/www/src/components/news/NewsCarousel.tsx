@@ -5,7 +5,6 @@ import useEmblaCarousel from 'embla-carousel-react';
 import { ArrowLeft, ArrowRight, Clock3, MapPin } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import type { LajukanNewsArticle } from '@/lib/news';
-import { buildNewsPath } from '@/lib/news';
 import { NewsMedia } from '@/components/news/NewsMedia';
 
 function formatDate(value: string, locale: string) {
@@ -112,7 +111,7 @@ export function NewsCarousel({
               className={\`min-w-0 shrink-0 grow-0 pl-3 \${related ? 'basis-[86%] sm:basis-1/2 xl:basis-1/3' : 'basis-[94%] sm:basis-[72%] lg:basis-[58%]'}\`}
             >
               <Link
-                href={buildNewsPath(article.slug)}
+                href={'/news/' + article.slug}
                 className="group block h-full overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_18px_44px_-34px_rgba(15,23,42,0.28)] transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-[0_22px_48px_-32px_rgba(15,23,42,0.32)] dark:border-white/10 dark:bg-slate-900"
               >
                 <div className="relative">
