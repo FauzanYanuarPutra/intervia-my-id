@@ -1647,8 +1647,8 @@ export function UmkmStoreMapClient({
       doubleClickZoom={interactive}
       boxZoom={interactive}
       keyboard={interactive}
-      zoomControl={controls}
-      className={`${className || 'h-[360px] w-full rounded-3xl'} max-w-full`}
+      zoomControl={false}
+      className={`umkm-leaflet-map ${className || 'h-[360px] w-full rounded-3xl'} max-w-full`}
       attributionControl={false}
     >
       <MapSizeStabilizer />
