@@ -1122,6 +1122,27 @@ fn validate_community_migration_versions(
     }
 }
 
+
+fn build_community_forward_migrator() -> anyhow::Result<sqlx::migrate::Migrator> {
+    let embedded = sqlx::migrate!("./migrations");
+    validate_community_migration_versions(&embedded)?;
+
+    // Startup only applies migrations forward. Keep down migrations available
+    // in the repository for explicit rollback tooling, but do not feed them to
+    // the runtime Migrator used by the migration container.
+    let forward_migrations = embedded
+        .iter()
+        .filter(|migration| !migration.migration_type.is_down_migration())
+        .cloned()
+        .collect::<Vec<_>>();
+
+    if forward_migrations.is_empty() {
+        anyhow::bail!("community_service has no executable forward migrations");
+    }
+
+    Ok(sqlx::migrate::Migrator::with_migrations(forward_migrations))
+}
+
 fn init_tracing() {
     let app_env = env::var("ENV")
         .or_else(|_| env::var("APP_ENV"))
@@ -1202,16 +1223,15 @@ async fn main() -> anyhow::Result<()> {
             .unwrap_or(!strict_migrations);
 
     if run_migrations_on_startup {
-        let mut migrator = sqlx::migrate!("./migrations");
-        validate_community_migration_versions(&migrator)?;
-        let migration_db =
+        let mut migrator = build_community_forward_migrator()?;
+        let mut migration_db =
             connect_database_pool(&database_url, DatabasePoolPurpose::Migration).await?;
         if !strict_migrations {
             migrator.set_ignore_missing(true);
         }
 
         let mut migration_error = None;
-        for attempt in 1..=5u32 {
+        for attempt in 1..=10u32 {
             match migrator.run(&migration_db).await {
                 Ok(()) => {
                     migration_error = None;
@@ -1223,20 +1243,26 @@ async fn main() -> anyhow::Result<()> {
                         message.contains("duplicate key value violates unique constraint")
                             && message.contains("_sqlx_migrations_pkey");
 
-                    if concurrent_migration_conflict && attempt < 5 {
+                    if concurrent_migration_conflict && attempt < 10 {
                         let delay_ms = match attempt {
                             1 => 250,
-                            2 => 750,
-                            3 => 1_500,
-                            _ => 3_000,
+                            2 => 500,
+                            3 => 1_000,
+                            4 => 1_500,
+                            _ => 2_000,
                         };
                         tracing::warn!(
-                            "Community migration hit a concurrent _sqlx_migrations conflict; retrying attempt={} retry_in_ms={} error={}",
+                            "Community migration hit a _sqlx_migrations conflict; refreshing the dedicated migration connection and retrying attempt={} retry_in_ms={} error={}",
                             attempt,
                             delay_ms,
                             message
                         );
+
+                        migration_db.close().await;
                         tokio::time::sleep(Duration::from_millis(delay_ms)).await;
+                        migration_db =
+                            connect_database_pool(&database_url, DatabasePoolPurpose::Migration)
+                                .await?;
                         continue;
                     }
 
