@@ -1486,7 +1486,7 @@ export function UmkmStoreMapClient({
   // provider. Do not allow an environment override to accidentally point at
   // a key-gated provider such as CARTO.
   const tileUrl = activeTheme.url;
-  const tileAttribution = normalizeMapAttribution(activeTheme.attribution);
+  const tileAttribution = activeTheme.attribution;
   const validViewerLocation = hasValidLatLng(viewerLocation)
     ? viewerLocation
     : null;
