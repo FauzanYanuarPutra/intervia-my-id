@@ -2433,6 +2433,9 @@ export default function PublicProfileClient({
                       ? 'Pilih satu jenis untuk menyaring postingan profil ini.'
                       : 'Choose one type to filter this profile storefront.'
                   }
+                  mobileDoneLabel={localeCode === 'id' ? 'Selesai' : 'Done'}
+                  mobileCloseLabel={localeCode === 'id' ? 'Tutup' : 'Close'}
+                  mobileCountSuffix={localeCode === 'id' ? 'item' : 'items'}
                   items={availableContentTabs.map(tab => ({
                     key: tab,
                     label: tab === 'all' ? copy.all : getProfileContentTabLabel(tab, localeCode),
