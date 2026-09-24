@@ -1080,61 +1080,33 @@ async fn connect_database_pool(
 fn validate_community_migration_versions(
     migrator: &sqlx::migrate::Migrator,
 ) -> anyhow::Result<()> {
-    #[derive(Default)]
-    struct MigrationVersionState {
-        up: Vec<String>,
-        down: Vec<String>,
-        simple: Vec<String>,
-    }
-
-    let mut versions = HashMap::<i64, MigrationVersionState>::new();
+    // Validate the set SQLx will execute forward. Legacy community history
+    // contains valid up-only migrations, while reversible migrations may also
+    // expose down entries depending on the migration source.
+    let mut versions = HashMap::<i64, Vec<String>>::new();
 
     for migration in migrator.iter() {
-        let entry = versions.entry(migration.version).or_default();
-        let label = format!("{} ({:?})", migration.description, migration.migration_type);
-
-        if migration.migration_type.is_up_migration() {
-            entry.up.push(label);
-        } else if migration.migration_type.is_down_migration() {
-            entry.down.push(label);
-        } else {
-            entry.simple.push(label);
+        if migration.migration_type.is_down_migration() {
+            continue;
         }
+
+        versions
+            .entry(migration.version)
+            .or_default()
+            .push(format!("{} ({:?})", migration.description, migration.migration_type));
     }
 
     let mut invalid = versions
         .into_iter()
-        .filter_map(|(version, state)| {
-            let has_reversible = !state.up.is_empty() || !state.down.is_empty();
-            let duplicate_up = state.up.len() > 1;
-            let duplicate_down = state.down.len() > 1;
-            let mixed_simple_and_reversible =
-                !state.simple.is_empty() && has_reversible;
-            let incomplete_reversible =
-                !state.up.is_empty() && state.down.is_empty()
-                    || state.up.is_empty() && !state.down.is_empty();
-
-            if !(duplicate_up
-                || duplicate_down
-                || mixed_simple_and_reversible
-                || incomplete_reversible
-                || state.simple.len() > 1)
-            {
+        .filter_map(|(version, migrations)| {
+            if migrations.len() <= 1 {
                 return None;
             }
 
-            let mut parts = Vec::new();
-            if !state.simple.is_empty() {
-                parts.push(format!("simple=[{}]", state.simple.join(", ")));
-            }
-            if !state.up.is_empty() {
-                parts.push(format!("up=[{}]", state.up.join(", ")));
-            }
-            if !state.down.is_empty() {
-                parts.push(format!("down=[{}]", state.down.join(", ")));
-            }
-
-            Some(format!("version {version}: {}", parts.join("; ")))
+            Some(format!(
+                "version {version}: [{}]",
+                migrations.join(", "),
+            ))
         })
         .collect::<Vec<_>>();
 
@@ -1144,8 +1116,8 @@ fn validate_community_migration_versions(
         Ok(())
     } else {
         anyhow::bail!(
-            "invalid SQLx migration version(s) embedded in community_service: {}.              Each version must be either one simple .sql migration or exactly one matching .up.sql/.down.sql pair.",
-            invalid.join("; ")
+            "duplicate SQLx migration version(s) embedded in community_service: {}. Each executable migration version must be unique.",
+            invalid.join("; "),
         );
     }
 }
