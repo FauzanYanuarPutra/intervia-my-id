@@ -1762,8 +1762,8 @@ export function UmkmDiscoveryPanel({
             y:
               !canUseDesktopMapPanel && !mapOnly
                 ? sheetExpanded
-                  ? -190
-                  : -60
+                  ? -140
+                  : -48
                 : 0,
           }
         : undefined;
@@ -1998,6 +1998,19 @@ export function UmkmDiscoveryPanel({
                       : `${selectedPlace.store.name} business details`
                 }
               >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedStoreId(null);
+                    setShowRoute(false);
+                    setRouteSummary(null);
+                    setMapFocusMode('stores');
+                    setMapFocusNonce(current => current + 1);
+                  }}
+                  className="mb-2 inline-flex min-h-7 items-center rounded-full bg-slate-100 px-2.5 text-[10px] font-semibold text-slate-600 transition hover:bg-slate-200 hover:text-slate-900 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+                >
+                  {isId ? '← Kembali ke hasil' : '← Back to results'}
+                </button>
                 <article
                   className="space-y-3 bg-transparent p-0 shadow-none ring-0"
                   data-testid={
