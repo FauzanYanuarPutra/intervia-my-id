@@ -444,20 +444,7 @@ export function MapQuickControls({
         >
           <Route className="h-3 w-3" />
         </button>
-        {onCycleTheme ? (
-          <button
-            type="button"
-            onClick={() => runAction(onCycleTheme, 'CYCLE_THEME')}
-            className={cn(
-              iconButtonClassName,
-              'border-white/80 bg-white/92 text-slate-700 hover:text-[color:var(--app-accent)]',
-            )}
-            title={`${isId ? 'Tema peta' : 'Map theme'}${themeLabel ? `: ${themeLabel}` : ''}`}
-            aria-label={`${isId ? 'Tema peta' : 'Map theme'}${themeLabel ? `: ${themeLabel}` : ''}`}
-          >
-            <Layers3 className="h-3 w-3" />
-          </button>
-        ) : null}
+
       </div>
     </div>
   );
