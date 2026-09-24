@@ -1035,15 +1035,7 @@ async fn connect_database_pool(
         DatabasePoolPurpose::Migration => PgPoolOptions::new()
             .max_connections(1)
             .min_connections(0)
-            .acquire_timeout(Duration::from_secs(30))
-            .after_connect(|conn, _meta| {
-                Box::pin(async move {
-                    sqlx::query("SELECT pg_advisory_lock(725384901234567890)")
-                        .execute(conn)
-                        .await?;
-                    Ok(())
-                })
-            }),
+            .acquire_timeout(Duration::from_secs(30)),
         DatabasePoolPurpose::Application => {
             let max_connections = env_u32_bounded("COMMUNITY_DB_MAX_CONNECTIONS", 20, 2, 100);
             let min_connections =
@@ -1122,26 +1114,6 @@ fn validate_community_migration_versions(
     }
 }
 
-
-fn build_community_forward_migrator() -> anyhow::Result<sqlx::migrate::Migrator> {
-    let embedded = sqlx::migrate!("./migrations");
-    validate_community_migration_versions(&embedded)?;
-
-    // Startup only applies migrations forward. Keep down migrations available
-    // in the repository for explicit rollback tooling, but do not feed them to
-    // the runtime Migrator used by the migration container.
-    let forward_migrations = embedded
-        .iter()
-        .filter(|migration| !migration.migration_type.is_down_migration())
-        .cloned()
-        .collect::<Vec<_>>();
-
-    if forward_migrations.is_empty() {
-        anyhow::bail!("community_service has no executable forward migrations");
-    }
-
-    Ok(sqlx::migrate::Migrator::with_migrations(forward_migrations))
-}
 
 fn init_tracing() {
     let app_env = env::var("ENV")
@@ -1223,15 +1195,16 @@ async fn main() -> anyhow::Result<()> {
             .unwrap_or(!strict_migrations);
 
     if run_migrations_on_startup {
-        let mut migrator = build_community_forward_migrator()?;
-        let mut migration_db =
+        let mut migrator = sqlx::migrate!("./migrations");
+        validate_community_migration_versions(&migrator)?;
+        let migration_db =
             connect_database_pool(&database_url, DatabasePoolPurpose::Migration).await?;
         if !strict_migrations {
             migrator.set_ignore_missing(true);
         }
 
         let mut migration_error = None;
-        for attempt in 1..=10u32 {
+        for attempt in 1..=3u32 {
             match migrator.run(&migration_db).await {
                 Ok(()) => {
                     migration_error = None;
@@ -1243,26 +1216,18 @@ async fn main() -> anyhow::Result<()> {
                         message.contains("duplicate key value violates unique constraint")
                             && message.contains("_sqlx_migrations_pkey");
 
-                    if concurrent_migration_conflict && attempt < 10 {
+                    if concurrent_migration_conflict && attempt < 3 {
                         let delay_ms = match attempt {
-                            1 => 250,
-                            2 => 500,
-                            3 => 1_000,
-                            4 => 1_500,
-                            _ => 2_000,
+                            1 => 500,
+                            _ => 1_500,
                         };
                         tracing::warn!(
-                            "Community migration hit a _sqlx_migrations conflict; refreshing the dedicated migration connection and retrying attempt={} retry_in_ms={} error={}",
+                            "Community migration hit _sqlx_migrations conflict; retrying with native SQLx migrator attempt={} retry_in_ms={} error={}",
                             attempt,
                             delay_ms,
                             message
                         );
-
-                        migration_db.close().await;
                         tokio::time::sleep(Duration::from_millis(delay_ms)).await;
-                        migration_db =
-                            connect_database_pool(&database_url, DatabasePoolPurpose::Migration)
-                                .await?;
                         continue;
                     }
 
