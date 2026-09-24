@@ -20,6 +20,8 @@ type ProfileFilterStripProps<T extends string> = {
   mobileLabel?: string;
   mobileTitle?: string;
   mobileDescription?: string;
+  mobileDoneLabel?: string;
+  mobileCloseLabel?: string;
 };
 
 export function ProfileFilterStrip<T extends string>({
@@ -31,6 +33,8 @@ export function ProfileFilterStrip<T extends string>({
   mobileLabel = 'Filter',
   mobileTitle = 'Pilih filter',
   mobileDescription = 'Tampilkan jenis konten yang ingin kamu lihat.',
+  mobileDoneLabel = 'Selesai',
+  mobileCloseLabel = 'Tutup',
 }: ProfileFilterStripProps<T>) {
   const [open, setOpen] = useState(false);
   const activeItem = items.find(item => item.key === activeKey) || items[0];
@@ -149,7 +153,7 @@ export function ProfileFilterStrip<T extends string>({
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                aria-label="Tutup"
+                aria-label={mobileCloseLabel}
                 className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] transition hover:text-[color:var(--app-text)]"
               >
                 <X className="h-4 w-4" />
@@ -204,7 +208,7 @@ export function ProfileFilterStrip<T extends string>({
                 onClick={() => setOpen(false)}
                 className="inline-flex min-h-10 w-full items-center justify-center rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-4 text-xs font-black text-[color:var(--app-text)] transition hover:bg-emerald-50"
               >
-                Selesai
+                {mobileDoneLabel}
               </button>
             </div>
           </div>
