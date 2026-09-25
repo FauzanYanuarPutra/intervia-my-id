@@ -317,6 +317,7 @@ struct FeedQuery {
     thread: Option<String>,
     category: Option<String>,
     tag: Option<String>,
+    group: Option<String>,
     cursor: Option<i64>,
     limit: Option<i64>,
 }
@@ -4361,6 +4362,7 @@ async fn list_threads(
     let page_size = query.page_size.unwrap_or(12).clamp(1, MAX_PAGE_SIZE);
     let offset = (page - 1) * page_size;
     let category = clean_optional(query.category);
+    let group = clean_optional(query.group);
     let tag = clean_optional(query.tag).map(|value| normalize_tag_slug(&value));
     let status = clean_optional(query.status);
     let q = clean_optional(query.q);
@@ -6364,7 +6366,7 @@ async fn list_reels(
             )
           )
         ORDER BY r.published_at DESC, r.id ASC
-        LIMIT $8 OFFSET $9
+        LIMIT $9 OFFSET $10
         "#,
     )
     .bind(q.as_deref())
@@ -7990,6 +7992,8 @@ async fn get_community_feed(
             )
             AND ($4::text IS NULL OR c.slug ILIKE '%community%')
 
+            AND ($8::text IS NULL OR t.group_id = $8 OR g.id = $8 OR g.slug = $8)
+
             AND (
                 t.group_id IS NULL OR
                 (
@@ -8048,6 +8052,7 @@ async fn get_community_feed(
     .bind(viewer_id.as_deref())
     .bind(actor.as_ref().is_some_and(is_moderator))
     .bind(requested_thread.as_deref())
+    .bind(group.as_deref())
     .bind(limit)
     .bind(cursor)
     .fetch_all(&state.db)
