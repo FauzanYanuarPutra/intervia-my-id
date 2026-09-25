@@ -1514,6 +1514,3035 @@ export function TrendingSearchSection({ isId }: { isId: boolean }) {
   );
 }
 
+// Restored shared home navigation primitives retained by the responsive marketplace shell.
+const QUICK_CATEGORY_UI: Record<QuickCategoryUiId, QuickCategoryUiConfig> = {
+  equipment: {
+    tone: 'emerald',
+    flip: true,
+    scale: 1,
+    rotate: -5,
+    offsetX: -20,
+    offsetY: -16,
+    imageSize: 70,
+  },
+  supplies: {
+    tone: 'orange',
+    flip: true,
+    scale: 1,
+    rotate: -5,
+    offsetX: -20,
+    offsetY: -16,
+    imageSize: 70,
+  },
+  service: {
+    tone: 'violet',
+    flip: true,
+    scale: 1,
+    rotate: -5,
+    offsetX: -20,
+    offsetY: -16,
+    imageSize: 70,
+  },
+  property: {
+    tone: 'rose',
+    flip: false,
+    scale: 1,
+    rotate: 5,
+    offsetX: -24,
+    offsetY: -16,
+    imageSize: 70,
+  },
+  opportunity: {
+    tone: 'cyan',
+    flip: false,
+    scale: 1,
+    rotate: 5,
+    offsetX: -24,
+    offsetY: -16,
+    imageSize: 70,
+  },
+  community: {
+    tone: 'amber',
+    flip: false,
+    scale: 1.2,
+    rotate: 5,
+    offsetX: -24,
+    offsetY: -16,
+    imageSize: 70,
+  },
+  video: {
+    tone: 'lime',
+    flip: false,
+    scale: 1.2,
+    rotate: 5,
+    offsetX: -24,
+    offsetY: -16,
+    imageSize: 70,
+  },
+  all: {
+    tone: 'blue',
+    flip: false,
+    scale: 1.08,
+    rotate: 3,
+    offsetX: -24,
+    offsetY: -16,
+    imageSize: 70,
+  },
+};
+
+
+export function getQuickCategories(isId: boolean): QuickCategory[] {
+  const categories = LAJUKAN_EXPLORE_CATEGORIES.map(category => ({
+    id: category.id,
+    label: isId ? category.labelId : category.labelEn,
+    description: isId ? category.descriptionId : category.descriptionEn,
+    href:
+      category.id === 'community'
+        ? '/community'
+        : category.id === 'video'
+          ? '/reels'
+          : buildExploreCategoryHref(category),
+    image: category.image,
+    badge: isId ? category.badge.labelId : category.badge.labelEn,
+    ...QUICK_CATEGORY_UI[category.id],
+  }));
+
+  return [
+    ...categories,
+    {
+      id: 'all',
+      label: isId ? 'Semua' : 'All',
+      description: isId
+        ? 'Lihat semua kategori, kebutuhan, dan peluang usaha.'
+        : 'Browse every category, business need, and opportunity.',
+      href: '/explore',
+      image: '/images/hero/menu/semua-01.png',
+      badge: isId ? 'Semua' : 'All',
+      ...QUICK_CATEGORY_UI.all,
+    },
+  ];
+}
+
+type CommunityTabItem = {
+  id: CommunityTab;
+  label: string;
+  emptyLabel: string;
+  icon: LucideIcon;
+};
+
+
+function getCommunityTabs(isId: boolean): CommunityTabItem[] {
+  return [
+    {
+      id: 'for-you',
+      label: isId ? 'Untukmu' : 'For you',
+      emptyLabel: isId
+        ? 'Belum ada diskusi yang direkomendasikan.'
+        : 'No recommended discussions yet.',
+      icon: MessageCircle,
+    },
+    {
+      id: 'community',
+      label: isId ? 'Grup' : 'Groups',
+      emptyLabel: isId
+        ? 'Belum ada diskusi grup untuk ditampilkan.'
+        : 'No group discussions to show yet.',
+      icon: Users,
+    },
+  ];
+}
+
+
+function DesktopSidebar({
+  pathname,
+  items,
+  inviteTitle,
+  inviteDescription,
+  inviteButton,
+  inviteHref,
+}: {
+  pathname: string;
+  items: { primary: SidebarItem[]; secondary: SidebarItem[] };
+  inviteTitle: string;
+  inviteDescription: string;
+  inviteButton: string;
+  inviteHref: string;
+}) {
+  const currentPath = normalizePathname(pathname);
+  const primaryItems = items.primary.slice(0, 6);
+  const secondaryItems = items.secondary.slice(0, 3);
+
+  const isItemActive = (item: SidebarItem) => {
+    const itemPath = item.href.split('?')[0];
+    return itemPath === '/home'
+      ? currentPath === '/home' || currentPath === '/'
+      : currentPath === itemPath || currentPath.startsWith(`${itemPath}/`);
+  };
+
+  const renderSidebarItem = (item: SidebarItem, compact = false) => {
+    const Icon = item.icon;
+    const active = isItemActive(item);
+
+    return (
+      <Link
+        key={item.id}
+        href={item.href}
+        title={item.caption}
+        aria-current={active ? 'page' : undefined}
+        className={cn(
+          'flex items-center gap-2.5 rounded-[14px] px-2.5 transition',
+          compact ? 'min-h-[40px] py-1.5' : 'min-h-[44px] py-2',
+          active
+            ? 'bg-emerald-50 text-emerald-700'
+            : 'text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-surface-muted)] hover:text-[color:var(--app-text)]',
+        )}
+      >
+        <span
+          className={cn(
+            'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[11px]',
+            active
+              ? 'bg-white text-emerald-600'
+              : 'bg-slate-50 text-[color:var(--app-text-soft)]',
+          )}
+        >
+          <Icon className="h-4.5 w-4.5" />
+        </span>
+        <span className="flex min-w-0 flex-1 items-center gap-2">
+          <span className="truncate text-xs font-semibold">{item.label}</span>
+          {item.locked ? (
+            <LockKeyhole className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+          ) : null}
+          {item.badge ? (
+            <span className="ml-auto rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold text-white">
+              {item.badge}
+            </span>
+          ) : null}
+        </span>
+      </Link>
+    );
+  };
+
+  return (
+    <aside className="hidden lg:block lg:h-full lg:min-h-0 lg:overflow-hidden">
+      <div
+        className="flex h-full max-h-full min-h-0 flex-col gap-3 overflow-y-auto overscroll-contain pb-6 pr-1"
+        data-auto-scrollbar
+      >
+        <nav className="shrink-0 rounded-[22px] p-2.5">
+          <div className="space-y-1">
+            {primaryItems.map(item => renderSidebarItem(item))}
+          </div>
+          {secondaryItems.length > 0 ? (
+            <>
+              <div className="my-2 h-px bg-[color:var(--app-border)]" />
+              <div className="space-y-1">
+                {secondaryItems.map(item => renderSidebarItem(item, true))}
+              </div>
+            </>
+          ) : null}
+        </nav>
+        <div className="m-2 shrink-0 overflow-hidden rounded-[20px] border border-emerald-100 bg-emerald-50/70 p-3 shadow-[0_18px_36px_-32px_rgba(22,163,74,0.22)]">
+          <h3 className="line-clamp-1 text-[0.85rem] font-bold tracking-[-0.03em] text-[color:var(--app-text)]">
+            {inviteTitle}
+          </h3>
+          <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-[color:var(--app-text-soft)]">
+            {inviteDescription}
+          </p>
+          <Link
+            href={inviteHref}
+            className="mt-2 inline-flex min-h-[36px] w-full items-center justify-center rounded-[13px] bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-3 text-xs font-semibold text-[color:var(--app-text-inverse)]"
+          >
+            {inviteButton}
+          </Link>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+
+function HeroVisualStage({
+  isId,
+  className,
+  query,
+  onQueryChange,
+  onSubmit,
+  onOpenFilters,
+}: {
+  isId: boolean;
+  className?: string;
+  query: string;
+  onQueryChange: (value: string) => void;
+  onSubmit: (submittedQuery: string) => void;
+  onOpenFilters: () => void;
+}) {
+  const { user, isAuthenticated } = useAuth();
+
+  const displayName =
+    user?.username ||
+    user?.fullName ||
+    user?.full_name ||
+    'Sobat Bisnis';
+
+  const heroCategories = LAJUKAN_EXPLORE_CATEGORIES.slice(0, 5);
+
+  return (
+    <section
+      className={cn(
+        'mx-auto w-full max-w-7xl px-0 pb-4 pt-2 sm:pb-5 sm:pt-3',
+        className,
+      )}
+      aria-labelledby="home-main-heading"
+    >
+      <div
+        className={cn(
+          'relative isolate overflow-hidden rounded-[28px] border border-emerald-100',
+          'bg-[linear-gradient(135deg,#f0fdf4_0%,#ecfdf5_54%,#ffffff_100%)]',
+          'px-3.5 py-4 sm:px-6 sm:py-5 lg:px-8 lg:py-6',
+          'dark:border-emerald-900/60',
+          'dark:bg-[linear-gradient(135deg,#09090b_0%,#071510_58%,#09090b_100%)]',
+        )}
+      >
+        {!isAuthenticated ? (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 right-0 z-0 hidden w-[58%] sm:block"
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-[#f0fdf4] via-[#f0fdf4]/88 to-transparent dark:from-[#09090b] dark:via-[#09090b]/90" />
+            <div className="absolute inset-y-3 right-3 grid w-[44%] grid-cols-2 gap-2 opacity-[0.16] blur-[0.2px] grayscale-[0.15] sm:inset-y-4 sm:right-4">
+              {heroCategories.slice(0, 4).map(category => (
+                <div
+                  key={category.id}
+                  className="overflow-hidden rounded-2xl border border-white/70 bg-white/40 shadow-sm dark:border-white/5 dark:bg-white/5"
+                >
+                  <Image
+                    src={category.image}
+                    alt=""
+                    width={220}
+                    height={160}
+                    className="h-full w-full object-cover"
+                    sizes="180px"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        <div className="relative z-10">
+          {isAuthenticated ? (
+            <div className="max-w-3xl">
+              <p className="mb-1 text-[10px] font-extrabold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-400 sm:text-xs">
+                {isId ? 'Selamat datang kembali' : 'Welcome back'}
+              </p>
+              <h1
+                id="home-main-heading"
+                className="text-[clamp(1.4rem,3vw,2.4rem)] font-black leading-[1] tracking-[-0.055em] text-zinc-950 dark:text-white"
+              >
+                {isId ? 'Halo, ' : 'Hi, '}
+                <span className="text-emerald-700 dark:text-emerald-400">
+                  {displayName}
+                </span>
+                <span aria-hidden="true"> 👋</span>
+              </h1>
+              <p className="mt-2 max-w-2xl text-xs font-semibold leading-5 text-zinc-700 dark:text-zinc-300 sm:text-sm sm:leading-6">
+                {isId
+                  ? 'Cari produk, supplier, jasa, bahan usaha, mesin, tempat usaha, dan peluang yang cocok untuk kebutuhan bisnismu.'
+                  : 'Find products, suppliers, services, business supplies, equipment, places, and opportunities that fit your business.'}
+              </p>
+            </div>
+          ) : (
+            <div className="max-w-3xl">
+              <p className="mb-1.5 text-[10px] font-extrabold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-400 sm:text-xs">
+                {isId
+                  ? 'Tempat cari kebutuhan usaha'
+                  : 'Find what your business needs'}
+              </p>
+              <h1
+                id="home-main-heading"
+                className="max-w-[760px] text-[clamp(1.45rem,4vw,2.55rem)] font-black leading-[1.02] tracking-[-0.055em] text-zinc-950 dark:text-white"
+              >
+                {isId ? (
+                  <>
+                    Cari supplier, jasa, mesin,{' '}
+                    <span className="text-emerald-700 dark:text-emerald-400">
+                      bahan & kebutuhan usaha.
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    Find suppliers, services, equipment,{' '}
+                    <span className="text-emerald-700 dark:text-emerald-400">
+                      materials & business needs.
+                    </span>
+                  </>
+                )}
+              </h1>
+              <p className="mt-2 max-w-2xl text-[11px] font-medium leading-5 text-zinc-700 dark:text-zinc-300 sm:text-[13px] sm:leading-5">
+                {isId
+                  ? 'Temukan bahan usaha, supplier, jasa profesional, mesin, tempat usaha, dan peluang bisnis dari berbagai daerah di Indonesia.'
+                  : 'Find business supplies, suppliers, professional services, equipment, business places, and opportunities across Indonesia.'}
+              </p>
+              <div className="mt-3 flex min-w-0 items-center gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {heroCategories.map(category => (
+                  <Link
+                    key={category.id}
+                    href={buildExploreCategoryHref(category)}
+                    className="inline-flex min-h-8 shrink-0 items-center rounded-full border border-white/80 bg-white/75 px-2.5 text-[10px] font-bold text-zinc-700 shadow-sm backdrop-blur transition hover:border-emerald-300 hover:bg-white hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 dark:border-white/10 dark:bg-zinc-900/70 dark:text-zinc-300 dark:hover:border-emerald-800 dark:hover:bg-zinc-900 dark:hover:text-emerald-300 sm:min-h-9 sm:px-3 sm:text-[11px]"
+                  >
+                    {isId ? category.shortLabelId : category.shortLabelEn}
+                  </Link>
+                ))}
+                <Link
+                  href={UMKM_DISCOVERY_PATH + '?view=map'}
+                  className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-full border border-blue-200 bg-blue-50/85 px-2.5 text-[10px] font-bold text-blue-700 shadow-sm backdrop-blur transition hover:border-blue-300 hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:border-blue-900/60 dark:bg-blue-950/50 dark:text-blue-300 dark:hover:bg-blue-950/80 sm:min-h-9 sm:px-3 sm:text-[11px]"
+                >
+                  <MapPin className="h-3 w-3" aria-hidden="true" />
+                  {isId ? 'Usaha sekitar' : 'Nearby'}
+                </Link>
+              </div>
+            </div>
+          )}
+
+          <form
+            role="search"
+            aria-label={isId ? 'Cari kebutuhan usaha' : 'Search business needs'}
+            onSubmit={event => {
+              event.preventDefault();
+              onSubmit(query.trim());
+            }}
+            className="mt-4 flex h-12 w-full max-w-4xl items-center gap-2 rounded-2xl border border-zinc-200 bg-white/95 px-3 shadow-[0_18px_45px_-28px_rgba(15,23,42,0.45)] backdrop-blur transition focus-within:border-emerald-400 focus-within:shadow-[0_20px_50px_-28px_rgba(5,150,105,0.32)] sm:h-13 sm:px-3.5 dark:border-zinc-700 dark:bg-zinc-900/95"
+          >
+            <Search className="h-4 w-4 shrink-0 text-emerald-600 sm:h-5 sm:w-5 dark:text-emerald-400" aria-hidden="true" />
+            <input
+              type="search"
+              name="q"
+              enterKeyHint="search"
+              autoComplete="off"
+              value={query}
+              onChange={event => onQueryChange(event.target.value)}
+              placeholder={
+                isAuthenticated
+                  ? isId
+                    ? 'Cari apa yang kamu butuhkan hari ini...'
+                    : 'What do you need today?'
+                  : isId
+                    ? 'Cari supplier, produk, jasa, mesin...'
+                    : 'Search suppliers, products, services...'
+              }
+              className="min-w-0 flex-1 bg-transparent text-sm font-semibold text-zinc-900 outline-none placeholder:text-zinc-400 dark:text-white dark:placeholder:text-zinc-500"
+            />
+            <button
+              type="submit"
+              className="hidden h-9 shrink-0 items-center justify-center rounded-xl bg-emerald-600 px-4 text-xs font-extrabold text-white transition hover:bg-emerald-700 active:scale-[0.98] sm:inline-flex"
+            >
+              {isId ? 'Cari' : 'Search'}
+            </button>
+            <button
+              type="button"
+              onClick={onOpenFilters}
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900 sm:h-9 sm:w-9 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white"
+              aria-label={isId ? 'Filter pencarian' : 'Search filters'}
+            >
+              <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </form>
+        </div>
+      </div>
+
+      {!isAuthenticated ? (
+        <p className="mx-auto mt-1.5 max-w-3xl px-3 text-center text-[10px] font-medium leading-4 text-zinc-500 sm:hidden dark:text-zinc-400">
+          {isId
+            ? 'Bahan • Supplier • Jasa • Mesin • Tempat Usaha • Peluang'
+            : 'Materials • Suppliers • Services • Equipment • Places • Opportunities'}
+        </p>
+      ) : null}
+    </section>
+  );
+}
+function GameProgressLoadingSkeleton({ compact = false }: { compact?: boolean }) {
+  return (
+    <section
+      className={cn(
+        'relative overflow-hidden rounded-2xl border border-zinc-100 bg-white text-[color:var(--app-text)] shadow-[0_8px_24px_-20px_rgba(15,23,42,0.24)] dark:border-zinc-800/80 dark:bg-zinc-950 dark:text-zinc-50',
+        compact ? 'px-3.5 py-3.5' : 'p-4',
+      )}
+      aria-busy="true"
+      data-skeleton-card="game-progress"
+    >
+      <div className="flex min-w-0 items-center gap-3">
+        <Skeleton className="h-11 w-11 shrink-0 rounded-[13px]" />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <Skeleton variant="line" className="h-4 w-20" />
+            <Skeleton variant="line" className="h-3 w-16" />
+          </div>
+          <Skeleton className="mt-2 h-2 w-full rounded-full" />
+        </div>
+      </div>
+      <div className={cn(
+        'mt-3 grid overflow-hidden rounded-xl border border-zinc-100 bg-zinc-50/70 dark:border-zinc-800 dark:bg-zinc-900/40',
+        compact ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2 sm:grid-cols-4',
+      )}>
+        {Array.from({ length: 4 }).map((_, index) => (
+          <div
+            key={index}
+            className={cn(
+              'min-w-0 px-3 py-2.5',
+              index > 0 && 'border-l border-zinc-100 dark:border-zinc-800',
+              index > 1 && 'border-t sm:border-t-0',
+            )}
+          >
+            <Skeleton variant="line" className="h-3 w-16" />
+            <Skeleton variant="line" className="mt-2 h-4 w-24 max-w-full" />
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function GameProgressCard({
+  isId,
+  isAuthenticated,
+  authLoading = false,
+  summary,
+  walletAmountLabel,
+  walletModeLabel,
+  walletLoading = false,
+  compact = false,
+}: {
+  isId: boolean;
+  isAuthenticated: boolean;
+  authLoading?: boolean;
+  summary: LajukanSummary | null;
+  walletAmountLabel?: string | null;
+  walletModeLabel?: string | null;
+  walletLoading?: boolean;
+  compact?: boolean;
+}) {
+  if (PROMO_ONLY_MODE) {
+    return null;
+  }
+
+  if (authLoading) {
+    return <GameProgressLoadingSkeleton compact={compact} />;
+  }
+
+  if (!isAuthenticated) {
+    if (compact) {
+      return (
+        <section
+          className="relative overflow-hidden rounded-[14px] border border-emerald-200/80 bg-white/95 px-2.5 py-2.5 text-[color:var(--app-text)] shadow-[0_8px_22px_-20px_rgba(15,23,42,0.24)] dark:border-emerald-900/70 dark:bg-zinc-950/95 dark:text-white"
+          data-layout="guest-compact"
+        >
+          <div className="relative flex min-w-0 items-center gap-2.5">
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] bg-emerald-600 text-white shadow-sm">
+              <LockKeyhole className="h-4 w-4" />
+            </span>
+
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-black leading-4 text-zinc-900 dark:text-white">
+                {isId ? 'Masuk untuk simpan progres' : 'Log in to save your progress'}
+              </p>
+              <p className="mt-0.5 truncate text-[10px] font-medium leading-4 text-zinc-500 dark:text-zinc-400">
+                {isId
+                  ? 'XP, streak, saldo, chat, dan transaksi akan tersimpan.'
+                  : 'XP, streak, wallet, chats, and transactions will be saved.'}
+              </p>
+            </div>
+
+            <Link
+              href="/login"
+              className="ui-pressable inline-flex h-8 shrink-0 items-center justify-center rounded-[9px] bg-emerald-600 px-3 text-[10px] font-extrabold text-white transition hover:bg-emerald-700 active:scale-95"
+            >
+              {isId ? 'Masuk' : 'Login'}
+            </Link>
+          </div>
+        </section>
+      );
+    }
+
+    return (
+      <section
+        className={cn(
+          'relative overflow-hidden rounded-[20px] border border-emerald-200/80 bg-[linear-gradient(135deg,#ffffff_0%,#f7fff9_58%,#ecfdf5_100%)] text-[color:var(--app-text)] shadow-[0_18px_34px_-30px_rgba(15,23,42,0.18)] dark:border-emerald-900/70 dark:bg-[linear-gradient(135deg,#07120f_0%,#0b1b16_62%,#10251e_100%)] dark:text-white',
+          'p-3',
+        )}
+      >
+        <div className="pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full bg-emerald-200/55 blur-3xl dark:bg-emerald-500/10" />
+        <div className="relative flex min-w-0 items-center gap-2.5">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px] bg-emerald-600 text-white">
+            <LockKeyhole className="h-4.5 w-4.5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-black text-[color:var(--app-text)] dark:text-white">
+              {isId ? 'Masuk untuk simpan progres' : 'Log in to save your progress'}
+            </p>
+            <p className="mt-0.5 truncate text-[11px] font-medium text-[color:var(--app-text-soft)] dark:text-white/65">
+              {isId
+                ? 'XP, streak, saldo, chat, dan transaksi akan tersimpan.'
+                : 'XP, streak, wallet, chats, and transactions will be saved.'}
+            </p>
+          </div>
+          <Link
+            href="/login"
+            className="ui-pressable inline-flex h-9 shrink-0 items-center justify-center rounded-[10px] bg-emerald-600 px-3.5 text-[11px] font-extrabold text-white transition hover:bg-emerald-700 active:scale-95"
+          >
+            {isId ? 'Masuk' : 'Login'}
+          </Link>
+        </div>
+      </section>
+    );
+  }
+
+  if (summary === null) {
+    return <GameProgressLoadingSkeleton compact={compact} />;
+  }
+
+  const snapshot = buildGameSnapshot(isId, isAuthenticated, summary);
+  const activeQuest =
+    snapshot.quests.find(quest => quest.progress < 100) ?? snapshot.quests[0];
+  const ActiveQuestIcon = activeQuest.icon;
+  const amountLabel = walletAmountLabel || formatCurrencyFromCents(0, 'IDR');
+
+  if (compact) {
+    return (
+      <section
+        className="lajukan-game-progress-card relative overflow-hidden rounded-2xl border border-zinc-100 bg-white px-3.5 py-3.5 text-[color:var(--app-text)] shadow-[0_8px_24px_-20px_rgba(15,23,42,0.24)] dark:border-zinc-800/80 dark:bg-zinc-950 dark:text-zinc-50"
+        data-layout="compact-readable"
+      >
+        <div className="relative space-y-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="relative grid h-11 w-11 shrink-0 place-items-center rounded-[13px] bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-sm shadow-emerald-500/20">
+              <span className="text-sm font-black leading-none">{snapshot.level}</span>
+              <span className="absolute -bottom-1 -right-1 grid h-5 w-5 place-items-center rounded-md bg-amber-400 shadow-sm">
+                <Trophy className="h-2.5 w-2.5 text-emerald-950" />
+              </span>
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-[13px] font-black leading-5 text-zinc-900 dark:text-zinc-50">
+                    Lvl {snapshot.level}
+                  </p>
+                  <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">
+                    {snapshot.rank}
+                  </p>
+                </div>
+                <span className="shrink-0 text-[11px] font-bold text-zinc-500 dark:text-zinc-400">
+                  {snapshot.xp}/{snapshot.xpGoal}
+                </span>
+              </div>
+
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-emerald-500 via-teal-400 to-amber-400 transition-all duration-500"
+                  style={{ width: `${snapshot.xpPercent}%` }}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 overflow-hidden rounded-xl border border-zinc-100 bg-zinc-50/70 dark:border-zinc-800 dark:bg-zinc-900/40 sm:grid-cols-4">
+            <div className="min-w-0 px-3 py-2.5 sm:border-r sm:border-zinc-100 sm:dark:border-zinc-800">
+              <p className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400">
+                {isId ? 'Saldo' : 'Balance'}
+              </p>
+              <p className="mt-0.5 truncate text-sm font-black text-zinc-900 dark:text-zinc-50">
+                {walletLoading ? '…' : amountLabel}
+              </p>
+            </div>
+
+            <div className="min-w-0 border-l border-zinc-100 px-3 py-2.5 dark:border-zinc-800 sm:border-l-0 sm:border-r">
+              <p className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400">
+                Streak
+              </p>
+              <p className="mt-0.5 flex items-center gap-1 text-sm font-black text-orange-600 dark:text-orange-400">
+                <Flame className="h-3.5 w-3.5" />
+                {snapshot.streak}x
+              </p>
+            </div>
+
+            <Link
+              href={activeQuest.href}
+              className="min-w-0 border-t border-zinc-100 px-3 py-2.5 transition hover:bg-white sm:border-l-0 sm:border-r sm:border-t-0 dark:border-zinc-800 dark:hover:bg-zinc-900/70"
+            >
+              <p className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400">
+                {isId ? 'Quest aktif' : 'Active quest'}
+              </p>
+              <p className="mt-0.5 truncate text-sm font-black text-emerald-700 dark:text-emerald-300">
+                +{activeQuest.xp} XP
+              </p>
+            </Link>
+
+            <div className="min-w-0 border-l border-t border-zinc-100 px-3 py-2.5 dark:border-zinc-800 sm:border-l-0 sm:border-t-0">
+              <p className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400">
+                {isId ? 'Berikutnya' : 'Next reward'}
+              </p>
+              <p className="mt-0.5 truncate text-sm font-black text-amber-700 dark:text-amber-300">
+                {snapshot.nextReward}
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+  return (
+    <section
+      className={cn(
+        'lajukan-game-progress-card relative overflow-hidden rounded-2xl border border-slate-100 bg-white text-[color:var(--app-text)] shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition-all dark:border-zinc-800/80 dark:bg-zinc-950 dark:text-zinc-50',
+        compact ? 'lajukan-game-progress-card-compact p-3' : 'p-4',
+      )}
+    >
+      {/* Ambient Background Glow (Lebih Smooth) */}
+      <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-emerald-400/10 blur-2xl dark:bg-emerald-500/5" />
+      <div className="pointer-events-none absolute -bottom-8 -left-8 h-32 w-32 rounded-full bg-amber-400/10 blur-2xl dark:bg-amber-500/5" />
+
+      <div className="relative space-y-3.5">
+        {/* SECTION 1: LEVEL & RANK HEADER */}
+        <div className="flex min-w-0 items-center gap-3">
+          {/* Badge Level dengan Efek 3D Clean */}
+          <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-500/20">
+            <span className="text-base font-bold tracking-tight">
+              {snapshot.level}
+            </span>
+            <div className="absolute -bottom-1 -right-1 rounded-md bg-amber-400 p-0.5 shadow-sm">
+              <Trophy className="h-3 w-3 text-emerald-950" />
+            </div>
+          </div>
+
+          <div className="min-w-0 flex-1 space-y-1">
+            <div className="flex items-center justify-between gap-2">
+              <p className="truncate text-xs font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
+                {isId ? 'Arena Level' : 'Level Arena'}
+              </p>
+              <span className="shrink-0 rounded-md bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700 ring-1 ring-inset ring-amber-600/10 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/20">
+                {snapshot.rank}
+              </span>
+            </div>
+
+            {/* Progress Bar Minimalis & Modern */}
+            <div className="flex items-center gap-2">
+              {/* Diubah dari h-2 menjadi h-2.5 */}
+              <div className="h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800 p-0 m-0 relative">
+                <div
+                  className="absolute left-0 top-0 bottom-0 h-full rounded-full bg-gradient-to-r from-emerald-500 via-teal-400 to-amber-400 transition-all duration-500 ease-out p-0 m-0"
+                  style={{ width: `${snapshot.xpPercent}%` }}
+                />
+              </div>
+              <span className="shrink-0 font-mono text-[10px] font-bold leading-none text-zinc-500 dark:text-zinc-400">
+                {snapshot.xp}/{snapshot.xpGoal}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* SECTION 2: INTEGRATED WALLET CARD */}
+        <div className="flex min-w-0 items-center justify-between gap-3 rounded-xl border border-zinc-100 bg-zinc-50/50 p-2.5 dark:border-zinc-900 dark:bg-zinc-900/40">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400">
+              <CreditCard className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <p className="text-[10px] font-medium uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+                  {isId ? 'Saldo' : 'Balance'}
+                </p>
+                {walletModeLabel && (
+                  <span className="rounded bg-zinc-200/60 px-1 py-0.2 text-[9px] font-bold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+                    {walletModeLabel}
+                  </span>
+                )}
+              </div>
+              {walletLoading ? (
+                <div className="mt-1 h-4 w-20 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+              ) : (
+                <p className="truncate text-sm font-bold tracking-tight text-zinc-800 dark:text-zinc-200">
+                  {amountLabel}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <Link
+            href="/payments"
+            className="inline-flex h-8 items-center justify-center rounded-lg bg-zinc-900 px-3.5 text-xs font-bold text-white transition-all hover:bg-zinc-800 active:scale-95 dark:bg-zinc-50 dark:text-zinc-950 dark:hover:bg-zinc-200"
+          >
+            Top up
+          </Link>
+        </div>
+
+        {/* SECTION 3: QUICK STATS & QUEST */}
+        <div className="grid grid-cols-2 gap-2">
+          {/* Streak Card */}
+          <div className="rounded-xl border border-zinc-100 bg-white p-2 shadow-sm dark:border-zinc-900 dark:bg-zinc-900/20">
+            <p className="text-[10px] font-medium text-zinc-400 dark:text-zinc-500">
+              Streak
+            </p>
+            <p className="mt-0.5 flex items-center gap-1 text-sm font-bold text-orange-600 dark:text-orange-400">
+              <Flame className="h-3.5 w-3.5 fill-orange-500/10" />
+              {snapshot.streak}x
+            </p>
+          </div>
+
+          {/* Reward Card */}
+          <div className="rounded-xl border border-zinc-100 bg-white p-2 shadow-sm dark:border-zinc-900 dark:bg-zinc-900/20">
+            <p className="text-[10px] font-medium text-zinc-400 dark:text-zinc-500">
+              Next Reward
+            </p>
+            <p className="mt-0.5 flex items-center gap-1 text-sm font-bold text-amber-600 dark:text-amber-500">
+              <Zap className="h-3.5 w-3.5 fill-amber-500/10" />
+              {snapshot.nextReward}
+            </p>
+          </div>
+
+          {/* Active Quest Full Width Action Card */}
+          <Link
+            href={activeQuest.href}
+            className="group col-span-2 flex items-center justify-between rounded-xl border border-emerald-100 bg-emerald-50/40 p-2.5 transition-all hover:bg-emerald-50 dark:border-emerald-500/10 dark:bg-emerald-500/5 dark:hover:bg-emerald-500/10"
+          >
+            <div className="flex min-w-0 items-center gap-2">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-emerald-500 text-white shadow-sm group-hover:scale-105 transition-transform">
+                <ActiveQuestIcon className="h-3.5 w-3.5" />
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-xs font-bold text-emerald-950 dark:text-emerald-300">
+                  {activeQuest.label}
+                </p>
+                <p className="text-[10px] font-medium text-emerald-600/80 dark:text-emerald-400/70">
+                  Active Quest
+                </p>
+              </div>
+            </div>
+            <span className="shrink-0 text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-white dark:bg-zinc-900 px-2 py-1 rounded-md border border-emerald-100/50 dark:border-zinc-800">
+              +{activeQuest.xp} XP
+            </span>
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+const FALLBACK_TRENDING_SEARCHES: TrendingSearchItem[] = [
+  'Supplier kemasan',
+  'Supplier bahan baku',
+  'Stok grosir reseller',
+  'Jasa foto produk',
+  'Jasa website UMKM',
+  'Lokasi usaha',
+  'Mesin usaha',
+].map(label => ({
+  label,
+  href: `/explore?q=${encodeURIComponent(label)}`,
+  source: 'fallback',
+}));
+
+function normalizeTrendingItem(value: unknown): TrendingSearchItem | null {
+  if (!value || typeof value !== 'object') return null;
+  const item = value as Partial<TrendingSearchItem>;
+  const label = typeof item.label === 'string' ? item.label.trim() : '';
+  const href = typeof item.href === 'string' ? item.href.trim() : '';
+  if (!label || !href) return null;
+  return {
+    label: label.slice(0, 80),
+    href,
+    score: typeof item.score === 'number' ? item.score : undefined,
+    count: typeof item.count === 'number' ? item.count : undefined,
+    source: typeof item.source === 'string' ? item.source : undefined,
+  };
+}
+
+async function loadTrendingSearches() {
+  if (trendingSearchCache) return trendingSearchCache;
+  if (trendingSearchRequest) return trendingSearchRequest;
+
+  trendingSearchRequest = fetch('/api/home/trending-searches', {
+    cache: 'no-store',
+  })
+    .then(async response => {
+      const payload = (await response.json().catch(() => ({}))) as {
+        data?: { items?: unknown[] };
+      };
+      const items = (payload.data?.items || [])
+        .map(normalizeTrendingItem)
+        .filter((item): item is TrendingSearchItem => Boolean(item))
+        .slice(0, 10);
+      trendingSearchCache =
+        items.length > 0 ? items : FALLBACK_TRENDING_SEARCHES;
+      return trendingSearchCache;
+    })
+    .catch(() => {
+      trendingSearchCache = FALLBACK_TRENDING_SEARCHES;
+      return trendingSearchCache;
+    })
+    .finally(() => {
+      trendingSearchRequest = null;
+    });
+
+  return trendingSearchRequest;
+}
+
+export function TrendingSearchSection({ isId }: { isId: boolean }) {
+  const [items, setItems] = useState<TrendingSearchItem[]>(
+    trendingSearchCache || FALLBACK_TRENDING_SEARCHES,
+  );
+
+  useEffect(() => {
+    let active = true;
+
+    void loadTrendingSearches().then(nextItems => {
+      if (active) {
+        setItems(nextItems);
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const [emblaRef, emblaApi] = useEmblaCarousel({
+    align: 'start',
+    containScroll: 'keepSnaps',
+    dragFree: true,
+    skipSnaps: true,
+  });
+
+  useEmblaWheelGestures(emblaApi);
+
+  if (items.length === 0) {
+    return null;
+  }
+
+  return (
+    <section
+      aria-labelledby="trending-search-title"
+      className="w-full py-1.5 sm:py-2"
+    >
+      {/* HEADER */}
+      <div className="flex h-6 items-center px-1 sm:px-3 md:px-6">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <Flame className="h-3.5 w-3.5 shrink-0 fill-amber-500 text-amber-500" />
+
+          <h2
+            id="trending-search-title"
+            className="truncate text-[11px] font-bold leading-none tracking-tight text-[color:var(--app-text)] sm:text-xs"
+          >
+            {isId ? 'Banyak dicari' : 'Trending'}
+          </h2>
+
+          <span className="hidden text-[10px] font-medium text-zinc-400 sm:inline">
+            {isId ? 'Geser untuk melihat' : 'Swipe to explore'}
+          </span>
+        </div>
+      </div>
+
+      {/* CAROUSEL */}
+      <div
+        ref={emblaRef}
+        className="
+          mt-1 cursor-grab overflow-hidden
+          contain-paint active:cursor-grabbing
+        "
+      >
+        <div
+          className="
+            flex touch-pan-y gap-1.5
+            px-1 py-0.5
+            sm:gap-2 sm:px-3
+            md:px-6
+            [backface-visibility:hidden]
+            [will-change:transform]
+          "
+        >
+          {items.map(item => (
+            <Link
+              key={`${item.label}-${item.href}`}
+              href={item.href}
+              onClick={() => {
+                void trackLajukanEvent(
+                  'home.trending_search.clicked',
+                  {
+                    properties: {
+                      query: item.label,
+                      source:
+                        item.source || 'home_trending_searches',
+                      score: item.score,
+                      count: item.count,
+                    },
+                  },
+                );
+              }}
+              className="
+                inline-flex h-7 max-w-[150px] shrink-0
+                select-none items-center
+                rounded-full
+                border border-zinc-200/80
+                bg-zinc-50/70
+                px-2.5
+                text-[10px] font-medium
+                text-zinc-600
+                transition-colors duration-150
+
+                hover:border-emerald-200
+                hover:bg-emerald-50
+                hover:text-emerald-700
+
+                focus-visible:outline-none
+                focus-visible:ring-2
+                focus-visible:ring-emerald-500/20
+
+                sm:h-8
+                sm:max-w-[180px]
+                sm:px-3
+                sm:text-[11px]
+              "
+              style={{
+                backfaceVisibility: 'hidden',
+              }}
+            >
+              <span className="truncate">
+                {item.label}
+              </span>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function QuickCategoriesSection({ isId }: { isId: boolean }) {
+  const categories = getQuickCategories(isId);
+
+  return (
+    <section className="rounded-2xl border border-zinc-100 bg-gradient-to-b from-white to-zinc-50 p-3 shadow-sm">
+      <div className="grid grid-cols-4 gap-2">
+        {categories.map(item => {
+          const toneStyle = toneClassNames(item.tone);
+
+          return (
+            <Link
+              key={item.id}
+              href={item.href}
+              aria-label={item.label}
+              className="group flex flex-col items-center rounded-2xl p-2 transition-transform hover:-translate-y-0.5"
+            >
+              <div
+                className={`
+                  relative
+                  flex
+                  h-14
+                  w-14
+                  items-center
+                  justify-center
+                  rounded-xl
+                  border
+                  shadow-sm
+                  ${toneStyle.surface}
+                `}
+              >
+                {/* Badge Container */}
+                {item.badge && (
+                  <div className="absolute left-0 top-0 z-20">
+                    <div className="whitespace-nowrap bg-black px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.05em] text-white">
+                      {item.badge}
+                    </div>
+                  </div>
+                )}
+
+                <div
+                  className="absolute aspect-square flex items-center justify-center"
+                  style={{
+                    width: item.imageSize ?? 70,
+                    right: item.offsetX ?? -18,
+                    bottom: item.offsetY ?? -14,
+                    transform: `
+                      scaleX(${item.flip ? -1 : 1})
+                      scale(${item.scale ?? 1})
+                      rotate(${item.rotate ?? 0}deg)
+                    `,
+                  }}
+                >
+                  <img
+                    src={item.image}
+                    alt={item.label}
+                    className="
+                      h-full
+                      w-full
+                      object-contain
+                      transition-transform
+                      duration-300
+                      group-hover:scale-105
+                      select-none
+                      pointer-events-none
+                    "
+                  />
+                </div>
+              </div>
+
+              <span className="mt-2 text-center text-[11px] font-semibold leading-tight text-zinc-700">
+                {item.label}
+              </span>
+            </Link>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function RecommendationsLoadingSkeleton({ isId }: { isId: boolean }) {
+  return (
+    <section
+      className="w-full min-w-0 overflow-hidden py-1.5 sm:py-2"
+      aria-label={isId ? 'Memuat rekomendasi listing' : 'Loading listing recommendations'}
+      aria-busy="true"
+      data-testid="home-recommendations-skeleton"
+    >
+      <div className="flex items-center gap-1.5 px-2 sm:px-3 md:px-4 lg:px-6">
+        <Skeleton className="h-3.5 w-3.5 rounded-full" />
+        <Skeleton className="h-3.5 w-32 rounded-full" />
+      </div>
+      <div className="mt-2 flex gap-2 overflow-hidden px-2 sm:gap-2.5 sm:px-3 md:px-4 lg:gap-3 lg:px-6">
+        {Array.from({ length: 5 }).map((_, index) => (
+          <div
+            key={index}
+            className="w-[calc((100vw-32px)/2.08)] shrink-0 sm:w-[180px] md:w-[190px] lg:w-[200px] xl:w-[210px]"
+          >
+            <div className="overflow-hidden rounded-2xl border border-zinc-200/80 bg-white">
+              <Skeleton className="aspect-square w-full rounded-none" />
+              <div className="space-y-2 p-3">
+                <Skeleton className="h-3.5 w-4/5 rounded" />
+                <Skeleton className="h-4 w-2/5 rounded" />
+                <Skeleton className="h-2.5 w-3/5 rounded" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+export function RecommendationsSection({
+  isId,
+  items,
+}: {
+  isId: boolean;
+  items: RecommendationItem[];
+}) {
+  const [emblaRef, emblaApi] = useEmblaCarousel({
+    align: 'start',
+    containScroll: 'trimSnaps',
+    dragFree: true,
+    skipSnaps: true,
+  });
+
+  useEmblaWheelGestures(emblaApi);
+
+  return (
+    <section
+      className="w-full min-w-0 overflow-hidden py-1.5 sm:py-2"
+      data-testid="home-recommendations-section"
+      aria-label={
+        isId
+          ? 'Rekomendasi penawaran untuk usahamu'
+          : 'Recommended offers for your business'
+      }
+    >
+      {/* HEADER */}
+      <div className="flex min-w-0 items-center gap-1.5 px-2 sm:px-3 md:px-4 lg:px-6">
+        <Sparkles className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+
+        <h2 className="min-w-0 truncate text-[11px] font-bold leading-5 tracking-tight text-[color:var(--app-text)] sm:text-xs">
+          {isId ? 'Rekomendasi listing' : 'Recommended listings'}
+        </h2>
+
+        <span className="hidden shrink-0 text-[9px] font-medium text-zinc-400 sm:inline">
+          {isId ? 'Produk, jasa, lokasi & sewa' : 'Products, services, places & rentals'}
+        </span>
+      </div>
+
+      {/* EMPTY */}
+      {items.length === 0 ? (
+        <div className="mt-1.5 px-2 sm:px-3 md:px-4 lg:px-6">
+          <div className="rounded-xl border border-dashed border-zinc-200 bg-zinc-50/60 px-3 py-4 text-center dark:border-zinc-800 dark:bg-zinc-900/40">
+            <p className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400 sm:text-[11px]">
+              {isId
+                ? 'Belum ada rekomendasi saat ini.'
+                : 'No recommendations right now.'}
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="relative mt-1.5 min-w-0">
+          <div
+            ref={emblaRef}
+            className="min-w-0 cursor-grab overflow-hidden active:cursor-grabbing"
+          >
+            <div
+              className="
+                flex min-w-0 touch-pan-y gap-2
+                px-2 py-0.5
+                sm:gap-2.5 sm:px-3
+                md:px-4
+                lg:gap-3 lg:px-6
+                [backface-visibility:hidden]
+              "
+            >
+              {items.map(item => (
+                <div
+                  key={item.id}
+                  className="
+                    min-w-0 shrink-0 grow-0 select-none
+
+                    basis-[calc((100vw-32px)/2.08)]
+
+                    min-[390px]:basis-[calc((100vw-36px)/2.15)]
+
+                    sm:basis-[180px]
+                    md:basis-[190px]
+                    lg:basis-[200px]
+                    xl:basis-[210px]
+                    2xl:basis-[220px]
+                  "
+                  style={{ backfaceVisibility: 'hidden' }}
+                >
+                  <RecommendationCard item={item} isId={isId} />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Desktop controls jika component ini sudah tersedia di Home */}
+          <div className="hidden md:block">
+            <EmblaDesktopControls api={emblaApi} compact />
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+export function PublicReferencesSection({
+  isId,
+  items,
+}: {
+  isId: boolean;
+  items: PublicReferenceItem[];
+}) {
+  const [emblaRef, emblaApi] = useEmblaCarousel({
+    align: 'start',
+    containScroll: 'keepSnaps',
+    dragFree: true,
+    skipSnaps: true,
+  });
+
+  useEmblaWheelGestures(emblaApi);
+
+  if (items.length === 0) return null;
+
+  return (
+    <section
+      className="w-full py-1.5 sm:py-2"
+      data-testid="home-public-references-section"
+      aria-label={
+        isId
+          ? 'Referensi lokasi usaha dari data publik'
+          : 'Business location references from public data'
+      }
+    >
+      {/* HEADER */}
+      <div className="flex h-6 items-center gap-1.5 px-1 sm:px-3 md:px-6">
+        <Globe2 className="h-3.5 w-3.5 shrink-0 text-blue-600" />
+
+        <h2 className="truncate text-[11px] font-bold leading-none tracking-tight text-[color:var(--app-text)] sm:text-xs">
+          {isId ? 'Referensi usaha sekitar' : 'Nearby references'}
+        </h2>
+
+        <span className="hidden text-[9px] font-medium text-zinc-400 sm:inline">
+          {isId ? 'Data publik' : 'Public data'}
+        </span>
+      </div>
+
+      {/* CAROUSEL */}
+      <div
+        ref={emblaRef}
+        className="mt-1 cursor-grab overflow-hidden contain-paint active:cursor-grabbing"
+      >
+        <div
+          className="
+            flex touch-pan-y items-start gap-2
+            px-1 py-0.5
+            sm:px-3
+            md:px-6
+            [backface-visibility:hidden]
+            [will-change:transform]
+          "
+        >
+          {items.map(item => (
+            <article
+              key={item.id}
+              className="
+                flex
+                w-[min(68vw,240px)]
+                shrink-0
+                flex-col
+                overflow-hidden
+                rounded-xl
+                border border-zinc-200/80
+                bg-white
+                transition-colors
+                hover:border-zinc-300
+                sm:w-[230px]
+                md:w-[240px]
+              "
+              style={{ backfaceVisibility: 'hidden' }}
+            >
+              {/* MAIN */}
+              <Link
+                href={item.href}
+                className="
+                  group flex flex-1 flex-col
+                  focus-visible:outline-none
+                  focus-visible:ring-2
+                  focus-visible:ring-blue-500
+                  focus-visible:ring-inset
+                "
+              >
+                {/* IMAGE */}
+                <div className="relative aspect-[16/8.5] w-full shrink-0 overflow-hidden bg-zinc-100">
+                  {item.image ? (
+                    <Image
+                      src={item.image}
+                      alt={item.title}
+                      fill
+                      sizes="
+                        (max-width: 480px) 68vw,
+                        (max-width: 768px) 230px,
+                        240px
+                      "
+                      className="object-cover transition-transform duration-300 group-hover:scale-[1.025]"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-zinc-400">
+                      <Globe2 className="h-5 w-5" />
+                    </div>
+                  )}
+
+                  <span
+                    className="
+                      absolute left-2 top-2
+                      max-w-[calc(100%-16px)]
+                      truncate rounded-full
+                      bg-white/90 px-2 py-0.5
+                      text-[8px] font-semibold
+                      text-zinc-600
+                      backdrop-blur
+                    "
+                  >
+                    {isId ? 'Referensi publik' : 'Public reference'}
+                  </span>
+                </div>
+
+                {/* CONTENT */}
+                <div className="flex flex-1 flex-col px-2.5 py-2">
+                  <h3
+                    className="
+                      line-clamp-1
+                      text-[11px]
+                      font-bold
+                      leading-4
+                      text-zinc-900
+                      transition-colors
+                      group-hover:text-blue-700
+                    "
+                  >
+                    {item.title}
+                  </h3>
+
+                  {item.location ? (
+                    <p className="mt-1 flex min-w-0 items-center gap-1 text-[9px] font-medium text-zinc-500">
+                      <MapPin className="h-3 w-3 shrink-0 text-zinc-400" />
+
+                      <span className="truncate">
+                        {item.location}
+                      </span>
+                    </p>
+                  ) : null}
+                </div>
+              </Link>
+
+              {/* SOURCE */}
+              <a
+                href={item.sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`${isId ? 'Buka sumber' : 'Open source'}: ${
+                  item.sourceTitle
+                }`}
+                className="
+                  group/source
+                  mx-2.5
+                  flex min-h-8
+                  items-center
+                  justify-between
+                  gap-2
+                  border-t border-zinc-100
+                  py-1.5
+                  focus-visible:outline-none
+                  focus-visible:ring-2
+                  focus-visible:ring-blue-500
+                "
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[8px] font-semibold text-zinc-500">
+                    {item.sourceTitle}
+                  </p>
+
+                  {item.sourceLicense ? (
+                    <p className="truncate text-[7px] text-zinc-400">
+                      {item.sourceLicense}
+                    </p>
+                  ) : null}
+                </div>
+
+                <span className="inline-flex shrink-0 items-center gap-0.5 text-[8px] font-semibold text-blue-600">
+                  {isId ? 'Sumber' : 'Source'}
+
+                  <ExternalLink className="h-2.5 w-2.5" />
+                </span>
+              </a>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+const PUBLIC_MEDIA_BASE =
+  'https://www.lajukan.com/api/content/media';
+
+function RecommendationCard({
+  item,
+  isId,
+}: {
+  item: RecommendationItem;
+  isId: boolean;
+}) {
+  const image = normalizeMediaUrl(
+    item.image || item.images?.[0],
+  );
+
+  const price =
+    item.unit && item.unit !== 'item'
+      ? `${item.price} / ${item.unit}`
+      : item.price;
+
+  const locationLabel =
+    item.distanceLabel || item.location;
+
+  const fallbackTitle = isId ? 'Gambar produk' : 'Product image';
+
+  return (
+    <a
+      href={item.href}
+      data-testid="home-recommendation-card"
+      className="
+        group
+        flex h-full min-w-0 w-full flex-col
+        overflow-hidden
+        rounded-2xl
+        border border-zinc-200/80
+        bg-white
+        text-left
+        shadow-[0_1px_2px_rgba(0,0,0,0.025)]
+        transition-all
+        duration-200
+        ease-out
+
+        hover:-translate-y-0.5
+        hover:border-zinc-300
+        hover:shadow-[0_10px_28px_-18px_rgba(0,0,0,0.22)]
+
+        focus-visible:outline-none
+        focus-visible:ring-2
+        focus-visible:ring-emerald-500/70
+        focus-visible:ring-offset-2
+
+        dark:border-zinc-800
+        dark:bg-zinc-950
+        dark:hover:border-zinc-700
+        dark:hover:shadow-[0_10px_28px_-18px_rgba(0,0,0,0.55)]
+      "
+    >
+      {/* IMAGE */}
+      <div
+        className="
+          relative
+          aspect-square
+          w-full
+          shrink-0
+          overflow-hidden
+          bg-zinc-100
+          dark:bg-zinc-900
+        "
+      >
+        {image ? (
+          <img
+            src={image}
+            alt={item.title || fallbackTitle}
+            loading="lazy"
+            decoding="async"
+            draggable={false}
+            className="
+              h-full
+              w-full
+              select-none
+              object-cover
+              transition-transform
+              duration-500
+              ease-out
+              group-hover:scale-[1.04]
+            "
+            onError={(event) => {
+              const target = event.currentTarget;
+
+              target.style.display = 'none';
+
+              const fallback =
+                target.parentElement?.querySelector(
+                  '[data-image-fallback]',
+                );
+
+              if (fallback instanceof HTMLElement) {
+                fallback.classList.remove('hidden');
+              }
+            }}
+          />
+        ) : null}
+
+        {/* IMAGE FALLBACK */}
+        <div
+          data-image-fallback
+          className={cn(
+            image ? 'hidden' : 'flex',
+            'absolute inset-0 flex-col items-center justify-center gap-2 bg-[linear-gradient(135deg,#ecfdf5_0%,#f8fafc_55%,#fff7ed_100%)] px-4 text-center dark:bg-[linear-gradient(135deg,#052e24_0%,#0f172a_60%,#1c1917_100%)]',
+          )}
+        >
+          <span className="grid h-10 w-10 place-items-center rounded-2xl bg-white/80 text-emerald-700 shadow-sm ring-1 ring-emerald-100 dark:bg-slate-950/60 dark:text-emerald-300 dark:ring-white/10">
+            <Store className="h-5 w-5" aria-hidden="true" />
+          </span>
+          <span className="text-[10px] font-bold text-emerald-800/70 sm:text-xs dark:text-emerald-200/70">
+            {isId ? 'Listing Lajukan' : 'Lajukan listing'}
+          </span>
+        </div>
+
+        {/* TOP GRADIENT */}
+        <div
+          aria-hidden="true"
+          className="
+            pointer-events-none
+            absolute inset-x-0 top-0
+            h-16
+            bg-gradient-to-b
+            from-black/20
+            via-black/5
+            to-transparent
+          "
+        />
+
+        {/* CATEGORY */}
+        {item.typeLabel ? (
+          <span
+            title={item.typeLabel}
+            className="
+              absolute
+              left-2
+              top-2
+              max-w-[72%]
+              truncate
+              rounded-full
+              border
+              border-white/20
+              bg-black/55
+              px-2.5
+              py-1.5
+              text-[8px]
+              font-bold
+              leading-none
+              text-white
+              shadow-sm
+              backdrop-blur-md
+
+              sm:text-[9px]
+            "
+          >
+            {item.typeLabel}
+          </span>
+        ) : null}
+
+        {/* VERIFIED */}
+        {item.verified ? (
+          <span
+            className="
+              absolute
+              bottom-2
+              left-2
+              inline-flex
+              items-center
+              gap-1.5
+              rounded-full
+              border
+              border-white/70
+              bg-white/92
+              px-2
+              py-1.5
+              text-[8px]
+              font-bold
+              leading-none
+              text-emerald-700
+              shadow-sm
+              backdrop-blur-md
+
+              sm:text-[9px]
+
+              dark:border-zinc-700/80
+              dark:bg-zinc-950/90
+              dark:text-emerald-400
+            "
+          >
+            <span
+              aria-hidden="true"
+              className="
+                h-1.5
+                w-1.5
+                shrink-0
+                rounded-full
+                bg-emerald-500
+              "
+            />
+
+            <span>
+              {isId ? 'Terverifikasi' : 'Verified'}
+            </span>
+          </span>
+        ) : null}
+      </div>
+
+      {/* CONTENT */}
+      <div
+        className="
+          flex
+          min-w-0
+          flex-1
+          flex-col
+          p-2.5
+          sm:p-3
+        "
+      >
+        {/* TITLE */}
+        <h3
+          className="
+            line-clamp-2
+            min-w-0
+            min-h-[32px]
+            text-[12px]
+            font-semibold
+            leading-[16px]
+            tracking-[-0.01em]
+            text-zinc-800
+
+            min-[360px]:text-[13px]
+            min-[360px]:leading-[17px]
+
+            sm:min-h-[36px]
+            sm:text-sm
+            sm:leading-[18px]
+
+            dark:text-zinc-100
+          "
+        >
+          {item.title}
+        </h3>
+
+        {/* PRICE */}
+        {price ? (
+          <p
+            title={price}
+            className="
+              mt-2
+              truncate
+              text-[14px]
+              font-black
+              leading-tight
+              tracking-[-0.025em]
+              text-emerald-700
+
+              min-[360px]:text-[15px]
+
+              sm:text-base
+
+              dark:text-emerald-400
+            "
+          >
+            {price}
+          </p>
+        ) : (
+          <div
+            aria-hidden="true"
+            className="mt-2 h-[17px] sm:h-[19px]"
+          />
+        )}
+
+        {/* META */}
+        <div
+          className="
+            mt-3
+            flex
+            min-w-0
+            items-center
+            gap-2
+            border-t
+            border-zinc-100
+            pt-2.5
+
+            dark:border-zinc-900
+          "
+        >
+          {/* LOCATION */}
+          {locationLabel ? (
+            <span
+              title={locationLabel}
+              className="
+                min-w-0
+                flex-1
+                truncate
+                text-[9px]
+                font-medium
+                leading-4
+                text-zinc-500
+
+                min-[360px]:text-[10px]
+                sm:text-[11px]
+
+                dark:text-zinc-400
+              "
+            >
+              {locationLabel}
+            </span>
+          ) : (
+            <span
+              aria-hidden="true"
+              className="min-w-0 flex-1"
+            />
+          )}
+
+          {/* SIDE */}
+          {item.side ? (
+            <span
+              title={item.side}
+              className="
+                max-w-[42%]
+                shrink-0
+                truncate
+                rounded-full
+                bg-zinc-100
+                px-2
+                py-1
+                text-[8px]
+                font-bold
+                leading-none
+                text-zinc-600
+
+                sm:max-w-[45%]
+                sm:text-[9px]
+
+                dark:bg-zinc-900
+                dark:text-zinc-300
+              "
+            >
+              {item.side}
+            </span>
+          ) : null}
+        </div>
+      </div>
+    </a>
+  );
+}
+
+function normalizeMediaUrl(value?: string | null): string | null {
+  if (!value) return null;
+
+  const raw = value.trim();
+
+  if (!raw) return null;
+
+  // Already a fully-qualified public Lajukan media URL.
+  if (raw.startsWith(`${PUBLIC_MEDIA_BASE}/`)) {
+    return raw;
+  }
+
+  // Already a relative public Lajukan media URL.
+  if (raw.startsWith('/api/content/media/')) {
+    return `https://www.lajukan.com${raw}`;
+  }
+
+  /**
+   * Direct object-storage path without a hostname.
+   *
+   * /laju-chat/content/foo.png
+   */
+  if (raw.startsWith('/laju-chat/')) {
+    return `${PUBLIC_MEDIA_BASE}${raw}`;
+  }
+
+  try {
+    const url = new URL(raw);
+
+    const pathname = url.pathname;
+
+    /**
+     * Any URL whose path points to the private object-storage
+     * bucket should go through the public Lajukan media proxy.
+     *
+     * Example:
+     *
+     * http://localhost:9002/laju-chat/content/foo.png
+     *
+     * becomes:
+     *
+     * https://www.lajukan.com/api/content/media/laju-chat/content/foo.png
+     */
+    if (pathname.startsWith('/laju-chat/')) {
+      return `${PUBLIC_MEDIA_BASE}${pathname}${url.search}${url.hash}`;
+    }
+
+    /**
+     * Local storage host fallback.
+     *
+     * This covers cases where the API may return a local storage URL
+     * with a different object path.
+     */
+    const isLocalHost =
+      url.hostname === 'localhost' ||
+      url.hostname === '127.0.0.1' ||
+      url.hostname === '0.0.0.0';
+
+    if (isLocalHost) {
+      return `${PUBLIC_MEDIA_BASE}${pathname}${url.search}${url.hash}`;
+    }
+
+    /**
+     * Keep unrelated/external absolute URLs unchanged.
+     *
+     * This prevents external image/CDN URLs from being incorrectly
+     * rewritten through the Lajukan media proxy.
+     */
+    return url.toString();
+  } catch {
+    /**
+     * Last fallback for malformed-but-path-like media URLs.
+     */
+    if (raw.startsWith('laju-chat/')) {
+      return `${PUBLIC_MEDIA_BASE}/${raw}`;
+    }
+
+    return raw;
+  }
+}
+
+
+function CommunityPanel({
+  isId,
+  isAuthenticated,
+  activeTab,
+  onTabChange,
+  avatarSrc,
+  posts,
+  loading = false,
+  loadError = null,
+  onRetry,
+  onToggleLike,
+  onSubmitComment,
+  onSharePost,
+  onRequireAuth,
+}: {
+  isId: boolean;
+  isAuthenticated: boolean;
+  activeTab: CommunityTab;
+  onTabChange: (tab: CommunityTab) => void;
+  avatarSrc: string;
+  posts: CommunityPost[];
+  loading?: boolean;
+  loadError?: string | null;
+  onRetry?: () => void;
+  onToggleLike: (
+    postId: string,
+    liked: boolean,
+  ) => Promise<void> | void;
+  onSubmitComment: (
+    postId: string,
+    body: string,
+  ) => Promise<void> | void;
+  onSharePost?: (postId: string) => Promise<void> | void;
+  onRequireAuth?: () => void;
+}) {
+  const router = useRouter();
+  const postOptionsRef = useRef<HTMLDivElement>(null);
+  const commentInputRef = useRef<HTMLInputElement>(null);
+
+  const [postOptionsOpen, setPostOptionsOpen] = useState(false);
+  const [postOptionsCopied, setPostOptionsCopied] = useState(false);
+  const [shareFeedback, setShareFeedback] = useState<
+    'shared' | 'copied' | null
+  >(null);
+  const [hiddenPostIds, setHiddenPostIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [likeOverrides, setLikeOverrides] = useState<
+    Record<string, boolean>
+  >({});
+  const [likeCountOverrides, setLikeCountOverrides] = useState<
+    Record<string, number>
+  >({});
+  const [commentCountDeltas, setCommentCountDeltas] = useState<
+    Record<string, number>
+  >({});
+  const [pendingLikeIds, setPendingLikeIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [commentOpen, setCommentOpen] = useState(false);
+  const [commentDraft, setCommentDraft] = useState('');
+  const [commentSubmitting, setCommentSubmitting] = useState(false);
+  const [interactionError, setInteractionError] = useState<string | null>(null);
+
+  const tabs = getCommunityTabs(isId);
+  const activeTabMeta =
+    tabs.find(item => item.id === activeTab) || tabs[0]!;
+  const visiblePosts = posts.filter(item => !hiddenPostIds.has(item.id));
+  const post =
+    visiblePosts.find(item => item.tab === activeTab) ||
+    visiblePosts[0] ||
+    null;
+  const communityPostHref = post
+    ? buildCommunityPostHref(post)
+    : buildCommunityTabHref(activeTab);
+  const morePosts = (post
+    ? visiblePosts.filter(item => item.id !== post.id)
+    : visiblePosts
+  ).slice(0, 2);
+  const communityHref = buildCommunityTabHref(activeTab);
+
+  const postMediaItems = post?.mediaItems?.length
+    ? post.mediaItems
+    : post?.mediaUrl
+      ? [
+          {
+            src: post.mediaUrl,
+            type: post.mediaType === 'video' ? 'video' : 'image',
+            alt: post.title,
+          } satisfies MediaPreviewItem,
+        ]
+      : [];
+  const postMediaUrl =
+    postMediaItems.length > 0 ? post?.mediaUrl || post?.image : null;
+  const postIsVideo = post?.mediaType === 'video';
+  const postInitiallyLiked = post?.viewerVote === 1;
+  const postLiked = post
+    ? (likeOverrides[post.id] ?? postInitiallyLiked)
+    : false;
+  const postLikeCount = post
+    ? (likeCountOverrides[post.id] ?? post.likes)
+    : 0;
+  const postCommentCount = post
+    ? post.comments + (commentCountDeltas[post.id] ?? 0)
+    : 0;
+  const postLikePending = post ? pendingLikeIds.has(post.id) : false;
+
+  const cleanPreviewBody = (target: CommunityPost) => {
+    if (target.postType !== 'poll') return target.body;
+    return target.body
+      .replace(/\n+\s*(?:Polling|Poll|Jajak pendapat)\s*:\s*[\s\S]*$/i, '')
+      .trim();
+  };
+
+  const renderContext = (target: CommunityPost, compact = false) => {
+    const contexts: Array<{
+      key: string;
+      label: string;
+      icon: LucideIcon;
+      className?: string;
+    }> = [];
+
+    if (target.isPinned) {
+      contexts.push({
+        key: 'pinned',
+        label: isId ? 'Disematkan' : 'Pinned',
+        icon: Pin,
+      });
+    }
+
+    if (target.isSolved) {
+      contexts.push({
+        key: 'solved',
+        label: isId ? 'Terjawab' : 'Answered',
+        icon: CheckCircle2,
+        className: 'text-emerald-700',
+      });
+    } else if (target.postType === 'poll') {
+      contexts.push({
+        key: 'poll',
+        label: isId ? 'Polling' : 'Poll',
+        icon: BarChart3,
+      });
+    } else if (target.postType === 'question') {
+      contexts.push({
+        key: 'question',
+        label: isId ? 'Pertanyaan' : 'Question',
+        icon: MessageCircle,
+      });
+    } else if (target.postType === 'update') {
+      contexts.push({
+        key: 'update',
+        label: isId ? 'Update usaha' : 'Business update',
+        icon: TrendingUp,
+      });
+    }
+
+    if (contexts.length === 0) return null;
+
+    return (
+      <span
+        className={cn(
+          'flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 font-bold text-[color:var(--app-text-soft)]',
+          compact ? 'text-[9px]' : 'text-[10px]',
+        )}
+      >
+        {contexts.slice(0, compact ? 1 : 2).map(context => {
+          const Icon = context.icon;
+          return (
+            <span
+              key={context.key}
+              className={cn(
+                'inline-flex min-w-0 items-center gap-1',
+                context.className,
+              )}
+            >
+              <Icon className={compact ? 'h-3 w-3' : 'h-3.5 w-3.5'} />
+              <span className="truncate">{context.label}</span>
+            </span>
+          );
+        })}
+      </span>
+    );
+  };
+
+  const buildAbsolutePostUrl = (targetPost: CommunityPost) => {
+    const href = buildCommunityPostHref(targetPost);
+    if (typeof window === 'undefined') return href;
+    return `${window.location.origin}${href.startsWith('/') ? href : `/${href}`}`;
+  };
+
+  const copyText = async (value: string) => {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(value);
+      return;
+    }
+
+    const textarea = document.createElement('textarea');
+    textarea.value = value;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    const copied = document.execCommand('copy');
+    textarea.remove();
+    if (!copied) throw new Error('Unable to copy link');
+  };
+
+  const openCommunityPost = () => {
+    if (!post) return;
+    router.push(communityPostHref);
+  };
+
+  const requireAuthentication = () => {
+    setInteractionError(
+      isId
+        ? 'Masuk terlebih dahulu untuk menggunakan fitur ini.'
+        : 'Sign in first to use this feature.',
+    );
+    onRequireAuth?.();
+  };
+
+  const isInteractiveTarget = (target: EventTarget | null) =>
+    target instanceof Element &&
+    Boolean(
+      target.closest(
+        [
+          'a',
+          'button',
+          'input',
+          'textarea',
+          'select',
+          'label',
+          'form',
+          '[role="button"]',
+          '[data-card-interactive="true"]',
+        ].join(','),
+      ),
+    );
+
+  const copyPostLink = async () => {
+    if (!post) return;
+
+    try {
+      await copyText(buildAbsolutePostUrl(post));
+      setPostOptionsCopied(true);
+      window.setTimeout(() => setPostOptionsCopied(false), 1600);
+    } catch {
+      setPostOptionsCopied(false);
+      setInteractionError(
+        isId
+          ? 'Link belum berhasil disalin.'
+          : 'The link could not be copied.',
+      );
+    }
+  };
+
+  const hidePostFromHome = () => {
+    if (!post) return;
+    setHiddenPostIds(current => {
+      const next = new Set(current);
+      next.add(post.id);
+      return next;
+    });
+    setPostOptionsOpen(false);
+  };
+
+  const toggleLike = async () => {
+    if (!post || postLikePending) return;
+
+    if (!isAuthenticated) {
+      requireAuthentication();
+      return;
+    }
+
+    setInteractionError(null);
+    const previousLiked = postLiked;
+    const previousCount = postLikeCount;
+    const nextLiked = !previousLiked;
+    const nextCount = Math.max(0, previousCount + (nextLiked ? 1 : -1));
+
+    setLikeOverrides(current => ({ ...current, [post.id]: nextLiked }));
+    setLikeCountOverrides(current => ({ ...current, [post.id]: nextCount }));
+    setPendingLikeIds(current => new Set(current).add(post.id));
+
+    try {
+      await onToggleLike(post.threadId, nextLiked);
+    } catch {
+      setLikeOverrides(current => ({ ...current, [post.id]: previousLiked }));
+      setLikeCountOverrides(current => ({
+        ...current,
+        [post.id]: previousCount,
+      }));
+      setInteractionError(
+        isId
+          ? 'Suka belum berhasil diperbarui. Coba lagi.'
+          : 'The like could not be updated. Try again.',
+      );
+    } finally {
+      setPendingLikeIds(current => {
+        const next = new Set(current);
+        next.delete(post.id);
+        return next;
+      });
+    }
+  };
+
+  const openInlineComment = () => {
+    if (!post) return;
+
+    if (!isAuthenticated) {
+      requireAuthentication();
+      return;
+    }
+
+    setInteractionError(null);
+    setCommentOpen(current => !current);
+
+    if (!commentOpen) {
+      window.requestAnimationFrame(() => commentInputRef.current?.focus());
+    }
+  };
+
+  const submitInlineComment = async () => {
+    if (!post || commentSubmitting) return;
+
+    if (!isAuthenticated) {
+      requireAuthentication();
+      return;
+    }
+
+    const body = commentDraft.trim();
+    if (!body) {
+      commentInputRef.current?.focus();
+      return;
+    }
+
+    setCommentSubmitting(true);
+    setInteractionError(null);
+
+    try {
+      await onSubmitComment(post.threadId, body);
+      setCommentDraft('');
+      setCommentCountDeltas(current => ({
+        ...current,
+        [post.id]: (current[post.id] ?? 0) + 1,
+      }));
+      window.requestAnimationFrame(() => commentInputRef.current?.focus());
+    } catch {
+      setInteractionError(
+        isId
+          ? 'Komentar belum berhasil dikirim. Coba lagi.'
+          : 'The comment could not be posted. Try again.',
+      );
+    } finally {
+      setCommentSubmitting(false);
+    }
+  };
+
+  const shareCurrentPost = async () => {
+    if (!post) return;
+
+    const url = buildAbsolutePostUrl(post);
+    setInteractionError(null);
+    setShareFeedback(null);
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: post.title,
+          text: post.body.slice(0, 140),
+          url,
+        });
+        setShareFeedback('shared');
+      } else {
+        await copyText(url);
+        setShareFeedback('copied');
+      }
+
+      await onSharePost?.(post.id);
+      window.setTimeout(() => setShareFeedback(null), 1800);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+
+      try {
+        await copyText(url);
+        setShareFeedback('copied');
+        await onSharePost?.(post.id);
+        window.setTimeout(() => setShareFeedback(null), 1800);
+      } catch {
+        setInteractionError(
+          isId
+            ? 'Posting belum berhasil dibagikan.'
+            : 'The post could not be shared.',
+        );
+      }
+    }
+  };
+
+  useEffect(() => {
+    setPostOptionsOpen(false);
+    setPostOptionsCopied(false);
+    setShareFeedback(null);
+    setCommentOpen(false);
+    setCommentDraft('');
+    setInteractionError(null);
+  }, [activeTab, post?.id]);
+
+  useEffect(() => {
+    if (!postOptionsOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (!target || postOptionsRef.current?.contains(target)) return;
+      setPostOptionsOpen(false);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setPostOptionsOpen(false);
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [postOptionsOpen]);
+
+  return (
+    <section
+      className="lajukan-home-community-panel relative z-[1] w-full py-1.5 sm:py-2"
+      aria-label={isId ? 'Komunitas' : 'Community'}
+    >
+      <div className="flex min-h-9 items-center justify-between gap-3 px-1 sm:px-3 md:px-6">
+        <div className="flex min-w-0 items-center gap-2">
+          <Users className="h-4 w-4 shrink-0 text-[color:var(--app-accent)]" />
+          <div className="min-w-0">
+            <h2 className="truncate text-[13px] font-bold tracking-[-0.025em] text-[color:var(--app-text)] sm:text-sm">
+              {isId ? 'Komunitas' : 'Community'}
+            </h2>
+            <p className="hidden truncate text-[10px] font-medium text-[color:var(--app-text-soft)] sm:block">
+              {isId ? 'Tanya, jawab, dan temukan koneksi usaha.' : 'Ask, answer, and find business connections.'}
+            </p>
+          </div>
+        </div>
+
+        <Link
+          href={communityHref}
+          className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-[10px] px-2 text-[10px] font-bold text-[color:var(--app-accent)] transition hover:bg-[color:var(--app-accent-soft)]"
+        >
+          {isId ? 'Lihat semua' : 'See all'}
+          <ChevronRight className="h-3.5 w-3.5" />
+        </Link>
+      </div>
+
+      <div className="mt-1 flex items-center gap-4 overflow-x-auto border-b border-[color:var(--app-border)] px-1 sm:px-3 md:px-6">
+        {tabs.map(tab => {
+          const Icon = tab.icon;
+          const active = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => {
+                setPostOptionsOpen(false);
+                onTabChange(tab.id);
+              }}
+              className={cn(
+                'inline-flex min-h-9 shrink-0 items-center gap-1.5 border-b-2 px-0.5 text-[10px] font-bold transition',
+                active
+                  ? 'border-[color:var(--app-accent)] text-[color:var(--app-accent)]'
+                  : 'border-transparent text-[color:var(--app-text-soft)] hover:text-[color:var(--app-text)]',
+              )}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="px-1 sm:px-3 md:px-6">
+        <Link
+          href="/community?compose=question"
+          className="mt-2 flex min-h-10 items-center gap-2 rounded-[14px] border border-[color:var(--app-border)] bg-white px-3 text-left transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-accent-soft)]/30"
+        >
+          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+            <MessageCircle className="h-3.5 w-3.5" />
+          </span>
+          <span className="min-w-0 flex-1 truncate text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+            {isId ? 'Punya pertanyaan usaha? Tanya komunitas.' : 'Have a business question? Ask the community.'}
+          </span>
+          <span className="shrink-0 text-[10px] font-bold text-[color:var(--app-accent)]">
+            {isId ? 'Tanya' : 'Ask'}
+          </span>
+        </Link>
+      </div>
+
+      {loading && !post ? (
+        <div className="mt-2 space-y-2 px-1 sm:px-3 md:px-6" aria-busy="true">
+          <div className="rounded-[16px] border border-[color:var(--app-border)] bg-white p-3">
+            <div className="flex items-center gap-2">
+              <SkeletonAvatar className="h-8 w-8" />
+              <Skeleton className="h-3 w-28" />
+            </div>
+            <SkeletonStack lines={3} className="mt-3" />
+          </div>
+        </div>
+      ) : post ? (
+        <article
+          tabIndex={0}
+          aria-label={
+            isId ? `Buka posting ${post.title}` : `Open post ${post.title}`
+          }
+          onClick={event => {
+            if (isInteractiveTarget(event.target)) return;
+            openCommunityPost();
+          }}
+          onKeyDown={event => {
+            if (event.target !== event.currentTarget) return;
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            event.preventDefault();
+            openCommunityPost();
+          }}
+          className="mt-2 cursor-pointer overflow-hidden border-y border-[color:var(--app-border)] bg-white transition hover:border-[color:var(--app-accent-border)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)]/30 sm:mx-3 sm:rounded-[18px] sm:border-x md:mx-6"
+        >
+          <div className="p-3">
+            <div className="flex items-start justify-between gap-2.5">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <Image
+                  src={profileAvatarSrc(post.avatar)}
+                  alt={post.author}
+                  width={34}
+                  height={34}
+                  className="h-[34px] w-[34px] shrink-0 rounded-full object-cover"
+                />
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-bold text-[color:var(--app-text)]">
+                    {post.author}
+                  </p>
+                  <p className="mt-0.5 flex min-w-0 items-center gap-1 text-[10px] text-[color:var(--app-text-soft)]">
+                    <span className="truncate">{post.community}</span>
+                    <span aria-hidden="true">·</span>
+                    <span className="shrink-0">{post.time}</span>
+                  </p>
+                </div>
+              </div>
+
+              <div ref={postOptionsRef} className="relative shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPostOptionsCopied(false);
+                    setPostOptionsOpen(open => !open);
+                  }}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[color:var(--app-text-soft)] transition hover:bg-slate-50 hover:text-[color:var(--app-text)]"
+                  aria-label={isId ? 'Buka opsi posting' : 'Open post options'}
+                  aria-expanded={postOptionsOpen}
+                  aria-haspopup="menu"
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </button>
+
+                {postOptionsOpen ? (
+                  <div
+                    role="menu"
+                    className="absolute right-0 top-9 z-20 w-48 overflow-hidden rounded-[14px] border border-[color:var(--app-border)] bg-white p-1 text-left shadow-[0_20px_44px_-26px_rgba(15,23,42,0.28)]"
+                    onClick={event => event.stopPropagation()}
+                  >
+                    <Link
+                      href={communityPostHref}
+                      role="menuitem"
+                      className="flex min-h-9 items-center justify-between gap-2 rounded-[10px] px-2.5 text-[11px] font-bold text-[color:var(--app-text)] hover:bg-slate-50"
+                    >
+                      {isId ? 'Buka detail' : 'Open detail'}
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </Link>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => void copyPostLink()}
+                      className="flex min-h-9 w-full items-center justify-between gap-2 rounded-[10px] px-2.5 text-left text-[11px] font-bold text-[color:var(--app-text)] hover:bg-slate-50"
+                    >
+                      {postOptionsCopied
+                        ? isId
+                          ? 'Link tersalin'
+                          : 'Link copied'
+                        : isId
+                          ? 'Salin link'
+                          : 'Copy link'}
+                      <Share2 className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={hidePostFromHome}
+                      className="flex min-h-9 w-full items-center justify-between gap-2 rounded-[10px] px-2.5 text-left text-[11px] font-bold text-[color:var(--app-text-soft)] hover:bg-slate-50"
+                    >
+                      {isId ? 'Sembunyikan dari Beranda' : 'Hide from Home'}
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="mt-2">{renderContext(post)}</div>
+
+            <h3 className="mt-1.5 line-clamp-2 text-[13px] font-bold leading-[18px] text-[color:var(--app-text)]">
+              {post.title}
+            </h3>
+
+            {cleanPreviewBody(post) ? (
+              <p className="mt-1 line-clamp-2 text-[11px] leading-[17px] text-[color:var(--app-text-soft)]">
+                {cleanPreviewBody(post)}
+              </p>
+            ) : null}
+
+            {post.tags.filter(tag => !/^(tanya|question|ask|help|support|poll|polling|survey|media-usaha|update-usaha)$/i.test(tag)).length > 0 ? (
+              <div className="mt-1.5 flex min-w-0 gap-1 overflow-hidden">
+                {post.tags
+                  .filter(tag => !/^(tanya|question|ask|help|support|poll|polling|survey|media-usaha|update-usaha)$/i.test(tag))
+                  .slice(0, 2)
+                  .map(tag => (
+                    <Link
+                      key={tag}
+                      href={`/community?tag=${encodeURIComponent(tag)}`}
+                      className="max-w-[140px] truncate rounded-full bg-slate-50 px-2 py-0.5 text-[9px] font-semibold text-[color:var(--app-text-soft)] hover:text-[color:var(--app-text)]"
+                    >
+                      #{tag}
+                    </Link>
+                  ))}
+              </div>
+            ) : null}
+          </div>
+
+          {postMediaItems.length > 0 ? (
+            <Link
+              href={communityPostHref}
+              className="relative block aspect-video w-full overflow-hidden bg-slate-100"
+              aria-label={isId ? 'Buka media posting' : 'Open post media'}
+            >
+              {postIsVideo && postMediaItems.length === 1 ? (
+                <video
+                  src={postMediaUrl || ''}
+                  muted
+                  playsInline
+                  preload="metadata"
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <MediaPreviewCarousel
+                  items={postMediaItems}
+                  alt={post.community}
+                  aspectClassName="h-full w-full"
+                  className="h-full w-full bg-transparent"
+                  sizes="(max-width: 640px) 100vw, 720px"
+                  controls={false}
+                  lightbox={false}
+                  showCounter={false}
+                  showDots={false}
+                />
+              )}
+            </Link>
+          ) : null}
+
+          {interactionError ? (
+            <p
+              role="alert"
+              className="border-t border-rose-100 bg-rose-50 px-3 py-1.5 text-[10px] font-semibold text-rose-700"
+            >
+              {interactionError}
+            </p>
+          ) : null}
+
+          <div className="grid grid-cols-3 border-t border-[color:var(--app-border)] px-1.5 py-1 text-[10px] font-semibold text-[color:var(--app-text-soft)]">
+            <button
+              type="button"
+              onClick={() => void toggleLike()}
+              disabled={postLikePending}
+              aria-pressed={postLiked}
+              className={cn(
+                'inline-flex min-h-9 items-center justify-center gap-1.5 rounded-[10px] px-2 transition disabled:cursor-not-allowed disabled:opacity-60',
+                postLiked
+                  ? 'bg-emerald-50 text-emerald-700'
+                  : 'hover:bg-slate-50 hover:text-[color:var(--app-accent)]',
+              )}
+            >
+              <ThumbsUp
+                className={cn(
+                  'h-3.5 w-3.5 shrink-0',
+                  postLiked && 'fill-current',
+                )}
+              />
+              <span>{formatCompactCount(postLikeCount, '0')}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={openInlineComment}
+              aria-expanded={commentOpen}
+              className={cn(
+                'inline-flex min-h-9 items-center justify-center gap-1.5 rounded-[10px] px-2 transition hover:bg-slate-50 hover:text-[color:var(--app-accent)]',
+                commentOpen &&
+                  'bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]',
+              )}
+            >
+              <MessageCircle className="h-3.5 w-3.5 shrink-0" />
+              <span>{formatCompactCount(postCommentCount, '0')}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => void shareCurrentPost()}
+              className={cn(
+                'inline-flex min-h-9 items-center justify-center gap-1.5 rounded-[10px] px-2 transition hover:bg-slate-50 hover:text-[color:var(--app-accent)]',
+                shareFeedback &&
+                  'bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]',
+              )}
+            >
+              <Share2 className="h-3.5 w-3.5 shrink-0" />
+              <span>{formatCompactCount(post.shares, '0')}</span>
+            </button>
+          </div>
+
+          {commentOpen ? (
+            <form
+              data-card-interactive="true"
+              className="flex items-center gap-2 border-t border-[color:var(--app-border)] bg-slate-50/60 px-2.5 py-2 sm:px-3"
+              onSubmit={event => {
+                event.preventDefault();
+                void submitInlineComment();
+              }}
+            >
+              <Image
+                src={avatarSrc}
+                alt=""
+                width={28}
+                height={28}
+                className="h-7 w-7 shrink-0 rounded-full object-cover"
+              />
+              <label className="sr-only" htmlFor={`comment-${post.id}`}>
+                {isId ? 'Tulis komentar' : 'Write a comment'}
+              </label>
+              <input
+                ref={commentInputRef}
+                id={`comment-${post.id}`}
+                value={commentDraft}
+                onChange={event => setCommentDraft(event.target.value)}
+                disabled={commentSubmitting}
+                maxLength={1000}
+                autoComplete="off"
+                placeholder={isId ? 'Tulis komentar...' : 'Write a comment...'}
+                className="min-h-9 min-w-0 flex-1 rounded-full border border-[color:var(--app-border)] bg-white px-3 text-[11px] text-[color:var(--app-text)] outline-none placeholder:text-[color:var(--app-text-soft)] focus:border-[color:var(--app-accent-border)] focus:ring-2 focus:ring-[color:var(--app-accent)]/10 disabled:opacity-60"
+              />
+              <button
+                type="submit"
+                disabled={commentSubmitting || !commentDraft.trim()}
+                className="inline-flex min-h-9 shrink-0 items-center justify-center rounded-full bg-[color:var(--app-accent)] px-3 text-[10px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {commentSubmitting
+                  ? isId
+                    ? 'Mengirim...'
+                    : 'Sending...'
+                  : isId
+                    ? 'Kirim'
+                    : 'Send'}
+              </button>
+            </form>
+          ) : null}
+        </article>
+      ) : (
+        <div className="mt-2 px-1 sm:px-3 md:px-6">
+          <div className="rounded-[16px] border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-4 text-center">
+            <p className="text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+              {activeTabMeta.emptyLabel}
+            </p>
+            <Link
+              href="/community?compose=question"
+              className="mt-2 inline-flex min-h-8 items-center gap-1.5 rounded-[10px] bg-[color:var(--app-accent)] px-3 text-[10px] font-bold text-white"
+            >
+              <MessageCircle className="h-3.5 w-3.5" />
+              {isId ? 'Ajukan pertanyaan' : 'Ask a question'}
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {morePosts.length > 0 ? (
+        <div className="mt-2 divide-y divide-[color:var(--app-border)] border-y border-[color:var(--app-border)] bg-white sm:mx-3 sm:overflow-hidden sm:rounded-[16px] sm:border-x md:mx-6">
+          {morePosts.map(item => {
+            const href = buildCommunityPostHref(item);
+            const itemMediaItems = item.mediaItems?.length
+              ? item.mediaItems
+              : item.mediaUrl
+                ? [
+                    {
+                      src: item.mediaUrl,
+                      type: item.mediaType === 'video' ? 'video' : 'image',
+                      alt: item.title,
+                    } satisfies MediaPreviewItem,
+                  ]
+                : [];
+            return (
+              <Link
+                key={item.id}
+                href={href}
+                className="group flex min-w-0 items-center gap-2.5 px-3 py-2.5 transition hover:bg-[color:var(--app-surface-muted)]"
+              >
+                <Image
+                  src={profileAvatarSrc(item.avatar)}
+                  alt={item.author}
+                  width={30}
+                  height={30}
+                  className="h-[30px] w-[30px] shrink-0 rounded-full object-cover"
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    {renderContext(item, true)}
+                    <span className="truncate text-[9px] text-[color:var(--app-text-soft)]">
+                      {item.community} · {item.time}
+                    </span>
+                  </span>
+                  <span className="mt-0.5 line-clamp-2 block text-[11px] font-bold leading-4 text-[color:var(--app-text)]">
+                    {item.title}
+                  </span>
+                  <span className="mt-0.5 inline-flex items-center gap-1 text-[9px] font-semibold text-[color:var(--app-text-soft)]">
+                    <MessageCircle className="h-3 w-3" />
+                    {formatCompactCount(item.comments, '0')}
+                  </span>
+                </span>
+
+                {itemMediaItems.length > 0 ? (
+                  <span className="relative h-12 w-16 shrink-0 overflow-hidden rounded-[9px] bg-slate-100">
+                    <MediaPreviewCarousel
+                      items={itemMediaItems}
+                      alt={item.title}
+                      aspectClassName="h-full w-full"
+                      className="h-full w-full bg-transparent"
+                      mediaClassName="transition duration-300 group-hover:scale-[1.02]"
+                      sizes="64px"
+                      controls={false}
+                      lightbox={false}
+                      showCounter={false}
+                      showDots={false}
+                    />
+                  </span>
+                ) : (
+                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[color:var(--app-text-soft)]" />
+                )}
+              </Link>
+            );
+          })}
+        </div>
+      ) : null}
+
+      {loadError ? (
+        <div className="mt-2 flex items-center justify-between gap-2 px-1 sm:px-3 md:px-6">
+          <p className="min-w-0 flex-1 text-[10px] font-semibold text-amber-700">
+            {loadError}
+          </p>
+          {onRetry ? (
+            <button
+              type="button"
+              onClick={onRetry}
+              disabled={loading}
+              className="min-h-8 shrink-0 rounded-[10px] border border-amber-200 bg-amber-50 px-2.5 text-[10px] font-bold text-amber-800 disabled:opacity-50"
+            >
+              {isId ? 'Coba lagi' : 'Try again'}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+export function ReelsPanel({ isId, items }: ReelsPanelProps) {
+  const [emblaRef, emblaApi] = useEmblaCarousel({
+    align: 'start',
+    containScroll: 'keepSnaps',
+    dragFree: true,
+    skipSnaps: true,
+  });
+
+  useEmblaWheelGestures(emblaApi);
+
+  return (
+    <section
+      className="w-full py-1.5 sm:py-2"
+      aria-label={isId ? 'Reels inspirasi' : 'Inspiration reels'}
+    >
+      {/* HEADER */}
+      <div className="flex h-6 items-center gap-1.5 px-1 sm:px-3 md:px-6">
+        <Play className="h-3.5 w-3.5 shrink-0 fill-emerald-600 text-emerald-600" />
+
+        <h2 className="truncate text-[11px] font-bold leading-none tracking-tight text-[color:var(--app-text)] sm:text-xs">
+          {isId ? 'Reels Inspirasi' : 'Inspiration Reels'}
+        </h2>
+
+        <span className="hidden truncate text-[9px] font-medium text-zinc-400 sm:inline">
+          {isId
+            ? 'Ide & tips bisnis singkat'
+            : 'Quick business ideas & tips'}
+        </span>
+      </div>
+
+      {/* EMPTY */}
+      {items.length === 0 ? (
+        <div className="mt-1 px-1 sm:px-3 md:px-6">
+          <div className="rounded-xl border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-3 text-center text-[10px] font-medium text-[color:var(--app-text-soft)]">
+            {isId
+              ? 'Belum ada reels saat ini.'
+              : 'No reels available right now.'}
+          </div>
+        </div>
+      ) : (
+        /* CAROUSEL */
+        <div
+          ref={emblaRef}
+          className="mt-1 cursor-grab overflow-hidden contain-paint active:cursor-grabbing"
+        >
+          <div
+            className="
+              flex touch-pan-y gap-2
+              px-1 py-0.5
+              sm:gap-2.5 sm:px-3
+              md:px-6
+              [backface-visibility:hidden]
+              [will-change:transform]
+            "
+          >
+            {items.map(item => (
+              <div
+                key={item.id}
+                className="
+                  w-[128px]
+                  shrink-0 select-none
+                  sm:w-[140px]
+                  md:w-[148px]
+                "
+                style={{
+                  backfaceVisibility: 'hidden',
+                }}
+              >
+                <ReelCard item={item} isId={isId} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ReelCard({ item, isId }: { item: ReelItem; isId: boolean }) {
+  return (
+    <Link
+      href={item.href}
+      className="group relative isolate block aspect-[9/16] w-full overflow-hidden rounded-[20px] border border-zinc-800 bg-zinc-950 shadow-[0_12px_24px_-16px_rgba(15,23,42,0.3)] transition-all duration-300 [backface-visibility:hidden] [transform:translateZ(0)] hover:-translate-y-1 hover:shadow-[0_16px_28px_-12px_rgba(15,23,42,0.4)]"
+      data-testid="home-reel-card"
+      data-lajukan-event="home.card_clicked"
+      data-lajukan-surface="home_reels"
+      data-lajukan-entity-type="reel"
+      data-lajukan-entity-id={item.id}
+      data-lajukan-label={item.title}
+    >
+      {/* BACKGROUND MEDIA */}
+      {item.mediaUrl && item.mediaType !== 'image' ? (
+        <video
+          src={item.mediaUrl}
+          muted
+          playsInline
+          preload="metadata"
+          className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 [backface-visibility:hidden] [transform:translateZ(0)] group-hover:scale-105"
+        />
+      ) : item.mediaUrl ? (
+        <Image
+          src={item.mediaUrl}
+          alt={item.title}
+          fill
+          sizes="(max-width: 640px) 140px, 156px"
+          className="object-cover transition-transform duration-500 [backface-visibility:hidden] [transform:translateZ(0)] group-hover:scale-105"
+        />
+      ) : (
+        <span className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(circle_at_top,#14532d,#020617)] text-white/40">
+          <Video className="h-8 w-8" />
+        </span>
+      )}
+
+      {/* GRADIENT OVERLAY (Gelap di bawah agar teks putih kontras & terbaca) */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-black/10 transition-opacity group-hover:via-black/40" />
+
+      {/* BADGE KATEGORI (Kiri Atas) */}
+      <span
+        className="absolute left-2.5 top-2.5 max-w-[calc(100%-1.25rem)] truncate rounded-full bg-white/90  px-2 py-0.5 text-[9px] font-bold text-emerald-800 shadow-sm"
+        title={item.category}
+      >
+        {item.category}
+      </span>
+
+      {/* DESKRIPSI & INFO TAYANGAN (Bagian Bawah) */}
+      <div className="absolute inset-x-3 bottom-3 flex flex-col justify-end">
+        {/* Judul dengan batasan baris */}
+        <p className="line-clamp-2 text-[11px] sm:text-xs font-bold leading-snug text-white tracking-tight drop-shadow-sm">
+          {item.title}
+        </p>
+
+        {/* Baris data tayangan & icon play */}
+        <div className="mt-2 flex items-center justify-between text-[10px] font-medium text-zinc-300/90">
+          <span className="rounded bg-black/45 px-1 text-white">
+            {item.views} {isId ? 'tayangan' : 'views'}
+          </span>
+          <PlayCircle className="h-4 w-4 text-white transition-transform group-hover:scale-110" />
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function RightRail({
+  isId,
+  locale,
+  isAuthenticated,
+  summary,
+  primaryCtaHref,
+  walletAmountLabel,
+  walletModeLabel,
+  walletLoading,
+}: {
+  isId: boolean;
+  locale: string;
+  isAuthenticated: boolean;
+  summary: LajukanSummary | null;
+  primaryCtaHref: string;
+  walletAmountLabel?: string | null;
+  walletModeLabel?: string | null;
+  walletLoading?: boolean;
+}) {
+  const pulseItems = [
+    {
+      id: 'verified',
+      label: isId ? 'Supplier siap' : 'Verified suppliers',
+      value: resolveCountLabel(summary?.stores?.verified, '0'),
+      icon: ShieldCheck,
+      tone: 'bg-emerald-50 text-emerald-700 ring-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-200 dark:ring-emerald-900/60',
+    },
+    {
+      id: 'cities',
+      label: isId ? 'Kota aktif' : 'Active cities',
+      value: resolveCountLabel(summary?.stores?.cities, '0'),
+      icon: MapPin,
+      tone: 'bg-teal-50 text-teal-700 ring-teal-100 dark:bg-teal-950/40 dark:text-teal-200 dark:ring-teal-900/60',
+    },
+    {
+      id: 'requests',
+      label: isId ? 'Permintaan aktif' : 'Active requests',
+      value: resolveCountLabel(summary?.requests?.active, '0'),
+      icon: ClipboardList,
+      tone: 'bg-amber-50 text-amber-700 ring-amber-100 dark:bg-amber-950/40 dark:text-amber-200 dark:ring-amber-900/60',
+    },
+  ];
+  const pulseCtaLabel = isAuthenticated
+    ? isId
+      ? 'Posting sekarang'
+      : 'Post now'
+    : isId
+      ? 'Mulai gratis'
+      : 'Start free';
+  const pulseHelperText = isId
+    ? 'Upload listing, update info, lalu lanjut chat.'
+    : 'Upload listings, keep them fresh, then continue in chat.';
+
+  return (
+    <aside className="lajukan-home-right-rail hidden min-w-0 xl:flex xl:h-full xl:max-h-full xl:min-h-0 xl:flex-col xl:overflow-hidden xl:pt-2">
+      <div
+        className="lajukan-home-right-rail-scroll flex h-full max-h-full min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto overflow-x-hidden px-2.5 py-3 overscroll-contain"
+        data-auto-scrollbar
+      >
+        <section className="lajukan-home-pulse-card flex min-w-0 flex-col overflow-hidden rounded-[20px] border border-[color:var(--app-border)] bg-[linear-gradient(180deg,#ffffff_0%,#f8fffb_100%)] p-3 shadow-[0_18px_36px_-32px_rgba(15,23,42,0.14)] dark:bg-[color:var(--app-surface)]">
+          <div className="flex min-w-0 items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[color:var(--app-accent)]">
+                {isId ? 'Hari ini' : 'Today'}
+              </p>
+              <h2 className="mt-1 line-clamp-2 text-[1rem] font-bold leading-tight tracking-[-0.035em] text-[color:var(--app-text)]">
+                {isId
+                  ? 'Lihat peluang, lalu lanjut chat.'
+                  : 'Find opportunities, then continue in chat.'}
+              </h2>
+            </div>
+            <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)]">
+              <BarChart3 className="h-4.5 w-4.5" />
+            </span>
+          </div>
+
+          <div className="mt-3 grid grid-cols-3 gap-1.5">
+            {pulseItems.map(item => {
+              const Icon = item.icon;
+              return (
+                <div
+                  key={item.id}
+                  className="min-w-0 rounded-[15px] border border-[color:var(--app-border)] bg-white/86 px-2 py-2 text-center shadow-[0_10px_22px_-24px_rgba(15,23,42,0.16)] dark:bg-slate-950/42"
+                >
+                  <span
+                    className={cn(
+                      'mx-auto inline-flex h-7 w-7 items-center justify-center rounded-[11px] ring-1',
+                      item.tone,
+                    )}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                  </span>
+                  <p className="mt-1 text-[15px] font-bold leading-none tracking-[-0.04em] text-[color:var(--app-text)]">
+                    {item.value}
+                  </p>
+                  <p className="mt-1 truncate text-[10px] font-semibold leading-tight text-[color:var(--app-text-soft)]">
+                    {item.label}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+
+          <p className="mt-3 rounded-[15px] bg-[color:var(--app-accent-soft)] px-3 py-2 text-[11.5px] font-semibold leading-4 text-[color:var(--app-accent)]">
+            {pulseHelperText}
+          </p>
+
+          <Link
+            href={primaryCtaHref}
+            className="mt-2 inline-flex min-h-[38px] w-full items-center justify-center gap-2 rounded-[14px] bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-4 text-[12px] font-bold text-[color:var(--app-text-inverse)] shadow-[0_16px_30px_-24px_color-mix(in_srgb,var(--app-accent)_50%,transparent)] transition hover:brightness-105"
+          >
+            <Package className="h-4 w-4" />
+            {pulseCtaLabel}
+          </Link>
+        </section>
+      </div>
+    </aside>
+  );
+}
+
+export function HomeNewsLoadingSkeleton() {
+  return (
+    <section
+      className="overflow-hidden rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 sm:p-4"
+      aria-busy="true"
+      data-skeleton-card="home-news"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <Skeleton className="h-9 w-9 rounded-[12px]" />
+          <div>
+            <Skeleton variant="line" className="h-4 w-28" />
+            <Skeleton variant="line" className="mt-2 h-3 w-52 max-w-[50vw]" />
+          </div>
+        </div>
+        <Skeleton variant="chip" className="w-20" />
+      </div>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <Skeleton variant="media" className="aspect-[16/9] rounded-[18px]" />
+        <div className="grid gap-3">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div
+              key={index}
+              className="grid grid-cols-[96px_minmax(0,1fr)] gap-3 rounded-[16px] border border-[color:var(--app-border)] p-2.5"
+            >
+              <Skeleton className="aspect-[4/3] w-full rounded-[12px]" />
+              <div className="min-w-0 py-0.5">
+                <Skeleton variant="line" className="h-3 w-20" />
+                <Skeleton variant="line" className="mt-2 h-4 w-full" />
+                <Skeleton variant="line" className="mt-2 h-4 w-4/5" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+
+
 function QuickCategoriesSection({ isId }: { isId: boolean }) {
   const categories = getQuickCategories(isId);
 
