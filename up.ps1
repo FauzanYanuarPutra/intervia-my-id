@@ -549,6 +549,13 @@ try {
             Write-Host "Tidak ada service build yang dipilih; melewati tahap image build." -ForegroundColor Yellow
         }
         else {
+            if ($Services.Count -gt 0) {
+                Write-Host "Build targets: $($BuildTargets -join ', ')" -ForegroundColor DarkGray
+            }
+            else {
+                Write-Host "Build targets: all build-capable services in the resolved Compose stack" -ForegroundColor DarkGray
+            }
+
             if ($ClearBuildCache) {
                 Write-Host "Building Docker images with cache disabled (-Buildclear)..." -ForegroundColor Yellow
             }
@@ -591,10 +598,9 @@ try {
                 $BuildArgs = @("build")
                 if ($ClearBuildCache) {
                     $BuildArgs += "--no-cache"
-                    $BuildArgs += "--pull"
                 }
                 $BuildArgs += $BuildTargets
-                $BuildCacheLabel = if ($ClearBuildCache) { "--no-cache --pull " } else { "" }
+                $BuildCacheLabel = if ($ClearBuildCache) { "--no-cache " } else { "" }
                 Write-Host "Docker build command: docker compose build $BuildCacheLabel$($BuildTargets -join ' ')" -ForegroundColor DarkGray
                 $BuildProbe = Invoke-DockerNative -Arguments (@($ComposeArgs) + $BuildArgs)
                 $BuildProbe.Output | ForEach-Object { Write-Output $_ }
@@ -624,7 +630,6 @@ try {
                                 $ServiceBuildArgs = @("build")
                                 if ($ClearBuildCache) {
                                     $ServiceBuildArgs += "--no-cache"
-                                    $ServiceBuildArgs += "--pull"
                                 }
                                 $ServiceBuildArgs += $ServiceName
                                 $ServiceBuildProbe = Invoke-DockerNative -Arguments (@($ComposeArgs) + $ServiceBuildArgs)
