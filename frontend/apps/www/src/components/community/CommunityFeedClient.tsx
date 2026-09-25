@@ -3080,7 +3080,7 @@ export function CommunityPostCard({
             className="shrink-0 font-semibold hover:text-[color:var(--app-text)]"
           >
             ${commentCount > 0
-              ? \`${compactNumber(commentCount)} ${isId ? 'komentar' : 'comments'}\`
+              ? `${compactNumber(commentCount)} ${isId ? 'komentar' : 'comments'}`
               : isId
                 ? 'Lihat diskusi'
                 : 'View discussion'}
@@ -5546,7 +5546,7 @@ function GroupCard({
 
     setBusy(true);
     const response = await authFetch(
-      \`/api/community/groups/${encodeURIComponent(group.id)}/${joined ? 'leave' : 'join'}\`,
+      `/api/community/groups/${encodeURIComponent(group.id)}/${joined ? 'leave' : 'join'}`,
       { method: 'POST' },
     );
     const payload = await response.json().catch(() => ({}));
@@ -6441,7 +6441,7 @@ function RightRail({
           <div className="mt-3 flex flex-wrap gap-1.5">
             {trendingTags.length ? (
               trendingTags.slice(0, 8).map(tag => (
-                <Link key={tag.id} href={\`/community?tag=${encodeURIComponent(tag.slug)}\`} className="rounded-full border border-[color:var(--app-border)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-text-soft)] transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)]">
+                <Link key={tag.id} href={`/community?tag=${encodeURIComponent(tag.slug)}`} className="rounded-full border border-[color:var(--app-border)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-text-soft)] transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)]">
                   #${tag.slug}
                 </Link>
               ))
@@ -6458,7 +6458,7 @@ function RightRail({
           <div className="mt-3 space-y-1.5">
             {topContributors.length ? (
               topContributors.slice(0, 5).map(person => (
-                <Link key={person.id} href={\`/profile/${encodeURIComponent(person.id)}\`} className="flex items-center gap-2 rounded-[14px] px-2 py-1.5 transition hover:bg-slate-50">
+                <Link key={person.id} href={`/profile/${encodeURIComponent(person.id)}`} className="flex items-center gap-2 rounded-[14px] px-2 py-1.5 transition hover:bg-slate-50">
                   <Image src={profileAvatarSrc(person.avatarUrl, readProfileAvatarStyle(person), person.name)} alt={person.name} width={34} height={34} className="h-8 w-8 rounded-full object-cover" />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-xs font-bold text-[color:var(--app-text)]">${person.name}</span>
