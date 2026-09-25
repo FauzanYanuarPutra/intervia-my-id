@@ -13,7 +13,10 @@ defmodule ChatService.AttachmentPolicyTest do
       assert {:ok, normalized} = AttachmentPolicy.normalize("image", attachments)
       assert length(normalized) == 100
       assert {:error, :invalid_attachments} =
-               AttachmentPolicy.normalize("image", attachments ++ ["/api/chat/media/laju-chat/chat/dm_a_b/asset-101.webp"])
+        AttachmentPolicy.normalize(
+          "image",
+          attachments ++ ["/api/chat/media/laju-chat/chat/dm_a_b/asset-101.webp"]
+        )
     end
 
     test "accepts only controlled chat and content media paths" do

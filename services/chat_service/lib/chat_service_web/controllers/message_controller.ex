@@ -96,6 +96,7 @@ defmodule ChatServiceWeb.MessageController do
     user_id_bin = conn.assigns.current_user_id_bin
     raw_content = params["content"] || conn.body_params["content"] || ""
     client_ref = params["client_ref"] || conn.body_params["client_ref"]
+
     reference =
       params["reply_to"] ||
         params["reference"] ||
