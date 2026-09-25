@@ -93,5 +93,17 @@ const UmkmStoreMapClient = dynamic(
 export const UmkmStoreMap = memo(function UmkmStoreMap(
   props: UmkmStoreMapProps,
 ) {
-  return <UmkmStoreMapClient {...props} />;
+  const { className, ...clientProps } = props;
+  const hostClassName = className || 'h-[360px] w-full rounded-3xl';
+
+  return (
+    <div
+      className={`umkm-map-host relative w-full max-w-full overflow-hidden ${hostClassName}`}
+    >
+      <UmkmStoreMapClient
+        {...clientProps}
+        className="umkm-leaflet-map h-full w-full max-w-full overflow-hidden rounded-[inherit]"
+      />
+    </div>
+  );
 });
