@@ -3605,7 +3605,7 @@ function HomeCommunityGroupsSection({
         </div>
 
         <Link
-          href="/community"
+          href="/community/groups"
           className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-[10px] px-2 text-[10px] font-bold text-[color:var(--app-accent)] transition hover:bg-[color:var(--app-accent-soft)]"
         >
           {isId ? 'Semua grup' : 'All groups'}
