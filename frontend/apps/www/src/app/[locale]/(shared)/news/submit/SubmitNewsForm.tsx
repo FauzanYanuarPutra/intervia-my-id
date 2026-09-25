@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
+import { Link } from '@/i18n/navigation';
 import NewsRichTextEditor from './NewsRichTextEditor';
 
 const CATEGORIES = ['Ekonomi', 'Bisnis', 'UMKM', 'Teknologi', 'Keuangan', 'Regulasi', 'Industri', 'Daerah'];
@@ -91,6 +92,10 @@ export default function SubmitNewsForm({ locale }: Props) {
         source_urls: '',
         cover_image: '',
       });
+      try {
+        localStorage.removeItem('lajukan-news-form-draft');
+        localStorage.removeItem('lajukan-news-draft');
+      } catch {}
       setState({
         loading: false,
         error: '',
@@ -110,7 +115,27 @@ export default function SubmitNewsForm({ locale }: Props) {
   return (
     <form onSubmit={submit} className="grid gap-5">
       {state.error ? <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-800 dark:border-red-400/20 dark:bg-red-400/10 dark:text-red-200">{state.error}</div> : null}
-      {state.success ? <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-800 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-200">{state.success}</div> : null}
+      {state.success ? (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-400/20 dark:bg-emerald-400/10">
+          <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">
+            {state.success}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link
+              href="/news/submissions"
+              className="inline-flex min-h-9 items-center rounded-xl bg-emerald-700 px-3 text-xs font-black text-white hover:bg-emerald-800"
+            >
+              {isId ? 'Lihat kiriman saya' : 'View my submissions'}
+            </Link>
+            <Link
+              href="/news"
+              className="inline-flex min-h-9 items-center rounded-xl border border-emerald-200 bg-white px-3 text-xs font-bold text-emerald-800 hover:border-emerald-300 dark:border-emerald-400/20 dark:bg-slate-950 dark:text-emerald-200"
+            >
+              {isId ? 'Kembali ke News' : 'Back to News'}
+            </Link>
+          </div>
+        </div>
+      ) : null}
 
       <label className="text-sm font-bold text-slate-800 dark:text-slate-100">
         {isId ? 'Judul' : 'Headline'}
