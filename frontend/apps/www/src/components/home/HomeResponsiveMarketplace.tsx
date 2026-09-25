@@ -5390,7 +5390,26 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
 
       if (communityRequestSeqRef.current !== requestSeq) return;
 
+      const groups = [
+        ...(groupsPayload?.data || []),
+        ...(groupsPayload?.joined || []),
+        ...(groupsPayload?.recommended || []),
+        ...(payload?.overview?.joinedGroups || []),
+        ...(payload?.overview?.recommendedGroups || []),
+        ...(payload?.overview?.groups || []),
+      ]
+        .filter(
+          (group, index, all) =>
+            all.findIndex(candidate => candidate.id === group.id) === index,
+        )
+        .slice(0, 8);
+
+      // Groups are a first-class Home discovery surface. Do not hide them just
+      // because the discussion feed itself is temporarily unavailable.
+      setCommunityGroups(groups);
+
       if (!response.ok) {
+        setCommunityPosts([]);
         throw new Error(
           isId
             ? 'Diskusi komunitas belum bisa dimuat. Coba lagi sebentar.'
@@ -5403,20 +5422,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
         .map(item => mapCommunityItemToPost(item, isId, activeTab))
         .slice(0, 3);
 
-      const groups = [
-        ...(groupsPayload?.data || []),
-        ...(payload?.overview?.joinedGroups || []),
-        ...(payload?.overview?.recommendedGroups || []),
-        ...(payload?.overview?.groups || []),
-      ]
-        .filter(
-          (group, index, all) =>
-            all.findIndex(candidate => candidate.id === group.id) === index,
-        )
-        .slice(0, 8);
-
       setCommunityPosts(mapped);
-      setCommunityGroups(groups);
       setCommunityError(null);
     } catch (error) {
       if (communityRequestSeqRef.current !== requestSeq) return;
