@@ -7,7 +7,13 @@ import {
   WalletCards,
   type LucideIcon,
 } from 'lucide-react';
+import { ExploreCardMedia } from '@/components/explore/cards/ExploreCardMedia';
 import { LocalizedAnchor as Link } from '@/components/navigation/LocalizedAnchor';
+import {
+  isPlaceholderLikeContentImage,
+  isPreviewableContentMediaUrl,
+  normalizeContentMediaUrl,
+} from '@/lib/content/catalog';
 import {
   getListingSideActorLabel,
   getListingSideVerbLabel,
@@ -101,6 +107,7 @@ export function NeedSearchCard({
   ]
     .filter(Boolean)
     .join(' ');
+
   const factItems = [
     {
       key: 'budget',
@@ -121,62 +128,126 @@ export function NeedSearchCard({
     icon: LucideIcon;
     label: string;
   }>;
+
   const visibleFactItems = factItems.slice(0, 3);
   const statusLabel = requestStatusLabel(item, locale);
   const sideStatusLabel = `${getListingSideVerbLabel('demand', locale)} - ${statusLabel}`;
   const actorLabel = getListingSideActorLabel('demand', locale).toLowerCase();
   const action = getExploreResultAction('needs', locale);
 
+  const imageCandidates = [
+    item.image,
+    ...[
+      'image_url',
+      'imageUrl',
+      'cover_image',
+      'coverImage',
+      'thumbnail',
+      'thumbnail_url',
+      'thumbnailUrl',
+      'photo',
+      'photo_url',
+      'photoUrl',
+      'media',
+      'media_url',
+      'mediaUrl',
+    ].map(key => {
+      const value = item.metadata?.[key];
+      return typeof value === 'string' ? value : null;
+    }),
+  ];
+
+  const imageSrc =
+    imageCandidates
+      .map(value => normalizeContentMediaUrl(value || undefined))
+      .find(
+        value =>
+          Boolean(value) &&
+          isPreviewableContentMediaUrl(value) &&
+          !isPlaceholderLikeContentImage(value),
+      ) || null;
+
+  const hasImage = Boolean(imageSrc);
+
   const card = (
     <article
+      data-testid="need-search-card"
       className={cn(
-        'flex h-full min-h-[164px] flex-col rounded-xl border bg-[color:var(--app-surface-strong)] p-3 shadow-[0_16px_34px_-30px_rgba(15,23,42,0.4)]',
+        'flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border bg-[color:var(--app-surface-strong)] shadow-[0_16px_34px_-30px_rgba(15,23,42,0.4)]',
+        hasImage ? 'min-h-[282px]' : 'min-h-[172px]',
         interactive &&
-          'cursor-pointer transition motion-reduce:transform-none hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:shadow-[0_18px_36px_-28px_rgba(15,23,42,0.3)]',
+          'cursor-pointer transition duration-200 motion-reduce:transform-none hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:shadow-[0_20px_40px_-30px_rgba(15,23,42,0.32)]',
         searchCardBorderClass('blue'),
       )}
     >
-      <SearchCardEyebrow
-        icon={Clock3}
-        label={item.label || (locale === 'id' ? `Kebutuhan ${actorLabel}` : 'Buyer need')}
-        tone="blue"
-        sideLabel={sideStatusLabel}
-      />
-      <h3
-        className={cn(
-          'mt-1.5 line-clamp-2 text-sm font-bold leading-5 text-[color:var(--app-text)]',
-          interactive && 'group-hover:text-[#1d4ed8]',
-        )}
-      >
-        {item.title}
-      </h3>
-      <p className="mt-1 line-clamp-1 text-xs leading-5 text-[color:var(--app-text-soft)]">
-        {item.summary ||
-          (locale === 'id'
-            ? 'Pembeli belum menulis detail panjang. Buka brief untuk cek konteks dan tawarkan bantuan yang relevan.'
-            : 'The buyer has not added a long description. Open the brief to review context and offer relevant help.')}
-      </p>
-      <div
-        className="mt-2 flex flex-wrap gap-1.5 border-t border-[color:var(--app-border)] pt-2 text-[11px]"
-        aria-label={locale === 'id' ? 'Info kebutuhan' : 'Need info'}
-      >
-        {visibleFactItems.map(fact => {
-          const FactIcon = fact.icon;
-          return (
-            <span
-              key={fact.key}
-              className="inline-flex min-w-0 max-w-full items-center gap-1 truncate rounded-full bg-[#eff6ff] px-2 py-1 font-semibold text-[#1d4ed8]"
-            >
-              <FactIcon className="h-3 w-3 shrink-0" aria-hidden="true" />
-              <span className="truncate">{fact.label}</span>
-            </span>
-          );
-        })}
+      {hasImage ? (
+        <ExploreCardMedia
+          src={imageSrc}
+          alt={item.title}
+          fallbackLabel={locale === 'id' ? 'Belum ada foto' : 'No photo yet'}
+          className="aspect-[16/7] w-full sm:aspect-[16/6]"
+        />
+      ) : null}
+
+      <div className="flex min-w-0 flex-1 flex-col p-3 sm:p-3.5">
+        <div className="flex min-w-0 flex-wrap items-start justify-between gap-1.5">
+          <SearchCardEyebrow
+            icon={Clock3}
+            label={
+              item.label ||
+              (locale === 'id' ? `Kebutuhan ${actorLabel}` : 'Buyer need')
+            }
+            tone="blue"
+            sideLabel={sideStatusLabel}
+          />
+        </div>
+
+        <h3
+          className={cn(
+            'mt-2 line-clamp-2 min-h-10 text-sm font-bold leading-5 text-[color:var(--app-text)] sm:text-[15px]',
+            interactive && 'group-hover:text-[#1d4ed8]',
+          )}
+        >
+          {item.title}
+        </h3>
+
+        <p className="mt-1 line-clamp-2 text-xs leading-5 text-[color:var(--app-text-soft)] sm:line-clamp-1">
+          {item.summary ||
+            (locale === 'id'
+              ? 'Pembeli belum menulis detail panjang. Buka brief untuk cek konteks dan tawarkan bantuan yang relevan.'
+              : 'The buyer has not added a long description. Open the brief to review context and offer relevant help.')}
+        </p>
+
+        {visibleFactItems.length ? (
+          <div
+            className="mt-2.5 flex flex-wrap gap-1.5 border-t border-[color:var(--app-border)] pt-2.5 text-[10px] sm:text-[11px]"
+            aria-label={locale === 'id' ? 'Info kebutuhan' : 'Need info'}
+          >
+            {visibleFactItems.map(fact => {
+              const FactIcon = fact.icon;
+              return (
+                <span
+                  key={fact.key}
+                  className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-full bg-[#eff6ff] px-2 py-1 font-semibold text-[#1d4ed8]"
+                >
+                  <FactIcon className="h-3 w-3 shrink-0" aria-hidden="true" />
+                  <span className="min-w-0 truncate">{fact.label}</span>
+                </span>
+              );
+            })}
+          </div>
+        ) : null}
+
+        <div className="mt-auto pt-2.5">
+          <span className="inline-flex min-h-8 max-w-full items-center gap-1 rounded-lg bg-[#eff6ff] px-2.5 text-[10px] font-black text-[#1d4ed8] sm:text-[11px]">
+            <span className="truncate">{action.label}</span>
+            <ArrowRight
+              className="h-3.5 w-3.5 shrink-0 transition group-hover:translate-x-0.5"
+              aria-hidden="true"
+            />
+          </span>
+        </div>
       </div>
-      <p className="mt-auto flex items-center gap-1 pt-2 text-[10px] font-black text-[#1d4ed8] sm:text-[11px]">
-        {action.label}
-        <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" aria-hidden="true" />
-      </p>
     </article>
   );
 
@@ -185,7 +256,7 @@ export function NeedSearchCard({
   return (
     <Link
       href={item.href}
-      className="group block h-full rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563eb] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--app-surface-muted)]"
+      className="group block h-full min-w-0 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563eb] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--app-surface-muted)]"
     >
       {card}
     </Link>
