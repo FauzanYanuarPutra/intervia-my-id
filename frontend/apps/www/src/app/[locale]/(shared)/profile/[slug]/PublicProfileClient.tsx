@@ -2390,7 +2390,7 @@ export default function PublicProfileClient({
             </div>
           </section>
 
-          <section className="mt-3 overflow-hidden border-y border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] sm:rounded-[24px] sm:border sm:shadow-sm">
+          <section className="mt-3 overflow-hidden rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-sm sm:rounded-[26px]">
             <div className="sticky top-14 z-20 border-b border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)]/96 backdrop-blur sm:top-0">
               <div
                 role="tablist"
