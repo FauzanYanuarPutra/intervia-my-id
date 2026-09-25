@@ -809,11 +809,13 @@ services:
       dockerfile: Dockerfile
     expose: ["8000"]
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8000/ready"]
+      # Liveness must not wait for the multi-minute PaddleOCR model warm-up.
+      # /ready remains the fail-closed readiness contract for callers.
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
       interval: 15s
       timeout: 10s
       retries: 10
-      start_period: 120s
+      start_period: 30s
     networks: [app]
 
   liveness_service:
