@@ -526,20 +526,51 @@ html {
 }
 
 .umkm-store-map-popup .leaflet-popup-content-wrapper {
-  max-width: min(260px, calc(100vw - 32px));
-  border-radius: 12px;
-  box-shadow: 0 14px 30px -22px rgb(15 23 42 / 0.28);
+  max-width: min(270px, calc(100vw - 24px));
+  overflow: hidden;
+  border: 1px solid rgb(226 232 240 / 0.92);
+  border-radius: 16px;
+  background: rgb(255 255 255 / 0.98);
+  box-shadow: 0 20px 46px -28px rgb(15 23 42 / 0.38);
 }
 
 .umkm-store-map-popup .leaflet-popup-content {
-  width: min(218px, calc(100vw - 72px));
+  width: min(248px, calc(100vw - 54px));
   max-width: 100%;
-  margin: 10px;
+  margin: 10px 11px;
+}
+
+.umkm-store-map-popup .leaflet-popup-close-button {
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+  display: inline-flex;
+  width: 26px;
+  height: 26px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: rgb(100 116 139);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  background: rgb(248 250 252 / 0.94);
+}
+
+.umkm-store-map-popup .leaflet-popup-close-button:hover {
+  color: rgb(15 23 42);
+  background: rgb(241 245 249);
+}
+
+.umkm-store-map-popup .leaflet-popup-tip {
+  border: 1px solid rgb(226 232 240 / 0.92);
+  box-shadow: 5px 5px 12px -10px rgb(15 23 42 / 0.25);
 }
 
 @media (max-width: 640px) {
   .umkm-store-map-popup .leaflet-popup-content {
-    width: min(210px, calc(100vw - 64px));
+    width: min(232px, calc(100vw - 46px));
+    margin: 9px 10px;
   }
 }
 
