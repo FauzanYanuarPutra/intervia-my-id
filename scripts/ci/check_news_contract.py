@@ -48,6 +48,9 @@ require(
         "next_cursor",
         "news.submission_received",
         "news.publication.changed",
+        "news.withdrawn",
+        "withdraw_news_submission",
+        "contributor_withdrawal_allowed",
         '"retracted"',
         "record_version_tx",
         "sync_source_references_tx",
@@ -339,6 +342,8 @@ require(
         "cover_image",
         "sanitizeRichText",
         "isSafePublicUrl",
+        "export async function DELETE",
+        "news:withdraw:user:",
     ),
 )
 
@@ -350,6 +355,9 @@ require(
         "cover_image",
         "statusLabel",
         "Catatan editor:",
+        "Hapus kiriman",
+        "Berita baru",
+        "Refresh submissions",
     ),
 )
 
@@ -485,6 +493,7 @@ require(
         "retraction tombstone",
         "Hardening V3",
         "scheduled publication",
+        "withdraw unpublished submissions",
         "independent source review",
         "news.engaged_30s",
         "news.share_clicked",
