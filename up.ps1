@@ -444,7 +444,11 @@ try {
     }
 
     $KycRequested = $RequestedProfiles -contains "kyc"
-    if ($Environment -eq "development" -and $KycRequested -and -not $Down.IsPresent) {
+    $KycServicesSelected =
+        $Services.Count -eq 0 -or
+        ($Services -contains "ocr_service") -or
+        ($Services -contains "liveness_service")
+    if ($Environment -eq "development" -and $KycRequested -and $KycServicesSelected -and -not $Down.IsPresent) {
         Write-Host "Verifying local KYC liveness models..." -ForegroundColor Cyan
         & $PythonCommand.Source "scripts/config/provision_kyc_models.py" "--env-file" $EnvFile
         if ($LASTEXITCODE -ne 0) {
@@ -762,8 +766,12 @@ try {
     # falls into a temporary gateway fallback even though the model is about to
     # become available.
     $LocalAiRequested = $RequestedProfiles -contains "local-ai"
-    $OllamaSelected = $LocalAiRequested -or ($Services.Count -eq 0) -or ($Services -contains "ollama")
-    if ($Environment -eq "development" -and $LocalAiRequested -and $OllamaSelected) {
+    $OllamaSelected =
+        $Services.Count -eq 0 -or
+        ($Services -contains "ollama") -or
+        ($Services -contains "ai_service") -or
+        ($Services -contains "chat_service")
+    if ($Environment -eq "development" -and $LocalAiRequested -and $OllamaSelected -and -not $Down.IsPresent) {
         Write-Host "Starting Ollama container for model provisioning..." -ForegroundColor Cyan
         # Do not block on Ollama's healthcheck here. The model provisioner already
         # retries until the API is reachable, avoiding a duplicated readiness wait.
