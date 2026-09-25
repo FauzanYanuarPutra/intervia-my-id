@@ -5385,6 +5385,8 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
       const groupsPayload = groupsResponse
         ? ((await groupsResponse.json().catch(() => ({}))) as {
             data?: CommunityGroup[];
+            joined?: CommunityGroup[];
+            recommended?: CommunityGroup[];
           })
         : null;
 
