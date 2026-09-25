@@ -123,7 +123,6 @@ export function LajukanImage({
       alt={alt}
       unoptimized={unoptimized ?? bypassOptimizer}
       onLoad={event => {
-        if (retryKey === key) setRetryKey('');
         props.onLoad?.(event);
       }}
       onError={event => {
