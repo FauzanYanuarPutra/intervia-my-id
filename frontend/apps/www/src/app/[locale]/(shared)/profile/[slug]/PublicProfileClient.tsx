@@ -2278,9 +2278,9 @@ export default function PublicProfileClient({
       <div className="min-h-screen overflow-x-clip bg-[color:var(--app-surface-muted)] pb-[calc(5.5rem+env(safe-area-inset-bottom))] dark:bg-[color:var(--app-surface)] sm:pb-8">
         <DetailMobileTopBar title={detail.displayName} eyebrow={copy.publicProfile} backLabel={copy.back} />
 
-        <main className="mx-auto w-full max-w-[1080px] px-0 py-0 sm:px-4 sm:py-4 lg:px-5 lg:py-5">
-          <section className="overflow-hidden border-y border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] sm:rounded-[24px] sm:border sm:shadow-sm">
-            <div className="relative h-20 overflow-hidden sm:h-28 lg:h-32">
+        <main className="mx-auto w-full max-w-[980px] px-3 py-3 sm:px-4 sm:py-4 lg:px-5 lg:py-5">
+          <section className="overflow-hidden rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-sm sm:rounded-[26px] sm:shadow-[0_18px_48px_-40px_rgba(15,23,42,0.32)]">
+            <div className="relative h-28 overflow-hidden sm:h-32 lg:h-36">
               {coverUrl ? (
                 <Image src={coverUrl} alt="" fill priority unoptimized sizes="(max-width: 640px) 100vw, 1080px" className="object-cover" />
               ) : (
@@ -2310,7 +2310,7 @@ export default function PublicProfileClient({
             </div>
 
             <div className="px-3 pb-3 sm:px-6 sm:pb-4">
-              <div className="-mt-9 flex min-w-0 items-end gap-3 sm:-mt-11 sm:gap-4">
+              <div className="-mt-10 flex min-w-0 items-end gap-3 sm:-mt-11 sm:gap-4">
                 <div className="relative h-[72px] w-[72px] shrink-0 overflow-hidden rounded-full border-[4px] border-[color:var(--app-surface-strong)] bg-[color:var(--app-surface-muted)] shadow-md sm:h-[88px] sm:w-[88px] sm:border-[5px]">
                   <Image src={avatarUrl} alt={detail.displayName} fill priority unoptimized sizes="96px" className="object-cover" />
                 </div>
@@ -2331,7 +2331,7 @@ export default function PublicProfileClient({
               {detail.headline ? <p className="mt-2.5 text-[13px] font-extrabold leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-sm">{detail.headline}</p> : null}
               <p className="mt-0.5 line-clamp-3 max-w-3xl text-[12px] leading-5 text-[color:var(--app-text-soft)] sm:text-[13px] sm:leading-6">{detail.summary}</p>
 
-              <div className="mt-3 grid grid-cols-3 divide-x divide-[color:var(--app-border)] rounded-2xl border border-[color:var(--app-border)] py-2 sm:max-w-[560px]">
+              <div className="mt-3 grid w-full grid-cols-3 divide-x divide-[color:var(--app-border)] overflow-hidden rounded-2xl border border-[color:var(--app-border)] py-2 sm:max-w-[560px]">
                 <button type="button" onClick={() => setActiveProfileTab('posts')} className="min-w-0 cursor-pointer px-2 text-center transition hover:bg-[color:var(--app-surface-muted)] active:scale-[0.99] sm:px-4">
                   <span className="block text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">{formatCompactNumber(listings.length, localeCode)}</span>
                   <span className="mt-0.5 block truncate text-[9px] font-semibold text-[color:var(--app-text-soft)] sm:text-[11px]">{localeCode === 'id' ? 'Etalase' : 'Items'}</span>
@@ -2391,11 +2391,11 @@ export default function PublicProfileClient({
           </section>
 
           <section className="mt-3 overflow-hidden border-y border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] sm:rounded-[24px] sm:border sm:shadow-sm">
-            <div className="sticky top-0 z-20 border-b border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)]/96 backdrop-blur">
+            <div className="sticky top-14 z-20 border-b border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)]/96 backdrop-blur sm:top-0">
               <div
                 role="tablist"
                 aria-label={localeCode === 'id' ? 'Navigasi profil' : 'Profile navigation'}
-                className="grid min-w-0 grid-cols-3 px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                className="flex min-w-full overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
               >
                 {profileTabs.map(tab => {
                   const active = activeProfileTab === tab.key;
@@ -2406,7 +2406,7 @@ export default function PublicProfileClient({
                       role="tab"
                       onClick={() => setActiveProfileTab(tab.key)}
                       aria-selected={active}
-                      className={`relative min-h-11 min-w-0 cursor-pointer px-2 text-center text-[12px] font-bold transition sm:min-h-14 sm:px-4 sm:text-sm ${
+                      className={`relative min-h-11 min-w-[104px] flex-1 cursor-pointer px-2 text-center text-[12px] font-bold transition sm:min-h-14 sm:min-w-0 sm:px-4 sm:text-sm ${
                         active
                           ? 'text-emerald-700 dark:text-emerald-300'
                           : 'text-[color:var(--app-text-soft)] hover:text-[color:var(--app-text)]'
@@ -2421,7 +2421,7 @@ export default function PublicProfileClient({
             </div>
 
             {activeProfileTab === 'posts' ? (
-              <div className="p-3 sm:p-5">
+              <div className="p-2.5 sm:p-5">
                 <ProfileFilterStrip
                   activeKey={resolvedContentTab}
                   ariaLabel={localeCode === 'id' ? 'Filter etalase' : 'Storefront filter'}
@@ -2445,7 +2445,7 @@ export default function PublicProfileClient({
                 />
 
                 {visibleListings.length > 0 ? (
-                  <div className="mt-3 grid gap-2.5 sm:grid-cols-2 sm:gap-3 lg:grid-cols-4">
+                  <div className="mt-3 grid gap-2.5 min-[480px]:grid-cols-2 sm:gap-3 lg:grid-cols-4">
                     {visibleListings.map(item => {
                       const tab = normalizeProfileContentTab({
                         type: item.content_type,
