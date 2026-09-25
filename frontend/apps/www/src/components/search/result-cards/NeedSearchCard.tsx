@@ -190,7 +190,7 @@ export function NeedSearchCard({
       ) : null}
 
       <div className="flex min-w-0 flex-1 flex-col p-3 sm:p-3.5">
-        <div className="flex min-w-0 flex-wrap items-start justify-between gap-1.5">
+        <div className="min-w-0 w-full">
           <SearchCardEyebrow
             icon={Clock3}
             label={
