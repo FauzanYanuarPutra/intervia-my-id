@@ -3058,7 +3058,7 @@ export function CommunityPostCard({
         />
       ) : null}
 
-      {/* ================= REACTION SUMMARY + ACTION BAR ================= */
+      {/* ================= REACTION SUMMARY + ACTION BAR ================= */}
 
       {(reactionCount > 0 || commentCount > 0 || item.stats.shares > 0) ? (
         <div className="flex min-h-9 items-center justify-between gap-3 border-t border-[color:var(--app-border)] px-3.5 pt-2 text-[11px] font-medium text-[color:var(--app-text-soft)] sm:px-4">
@@ -3069,7 +3069,7 @@ export function CommunityPostCard({
                   <ThumbsUp className="h-3 w-3 fill-current" />
                 </span>
                 <span className="truncate font-semibold">
-                  ${compactNumber(reactionCount)} ${isId ? 'suka' : 'likes'}
+                  {compactNumber(reactionCount)} {isId ? 'suka' : 'likes'}
                 </span>
               </>
             ) : null}
@@ -3079,7 +3079,7 @@ export function CommunityPostCard({
             onClick={openDetail}
             className="shrink-0 font-semibold hover:text-[color:var(--app-text)]"
           >
-            ${commentCount > 0
+            {commentCount > 0
               ? `${compactNumber(commentCount)} ${isId ? 'komentar' : 'comments'}`
               : isId
                 ? 'Lihat diskusi'
@@ -3110,7 +3110,7 @@ export function CommunityPostCard({
         </button>
       </div>
 
-      /* ================= FACEBOOK-LIKE COMMENTS PREVIEW ================= */}
+      {/* ================= FACEBOOK-LIKE COMMENTS PREVIEW ================= */}}
 
       {commentCount > 0 ? (
         <section className="border-t border-[color:var(--app-border)] px-3 pb-2.5 pt-2.5 sm:px-4">
@@ -6417,17 +6417,17 @@ function RightRail({
       <div className="flex h-full max-h-full min-h-0 flex-col gap-3 overflow-y-auto overscroll-contain pb-6 pl-1 pt-2" data-auto-scrollbar>
         <section className="shrink-0 rounded-[20px] border border-[color:var(--app-border)] bg-white p-3.5">
           <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[color:var(--app-text-muted)]">
-            ${isId ? 'Aktivitas komunitas' : 'Community activity'}
+            {isId ? 'Aktivitas komunitas' : 'Community activity'}
           </p>
           <div className="mt-3 grid grid-cols-3 gap-2">
             {[
-              [${isId ? 'Diskusi' : 'Threads'}, overview?.stats.totalThreads],
-              [${isId ? 'Jawaban' : 'Replies'}, overview?.stats.totalPosts],
-              [${isId ? 'Member' : 'Members'}, overview?.stats.totalUsers],
+              [{isId ? 'Diskusi' : 'Threads'}, overview?.stats.totalThreads],
+              [{isId ? 'Jawaban' : 'Replies'}, overview?.stats.totalPosts],
+              [{isId ? 'Member' : 'Members'}, overview?.stats.totalUsers],
             ].map(([label, value]) => (
               <div key={String(label)} className="min-w-0 rounded-[13px] bg-slate-50 px-2 py-2 text-center">
-                <p className="text-sm font-bold text-[color:var(--app-text)]">${compactNumber(Number(value || 0))}</p>
-                <p className="mt-0.5 truncate text-[9px] font-semibold text-[color:var(--app-text-soft)]">${label}</p>
+                <p className="text-sm font-bold text-[color:var(--app-text)]">{compactNumber(Number(value || 0))}</p>
+                <p className="mt-0.5 truncate text-[9px] font-semibold text-[color:var(--app-text-soft)]">{label}</p>
               </div>
             ))}
           </div>
@@ -6436,60 +6436,60 @@ function RightRail({
         <section className="shrink-0 rounded-[20px] border border-[color:var(--app-border)] bg-white p-3.5">
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-[color:var(--app-accent)]" />
-            <h2 className="text-sm font-bold text-[color:var(--app-text)]">${isId ? 'Sedang ramai' : 'Trending'}</h2>
+            <h2 className="text-sm font-bold text-[color:var(--app-text)]">{isId ? 'Sedang ramai' : 'Trending'}</h2>
           </div>
           <div className="mt-3 flex flex-wrap gap-1.5">
             {trendingTags.length ? (
               trendingTags.slice(0, 8).map(tag => (
                 <Link key={tag.id} href={`/community?tag=${encodeURIComponent(tag.slug)}`} className="rounded-full border border-[color:var(--app-border)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-text-soft)] transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)]">
-                  #${tag.slug}
+                  #{tag.slug}
                 </Link>
               ))
             ) : (
               <p className="rounded-[16px] bg-slate-50 px-3 py-2 text-xs font-semibold leading-5 text-[color:var(--app-text-soft)]">
-                ${isId ? 'Tag ramai akan muncul setelah komunitas mulai aktif.' : 'Trending tags will appear once the community is active.'}
+                {isId ? 'Tag ramai akan muncul setelah komunitas mulai aktif.' : 'Trending tags will appear once the community is active.'}
               </p>
             )}
           </div>
         </section>
 
         <section className="shrink-0 rounded-[20px] border border-[color:var(--app-border)] bg-white p-3.5">
-          <h2 className="text-sm font-bold text-[color:var(--app-text)]">${isId ? 'Kontributor aktif' : 'Active contributors'}</h2>
+          <h2 className="text-sm font-bold text-[color:var(--app-text)]">{isId ? 'Kontributor aktif' : 'Active contributors'}</h2>
           <div className="mt-3 space-y-1.5">
             {topContributors.length ? (
               topContributors.slice(0, 5).map(person => (
                 <Link key={person.id} href={`/profile/${encodeURIComponent(person.id)}`} className="flex items-center gap-2 rounded-[14px] px-2 py-1.5 transition hover:bg-slate-50">
                   <Image src={profileAvatarSrc(person.avatarUrl, readProfileAvatarStyle(person), person.name)} alt={person.name} width={34} height={34} className="h-8 w-8 rounded-full object-cover" />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-xs font-bold text-[color:var(--app-text)]">${person.name}</span>
-                    <span className="block truncate text-[10px] text-[color:var(--app-text-soft)]">${person.title}</span>
+                    <span className="block truncate text-xs font-bold text-[color:var(--app-text)]">{person.name}</span>
+                    <span className="block truncate text-[10px] text-[color:var(--app-text-soft)]">{person.title}</span>
                   </span>
                 </Link>
               ))
             ) : (
               <p className="rounded-[16px] bg-slate-50 px-3 py-2 text-xs font-semibold leading-5 text-[color:var(--app-text-soft)]">
-                ${isId ? 'Kontributor aktif akan muncul setelah ada aktivitas.' : 'Active contributors will appear as the community grows.'}
+                {isId ? 'Kontributor aktif akan muncul setelah ada aktivitas.' : 'Active contributors will appear as the community grows.'}
               </p>
             )}
           </div>
         </section>
 
         <section className="shrink-0 rounded-[20px] border border-[color:var(--app-border)] bg-white p-3.5">
-          <h2 className="text-sm font-bold text-[color:var(--app-text)]">${isId ? 'Rekomendasi grup' : 'Recommended groups'}</h2>
+          <h2 className="text-sm font-bold text-[color:var(--app-text)]">{isId ? 'Rekomendasi grup' : 'Recommended groups'}</h2>
           <div className="mt-3 space-y-2">
             {recommendedGroups.length ? (
               recommendedGroups.slice(0, 5).map(group => (
                 <Link key={group.id} href={communityGroupHref(group)} className="flex items-center gap-2 rounded-[14px] p-2 transition hover:bg-slate-50">
                   <GroupAvatarMark group={group} className="h-9 w-9 rounded-[13px] text-sm" sizes="36px" />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-xs font-bold text-[color:var(--app-text)]">${group.name}</span>
-                    <span className="block truncate text-[10px] text-[color:var(--app-text-soft)]">${compactNumber(group.memberCount)} ${isId ? 'anggota' : 'members'}</span>
+                    <span className="block truncate text-xs font-bold text-[color:var(--app-text)]">{group.name}</span>
+                    <span className="block truncate text-[10px] text-[color:var(--app-text-soft)]">{compactNumber(group.memberCount)} {isId ? 'anggota' : 'members'}</span>
                   </span>
                 </Link>
               ))
             ) : (
               <p className="rounded-[16px] bg-slate-50 px-3 py-2 text-xs font-semibold leading-5 text-[color:var(--app-text-soft)]">
-                ${isId ? 'Rekomendasi grup akan muncul setelah ada aktivitas.' : 'Recommended groups will appear after more activity.'}
+                {isId ? 'Rekomendasi grup akan muncul setelah ada aktivitas.' : 'Recommended groups will appear after more activity.'}
               </p>
             )}
           </div>
