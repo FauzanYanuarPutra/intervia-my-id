@@ -679,6 +679,7 @@ function ProfileTabButton({
     </button>
   );
 }
+
 function EntryList({
   items,
   empty,
@@ -906,7 +907,10 @@ function ProfileGameProgress({
         </span>
       </div>
       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[color:var(--app-surface-muted)] dark:bg-[color:var(--app-surface)]">
-        <div className="h-full rounded-full bg-[color:var(--app-accent-strong)] transition-all" style={{ width: String(progress) + '%' }} />
+        <div
+          className="h-full rounded-full bg-[color:var(--app-accent-strong)] transition-all"
+          style={{ width: String(progress) + '%' }}
+        />
       </div>
       <p className="mt-2 truncate text-[10px] font-semibold text-[color:var(--app-text-soft)]">
         {isId
@@ -916,6 +920,7 @@ function ProfileGameProgress({
     </section>
   );
 }
+
 function InlineProfileEditorModal({
   section,
   isId,
@@ -1983,7 +1988,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
         icon: Clapperboard,
         metric:
           reelsSignalCount > 0
-            ? `${reelsSignalCount.toLocaleString()} ${isId ? 'sinyal' : 'signals'}`
+            ? `${reelsSignalCount.toLocaleString(locale)} ${isId ? 'sinyal' : 'signals'}`
             : isId
               ? 'Like / repost'
               : 'Like / repost',
@@ -2015,7 +2020,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
         description: copy.listingDesc,
         href: '/create',
         icon: Upload,
-        metric: `${listings.length.toLocaleString()} ${isId ? 'aktif' : 'active'}`,
+        metric: `${listings.length.toLocaleString(locale)} ${isId ? 'aktif' : 'active'}`,
         actionLabel: copy.create,
       },
       {
@@ -2028,7 +2033,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
           ? isId
             ? 'Inbox aktif'
             : 'Active inbox'
-          : `${txPreview.length.toLocaleString()} ${isId ? 'terbaru' : 'latest'}`,
+          : `${txPreview.length.toLocaleString(locale)} ${isId ? 'terbaru' : 'latest'}`,
         actionLabel: copy.open,
       },
       {
@@ -2080,11 +2085,11 @@ export function ProfileHubView(props: ProfileHubViewProps) {
     () => [
       {
         label: isId ? 'Kunjungan profil' : 'Profile views',
-        value: profileViewNotifications.length.toLocaleString(),
+        value: profileViewNotifications.length.toLocaleString(locale),
         hint: uniqueProfileViewers.length
           ? isId
-            ? `${uniqueProfileViewers.length.toLocaleString()} unik`
-            : `${uniqueProfileViewers.length.toLocaleString()} unique`
+            ? `${uniqueProfileViewers.length.toLocaleString(locale)} unik`
+            : `${uniqueProfileViewers.length.toLocaleString(locale)} unique`
           : isId
             ? 'dilihat'
             : 'views',
@@ -2092,13 +2097,13 @@ export function ProfileHubView(props: ProfileHubViewProps) {
       },
       {
         label: isId ? 'Interaksi reels' : 'Reels interactions',
-        value: reelsSignalCount.toLocaleString(),
+        value: reelsSignalCount.toLocaleString(locale),
         hint: isId ? 'like/share/save' : 'like/share/save',
         icon: Clapperboard,
       },
       {
         label: isId ? 'Listing aktif' : 'Active listings',
-        value: listings.length.toLocaleString(),
+        value: listings.length.toLocaleString(locale),
         hint: isId ? 'etalase' : 'showcase',
         icon: Upload,
       },
@@ -2106,7 +2111,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
         ? [
             {
               label: isId ? 'Transaksi terbaru' : 'Latest deals',
-              value: txPreview.length.toLocaleString(),
+              value: txPreview.length.toLocaleString(locale),
               hint: isId ? 'deal' : 'deals',
               icon: BarChart3,
             },
@@ -2145,8 +2150,8 @@ export function ProfileHubView(props: ProfileHubViewProps) {
         key: 'reels-signal',
         title: isId ? 'Reels mulai kebaca' : 'Reels signals learned',
         description: isId
-          ? `${reelsSignalCount.toLocaleString()} aksi watch/like/share/save`
-          : `${reelsSignalCount.toLocaleString()} watch/like/share/save actions`,
+          ? `${reelsSignalCount.toLocaleString(locale)} aksi watch/like/share/save`
+          : `${reelsSignalCount.toLocaleString(locale)} watch/like/share/save actions`,
         href: '/reels',
         icon: Heart,
       });
@@ -2480,7 +2485,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                         )}
                       >
                         <span className="block truncate text-sm font-bold leading-none text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
-                          {followerCount.toLocaleString()}
+                          {followerCount.toLocaleString(locale)}
                         </span>
                         <span className="mt-0.5 block truncate text-[10px] font-semibold text-[color:var(--app-text-soft)] sm:text-[11px]">
                           {copy.followers}
@@ -2495,7 +2500,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                         )}
                       >
                         <span className="block truncate text-sm font-bold leading-none text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
-                          {followingCount.toLocaleString()}
+                          {followingCount.toLocaleString(locale)}
                         </span>
                         <span className="mt-0.5 block truncate text-[10px] font-semibold text-[color:var(--app-text-soft)] sm:text-[11px]">
                           {copy.following}
@@ -2554,15 +2559,15 @@ export function ProfileHubView(props: ProfileHubViewProps) {
 
           <div className="grid grid-cols-3 overflow-hidden rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] dark:border-[color:var(--app-border-strong)]">
             <button type="button" onClick={() => setActiveHubTab('etalase')} className="min-w-0 cursor-pointer px-2 py-2.5 text-center transition hover:bg-[color:var(--app-surface-muted)] active:scale-[0.99]">
-              <span className="block truncate text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">{listings.length.toLocaleString()}</span>
+              <span className="block truncate text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">{listings.length.toLocaleString(locale)}</span>
               <span className="mt-0.5 block truncate text-[10px] font-semibold text-[color:var(--app-text-soft)]">{isId ? 'Etalase' : 'Storefront'}</span>
             </button>
             <button type="button" onClick={() => setSocialModal('followers')} className="min-w-0 cursor-pointer border-x border-[color:var(--app-border)] px-2 py-2.5 text-center transition hover:bg-[color:var(--app-surface-muted)] active:scale-[0.99] dark:border-[color:var(--app-border-strong)]">
-              <span className="block truncate text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">{followerCount.toLocaleString()}</span>
+              <span className="block truncate text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">{followerCount.toLocaleString(locale)}</span>
               <span className="mt-0.5 block truncate text-[10px] font-semibold text-[color:var(--app-text-soft)]">{copy.followers}</span>
             </button>
             <button type="button" onClick={() => setSocialModal('following')} className="min-w-0 cursor-pointer px-2 py-2.5 text-center transition hover:bg-[color:var(--app-surface-muted)] active:scale-[0.99]">
-              <span className="block truncate text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">{followingCount.toLocaleString()}</span>
+              <span className="block truncate text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">{followingCount.toLocaleString(locale)}</span>
               <span className="mt-0.5 block truncate text-[10px] font-semibold text-[color:var(--app-text-soft)]">{copy.following}</span>
             </button>
           </div>
@@ -3445,7 +3450,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                     className={cn(MUTED_ROW_CLASS, 'px-2.5 py-1.5 text-left')}
                   >
                     <span className="block text-base font-bold leading-none text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                      {followerCount.toLocaleString()}
+                      {followerCount.toLocaleString(locale)}
                     </span>
                     <span className="text-[11px] font-semibold text-[color:var(--app-text-soft)]">
                       {copy.followers}
@@ -3457,7 +3462,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                     className={cn(MUTED_ROW_CLASS, 'px-2.5 py-1.5 text-left')}
                   >
                     <span className="block text-base font-bold leading-none text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                      {followingCount.toLocaleString()}
+                      {followingCount.toLocaleString(locale)}
                     </span>
                     <span className="text-[11px] font-semibold text-[color:var(--app-text-soft)]">
                       {copy.following}
@@ -3584,7 +3589,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                 )}
               >
                 <span className="block text-sm leading-4">
-                  {item.value.toLocaleString()}
+                  {item.value.toLocaleString(locale)}
                 </span>
                 <span className="block truncate text-[10px] font-semibold">
                   {item.label}
