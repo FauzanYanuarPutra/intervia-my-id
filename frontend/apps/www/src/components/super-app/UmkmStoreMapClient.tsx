@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Check, ExternalLink, MapPin, Navigation, Route, Store } from 'lucide-react';
+import { ExternalLink, MapPin, Navigation, Route, Store } from 'lucide-react';
 import {
   AttributionControl,
   Circle,
@@ -517,26 +517,19 @@ function StorePreviewCard({
 function StorePopupSummary({
   store,
   ui,
-  active = false,
-  selectable = false,
-  onSelect,
   isId,
 }: {
   store: UmkmMapStore;
   ui: StorePresentation['ui'];
-  active?: boolean;
-  selectable?: boolean;
-  onSelect?: () => void;
   isId: boolean;
 }) {
-  const addressLabel =
+  const locationLabel =
+    store.city ||
     ui.addressLine ||
     store.address ||
-    store.city ||
     (isId ? 'Lokasi belum lengkap' : 'Location unavailable');
   const distanceLabel = ui.distanceLabel;
   const isReference = isUmkmMapPublicReference(store);
-  const isOpen = ui.openNow === true;
   const statusLabel = isReference
     ? isId
       ? 'Referensi'
@@ -554,80 +547,59 @@ function StorePopupSummary({
           : 'Not checked';
 
   return (
-    <div className='w-[min(78vw,280px)] space-y-2'>
-      <div className='min-w-0'>
-        <div className='mb-1 flex min-w-0 items-center justify-between gap-2'>
-          <div className='flex min-w-0 items-center gap-1.5'>
-            <StoreKindChip ui={ui} compact />
-            <span className='truncate text-[10px] font-semibold text-slate-500'>{ui.kindLabel}</span>
-          </div>
-          <span
-            className={isOpen
-              ? 'inline-flex min-h-[20px] shrink-0 items-center rounded-full bg-emerald-50 px-1.5 text-[9.5px] font-bold text-emerald-700'
-              : 'inline-flex min-h-[20px] shrink-0 items-center rounded-full bg-slate-100 px-1.5 text-[9.5px] font-bold text-slate-500'}
-          >
+    <div className="w-[min(76vw,248px)] pr-5">
+      <div className="min-w-0">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <StoreKindChip ui={ui} compact />
+          <span className="min-w-0 truncate text-[9.5px] font-semibold text-slate-500">
             {statusLabel}
           </span>
         </div>
 
-        <h3 className='min-w-0 truncate text-[13px] font-bold leading-tight text-slate-950'>
+        <h3 className="mt-1.5 line-clamp-1 text-[14px] font-extrabold leading-tight tracking-tight text-slate-950">
           {store.name}
         </h3>
 
-        <div className='mt-1.5 flex min-w-0 items-start gap-1.5 text-[10px] leading-4 text-slate-500'>
-          <MapPin className='mt-0.5 h-3 w-3 shrink-0 text-slate-400' aria-hidden='true' />
-          <span className='min-w-0 flex-1 line-clamp-2'>{addressLabel}</span>
+        <div className="mt-1.5 flex min-w-0 items-center gap-1.5 text-[10px] leading-4 text-slate-500">
+          <MapPin
+            className="h-3 w-3 shrink-0 text-slate-400"
+            aria-hidden="true"
+          />
+          <span className="min-w-0 flex-1 truncate">{locationLabel}</span>
           {distanceLabel ? (
-            <span className='shrink-0 font-bold text-emerald-700'>
+            <span className="shrink-0 font-bold text-emerald-700">
               {distanceLabel}
             </span>
           ) : null}
         </div>
       </div>
 
-      <div className='flex gap-1.5 pt-0.5'>
+      <div className="mt-2 grid grid-cols-2 gap-1.5">
         <a
           href={buildUmkmMapPlacePath(store)}
-          aria-label={isId ? `Detail ${store.name}` : `Details for ${store.name}`}
-          className='inline-flex min-h-[34px] flex-1 items-center justify-center gap-1.5 rounded-[10px] bg-emerald-600 px-2 text-[10px] font-bold text-white transition hover:bg-emerald-700 active:scale-[0.98]'
+          aria-label={isId ? `Detail ` : `Details for `}
+          className="inline-flex min-h-[32px] items-center justify-center gap-1.5 rounded-[10px] bg-emerald-600 px-2 text-[10px] font-bold text-white shadow-[0_8px_18px_-12px_rgba(5,150,105,0.9)] transition hover:bg-emerald-700 active:scale-[0.98]"
         >
-          <Store className='h-3.5 w-3.5' aria-hidden='true' />
+          <Store className="h-3.5 w-3.5" aria-hidden="true" />
           {isId ? 'Detail' : 'Details'}
-          <ExternalLink className='h-2.5 w-2.5 opacity-75' aria-hidden='true' />
+          <ExternalLink className="h-2.5 w-2.5 opacity-75" aria-hidden="true" />
         </a>
+
         <a
           href={ui.googleMapsDirectionsUrl}
-          target='_blank'
-          rel='noreferrer'
-          aria-label={isId ? `Rute ke ${store.name}` : `Route to ${store.name}`}
-          className='inline-flex min-h-[34px] flex-1 items-center justify-center gap-1.5 rounded-[10px] border border-slate-200 bg-slate-50 px-2 text-[10px] font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-100 active:scale-[0.98]'
+          target="_blank"
+          rel="noreferrer"
+          aria-label={isId ? `Rute ke ` : `Route to `}
+          className="inline-flex min-h-[32px] items-center justify-center gap-1.5 rounded-[10px] border border-slate-200 bg-slate-50 px-2 text-[10px] font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-100 active:scale-[0.98]"
         >
-          <Navigation className='h-3.5 w-3.5' aria-hidden='true' />
+          <Navigation className="h-3.5 w-3.5" aria-hidden="true" />
           {isId ? 'Rute' : 'Route'}
         </a>
-        {selectable ? (
-          <button
-            type='button'
-            onClick={onSelect}
-            aria-pressed={active}
-            className={active
-              ? 'inline-flex min-h-[30px] flex-1 items-center justify-center gap-1 rounded-full border border-emerald-500 bg-emerald-50 px-2 text-[9.5px] font-bold text-emerald-700 transition'
-              : 'inline-flex min-h-[30px] flex-1 items-center justify-center gap-1 rounded-full border border-slate-200 bg-white px-2 text-[9.5px] font-bold text-slate-700 transition hover:border-emerald-300 hover:text-emerald-700'}
-          >
-            <Check className={active ? 'h-3 w-3' : 'h-3 w-3 opacity-40'} aria-hidden='true' />
-            {active
-              ? isId
-                ? 'Dipilih'
-                : 'Selected'
-              : isId
-                ? 'Pilih'
-                : 'Select'}
-          </button>
-        ) : null}
       </div>
     </div>
   );
 }
+
 function buildClusterMarkerIcon(input: {
   count: number;
   selected?: boolean;
@@ -1286,21 +1258,11 @@ function StoreMarkersLayer({
               <Tooltip direction="top" offset={[0, -8]}>
                 {store.name}
               </Tooltip>
-              <Popup className="umkm-store-map-popup" maxWidth={240}>
+              <Popup className="umkm-store-map-popup" maxWidth={270}>
                 <StorePopupSummary
                   store={store}
                   ui={ui}
-                  active={active}
-                  selectable={Boolean(onSelectStore)}
                   isId={isId}
-                  onSelect={
-                    onSelectStore
-                      ? () => {
-                          focusMarker(store, MARKER_CLICK_FOCUS_ZOOM);
-                          onSelectStore(store.id);
-                        }
-                      : undefined
-                  }
                 />
               </Popup>
             </Marker>
@@ -1574,10 +1536,14 @@ export function UmkmStoreMapClient({
     };
   }, [onRouteResolved, routeDestination, routeOrigin, showRoute]);
 
+  const initialMapCenter: [number, number] =
+    focusMode === 'indonesia' ? [-2.5, 118] : defaultCenter;
+  const initialMapZoom = focusMode === 'indonesia' ? 5 : 12;
+
   return (
     <MapContainer
-      center={defaultCenter}
-      zoom={12}
+      center={initialMapCenter}
+      zoom={initialMapZoom}
       minZoom={3}
       maxZoom={18}
       scrollWheelZoom={interactive}
