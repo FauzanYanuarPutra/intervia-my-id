@@ -9,7 +9,7 @@ export type PortalNavigationItem = {
 const labels: Record<PortalSection, string> = {
   home: 'Beranda',
   orders: 'Jual',
-  products: 'Barang',
+  products: 'Produk',
   inventory: 'Stok',
   finance: 'Uang',
   reports: 'Laporan',
