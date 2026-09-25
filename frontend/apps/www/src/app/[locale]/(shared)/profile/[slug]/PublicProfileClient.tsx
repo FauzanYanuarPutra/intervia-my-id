@@ -2280,7 +2280,7 @@ export default function PublicProfileClient({
 
         <main className="mx-auto w-full max-w-[1080px] px-0 py-0 sm:px-4 sm:py-4 lg:px-5 lg:py-5">
           <section className="overflow-hidden border-y border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] sm:rounded-[24px] sm:border sm:shadow-sm">
-            <div className="relative h-24 overflow-hidden sm:h-32 lg:h-36">
+            <div className="relative h-20 overflow-hidden sm:h-28 lg:h-32">
               {coverUrl ? (
                 <Image src={coverUrl} alt="" fill priority unoptimized sizes="(max-width: 640px) 100vw, 1080px" className="object-cover" />
               ) : (
@@ -2288,14 +2288,14 @@ export default function PublicProfileClient({
               )}
               <div className="absolute inset-0 bg-gradient-to-b from-black/5 via-transparent to-black/35" />
               <div className="absolute right-3 top-3 flex gap-2">
-                <button type="button" onClick={handleShareProfile} className="grid h-9 w-9 place-items-center rounded-full border border-white/40 bg-black/35 text-white backdrop-blur-md transition hover:bg-black/55" aria-label={shareMessage || copy.share} title={shareMessage || copy.share}>
+                <button type="button" onClick={handleShareProfile} className="grid h-9 w-9 cursor-pointer place-items-center rounded-full border border-white/40 bg-black/35 text-white backdrop-blur-md transition hover:bg-black/55 active:scale-[0.96]" aria-label={shareMessage || copy.share} title={shareMessage || copy.share}>
                   {shareMessage ? <Copy className="h-4 w-4" /> : <Share2 className="h-4 w-4" />}
                 </button>
                 {!isOwnProfile ? (
                   <button
                     type="button"
                     onClick={handleToggleSaved}
-                    className={`grid h-9 w-9 place-items-center rounded-full border text-white backdrop-blur-md transition ${
+                    className={`grid h-9 w-9 cursor-pointer place-items-center rounded-full border text-white backdrop-blur-md transition active:scale-[0.96] ${
                       isSaved
                         ? 'border-emerald-300 bg-emerald-600'
                         : 'border-white/40 bg-black/35 hover:bg-black/55'
@@ -2309,7 +2309,7 @@ export default function PublicProfileClient({
               </div>
             </div>
 
-            <div className="px-3 pb-3.5 sm:px-6 sm:pb-4">
+            <div className="px-3 pb-3 sm:px-6 sm:pb-4">
               <div className="-mt-9 flex min-w-0 items-end gap-3 sm:-mt-11 sm:gap-4">
                 <div className="relative h-[72px] w-[72px] shrink-0 overflow-hidden rounded-full border-[4px] border-[color:var(--app-surface-strong)] bg-[color:var(--app-surface-muted)] shadow-md sm:h-[88px] sm:w-[88px] sm:border-[5px]">
                   <Image src={avatarUrl} alt={detail.displayName} fill priority unoptimized sizes="96px" className="object-cover" />
@@ -2331,8 +2331,8 @@ export default function PublicProfileClient({
               {detail.headline ? <p className="mt-2.5 text-[13px] font-extrabold leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-sm">{detail.headline}</p> : null}
               <p className="mt-0.5 line-clamp-3 max-w-3xl text-[12px] leading-5 text-[color:var(--app-text-soft)] sm:text-[13px] sm:leading-6">{detail.summary}</p>
 
-              <div className="mt-3 grid grid-cols-3 divide-x divide-[color:var(--app-border)] rounded-2xl border border-[color:var(--app-border)] py-2.5 sm:max-w-[560px]">
-                <button type="button" onClick={() => setActiveProfileTab('posts')} className="min-w-0 px-2 text-center transition hover:bg-[color:var(--app-surface-muted)] sm:px-4">
+              <div className="mt-3 grid grid-cols-3 divide-x divide-[color:var(--app-border)] rounded-2xl border border-[color:var(--app-border)] py-2 sm:max-w-[560px]">
+                <button type="button" onClick={() => setActiveProfileTab('posts')} className="min-w-0 cursor-pointer px-2 text-center transition hover:bg-[color:var(--app-surface-muted)] active:scale-[0.99] sm:px-4">
                   <span className="block text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">{formatCompactNumber(listings.length, localeCode)}</span>
                   <span className="mt-0.5 block truncate text-[9px] font-semibold text-[color:var(--app-text-soft)] sm:text-[11px]">{localeCode === 'id' ? 'Etalase' : 'Items'}</span>
                 </button>
@@ -2361,7 +2361,7 @@ export default function PublicProfileClient({
                       type="button"
                       onClick={() => void handleToggleProfileFollow()}
                       disabled={followLoading}
-                      className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-4 text-xs font-black transition disabled:cursor-wait disabled:opacity-70 sm:text-sm ${
+                      className={`inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border px-4 text-xs font-black transition disabled:cursor-wait disabled:opacity-70 sm:text-sm ${
                         isFollowingProfile
                           ? 'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]'
                           : 'border-emerald-600 bg-[color:var(--app-surface-strong)] text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-500/10'
@@ -2369,7 +2369,7 @@ export default function PublicProfileClient({
                     >
                       {followLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : isFollowingProfile ? <UserCheck className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}{followLoading ? copy.followLoading : isFollowingProfile ? copy.followingAction : copy.followAction}
                     </button>
-                    {whatsAppHref ? <a href={whatsAppHref} target="_blank" rel="noreferrer noopener" className="col-span-2 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 text-xs font-black text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)] dark:text-[color:var(--app-text-inverse)] sm:col-span-1"><PhoneCall className="h-4 w-4 text-emerald-600" />{copy.whatsapp}</a> : null}
+                    {whatsAppHref ? <a href={whatsAppHref} target="_blank" rel="noreferrer noopener" className="col-span-2 inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 text-xs font-black text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)] dark:text-[color:var(--app-text-inverse)] sm:col-span-1"><PhoneCall className="h-4 w-4 text-emerald-600" />{copy.whatsapp}</a> : null}
                   </>
                 )}
               </div>
@@ -2406,7 +2406,7 @@ export default function PublicProfileClient({
                       role="tab"
                       onClick={() => setActiveProfileTab(tab.key)}
                       aria-selected={active}
-                      className={`relative min-h-11 min-w-0 px-2 text-center text-[12px] font-bold transition sm:min-h-14 sm:px-4 sm:text-sm ${
+                      className={`relative min-h-11 min-w-0 cursor-pointer px-2 text-center text-[12px] font-bold transition sm:min-h-14 sm:px-4 sm:text-sm ${
                         active
                           ? 'text-emerald-700 dark:text-emerald-300'
                           : 'text-[color:var(--app-text-soft)] hover:text-[color:var(--app-text)]'
@@ -2462,7 +2462,7 @@ export default function PublicProfileClient({
                         >
                           <Link
                             href={href}
-                            className="grid min-w-0 grid-cols-[88px_minmax(0,1fr)] gap-3 p-2.5 sm:block sm:p-0"
+                            className="grid min-w-0 cursor-pointer grid-cols-[88px_minmax(0,1fr)] gap-3 p-2.5 sm:block sm:p-0"
                           >
                             <div className="relative aspect-square h-[88px] w-[88px] shrink-0 overflow-hidden rounded-xl bg-[color:var(--app-surface-muted)] sm:h-auto sm:w-full sm:rounded-none sm:rounded-t-2xl">
                               {item.cover_image ? (
