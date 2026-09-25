@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import type { KeyboardEvent, MouseEvent } from 'react';
-import { ArrowUpRight, MapPinned } from 'lucide-react';
+import { ArrowUpRight } from 'lucide-react';
 import { Link, useRouter } from '@/i18n/navigation';
 import { UMKM_DISCOVERY_PATH } from '@/lib/umkmSurface';
 import { UmkmStoreMap, type UmkmMapStore } from '@/components/super-app/UmkmStoreMap';
@@ -136,18 +136,14 @@ export function HomeBusinessMapSection({
 
   return (
     <section
-      className="overflow-hidden rounded-[20px] border border-slate-200/80 bg-white shadow-[0_16px_40px_-30px_rgba(15,23,42,0.34)]"
+      className="overflow-hidden rounded-[18px] border border-slate-200/80 bg-white shadow-[0_14px_32px_-26px_rgba(15,23,42,0.34)]"
       data-testid="home-business-map-section"
       aria-label={
         isId ? 'Sebaran usaha Indonesia' : 'Indonesia business coverage map'
       }
     >
       <div className="flex items-center justify-between gap-2 px-3 py-2.5 sm:px-3.5">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.08)]">
-            <MapPinned className="h-3.5 w-3.5" />
-          </span>
-          <div className="min-w-0">
+        <div className="min-w-0">
             <h2 className="truncate text-[12px] font-black tracking-tight text-slate-950 sm:text-[13px]">
               {isId ? 'Sebaran UMKM Indonesia' : 'Indonesian business map'}
             </h2>
@@ -160,7 +156,6 @@ export function HomeBusinessMapSection({
                 ? `${summary.businessCount} usaha terpetakan`
                 : `${summary.businessCount} businesses mapped`}
           </p>
-        </div>
         </div>
 
         <Link
@@ -189,50 +184,17 @@ export function HomeBusinessMapSection({
           controls={false}
           theme="default"
           focusMode="indonesia"
-          className="leaflet-home-map h-[148px] w-full sm:h-[164px]"
+          className="leaflet-home-map h-[126px] w-full sm:h-[140px]"
         />
-
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 z-[5] bg-[radial-gradient(circle_at_52%_48%,rgba(16,185,129,0.08),transparent_42%),linear-gradient(to_bottom,rgba(255,255,255,0.04),transparent_35%,rgba(15,23,42,0.08))] transition-opacity duration-200 group-hover/map:opacity-95"
-        />
-
-        <div className="pointer-events-none absolute inset-x-2.5 top-2.5 z-10 flex items-center justify-between gap-2 sm:inset-x-3 sm:top-3">
-          <span className="rounded-full border border-white/80 bg-white/88 px-2 py-1 text-[8px] font-black uppercase tracking-[0.08em] text-emerald-800 shadow-sm backdrop-blur sm:text-[9px]">
-            {isId ? 'Indonesia' : 'Indonesia'}
-          </span>
-
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-white/80 bg-slate-950/78 px-2 py-1 text-[8px] font-bold text-white shadow-sm backdrop-blur sm:text-[9px]">
-            <span className="relative flex h-1.5 w-1.5 shrink-0">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-75" />
-              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
-            </span>
-            {loading
-              ? isId
-                ? 'Mencari titik…'
-                : 'Finding points…'
-              : isId
-                ? `${summary.businessCount} titik`
-                : `${summary.businessCount} points`}
-          </span>
-        </div>
 
         <div className="pointer-events-none absolute inset-x-2.5 bottom-2.5 z-10 flex items-center justify-between gap-2 sm:inset-x-3 sm:bottom-3">
-          <span className="max-w-[78%] truncate rounded-full border border-white/85 bg-white/92 px-2.5 py-1.5 text-[8px] font-black text-slate-800 shadow-[0_8px_22px_-14px_rgba(15,23,42,0.55)] backdrop-blur sm:max-w-none sm:text-[9px]">
-            {loading
-              ? isId
-                ? 'Menyiapkan sebaran UMKM…'
-                : 'Preparing business coverage…'
-              : summary.businessCount > 0
-                ? isId
-                  ? 'Ada yang terpetakan · ketuk untuk menjelajah'
-                  : 'Locations are waiting · tap to explore'
-                : isId
-                  ? 'Belum banyak titik · ketuk untuk lihat peta'
-                  : 'Few locations yet · tap to open the map'}
+          <span className="rounded-full border border-white/90 bg-white/92 px-2.5 py-1.5 text-[8px] font-black text-slate-700 shadow-sm backdrop-blur sm:text-[9px]">
+            Indonesia
+            {!loading && summary.businessCount > 0
+              ? ` · ${summary.businessCount} titik`
+              : ''}
           </span>
-
-          <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/85 bg-emerald-600 text-white shadow-[0_10px_24px_-12px_rgba(5,150,105,0.9)] transition-transform duration-200 group-hover/map:translate-x-0.5 group-hover/map:scale-105">
+          <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white shadow-[0_10px_24px_-12px_rgba(5,150,105,0.9)] transition-transform duration-200 group-hover/map:translate-x-0.5 group-hover/map:scale-105">
             <ArrowUpRight className="h-3.5 w-3.5" />
           </span>
         </div>
