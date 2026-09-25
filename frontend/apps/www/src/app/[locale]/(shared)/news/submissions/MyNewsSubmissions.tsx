@@ -1,6 +1,8 @@
 'use client';
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { Link } from '@/i18n/navigation';
 import NewsRichTextEditor from '../submit/NewsRichTextEditor';
 
 type NewsItem = {
@@ -105,6 +107,7 @@ function statusLabel(status: string, isId: boolean): string {
     needs_revision: ['Perlu revisi', 'Needs revision'],
     published: ['Terbit', 'Published'],
     rejected: ['Ditolak', 'Rejected'],
+    withdrawn: ['Dihapus', 'Withdrawn'],
     retracted: ['Ditarik', 'Retracted'],
   };
   return labels[status]?.[isId ? 0 : 1] || status.replaceAll('_', ' ');
@@ -173,6 +176,7 @@ export default function MyNewsSubmissions({ locale }: { locale: string }) {
   const [selectedId, setSelectedId] = useState('');
   const [form, setForm] = useState<SubmissionForm>(EMPTY_FORM);
   const [uploadingCover, setUploadingCover] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [status, setStatus] = useState({
     loading: true,
     saving: false,
@@ -382,15 +386,97 @@ export default function MyNewsSubmissions({ locale }: { locale: string }) {
     }
   };
 
+  const withdraw = async () => {
+    if (!selected || deleting || status.saving) return;
+
+    const confirmed = window.confirm(
+      isId
+        ? 'Hapus kiriman ini dari antrean editorial? Artikel tidak akan diterbitkan, tetapi riwayat editorial tetap tersimpan.'
+        : 'Remove this submission from the editorial queue? It will not be published, but the editorial audit history will be retained.',
+    );
+    if (!confirmed) return;
+
+    setDeleting(true);
+    setStatus(current => ({ ...current, error: '', success: '' }));
+
+    try {
+      const response = await fetch(
+        `/api/news/submissions/${encodeURIComponent(selected.id)}`,
+        { method: 'DELETE', cache: 'no-store' },
+      );
+      const payload = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        message?: string;
+      };
+
+      if (!response.ok) {
+        setStatus(current => ({
+          ...current,
+          error:
+            payload.error ||
+            (isId
+              ? 'Kiriman belum dapat dihapus.'
+              : 'The submission could not be removed.'),
+        }));
+        return;
+      }
+
+      await reload();
+      setStatus(current => ({
+        ...current,
+        success:
+          payload.message ||
+          (isId
+            ? 'Kiriman dihapus dari antrean editorial.'
+            : 'Submission removed from the editorial queue.'),
+      }));
+    } catch {
+      setStatus(current => ({
+        ...current,
+        error: isId
+          ? 'Tidak dapat menghapus kiriman.'
+          : 'Could not remove the submission.',
+      }));
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const inputClass =
     'mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-900 dark:border-white/10 dark:bg-slate-950 dark:text-white';
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
-      <aside className="rounded-[26px] border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-slate-900">
-        <h2 className="font-bold text-slate-950 dark:text-white">
-          {isId ? 'Kiriman saya' : 'My submissions'}
-        </h2>
+    <div className="grid min-w-0 gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
+      <aside className="min-w-0 rounded-[26px] border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-slate-900">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="font-bold text-slate-950 dark:text-white">
+              {isId ? 'Kiriman saya' : 'My submissions'}
+            </h2>
+            <p className="mt-0.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+              {items.length} {isId ? 'kiriman' : 'submissions'}
+            </p>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => void reload(selected?.id)}
+              disabled={status.loading || deleting || status.saving}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-emerald-200 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:bg-slate-950 dark:text-slate-300"
+              aria-label={isId ? 'Segarkan kiriman' : 'Refresh submissions'}
+              title={isId ? 'Segarkan' : 'Refresh'}
+            >
+              <RefreshCw className={`h-4 w-4 ${status.loading ? 'animate-spin' : ''}`} />
+            </button>
+            <Link
+              href="/news/submit"
+              className="inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-emerald-700 px-3 text-xs font-black text-white transition hover:bg-emerald-800"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              {isId ? 'Berita baru' : 'New submission'}
+            </Link>
+          </div>
+        </div>
         {status.loading ? (
           <p className="mt-3 text-sm text-slate-500">Memuat...</p>
         ) : null}
@@ -414,7 +500,7 @@ export default function MyNewsSubmissions({ locale }: { locale: string }) {
                     : 'border-slate-200 dark:border-white/10'
                 }`}
               >
-                <p className="text-sm font-bold text-slate-900 dark:text-white">
+                <p className="line-clamp-2 text-sm font-bold text-slate-900 dark:text-white">
                   {item.title}
                 </p>
                 <p className="mt-1 text-xs font-semibold text-slate-500">
@@ -426,7 +512,7 @@ export default function MyNewsSubmissions({ locale }: { locale: string }) {
         </div>
       </aside>
 
-      <section className="rounded-[26px] border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-slate-900 sm:p-6">
+      <section className="min-w-0 rounded-[26px] border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-slate-900 sm:p-6">
         {!selected ? (
           <p className="text-sm text-slate-500">
             {isId ? 'Belum ada kiriman.' : 'No submissions yet.'}
@@ -659,23 +745,40 @@ export default function MyNewsSubmissions({ locale }: { locale: string }) {
               </label>
 
               {editable ? (
-                <button
-                  disabled={status.saving}
-                  className="min-h-11 rounded-xl bg-emerald-700 px-4 text-sm font-bold text-white hover:bg-emerald-800 disabled:opacity-60"
-                >
-                  {status.saving
-                    ? isId
-                      ? 'Menyimpan...'
-                      : 'Saving...'
-                    : isId
-                      ? 'Kirim revisi'
-                      : 'Resubmit revision'}
-                </button>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <button
+                    disabled={status.saving || deleting}
+                    className="min-h-11 flex-1 rounded-xl bg-emerald-700 px-4 text-sm font-bold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {status.saving
+                      ? isId
+                        ? 'Mengirim revisi...'
+                        : 'Resubmitting...'
+                      : isId
+                        ? 'Kirim revisi'
+                        : 'Resubmit revision'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void withdraw()}
+                    disabled={status.saving || deleting}
+                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 text-sm font-bold text-rose-700 transition hover:border-rose-300 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-200"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    {deleting
+                      ? isId
+                        ? 'Menghapus...'
+                        : 'Removing...'
+                      : isId
+                        ? 'Hapus kiriman'
+                        : 'Remove submission'}
+                  </button>
+                </div>
               ) : (
-                <p className="text-xs font-semibold text-slate-500">
+                <p className="text-xs font-semibold leading-5 text-slate-500">
                   {isId
-                    ? 'Item ini tidak dapat diedit pada status sekarang.'
-                    : 'This item cannot be edited in its current state.'}
+                    ? 'Item ini tidak dapat diedit atau dihapus pada status sekarang.'
+                    : 'This item cannot be edited or removed in its current state.'}
                 </p>
               )}
             </form>
