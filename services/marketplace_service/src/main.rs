@@ -30,8 +30,8 @@ use tower_http::cors::CorsLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use uuid::Uuid;
 
-mod blog;
 mod auth;
+mod blog;
 mod business_moderation;
 mod businesses;
 mod content_projection;
@@ -11256,7 +11256,11 @@ async fn get_content_save_state(
         Ok(state) => (StatusCode::OK, Json(state)).into_response(),
         Err(error) => {
             tracing::error!("get_content_save_state error: {:?}", error);
-            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load save state").into_response()
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load save state",
+            )
+            .into_response()
         }
     }
 }
@@ -11288,17 +11292,18 @@ async fn update_content_save(
     };
 
     if let Err(error) = ensure_user_read_model_exists(&state.db, actor_user_id).await {
-        tracing::error!("update_content_save ensure user read model error: {:?}", error);
-        return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update save")
-            .into_response();
+        tracing::error!(
+            "update_content_save ensure user read model error: {:?}",
+            error
+        );
+        return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update save").into_response();
     }
 
     let mut tx = match state.db.begin().await {
         Ok(tx) => tx,
         Err(error) => {
             tracing::error!("update_content_save begin tx error: {:?}", error);
-            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update save")
-                .into_response();
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update save").into_response();
         }
     };
 
@@ -11319,8 +11324,7 @@ async fn update_content_save(
         .await
         {
             tracing::error!("update_content_save insert error: {:?}", error);
-            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update save")
-                .into_response();
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update save").into_response();
         }
     } else if let Err(error) = sqlx::query(
         r#"
@@ -11334,8 +11338,7 @@ async fn update_content_save(
     .await
     {
         tracing::error!("update_content_save delete error: {:?}", error);
-        return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update save")
-            .into_response();
+        return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update save").into_response();
     }
 
     let save_count: i64 = match sqlx::query_scalar(
@@ -11352,8 +11355,7 @@ async fn update_content_save(
         Ok(value) => value,
         Err(error) => {
             tracing::error!("update_content_save count error: {:?}", error);
-            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update save")
-                .into_response();
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update save").into_response();
         }
     };
 
