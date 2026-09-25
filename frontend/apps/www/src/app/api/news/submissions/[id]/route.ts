@@ -225,3 +225,53 @@ export async function PATCH(
     return NextResponse.json({ error: 'Marketplace service unavailable' }, { status: 503 });
   }
 }
+
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const auth = await requireAuth(request);
+  if (!auth.ok) return auth.res;
+
+  const rate = await enforceRateLimit({
+    key: `news:withdraw:user:${auth.ctx.userId}`,
+    limit: 20,
+    windowSeconds: 3600,
+  });
+  if (!rate.ok) return rate.response;
+
+  const { id } = await params;
+  if (!id.trim()) {
+    return NextResponse.json(
+      { error: 'ID kiriman tidak valid.' },
+      { status: 400 },
+    );
+  }
+
+  try {
+    const upstream = await fetch(
+      `${MARKETPLACE_URL}/v1/news/submissions/${encodeURIComponent(id)}`,
+      {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${auth.ctx.token}`,
+        },
+        cache: 'no-store',
+      },
+    );
+    const text = await upstream.text();
+    return new NextResponse(text, {
+      status: upstream.status,
+      headers: {
+        'Content-Type':
+          upstream.headers.get('content-type') || 'application/json',
+      },
+    });
+  } catch {
+    return NextResponse.json(
+      { error: 'Marketplace service unavailable' },
+      { status: 503 },
+    );
+  }
+}
