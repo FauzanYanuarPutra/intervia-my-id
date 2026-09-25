@@ -231,32 +231,10 @@ function buildMarkerSymbolSvg(input: {
   `;
 }
 
-function buildLocationModeSvg(input: {
-  locationMode: ReturnType<typeof buildUmkmPlacePresentation>['locationMode'];
-}): string {
-  const stroke = input.locationMode === 'mobile' ? '#ffffff' : '#334155';
-  if (input.locationMode === 'mobile') {
-    return `
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path d="M5 18c4-1 7-4 8-8l2-5 4 4-5 2c-4 1-7 4-8 8l-1 3 0-4Z" stroke="${stroke}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-    `;
-  }
-
-  return `
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M4 10 12 5l8 5" stroke="${stroke}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-      <path d="M6 11v8h12v-8" stroke="${stroke}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>
-  `;
-}
-
 function buildStoreMarkerIcon(input: {
   kind: ReturnType<typeof buildUmkmPlacePresentation>['kind'];
-  ratingLabel: string;
   markerTone: ReturnType<typeof buildUmkmPlacePresentation>['markerTone'];
-  locationMode: ReturnType<typeof buildUmkmPlacePresentation>['locationMode'];
-  liveNow: boolean | null;
+  liveNow?: boolean | null;
   selected?: boolean;
 }): DivIcon {
   const cacheKey = [
@@ -1294,10 +1272,7 @@ function StoreMarkersLayer({
               interactive={interactive}
               icon={buildStoreMarkerIcon({
                 kind: ui.kind,
-                ratingLabel: ui.ratingLabel,
                 markerTone: ui.markerTone,
-                locationMode: ui.locationMode,
-                liveNow: null,
                 selected: selectedStoreId === store.id,
               })}
               zIndexOffset={active ? 480 : 220}
