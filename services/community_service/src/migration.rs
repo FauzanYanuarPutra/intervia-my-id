@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
-use sqlx::{migrate::Migrator, FromRow, PgPool, Row};
+use sqlx::{FromRow, PgPool, Row};
 
 pub(crate) fn validate_community_migration_versions(
     migrator: &sqlx::migrate::Migrator,
