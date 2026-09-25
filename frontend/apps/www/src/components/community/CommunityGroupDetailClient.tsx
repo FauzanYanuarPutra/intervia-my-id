@@ -556,7 +556,7 @@ export default function CommunityGroupDetailClient({
     if (!group) return;
     let alive = true;
     const params = new URLSearchParams();
-    params.set('category', group.categoryId);
+    params.set('group', group.id);
     params.set('limit', '10');
     params.set('cursor', '0');
     params.set('_', String(refreshKey));
@@ -629,7 +629,7 @@ export default function CommunityGroupDetailClient({
     if (!group || !hasMore || nextCursor == null || loadingMore) return;
     setLoadingMore(true);
     const params = new URLSearchParams();
-    params.set('category', group.categoryId);
+    params.set('group', group.id);
     params.set('limit', '10');
     params.set('cursor', String(nextCursor));
     const response = await fetch(`/api/community/feed?${params.toString()}`, {
