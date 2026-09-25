@@ -232,11 +232,19 @@ inference_semaphore = asyncio.Semaphore(MAX_CONCURRENT)
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    # Finish one initialization attempt before marking the application started.
-    # If initialization fails the API still starts in degraded mode, so /health
-    # and /ready explain the failure instead of the container crash-looping.
-    await run_in_threadpool(runtime.initialize)
-    yield
+    # Start the OCR engine in the background so the HTTP process can expose
+    # liveness/readiness while large CPU model files are loading. Requests to
+    # /predict remain fail-closed until runtime.ready becomes true.
+    initialization = asyncio.create_task(run_in_threadpool(runtime.initialize))
+    try:
+        yield
+    finally:
+        if not initialization.done():
+            initialization.cancel()
+        try:
+            await initialization
+        except asyncio.CancelledError:
+            pass
 
 
 app = FastAPI(
@@ -257,13 +265,18 @@ def package_version(name: str) -> str | None:
 
 
 @app.get("/health")
-async def health() -> dict[str, Any]:
-    return {
-        "status": "ok",
+async def health() -> JSONResponse:
+    state = runtime.state
+    status = "ok" if state in {"starting", "ready"} else "degraded"
+    body = {
+        "status": status,
         "service": SERVICE_NAME,
         "version": SERVICE_VERSION,
-        "engine_state": runtime.state,
+        "engine_state": state,
     }
+    if runtime.error:
+        body["reason"] = runtime.error[:500]
+    return JSONResponse(body, status_code=200 if state in {"starting", "ready"} else 503)
 
 
 @app.get("/ready")
