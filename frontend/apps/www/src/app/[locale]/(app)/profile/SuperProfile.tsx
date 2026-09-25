@@ -2482,7 +2482,7 @@ export default function SuperProfile() {
             </div>
 
             {visibleListings.length > 0 ? (
-              <div className="grid grid-cols-2 gap-2 p-2 sm:gap-3 sm:p-4 min-[480px]:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-2 p-2 min-[480px]:grid-cols-2 sm:gap-3 sm:p-4 lg:grid-cols-4">
                 {visibleListings.map(item => (
                   <ListingCard
                     key={item.id}
