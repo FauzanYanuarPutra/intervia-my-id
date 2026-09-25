@@ -17,6 +17,7 @@ import {
   MessageCircle,
   Pin,
   Settings,
+  Share2,
   ShieldCheck,
   Upload,
   Users,
@@ -62,7 +63,15 @@ type GroupResponse = {
   error?: string;
 };
 
-type GroupTab = 'discussion' | 'members' | 'about' | 'rules';
+type GroupTab =
+  | 'discussion'
+  | 'featured'
+  | 'members'
+  | 'media'
+  | 'about'
+  | 'rules';
+
+type GroupFeedSort = 'most-relevant' | 'recent-activity' | 'new-posts';
 
 function compactNumber(value: number | undefined) {
   const safe = Math.max(Number(value || 0), 0);
@@ -492,6 +501,7 @@ export default function CommunityGroupDetailClient({
   const [loadingGroup, setLoadingGroup] = useState(true);
   const [loadingFeed, setLoadingFeed] = useState(false);
   const [loadingMembers, setLoadingMembers] = useState(false);
+  const [feedSort, setFeedSort] = useState<GroupFeedSort>('most-relevant');
   const [notFound, setNotFound] = useState(false);
   const [busyJoin, setBusyJoin] = useState(false);
   const [uploadingMedia, setUploadingMedia] = useState<
@@ -557,8 +567,9 @@ export default function CommunityGroupDetailClient({
     let alive = true;
     const params = new URLSearchParams();
     params.set('group', group.id);
-    params.set('limit', '10');
+    params.set('limit', '12');
     params.set('cursor', '0');
+    params.set('sort', feedSort);
     params.set('_', String(refreshKey));
     queueMicrotask(() => {
       if (alive) setLoadingFeed(true);
@@ -588,7 +599,7 @@ export default function CommunityGroupDetailClient({
     return () => {
       alive = false;
     };
-  }, [group, refreshKey]);
+  }, [feedSort, group, refreshKey]);
 
   useEffect(() => {
     if (!group) return;
@@ -630,8 +641,9 @@ export default function CommunityGroupDetailClient({
     setLoadingMore(true);
     const params = new URLSearchParams();
     params.set('group', group.id);
-    params.set('limit', '10');
+    params.set('limit', '12');
     params.set('cursor', String(nextCursor));
+    params.set('sort', feedSort);
     const response = await fetch(`/api/community/feed?${params.toString()}`, {
       cache: 'no-store',
       credentials: 'include',
@@ -649,6 +661,35 @@ export default function CommunityGroupDetailClient({
     setNextCursor(payload.nextCursor ?? null);
     setHasMore(Boolean(payload.hasMore));
     setLoadingMore(false);
+  };
+
+  const handleShareGroup = async () => {
+    if (!group) return;
+    const url =
+      typeof window !== 'undefined'
+        ? window.location.href
+        : pathname || `/community/groups/${encodeURIComponent(slug)}`;
+
+    try {
+      if (typeof navigator !== 'undefined' && navigator.share) {
+        await navigator.share({
+          title: group.name,
+          text: group.description,
+          url,
+        });
+        return;
+      }
+
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(url);
+        notify({
+          title: isId ? 'Link grup disalin' : 'Group link copied',
+          variant: 'success',
+        });
+      }
+    } catch {
+      // User cancellation of native share should not create an error toast.
+    }
   };
 
   const joinOrLeave = async () => {
@@ -848,10 +889,18 @@ export default function CommunityGroupDetailClient({
   }
 
   const leaders = [...admins, ...moderators].slice(0, 5);
-  const featuredItems = items.filter(item => item.isPinned).slice(0, 3);
+  const featuredItems = items.filter(item => item.isPinned);
+  const mediaItems = items.filter(
+    item =>
+      Boolean(item.media?.src) ||
+      Boolean(item.mediaItems?.length) ||
+      Boolean(item.imageUrls?.length),
+  );
   const tabs: Array<{ id: GroupTab; label: string }> = [
-    { id: 'discussion', label: isId ? 'Diskusi' : 'Discussions' },
-    { id: 'members', label: isId ? 'Anggota' : 'Members' },
+    { id: 'discussion', label: isId ? 'Diskusi' : 'Discussion' },
+    { id: 'featured', label: 'Featured' },
+    { id: 'members', label: isId ? 'Anggota' : 'People' },
+    { id: 'media', label: 'Media' },
     { id: 'about', label: isId ? 'Tentang' : 'About' },
     { id: 'rules', label: isId ? 'Aturan' : 'Rules' },
   ];
@@ -1102,7 +1151,15 @@ export default function CommunityGroupDetailClient({
               <p className="text-sm leading-6 text-[color:var(--app-text)]">
                 {group.description}
               </p>
-              <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="flex flex-wrap gap-2 lg:flex-nowrap lg:justify-end">
+                <button
+                  type="button"
+                  onClick={() => void handleShareGroup()}
+                  className="inline-flex min-h-[40px] items-center justify-center gap-2 rounded-[14px] border border-[color:var(--app-border)] bg-white px-3 text-xs font-bold text-[color:var(--app-text)]"
+                >
+                  <Share2 className="h-4 w-4" />
+                  {isId ? 'Bagikan' : 'Share'}
+                </button>
                 <button
                   type="button"
                   onClick={() => setMembersModalGroup(group)}
@@ -1155,6 +1212,49 @@ export default function CommunityGroupDetailClient({
 
           {activeTab === 'discussion' ? (
             <>
+              <section className="rounded-[18px] border border-[color:var(--app-border)] bg-white p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[color:var(--app-text-soft)]">
+                      {isId ? 'Urutan posting' : 'Post order'}
+                    </p>
+                    <p className="mt-0.5 text-xs font-semibold text-[color:var(--app-text)]">
+                      {feedSort === 'most-relevant'
+                        ? isId
+                          ? 'Paling relevan'
+                          : 'Most relevant'
+                        : feedSort === 'recent-activity'
+                          ? isId
+                            ? 'Aktivitas terbaru'
+                            : 'Recent activity'
+                          : isId
+                            ? 'Posting terbaru'
+                            : 'New posts'}
+                    </p>
+                  </div>
+                  <select
+                    value={feedSort}
+                    onChange={event =>
+                      setFeedSort(event.target.value as GroupFeedSort)
+                    }
+                    className="min-h-9 rounded-[11px] border border-[color:var(--app-border)] bg-white px-2.5 text-[11px] font-bold text-[color:var(--app-text)] outline-none"
+                    aria-label={
+                      isId ? 'Urutan posting grup' : 'Group post order'
+                    }
+                  >
+                    <option value="most-relevant">
+                      {isId ? 'Paling relevan' : 'Most relevant'}
+                    </option>
+                    <option value="recent-activity">
+                      {isId ? 'Aktivitas terbaru' : 'Recent activity'}
+                    </option>
+                    <option value="new-posts">
+                      {isId ? 'Posting terbaru' : 'New posts'}
+                    </option>
+                  </select>
+                </div>
+              </section>
+
               {featuredItems.length ? (
                 <section className="rounded-[20px] border border-amber-100 bg-amber-50/60 p-3.5 shadow-[0_12px_28px_-26px_rgba(245,158,11,0.28)]">
                   <div className="flex items-start gap-3">
@@ -1252,6 +1352,40 @@ export default function CommunityGroupDetailClient({
             </>
           ) : null}
 
+          {activeTab === 'featured' ? (
+            <section className="space-y-3">
+              <section className="rounded-[20px] border border-amber-100 bg-amber-50/60 p-3.5">
+                <p className="text-[10px] font-black uppercase tracking-[0.12em] text-amber-700">
+                  Featured
+                </p>
+                <p className="mt-1 text-xs leading-5 text-[color:var(--app-text-soft)]">
+                  {isId
+                    ? 'Posting penting yang dipilih admin atau moderator tetap mudah ditemukan.'
+                    : 'Important posts selected by admins or moderators stay easy to find.'}
+                </p>
+              </section>
+              {featuredItems.length ? (
+                <div className="space-y-3">
+                  {featuredItems.map(item => (
+                    <CommunityPostCard
+                      key={item.id}
+                      item={item}
+                      isId={isId}
+                      onOpenDetail={handleOpenThread}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <section className="rounded-[20px] border border-[color:var(--app-border)] bg-white p-6 text-center">
+                  <Pin className="mx-auto h-7 w-7 text-amber-500" />
+                  <p className="mt-3 text-sm font-bold text-[color:var(--app-text)]">
+                    {isId ? 'Belum ada posting featured.' : 'No featured posts yet.'}
+                  </p>
+                </section>
+              )}
+            </section>
+          ) : null}
+
           {activeTab === 'members' ? (
             <section className="rounded-[20px] border border-[color:var(--app-border)] bg-white p-3.5 shadow-[0_10px_30px_-28px_rgba(15,23,42,0.18)]">
               <div className="flex items-center justify-between gap-3">
@@ -1277,6 +1411,62 @@ export default function CommunityGroupDetailClient({
                   <MemberRow key={member.userId} member={member} isId={isId} />
                 ))}
               </div>
+            </section>
+          ) : null}
+
+          {activeTab === 'media' ? (
+            <section className="space-y-3">
+              <section className="rounded-[20px] border border-[color:var(--app-border)] bg-white p-4">
+                <h2 className="text-base font-bold text-[color:var(--app-text)]">
+                  {isId ? 'Media grup' : 'Group media'}
+                </h2>
+                <p className="mt-1 text-xs leading-5 text-[color:var(--app-text-soft)]">
+                  {isId
+                    ? 'Foto dan media yang dibagikan dalam diskusi grup.'
+                    : 'Photos and media shared across group discussions.'}
+                </p>
+              </section>
+              {mediaItems.length ? (
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {mediaItems.flatMap(item => {
+                    const sources = Array.from(
+                      new Set([
+                        ...(item.imageUrls || []),
+                        ...(item.mediaItems || []).map(media => media.src),
+                        ...(item.media?.src ? [item.media.src] : []),
+                      ].filter(Boolean)),
+                    ).slice(0, 6);
+
+                    return sources.map((src, index) => (
+                      <button
+                        key={item.id + '-' + index + '-' + src}
+                        type="button"
+                        onClick={() => handleOpenThread(item.threadId || item.id)}
+                        className="group relative aspect-square overflow-hidden rounded-[16px] bg-slate-100"
+                        title={item.title}
+                      >
+                        <LajukanImage
+                          src={src}
+                          alt={item.title}
+                          fill
+                          sizes="(max-width: 640px) 50vw, 240px"
+                          className="object-cover transition duration-300 group-hover:scale-[1.04]"
+                        />
+                        <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/55 to-transparent px-2 pb-2 pt-5 text-left text-[10px] font-bold text-white">
+                          {item.title}
+                        </span>
+                      </button>
+                    ));
+                  })}
+                </div>
+              ) : (
+                <section className="rounded-[20px] border border-dashed border-[color:var(--app-border)] bg-white p-6 text-center">
+                  <ImageIcon className="mx-auto h-7 w-7 text-[color:var(--app-text-soft)]" />
+                  <p className="mt-3 text-sm font-bold text-[color:var(--app-text)]">
+                    {isId ? 'Belum ada media.' : 'No media yet.'}
+                  </p>
+                </section>
+              )}
             </section>
           ) : null}
 
