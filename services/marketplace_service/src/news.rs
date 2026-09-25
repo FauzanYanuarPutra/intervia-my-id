@@ -2,7 +2,7 @@ use axum::{
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::IntoResponse,
-    routing::{get, patch},
+    routing::{delete, get, patch},
     Json, Router,
 };
 use chrono::{DateTime, Duration, Utc};
@@ -27,7 +27,10 @@ pub(crate) fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/v1/news", get(list_news))
         .route("/v1/news/submissions/mine", get(list_my_news_submissions))
-        .route("/v1/news/submissions/{id}", patch(update_news_submission))
+        .route(
+            "/v1/news/submissions/{id}",
+            delete(withdraw_news_submission).patch(update_news_submission),
+        )
         .route("/v1/news/editorial/queue", get(list_editorial_queue))
         .route(
             "/v1/news/editorial/reviewers",
@@ -1548,6 +1551,206 @@ async fn list_my_news_submissions(
             )
         }
     }
+}
+
+fn contributor_withdrawal_allowed(status: &str) -> bool {
+    matches!(status, "pending_review" | "needs_revision" | "rejected")
+}
+
+async fn withdraw_news_submission(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    let owner_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return response_error(StatusCode::UNAUTHORIZED, "unauthorized"),
+    };
+    let content_id = match Uuid::parse_str(id.trim()) {
+        Ok(id) => id,
+        Err(_) => return response_error(StatusCode::BAD_REQUEST, "invalid news id"),
+    };
+
+    let mut tx = match state.db.begin().await {
+        Ok(tx) => tx,
+        Err(error) => {
+            tracing::error!("withdraw_news_submission begin tx error: {:?}", error);
+            return response_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to withdraw news submission",
+            );
+        }
+    };
+
+    let current = match load_news_for_review(&mut tx, content_id).await {
+        Ok(Some(row)) => row,
+        Ok(None) => return response_error(StatusCode::NOT_FOUND, "news submission not found"),
+        Err(error) => {
+            tracing::error!("withdraw_news_submission load error: {:?}", error);
+            return response_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to withdraw news submission",
+            );
+        }
+    };
+
+    if current.owner_id != owner_id {
+        return response_error(StatusCode::FORBIDDEN, "forbidden");
+    }
+
+    let from_status = editorial_status(&current.content_status, &current.metadata);
+    if !contributor_withdrawal_allowed(&from_status) {
+        return response_error(
+            StatusCode::CONFLICT,
+            "news can only be withdrawn before publication",
+        );
+    }
+
+    let mut metadata = current.metadata.clone();
+    if !metadata.is_object() {
+        metadata = json!({});
+    }
+    {
+        let root = metadata
+            .as_object_mut()
+            .expect("news metadata root initialized");
+        let news = root.entry("news".to_string()).or_insert_with(|| json!({}));
+        if !news.is_object() {
+            *news = json!({});
+        }
+        let news = news
+            .as_object_mut()
+            .expect("news metadata object initialized");
+        news.insert(
+            "editorial_status".to_string(),
+            Value::String("withdrawn".to_string()),
+        );
+        news.insert(
+            "withdrawn_at".to_string(),
+            Value::String(Utc::now().to_rfc3339()),
+        );
+        news.insert(
+            "withdrawn_by".to_string(),
+            Value::String(owner_id.to_string()),
+        );
+    }
+
+    let updated = match sqlx::query_as::<_, NewsRow>(
+        r#"
+        UPDATE content_items
+        SET
+            content_status = 'deleted',
+            listing_status = 'draft',
+            published_at = NULL,
+            metadata = $2,
+            updated_at = NOW(),
+            last_saved_at = NOW(),
+            draft_version = draft_version + 1
+        WHERE id = $1
+          AND owner_id = $3
+          AND content_type = 'news'
+          AND content_status <> 'deleted'
+        RETURNING
+            id, owner_id, slug, title, summary, body, tags, cover_image, metadata,
+            content_status, published_at, created_at, updated_at
+        "#,
+    )
+    .bind(content_id)
+    .bind(metadata)
+    .bind(owner_id)
+    .fetch_one(&mut *tx)
+    .await
+    {
+        Ok(row) => row,
+        Err(error) => {
+            tracing::error!("withdraw_news_submission update error: {:?}", error);
+            return response_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to withdraw news submission",
+            );
+        }
+    };
+
+    if let Err(error) = sqlx::query(
+        r#"
+        INSERT INTO news_editorial_events (
+            content_id, actor_id, actor_role, action, from_status, to_status, note
+        )
+        VALUES ($1, $2, 'contributor', 'withdraw', $3, 'withdrawn', 'Contributor withdrew the submission')
+        "#,
+    )
+    .bind(content_id)
+    .bind(owner_id)
+    .bind(from_status)
+    .execute(&mut *tx)
+    .await
+    {
+        tracing::error!("withdraw_news_submission audit error: {:?}", error);
+        return response_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record news withdrawal",
+        );
+    }
+
+    if let Err(error) =
+        record_version_tx(&mut tx, &updated, Some(owner_id), "contributor", "withdraw").await
+    {
+        tracing::error!("withdraw_news_submission version error: {:?}", error);
+        return response_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record news withdrawal version",
+        );
+    }
+
+    if let Err(error) = enqueue_news_outbox_tx(
+        &mut tx,
+        &updated,
+        Some(owner_id),
+        "news.withdrawn",
+        "news.editorial.changed",
+    )
+    .await
+    {
+        tracing::error!("withdraw_news_submission outbox error: {:?}", error);
+        return response_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to enqueue news withdrawal",
+        );
+    }
+
+    if let Err(error) = tx.commit().await {
+        tracing::error!("withdraw_news_submission commit error: {:?}", error);
+        return response_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to withdraw news submission",
+        );
+    }
+
+    push_notification_best_effort(
+        &state,
+        owner_id,
+        "news",
+        "news.submission_withdrawn",
+        "Kiriman berita dihapus",
+        "Kirimanmu sudah ditarik dari antrean editorial dan tidak akan diterbitkan.",
+        json!({
+            "content_id": content_id,
+            "slug": updated.slug,
+            "href": "/news/submissions",
+            "editorial_status": "withdrawn",
+        }),
+    )
+    .await;
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "id": content_id,
+            "editorial_status": "withdrawn",
+            "message": "news submission withdrawn",
+        })),
+    )
+        .into_response()
 }
 
 async fn update_news_submission(
@@ -3700,7 +3903,7 @@ async fn list_editorial_history(
 #[cfg(test)]
 mod tests {
     use super::{
-        is_allowed_news_source_url, moderation_action_allowed, moderation_action_requires_note,
+        contributor_withdrawal_allowed, is_allowed_news_source_url, moderation_action_allowed, moderation_action_requires_note,
         moderation_target, normalize_editorial_priority, normalize_editorial_sensitivity,
         normalize_fact_check_status, normalize_legal_review_status, normalize_news_category_filter,
         normalize_news_language, normalize_news_search_query, normalize_queue_status,
@@ -3723,6 +3926,16 @@ mod tests {
             Some(("archived", "retracted"))
         );
         assert_eq!(moderation_target("unknown"), None);
+    }
+
+    #[test]
+    fn contributor_withdrawal_is_limited_to_unpublished_states() {
+        assert!(contributor_withdrawal_allowed("pending_review"));
+        assert!(contributor_withdrawal_allowed("needs_revision"));
+        assert!(contributor_withdrawal_allowed("rejected"));
+        assert!(!contributor_withdrawal_allowed("published"));
+        assert!(!contributor_withdrawal_allowed("retracted"));
+        assert!(!contributor_withdrawal_allowed("withdrawn"));
     }
 
     #[test]
