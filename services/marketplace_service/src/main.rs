@@ -23031,6 +23031,27 @@ mod tests {
     use super::*;
 
     #[test]
+    fn daily_login_reward_amounts_are_deterministic_and_bounded() {
+        let expected_coins = [15, 20, 25, 30, 35, 40, 45];
+        let expected_xp = [30, 40, 50, 60, 70, 80, 90];
+
+        for day in 1..=7 {
+            let index = (day - 1) as usize;
+            assert_eq!(daily_login_coin_amount(day), expected_coins[index]);
+            assert_eq!(daily_login_xp_amount(day), expected_xp[index]);
+        }
+    }
+
+    #[test]
+    fn reward_coin_discount_is_capped_and_preserves_cash_floor() {
+        assert_eq!(reward_coin_max_discount_cents(100_000), 0);
+        assert_eq!(reward_coin_max_discount_cents(200_000), 50_000);
+        assert_eq!(reward_coin_max_discount_cents(1_000_000), 250_000);
+        assert_eq!(REWARD_COIN_VALUE_CENTS, 10_000);
+        assert_eq!(REWARD_COIN_MAX_PAYMENT_BPS, 2_500);
+    }
+
+    #[test]
     fn listing_draft_patch_distinguishes_omitted_null_and_present_nullable_fields() {
         let omitted: PatchListingDraftRequest =
             serde_json::from_value(json!({})).expect("empty patch should deserialize");
