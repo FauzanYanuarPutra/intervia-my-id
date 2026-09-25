@@ -29,7 +29,7 @@ export type BusinessLocationMapProps = {
   markerLabel?: string;
 };
 
-const TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+const TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 const TILE_ATTRIBUTION = '&copy; OpenStreetMap contributors';
 const MARKER_ICON: DivIcon = divIcon({
   className: 'leaflet-superapp-marker-host',
