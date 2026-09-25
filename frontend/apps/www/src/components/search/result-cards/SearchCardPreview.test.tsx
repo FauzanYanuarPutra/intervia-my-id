@@ -119,7 +119,27 @@ describe('search result card preview mode', () => {
     expect(html).toContain('Rp 2 juta');
     expect(html).toContain('Bandung');
     expect(html).toContain('2026-08-15');
+    expect(html).toContain('reference.jpg');
     expect(html).not.toContain('Bulanan');
     expect(html).not.toContain('Ada gambar referensi');
+  });
+
+  it('keeps need media optional when no image is available', () => {
+    const html = renderToStaticMarkup(
+      <NeedSearchCard
+        item={{
+          ...baseItem,
+          kind: 'needs',
+          side: 'demand',
+          image: null,
+          metadata: { requestStatus: 'open' },
+        }}
+        locale="id"
+        interactive={false}
+      />,
+    );
+
+    expect(html).toContain('data-testid="need-search-card"');
+    expect(html).not.toContain('<img');
   });
 });
