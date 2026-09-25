@@ -36,8 +36,8 @@ use uuid::Uuid;
 
 mod auth;
 mod health;
-mod migration;
 mod media;
+mod migration;
 mod normalization;
 mod rate_limit;
 mod runtime_metrics;
@@ -45,12 +45,12 @@ mod schema_contract;
 
 use auth::{is_moderator, optional_actor, request_ip, require_actor, AuthActor};
 use health::{health, ready, root, service_metrics};
-use migration::{normalize_community_migration_tracking, validate_community_migration_versions};
 use media::{
     content_type_for_filename, extension_for, first_feed_media_url, has_valid_media_signature,
     is_allowed_media_type, is_allowed_video_type, is_video_url, media_public_path, safe_file_name,
     upload_dir,
 };
+use migration::{normalize_community_migration_tracking, validate_community_migration_versions};
 use normalization::*;
 use rate_limit::{enforce_rate_limit, mutation_rate_limit, run_rate_limit_cleanup};
 
@@ -1172,9 +1172,9 @@ async fn main() -> anyhow::Result<()> {
                 }
                 Err(error) => {
                     let message = error.to_string();
-                    let concurrent_migration_conflict =
-                        message.contains("duplicate key value violates unique constraint")
-                            && message.contains("_sqlx_migrations_pkey");
+                    let concurrent_migration_conflict = message
+                        .contains("duplicate key value violates unique constraint")
+                        && message.contains("_sqlx_migrations_pkey");
 
                     if concurrent_migration_conflict && attempt < 3 {
                         let delay_ms = match attempt {
@@ -1297,9 +1297,7 @@ async fn main() -> anyhow::Result<()> {
             cors = cors.allow_origin(value);
         }
     } else {
-        cors = cors.allow_origin([
-            "http://localhost:3000".parse::<HeaderValue>()?,
-        ]);
+        cors = cors.allow_origin(["http://localhost:3000".parse::<HeaderValue>()?]);
     }
 
     let app = Router::new()
@@ -5521,14 +5519,12 @@ async fn set_thread_bookmark(
     .await
     .map_err(internal_error)?;
 
-    sqlx::query(
-        "UPDATE forum.lajukan_forum_threads SET bookmark_count = $2 WHERE id = $1",
-    )
-    .bind(&thread_id)
-    .bind(bookmark_count)
-    .execute(&state.db)
-    .await
-    .map_err(internal_error)?;
+    sqlx::query("UPDATE forum.lajukan_forum_threads SET bookmark_count = $2 WHERE id = $1")
+        .bind(&thread_id)
+        .bind(bookmark_count)
+        .execute(&state.db)
+        .await
+        .map_err(internal_error)?;
 
     Ok(Json(BookmarkResponse {
         thread_id,
@@ -8395,9 +8391,7 @@ async fn build_feed_items(
                 root.map(|post| post.content.as_str())
                     .unwrap_or(&thread.title),
             );
-            let root_post_image_urls = root
-                .map(|post| post.image_urls.as_slice())
-                .unwrap_or(&[]);
+            let root_post_image_urls = root.map(|post| post.image_urls.as_slice()).unwrap_or(&[]);
             let image_urls = if root_post_image_urls.is_empty() {
                 thread.image_urls.clone()
             } else {

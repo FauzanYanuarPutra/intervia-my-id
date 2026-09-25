@@ -16,10 +16,10 @@ pub(crate) fn validate_community_migration_versions(
             continue;
         }
 
-        versions
-            .entry(migration.version)
-            .or_default()
-            .push(format!("{} ({:?})", migration.description, migration.migration_type));
+        versions.entry(migration.version).or_default().push(format!(
+            "{} ({:?})",
+            migration.description, migration.migration_type
+        ));
     }
 
     let mut invalid = versions
@@ -29,10 +29,7 @@ pub(crate) fn validate_community_migration_versions(
                 return None;
             }
 
-            Some(format!(
-                "version {version}: [{}]",
-                migrations.join(", "),
-            ))
+            Some(format!("version {version}: [{}]", migrations.join(", "),))
         })
         .collect::<Vec<_>>();
 
@@ -47,7 +44,6 @@ pub(crate) fn validate_community_migration_versions(
         );
     }
 }
-
 
 #[derive(Debug, FromRow)]
 pub(crate) struct CommunityMigrationRecord {
