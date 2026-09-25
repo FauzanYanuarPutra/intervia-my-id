@@ -471,7 +471,7 @@ try {
         throw "Kontrak konfigurasi runtime tidak valid. Tidak ada container yang diubah."
     }
     Write-Host "Runtime configuration contract passed." -ForegroundColor Green
-    Write-Host "Preparing build targets..." -ForegroundColor Cyan -ForegroundColor Green
+    Write-Host "Preparing build targets..." -ForegroundColor Cyan
     Write-Host "Launcher actions: Build=$($Build.IsPresent) Pull=$($Pull.IsPresent) Fresh=$($Fresh.IsPresent) Down=$($Down.IsPresent) Services=$($Services -join ",")" -ForegroundColor DarkCyan
 
     if ($Fresh.IsPresent) {
