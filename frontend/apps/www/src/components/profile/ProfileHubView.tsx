@@ -270,12 +270,6 @@ const SECTION_TONE_CLASS: Record<SectionTone, string> = {
     'border-orange-200/80 bg-[linear-gradient(135deg,#ffffff_0%,#fff8ed_54%,#ecfdf5_100%)] dark:border-orange-900/70 dark:bg-[linear-gradient(135deg,#160f07_0%,#1f170b_56%,#092017_100%)]',
 };
 
-const STAT_TONE_CLASSES = [
-  'border-emerald-200/80 bg-[linear-gradient(135deg,#ffffff_0%,#f7fff9_62%,#ecfdf5_100%)] dark:border-emerald-900/70 dark:bg-[linear-gradient(135deg,#07120f_0%,#0b1b16_100%)]',
-  'border-sky-200/80 bg-[linear-gradient(135deg,#ffffff_0%,#f8fbff_62%,#e0f2fe_100%)] dark:border-sky-900/70 dark:bg-[linear-gradient(135deg,#07111d_0%,#0b1726_100%)]',
-  'border-amber-200/85 bg-[linear-gradient(135deg,#ffffff_0%,#fffdf5_62%,#fef3c7_100%)] dark:border-amber-900/70 dark:bg-[linear-gradient(135deg,#151007_0%,#241a09_100%)]',
-  'border-rose-200/75 bg-[linear-gradient(135deg,#ffffff_0%,#fff7fb_62%,#ffe4e6_100%)] dark:border-rose-900/70 dark:bg-[linear-gradient(135deg,#16090f_0%,#25101a_100%)]',
-];
 const PRIMARY_ACTION_CLASS =
   'inline-flex min-h-[42px] max-w-full items-center justify-center gap-1.5 rounded-full bg-[color:var(--app-accent-strong)] px-3.5 text-xs font-bold text-[color:var(--app-text-inverse)] shadow-[0_16px_28px_-22px_rgba(4,120,87,0.65)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-65 sm:min-h-[44px] sm:px-2';
 const SECONDARY_ACTION_CLASS =
@@ -406,17 +400,6 @@ function SectionBlock({
       </div>
       {children}
     </section>
-  );
-}
-
-function ProgressBar({ value }: { value: number }) {
-  return (
-    <div className="h-1.5 overflow-hidden rounded-full bg-[color:var(--app-surface-muted)] dark:bg-[color:var(--app-surface)]">
-      <div
-        className="h-full rounded-full bg-[color:var(--app-accent-strong)] transition-all"
-        style={{ width: `${Math.max(0, Math.min(100, value))}%` }}
-      />
-    </div>
   );
 }
 
