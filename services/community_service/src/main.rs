@@ -319,6 +319,7 @@ struct FeedQuery {
     category: Option<String>,
     tag: Option<String>,
     group: Option<String>,
+    sort: Option<String>,
     cursor: Option<i64>,
     limit: Option<i64>,
 }
@@ -7900,6 +7901,13 @@ async fn get_community_feed(
     let group = clean_optional(query.group);
     let q = clean_optional(query.q);
     let requested_thread = clean_optional(query.thread);
+    let sort = clean_optional(query.sort).unwrap_or_else(|| "most-relevant".to_string());
+    let sort = match sort.as_str() {
+        "new" | "newest" | "new-posts" => "new-posts",
+        "recent" | "recent-activity" => "recent-activity",
+        "featured" => "featured",
+        _ => "most-relevant",
+    };
 
     if tab == "reels" {
         let mut items = build_reel_community_items(
@@ -8040,7 +8048,22 @@ async fn get_community_feed(
             p.metadata
             ORDER BY
               CASE WHEN $7::text IS NOT NULL AND t.id = $7 THEN 0 ELSE 1 END,
-              t.is_pinned DESC,
+              CASE
+                WHEN $11::text = 'featured' THEN CASE WHEN t.is_pinned THEN 0 ELSE 1 END
+                ELSE 0
+              END,
+              CASE
+                WHEN $11::text = 'new-posts' THEN t.created_at
+                ELSE NULL
+              END DESC NULLS LAST,
+              CASE
+                WHEN $11::text = 'most-relevant' THEN t.reply_count
+                ELSE 0
+              END DESC,
+              CASE
+                WHEN $11::text IN ('most-relevant', 'featured') THEN t.is_pinned::int
+                ELSE 0
+              END DESC,
               t.last_activity_at DESC,
               t.id ASC
             LIMIT $9 OFFSET $10
@@ -8060,6 +8083,7 @@ async fn get_community_feed(
     .bind(group.as_deref())
     .bind(limit)
     .bind(cursor)
+    .bind(sort)
     .fetch_all(&state.db)
     .await
     .map_err(internal_error)?;
