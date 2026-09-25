@@ -128,11 +128,11 @@ pub(crate) async fn normalize_community_migration_tracking(pool: &PgPool) -> any
                 let existing_description: String = existing.get("description");
 
                 if existing_checksum != record.checksum {
-                    anyhow::bail!(
-                        "conflicting community migration metadata for version {}: public description={:?}, {} description={:?}",
+                    tracing::warn!(
+                        "Ignoring legacy community migration metadata for version={} table={} because the canonical public tracker already has a different checksum (canonical_description={:?}, legacy_description={:?})",
                         record.version,
-                        existing_description,
                         table,
+                        existing_description,
                         record.description
                     );
                 }
