@@ -116,6 +116,7 @@ import { useHomeNews } from '@/components/home/HomeNewsContext';
 import type {
   CommunityFeedItem,
   CommunityFeedResponse,
+  CommunityGroup,
 } from '@/lib/community/types';
 import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 import { UMKM_DISCOVERY_PATH } from '@/lib/umkmSurface';
@@ -126,6 +127,7 @@ import {
 } from '@/lib/discovery/lajukanCategories';
 import { cn } from '@/lib/utils';
 import { trackLajukanEvent } from '@/lib/analytics/lajukanEvents';
+import { GroupAvatarMark } from '@/components/community/CommunityFeedClient';
 import type { GlobalSearchItem } from '@/lib/search/globalSearch';
 import useEmblaCarousel from 'embla-carousel-react';
 
@@ -3575,6 +3577,107 @@ function normalizeMediaUrl(value?: string | null): string | null {
 }
 
 
+
+function HomeCommunityGroupsSection({
+  isId,
+  groups,
+}: {
+  isId: boolean;
+  groups: CommunityGroup[];
+}) {
+  if (!groups.length) return null;
+
+  return (
+    <section
+      className="w-full rounded-[20px] border border-[color:var(--app-border)] bg-white p-3.5 shadow-[0_10px_30px_-28px_rgba(15,23,42,0.18)]"
+      aria-label={isId ? 'Grup komunitas' : 'Community groups'}
+    >
+      <div className="flex items-end justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <Users className="h-4 w-4 shrink-0 text-[color:var(--app-accent)]" />
+            <h2 className="truncate text-sm font-bold tracking-[-0.025em] text-[color:var(--app-text)]">
+              {isId ? 'Grup yang mungkin cocok' : 'Groups you may like'}
+            </h2>
+          </div>
+          <p className="mt-0.5 text-[10px] font-medium text-[color:var(--app-text-soft)]">
+            {isId
+              ? 'Temukan ruang diskusi yang sesuai dengan usaha kamu.'
+              : 'Find communities that fit your business interests.'}
+          </p>
+        </div>
+
+        <Link
+          href="/community"
+          className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-[10px] px-2 text-[10px] font-bold text-[color:var(--app-accent)] transition hover:bg-[color:var(--app-accent-soft)]"
+        >
+          {isId ? 'Semua grup' : 'All groups'}
+          <ChevronRight className="h-3.5 w-3.5" />
+        </Link>
+      </div>
+
+      <div className="-mx-1 mt-3 flex gap-2 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {groups.map(group => (
+          <Link
+            key={group.id}
+            href={'/community/groups/' + encodeURIComponent(group.slug || group.id)}
+            className="group flex min-w-[218px] max-w-[240px] shrink-0 flex-col overflow-hidden rounded-[18px] border border-[color:var(--app-border)] bg-white transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:shadow-[0_18px_32px_-28px_rgba(15,23,42,0.28)]"
+          >
+            <div className="relative h-[84px] overflow-hidden bg-[linear-gradient(135deg,#ecfdf5,#eff6ff)]">
+              {group.coverUrl ? (
+                <Image
+                  src={group.coverUrl}
+                  alt={group.name}
+                  fill
+                  sizes="240px"
+                  className="object-cover transition duration-500 group-hover:scale-[1.03]"
+                />
+              ) : (
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,rgba(16,185,129,0.26),transparent_32%),radial-gradient(circle_at_85%_15%,rgba(59,130,246,0.20),transparent_28%)]" />
+              )}
+              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(15,23,42,0.02),rgba(15,23,42,0.32))]" />
+              <div className="absolute right-2 top-2 rounded-full bg-white/94 px-2 py-1 text-[9px] font-bold text-[color:var(--app-text)] shadow-sm">
+                {group.privacy === 'public'
+                  ? isId
+                    ? 'Publik'
+                    : 'Public'
+                  : isId
+                    ? 'Privat'
+                    : 'Private'}
+              </div>
+            </div>
+
+            <div className="relative flex flex-1 flex-col px-2.5 pb-2.5">
+              <GroupAvatarMark
+                group={group}
+                className="-mt-7 h-14 w-14 rounded-[17px] border-[3px] border-white text-lg shadow-[0_16px_26px_-22px_rgba(15,23,42,0.45)]"
+                sizes="56px"
+              />
+              <div className="mt-1.5 min-w-0">
+                <h3 className="truncate text-xs font-bold text-[color:var(--app-text)]">
+                  {group.name}
+                </h3>
+                <p className="mt-0.5 text-[10px] font-semibold text-[color:var(--app-text-soft)]">
+                  {formatCompactCount(group.memberCount, '0')}{' '}
+                  {isId ? 'anggota' : 'members'} · {formatCompactCount(group.postCount, '0')}{' '}
+                  {isId ? 'post' : 'posts'}
+                </p>
+                <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-[color:var(--app-text-soft)]">
+                  {group.description}
+                </p>
+              </div>
+
+              <span className="mt-auto pt-2 text-[10px] font-bold text-[color:var(--app-accent)]">
+                {isId ? 'Buka grup →' : 'Open group →'}
+              </span>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function CommunityPanel({
   isId,
   isAuthenticated,
@@ -4909,6 +5012,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
     PublicReferenceItem[]
   >([]);
   const [communityPosts, setCommunityPosts] = useState<CommunityPost[]>([]);
+  const [communityGroups, setCommunityGroups] = useState<CommunityGroup[]>([]);
   const [communityLoading, setCommunityLoading] = useState(false);
   const [communityError, setCommunityError] = useState<string | null>(null);
   const communityRequestSeqRef = useRef(0);
@@ -5259,7 +5363,19 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
         .map(item => mapCommunityItemToPost(item, isId, activeTab))
         .slice(0, 3);
 
+      const groups = [
+        ...(payload?.overview?.joinedGroups || []),
+        ...(payload?.overview?.recommendedGroups || []),
+        ...(payload?.overview?.groups || []),
+      ]
+        .filter(
+          (group, index, all) =>
+            all.findIndex(candidate => candidate.id === group.id) === index,
+        )
+        .slice(0, 6);
+
       setCommunityPosts(mapped);
+      setCommunityGroups(groups);
       setCommunityError(null);
     } catch (error) {
       if (communityRequestSeqRef.current !== requestSeq) return;
@@ -5286,6 +5402,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
 
   useEffect(() => {
     setCommunityPosts([]);
+    setCommunityGroups([]);
     setCommunityError(null);
     void loadCommunityPostsPage();
   }, [loadCommunityPostsPage]);
@@ -5611,6 +5728,10 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
         ) : null}
         <HomeNewsSection locale={locale} items={homeNewsItems} />
         <ReelsPanel isId={isId} items={reels} />
+        <HomeCommunityGroupsSection
+          isId={isId}
+          groups={communityGroups}
+        />
         <CommunityPanel
           isId={isId}
           isAuthenticated={isAuthenticated}
@@ -5706,6 +5827,10 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
               <HomeNewsSection locale={locale} items={homeNewsItems} />
               <div className="grid gap-4">
                 <ReelsPanel isId={isId} items={reels} />
+                <HomeCommunityGroupsSection
+                  isId={isId}
+                  groups={communityGroups}
+                />
                 <CommunityPanel
                   isId={isId}
                   isAuthenticated={isAuthenticated}
