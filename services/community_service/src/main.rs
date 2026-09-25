@@ -8061,7 +8061,7 @@ async fn get_community_feed(
                 ELSE 0
               END DESC,
               CASE
-                WHEN $11::text IN ('most-relevant', 'featured') THEN t.is_pinned::int
+                WHEN $11::text IN ('most-relevant', 'featured') AND t.is_pinned THEN 1
                 ELSE 0
               END DESC,
               t.last_activity_at DESC,
