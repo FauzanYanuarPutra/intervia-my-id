@@ -10,10 +10,10 @@ The policy is **open contribution, controlled publication**:
 2. Every submission is forced to `content_status=draft` and `metadata.news.editorial_status=pending_review` in the backend, even if a caller tries to use the generic content API.
 3. CMS editors review the queue at `/news` in the CMS app.
 4. Supported editorial actions are approve, request revision, reject, correct, and retract.
-5. Contributors can read editor feedback and resubmit eligible items from `/{locale}/news/submissions`.
+5. Contributors can read editor feedback, resubmit eligible items, and withdraw unpublished submissions from `/{locale}/news/submissions`.
 6. Only active news with editorial status `published` is exposed by the public news API.
 
-Generic update/delete paths intentionally reject News items so publication state cannot bypass editorial audit.
+Generic update/delete paths intentionally reject News items so publication state cannot bypass editorial audit. The contributor News submission DELETE endpoint is a dedicated withdrawal workflow: it soft-deletes the unpublished submission, records a `withdraw` event/version, emits the normal News outbox event, and never deletes the editorial audit trail. Published or retracted News can only be handled through the CMS editorial workflow.
 
 ## Metadata
 
@@ -45,6 +45,7 @@ Public:
 Contributor:
 - `GET /v1/news/submissions/mine`
 - `PATCH /v1/news/submissions/{id}`
+- `DELETE /v1/news/submissions/{id}` — withdraw unpublished submission with audit/version preservation
 
 CMS:
 - `GET /v1/news/editorial/queue`
@@ -72,7 +73,7 @@ The News domain also maintains durability and observability primitives:
 - `news_source_references` normalizes source URLs separately from article metadata and retains editorial classification/verification state.
 - Editorial history returns events, version snapshots, and source provenance in one CMS-oriented response.
 - News publication and editorial changes enqueue explicit events into the existing marketplace transactional outbox. This supplements, rather than replaces, the generic `content_items` outbox trigger.
-- Contributors receive the existing Lajukan in-app/realtime notifications for submission receipt, publication, revision requests, rejection, correction, and retraction.
+- Contributors receive the existing Lajukan in-app/realtime notifications for submission receipt, publication, revision requests, rejection, correction, retraction, and contributor withdrawal.
 - Public News listing supports cursor pagination while retaining bounded offset compatibility.
 - The News article surface emits engagement events: `news.opened`, `news.read_25`, `news.read_50`, `news.read_75`, `news.read_100`, `news.source_clicked`, and `news.related_clicked`.
 - CMS newsroom metrics aggregate queue state, publication throughput, review latency, source verification, and seven-day article opens from existing source-of-truth tables.
