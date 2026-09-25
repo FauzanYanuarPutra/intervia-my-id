@@ -93,8 +93,14 @@ export function LajukanImage({
   ...props
 }: LajukanImageProps) {
   const [failedKey, setFailedKey] = useState('');
+  const [retryKey, setRetryKey] = useState('');
   const normalizedSrc = useMemo(() => normalizeImageSrc(src), [src]);
   const key = useMemo(() => imageKey(normalizedSrc), [normalizedSrc]);
+  const retrySrc = useMemo(() => {
+    if (!normalizedSrc || retryKey !== key) return normalizedSrc;
+    const separator = normalizedSrc.includes('?') ? '&' : '?';
+    return `${normalizedSrc}${separator}lajukan_retry=1`;
+  }, [key, normalizedSrc, retryKey]);
   const bypassOptimizer = shouldBypassOptimizer(normalizedSrc);
   const failed = !normalizedSrc || failedKey === key;
 
@@ -113,11 +119,18 @@ export function LajukanImage({
   return (
     <Image
       {...props}
-      src={normalizedSrc}
+      src={retrySrc ?? normalizedSrc}
       alt={alt}
       unoptimized={unoptimized ?? bypassOptimizer}
+      onLoad={event => {
+        props.onLoad?.(event);
+      }}
       onError={event => {
         onError?.(event);
+        if (retryKey !== key) {
+          setRetryKey(key);
+          return;
+        }
         setFailedKey(key);
       }}
     />

@@ -83,7 +83,7 @@ const UmkmStoreMapClient = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex h-[360px] w-full max-w-full items-center justify-center rounded-3xl text-[color:var(--app-accent)] text-xs font-semibold border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]">
+      <div className="flex h-full w-full max-w-full items-center justify-center rounded-[inherit] text-[color:var(--app-accent)] text-xs font-semibold border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]">
         Memuat peta usaha...
       </div>
     ),
@@ -93,5 +93,17 @@ const UmkmStoreMapClient = dynamic(
 export const UmkmStoreMap = memo(function UmkmStoreMap(
   props: UmkmStoreMapProps,
 ) {
-  return <UmkmStoreMapClient {...props} />;
+  const { className, ...clientProps } = props;
+  const hostClassName = className || 'h-[360px] w-full rounded-3xl';
+
+  return (
+    <div
+      className={`umkm-map-host relative w-full max-w-full overflow-hidden ${hostClassName}`}
+    >
+      <UmkmStoreMapClient
+        {...clientProps}
+        className="umkm-leaflet-map h-full w-full max-w-full overflow-hidden rounded-[inherit]"
+      />
+    </div>
+  );
 });
