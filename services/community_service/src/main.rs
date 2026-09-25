@@ -1078,11 +1078,10 @@ async fn reconcile_dev_migration_checksums(
     pool: &PgPool,
     migrator: &sqlx::migrate::Migrator,
 ) -> anyhow::Result<()> {
-    let applied = sqlx::query(
-        "SELECT version, checksum FROM public._sqlx_migrations WHERE success = TRUE",
-    )
-    .fetch_all(pool)
-    .await?;
+    let applied =
+        sqlx::query("SELECT version, checksum FROM public._sqlx_migrations WHERE success = TRUE")
+            .fetch_all(pool)
+            .await?;
 
     for row in applied {
         let version: i64 = row.get("version");
