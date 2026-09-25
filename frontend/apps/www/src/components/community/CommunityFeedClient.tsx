@@ -5754,6 +5754,12 @@ function GroupStrip({
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
+          <Link
+            href="/community/groups"
+            className="inline-flex min-h-[36px] shrink-0 items-center rounded-full px-3 text-xs font-bold text-[color:var(--app-accent)] hover:bg-[color:var(--app-accent-soft)]"
+          >
+            {isId ? 'Semua grup' : 'All groups'}
+          </Link>
           <EmblaDesktopControls api={emblaApi} isId={isId} compact />
           <button
             type="button"
@@ -5766,27 +5772,48 @@ function GroupStrip({
         </div>
       </div>
 
-      <div
-        className="-mx-3 mt-3 cursor-grab overflow-hidden px-3 active:cursor-grabbing"
-        ref={emblaRef}
-      >
-        <div className="-ml-3 flex touch-pan-y">
-          {groups.map(group => (
-            <div
-              key={group.id}
-              className="min-w-0 flex-[0_0_82%] pl-3 sm:flex-[0_0_46%] xl:flex-[0_0_31%] 2xl:flex-[0_0_24%]"
-            >
-              <GroupCard
-                group={group}
-                isId={isId}
-                compact
-                onChanged={onChanged}
-                onOpenMembers={onOpenMembers}
-              />
-            </div>
-          ))}
+      {groups.length ? (
+        <div
+          className="-mx-3 mt-3 cursor-grab overflow-hidden px-3 active:cursor-grabbing"
+          ref={emblaRef}
+        >
+          <div className="-ml-3 flex touch-pan-y">
+            {groups.map(group => (
+              <div
+                key={group.id}
+                className="min-w-0 flex-[0_0_82%] pl-3 sm:flex-[0_0_46%] xl:flex-[0_0_31%] 2xl:flex-[0_0_24%]"
+              >
+                <GroupCard
+                  group={group}
+                  isId={isId}
+                  compact
+                  onChanged={onChanged}
+                  onOpenMembers={onOpenMembers}
+                />
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-[16px] border border-dashed border-emerald-200 bg-emerald-50/55 px-3.5 py-3">
+          <div className="min-w-0">
+            <p className="text-xs font-bold text-[color:var(--app-text)]">
+              {isId ? 'Belum ada grup yang cocok' : 'No matching groups yet'}
+            </p>
+            <p className="mt-0.5 text-[10px] leading-4 text-[color:var(--app-text-soft)]">
+              {isId
+                ? 'Jelajahi directory grup atau buat ruang komunitas baru.'
+                : 'Explore the directory or create a new community space.'}
+            </p>
+          </div>
+          <Link
+            href="/community/groups"
+            className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-full bg-[color:var(--app-accent)] px-3 text-[10px] font-bold text-white"
+          >
+            {isId ? 'Jelajah' : 'Explore'}
+          </Link>
+        </div>
+      )}
     </section>
   );
 }
