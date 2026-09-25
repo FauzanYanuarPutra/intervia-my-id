@@ -1,7 +1,8 @@
 use super::{
     apply_reel_privacy_metadata, clean_store_reference, has_valid_media_signature,
     normalize_reel_action, normalize_trust_report_reason, parse_media_range, resolve_reel_privacy,
-    safe_public_display_name, sanitize_reel_metadata, sanitize_report_details, MAX_MEDIA_RANGE_BYTES,
+    safe_public_display_name, sanitize_reel_metadata, sanitize_report_details,
+    MAX_MEDIA_RANGE_BYTES,
 };
 use serde_json::json;
 
