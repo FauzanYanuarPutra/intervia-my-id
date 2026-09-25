@@ -15,6 +15,7 @@ import {
   Loader2,
   Lock,
   MessageCircle,
+  Pin,
   Settings,
   ShieldCheck,
   Upload,
@@ -847,6 +848,7 @@ export default function CommunityGroupDetailClient({
   }
 
   const leaders = [...admins, ...moderators].slice(0, 5);
+  const featuredItems = items.filter(item => item.isPinned).slice(0, 3);
   const tabs: Array<{ id: GroupTab; label: string }> = [
     { id: 'discussion', label: isId ? 'Diskusi' : 'Discussions' },
     { id: 'members', label: isId ? 'Anggota' : 'Members' },
@@ -1153,6 +1155,43 @@ export default function CommunityGroupDetailClient({
 
           {activeTab === 'discussion' ? (
             <>
+              {featuredItems.length ? (
+                <section className="rounded-[20px] border border-amber-100 bg-amber-50/60 p-3.5 shadow-[0_12px_28px_-26px_rgba(245,158,11,0.28)]">
+                  <div className="flex items-start gap-3">
+                    <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-[12px] bg-white text-amber-600 ring-1 ring-amber-100">
+                      <Pin className="h-4 w-4" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] font-black uppercase tracking-[0.13em] text-amber-700">
+                        {isId ? 'Featured' : 'Featured'}
+                      </p>
+                      <p className="mt-0.5 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+                        {isId
+                          ? 'Posting penting dari admin/moderator.'
+                          : 'Important posts from admins or moderators.'}
+                      </p>
+                      <div className="mt-2 space-y-1.5">
+                        {featuredItems.map(item => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => handleOpenThread(item.threadId)}
+                            className="flex min-h-9 w-full items-center justify-between gap-3 rounded-[11px] bg-white px-2.5 text-left ring-1 ring-amber-100 transition hover:ring-amber-200"
+                          >
+                            <span className="min-w-0 truncate text-xs font-bold text-[color:var(--app-text)]">
+                              {item.title}
+                            </span>
+                            <span className="shrink-0 text-[10px] font-bold text-amber-700">
+                              {compactNumber(item.stats.comments)} {isId ? 'komentar' : 'comments'}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              ) : null}
+
               {group.viewerCanPost ? (
                 <CommunityComposer
                   isId={isId}
