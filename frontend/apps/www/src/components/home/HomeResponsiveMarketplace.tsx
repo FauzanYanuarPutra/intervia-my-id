@@ -3584,8 +3584,6 @@ function HomeCommunityGroupsSection({
   isId: boolean;
   groups: CommunityGroup[];
 }) {
-  if (!groups.length) return null;
-
   return (
     <section
       className="w-full rounded-[20px] border border-[color:var(--app-border)] bg-white p-3.5 shadow-[0_10px_30px_-28px_rgba(15,23,42,0.18)]"
@@ -3615,8 +3613,9 @@ function HomeCommunityGroupsSection({
         </Link>
       </div>
 
-      <div className="-mx-1 mt-3 flex gap-2 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {groups.map(group => (
+      {groups.length ? (
+        <div className="-mx-1 mt-3 flex gap-2 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {groups.map(group => (
           <Link
             key={group.id}
             href={'/community/groups/' + encodeURIComponent(group.slug || group.id)}
@@ -3680,9 +3679,29 @@ function HomeCommunityGroupsSection({
                 {isId ? 'Buka grup →' : 'Open group →'}
               </span>
             </div>
+            </Link>
+          ))}
+        </div>
+      ) : (
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-[16px] border border-dashed border-emerald-200 bg-emerald-50/55 px-3.5 py-3">
+          <div className="min-w-0">
+            <p className="text-xs font-bold text-[color:var(--app-text)]">
+              {isId ? 'Temukan atau buat grup usaha' : 'Find or create a business group'}
+            </p>
+            <p className="mt-0.5 text-[10px] leading-4 text-[color:var(--app-text-soft)]">
+              {isId
+                ? 'Ruang diskusi grup akan muncul di sini.'
+                : 'Your group spaces will appear here.'}
+            </p>
+          </div>
+          <Link
+            href="/community/groups"
+            className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-full bg-[color:var(--app-accent)] px-3 text-[10px] font-bold text-white"
+          >
+            {isId ? 'Jelajah grup' : 'Explore groups'}
           </Link>
-        ))}
-      </div>
+        </div>
+      )}
     </section>
   );
 }
@@ -5345,17 +5364,29 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
         limit: String(HOME_COMMUNITY_PAGE_SIZE),
         cursor: '0',
       });
-      const response = await fetch(
-        `/api/community/feed?${params.toString()}`,
-        {
+      const groupsRequest = fetch('/api/community/groups?limit=12', {
+        cache: 'no-store',
+        credentials: 'include',
+        signal: controller.signal,
+      }).catch(() => null);
+
+      const [response, groupsResponse] = await Promise.all([
+        fetch(`/api/community/feed?${params.toString()}`, {
           cache: 'no-store',
           credentials: 'include',
           signal: controller.signal,
-        },
-      );
+        }),
+        groupsRequest,
+      ]);
+
       const payload = (await response
         .json()
         .catch(() => null)) as CommunityFeedResponse | null;
+      const groupsPayload = groupsResponse
+        ? ((await groupsResponse.json().catch(() => ({}))) as {
+            data?: CommunityGroup[];
+          })
+        : null;
 
       if (communityRequestSeqRef.current !== requestSeq) return;
 
@@ -5373,6 +5404,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
         .slice(0, 3);
 
       const groups = [
+        ...(groupsPayload?.data || []),
         ...(payload?.overview?.joinedGroups || []),
         ...(payload?.overview?.recommendedGroups || []),
         ...(payload?.overview?.groups || []),
@@ -5381,7 +5413,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
           (group, index, all) =>
             all.findIndex(candidate => candidate.id === group.id) === index,
         )
-        .slice(0, 6);
+        .slice(0, 8);
 
       setCommunityPosts(mapped);
       setCommunityGroups(groups);
