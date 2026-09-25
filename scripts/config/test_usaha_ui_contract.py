@@ -46,14 +46,13 @@ class UsahaBusinessOsUiContractTests(unittest.TestCase):
             "'inventory'",
             "'finance'",
             "orders: 'Jual'",
-            "products: 'Barang'",
+            "products: 'Produk'",
             "inventory: 'Stok'",
             "finance: 'Uang'",
             "const mobilePrimaryOrder: PortalSection[] = ['home', 'orders', 'products', 'finance'];",
         ):
             self.assertIn(marker, navigation)
         self.assertNotIn("orders: 'Jualan'", navigation)
-        self.assertNotIn("products: 'Produk'", navigation)
 
         mobile = (PORTAL / "MobileNav.tsx").read_text(encoding="utf-8")
         for marker in ("from '@/lib/portal-visual'", "Menu"):
