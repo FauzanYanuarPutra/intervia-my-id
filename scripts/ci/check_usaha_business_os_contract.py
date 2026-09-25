@@ -35,8 +35,8 @@ def main() -> int:
 
     require(
         'frontend/apps/usaha/src/lib/portal-navigation.ts',
-        'Beranda', 'Jual', 'Barang', 'Stok', 'Uang', 'Laporan',
-        'Jual Online', 'Pengaturan Usaha', 'Lokasi & Outlet', 'Tim & Akses',
+        'Beranda', 'Jual', 'Produk', 'Stok', 'Uang', 'Laporan',
+        'Kanal Jual', 'Pengaturan Usaha', 'Lokasi & Outlet', 'Tim & Akses',
         'Tampilan Toko', 'desktopPrimaryNavigation', 'mobilePrimaryNavigation',
         'portalMenuNavigation',
     )
