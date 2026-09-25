@@ -2126,10 +2126,10 @@ export default function SuperProfile() {
   return (
     <>
       <main className="min-h-screen max-w-full overflow-x-clip bg-[color:var(--app-surface-muted)] pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pb-8">
-        <div className="mx-auto w-full max-w-[1120px] space-y-3 px-0 py-0 sm:space-y-4 sm:px-4 sm:py-4 lg:px-5 lg:py-5">
+        <div className="mx-auto w-full max-w-[980px] space-y-3 px-3 py-3 sm:space-y-4 sm:px-4 sm:py-4 lg:px-5 lg:py-5">
           {/* PROFILE — identity first, like familiar social/business profiles. */}
-          <section className="overflow-hidden border-y border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] sm:rounded-[24px] sm:border sm:shadow-[0_18px_48px_-40px_rgba(15,23,42,0.35)]">
-            <div className="relative h-24 overflow-hidden sm:h-32 lg:h-36">
+          <section className="overflow-hidden rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-sm sm:rounded-[26px] sm:shadow-[0_18px_48px_-40px_rgba(15,23,42,0.35)]">
+            <div className="relative h-28 overflow-hidden sm:h-32 lg:h-36">
               {effectiveCoverUrl ? (
                 <NextImage
                   src={effectiveCoverUrl}
@@ -2181,7 +2181,7 @@ export default function SuperProfile() {
             </div>
 
             <div className="relative px-3 pb-3.5 sm:px-5 sm:pb-4">
-              <div className="-mt-9 flex min-w-0 items-end gap-3 sm:-mt-11 sm:gap-4">
+              <div className="-mt-10 flex min-w-0 items-end gap-3 sm:-mt-11 sm:gap-4">
                 <div className="relative h-[72px] w-[72px] shrink-0 rounded-full bg-[color:var(--app-surface-muted)] shadow-lg ring-[4px] ring-[color:var(--app-surface-strong)] sm:h-[88px] sm:w-[88px]">
                   <div className="absolute inset-0 overflow-hidden rounded-full">
                     <NextImage
@@ -2293,7 +2293,7 @@ export default function SuperProfile() {
                 ) : null}
               </div>
 
-              <div className="mt-3 grid grid-cols-3 divide-x divide-[color:var(--app-border)] rounded-2xl border border-[color:var(--app-border)] py-2.5 sm:max-w-[560px]">
+              <div className="mt-3 grid w-full grid-cols-3 divide-x divide-[color:var(--app-border)] overflow-hidden rounded-2xl border border-[color:var(--app-border)] py-2.5 sm:max-w-[560px]">
                 <LocalizedLink href={ROUTES.manageListings} className="min-w-0 px-2 text-center transition hover:bg-[color:var(--app-surface-muted)] sm:px-4">
                   <span className="block text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
                     {formatCompactNumber(activePostCount, numberLocale)}
@@ -2342,13 +2342,13 @@ export default function SuperProfile() {
           </section>
 
           {saveMessage ? (
-            <div className="mx-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-500/10 dark:text-emerald-200 sm:mx-0">
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm font-medium text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-500/10 dark:text-emerald-200 sm:px-4">
               {saveMessage}
             </div>
           ) : null}
 
           {profileError ? (
-            <div className="mx-3 flex flex-col gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800 dark:border-rose-900/60 dark:bg-rose-500/10 dark:text-rose-200 sm:mx-0 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-3 text-sm font-medium text-rose-800 dark:border-rose-900/60 dark:bg-rose-500/10 dark:text-rose-200 sm:flex-row sm:items-center sm:justify-between sm:px-4">
               <span>{profileError}</span>
               <button
                 type="button"
@@ -2364,7 +2364,7 @@ export default function SuperProfile() {
           {attentionAction ? (
             <LocalizedLink
               href={attentionAction.href}
-              className="mx-3 flex min-h-14 items-center gap-3 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2.5 transition hover:border-emerald-200 hover:bg-[color:var(--app-surface-muted)] sm:mx-0 sm:px-4"
+              className="flex min-h-14 items-center gap-3 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2.5 transition hover:border-emerald-200 hover:bg-[color:var(--app-surface-muted)] sm:px-4"
             >
               <span className={cn('grid h-9 w-9 shrink-0 place-items-center rounded-xl', attentionAction.tone)}>
                 <AttentionIcon className="h-4 w-4" />
@@ -2376,7 +2376,7 @@ export default function SuperProfile() {
             </LocalizedLink>
           ) : null}
           {profileDetailRows.length > 0 ? (
-            <section className="border-y border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] sm:rounded-[24px] sm:border">
+            <section className="overflow-hidden rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)]">
               <div className="flex items-center justify-between gap-3 border-b border-[color:var(--app-border)] px-3 py-3 sm:px-5">
                 <div>
                   <h2 className="text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">{isId ? 'Tentang' : 'About'}</h2>
@@ -2400,7 +2400,7 @@ export default function SuperProfile() {
           ) : null}
 
           {/* OWNER TOOLS — four actions only. */}
-          <section className="border-y border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-3 sm:rounded-[24px] sm:border sm:px-5 sm:py-4">
+          <section className="rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-2.5 py-3 sm:px-5 sm:py-4">
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {quickActions.map(action => {
                 const Icon = action.icon;
@@ -2428,7 +2428,7 @@ export default function SuperProfile() {
           </section>
 
           {/* STOREFRONT — visual first, like familiar profile/shop grids. */}
-          <section className="overflow-hidden border-y border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] sm:rounded-[24px] sm:border">
+          <section className="overflow-hidden rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)]">
             <div className="flex items-center justify-between gap-3 border-b border-[color:var(--app-border)] px-3 py-3.5 sm:px-5">
               <div className="min-w-0">
                 <h2 className="text-base font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-lg">
@@ -2482,7 +2482,7 @@ export default function SuperProfile() {
             </div>
 
             {visibleListings.length > 0 ? (
-              <div className="grid grid-cols-2 gap-2 p-2.5 sm:grid-cols-3 sm:gap-3 sm:p-4 lg:grid-cols-4">
+              <div className="grid grid-cols-2 gap-2 p-2 sm:gap-3 sm:p-4 min-[480px]:grid-cols-2 lg:grid-cols-4">
                 {visibleListings.map(item => (
                   <ListingCard
                     key={item.id}
