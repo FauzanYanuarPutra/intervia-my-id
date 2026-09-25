@@ -213,6 +213,25 @@ try {
         )
     }
 
+    function Test-DockerBuildKitFailure {
+        param(
+            [Parameter(Mandatory = $true)]
+            [string]$OutputText
+        )
+
+        # BuildKit can lose its frontend gRPC session while the Docker Engine
+        # itself still answers `docker info`. Treat these as recoverable
+        # infrastructure/build-orchestrator failures so the launcher can restart
+        # Docker Desktop and retry the affected services sequentially.
+        return (
+            $OutputText -match "(?i)frontend grpc server closed unexpectedly" -or
+            $OutputText -match "(?i)failed to solve:\s*frontend" -or
+            $OutputText -match "(?i)buildkit.*(?:grpc|frontend).*closed" -or
+            $OutputText -match "(?i)rpc error:\s*code\s*=\s*(?:Unavailable|Canceled)" -or
+            $OutputText -match "(?i)failed to receive status:.*(?:grpc|buildkit)"
+        )
+    }
+
     function Test-DockerResourceFailure {
         param(
             [Parameter(Mandatory = $true)]
@@ -585,6 +604,12 @@ try {
                 elseif ($HostRamGb -gt 0 -and $HostRamGb -le 16) {
                     $AdaptiveLimit = [math]::Min($ParallelLimit, 2)
                 }
+                elseif ($BuildTargets.Count -gt 12) {
+                    # The development stack can contain 20+ build targets.
+                    # Keeping the first pass at 2 workers avoids BuildKit frontend
+                    # gRPC failures caused by too much simultaneous solver load.
+                    $AdaptiveLimit = [math]::Min($ParallelLimit, 2)
+                }
                 elseif ($HostCpu -le 4) {
                     $AdaptiveLimit = [math]::Min($ParallelLimit, 2)
                 }
@@ -611,13 +636,19 @@ try {
                 else {
                     $BuildText = ($BuildProbe.Output -join [Environment]::NewLine)
                     $EngineFailure = Test-DockerEngineFailure -OutputText $BuildText
+                    $BuildKitFailure = Test-DockerBuildKitFailure -OutputText $BuildText
                     $PostBuildProbe = Invoke-DockerNative -Arguments @("info", "--format", "{{json .ServerVersion}}")
                     if ($PostBuildProbe.ExitCode -ne 0) {
                         $EngineFailure = $true
                     }
 
-                    if ($EngineFailure) {
-                        Write-Warning "Full-stack build hit a Docker Engine failure. Recovering, then retrying safely with bounded sequential builds..."
+                    if ($EngineFailure -or $BuildKitFailure) {
+                        if ($BuildKitFailure -and -not $EngineFailure) {
+                            Write-Warning "BuildKit frontend failure terdeteksi. Docker Engine masih hidup, tetapi solver akan dipulihkan sebelum retry sequential..."
+                        }
+                        else {
+                            Write-Warning "Full-stack build hit a Docker Engine failure. Recovering, then retrying safely with bounded sequential builds..."
+                        }
                         if (-not (Invoke-DockerEngineRecovery -Reason "full-stack build")) {
                             throw "Docker Engine gagal saat build full stack dan recovery tidak berhasil."
                         }
@@ -641,12 +672,13 @@ try {
 
                                 $ServiceBuildText = ($ServiceBuildProbe.Output -join [Environment]::NewLine)
                                 $RetryEngineFailure = Test-DockerEngineFailure -OutputText $ServiceBuildText
+                                $RetryBuildKitFailure = Test-DockerBuildKitFailure -OutputText $ServiceBuildText
                                 $RetryProbe = Invoke-DockerNative -Arguments @("info", "--format", "{{json .ServerVersion}}")
                                 if ($RetryProbe.ExitCode -ne 0) {
                                     $RetryEngineFailure = $true
                                 }
 
-                                if ($RetryEngineFailure -and $ServiceAttempt -lt 2) {
+                                if (($RetryEngineFailure -or $RetryBuildKitFailure) -and $ServiceAttempt -lt 2) {
                                     if (Invoke-DockerEngineRecovery -Reason "retry build service $ServiceName") {
                                         continue
                                     }
