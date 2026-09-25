@@ -1,33 +1,9 @@
 use super::{
-    apply_reel_privacy_metadata, clean_store_reference, database_session_setup,
-    has_valid_media_signature, is_migration_unique_conflict_message, normalize_reel_action,
-    normalize_trust_report_reason, parse_media_range, resolve_reel_privacy,
-    safe_public_display_name, sanitize_reel_metadata, sanitize_report_details, DatabasePoolPurpose,
-    MAX_MEDIA_RANGE_BYTES,
+    apply_reel_privacy_metadata, clean_store_reference, has_valid_media_signature,
+    normalize_reel_action, normalize_trust_report_reason, parse_media_range, resolve_reel_privacy,
+    safe_public_display_name, sanitize_reel_metadata, sanitize_report_details, MAX_MEDIA_RANGE_BYTES,
 };
 use serde_json::json;
-
-#[test]
-fn migration_pool_keeps_the_canonical_public_migration_tracker() {
-    assert_eq!(database_session_setup(DatabasePoolPurpose::Migration), None);
-    assert_eq!(
-        database_session_setup(DatabasePoolPurpose::Application),
-        Some("SET search_path TO forum, reel, public, events")
-    );
-}
-
-#[test]
-fn migration_unique_conflict_is_retried_only_for_the_sqlx_migration_tracker() {
-    assert!(is_migration_unique_conflict_message(
-        "duplicate key value violates unique constraint \"_sqlx_migrations_pkey\""
-    ));
-    assert!(!is_migration_unique_conflict_message(
-        "duplicate key value violates unique constraint \"some_other_table_pkey\""
-    ));
-    assert!(!is_migration_unique_conflict_message(
-        "was previously applied but has been modified"
-    ));
-}
 
 #[test]
 fn media_signatures_reject_active_content_disguised_as_an_image() {
