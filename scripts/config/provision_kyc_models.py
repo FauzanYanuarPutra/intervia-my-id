@@ -7,7 +7,6 @@ import argparse
 import hashlib
 import os
 import tempfile
-import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Iterable
@@ -68,6 +67,10 @@ def ensure_container_readable(path: Path) -> None:
 
 
 def download_bytes(url: str) -> bytes:
+    # Import urllib lazily so a fully verified local model set does not need
+    # to initialize Python's HTTP/email stack on every launcher invocation.
+    import urllib.request
+
     request = urllib.request.Request(
         url,
         headers={"User-Agent": "lajukan-kyc-model-provisioner/1.0"},
