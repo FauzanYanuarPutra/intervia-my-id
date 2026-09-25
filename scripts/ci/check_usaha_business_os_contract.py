@@ -42,7 +42,7 @@ def main() -> int:
     )
     forbid(
         'frontend/apps/usaha/src/lib/portal-navigation.ts',
-        "orders: 'Jualan'", "products: 'Produk'",
+        "orders: 'Jualan'", "products: 'Barang'", "channels: 'Jual Online'",
     )
     require(
         'frontend/apps/usaha/src/lib/portal-visual.ts',
