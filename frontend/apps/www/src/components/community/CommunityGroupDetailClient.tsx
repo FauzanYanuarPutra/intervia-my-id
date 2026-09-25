@@ -1275,7 +1275,7 @@ export default function CommunityGroupDetailClient({
                           <button
                             key={item.id}
                             type="button"
-                            onClick={() => handleOpenThread(item.threadId)}
+                            onClick={() => handleOpenThread(item.threadId || item.id)}
                             className="flex min-h-9 w-full items-center justify-between gap-3 rounded-[11px] bg-white px-2.5 text-left ring-1 ring-amber-100 transition hover:ring-amber-200"
                           >
                             <span className="min-w-0 truncate text-xs font-bold text-[color:var(--app-text)]">
