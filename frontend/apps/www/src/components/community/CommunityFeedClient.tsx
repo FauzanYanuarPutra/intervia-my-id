@@ -1,7 +1,6 @@
 'use client';
 
 import { LajukanImage as Image } from '@/components/common/LajukanImage';
-import { MediaPreviewCarousel } from '@/components/common/MediaPreviewCarousel';
 import { EmblaDesktopControls } from '@/components/common/EmblaDesktopControls';
 import { useEmblaWheelGestures } from '@/components/common/useEmblaWheelGestures';
 import { CompactSeeAllButton } from '@/components/common/CompactSectionAction';
@@ -70,11 +69,8 @@ import {
 } from '@/components/ui/Skeleton';
 import type {
   CommunityFeedItem,
-  CommunityFeedMedia,
-  CommunityFeedCategory,
   CommunityFeedOverview,
   CommunityFeedResponse,
-  CommunityFeedTag,
   CommunityFeedTab,
   CommunitySearchKind,
   CommunitySearchResponse,
