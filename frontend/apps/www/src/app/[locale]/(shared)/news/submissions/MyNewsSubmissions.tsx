@@ -7,6 +7,7 @@ import NewsRichTextEditor from '../submit/NewsRichTextEditor';
 
 type NewsItem = {
   id: string;
+  slug?: string | null;
   title: string;
   summary?: string | null;
   body: string;
@@ -775,11 +776,29 @@ export default function MyNewsSubmissions({ locale }: { locale: string }) {
                   </button>
                 </div>
               ) : (
-                <p className="text-xs font-semibold leading-5 text-slate-500">
-                  {isId
-                    ? 'Item ini tidak dapat diedit atau dihapus pada status sekarang.'
-                    : 'This item cannot be edited or removed in its current state.'}
-                </p>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-xs font-semibold leading-5 text-slate-500">
+                    {isId
+                      ? 'Item ini tidak dapat diedit atau dihapus pada status sekarang.'
+                      : 'This item cannot be edited or removed in its current state.'}
+                  </p>
+                  {selected.slug &&
+                  (editorialStatus === 'published' ||
+                    editorialStatus === 'retracted') ? (
+                    <Link
+                      href={`/news/${encodeURIComponent(selected.slug)}`}
+                      className="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 hover:border-emerald-200 hover:text-emerald-700 dark:border-white/10 dark:bg-slate-950 dark:text-slate-200 dark:hover:text-emerald-300"
+                    >
+                      {editorialStatus === 'retracted'
+                        ? isId
+                          ? 'Lihat halaman penarikan'
+                          : 'View retraction page'
+                        : isId
+                          ? 'Lihat artikel'
+                          : 'View article'}
+                    </Link>
+                  ) : null}
+                </div>
               )}
             </form>
           </>
