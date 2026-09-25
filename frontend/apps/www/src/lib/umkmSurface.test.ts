@@ -51,10 +51,10 @@ describe('UMKM public route helpers', () => {
 
   it('opens owner actions directly in the dedicated Usaha workspace', () => {
     expect(buildUsahaPath('catalog', { storeId: 'store / 1' })).toBe(
-      'http://localhost:3003/businesses/store%20%2F%201/products',
+      'https://usaha.lajukan.com/businesses/store%20%2F%201/products',
     );
     expect(buildUsahaPath('home', { storeId: 'business-1' })).toBe(
-      'http://localhost:3003/?business=business-1',
+      'https://usaha.lajukan.com/?business=business-1',
     );
   });
 
@@ -65,7 +65,7 @@ describe('UMKM public route helpers', () => {
         hash: 'stok-menipis',
       }),
     ).toBe(
-      'http://localhost:3003/businesses/business-1/operations#stok-menipis',
+      'https://usaha.lajukan.com/businesses/business-1/operations#stok-menipis',
     );
   });
 });
