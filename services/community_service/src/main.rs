@@ -295,6 +295,7 @@ struct VoteStats {
 struct ListThreadQuery {
     category: Option<String>,
     tag: Option<String>,
+    group: Option<String>,
     sort: Option<String>,
     status: Option<String>,
     q: Option<String>,
@@ -1111,7 +1112,7 @@ async fn reconcile_dev_migration_checksums(
             "#,
         )
         .bind(version)
-        .bind(migration.description)
+        .bind(migration.description.clone())
         .bind(current_checksum)
         .execute(pool)
         .await?;
@@ -4400,6 +4401,7 @@ async fn list_threads(
             lower(c.name) LIKE '%' || lower($4) || '%' OR
             lower(coalesce(root.content, '')) LIKE '%' || lower($4) || '%'
           )
+          AND ($8::text IS NULL OR t.group_id = $8 OR g.id = $8 OR g.slug = $8)
           AND ($7::boolean = false OR ($5::text IS NOT NULL AND t.author_id = $5))
           AND (
             t.group_id IS NULL OR
@@ -4462,6 +4464,7 @@ async fn list_threads(
             lower(c.name) LIKE '%' || lower($4) || '%' OR
             lower(coalesce(root.content, '')) LIKE '%' || lower($4) || '%'
           )
+          AND ($8::text IS NULL OR t.group_id = $8 OR g.id = $8 OR g.slug = $8)
           AND ($7::boolean = false OR ($5::text IS NOT NULL AND t.author_id = $5))
           AND (
             t.group_id IS NULL OR
@@ -4477,12 +4480,12 @@ async fn list_threads(
         GROUP BY t.id
         ORDER BY
           t.is_pinned DESC,
-          CASE WHEN $8 = 'top' THEN (t.reply_count * 2 + t.views + t.like_count * 8) END DESC NULLS LAST,
-          CASE WHEN $8 IN ('new', 'latest') THEN t.created_at END DESC NULLS LAST,
-          CASE WHEN $8 = 'active' THEN t.last_activity_at END DESC NULLS LAST,
+          CASE WHEN $9 = 'top' THEN (t.reply_count * 2 + t.views + t.like_count * 8) END DESC NULLS LAST,
+          CASE WHEN $9 IN ('new', 'latest') THEN t.created_at END DESC NULLS LAST,
+          CASE WHEN $9 = 'active' THEN t.last_activity_at END DESC NULLS LAST,
           (t.reply_count * 2 + t.views + t.like_count * 8) DESC,
           t.last_activity_at DESC
-        LIMIT $9 OFFSET $10
+        LIMIT $10 OFFSET $11
         "#,
     )
     .bind(category.as_deref())
@@ -4492,6 +4495,7 @@ async fn list_threads(
     .bind(viewer_id.as_deref())
     .bind(actor.as_ref().is_some_and(is_moderator))
     .bind(mine)
+    .bind(group.as_deref())
     .bind(sort)
     .bind(page_size)
     .bind(offset)
@@ -7893,6 +7897,7 @@ async fn get_community_feed(
     let tab = query.tab.unwrap_or_else(|| "for-you".to_string());
     let category = clean_optional(query.category);
     let tag = clean_optional(query.tag).map(|value| normalize_tag_slug(&value));
+    let group = clean_optional(query.group);
     let q = clean_optional(query.q);
     let requested_thread = clean_optional(query.thread);
 
@@ -8038,7 +8043,7 @@ async fn get_community_feed(
               t.is_pinned DESC,
               t.last_activity_at DESC,
               t.id ASC
-            LIMIT $8 OFFSET $9
+            LIMIT $9 OFFSET $10
         "#,
     )
     .bind(category.as_deref())
