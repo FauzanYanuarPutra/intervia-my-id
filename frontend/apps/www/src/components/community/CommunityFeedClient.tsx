@@ -32,7 +32,6 @@ import {
   MessageCircle,
   MoreHorizontal,
   Plus,
-  PlayCircle,
   Pin,
   Search,
   Send,
@@ -6056,66 +6055,6 @@ function SearchPersonResult({
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-function LegacySearchVideoResult({
-  item,
-  isId,
-}: {
-  item: CommunityFeedItem;
-  isId: boolean;
-}) {
-  return (
-    <Link
-      href={item.href}
-      className="flex gap-3 rounded-[18px] border border-[color:var(--app-border)] bg-white p-3 hover:border-[color:var(--app-accent-soft)]"
-    >
-      <div className="relative h-[104px] w-[78px] shrink-0 overflow-hidden rounded-[16px] bg-slate-950">
-        {item.media ? (
-          <MediaPreviewCarousel
-            items={[
-              {
-                src:
-                  item.media.type === 'video'
-                    ? resolveCommunityMediaSrc(item.media.src)
-                    : item.media.src,
-                type: item.media.type,
-                alt: item.media.alt,
-              },
-            ]}
-            alt={item.media.alt || item.title}
-            aspectClassName="h-full w-full"
-            className="h-full w-full bg-slate-950"
-            sizes="78px"
-            controls={false}
-            lightbox={false}
-            showCounter={false}
-            showDots={false}
-          />
-        ) : (
-          <div className="grid h-full w-full place-items-center text-white">
-            <PlayCircle className="h-7 w-7" />
-          </div>
-        )}
-        <span className="absolute left-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-[9px] font-bold text-white">
-          Video
-        </span>
-      </div>
-      <div className="min-w-0 flex-1 py-1">
-        <h3 className="line-clamp-2 text-sm font-bold text-[color:var(--app-text)]">
-          {item.title}
-        </h3>
-        <p className="mt-1 line-clamp-2 text-xs leading-5 text-[color:var(--app-text-soft)]">
-          {item.body}
-        </p>
-        <p className="mt-2 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
-          {compactNumber(item.stats.reactions)} {isId ? 'suka' : 'likes'}{' '}
-          &middot; {compactNumber(item.stats.comments)}{' '}
-          {isId ? 'komentar' : 'comments'}
-        </p>
-      </div>
-    </Link>
-  );
-}
-
 function SearchMarketplaceResult({
   query,
   isId,
