@@ -157,20 +157,18 @@ try {
     }
     $DockerDesktopCliAvailable = $false
     $DockerDesktopCommand = Get-Command "docker" -ErrorAction SilentlyContinue
-    $DesktopStatusProbe = $null
     $DesktopVersionProbe = $null
+    $DesktopStatusProbe = $null
     if ($DockerDesktopCommand) {
-        # `status` can return non-zero when Desktop/Engine is broken, so use
-        # `version` as the capability probe and keep status for diagnostics.
+        # Do not call `docker desktop status` during the hot startup path.
+        # On some Docker Desktop builds this command can block while the Linux
+        # engine is starting, making the launcher look frozen before preflight.
         $DesktopVersionProbe = Invoke-DockerNative -Arguments @("desktop", "version", "--short") -Silent
-        $DesktopStatusProbe = Invoke-DockerNative -Arguments @("desktop", "status", "--format", "json") -Silent
         $DesktopVersionText = ($DesktopVersionProbe.Output -join " ").Trim()
         if ($DesktopVersionProbe.ExitCode -eq 0 -and $DesktopVersionText) {
             Write-Host "Docker Desktop CLI: $DesktopVersionText" -ForegroundColor DarkGray
         }
-        $DockerDesktopCliAvailable =
-            ($DesktopVersionProbe.ExitCode -eq 0) -or
-            ($DesktopStatusProbe.ExitCode -eq 0)
+        $DockerDesktopCliAvailable = $DesktopVersionProbe.ExitCode -eq 0
     }
 
     function Test-DockerEngineFailure {
@@ -290,6 +288,7 @@ try {
     # healthy. Probe the actual Engine API before resolving/building the stack.
     # This catches Docker Desktop Linux-engine failures such as HTTP 500 on
     # /_ping before a 22-image build is started.
+    Write-Host "Checking Docker Engine..." -ForegroundColor Cyan
     $EngineReady = $false
     $EngineProbeOutput = @()
     $EngineExitCode = 1
@@ -313,15 +312,9 @@ try {
 
     if (-not $EngineReady) {
         $EngineDetails = ($EngineProbeOutput -join " ").Trim()
-        $DesktopStatus = ""
-        if ($DesktopStatusProbe) {
-            $DesktopStatus = ($DesktopStatusProbe.Output -join " ").Trim()
-        }
-
         $RecoveryHint = @(
             "Docker Engine tidak sehat/tidak merespons.",
             "Status probe: $EngineDetails",
-            "Docker Desktop status: $DesktopStatus",
             "Docker Desktop CLI: $($DockerRecoveryState.Reason)",
             "",
             $(if ($DockerRecoveryState.Attempted) {
@@ -355,6 +348,7 @@ try {
     # the script level so every build/up/pull/config invocation uses the same
     # stable concurrency budget without changing repository Compose semantics.
     $env:COMPOSE_PARALLEL_LIMIT = $ParallelLimit.ToString()
+    Write-Host "Docker Engine ready. Resolving Compose..." -ForegroundColor Green
 
     $ComposeVersionProbe = Invoke-DockerNative -Arguments @("compose", "version")
     if ($ComposeVersionProbe.ExitCode -ne 0) {
@@ -424,6 +418,7 @@ try {
         $ComposeArgs += @("--profile", $RequestedProfile)
     }
 
+    Write-Host "Validating Docker Compose configuration..." -ForegroundColor Cyan
     & docker @ComposeArgs config --quiet
     if ($LASTEXITCODE -ne 0) {
         throw "Konfigurasi Docker Compose tidak valid. Perbaiki error di atas sebelum stack dijalankan."
@@ -438,6 +433,7 @@ try {
         }
     }
 
+    Write-Host "Validating runtime contract..." -ForegroundColor Cyan
     $ComposeModelProbe = Get-DockerComposeConfigJson -ComposeArguments $ComposeArgs
     if ($ComposeModelProbe.ExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($ComposeModelProbe.Json)) {
         $ComposeModelError = ($ComposeModelProbe.Error -join " ").Trim()
@@ -474,7 +470,8 @@ try {
     if ($ValidatorExitCode -ne 0) {
         throw "Kontrak konfigurasi runtime tidak valid. Tidak ada container yang diubah."
     }
-    Write-Host "Runtime configuration contract passed; continuing launcher lifecycle..." -ForegroundColor Green
+    Write-Host "Runtime configuration contract passed." -ForegroundColor Green
+    Write-Host "Preparing build targets..." -ForegroundColor Cyan -ForegroundColor Green
     Write-Host "Launcher actions: Build=$($Build.IsPresent) Pull=$($Pull.IsPresent) Fresh=$($Fresh.IsPresent) Down=$($Down.IsPresent) Services=$($Services -join ",")" -ForegroundColor DarkCyan
 
     if ($Fresh.IsPresent) {
