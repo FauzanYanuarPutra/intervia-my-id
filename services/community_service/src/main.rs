@@ -4401,7 +4401,7 @@ async fn list_threads(
             lower(c.name) LIKE '%' || lower($4) || '%' OR
             lower(coalesce(root.content, '')) LIKE '%' || lower($4) || '%'
           )
-          AND ($8::text IS NULL OR t.group_id = $8 OR g.id = $8 OR g.slug = $8)
+          AND ($8::text IS NULL OR t.group_id::text = $8 OR g.id::text = $8 OR g.slug = $8)
           AND ($7::boolean = false OR ($5::text IS NOT NULL AND t.author_id = $5))
           AND (
             t.group_id IS NULL OR
@@ -4464,7 +4464,7 @@ async fn list_threads(
             lower(c.name) LIKE '%' || lower($4) || '%' OR
             lower(coalesce(root.content, '')) LIKE '%' || lower($4) || '%'
           )
-          AND ($8::text IS NULL OR t.group_id = $8 OR g.id = $8 OR g.slug = $8)
+          AND ($8::text IS NULL OR t.group_id::text = $8 OR g.id::text = $8 OR g.slug = $8)
           AND ($7::boolean = false OR ($5::text IS NOT NULL AND t.author_id = $5))
           AND (
             t.group_id IS NULL OR
@@ -7997,7 +7997,7 @@ async fn get_community_feed(
             )
             AND ($4::text IS NULL OR c.slug ILIKE '%community%')
 
-            AND ($8::text IS NULL OR t.group_id = $8 OR g.id = $8 OR g.slug = $8)
+            AND ($8::text IS NULL OR t.group_id::text = $8 OR g.id::text = $8 OR g.slug = $8)
 
             AND (
                 t.group_id IS NULL OR
