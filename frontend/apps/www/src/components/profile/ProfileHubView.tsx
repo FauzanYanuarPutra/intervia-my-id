@@ -403,6 +403,39 @@ function SectionBlock({
   );
 }
 
+function ProgressBar({ value }: { value: number }) {
+  return (
+    <div className="h-1.5 overflow-hidden rounded-full bg-[color:var(--app-surface-muted)] dark:bg-[color:var(--app-surface)]">
+      <div
+        className="h-full rounded-full bg-[color:var(--app-accent-strong)] transition-all"
+        style={{ width: `${Math.max(0, Math.min(100, value))}%` }}
+      />
+    </div>
+  );
+}
+
+function EmptyState({
+  title,
+  description,
+  action,
+}: {
+  title: string;
+  description: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="rounded-[12px] border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3 text-center dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)]">
+      <p className="text-[13px] font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+        {title}
+      </p>
+      <p className="mx-auto mt-1 max-w-md text-xs font-semibold leading-4 text-[color:var(--app-text-soft)]">
+        {description}
+      </p>
+      {action ? <div className="mt-2">{action}</div> : null}
+    </div>
+  );
+}
+
 function IconPill({
   icon: Icon,
   children,

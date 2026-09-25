@@ -14,7 +14,7 @@ type PageProps = {
 };
 
 export default async function ContentDetailPage({ params }: PageProps) {
-  const { id } = await params;
+  const { locale, id } = await params;
   const result = await getPublicContent(id);
 
   if (

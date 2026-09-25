@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { NextRequest } from 'next/server';
 
-import { GET, isEditorialContentRecord } from '@/app/api/content/route';
+import { GET } from '@/app/api/content/route';
+import { isEditorialContentRecord } from '@/lib/server/contentEditorial';
 
 describe('public content status boundary', () => {
   it.each(['draft', 'archived', 'deleted'])(

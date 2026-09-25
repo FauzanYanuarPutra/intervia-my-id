@@ -273,7 +273,10 @@ try {
             return $false
         }
 
-        return $Text -match '^"[^"]+"
+        return $Text -match '^"[^"]+"$'
+    }
+
+    function Invoke-DockerEngineRecovery {
         param(
             [Parameter(Mandatory = $true)]
             [string]$Reason
