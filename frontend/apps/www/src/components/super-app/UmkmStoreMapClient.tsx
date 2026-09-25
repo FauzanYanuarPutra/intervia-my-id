@@ -231,39 +231,15 @@ function buildMarkerSymbolSvg(input: {
   `;
 }
 
-function buildLocationModeSvg(input: {
-  locationMode: ReturnType<typeof buildUmkmPlacePresentation>['locationMode'];
-}): string {
-  const stroke = input.locationMode === 'mobile' ? '#ffffff' : '#334155';
-  if (input.locationMode === 'mobile') {
-    return `
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path d="M5 18c4-1 7-4 8-8l2-5 4 4-5 2c-4 1-7 4-8 8l-1 3 0-4Z" stroke="${stroke}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-    `;
-  }
-
-  return `
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M4 10 12 5l8 5" stroke="${stroke}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-      <path d="M6 11v8h12v-8" stroke="${stroke}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>
-  `;
-}
-
 function buildStoreMarkerIcon(input: {
   kind: ReturnType<typeof buildUmkmPlacePresentation>['kind'];
-  ratingLabel: string;
   markerTone: ReturnType<typeof buildUmkmPlacePresentation>['markerTone'];
-  locationMode: ReturnType<typeof buildUmkmPlacePresentation>['locationMode'];
-  liveNow: boolean | null;
+  liveNow?: boolean | null;
   selected?: boolean;
 }): DivIcon {
   const cacheKey = [
     input.kind,
-    input.ratingLabel,
     input.markerTone,
-    input.locationMode,
     input.liveNow === null ? 'null' : input.liveNow ? '1' : '0',
     input.selected ? '1' : '0',
   ].join('|');
@@ -271,134 +247,100 @@ function buildStoreMarkerIcon(input: {
   if (cached) return cached;
 
   const palette = getMarkerPalette(input.markerTone);
-  const height = input.selected ? 32 : 29;
-  const badgeSize = input.selected ? 19 : 17;
-  const fontSize = input.selected ? 10.5 : 9.5;
-  const borderColor =
-    input.liveNow === false && !input.selected
-      ? '#cbd5e1'
-      : input.selected
-        ? '#059669'
-        : '#d1d5db';
-  const overlayBg =
-    input.locationMode === 'mobile'
-      ? input.liveNow === false
-        ? '#94a3b8'
-        : '#0f172a'
-      : '#ffffff';
-  const overlayBorder = input.locationMode === 'mobile' ? '#0f172a' : '#cbd5e1';
-  const overlayColor = input.locationMode === 'mobile' ? '#ffffff' : '#334155';
+  const size = input.selected ? 32 : 29;
+  const iconSize = input.selected ? 48 : 44;
+  const borderWidth = input.selected ? 3 : 2.5;
+  const pinShadow = input.selected
+    ? '0 10px 24px rgba(15,23,42,0.24)'
+    : '0 8px 18px rgba(15,23,42,0.18)';
+  const ring = input.selected
+    ? `box-shadow:0 0 0 3px rgba(255,255,255,0.96),0 0 0 5px ${palette.border},${pinShadow};`
+    : `box-shadow:${pinShadow};`;
   const liveDot = input.liveNow
     ? `
         <span
+          aria-hidden="true"
           style="
             position:absolute;
-            right:10px;
-            bottom:18px;
-            display:inline-flex;
-            width:10px;
-            height:10px;
+            right:3px;
+            top:1px;
+            z-index:4;
+            width:9px;
+            height:9px;
             border-radius:999px;
             background:#22c55e;
             border:2px solid #ffffff;
-            box-shadow:0 0 0 4px rgba(34,197,94,0.14);
+            box-shadow:0 2px 6px rgba(15,23,42,0.2);
           "
         ></span>
       `
     : '';
 
+  const kindIcon = buildMarkerSymbolSvg({
+    kind: input.kind,
+    selected: input.selected,
+  });
+
   return divIcon({
     className: 'leaflet-superapp-marker-host',
-    iconSize: [58, 40],
-    iconAnchor: [29, 35],
-    tooltipAnchor: [0, -26],
+    iconSize: [iconSize, iconSize],
+    iconAnchor: [iconSize / 2, iconSize - 2],
+    tooltipAnchor: [0, -(iconSize - 8)],
     html: `
       <span
         style="
           position:relative;
-          display:inline-flex;
-          flex-direction:column;
-          align-items:center;
-          justify-content:flex-start;
-          width:58px;
-          height:40px;
+          display:block;
+          width:${iconSize}px;
+          height:${iconSize}px;
           font-family:ui-sans-serif,system-ui,sans-serif;
         "
       >
         <span
+          aria-hidden="true"
           style="
-            display:inline-flex;
-            align-items:center;
-            gap:4px;
-            min-height:${height}px;
-            padding:0 7px 0 5px;
-            border-radius:999px;
-            border:1px solid ${borderColor};
-            background:#ffffff;
-            box-shadow:${input.selected ? '0 12px 24px rgba(15,23,42,0.24)' : '0 8px 16px rgba(15,23,42,0.16)'};
-          "
-        >
-          <span
-            style="
-              display:inline-flex;
-              width:${badgeSize}px;
-              height:${badgeSize}px;
-              border-radius:999px;
-              align-items:center;
-              justify-content:center;
-              background:${palette.badge};
-              color:#ffffff;
-              font-size:9px;
-              font-weight:800;
-              letter-spacing:0.02em;
-            "
-          >${buildMarkerSymbolSvg({ kind: input.kind, selected: input.selected })}</span>
-          <span
-            style="
-              display:${input.ratingLabel.trim() === '0.0' ? 'none' : 'inline-flex'};
-              align-items:center;
-              gap:2px;
-              color:#111827;
-              font-size:${fontSize}px;
-              font-weight:800;
-              line-height:1;
-            "
-          >${escapeHtml(input.ratingLabel)}</span>
-        </span>
-        <span
-          style="
-            margin-top:-1px;
-            width:14px;
-            height:14px;
-            transform:rotate(45deg);
-            border-right:1px solid ${borderColor};
-            border-bottom:1px solid ${borderColor};
-            background:#ffffff;
+            position:absolute;
+            left:50%;
+            top:23px;
+            width:12px;
+            height:12px;
+            transform:translateX(-50%) rotate(45deg);
+            border-right:${borderWidth}px solid #ffffff;
+            border-bottom:${borderWidth}px solid #ffffff;
+            border-radius:2px 2px 4px 2px;
+            background:${palette.badge};
+            box-sizing:border-box;
+            z-index:1;
           "
         ></span>
+
         <span
           style="
             position:absolute;
-            right:6px;
+            left:50%;
             top:0;
-            display:none;
-            width:20px;
-            height:20px;
+            display:inline-flex;
+            width:${size}px;
+            height:${size}px;
+            transform:translateX(-50%);
             align-items:center;
             justify-content:center;
             border-radius:999px;
-            border:1px solid ${overlayBorder};
-            background:${overlayBg};
-            color:${overlayColor};
-            box-shadow:0 8px 18px rgba(15,23,42,0.16);
+            border:${borderWidth}px solid #ffffff;
+            background:${palette.badge};
+            box-sizing:border-box;
+            ${ring}
+            z-index:2;
           "
-        >${buildLocationModeSvg({ locationMode: input.locationMode })}</span>
+        >
+          ${kindIcon}
+        </span>
+
         ${liveDot}
       </span>
     `,
   });
 }
-
 function buildViewerMarkerIcon(isId: boolean): DivIcon {
   const cacheKey = `viewer:${isId ? 'id' : 'en'}`;
   const cached = STORE_MARKER_ICON_CACHE.get(cacheKey);
@@ -1330,10 +1272,7 @@ function StoreMarkersLayer({
               interactive={interactive}
               icon={buildStoreMarkerIcon({
                 kind: ui.kind,
-                ratingLabel: ui.ratingLabel,
                 markerTone: ui.markerTone,
-                locationMode: ui.locationMode,
-                liveNow: null,
                 selected: selectedStoreId === store.id,
               })}
               zIndexOffset={active ? 480 : 220}
