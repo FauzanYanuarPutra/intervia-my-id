@@ -11,7 +11,7 @@ describe('merchant OS foundation', () => {
     const source = read('../../lib/portal-navigation.ts');
     expect(source).toContain("'home',\n  'orders',\n  'products',\n  'inventory',\n  'finance'");
     expect(source).toContain("orders: 'Jual'");
-    expect(source).toContain("products: 'Barang'");
+    expect(source).toContain("products: 'Produk'");
     expect(source).toContain("inventory: 'Stok'");
     expect(source).toContain("finance: 'Uang'");
   });
