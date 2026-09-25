@@ -2823,7 +2823,7 @@ export function CommunityPostCard({
     <>
       <article
         ref={cardRef}
-        className="overflow-hidden border-y border-[color:var(--app-border)] bg-white sm:rounded-[18px] sm:border-x sm:shadow-[0_14px_28px_-28px_rgba(15,23,42,0.16)]"
+        className="overflow-hidden border border-[color:var(--app-border)] bg-white shadow-[0_10px_30px_-28px_rgba(15,23,42,0.18)] sm:rounded-[20px]"
       >
       {/* ================= POST HEADER ================= */}
 
@@ -2852,13 +2852,22 @@ export function CommunityPostCard({
               </button>
 
               <p className="mt-0.5 flex min-w-0 items-center gap-1 text-xs text-[color:var(--app-text-soft)]">
-                <span className="truncate">
-                  {item.group?.name || item.communityName}
-                  <span aria-hidden="true"> &middot; </span>
-                  {timeAgo(item.createdAt, isId)}
-                </span>
-
-                <Earth className="h-3.5 w-3.5" />
+                {item.group ? (
+                  <Link
+                    href={communityGroupHref(item.group)}
+                    className="max-w-[70%] truncate font-semibold hover:text-[color:var(--app-accent)]"
+                    onClick={event => event.stopPropagation()}
+                  >
+                    {item.group.name}
+                  </Link>
+                ) : (
+                  <span className="max-w-[70%] truncate font-semibold">
+                    {item.communityName}
+                  </span>
+                )}
+                <span aria-hidden="true">·</span>
+                <span className="shrink-0">{timeAgo(item.createdAt, isId)}</span>
+                <Earth className="h-3.5 w-3.5 shrink-0" />
               </p>
             </div>
           </div>
@@ -3049,123 +3058,59 @@ export function CommunityPostCard({
         />
       ) : null}
 
-      {/* ================= ACTION BAR ================= */}
+      {/* ================= REACTION SUMMARY + ACTION BAR ================= */
 
-      <div className="grid grid-cols-4 border-t border-[color:var(--app-border)] px-2 py-1.5 text-xs font-semibold text-[color:var(--app-text-soft)]">
-        {/* LIKE */}
-
-        <button
-          type="button"
-          onClick={() => void handleLike()}
-          aria-pressed={localVote === 1}
-          aria-label={
-            localVote === 1
-              ? isId
-                ? `Batalkan suka, ${reactionCount} suka`
-                : `Unlike, ${reactionCount} likes`
+      {(reactionCount > 0 || commentCount > 0 || item.stats.shares > 0) ? (
+        <div className="flex min-h-9 items-center justify-between gap-3 border-t border-[color:var(--app-border)] px-3.5 pt-2 text-[11px] font-medium text-[color:var(--app-text-soft)] sm:px-4">
+          <div className="flex min-w-0 items-center gap-1.5">
+            {reactionCount > 0 ? (
+              <>
+                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                  <ThumbsUp className="h-3 w-3 fill-current" />
+                </span>
+                <span className="truncate font-semibold">
+                  ${compactNumber(reactionCount)} ${isId ? 'suka' : 'likes'}
+                </span>
+              </>
+            ) : null}
+          </div>
+          <button
+            type="button"
+            onClick={openDetail}
+            className="shrink-0 font-semibold hover:text-[color:var(--app-text)]"
+          >
+            ${commentCount > 0
+              ? \`${compactNumber(commentCount)} ${isId ? 'komentar' : 'comments'}\`
               : isId
-                ? `Suka, ${reactionCount} suka`
-                : `Like, ${reactionCount} likes`
-          }
-          title={isId ? 'Suka' : 'Like'}
-          className={cn(
-            'inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[12px] px-3 transition',
-            localVote === 1
-              ? 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200'
-              : 'hover:bg-slate-50 hover:text-[color:var(--app-accent)]',
-          )}
-        >
-          <ThumbsUp
-            className={cn(
-              'h-4 w-4 shrink-0 transition',
-              localVote === 1 && 'scale-105 fill-current',
-            )}
-          />
+                ? 'Lihat diskusi'
+                : 'View discussion'}
+          </button>
+        </div>
+      ) : null}
 
-          {reactionCount > 0 ? (
-            <span className="tabular-nums">
-              {compactNumber(reactionCount)}
-            </span>
-          ) : null}
+      <div className="grid grid-cols-4 border-y border-[color:var(--app-border)] px-1.5 py-1 text-xs font-semibold text-[color:var(--app-text-soft)] sm:px-2">
+        <button type="button" onClick={() => void handleLike()} aria-pressed={localVote === 1} title={isId ? 'Suka' : 'Like'} className={cn('inline-flex min-h-11 items-center justify-center gap-2 rounded-[12px] px-2 transition hover:bg-slate-50', localVote === 1 ? 'text-emerald-700' : 'hover:text-[color:var(--app-accent)]')}>
+          <ThumbsUp className={cn('h-[18px] w-[18px]', localVote === 1 && 'fill-current')} />
+          <span>{isId ? 'Suka' : 'Like'}</span>
         </button>
 
-        {/* COMMENT - FOCUS INLINE INPUT */}
-
-        <button
-          type="button"
-          onClick={focusCommentInput}
-          aria-label={
-            isId
-              ? `Komentar, ${commentCount} komentar`
-              : `Comment, ${commentCount} comments`
-          }
-          title={isId ? 'Komentar' : 'Comment'}
-          className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[12px] px-3 transition hover:bg-slate-50 hover:text-[color:var(--app-accent)]"
-        >
-          <MessageCircle className="h-4 w-4 shrink-0" />
-
-          {commentCount > 0 ? (
-            <span className="tabular-nums">
-              {compactNumber(commentCount)}
-            </span>
-          ) : null}
+        <button type="button" onClick={focusCommentInput} aria-label={isId ? 'Komentar' : 'Comment'} title={isId ? 'Komentar' : 'Comment'} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[12px] px-2 transition hover:bg-slate-50 hover:text-[color:var(--app-accent)]">
+          <MessageCircle className="h-[18px] w-[18px]" />
+          <span>{isId ? 'Komentar' : 'Comment'}</span>
         </button>
 
-        {/* SAVE */}
-
-        <button
-          type="button"
-          onClick={() => void handleSave()}
-          disabled={saveLoading}
-          aria-pressed={saved}
-          aria-busy={saveLoading}
-          aria-label={
-            saved
-              ? isId
-                ? `Hapus simpanan, ${saveCount} tersimpan`
-                : `Remove save, ${saveCount} saves`
-              : isId
-                ? `Simpan, ${saveCount} tersimpan`
-                : `Save, ${saveCount} saves`
-          }
-          title={isId ? 'Simpan' : 'Save'}
-          className={cn(
-            'inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[12px] px-2 transition disabled:cursor-wait disabled:opacity-60',
-            saved
-              ? 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200'
-              : 'hover:bg-slate-50 hover:text-[color:var(--app-accent)]',
-          )}
-        >
-          <Bookmark className={cn('h-4 w-4 shrink-0', saved && 'fill-current')} />
-          {saveCount > 0 ? (
-            <span className="tabular-nums">{compactNumber(saveCount)}</span>
-          ) : null}
+        <button type="button" onClick={() => void handleSave()} disabled={saveLoading} aria-pressed={saved} aria-busy={saveLoading} aria-label={saved ? (isId ? 'Hapus simpanan' : 'Remove save') : (isId ? 'Simpan' : 'Save')} title={isId ? 'Simpan' : 'Save'} className={cn('inline-flex min-h-11 items-center justify-center gap-2 rounded-[12px] px-2 transition disabled:cursor-wait disabled:opacity-60', saved ? 'text-amber-700' : 'hover:bg-slate-50 hover:text-[color:var(--app-accent)]')}>
+          <Bookmark className={cn('h-[18px] w-[18px]', saved && 'fill-current')} />
+          <span>{isId ? 'Simpan' : 'Save'}</span>
         </button>
 
-        {/* SHARE */}
-
-        <button
-          type="button"
-          onClick={() => void handleShare()}
-          aria-label={
-            isId
-              ? `Bagikan, ${item.stats.shares} kali dibagikan`
-              : `Share, ${item.stats.shares} shares`
-          }
-          title={isId ? 'Bagikan' : 'Share'}
-          className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[12px] px-3 transition hover:bg-slate-50 hover:text-[color:var(--app-accent)]"
-        >
-          <Share2 className="h-4 w-4 shrink-0" />
-
-          {item.stats.shares > 0 ? (
-            <span className="tabular-nums">
-              {compactNumber(item.stats.shares)}
-            </span>
-          ) : null}
+        <button type="button" onClick={() => void handleShare()} aria-label={isId ? 'Bagikan' : 'Share'} title={isId ? 'Bagikan' : 'Share'} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[12px] px-2 transition hover:bg-slate-50 hover:text-[color:var(--app-accent)]">
+          <Share2 className="h-[18px] w-[18px]" />
+          <span>{isId ? 'Bagikan' : 'Share'}</span>
         </button>
       </div>
 
-      {/* ================= FACEBOOK-LIKE COMMENTS PREVIEW ================= */}
+      /* ================= FACEBOOK-LIKE COMMENTS PREVIEW ================= */}
 
       {commentCount > 0 ? (
         <section className="border-t border-[color:var(--app-border)] px-3 pb-2.5 pt-2.5 sm:px-4">
@@ -5601,7 +5546,7 @@ function GroupCard({
 
     setBusy(true);
     const response = await authFetch(
-      `/api/community/groups/${encodeURIComponent(group.id)}/${joined ? 'leave' : 'join'}`,
+      \`/api/community/groups/${encodeURIComponent(group.id)}/${joined ? 'leave' : 'join'}\`,
       { method: 'POST' },
     );
     const payload = await response.json().catch(() => ({}));
@@ -5636,14 +5581,14 @@ function GroupCard({
   return (
     <article
       className={cn(
-        'group relative flex h-full flex-col overflow-hidden rounded-[24px] border border-[color:color-mix(in_srgb,var(--app-border)_82%,transparent)] bg-white text-left shadow-[0_18px_34px_-32px_rgba(15,23,42,0.22)] transition hover:border-[color:var(--app-accent-border)]',
-        compact && 'min-w-0 rounded-[20px]',
+        'group relative flex h-full flex-col overflow-hidden rounded-[20px] border border-[color:var(--app-border)] bg-white text-left shadow-[0_10px_30px_-28px_rgba(15,23,42,0.3)] transition duration-200 hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:shadow-[0_22px_42px_-32px_rgba(15,23,42,0.34)]',
+        compact && 'rounded-[18px]',
       )}
     >
       <div
         className={cn(
           'relative overflow-hidden bg-slate-100',
-          compact ? 'h-[72px]' : 'h-24',
+          compact ? 'aspect-[2.15/1]' : 'aspect-[2.4/1]',
         )}
       >
         {group.coverUrl ? (
@@ -5651,138 +5596,101 @@ function GroupCard({
             src={group.coverUrl}
             alt={group.name}
             fill
-            className="object-cover"
+            className="object-cover transition duration-500 group-hover:scale-[1.03]"
           />
         ) : (
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgba(16,185,129,0.28),transparent_32%),radial-gradient(circle_at_84%_12%,rgba(59,130,246,0.22),transparent_26%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,rgba(16,185,129,0.30),transparent_32%),radial-gradient(circle_at_85%_15%,rgba(59,130,246,0.24),transparent_30%),linear-gradient(135deg,#ecfdf5,#f8fafc)]" />
         )}
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.12),rgba(15,23,42,0.22))]" />
-        <div className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-white/92 px-2 py-1 text-[10px] font-bold text-[color:var(--app-accent)] shadow-sm">
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(15,23,42,0.02),rgba(15,23,42,0.34))]" />
+        <div className="absolute right-2.5 top-2.5 inline-flex items-center gap-1 rounded-full bg-white/94 px-2 py-1 text-[10px] font-bold text-[color:var(--app-text)] shadow-sm backdrop-blur">
           {group.privacy === 'public' ? (
-            <Earth className="h-3 w-3" />
+            <Earth className="h-3 w-3 text-[color:var(--app-accent)]" />
           ) : (
-            <Lock className="h-3 w-3" />
+            <Lock className="h-3 w-3 text-[color:var(--app-text-soft)]" />
           )}
           {groupPrivacyLabel(group, isId)}
         </div>
       </div>
 
-      <div
-        className={cn(
-          'relative flex flex-1 flex-col px-3 pb-3 pt-0',
-          compact && 'px-2.5 pb-2.5',
-        )}
-      >
+      <div className={cn('relative flex flex-1 flex-col px-3 pb-3', compact ? 'px-2.5 pb-2.5' : '')}>
         <Link
           href={communityGroupHref(group)}
           className={cn(
-            '-mt-9 inline-flex overflow-hidden rounded-[22px] border-[3px] border-white shadow-[0_18px_28px_-24px_rgba(15,23,42,0.4)] transition group-hover:scale-[1.03]',
-            compact ? 'h-12 w-12' : 'h-16 w-16',
+            '-mt-7 inline-flex overflow-hidden rounded-[18px] border-[3px] border-white bg-white shadow-[0_16px_28px_-22px_rgba(15,23,42,0.5)] transition group-hover:scale-[1.02]',
+            compact ? 'h-14 w-14' : 'h-16 w-16',
           )}
           aria-label={group.name}
         >
           <GroupAvatarMark
             group={group}
-            className="h-full w-full rounded-[18px] text-xl"
-            sizes={compact ? '48px' : '64px'}
+            className="h-full w-full rounded-[15px] text-xl"
+            sizes={compact ? '56px' : '64px'}
           />
         </Link>
 
         <div className="mt-2 min-w-0">
-          <Link
-            href={communityGroupHref(group)}
-            className={cn(
-              'font-bold tracking-[-0.02em] text-[color:var(--app-text)]',
-              compact
-                ? 'line-clamp-1 text-sm leading-5'
-                : 'line-clamp-2 text-[0.98rem] leading-5',
-            )}
-          >
-            {group.name}
-          </Link>
-          <p
-            className={cn(
-              'mt-1 text-[11px] font-semibold leading-4 text-[color:var(--app-text-soft)]',
-              compact ? 'line-clamp-1' : 'line-clamp-2',
-            )}
-          >
+          <div className="flex items-start gap-2">
+            <Link
+              href={communityGroupHref(group)}
+              className={cn(
+                'min-w-0 flex-1 font-bold tracking-[-0.025em] text-[color:var(--app-text)] transition hover:text-[color:var(--app-accent)]',
+                compact ? 'line-clamp-1 text-sm leading-5' : 'line-clamp-2 text-base leading-5',
+              )}
+            >
+              {group.name}
+            </Link>
+            {highlightedRole ? (
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-[9px] font-bold text-amber-700">
+                {group.viewerRole === 'owner' ? (
+                  <Crown className="h-3 w-3" />
+                ) : (
+                  <UserCog className="h-3 w-3" />
+                )}
+                {highlightedRole}
+              </span>
+            ) : null}
+          </div>
+
+          <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[10px] font-semibold text-[color:var(--app-text-soft)]">
+            <button
+              type="button"
+              onClick={() => onOpenMembers(group)}
+              className="truncate transition hover:text-[color:var(--app-accent)]"
+            >
+              {compactNumber(group.memberCount)} {isId ? 'anggota' : 'members'}
+            </button>
+            <span aria-hidden="true">·</span>
+            <span>{compactNumber(group.postCount)} {isId ? 'postingan' : 'posts'}</span>
+          </div>
+
+          <p className={cn(
+            'mt-2 text-[11px] font-medium leading-4 text-[color:var(--app-text-soft)]',
+            compact ? 'line-clamp-1' : 'line-clamp-2',
+          )}>
             {group.description}
           </p>
         </div>
 
-        <div
-          className={cn(
-            'mt-3 gap-2',
-            compact ? 'flex items-center' : 'grid grid-cols-2',
-          )}
-        >
-          <button
-            type="button"
-            onClick={() => onOpenMembers(group)}
+        <div className="mt-auto flex items-center gap-2 pt-3">
+          <Link
+            href={communityGroupHref(group)}
             className={cn(
-              'bg-slate-50 text-left transition hover:bg-emerald-50',
-              compact
-                ? 'inline-flex min-h-[30px] flex-1 items-center gap-1 rounded-full px-2 py-0 text-[10px]'
-                : 'rounded-[16px] px-2 py-2',
+              'inline-flex min-h-[38px] flex-1 items-center justify-center rounded-[13px] border border-[color:var(--app-border)] bg-white px-3 text-xs font-bold text-[color:var(--app-text)] transition hover:bg-slate-50',
+              compact && 'min-h-[34px] text-[11px]',
             )}
           >
-            <span
-              className={cn(
-                'font-bold text-[color:var(--app-text)]',
-                compact ? 'text-xs' : 'block text-sm',
-              )}
-            >
-              {compactNumber(group.memberCount)}
-            </span>
-            <span className="block truncate text-[10px] font-bold text-[color:var(--app-text-soft)]">
-              {isId ? 'member' : 'members'}
-            </span>
-          </button>
-          <div
-            className={cn(
-              'bg-slate-50 text-left',
-              compact
-                ? 'inline-flex min-h-[30px] flex-1 items-center gap-1 rounded-full px-2 py-0 text-[10px]'
-                : 'rounded-[16px] px-2 py-2',
-            )}
-          >
-            <span
-              className={cn(
-                'font-bold text-[color:var(--app-text)]',
-                compact ? 'text-xs' : 'block text-sm',
-              )}
-            >
-              {compactNumber(group.postCount)}
-            </span>
-            <span className="block truncate text-[10px] font-bold text-[color:var(--app-text-soft)]">
-              posts
-            </span>
-          </div>
-        </div>
-
-        {highlightedRole ? (
-          <div className="mt-2">
-            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-700">
-              {group.viewerRole === 'owner' ? (
-                <Crown className="h-3 w-3" />
-              ) : (
-                <UserCog className="h-3 w-3" />
-              )}
-              {highlightedRole}
-            </span>
-          </div>
-        ) : null}
-
-        <div className="mt-auto pt-2.5">
+            {isId ? 'Lihat grup' : 'View group'}
+          </Link>
           <button
             type="button"
             onClick={joinOrLeave}
             disabled={busy || pending}
             className={cn(
-              'inline-flex min-h-[38px] w-full items-center justify-center gap-2 rounded-[15px] px-2 text-center text-xs font-bold leading-4 transition disabled:opacity-60',
+              'inline-flex min-h-[38px] flex-1 items-center justify-center gap-1.5 rounded-[13px] px-3 text-xs font-bold transition disabled:cursor-wait disabled:opacity-60',
+              compact && 'min-h-[34px] text-[11px]',
               joined
-                ? 'border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)]'
-                : 'bg-[color:var(--app-accent)] text-white shadow-[0_14px_24px_-18px_rgba(4,120,87,0.7)] hover:bg-[color:var(--app-accent-strong)]',
+                ? 'border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] hover:bg-slate-100'
+                : 'bg-[color:var(--app-accent)] text-white hover:bg-[color:var(--app-accent-strong)]',
             )}
           >
             {busy ? (
@@ -5793,16 +5701,10 @@ function GroupCard({
               <Plus className="h-4 w-4" />
             )}
             {pending
-              ? isId
-                ? 'Menunggu persetujuan'
-                : 'Pending approval'
+              ? isId ? 'Pending' : 'Pending'
               : joined
-                ? isId
-                  ? 'Sudah join'
-                  : 'Joined'
-                : isId
-                  ? 'Join grup'
-                  : 'Join group'}
+                ? isId ? 'Sudah join' : 'Joined'
+                : isId ? 'Gabung' : 'Join'}
           </button>
         </div>
       </div>
@@ -5841,7 +5743,7 @@ function GroupStrip({
     .slice(0, 8);
 
   return (
-    <section className="overflow-hidden border-y border-[color:var(--app-border)] bg-white p-3 sm:rounded-[18px] sm:border-x sm:p-3.5">
+    <section className="overflow-hidden rounded-[20px] border border-[color:var(--app-border)] bg-white p-3.5 shadow-[0_10px_30px_-28px_rgba(15,23,42,0.2)]">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[10px] font-bold uppercase tracking-[0.13em] text-[color:var(--app-accent)]">
@@ -6508,89 +6410,86 @@ function RightRail({
 }) {
   const trendingTags = overview?.trendingTags || [];
   const recommendedGroups = overview?.recommendedGroups || [];
+  const topContributors = overview?.topContributors || [];
 
   return (
     <aside className="hidden xl:block xl:h-full xl:min-h-0 xl:overflow-hidden">
-      <div
-        className="flex h-full max-h-full min-h-0 flex-col gap-3 overflow-y-auto overscroll-contain pb-6 pl-1 pt-2"
-        data-auto-scrollbar
-      >
-        <section className="shrink-0 rounded-[18px] border border-[color:var(--app-border)] bg-white p-3.5">
+      <div className="flex h-full max-h-full min-h-0 flex-col gap-3 overflow-y-auto overscroll-contain pb-6 pl-1 pt-2" data-auto-scrollbar>
+        <section className="shrink-0 rounded-[20px] border border-[color:var(--app-border)] bg-white p-3.5">
           <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[color:var(--app-text-muted)]">
-            {isId ? 'Aktivitas komunitas' : 'Community activity'}
+            ${isId ? 'Aktivitas komunitas' : 'Community activity'}
           </p>
           <div className="mt-3 grid grid-cols-3 gap-2">
             {[
-              [isId ? 'Diskusi' : 'Threads', overview?.stats.totalThreads],
-              [isId ? 'Jawaban' : 'Replies', overview?.stats.totalPosts],
-              [isId ? 'Member' : 'Members', overview?.stats.totalUsers],
+              [${isId ? 'Diskusi' : 'Threads'}, overview?.stats.totalThreads],
+              [${isId ? 'Jawaban' : 'Replies'}, overview?.stats.totalPosts],
+              [${isId ? 'Member' : 'Members'}, overview?.stats.totalUsers],
             ].map(([label, value]) => (
-              <div key={String(label)} className="min-w-0 rounded-[12px] bg-slate-50 px-2 py-2 text-center">
-                <p className="text-sm font-bold text-[color:var(--app-text)]">{compactNumber(Number(value || 0))}</p>
-                <p className="mt-0.5 truncate text-[9px] font-semibold text-[color:var(--app-text-soft)]">{label}</p>
+              <div key={String(label)} className="min-w-0 rounded-[13px] bg-slate-50 px-2 py-2 text-center">
+                <p className="text-sm font-bold text-[color:var(--app-text)]">${compactNumber(Number(value || 0))}</p>
+                <p className="mt-0.5 truncate text-[9px] font-semibold text-[color:var(--app-text-soft)]">${label}</p>
               </div>
             ))}
           </div>
         </section>
 
-        <section className="shrink-0 rounded-[18px] border border-[color:var(--app-border)] bg-white p-3.5">
+        <section className="shrink-0 rounded-[20px] border border-[color:var(--app-border)] bg-white p-3.5">
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-[color:var(--app-accent)]" />
-            <h2 className="text-sm font-bold text-[color:var(--app-text)]">
-              {isId ? 'Sedang ramai' : 'Trending'}
-            </h2>
+            <h2 className="text-sm font-bold text-[color:var(--app-text)]">${isId ? 'Sedang ramai' : 'Trending'}</h2>
           </div>
           <div className="mt-3 flex flex-wrap gap-1.5">
             {trendingTags.length ? (
-              trendingTags.slice(0, 6).map(tag => (
-                <Link
-                  key={tag.id}
-                  href={`/community?tag=${encodeURIComponent(tag.slug)}`}
-                  className="rounded-full border border-[color:var(--app-border)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-text-soft)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)]"
-                >
-                  #{tag.slug}
+              trendingTags.slice(0, 8).map(tag => (
+                <Link key={tag.id} href={\`/community?tag=${encodeURIComponent(tag.slug)}\`} className="rounded-full border border-[color:var(--app-border)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-text-soft)] transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)]">
+                  #${tag.slug}
                 </Link>
               ))
             ) : (
               <p className="rounded-[16px] bg-slate-50 px-3 py-2 text-xs font-semibold leading-5 text-[color:var(--app-text-soft)]">
-                {isId
-                  ? 'Tag ramai akan muncul setelah komunitas mulai aktif.'
-                  : 'Trending tags will appear once the community is active.'}
+                ${isId ? 'Tag ramai akan muncul setelah komunitas mulai aktif.' : 'Trending tags will appear once the community is active.'}
               </p>
             )}
           </div>
         </section>
 
-        <section className="shrink-0 rounded-[18px] border border-[color:var(--app-border)] bg-white p-3.5">
-          <h2 className="text-sm font-bold text-[color:var(--app-text)]">
-            {isId ? 'Rekomendasi grup' : 'Recommended groups'}
-          </h2>
-          <div className="mt-3 space-y-2">
-            {recommendedGroups.length ? (
-              recommendedGroups.slice(0, 4).map(group => (
-                <Link
-                  key={group.id}
-                  href={communityGroupHref(group)}
-                  className="flex items-center gap-2 rounded-[14px] p-2 hover:bg-slate-50"
-                >
-                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[13px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
-                    <Users className="h-4 w-4" />
-                  </span>
+        <section className="shrink-0 rounded-[20px] border border-[color:var(--app-border)] bg-white p-3.5">
+          <h2 className="text-sm font-bold text-[color:var(--app-text)]">${isId ? 'Kontributor aktif' : 'Active contributors'}</h2>
+          <div className="mt-3 space-y-1.5">
+            {topContributors.length ? (
+              topContributors.slice(0, 5).map(person => (
+                <Link key={person.id} href={\`/profile/${encodeURIComponent(person.id)}\`} className="flex items-center gap-2 rounded-[14px] px-2 py-1.5 transition hover:bg-slate-50">
+                  <Image src={profileAvatarSrc(person.avatarUrl, readProfileAvatarStyle(person), person.name)} alt={person.name} width={34} height={34} className="h-8 w-8 rounded-full object-cover" />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-xs font-bold text-[color:var(--app-text)]">
-                      {group.name}
-                    </span>
-                    <span className="block truncate text-[10px] text-[color:var(--app-text-soft)]">
-                      {compactNumber(group.memberCount)} member
-                    </span>
+                    <span className="block truncate text-xs font-bold text-[color:var(--app-text)]">${person.name}</span>
+                    <span className="block truncate text-[10px] text-[color:var(--app-text-soft)]">${person.title}</span>
                   </span>
                 </Link>
               ))
             ) : (
               <p className="rounded-[16px] bg-slate-50 px-3 py-2 text-xs font-semibold leading-5 text-[color:var(--app-text-soft)]">
-                {isId
-                  ? 'Rekomendasi grup akan muncul setelah ada aktivitas.'
-                  : 'Recommended groups will appear after more activity.'}
+                ${isId ? 'Kontributor aktif akan muncul setelah ada aktivitas.' : 'Active contributors will appear as the community grows.'}
+              </p>
+            )}
+          </div>
+        </section>
+
+        <section className="shrink-0 rounded-[20px] border border-[color:var(--app-border)] bg-white p-3.5">
+          <h2 className="text-sm font-bold text-[color:var(--app-text)]">${isId ? 'Rekomendasi grup' : 'Recommended groups'}</h2>
+          <div className="mt-3 space-y-2">
+            {recommendedGroups.length ? (
+              recommendedGroups.slice(0, 5).map(group => (
+                <Link key={group.id} href={communityGroupHref(group)} className="flex items-center gap-2 rounded-[14px] p-2 transition hover:bg-slate-50">
+                  <GroupAvatarMark group={group} className="h-9 w-9 rounded-[13px] text-sm" sizes="36px" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-xs font-bold text-[color:var(--app-text)]">${group.name}</span>
+                    <span className="block truncate text-[10px] text-[color:var(--app-text-soft)]">${compactNumber(group.memberCount)} ${isId ? 'anggota' : 'members'}</span>
+                  </span>
+                </Link>
+              ))
+            ) : (
+              <p className="rounded-[16px] bg-slate-50 px-3 py-2 text-xs font-semibold leading-5 text-[color:var(--app-text-soft)]">
+                ${isId ? 'Rekomendasi grup akan muncul setelah ada aktivitas.' : 'Recommended groups will appear after more activity.'}
               </p>
             )}
           </div>
