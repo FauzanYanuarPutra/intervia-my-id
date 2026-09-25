@@ -270,12 +270,6 @@ const SECTION_TONE_CLASS: Record<SectionTone, string> = {
     'border-orange-200/80 bg-[linear-gradient(135deg,#ffffff_0%,#fff8ed_54%,#ecfdf5_100%)] dark:border-orange-900/70 dark:bg-[linear-gradient(135deg,#160f07_0%,#1f170b_56%,#092017_100%)]',
 };
 
-const STAT_TONE_CLASSES = [
-  'border-emerald-200/80 bg-[linear-gradient(135deg,#ffffff_0%,#f7fff9_62%,#ecfdf5_100%)] dark:border-emerald-900/70 dark:bg-[linear-gradient(135deg,#07120f_0%,#0b1b16_100%)]',
-  'border-sky-200/80 bg-[linear-gradient(135deg,#ffffff_0%,#f8fbff_62%,#e0f2fe_100%)] dark:border-sky-900/70 dark:bg-[linear-gradient(135deg,#07111d_0%,#0b1726_100%)]',
-  'border-amber-200/85 bg-[linear-gradient(135deg,#ffffff_0%,#fffdf5_62%,#fef3c7_100%)] dark:border-amber-900/70 dark:bg-[linear-gradient(135deg,#151007_0%,#241a09_100%)]',
-  'border-rose-200/75 bg-[linear-gradient(135deg,#ffffff_0%,#fff7fb_62%,#ffe4e6_100%)] dark:border-rose-900/70 dark:bg-[linear-gradient(135deg,#16090f_0%,#25101a_100%)]',
-];
 const PRIMARY_ACTION_CLASS =
   'inline-flex min-h-[42px] max-w-full items-center justify-center gap-1.5 rounded-full bg-[color:var(--app-accent-strong)] px-3.5 text-xs font-bold text-[color:var(--app-text-inverse)] shadow-[0_16px_28px_-22px_rgba(4,120,87,0.65)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-65 sm:min-h-[44px] sm:px-2';
 const SECONDARY_ACTION_CLASS =
@@ -406,17 +400,6 @@ function SectionBlock({
       </div>
       {children}
     </section>
-  );
-}
-
-function ProgressBar({ value }: { value: number }) {
-  return (
-    <div className="h-1.5 overflow-hidden rounded-full bg-[color:var(--app-surface-muted)] dark:bg-[color:var(--app-surface)]">
-      <div
-        className="h-full rounded-full bg-[color:var(--app-accent-strong)] transition-all"
-        style={{ width: `${Math.max(0, Math.min(100, value))}%` }}
-      />
-    </div>
   );
 }
 
@@ -651,67 +634,6 @@ function SocialUserRow({
   );
 }
 
-function StatStrip({ items }: { items: StatItem[] }) {
-  return (
-    <div className="grid grid-cols-2 gap-2 sm:gap-2.5 lg:grid-cols-4">
-      {items.map((item, index) => {
-        const Icon = item.icon;
-        return (
-          <div
-            key={item.label}
-            className={cn(
-              CARD_CLASS,
-              STAT_TONE_CLASSES[index % STAT_TONE_CLASSES.length],
-              'min-w-0 p-3',
-            )}
-          >
-            <div className="flex min-w-0 items-center gap-2.5">
-              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-white/90 text-[color:var(--app-accent)] shadow-sm ring-1 ring-white/80 dark:bg-white/10 dark:ring-white/10">
-                <Icon className="h-[18px] w-[18px]" />
-              </span>
-              <span className="min-w-0">
-                <span className="block truncate text-xl font-bold leading-6 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                  {item.value}
-                </span>
-                <span className="mt-0.5 block truncate text-[11px] font-bold text-[color:var(--app-text-soft)] sm:text-xs">
-                  {item.label}
-                </span>
-              </span>
-            </div>
-            {item.hint ? (
-              <p className="mt-2 truncate rounded-full bg-white/70 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[color:var(--app-text-soft)] dark:bg-white/10">
-                {item.hint}
-              </p>
-            ) : null}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function EmptyState({
-  title,
-  description,
-  action,
-}: {
-  title: string;
-  description: string;
-  action?: ReactNode;
-}) {
-  return (
-    <div className="rounded-[12px] border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3 text-center dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)]">
-      <p className="text-[13px] font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-        {title}
-      </p>
-      <p className="mx-auto mt-1 max-w-md text-xs font-semibold leading-4 text-[color:var(--app-text-soft)]">
-        {description}
-      </p>
-      {action ? <div className="mt-2">{action}</div> : null}
-    </div>
-  );
-}
-
 function ProfileTabButton({
   active,
   icon: Icon,
@@ -728,14 +650,14 @@ function ProfileTabButton({
       type="button"
       onClick={onClick}
       className={cn(
-        'inline-flex min-h-[34px] shrink-0 items-center justify-center gap-1.5 rounded-full px-3 text-xs font-bold transition sm:min-h-[36px] sm:px-3.5',
+        'relative inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 px-2.5 text-xs font-bold transition sm:min-h-10 sm:px-3 sm:text-[13px]',
         active
-          ? 'bg-[color:var(--app-accent-strong)] text-[color:var(--app-text-inverse)] shadow-[0_14px_24px_-20px_rgba(4,120,87,0.7)]'
-          : 'bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)] ring-1 ring-[color:var(--app-border)] hover:bg-[color:var(--app-surface-muted)] dark:text-[color:var(--app-text-soft)] dark:ring-[color:var(--app-border-strong)]',
+          ? 'text-[color:var(--app-accent)] after:absolute after:inset-x-2.5 after:bottom-0 after:h-0.5 after:rounded-full after:bg-[color:var(--app-accent-strong)] sm:after:inset-x-3'
+          : 'text-[color:var(--app-text-soft)] hover:text-[color:var(--app-text)]',
       )}
       aria-pressed={active}
     >
-      <Icon className="h-4 w-4" />
+      <Icon className="hidden h-3.5 w-3.5 shrink-0 sm:block" />
       <span className="whitespace-nowrap">{label}</span>
     </button>
   );
@@ -934,139 +856,53 @@ function ProfileGameProgress({
   reelsSignalCount: number;
   trustReady: boolean;
 }) {
-  const totalXp =
-    360 +
-    setupPercent * 6 +
-    listingsCount * 140 +
-    txCount * 180 +
-    reelsSignalCount * 28 +
-    (trustReady ? 320 : 0);
-  const xpGoal = 500;
-  const level = Math.max(1, Math.floor(totalXp / xpGoal) + 1);
-  const xp = totalXp % xpGoal;
-  const xpPercent = clampProfileProgress((xp / xpGoal) * 100);
-  const rank =
-    level >= 12
-      ? isId
-        ? 'Pro Seller'
-        : 'Pro Seller'
-      : level >= 7
-        ? isId
-          ? 'Builder'
-          : 'Builder'
-        : isId
-          ? 'Starter'
-          : 'Starter';
-  const streak = Math.max(
-    1,
-    Math.min(
-      21,
-      2 + listingsCount + txCount + Math.floor(reelsSignalCount / 2),
-    ),
-  );
-  const quest = !trustReady
+  const nextAction = !trustReady
     ? isId
-      ? 'Verifikasi profil'
-      : 'Verify profile'
+      ? 'Lengkapi verifikasi profil'
+      : 'Complete profile verification'
     : listingsCount === 0
       ? isId
-        ? 'Upload listing pertama'
-        : 'Upload first listing'
-      : reelsSignalCount === 0
-        ? isId
-          ? 'Buat Reels singkat'
-          : 'Upload a short reel'
-        : isId
-          ? PROMO_ONLY_MODE
-            ? 'Balas chat dan rapikan listing'
-            : 'Balas chat dan transaksi'
-          : PROMO_ONLY_MODE
-            ? 'Reply to chats and polish listings'
-            : 'Reply to chats and deals';
+        ? 'Buat listing pertama'
+        : 'Create your first listing'
+      : isId
+        ? 'Rapikan profil atau tambah konten'
+        : 'Polish the profile or add content';
+  const progress = clampProfileProgress(setupPercent);
 
   return (
-    <section className="relative overflow-hidden rounded-[20px] border border-emerald-200/85 bg-[linear-gradient(135deg,#ffffff_0%,#f7fff9_48%,#ecfdf5_100%)] p-3.5 text-[color:var(--app-text)] shadow-[0_18px_38px_-34px_rgba(15,23,42,0.3)] dark:border-emerald-900/70 dark:bg-[linear-gradient(135deg,#07120f_0%,#0b1b16_58%,#10251e_100%)] sm:p-4">
-      <div className="flex min-w-0 items-start gap-3">
-        <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px] bg-emerald-600 text-white shadow-[0_14px_24px_-20px_rgba(4,120,87,0.9)]">
-          <BadgeCheck className="h-5 w-5" />
-        </span>
-
-        <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-            <span className="rounded-full bg-white/82 px-2.5 py-1 text-[11px] font-bold text-emerald-800 ring-1 ring-emerald-100 dark:bg-white/10 dark:text-emerald-100 dark:ring-white/10">
-              {rank}
-            </span>
-            <span className="rounded-full bg-white/82 px-2.5 py-1 text-[11px] font-bold text-[color:var(--app-text-soft)] ring-1 ring-emerald-100 dark:bg-white/10 dark:ring-white/10">
-              Level {level}
-            </span>
+    <section className="rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.35)] dark:border-[color:var(--app-border-strong)]">
+      <div className="flex min-w-0 items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[11px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+            <Sparkles className="h-4 w-4" />
+          </span>
+          <div className="min-w-0">
+            <p className="truncate text-[12px] font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+              {isId ? 'Profil siap dipakai' : 'Profile readiness'}
+            </p>
+            <p className="truncate text-[10px] font-semibold text-[color:var(--app-text-soft)]">
+              {nextAction}
+            </p>
           </div>
-          <h3 className="mt-2 text-base font-bold leading-5 sm:text-[17px]">
-            {isId ? 'Profil makin siap dipakai' : 'Profile is getting ready'}
-          </h3>
-          <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-[color:var(--app-text-soft)]">
-            {isId
-              ? 'Fokus ke satu misi berikutnya. Tidak perlu isi semuanya sekaligus.'
-              : 'Focus on the next mission. No need to complete everything at once.'}
-          </p>
         </div>
+        <span className="shrink-0 text-sm font-black text-[color:var(--app-accent)]">
+          {progress}%
+        </span>
       </div>
-
-      <div className="mt-3 rounded-[16px] border border-emerald-100 bg-white/78 p-3 dark:border-white/10 dark:bg-white/[0.06]">
-        <div className="flex items-center justify-between gap-3">
-          <span className="min-w-0 truncate text-xs font-bold text-[color:var(--app-text)] dark:text-white">
-            {isId ? `Misi: ${quest}` : `Mission: ${quest}`}
-          </span>
-          <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-400/10 dark:text-emerald-200 dark:ring-emerald-400/15">
-            {xp}/{xpGoal} XP
-          </span>
-        </div>
-        <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-emerald-100 dark:bg-white/12">
-          <div
-            className="h-full rounded-full bg-[linear-gradient(90deg,#047857,#22c55e,#facc15)]"
-            style={{ width: `${xpPercent}%` }}
-          />
-        </div>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[color:var(--app-surface-muted)] dark:bg-[color:var(--app-surface)]">
+        <div
+          className="h-full rounded-full bg-[color:var(--app-accent-strong)] transition-all"
+          style={{ width: String(progress) + '%' }}
+        />
       </div>
-
-      <div className="mt-2 grid grid-cols-3 gap-2">
-        {[
-          {
-            label: isId ? 'Kelengkapan' : 'Ready',
-            value: `${setupPercent}%`,
-            icon: Sparkles,
-          },
-          {
-            label: isId ? 'Listing' : 'Listings',
-            value: listingsCount.toLocaleString(),
-            icon: BriefcaseBusiness,
-          },
-          {
-            label: isId ? 'Aktif' : 'Active',
-            value: `${streak}x`,
-            icon: Repeat2,
-          },
-        ].map(item => {
-          const Icon = item.icon;
-          return (
-            <div
-              key={item.label}
-              className="min-w-0 rounded-[15px] border border-emerald-100 bg-white/72 px-2.5 py-2 dark:border-white/10 dark:bg-white/[0.06]"
-            >
-              <Icon className="h-4 w-4 text-emerald-700 dark:text-emerald-200" />
-              <p className="mt-1 truncate text-sm font-bold leading-4 text-[color:var(--app-text)] dark:text-white">
-                {item.value}
-              </p>
-              <p className="truncate text-[10px] font-bold text-[color:var(--app-text-soft)]">
-                {item.label}
-              </p>
-            </div>
-          );
-        })}
-      </div>
+      <p className="mt-2 truncate text-[10px] font-semibold text-[color:var(--app-text-soft)]">
+        {isId
+          ? listingsCount.toLocaleString() + ' listing · ' + txCount.toLocaleString() + ' transaksi · ' + reelsSignalCount.toLocaleString() + ' sinyal'
+          : listingsCount.toLocaleString() + ' listings · ' + txCount.toLocaleString() + ' transactions · ' + reelsSignalCount.toLocaleString() + ' signals'}
+      </p>
     </section>
   );
 }
-
 
 function InlineProfileEditorModal({
   section,
@@ -1578,7 +1414,6 @@ export function ProfileHubView(props: ProfileHubViewProps) {
     saveMessage,
     profileError,
     professionalData: initialProfessionalData,
-    statItems,
     fullNameInput,
     usernameInput,
     phoneInput,
@@ -2515,647 +2350,12 @@ export function ProfileHubView(props: ProfileHubViewProps) {
       done: Boolean(bioInput.trim() || professionalData.summary.trim()),
     },
   ];
-  const previewListings = listings.slice(0, 3);
-  const simpleProfileIntro = isId
-    ? 'Layar awal cukup jawab 3 hal: siapa kamu, ada postingan apa, dan bisa dihubungi lewat mana.'
-    : 'The first screen should answer 3 things: who you are, what you show, and how people can reach you.';
-  const simpleProfileTitle = isId
-    ? 'Profil promosi kamu'
-    : 'Your promo profile';
-
-  return (
-    <div className="min-h-screen overflow-x-hidden bg-white pb-[calc(5.5rem+env(safe-area-inset-bottom))] text-slate-950 dark:bg-slate-950 dark:text-white sm:pb-10">
-      <div className="!p-0 !px-0 !py-0 !m-0 lg:py-5">
-        <div className="w-full max-w-[1360px] gap-3 mx-auto">
-          <main className="min-w-0 space-y-3">
-            <section
-              className="
-    rounded-none
-    lg:rounded-[28px]
-    !border-0
-    outline-none
-    ring-0
-    shadow-none
-    "
-              style={{ borderRadius: '0px !important' }}
-            >
-              <div
-                className="
-                !border-none
-                !outline-none !ring-0 focus:border-none focus:ring-0 focus:outline-none
-    relative
-    overflow-hidden
-    lg:rounded-t-[28px]
-    h-36
-    sm:h-44
-    md:h-52
-    lg:h-60
-    xl:h-64
-    bg-emerald-100
-  "
-              >
-                {effectiveCoverUrl ? (
-                  <Image
-                    src={effectiveCoverUrl}
-                    alt={isId ? 'Sampul profil' : 'Profile cover'}
-                    fill
-                    sizes="100vw"
-                    className="!border-none
-                !outline-none !ring-0 focus:border-none focus:ring-0 focus:outline-none object-cover"
-                    priority
-                    unoptimized
-                  />
-                ) : (
-                  <div className="h-full w-full bg-[linear-gradient(135deg,#d9f99d_0%,#99f6e4_45%,#fed7aa_100%)] dark:bg-[linear-gradient(135deg,#064e3b_0%,#0f172a_55%,#78350f_100%)]" />
-                )}
-
-                {/* Overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-black/10 to-transparent" />
-
-                {/* ===========================
-      Desktop Button
-  =========================== */}
-                <label
-                  htmlFor="simple-profile-cover-upload"
-                  className="
-      absolute
-      left-4
-      top-4
-      hidden
-      lg:inline-flex
-      cursor-pointer
-      items-center
-      gap-2
-      rounded-full
-      border
-      border-white/30
-      bg-white/95
-      px-4
-      py-2
-      text-sm
-      font-bold
-      text-slate-800
-      shadow-lg
-      
-      transition-all
-      duration-200
-      hover:scale-[1.02]
-      hover:bg-white
-      dark:border-white/10
-      dark:bg-slate-900/90
-      dark:text-white
-    "
-                >
-                  {coverUploading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Camera className="h-4 w-4" />
-                  )}
-
-                  {isId ? 'Ganti Sampul' : 'Change Cover'}
-
-                  <input
-                    id="simple-profile-cover-upload"
-                    type="file"
-                    accept="image/*"
-                    className="sr-only"
-                    onChange={onCoverFileChange}
-                  />
-                </label>
-
-                {/* ===========================
-      Mobile Button
-  =========================== */}
-                <label
-                  htmlFor="simple-profile-cover-upload"
-                  className="
-      absolute
-      bottom-3
-      right-3
-      inline-flex
-      lg:hidden
-      cursor-pointer
-      items-center
-      gap-1.5
-      rounded-full
-      bg-white
-      px-3
-      py-2
-      text-xs
-      font-semibold
-      text-slate-800
-      shadow-xl
-      transition-all
-      duration-200
-      active:scale-95
-      dark:bg-slate-900
-      dark:text-white
-    "
-                >
-                  {coverUploading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Camera className="h-4 w-4" />
-                  )}
-
-                  {isId ? 'Ganti Sampul' : 'Change Cover'}
-
-                  <input
-                    id="simple-profile-cover-upload"
-                    type="file"
-                    accept="image/*"
-                    className="sr-only"
-                    onChange={onCoverFileChange}
-                  />
-                </label>
-              </div>
-
-              <div className="grid gap-3 grid-cols-2 lg:grid-cols-4 lg:pt-2">
-                <div className="lg:col-span-1 px-4 pb-4 sm:px-5 sm:pb-5">
-                  <div>
-                    <div className="flex flex-col lg:flex-row items-start gap-4 sm:gap-5">
-                      <div
-                        className="
-    relative
-    -mt-[50px]
-    h-24
-    w-24
-    shrink-0
-    rounded-full
-    border-[5px]
-    border-white
-    bg-slate-100
-    shadow-[0_20px_45px_-18px_rgba(15,23,42,0.35)]
-    dark:border-slate-900
-    dark:bg-slate-800
-
-    sm:-mt-[78px]
-    sm:h-32
-    sm:w-32
-
-    lg:-mt-[90px]
-    lg:h-[150px]
-    lg:w-[150px]
-transition  "
-                      >
-                        <Image
-                          src={profileAvatarSrc(effectiveAvatarUrl)}
-                          alt={displayName}
-                          fill
-                          sizes="(min-width:1024px) 150px, (min-width:640px) 128px, 96px"
-                          className="object-cover rounded-full"
-                          unoptimized
-                        />
-                        <label
-                          htmlFor="simple-profile-avatar-upload"
-                          className="absolute -bottom-1 -right-1 z-10 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border-2 border-white bg-white text-slate-700 shadow-lg transition-all duration-200 hover:scale-105 hover:bg-emerald-50 hover:text-emerald-600 dark:border-slate-900 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-emerald-500/20 dark:hover:text-emerald-300"
-                        >
-                          {avatarUploading ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Camera className="h-4 w-4" />
-                          )}
-
-                          <input
-                            id="simple-profile-avatar-upload"
-                            type="file"
-                            accept="image/*"
-                            className="sr-only"
-                            onChange={onAvatarFileChange}
-                          />
-                        </label>
-                      </div>
-                      <div className="min-w-0 pb-0 sm:pb-1 w-full mt-2 lg:mt-0">
-                        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] items-center justify-between">
-                          <h1 className="truncate  text-[22px] font-bold tracking-[-0.05em] text-slate-950 dark:text-white sm:text-3xl">
-                            {displayName}
-                          </h1>
-                        </div>
-                        {publicHandle ? (
-                          <p className="mt-0.5 truncate text-[14px] font-normal text-emerald-700 dark:text-emerald-300">
-                            @{publicHandle}
-                          </p>
-                        ) : null}
-                        <p className="mt-1 line-clamp-2 text-[14px] font-normal leading-5 text-slate-600 dark:text-slate-300">
-                          {headlineValue}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-2 ml-auto flex w-fit flex-col gap-2">
-                  <LocalizedLink
-                    href={publicProfilePath}
-                    className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
-                  >
-                    <ExternalLink className="h-3.5 w-3.5" />
-                    {isId ? 'Lihat Profil Publik' : 'View Public'}
-                  </LocalizedLink>
-
-                  <button
-                    type="button"
-                    onClick={() => setProfileEditorSection('menu')}
-                    className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white transition hover:bg-emerald-700 active:scale-[0.98]"
-                  >
-                    <UserPen className="h-3.5 w-3.5" />
-                    {isId ? 'Edit Profil' : 'Edit Profile'}
-                  </button>
-                </div>
-                <section className="col-span-3 lg:col-span-1 rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-slate-900 w-[calc(100%-1rem)] lg:w-[calc(100%-2.5rem)] mx-auto">
-                  {/* Header */}
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h3 className="text-[24px] text-lg font-bold text-slate-900 dark:text-white">
-                        {isId ? 'Profil siap' : 'Profile Ready'}
-                      </h3>
-
-                      <p className="mt-1 text-[14px] text-slate-500">
-                        <span className="text-[16px] font-bold text-slate-900 dark:text-white">
-                          {setupPercent}%
-                        </span>{' '}
-                        {isId ? 'terisi' : 'completed'}
-                      </p>
-                    </div>
-
-                    {/* Circle Progress */}
-                    <div className="relative h-10 w-10">
-                      <svg
-                        viewBox="0 0 40 40"
-                        className="-rotate-90 h-full w-full"
-                      >
-                        <circle
-                          cx="20"
-                          cy="20"
-                          r="16"
-                          strokeWidth="4"
-                          fill="none"
-                          className="stroke-slate-200 dark:stroke-slate-700"
-                        />
-
-                        <circle
-                          cx="20"
-                          cy="20"
-                          r="16"
-                          strokeWidth="4"
-                          fill="none"
-                          strokeLinecap="round"
-                          className="stroke-emerald-600"
-                          strokeDasharray={2 * Math.PI * 16}
-                          strokeDashoffset={
-                            2 * Math.PI * 16 -
-                            (setupPercent / 100) * (2 * Math.PI * 16)
-                          }
-                        />
-                      </svg>
-
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-[10px] font-bold">
-                          {setupPercent}%
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Desktop */}
-                  <div className="mt-5 hidden lg:grid gap-3">
-                    {importantSetup.map(item => (
-                      <div
-                        key={item.label}
-                        className="flex items-center justify-between"
-                      >
-                        <div className="flex items-center gap-2">
-                          <div
-                            className={`flex h-5 w-5 items-center justify-center rounded-full ${
-                              item.done
-                                ? 'bg-emerald-100 text-emerald-600'
-                                : 'bg-slate-100 text-slate-400'
-                            }`}
-                          >
-                            {item.done ? (
-                              <CheckCircle2 className="h-4 w-4" />
-                            ) : (
-                              <div className="h-2 w-2 rounded-full bg-current" />
-                            )}
-                          </div>
-
-                          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                            {item.label}
-                          </span>
-                        </div>
-
-                        {!item.done && (
-                          <span className="text-xs font-semibold text-slate-400">
-                            {isId ? 'Belum' : 'Missing'}
-                          </span>
-                        )}
-                      </div>
-                    ))}
-
-                    {/* CTA */}
-                    <div className="mt-3 rounded-2xl bg-emerald-50 p-4 dark:bg-emerald-500/10">
-                      <div className="flex items-start gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-emerald-600 shadow">
-                          <Sparkles className="h-5 w-5" />
-                        </div>
-
-                        <div>
-                          <p className="font-bold text-emerald-800 dark:text-emerald-300">
-                            {isId
-                              ? 'Lengkapi profilmu'
-                              : 'Complete your profile'}
-                          </p>
-
-                          <p className="mt-1 text-sm text-emerald-700 dark:text-emerald-200">
-                            {isId
-                              ? 'Profil lengkap meningkatkan kepercayaan pelanggan.'
-                              : 'A complete profile builds customer trust.'}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Mobile */}
-                  <div className="mt-5 lg:hidden">
-                    <div className="grid grid-cols-5 gap-3">
-                      {importantSetup.map(item => (
-                        <div
-                          key={item.label}
-                          className="flex flex-col items-center gap-2 text-center"
-                        >
-                          <div
-                            className={`flex h-10 w-10 items-center justify-center rounded-full ${
-                              item.done
-                                ? 'bg-emerald-100 text-emerald-600'
-                                : 'bg-slate-100 text-slate-400'
-                            }`}
-                          >
-                            {item.done ? (
-                              <CheckCircle2 className="h-5 w-5" />
-                            ) : (
-                              <Circle className="h-5 w-5" />
-                            )}
-                          </div>
-
-                          <span className="text-[11px] font-medium leading-tight">
-                            {item.label}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </section>
-              </div>
-            </section>
-
-            {/* <section className="rounded-[26px] border border-slate-200 bg-white p-4 shadow-[0_18px_44px_-38px_rgba(15,23,42,0.25)] dark:border-white/10 dark:bg-slate-900 sm:p-5">
-              <div className="flex flex-col gap-1">
-                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">
-                  {isId ? 'Edit profil' : 'Edit profile'}
-                </p>
-                <h2 className="text-lg font-bold tracking-[-0.03em]">
-                  {isId
-                    ? 'Cukup isi yang orang perlu tahu.'
-                    : 'Only fill what people need to know.'}
-                </h2>
-                <p className="text-sm font-semibold leading-6 text-slate-500 dark:text-slate-400">
-                  {isId
-                    ? 'Tidak perlu ribet. Nama, lokasi, nomor, dan cerita singkat sudah cukup untuk mulai promosi.'
-                    : 'No need to complete everything. Name, location, phone, and a short intro are enough to start.'}
-                </p>
-              </div>
-
-              {avatarBuilder ? (
-                <div className="mt-4">{avatarBuilder}</div>
-              ) : null}
-
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <label className="space-y-1.5">
-                  <span className="text-sm font-bold">
-                    {isId ? 'Nama tampil' : 'Display name'}
-                  </span>
-                  <input
-                    value={fullNameInput}
-                    onChange={event => onFullNameChange(event.target.value)}
-                    className={INPUT_CLASS}
-                    placeholder={
-                      isId ? 'Contoh: Warung Bu Sari' : 'Example: Sari Store'
-                    }
-                    autoComplete="name"
-                  />
-                </label>
-                <label className="space-y-1.5">
-                  <span className="text-sm font-bold">
-                    {isId ? 'Nomor HP' : 'Phone number'}
-                  </span>
-                  <input
-                    value={phoneInput}
-                    onChange={event => onPhoneChange(event.target.value)}
-                    className={INPUT_CLASS}
-                    placeholder="08xxxxxxxxxx"
-                    autoComplete="tel"
-                  />
-                </label>
-                <label className="space-y-1.5">
-                  <span className="text-sm font-bold">
-                    {isId ? 'Lokasi' : 'Location'}
-                  </span>
-                  <input
-                    value={locationInput}
-                    onChange={event => onLocationChange(event.target.value)}
-                    className={INPUT_CLASS}
-                    placeholder={isId ? 'Kota / Kecamatan' : 'City / district'}
-                    autoComplete="address-level2"
-                  />
-                </label>
-                <label className="space-y-1.5">
-                  <span className="text-sm font-bold">
-                    {isId ? 'Link profil' : 'Profile link'}
-                  </span>
-                  <input
-                    value={usernameInput}
-                    onChange={event => onUsernameChange(event.target.value)}
-                    className={INPUT_CLASS}
-                    placeholder="nama-usaha"
-                    autoComplete="username"
-                  />
-                </label>
-                <label className="space-y-1.5 sm:col-span-2">
-                  <span className="text-sm font-bold">
-                    {isId ? 'Cerita singkat' : 'Short intro'}
-                  </span>
-                  <textarea
-                    value={bioInput}
-                    onChange={event => onBioChange(event.target.value)}
-                    rows={4}
-                    className={INPUT_CLASS}
-                    placeholder={
-                      isId
-                        ? 'Contoh: Jual snack rumahan, katering harian, dan bisa pesan untuk acara kecil.'
-                        : 'Example: Home-made snacks, daily catering, and small event orders.'
-                    }
-                  />
-                </label>
-              </div>
-
-              <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
-                <button
-                  type="button"
-                  onClick={onSaveProfile}
-                  disabled={saving || avatarUploading || coverUploading}
-                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-emerald-700 px-5 text-sm font-bold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {saving ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Save className="h-4 w-4" />
-                  )}
-                  {isId ? 'Simpan profil' : 'Save profile'}
-                </button>
-                {saveMessage ? (
-                  <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">
-                    {saveMessage}
-                  </p>
-                ) : null}
-              </div>
-            </section> */}
-
-            {/* <section className="rounded-[26px] border border-slate-200 bg-white p-4 shadow-[0_18px_44px_-38px_rgba(15,23,42,0.25)] dark:border-white/10 dark:bg-slate-900 sm:p-5">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">
-                    {isId ? 'Postingan' : 'Posts'}
-                  </p>
-                  <h2 className="text-lg font-bold tracking-[-0.03em]">
-                    {isId
-                      ? 'Yang sedang kamu tampilkan.'
-                      : 'What you are showing.'}
-                  </h2>
-                </div>
-                <LocalizedLink
-                  href="/create"
-                  className="inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-full !bg-slate-950 px-3 text-xs font-bold !text-white !dark:bg-white !dark:text-slate-950"
-                >
-                  <Upload className="h-3.5 w-3.5" />
-                  {isId ? 'Posting' : 'Post'}
-                </LocalizedLink>
-              </div>
-
-              {previewListings.length === 0 ? (
-                <div className="mt-4 rounded-[20px] border border-dashed border-slate-200 bg-[#f7f4ed] p-4 text-center dark:border-white/10 dark:bg-white/[0.04]">
-                  <p className="text-sm font-bold">
-                    {isId
-                      ? 'Belum ada postingan aktif.'
-                      : 'No active posts yet.'}
-                  </p>
-                  <p className="mt-1 text-sm font-semibold leading-6 text-slate-500 dark:text-slate-400">
-                    {isId
-                      ? 'Buat satu postingan produk, jasa, atau kebutuhan agar orang bisa menemukan kamu.'
-                      : 'Create one product, service, or need post so people can find you.'}
-                  </p>
-                </div>
-              ) : (
-                <div className="mt-4 grid gap-2">
-                  {previewListings.map(item => (
-                    <LocalizedLink
-                      key={item.id}
-                      href="/my-listings"
-                      className="flex min-w-0 items-center justify-between gap-3 rounded-[18px] border border-slate-200 bg-[#f7f4ed] px-3 py-3 transition hover:border-emerald-200 dark:border-white/10 dark:bg-white/[0.04]"
-                    >
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm font-bold">
-                          {item.title ||
-                            (isId ? 'Postingan tanpa judul' : 'Untitled post')}
-                        </span>
-                        <span className="mt-0.5 block text-xs font-semibold text-slate-500 dark:text-slate-400">
-                          {(item.content_type || 'post').toUpperCase()} -{' '}
-                          {formatDate(item.created_at)}
-                        </span>
-                      </span>
-                      <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
-                    </LocalizedLink>
-                  ))}
-                </div>
-              )}
-            </section> */}
-          </main>
-
-          {/* <aside className="space-y-3 lg:sticky lg:top-[calc(88px+env(safe-area-inset-top))] lg:self-start">
-            <section className="rounded-[26px] border border-slate-200 bg-white p-4 shadow-[0_18px_44px_-38px_rgba(15,23,42,0.25)] dark:border-white/10 dark:bg-slate-900">
-              <p className="text-sm font-bold">
-                {isId ? 'Butuh apa sekarang?' : 'What do you need now?'}
-              </p>
-              <div className="mt-3 grid gap-2">
-                <LocalizedLink
-                  href="/chat"
-                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-emerald-700 px-4 text-sm font-bold text-white transition hover:bg-emerald-800"
-                >
-                  <MessageCircle className="h-4 w-4" />
-                  {isId ? 'Buka chat' : 'Open chat'}
-                </LocalizedLink>
-                <LocalizedLink
-                  href="/my-listings"
-                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-bold text-slate-800 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/8 dark:text-white"
-                >
-                  <Store className="h-4 w-4" />
-                  {isId ? 'Kelola postingan' : 'Manage posts'}
-                </LocalizedLink>
-                <LocalizedLink
-                  href="/usaha"
-                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-bold text-slate-800 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/8 dark:text-white"
-                >
-                  <Briefcase className="h-4 w-4" />
-                  {isId ? 'Kelola Usaha' : 'Manage business'}
-                </LocalizedLink>
-                {dialPhone ? (
-                  <a
-                    href={`tel:${dialPhone}`}
-                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-bold text-slate-800 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/8 dark:text-white"
-                  >
-                    <Phone className="h-4 w-4" />
-                    {isId ? 'Telepon' : 'Call'}
-                  </a>
-                ) : null}
-              </div>
-            </section>
-
-            <section className="rounded-[26px] border border-slate-200 bg-white p-4 shadow-[0_18px_44px_-38px_rgba(15,23,42,0.25)] dark:border-white/10 dark:bg-slate-900">
-              <p className="text-sm font-bold">
-                {isId ? 'Kontak' : 'Contact'}
-              </p>
-              <div className="mt-3 space-y-2 text-sm font-semibold text-slate-600 dark:text-slate-300">
-                <div className="flex min-w-0 items-center gap-2 rounded-[15px] bg-[#f7f4ed] px-3 py-2 dark:bg-white/[0.04]">
-                  <Mail className="h-4 w-4 shrink-0 text-emerald-700 dark:text-emerald-300" />
-                  <span className="truncate">{emailValue || '-'}</span>
-                </div>
-                <div className="flex min-w-0 items-center gap-2 rounded-[15px] bg-[#f7f4ed] px-3 py-2 dark:bg-white/[0.04]">
-                  <Phone className="h-4 w-4 shrink-0 text-emerald-700 dark:text-emerald-300" />
-                  <span className="truncate">{phoneValue || '-'}</span>
-                </div>
-                <div className="flex min-w-0 items-center gap-2 rounded-[15px] bg-[#f7f4ed] px-3 py-2 dark:bg-white/[0.04]">
-                  <MapPin className="h-4 w-4 shrink-0 text-emerald-700 dark:text-emerald-300" />
-                  <span className="truncate">{locationValue || '-'}</span>
-                </div>
-              </div>
-            </section>
-
-            {profileError ? (
-              <section className="rounded-[22px] border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-100">
-                {profileError}
-              </section>
-            ) : null}
-          </aside> */}
-        </div>
-      </div>
-    </div>
-  );
-
   return (
     <div className={PAGE_CLASS}>
       <div className="page-shell overflow-x-hidden">
-        <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-3 px-1 sm:gap-4 sm:px-2 lg:px-0">
-          <section className={cn(CARD_CLASS, 'overflow-hidden rounded-[24px]')}>
-            <div className="relative h-32 bg-[color:var(--app-surface-muted)] sm:h-40 lg:h-44">
+        <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-3 px-0 sm:gap-4 sm:px-2 lg:px-0">
+          <section className={cn(CARD_CLASS, 'overflow-hidden rounded-[20px] sm:rounded-[24px]')}>
+            <div className="relative h-24 bg-[color:var(--app-surface-muted)] sm:h-36 lg:h-40">
               {effectiveCoverUrl ? (
                 <Image
                   src={effectiveCoverUrl}
@@ -3340,7 +2540,20 @@ transition  "
             </div>
           ) : null}
 
-          <StatStrip items={statItems} />
+          <div className="grid grid-cols-3 overflow-hidden rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] dark:border-[color:var(--app-border-strong)]">
+            <button type="button" onClick={() => setActiveHubTab('etalase')} className="min-w-0 cursor-pointer px-2 py-2.5 text-center transition hover:bg-[color:var(--app-surface-muted)] active:scale-[0.99]">
+              <span className="block truncate text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">{listings.length.toLocaleString(locale)}</span>
+              <span className="mt-0.5 block truncate text-[10px] font-semibold text-[color:var(--app-text-soft)]">{isId ? 'Etalase' : 'Storefront'}</span>
+            </button>
+            <button type="button" onClick={() => setSocialModal('followers')} className="min-w-0 cursor-pointer border-x border-[color:var(--app-border)] px-2 py-2.5 text-center transition hover:bg-[color:var(--app-surface-muted)] active:scale-[0.99] dark:border-[color:var(--app-border-strong)]">
+              <span className="block truncate text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">{followerCount.toLocaleString(locale)}</span>
+              <span className="mt-0.5 block truncate text-[10px] font-semibold text-[color:var(--app-text-soft)]">{copy.followers}</span>
+            </button>
+            <button type="button" onClick={() => setSocialModal('following')} className="min-w-0 cursor-pointer px-2 py-2.5 text-center transition hover:bg-[color:var(--app-surface-muted)] active:scale-[0.99]">
+              <span className="block truncate text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">{followingCount.toLocaleString(locale)}</span>
+              <span className="mt-0.5 block truncate text-[10px] font-semibold text-[color:var(--app-text-soft)]">{copy.following}</span>
+            </button>
+          </div>
 
           <ProfileGameProgress
             isId={isId}
@@ -3354,10 +2567,10 @@ transition  "
           <div
             className={cn(
               CARD_CLASS,
-              'sticky top-[calc(52px+env(safe-area-inset-top))] z-20 overflow-x-auto px-2 py-1.5 sm:top-[calc(60px+env(safe-area-inset-top))] sm:px-2.5',
+              'sticky top-[calc(52px+env(safe-area-inset-top))] z-20 overflow-x-auto border-b border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)]/95 px-0 backdrop-blur sm:top-[calc(60px+env(safe-area-inset-top))] sm:px-0 dark:border-[color:var(--app-border-strong)]',
             )}
           >
-            <div className="flex min-w-max gap-1.5 sm:gap-2">
+            <div className="flex min-w-max gap-0.5 px-1 sm:gap-1 sm:px-0.5">
               {hubTabs.map(item => (
                 <ProfileTabButton
                   key={item.key}
