@@ -136,7 +136,7 @@ export function HomeBusinessMapSection({
 
   return (
     <section
-      className="overflow-hidden rounded-[20px] border border-slate-200/80 bg-white shadow-[0_16px_40px_-34px_rgba(15,23,42,0.3)]"
+      className="overflow-hidden rounded-[20px] border border-slate-200/80 bg-white shadow-[0_16px_40px_-30px_rgba(15,23,42,0.34)]"
       data-testid="home-business-map-section"
       aria-label={
         isId ? 'Sebaran usaha Indonesia' : 'Indonesia business coverage map'
@@ -144,7 +144,7 @@ export function HomeBusinessMapSection({
     >
       <div className="flex items-center justify-between gap-2 px-3 py-2.5 sm:px-3.5">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
+          <span className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.08)]">
             <MapPinned className="h-3.5 w-3.5" />
           </span>
           <div className="min-w-0">
@@ -173,7 +173,7 @@ export function HomeBusinessMapSection({
       </div>
 
       <div
-        className="relative mx-1.5 mb-1.5 cursor-pointer overflow-hidden rounded-[16px] border border-slate-200 bg-slate-100 outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 sm:mx-2 sm:mb-2"
+        className="group/map relative mx-1.5 mb-1.5 cursor-pointer overflow-hidden rounded-[16px] border border-slate-200 bg-slate-100 outline-none transition-[border-color,box-shadow] duration-200 hover:border-emerald-200 hover:shadow-[0_12px_28px_-22px_rgba(16,185,129,0.5)] focus-visible:ring-2 focus-visible:ring-emerald-500 sm:mx-2 sm:mb-2"
         role="link"
         tabIndex={0}
         aria-label={
@@ -192,15 +192,49 @@ export function HomeBusinessMapSection({
           className="leaflet-home-map h-[148px] w-full sm:h-[164px]"
         />
 
-        <div className="pointer-events-none absolute inset-x-2.5 bottom-2.5 z-10 flex items-center justify-between gap-2 sm:inset-x-3 sm:bottom-3">
-          <span className="rounded-full border border-white/80 bg-white/90 px-2 py-1 text-[8px] font-bold text-slate-700 shadow-sm backdrop-blur sm:text-[9px]">
-            {isId ? 'Indonesia · ketuk untuk buka peta' : 'Indonesia · tap to open map'}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 z-[5] bg-[radial-gradient(circle_at_52%_48%,rgba(16,185,129,0.08),transparent_42%),linear-gradient(to_bottom,rgba(255,255,255,0.04),transparent_35%,rgba(15,23,42,0.08))] transition-opacity duration-200 group-hover/map:opacity-95"
+        />
+
+        <div className="pointer-events-none absolute inset-x-2.5 top-2.5 z-10 flex items-center justify-between gap-2 sm:inset-x-3 sm:top-3">
+          <span className="rounded-full border border-white/80 bg-white/88 px-2 py-1 text-[8px] font-black uppercase tracking-[0.08em] text-emerald-800 shadow-sm backdrop-blur sm:text-[9px]">
+            {isId ? 'Indonesia' : 'Indonesia'}
           </span>
-          {summary.referenceCount > 0 ? (
-            <span className="rounded-full border border-white/80 bg-white/90 px-2 py-1 text-[8px] font-bold text-slate-600 shadow-sm backdrop-blur sm:text-[9px]">
-              +{summary.referenceCount} {isId ? 'referensi' : 'references'}
+
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-white/80 bg-slate-950/78 px-2 py-1 text-[8px] font-bold text-white shadow-sm backdrop-blur sm:text-[9px]">
+            <span className="relative flex h-1.5 w-1.5 shrink-0">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-75" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
             </span>
-          ) : null}
+            {loading
+              ? isId
+                ? 'Mencari titik…'
+                : 'Finding points…'
+              : isId
+                ? `${summary.businessCount} titik`
+                : `${summary.businessCount} points`}
+          </span>
+        </div>
+
+        <div className="pointer-events-none absolute inset-x-2.5 bottom-2.5 z-10 flex items-center justify-between gap-2 sm:inset-x-3 sm:bottom-3">
+          <span className="max-w-[78%] truncate rounded-full border border-white/85 bg-white/92 px-2.5 py-1.5 text-[8px] font-black text-slate-800 shadow-[0_8px_22px_-14px_rgba(15,23,42,0.55)] backdrop-blur sm:max-w-none sm:text-[9px]">
+            {loading
+              ? isId
+                ? 'Menyiapkan sebaran UMKM…'
+                : 'Preparing business coverage…'
+              : summary.businessCount > 0
+                ? isId
+                  ? 'Ada yang terpetakan · ketuk untuk menjelajah'
+                  : 'Locations are waiting · tap to explore'
+                : isId
+                  ? 'Belum banyak titik · ketuk untuk lihat peta'
+                  : 'Few locations yet · tap to open the map'}
+          </span>
+
+          <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/85 bg-emerald-600 text-white shadow-[0_10px_24px_-12px_rgba(5,150,105,0.9)] transition-transform duration-200 group-hover/map:translate-x-0.5 group-hover/map:scale-105">
+            <ArrowUpRight className="h-3.5 w-3.5" />
+          </span>
         </div>
 
         {error && !loading ? (
