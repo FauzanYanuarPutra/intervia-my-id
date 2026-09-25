@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 import { describe, expect, it } from 'vitest';
 import {
   createHomeCopy,
@@ -37,6 +39,35 @@ function expectValidActionLink(item: LinkLike) {
 }
 
 describe('home launcher data', () => {
+  it('keeps reward balances tied to the real reward service', () => {
+    const home = readFileSync(
+      new URL('./HomeResponsiveMarketplace.tsx', import.meta.url),
+      'utf8',
+    );
+    const balanceRoute = readFileSync(
+      new URL('../../app/api/rewards/balance/route.ts', import.meta.url),
+      'utf8',
+    );
+    const claimRoute = readFileSync(
+      new URL('../../app/api/rewards/daily-login/claim/route.ts', import.meta.url),
+      'utf8',
+    );
+
+    expect(home).toContain('DailyLoginRewardCard');
+    expect(home).not.toContain('buildGameSnapshot');
+    expect(home).not.toContain('GameProgressCard');
+    expect(home).not.toContain('const baseXp =');
+    expect(home).not.toContain('120 XP');
+    expect(home).not.toContain('180 XP');
+
+    expect(balanceRoute).toContain(
+      "process.env.REWARD_MEMORY_FALLBACK === 'true'",
+    );
+    expect(claimRoute).toContain(
+      "process.env.REWARD_MEMORY_FALLBACK === 'true'",
+    );
+  });
+
   it('keeps every home button/link actionable', () => {
     const groups: LinkLike[][] = [
       shortcutItems,
