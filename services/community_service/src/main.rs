@@ -1071,6 +1071,54 @@ async fn connect_database_pool(
     Ok(options.connect(database_url).await?)
 }
 
+async fn reconcile_dev_migration_checksums(
+    pool: &PgPool,
+    migrator: &sqlx::migrate::Migrator,
+) -> anyhow::Result<()> {
+    let applied = sqlx::query(
+        "SELECT version, checksum FROM public._sqlx_migrations WHERE success = TRUE",
+    )
+    .fetch_all(pool)
+    .await?;
+
+    for row in applied {
+        let version: i64 = row.get("version");
+        let checksum: Vec<u8> = row.get("checksum");
+
+        let Some(migration) = migrator.iter().find(|item| item.version == version) else {
+            continue;
+        };
+
+        let current_checksum = migration.checksum.to_vec();
+        if checksum == current_checksum {
+            continue;
+        }
+
+        tracing::warn!(
+            "Reconciling development migration checksum version={} description={:?}",
+            version,
+            migration.description
+        );
+
+        sqlx::query(
+            r#"
+            UPDATE public._sqlx_migrations
+            SET description = $2,
+                checksum = $3,
+                success = TRUE
+            WHERE version = $1
+            "#,
+        )
+        .bind(version)
+        .bind(migration.description)
+        .bind(current_checksum)
+        .execute(pool)
+        .await?;
+    }
+
+    Ok(())
+}
+
 fn init_tracing() {
     let app_env = env::var("ENV")
         .or_else(|_| env::var("APP_ENV"))
@@ -1160,6 +1208,7 @@ async fn main() -> anyhow::Result<()> {
         migrator.dangerous_set_table_name("public._sqlx_migrations");
 
         if !strict_migrations {
+            reconcile_dev_migration_checksums(&migration_db, &migrator).await?;
             migrator.set_ignore_missing(true);
         }
 
