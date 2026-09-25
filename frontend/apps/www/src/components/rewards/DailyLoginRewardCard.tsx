@@ -315,10 +315,9 @@ export function DailyLoginRewardCard({ locale, compact = false }: Props) {
                   : (isId ? `Hari ${nextStreakDay}/7` : `Day ${nextStreakDay}/7`)}
               </p>
               <span className="shrink-0 text-[9px] font-bold text-orange-600 dark:text-orange-300">
-                +{todayCoin} coin
-              </span>
-              <span className="hidden shrink-0 text-[9px] text-zinc-400 sm:inline">
-                +{todayXp} XP
+                {isId
+                  ? `+${todayCoin} koin · +${todayXp} XP`
+                  : `+${todayCoin} coins · +${todayXp} XP`}
               </span>
             </div>
             <p className="truncate text-[8px] text-[color:var(--app-text-soft)]">
@@ -423,7 +422,7 @@ export function DailyLoginRewardCard({ locale, compact = false }: Props) {
         </div>
         <div
           className={cn(
-            'grid grid-cols-3',
+            'grid grid-cols-2 sm:grid-cols-4',
             compact ? 'gap-1.5' : 'flex-1 gap-2 sm:flex sm:flex-none',
           )}
         >
@@ -452,7 +451,7 @@ export function DailyLoginRewardCard({ locale, compact = false }: Props) {
               {coins}
             </p>
             <p className="text-[10px] font-bold uppercase text-amber-700/75">
-              coin
+              {isId ? 'koin' : 'coins'}
             </p>
           </div>
           <div
@@ -462,15 +461,25 @@ export function DailyLoginRewardCard({ locale, compact = false }: Props) {
             )}
           >
             <p className="inline-flex items-center justify-center gap-1 text-sm font-bold text-[color:var(--app-text)]">
-              {voucherCount > 0 ? (
-                <TicketPercent className="h-3.5 w-3.5 text-orange-600" />
-              ) : (
-                <Sparkles className="h-3.5 w-3.5 text-amber-600" />
-              )}
-              {voucherCount > 0 ? voucherCount : xp}
+              <Sparkles className="h-3.5 w-3.5 text-sky-600" />
+              {xp}
             </p>
             <p className="text-[10px] font-bold uppercase text-sky-700/75">
-              {voucherCount > 0 ? 'voucher' : 'XP'}
+              XP
+            </p>
+          </div>
+          <div
+            className={cn(
+              'rounded-2xl border border-violet-100 bg-white/84 px-3 py-2 text-center text-violet-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]',
+              compact ? 'rounded-[14px] px-1.5 py-1.5' : '',
+            )}
+          >
+            <p className="inline-flex items-center justify-center gap-1 text-sm font-bold text-[color:var(--app-text)]">
+              <TicketPercent className="h-3.5 w-3.5 text-violet-600" />
+              {voucherCount}
+            </p>
+            <p className="text-[10px] font-bold uppercase text-violet-700/75">
+              {isId ? 'voucher' : 'vouchers'}
             </p>
           </div>
         </div>
