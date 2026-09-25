@@ -399,7 +399,7 @@ jobs:
           assert www_env['AI_SERVICE_TOKEN'] == ai_env['AI_SERVICE_TOKEN']
           assert 'profiles' not in services['ai_service']
           assert services['ollama']['profiles'] == ['local-ai']
-          assert services['ocr_service']['healthcheck']['test'][-1].endswith('/ready')
+          assert services['ocr_service']['healthcheck']['test'][-1].endswith('/health')
           assert services['liveness_service']['healthcheck']['test'][-1].endswith('/ready')
           liveness_mount = next(item for item in services['liveness_service']['volumes'] if item['target'] == '/models')
           assert liveness_mount['type'] == 'bind'
