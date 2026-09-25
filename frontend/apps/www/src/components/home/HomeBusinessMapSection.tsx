@@ -205,12 +205,6 @@ export function HomeBusinessMapSection({
           </div>
         ) : null}
 
-        {loading ? (
-          <div className="pointer-events-none absolute inset-x-2 bottom-2.5 z-10 flex items-center gap-1.5 rounded-lg border border-white/80 bg-white/88 px-2 py-1.5 text-[8px] font-semibold text-slate-600 shadow-sm backdrop-blur sm:inset-x-3 sm:text-[9px]">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
-            {isId ? 'Memuat titik usaha…' : 'Loading business points…'}
-          </div>
-        ) : null}
       </div>
     </section>
   );
