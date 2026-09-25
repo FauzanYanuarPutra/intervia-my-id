@@ -372,7 +372,6 @@ export default async function NewsArticlePage({ params }: PageProps) {
               title={isId ? 'Berita terkait' : 'Related news'}
               related
             />
-          </section>
             <div className="mt-3 flex justify-end">
               <Link
                 href="/news"
@@ -384,6 +383,7 @@ export default async function NewsArticlePage({ params }: PageProps) {
             </div>
           </section>
         ) : null}
+
       </article>
     </main>
   );

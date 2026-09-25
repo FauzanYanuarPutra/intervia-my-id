@@ -671,10 +671,13 @@ defmodule ChatServiceWeb.RoomChannel do
     reference =
       Map.get(payload, "reply_to") ||
         Map.get(payload, "reference") ||
-        if(Map.get(payload, "reply_to_message_id"), do: %{
-          "message_id" => Map.get(payload, "reply_to_message_id"),
-          "mode" => Map.get(payload, "reply_mode") || "reply"
-        }, else: nil)
+        if(Map.get(payload, "reply_to_message_id"),
+          do: %{
+            "message_id" => Map.get(payload, "reply_to_message_id"),
+            "mode" => Map.get(payload, "reply_mode") || "reply"
+          },
+          else: nil
+        )
 
     {body, ref, message_type, attachments, reference}
   end

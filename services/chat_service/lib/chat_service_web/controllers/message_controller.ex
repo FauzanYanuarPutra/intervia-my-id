@@ -99,10 +99,13 @@ defmodule ChatServiceWeb.MessageController do
     reference =
       params["reply_to"] ||
         params["reference"] ||
-        if(params["reply_to_message_id"], do: %{
-          "message_id" => params["reply_to_message_id"],
-          "mode" => params["reply_mode"] || "reply"
-        }, else: nil)
+        if(params["reply_to_message_id"],
+          do: %{
+            "message_id" => params["reply_to_message_id"],
+            "mode" => params["reply_mode"] || "reply"
+          },
+          else: nil
+        )
 
     # Media support: optional type + attachments
     raw_type = params["type"] || conn.body_params["type"] || "text"

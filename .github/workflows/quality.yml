@@ -102,8 +102,8 @@ jobs:
             '$env:COMPOSE_PROGRESS = "plain"',
             '$env:COMPOSE_STATUS_STDOUT = "false"',
             'function Get-DockerComposeConfigJson',
-            'Building Docker images in adaptive batches (Bake disabled, cache-friendly)',
-            'for ($BatchStart = 0; $BatchStart -lt $BuildTargets.Count; $BatchStart += $AdaptiveLimit)',
+            'Write-Host "Adaptive build parallelism: $AdaptiveLimit (host CPU=$HostCpu, RAM=$HostRamGb GB, requested=$ParallelLimit)"',
+            'if ($BuildTargets.Count -gt 12)',
             'Invoke-DockerEngineRecovery -Reason "retry build service $ServiceName"',
             '& docker @ComposeArgs @UpArgs'
           )

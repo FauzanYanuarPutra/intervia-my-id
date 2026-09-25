@@ -509,8 +509,7 @@ defmodule ChatService.MessagePersistence do
       message_id when is_binary(message_id) and message_id != "" ->
         %{
           message_id: message_id,
-          mode:
-            if(row["reply_mode"] == "quote", do: "quote", else: "reply"),
+          mode: if(row["reply_mode"] == "quote", do: "quote", else: "reply"),
           sender_id: uuid_to_string(row["reply_to_sender_id"]),
           sender_name: row["reply_to_sender_name"],
           content: row["reply_to_content"] || "",
