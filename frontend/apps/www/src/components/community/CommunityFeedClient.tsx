@@ -3110,7 +3110,7 @@ export function CommunityPostCard({
         </button>
       </div>
 
-      {/* ================= FACEBOOK-LIKE COMMENTS PREVIEW ================= */}}
+      {/* ================= FACEBOOK-LIKE COMMENTS PREVIEW ================= */}
 
       {commentCount > 0 ? (
         <section className="border-t border-[color:var(--app-border)] px-3 pb-2.5 pt-2.5 sm:px-4">
@@ -6421,9 +6421,9 @@ function RightRail({
           </p>
           <div className="mt-3 grid grid-cols-3 gap-2">
             {[
-              [{isId ? 'Diskusi' : 'Threads'}, overview?.stats.totalThreads],
-              [{isId ? 'Jawaban' : 'Replies'}, overview?.stats.totalPosts],
-              [{isId ? 'Member' : 'Members'}, overview?.stats.totalUsers],
+              [isId ? 'Diskusi' : 'Threads', overview?.stats.totalThreads],
+              [isId ? 'Jawaban' : 'Replies', overview?.stats.totalPosts],
+              [isId ? 'Member' : 'Members', overview?.stats.totalUsers],
             ].map(([label, value]) => (
               <div key={String(label)} className="min-w-0 rounded-[13px] bg-slate-50 px-2 py-2 text-center">
                 <p className="text-sm font-bold text-[color:var(--app-text)]">{compactNumber(Number(value || 0))}</p>
