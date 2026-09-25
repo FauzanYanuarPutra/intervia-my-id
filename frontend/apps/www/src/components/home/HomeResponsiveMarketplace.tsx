@@ -127,7 +127,6 @@ import {
 } from '@/lib/discovery/lajukanCategories';
 import { cn } from '@/lib/utils';
 import { trackLajukanEvent } from '@/lib/analytics/lajukanEvents';
-import { GroupAvatarMark } from '@/components/community/CommunityFeedClient';
 import type { GlobalSearchItem } from '@/lib/search/globalSearch';
 import useEmblaCarousel from 'embla-carousel-react';
 
@@ -3648,11 +3647,21 @@ function HomeCommunityGroupsSection({
             </div>
 
             <div className="relative flex flex-1 flex-col px-2.5 pb-2.5">
-              <GroupAvatarMark
-                group={group}
-                className="-mt-7 h-14 w-14 rounded-[17px] border-[3px] border-white text-lg shadow-[0_16px_26px_-22px_rgba(15,23,42,0.45)]"
-                sizes="56px"
-              />
+              <div className="-mt-7 flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-[17px] border-[3px] border-white bg-[color:var(--app-accent-soft)] text-lg font-bold text-[color:var(--app-accent)] shadow-[0_16px_26px_-22px_rgba(15,23,42,0.45)]">
+                {group.avatarUrl ? (
+                  <Image
+                    src={group.avatarUrl}
+                    alt=""
+                    width={56}
+                    height={56}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  group.name.trim().slice(0, 1).toUpperCase() || (
+                    <Users className="h-6 w-6" />
+                  )
+                )}
+              </div>
               <div className="mt-1.5 min-w-0">
                 <h3 className="truncate text-xs font-bold text-[color:var(--app-text)]">
                   {group.name}
