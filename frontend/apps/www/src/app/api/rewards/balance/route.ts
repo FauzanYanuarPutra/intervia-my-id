@@ -11,22 +11,8 @@ const MARKETPLACE_URL =
   process.env.NEXT_PUBLIC_MARKETPLACE_URL ||
   'http://localhost:8081';
 
-function resolveRuntimeEnv(): string {
-  return (
-    process.env.APP_ENV ||
-    process.env.ENV ||
-    process.env.NEXT_PUBLIC_APP_ENV ||
-    process.env.NODE_ENV ||
-    'development'
-  ).toLowerCase();
-}
-
-const RUNTIME_ENV = resolveRuntimeEnv();
 const ENABLE_MEMORY_FALLBACK =
-  process.env.REWARD_MEMORY_FALLBACK === 'true' ||
-  (process.env.REWARD_MEMORY_FALLBACK !== 'false' &&
-    RUNTIME_ENV !== 'production' &&
-    RUNTIME_ENV !== 'staging');
+  process.env.REWARD_MEMORY_FALLBACK === 'true';
 
 function shouldForwardStatus(status: number): boolean {
   return status >= 400 && status < 500 && status !== 404;
