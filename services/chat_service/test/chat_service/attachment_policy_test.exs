@@ -61,6 +61,7 @@ defmodule ChatService.AttachmentPolicyTest do
       end)
 
     assert {:ok, ^attachments} = AttachmentPolicy.normalize("image", attachments)
+
     assert {:error, :invalid_attachments} =
              AttachmentPolicy.normalize(
                "image",
