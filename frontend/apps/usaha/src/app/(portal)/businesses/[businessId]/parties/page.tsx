@@ -5,6 +5,9 @@ import {
   listCommercialPayables,
   listCommercialParties,
   listCommercialReceivables,
+  type CommercialPayable,
+  type CommercialParty,
+  type CommercialReceivable,
 } from '@/lib/business-commercial-core-server';
 import { hasPermission } from '@/lib/portal-logic';
 import { resolvePortalBusinessPageState } from '@/lib/portal-server';
@@ -32,9 +35,9 @@ export default async function BusinessPartiesPage({ params }: PageProps) {
     hasPermission(business, 'manageInventory') ||
     hasPermission(business, 'manageInfo');
 
-  let parties = [];
-  let receivables = [];
-  let payables = [];
+  let parties: CommercialParty[] = [];
+  let receivables: CommercialReceivable[] = [];
+  let payables: CommercialPayable[] = [];
 
   try {
     [parties, receivables, payables] = await Promise.all([
