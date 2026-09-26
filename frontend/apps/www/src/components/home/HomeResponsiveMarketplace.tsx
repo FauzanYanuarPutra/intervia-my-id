@@ -1273,11 +1273,27 @@ function communityPostToFeedItem(post: CommunityPost): CommunityFeedItem {
         }
       : null,
     mediaItems: normalizeCommunityMediaItems(
-      post.mediaItems,
+      post.mediaItems.flatMap(media => {
+        const src = typeof media.src === 'string' ? media.src.trim() : '';
+        if (!src) return [];
+        return [{
+          src,
+          type: media.type === 'video' ? 'video' : 'image',
+          alt: media.alt || post.title,
+        }];
+      }),
       post.title,
     ),
     imageUrls: normalizeCommunityMediaItems(
-      post.mediaItems,
+      post.mediaItems.flatMap(media => {
+        const src = typeof media.src === 'string' ? media.src.trim() : '';
+        if (!src) return [];
+        return [{
+          src,
+          type: media.type === 'video' ? 'video' : 'image',
+          alt: media.alt || post.title,
+        }];
+      }),
       post.title,
     ).map(item => item.src),
     stats: {
@@ -2538,6 +2554,7 @@ function RecommendationCard({
     item.distanceLabel || item.location;
 
   const fallbackTitle = isId ? 'Gambar produk' : 'Product image';
+  const isDemand = item.side === 'demand';
 
   return (
     <a
@@ -2547,45 +2564,21 @@ function RecommendationCard({
           ? 'home-demand-listing-card'
           : 'home-recommendation-card'
       }
-      className="
-        group
-        flex h-full min-w-0 w-full flex-col
-        overflow-hidden
-        rounded-2xl
-        border border-zinc-200/80
-        bg-white
-        text-left
-        shadow-[0_1px_2px_rgba(0,0,0,0.025)]
-        transition-all
-        duration-200
-        ease-out
-
-        hover:-translate-y-0.5
-        hover:border-zinc-300
-        hover:shadow-[0_10px_28px_-18px_rgba(0,0,0,0.22)]
-
-        focus-visible:outline-none
-        focus-visible:ring-2
-        focus-visible:ring-emerald-500/70
-        focus-visible:ring-offset-2
-
-        dark:border-zinc-800
-        dark:bg-zinc-950
-        dark:hover:border-zinc-700
-        dark:hover:shadow-[0_10px_28px_-18px_rgba(0,0,0,0.55)]
-      "
+      className={cn(
+        'group flex h-full min-w-0 w-full flex-col overflow-hidden rounded-2xl text-left shadow-[0_1px_2px_rgba(0,0,0,0.025)] transition-all duration-200 ease-out hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
+        isDemand
+          ? 'border border-blue-200/90 bg-blue-50/45 hover:border-blue-300 hover:shadow-[0_10px_28px_-18px_rgba(37,99,235,0.24)] focus-visible:ring-blue-500/70 dark:border-blue-900/70 dark:bg-blue-950/25 dark:hover:border-blue-800 dark:hover:shadow-[0_10px_28px_-18px_rgba(37,99,235,0.28)]'
+          : 'border border-zinc-200/80 bg-white hover:border-zinc-300 hover:shadow-[0_10px_28px_-18px_rgba(0,0,0,0.22)] focus-visible:ring-emerald-500/70 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700 dark:hover:shadow-[0_10px_28px_-18px_rgba(0,0,0,0.55)]',
+      )}
     >
       {/* IMAGE */}
       <div
-        className="
-          relative
-          aspect-square
-          w-full
-          shrink-0
-          overflow-hidden
-          bg-zinc-100
-          dark:bg-zinc-900
-        "
+        className={cn(
+          'relative aspect-square w-full shrink-0 overflow-hidden',
+          isDemand
+            ? 'bg-blue-100 dark:bg-blue-950/60'
+            : 'bg-zinc-100 dark:bg-zinc-900',
+        )}
       >
         {image ? (
           <img
@@ -2626,14 +2619,43 @@ function RecommendationCard({
           data-image-fallback
           className={cn(
             image ? 'hidden' : 'flex',
-            'absolute inset-0 flex-col items-center justify-center gap-2 bg-[linear-gradient(135deg,#ecfdf5_0%,#f8fafc_55%,#fff7ed_100%)] px-4 text-center dark:bg-[linear-gradient(135deg,#052e24_0%,#0f172a_60%,#1c1917_100%)]',
+            cn(
+              'absolute inset-0 flex-col items-center justify-center gap-2 px-4 text-center',
+              isDemand
+                ? 'bg-[linear-gradient(135deg,#eff6ff_0%,#dbeafe_55%,#f0f9ff_100%)] dark:bg-[linear-gradient(135deg,#172554_0%,#0c4a6e_55%,#082f49_100%)]'
+                : 'bg-[linear-gradient(135deg,#ecfdf5_0%,#f8fafc_55%,#fff7ed_100%)] dark:bg-[linear-gradient(135deg,#052e24_0%,#0f172a_60%,#1c1917_100%)]',
+            ),
           )}
         >
-          <span className="grid h-10 w-10 place-items-center rounded-2xl bg-white/80 text-emerald-700 shadow-sm ring-1 ring-emerald-100 dark:bg-slate-950/60 dark:text-emerald-300 dark:ring-white/10">
-            <Store className="h-5 w-5" aria-hidden="true" />
+          <span
+            className={cn(
+              'grid h-10 w-10 place-items-center rounded-2xl shadow-sm ring-1',
+              isDemand
+                ? 'bg-blue-600/10 text-blue-700 ring-blue-200 dark:bg-blue-400/10 dark:text-blue-200 dark:ring-blue-800'
+                : 'bg-white/80 text-emerald-700 ring-emerald-100 dark:bg-slate-950/60 dark:text-emerald-300 dark:ring-white/10',
+            )}
+          >
+            {isDemand ? (
+              <Search className="h-5 w-5" aria-hidden="true" />
+            ) : (
+              <Store className="h-5 w-5" aria-hidden="true" />
+            )}
           </span>
-          <span className="text-[10px] font-bold text-emerald-800/70 sm:text-xs dark:text-emerald-200/70">
-            {isId ? 'Listing Lajukan' : 'Lajukan listing'}
+          <span
+            className={cn(
+              'text-[10px] font-bold sm:text-xs',
+              isDemand
+                ? 'text-blue-800/80 dark:text-blue-200/80'
+                : 'text-emerald-800/70 dark:text-emerald-200/70',
+            )}
+          >
+            {isDemand
+              ? isId
+                ? 'Kebutuhan usaha'
+                : 'Business request'
+              : isId
+                ? 'Listing Lajukan'
+                : 'Lajukan listing'}
           </span>
         </div>
 
@@ -2655,27 +2677,12 @@ function RecommendationCard({
         {item.typeLabel ? (
           <span
             title={item.typeLabel}
-            className="
-              absolute
-              left-2
-              top-2
-              max-w-[72%]
-              truncate
-              rounded-full
-              border
-              border-white/20
-              bg-black/55
-              px-2.5
-              py-1.5
-              text-[8px]
-              font-bold
-              leading-none
-              text-white
-              shadow-sm
-              backdrop-blur-md
-
-              sm:text-[9px]
-            "
+            className={cn(
+              'absolute left-2 top-2 max-w-[72%] truncate rounded-full border px-2.5 py-1.5 text-[8px] font-bold leading-none shadow-sm backdrop-blur-md sm:text-[9px]',
+              isDemand
+                ? 'border-blue-100/70 bg-blue-700/90 text-white dark:border-blue-700/70 dark:bg-blue-950/85'
+                : 'border-white/20 bg-black/55 text-white',
+            )}
           >
             {item.typeLabel}
           </span>
@@ -2769,21 +2776,12 @@ function RecommendationCard({
         {price ? (
           <p
             title={price}
-            className="
-              mt-2
-              truncate
-              text-[14px]
-              font-black
-              leading-tight
-              tracking-[-0.025em]
-              text-emerald-700
-
-              min-[360px]:text-[15px]
-
-              sm:text-base
-
-              dark:text-emerald-400
-            "
+            className={cn(
+              'mt-2 truncate text-[14px] font-black leading-tight tracking-[-0.025em] min-[360px]:text-[15px] sm:text-base',
+              isDemand
+                ? 'text-blue-700 dark:text-blue-300'
+                : 'text-emerald-700 dark:text-emerald-400',
+            )}
           >
             {price}
           </p>
@@ -2841,25 +2839,12 @@ function RecommendationCard({
           {item.side ? (
             <span
               title={getListingSideVerbLabel(item.side, isId ? 'id' : 'en')}
-              className="
-                max-w-[42%]
-                shrink-0
-                truncate
-                rounded-full
-                bg-zinc-100
-                px-2
-                py-1
-                text-[8px]
-                font-bold
-                leading-none
-                text-zinc-600
-
-                sm:max-w-[45%]
-                sm:text-[9px]
-
-                dark:bg-zinc-900
-                dark:text-zinc-300
-              "
+              className={cn(
+                'max-w-[42%] shrink-0 truncate rounded-full px-2 py-1 text-[8px] font-bold leading-none sm:max-w-[45%] sm:text-[9px]',
+                isDemand
+                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-950/70 dark:text-blue-200'
+                  : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-900 dark:text-zinc-300',
+              )}
             >
               {getListingSideVerbLabel(item.side, isId ? 'id' : 'en')}
             </span>
