@@ -483,6 +483,32 @@ fn is_public_news_source_ipv6(ip: Ipv6Addr) -> bool {
     true
 }
 
+fn is_allowed_news_cover_url(raw: &str) -> bool {
+    let raw = raw.trim();
+    if raw.len() > 4_096 {
+        return false;
+    }
+
+    for prefix in [
+        "/api/content/media/laju-chat/content/",
+        "/uploads/content/",
+    ] {
+        if let Some(rest) = raw.strip_prefix(prefix) {
+            if rest.is_empty()
+                || rest.contains('/')
+                || rest.contains('\\')
+                || rest.contains("..")
+                || !rest.chars().all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '.' | '_' | '-' | '%' ))
+            {
+                return false;
+            }
+            return true;
+        }
+    }
+
+    is_allowed_news_source_url(raw)
+}
+
 fn is_allowed_news_source_url(raw: &str) -> bool {
     if raw.len() > 2_048 {
         return false;
@@ -1838,7 +1864,7 @@ async fn update_news_submission(
             let value = value.trim().to_string();
             if value.is_empty() {
                 None
-            } else if !is_allowed_news_source_url(&value) {
+            } else if !is_allowed_news_cover_url(&value) {
                 return response_error(StatusCode::BAD_REQUEST, "unsupported news cover image URL");
             } else {
                 Some(value)
