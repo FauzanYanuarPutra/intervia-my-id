@@ -490,7 +490,53 @@ fn json_value_as_bool(value: Option<&Value>) -> bool {
     }
 }
 
-async fn verify_google_id_token(
+async fn is_google_avatar_url(value: &str) -> bool {
+    let clean = value.trim().to_ascii_lowercase();
+    clean.contains("googleusercontent.com/")
+        || clean.contains("google.com/accounts/")
+        || clean.contains("googleusercontent.com")
+}
+
+fn is_default_profile_avatar_value(value: &str) -> bool {
+    let clean = value.trim().to_ascii_lowercase();
+    clean.is_empty()
+        || clean == DEFAULT_PROFILE_AVATAR
+        || clean.ends_with("/default-avatar.svg")
+        || clean.contains("default-avatar.svg")
+}
+
+fn persisted_custom_avatar_url(
+    picture: Option<&str>,
+    metadata: Option<&Value>,
+) -> Option<String> {
+    let metadata_object = metadata.and_then(Value::as_object);
+    let media_object = metadata_object
+        .and_then(|object| object.get("media"))
+        .and_then(Value::as_object);
+
+    let candidates = [
+        metadata_object
+            .and_then(|object| object.get("avatar_url"))
+            .and_then(Value::as_str),
+        media_object
+            .and_then(|object| object.get("avatar_url"))
+            .and_then(Value::as_str),
+        picture,
+    ];
+
+    candidates.iter().copied().find_map(|candidate| {
+        let value = candidate?.trim();
+        if value.is_empty()
+            || is_default_profile_avatar_value(value)
+            || is_google_avatar_url(value)
+        {
+            return None;
+        }
+        Some(value.to_string())
+    })
+}
+
+fn verify_google_id_token(
     google_client_id: &str,
     id_token: &str,
 ) -> Result<VerifiedGoogleIdentity, &'static str> {
@@ -862,6 +908,66 @@ fn resolve_access_token_algorithm(
 fn access_token_algorithm() -> Result<Algorithm, anyhow::Error> {
     let configured = env::var("JWT_ACCESS_ALG").unwrap_or_else(|_| "HS256".to_string());
     resolve_access_token_algorithm(&configured, environment_requires_asymmetric_access_tokens())
+}
+
+#[cfg(test)]
+mod profile_avatar_persistence_tests {
+    use super::*;
+
+    #[test]
+    fn keeps_uploaded_avatar_over_google_picture() {
+        let metadata = json!({
+            "avatar_url": "/api/content/media/laju-chat/content/custom-avatar.jpg",
+            "google": {
+                "picture": "https://lh3.googleusercontent.com/google-avatar"
+            }
+        });
+        assert_eq!(
+            persisted_custom_avatar_url(
+                Some("https://lh3.googleusercontent.com/legacy-avatar"),
+                Some(&metadata),
+            )
+            .as_deref(),
+            Some("/api/content/media/laju-chat/content/custom-avatar.jpg")
+        );
+    }
+
+    #[test]
+    fn ignores_google_and_default_avatars() {
+        let google = json!({
+            "avatar_url": "https://lh3.googleusercontent.com/google-avatar"
+        });
+        assert_eq!(
+            persisted_custom_avatar_url(
+                Some("/default-avatar.svg"),
+                Some(&google),
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn preserves_generated_lajukan_avatar_data_urls() {
+        let generated = "data:image/svg+xml,%3Csvg%3Eavatar%3C/svg%3E";
+        let metadata = json!({ "avatar_url": generated });
+        assert_eq!(
+            persisted_custom_avatar_url(None, Some(&metadata)).as_deref(),
+            Some(generated)
+        );
+    }
+
+    #[test]
+    fn uses_legacy_profile_picture_when_metadata_has_no_avatar() {
+        let metadata = json!({});
+        assert_eq!(
+            persisted_custom_avatar_url(
+                Some("/api/content/media/laju-chat/content/legacy-avatar.jpg"),
+                Some(&metadata),
+            )
+            .as_deref(),
+            Some("/api/content/media/laju-chat/content/legacy-avatar.jpg")
+        );
+    }
 }
 
 #[cfg(test)]
@@ -2308,9 +2414,44 @@ pub async fn oauth_google(
             .into_response();
     }
 
+    let existing_profile = match sqlx::query(
+        r#"
+        SELECT picture, metadata
+        FROM core.user_profiles
+        WHERE user_id = $1
+        LIMIT 1
+        "#,
+    )
+    .bind(user_id)
+    .fetch_optional(&state.db)
+    .await
+    {
+        Ok(profile) => profile,
+        Err(error) => {
+            tracing::error!("oauth google existing profile lookup failed: {:?}", error);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error":"database error"})),
+            )
+                .into_response();
+        }
+    };
+
+    let persisted_avatar_url = existing_profile.as_ref().and_then(|row| {
+        let picture = row.get::<Option<String>, _>("picture");
+        let metadata = row.get::<Option<Value>, _>("metadata");
+        persisted_custom_avatar_url(picture.as_deref(), metadata.as_ref())
+    });
+
+    // Google supplies the provider avatar, but it must never overwrite a
+    // user-selected Lajukan avatar that is already persisted locally.
+    let effective_avatar_url = persisted_avatar_url
+        .or_else(|| avatar_url.clone())
+        .or_else(|| Some(DEFAULT_PROFILE_AVATAR.to_string()));
+
     let generated_username = generate_google_username(&state, &email, full_name.as_deref()).await;
     let profile_metadata = json!({
-        "avatar_url": avatar_url.clone(),
+        "avatar_url": effective_avatar_url.clone(),
         "auth_provider": "google",
         "google": {
             "provider_user_id": provider_user_id.clone(),
@@ -2368,7 +2509,7 @@ pub async fn oauth_google(
     .bind(user_id)
     .bind(full_name.clone())
     .bind(generated_username.clone())
-    .bind(avatar_url.clone())
+    .bind(effective_avatar_url.clone())
     .bind(profile_metadata)
     .execute(&state.db)
     .await
