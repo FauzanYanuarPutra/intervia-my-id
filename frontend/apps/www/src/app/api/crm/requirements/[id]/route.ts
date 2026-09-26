@@ -1,0 +1,48 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/serverAuth';
+
+const MARKETPLACE_URL =
+  process.env.INTERNAL_MARKETPLACE_URL ||
+  process.env.MARKETPLACE_URL ||
+  'http://localhost:8081';
+
+type Params = { params: Promise<{ id: string }> };
+
+export async function GET(_req: NextRequest, { params }: Params) {
+  try {
+    const auth = await requireAuth(_req);
+    if (!auth.ok) return auth.res;
+    const { id } = await params;
+    const res = await fetch(`${MARKETPLACE_URL}/v1/crm/requirements/${id}`, {
+      headers: { Authorization: `Bearer ${auth.ctx.token}` },
+      cache: 'no-store',
+    });
+    const data = await res.json().catch(() => ({}));
+    return NextResponse.json(data, { status: res.status });
+  } catch (error) {
+    console.error('[CRM_REQUIREMENT_GET_ERROR]', error);
+    return NextResponse.json({ error: 'Service unavailable' }, { status: 503 });
+  }
+}
+
+export async function POST(req: NextRequest, { params }: Params) {
+  try {
+    const auth = await requireAuth(req);
+    if (!auth.ok) return auth.res;
+    const { id } = await params;
+    const body = await req.json().catch(() => ({}));
+    const res = await fetch(`${MARKETPLACE_URL}/v1/crm/requirements/${id}/match`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${auth.ctx.token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => ({}));
+    return NextResponse.json(data, { status: res.status });
+  } catch (error) {
+    console.error('[CRM_REQUIREMENT_MATCH_ERROR]', error);
+    return NextResponse.json({ error: 'Service unavailable' }, { status: 503 });
+  }
+}
