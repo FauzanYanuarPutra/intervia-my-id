@@ -663,20 +663,40 @@ export default function ManageHubClient({ isId }: ManageHubClientProps) {
           </p>
         </div>
 
-        <div className="overflow-hidden rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)]">
-          <div className="grid min-w-0 sm:grid-cols-2">
-            {manageItems.map((item, index) => (
-              <ManageRow
-                key={item.id}
-                item={item}
-                locale={locale}
-                index={index}
-              />
-            ))}
+        <div className="space-y-4">
+          <div className="overflow-hidden rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)]">
+            <div className="border-b border-[color:var(--app-border)] px-3.5 py-3 sm:px-4">
+              <h3 className="text-xs font-black uppercase tracking-[0.1em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                {isId ? 'Operasional usaha' : 'Business operations'}
+              </h3>
+              <p className="mt-0.5 text-[10px] leading-4 text-[color:var(--app-text-soft)] sm:text-[11px]">
+                {isId ? 'Chat, listing, transaksi, dan usaha.' : 'Chat, listings, transactions, and business.'}
+              </p>
+            </div>
+            <div className="grid min-w-0 sm:grid-cols-2">
+              {manageItems.filter(item => item.id !== "content").map((item, index) => (
+                <ManageRow key={item.id} item={item} locale={locale} index={index} />
+              ))}
+            </div>
+          </div>
+
+          <div className="overflow-hidden rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)]">
+            <div className="border-b border-[color:var(--app-border)] px-3.5 py-3 sm:px-4">
+              <h3 className="text-xs font-black uppercase tracking-[0.1em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                {isId ? 'Konten publik' : 'Public content'}
+              </h3>
+              <p className="mt-0.5 text-[10px] leading-4 text-[color:var(--app-text-soft)] sm:text-[11px]">
+                {isId ? 'News, Reels, dan Community dikelola terpisah dari Listing.' : 'News, Reels, and Community are managed separately from Listings.'}
+              </p>
+            </div>
+            <div className="grid min-w-0 sm:grid-cols-2">
+              {manageItems.filter(item => item.id === "content").map((item, index) => (
+                <ManageRow key={item.id} item={item} locale={locale} index={index} />
+              ))}
+            </div>
           </div>
         </div>
       </section>
-
       <section className="min-w-0 border-t border-[color:var(--app-border)] pt-3 sm:pt-4">
         <h2 className="text-xs font-black text-[color:var(--app-text-soft)]">
           {copy.tools}
