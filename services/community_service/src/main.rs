@@ -1376,6 +1376,7 @@ async fn main() -> anyhow::Result<()> {
             post(set_community_user_block),
         )
         .route("/v1/community/feed", get(get_community_feed))
+        .route("/v1/community/groups/feed", get(get_community_groups_feed))
         .route("/v1/community/search", get(search_community))
         .route("/v1/community/groups", get(list_groups).post(create_group))
         .route("/v1/community/groups/{group_id}", get(get_group))
@@ -7448,6 +7449,15 @@ fn map_reel_feed_item(row: ReelRow) -> ReelFeedItem {
     }
 }
 
+async fn get_community_groups_feed(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(mut query): Query<FeedQuery>,
+) -> ApiResult<Json<CommunityFeedResponse>> {
+    query.tab = Some("community".to_string());
+    get_community_feed(State(state), headers, Query(query)).await
+}
+
 async fn get_community_feed(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -7565,7 +7575,17 @@ async fn get_community_feed(
                 lower(c.name) LIKE '%' || lower($3) || '%' OR
                 lower(coalesce(root.content, '')) LIKE '%' || lower($3) || '%'
             )
-            AND ($4::text IS NULL OR c.slug ILIKE '%community%')
+            AND (
+                (
+                    $4::text IS NULL
+                    AND t.group_id IS NULL
+                )
+                OR (
+                    $4::text = 'community'
+                    AND t.group_id IS NOT NULL
+                    AND c.slug ILIKE '%community%'
+                )
+            )
 
             AND ($8::text IS NULL OR t.group_id::text = $8 OR g.id::text = $8 OR g.slug = $8)
 
