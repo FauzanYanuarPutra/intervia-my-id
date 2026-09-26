@@ -43,7 +43,7 @@ mod rate_limit;
 mod runtime_metrics;
 mod schema_contract;
 
-use auth::{is_moderator, optional_actor, request_ip, require_actor, AuthActor};
+use auth::{is_moderator, is_platform_group_admin, optional_actor, request_ip, require_actor, AuthActor};
 use health::{health, ready, root, service_metrics};
 use media::{
     content_type_for_filename, extension_for, first_feed_media_url, has_valid_media_signature,
@@ -2032,12 +2032,44 @@ async fn ensure_forum_user(db: &PgPool, actor: &AuthActor) -> ApiResult<ForumUse
     })
 }
 
+async fn ensure_platform_group_admin_memberships(
+    db: &PgPool,
+    forum_user_id: &str,
+    actor: &AuthActor,
+) -> ApiResult<()> {
+    if !is_platform_group_admin(actor) {
+        return Ok(());
+    }
+
+    sqlx::query(
+        r#"
+        INSERT INTO lajukan_group_members (
+            group_id, user_id, role, status, joined_at, updated_at
+        )
+        SELECT g.id, $1, 'owner', 'active', now(), now()
+        FROM lajukan_groups g
+        WHERE g.status = 'active'
+        ON CONFLICT (group_id, user_id) DO UPDATE
+        SET role = 'owner',
+            status = 'active',
+            updated_at = now()
+        "#,
+    )
+    .bind(forum_user_id)
+    .execute(db)
+    .await
+    .map_err(internal_error)?;
+
+    Ok(())
+}
+
 async fn sync_current_profile(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> ApiResult<Json<ForumUser>> {
     let actor = require_actor(&headers, &state)?;
     let forum_user = ensure_forum_user(&state.db, &actor).await?;
+    ensure_platform_group_admin_memberships(&state.db, &forum_user.id, &actor).await?;
     Ok(Json(forum_user))
 }
 
