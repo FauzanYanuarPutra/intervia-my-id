@@ -152,8 +152,12 @@ export function ExploreListingCard({
           fallbackLabel={locale === 'id' ? 'Belum ada foto' : 'No photo yet'}
           className="aspect-[4/3] w-full sm:aspect-[16/10]"
         />
-        <span className="absolute left-2 top-2 inline-flex min-h-7 items-center rounded-full border border-white/70 bg-white/90 px-2.5 text-[10px] font-black text-emerald-800 shadow-sm backdrop-blur">
-          {sideLabel}
+        <span
+          className="absolute left-2 top-2 inline-flex min-h-6 max-w-[72%] items-center gap-1.5 rounded-lg bg-slate-950/72 px-2 py-1 text-[9px] font-extrabold leading-none text-white shadow-[0_6px_18px_-10px_rgba(15,23,42,0.65)] backdrop-blur-md"
+          title={sideLabel}
+        >
+          <ListingIcon className="h-3.5 w-3.5 shrink-0 text-white/85" aria-hidden="true" />
+          <span className="truncate">{sideLabel}</span>
         </span>
         {isOwner && !isPublic ? (
           <span className="absolute right-2 top-2 inline-flex min-h-7 items-center gap-1 rounded-full border border-amber-200 bg-amber-50/95 px-2.5 text-[10px] font-black text-amber-900 shadow-sm backdrop-blur">
