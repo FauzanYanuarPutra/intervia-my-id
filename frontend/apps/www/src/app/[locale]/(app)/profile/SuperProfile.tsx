@@ -2181,8 +2181,8 @@ export default function SuperProfile() {
             </div>
 
             <div className="relative px-3 pb-3.5 sm:px-5 sm:pb-4">
-              <div className="-mt-10 flex min-w-0 items-end gap-3 sm:-mt-11 sm:gap-4">
-                <div className="relative h-[72px] w-[72px] shrink-0 rounded-full bg-[color:var(--app-surface-muted)] shadow-lg ring-[4px] ring-[color:var(--app-surface-strong)] sm:h-[88px] sm:w-[88px]">
+              <div className="-mt-10 flex min-w-0 flex-col items-center gap-2 sm:-mt-11 sm:flex-row sm:items-end sm:gap-4">
+                <div className="relative h-[76px] w-[76px] shrink-0 rounded-full bg-[color:var(--app-surface-muted)] shadow-lg ring-[4px] ring-[color:var(--app-surface-strong)] sm:h-[88px] sm:w-[88px] sm:ring-[5px]">
                   <div className="absolute inset-0 overflow-hidden rounded-full">
                     <NextImage
                       src={effectiveAvatarUrl}
@@ -2215,9 +2215,9 @@ export default function SuperProfile() {
                   />
                 </div>
 
-                <div className="min-w-0 flex-1 pb-0.5 sm:pb-1.5">
-                  <div className="flex min-w-0 items-center gap-1.5">
-                    <h1 className="min-w-0 truncate text-xl font-black leading-tight tracking-[-0.025em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-2xl">
+                <div className="min-w-0 flex-1 pb-0 text-center sm:pb-1.5 sm:text-left">
+                  <div className="flex min-w-0 items-center justify-center gap-1.5 sm:justify-start">
+                    <h1 className="min-w-0 max-w-full truncate text-xl font-black leading-tight tracking-[-0.025em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-2xl">
                       {displayName}
                     </h1>
                     {verified ? (
@@ -2243,7 +2243,7 @@ export default function SuperProfile() {
                 </div>
               </div>
 
-              <div className="mt-2 flex min-w-0 flex-wrap items-center gap-1.5 text-[11px] font-semibold text-[color:var(--app-text-soft)] sm:text-xs">
+              <div className="mt-2 flex min-w-0 flex-wrap items-center justify-center gap-1.5 text-[11px] font-semibold text-[color:var(--app-text-soft)] sm:justify-start sm:text-xs">
                 {location ? (
                   <span className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1">
                     <MapPin className="h-3.5 w-3.5 shrink-0" />
