@@ -4025,7 +4025,55 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
       // because the discussion feed itself is temporarily unavailable.
       setCommunityGroups(groups);
 
-      if (!response.ok) {
+      let feedPayload = payload;
+      const primaryDiscussionItems = (payload?.items || []).filter(
+        item => item.kind !== 'reel',
+      );
+
+      // "For you" is personalized. When it is empty or unavailable, Home should
+      // still surface public business discussions that already exist.
+      const shouldFallbackToPublic =
+        activeTab === 'for-you' &&
+        (!response.ok || primaryDiscussionItems.length === 0);
+
+      if (shouldFallbackToPublic) {
+        try {
+          const fallbackParams = new URLSearchParams({
+            tab: 'community',
+            limit: String(HOME_COMMUNITY_PAGE_SIZE),
+            cursor: '0',
+            sort: 'new-posts',
+          });
+          const fallbackResponse = await fetch(
+            `/api/community/feed?${fallbackParams.toString()}`,
+            {
+              cache: 'no-store',
+              credentials: 'include',
+              signal: controller.signal,
+            },
+          );
+          const fallbackPayload = (await fallbackResponse
+            .json()
+            .catch(() => null)) as CommunityFeedResponse | null;
+
+          if (
+            fallbackResponse.ok &&
+            (fallbackPayload?.items || []).some(item => item.kind !== 'reel')
+          ) {
+            feedPayload = fallbackPayload;
+          }
+        } catch {
+          // Preserve the primary response. The final empty/error state below
+          // remains the last resort when both feeds are unavailable.
+        }
+      }
+
+      const mapped = (feedPayload?.items || [])
+        .filter(item => item.kind !== 'reel')
+        .map(item => mapCommunityItemToPost(item, isId, activeTab))
+        .slice(0, 3);
+
+      if (!response.ok && feedPayload === payload) {
         setCommunityPosts([]);
         throw new Error(
           isId
@@ -4033,11 +4081,6 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
             : 'Community discussions could not be loaded. Please try again.',
         );
       }
-
-      const mapped = (payload?.items || [])
-        .filter(item => item.kind !== 'reel')
-        .map(item => mapCommunityItemToPost(item, isId, activeTab))
-        .slice(0, 3);
 
       setCommunityPosts(mapped);
       setCommunityError(null);
