@@ -12193,12 +12193,13 @@ async fn update_content(
     // A published listing must never remain live while its owner is changing
     // substantive content. Autosave may keep the live state temporarily;
     // the explicit save moves it back into the moderation queue.
-    let owner_revision_pending = existing.content_status.eq_ignore_ascii_case("active")
-        && !autosave
-        && content_status.eq_ignore_ascii_case("active");
-    if owner_revision_pending {
+    let was_live_before_edit = existing.content_status.eq_ignore_ascii_case("active")
+        && !autosave;
+    if was_live_before_edit && content_status.eq_ignore_ascii_case("active") {
         content_status = "draft".to_string();
     }
+    let owner_revision_pending =
+        was_live_before_edit && content_status.eq_ignore_ascii_case("draft");
 
     let pricing_mode = normalize_pricing_mode(payload.pricing_mode)
         .unwrap_or_else(|| existing.pricing_mode.clone());
