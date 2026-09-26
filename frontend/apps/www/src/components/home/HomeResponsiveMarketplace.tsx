@@ -314,8 +314,6 @@ type PublicReferenceApiResponse = {
   };
 };
 
-type CommunityTab = 'for-you' | 'community';
-
 type CommunityPostType =
   | 'question'
   | 'poll'
@@ -328,7 +326,6 @@ type CommunityPost = {
   threadId: string;
   postId?: string;
 
-  tab: CommunityTab;
   href?: string;
   kind: 'discussion' | 'reel';
   community: string;
@@ -1720,36 +1717,6 @@ export function getQuickCategories(isId: boolean): QuickCategory[] {
     },
   ];
 }
-
-type CommunityTabItem = {
-  id: CommunityTab;
-  label: string;
-  emptyLabel: string;
-  icon: LucideIcon;
-};
-
-
-function getCommunityTabs(isId: boolean): CommunityTabItem[] {
-  return [
-    {
-      id: 'for-you',
-      label: isId ? 'Untukmu' : 'For you',
-      emptyLabel: isId
-        ? 'Belum ada diskusi yang direkomendasikan.'
-        : 'No recommended discussions yet.',
-      icon: MessageCircle,
-    },
-    {
-      id: 'community',
-      label: isId ? 'Grup' : 'Groups',
-      emptyLabel: isId
-        ? 'Belum ada diskusi grup untuk ditampilkan.'
-        : 'No group discussions to show yet.',
-      icon: Users,
-    },
-  ];
-}
-
 
 function DesktopSidebar({
   pathname,
@@ -3625,7 +3592,6 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
   const { totalUnread } = useChatInbox();
   const [query, setQuery] = useState('');
   const [summary, setSummary] = useState<LajukanSummary | null>(null);
-  const [activeTab, setActiveTab] = useState<CommunityTab>('for-you');
   const [recommendations, setRecommendations] = useState<RecommendationItem[]>(
     [],
   );
