@@ -253,16 +253,16 @@ export function UmkmDiscoveryClient(props: UmkmDiscoveryClientProps) {
         title={
           activeLane === 'all'
             ? isId
-              ? 'Usaha & referensi publik'
-              : 'Businesses & public references'
+              ? 'Peta UMKM'
+              : 'Business map'
             : isId
-              ? `${activeCategoryLabel} & referensi publik`
-              : `${activeCategoryLabel} & public references`
+              ? `Peta ${activeCategoryLabel}`
+              : `${activeCategoryLabel} map`
         }
         description={
           isId
-            ? 'Toko terdaftar dan titik referensi dari sumber terbuka ditampilkan terpisah; referensi publik tidak memiliki klaim stok, harga, atau verifikasi.'
-            : 'Registered stores and open-source reference points are kept distinct; public references do not imply stock, prices, or verification.'
+            ? 'Temukan usaha di peta, lalu buka detail atau rute.'
+            : 'Find businesses on the map, then open details or directions.'
         }
         selectedSlug={initialStoreSlug}
         selectedStoreIdInitial={initialStoreId}
