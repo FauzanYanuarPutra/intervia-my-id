@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
+import { createPortal } from 'react-dom';
 import Image from 'next/image';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useDialog } from '@/components/system/feedback/DialogProvider';
@@ -900,32 +901,240 @@ function ChatMediaLightbox({
 }) {
   useEffect(() => {
     if (!viewer) return;
+
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-      if (event.key === 'ArrowLeft' && viewer.attachments.length > 1) onIndexChange((viewer.index - 1 + viewer.attachments.length) % viewer.attachments.length);
-      if (event.key === 'ArrowRight' && viewer.attachments.length > 1) onIndexChange((viewer.index + 1) % viewer.attachments.length);
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+
+      if (event.key === 'ArrowLeft' && viewer.attachments.length > 1) {
+        event.preventDefault();
+        onIndexChange(
+          (viewer.index - 1 + viewer.attachments.length) %
+            viewer.attachments.length,
+        );
+      }
+
+      if (event.key === 'ArrowRight' && viewer.attachments.length > 1) {
+        event.preventDefault();
+        onIndexChange((viewer.index + 1) % viewer.attachments.length);
+      }
     };
+
+    const html = document.documentElement;
+    const body = document.body;
+    const previousHtmlOverflow = html.style.overflow;
+    const previousBodyOverflow = body.style.overflow;
+
+    html.style.overflow = 'hidden';
+    body.style.overflow = 'hidden';
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+
+    return () => {
+      html.style.overflow = previousHtmlOverflow;
+      body.style.overflow = previousBodyOverflow;
+      window.removeEventListener('keydown', onKey);
+    };
   }, [onClose, onIndexChange, viewer]);
-  if (!viewer) return null;
-  const url = normalizeAttachmentUrl(viewer.attachments[viewer.index] || '');
+
+  if (!viewer || typeof document === 'undefined') return null;
+
+  const url = normalizeAttachmentUrl(
+    viewer.attachments[viewer.index] || '',
+  );
   if (!url) return null;
+
   const kind = resolveAttachmentKind(viewer.messageType, url);
-  return (
-    <div className="fixed inset-0 z-[12000] flex h-[100dvh] w-screen flex-col bg-black/96 text-white" role="dialog" aria-modal="true" onClick={onClose}>
-      <div className="flex shrink-0 items-center justify-between gap-3 px-3 py-2.5 sm:px-5">
-        <div className="min-w-0"><p className="truncate text-xs font-bold">{viewer.title || (locale === 'id' ? 'Media' : 'Media')}</p>{viewer.attachments.length > 1 ? <p className="text-[10px] font-semibold text-white/55">{viewer.index + 1}/{viewer.attachments.length}</p> : null}</div>
-        <button type="button" onClick={onClose} className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/10"><X className="h-5 w-5" /></button>
+
+  const lightbox = (
+    <div
+      className="fixed inset-0 isolate z-[2147483000] flex h-[100dvh] w-screen min-h-0 flex-col overflow-hidden overscroll-none bg-black text-white"
+      role="dialog"
+      aria-modal="true"
+      aria-label={locale === 'id' ? 'Pratinjau media' : 'Media preview'}
+      onClick={onClose}
+    >
+      <div
+        className="absolute inset-0 z-0 bg-black/95 backdrop-blur-[2px]"
+        aria-hidden="true"
+      />
+
+      <div className="relative z-10 flex min-h-0 flex-1 flex-col">
+        <div
+          className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 bg-black/65 px-3 py-2.5 backdrop-blur-md sm:px-5"
+          style={{
+            paddingTop:
+              'max(0.625rem, env(safe-area-inset-top, 0px))',
+          }}
+          onClick={event => event.stopPropagation()}
+        >
+          <div className="min-w-0">
+            <p className="truncate text-xs font-bold">
+              {viewer.title || (locale === 'id' ? 'Media' : 'Media')}
+            </p>
+            {viewer.attachments.length > 1 ? (
+              <p className="text-[10px] font-semibold text-white/55">
+                {viewer.index + 1}/{viewer.attachments.length}
+              </p>
+            ) : null}
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 text-white ring-1 ring-white/10 transition hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#25d366]"
+            aria-label={locale === 'id' ? 'Tutup preview' : 'Close preview'}
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div
+          className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden px-3 py-3 sm:px-8"
+          onClick={event => event.stopPropagation()}
+        >
+          {kind === 'image' ? (
+            <div className="flex h-full w-full items-center justify-center">
+              <img
+                src={url}
+                alt=""
+                className="max-h-full max-w-full rounded-lg object-contain shadow-2xl"
+              />
+            </div>
+          ) : kind === 'video' ? (
+            <div className="flex h-full w-full items-center justify-center">
+              <video
+                src={url}
+                controls
+                autoPlay
+                playsInline
+                className="max-h-full max-w-full rounded-xl bg-black object-contain shadow-2xl"
+              />
+            </div>
+          ) : kind === 'audio' ? (
+            <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-[#111b21]/95 p-6 shadow-2xl backdrop-blur">
+              <div className="mb-4 flex items-center justify-center">
+                <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-[#25d366]/15 text-[#25d366]">
+                  <Mic className="h-6 w-6" />
+                </span>
+              </div>
+              <audio src={url} controls className="w-full" />
+            </div>
+          ) : (
+            <div className="flex w-full max-w-lg flex-col items-center gap-4 rounded-2xl border border-white/10 bg-[#111b21]/95 p-6 text-center shadow-2xl backdrop-blur">
+              <FileText className="h-12 w-12 text-white/75" />
+              <p className="text-sm font-bold">
+                {locale === 'id' ? 'Dokumen' : 'Document'}
+              </p>
+              <a
+                href={url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#25d366] px-4 text-sm font-bold text-[#0b141a]"
+              >
+                <Download className="h-4 w-4" />
+                {locale === 'id' ? 'Buka dokumen' : 'Open document'}
+              </a>
+            </div>
+          )}
+
+          {viewer.attachments.length > 1 ? (
+            <>
+              <button
+                type="button"
+                onClick={() =>
+                  onIndexChange(
+                    (viewer.index - 1 + viewer.attachments.length) %
+                      viewer.attachments.length,
+                  )
+                }
+                className="absolute left-2 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/65 text-white shadow-lg ring-1 ring-white/10 transition hover:bg-black/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#25d366] sm:left-5"
+                aria-label={locale === 'id' ? 'Media sebelumnya' : 'Previous media'}
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  onIndexChange(
+                    (viewer.index + 1) % viewer.attachments.length,
+                  )
+                }
+                className="absolute right-2 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/65 text-white shadow-lg ring-1 ring-white/10 transition hover:bg-black/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#25d366] sm:right-5"
+                aria-label={locale === 'id' ? 'Media berikutnya' : 'Next media'}
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+            </>
+          ) : null}
+        </div>
+
+        {viewer.attachments.length > 1 ? (
+          <div
+            className="flex shrink-0 gap-1.5 overflow-x-auto border-t border-white/10 bg-black/75 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-md sm:px-5"
+            onClick={event => event.stopPropagation()}
+          >
+            {viewer.attachments.slice(0, 20).map((rawUrl, index) => {
+              const thumb = normalizeAttachmentUrl(rawUrl);
+              const thumbKind = resolveAttachmentKind(
+                viewer.messageType,
+                thumb,
+              );
+
+              return (
+                <button
+                  key={rawUrl + index}
+                  type="button"
+                  onClick={() => onIndexChange(index)}
+                  className={
+                    'h-14 w-14 shrink-0 overflow-hidden rounded-lg border bg-white/5 ' +
+                    (index === viewer.index
+                      ? 'border-[#25d366] ring-2 ring-[#25d366]/35'
+                      : 'border-white/10 opacity-70 hover:opacity-100')
+                  }
+                  aria-label={
+                    locale === 'id'
+                      ? `Buka media ${index + 1}`
+                      : `Open media ${index + 1}`
+                  }
+                >
+                  {thumbKind === 'image' ? (
+                    <img
+                      src={thumb}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  ) : thumbKind === 'video' ? (
+                    <video
+                      src={thumb}
+                      muted
+                      playsInline
+                      className="h-full w-full object-cover"
+                    />
+                  ) : thumbKind === 'audio' ? (
+                    <div className="flex h-full w-full items-center justify-center bg-white/10">
+                      <Mic className="h-4 w-4 text-[#25d366]" />
+                    </div>
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center bg-white/10">
+                      <FileText className="h-4 w-4 text-white/70" />
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
       </div>
-      <div className="relative flex min-h-0 flex-1 items-center justify-center px-3 pb-3 sm:px-8" onClick={event => event.stopPropagation()}>
-        {kind === 'image' ? <img src={url} alt="" className="max-h-full max-w-full object-contain" /> : kind === 'video' ? <video src={url} controls autoPlay playsInline className="max-h-full max-w-full rounded-lg bg-black object-contain" /> : kind === 'audio' ? <div className="flex w-full max-w-lg flex-col items-center gap-4 rounded-2xl bg-white/8 p-6"><Mic className="h-10 w-10 text-[#25d366]" /><audio src={url} controls className="w-full" /></div> : <div className="flex max-w-lg flex-col items-center gap-4 rounded-2xl bg-white/8 p-6 text-center"><FileText className="h-12 w-12 text-white/75" /><p className="text-sm font-bold">{locale === 'id' ? 'Dokumen' : 'Document'}</p><a href={url} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#25d366] px-4 text-sm font-bold text-[#0b141a]"><Download className="h-4 w-4" />{locale === 'id' ? 'Buka dokumen' : 'Open document'}</a></div>}
-        {viewer.attachments.length > 1 ? <><button type="button" onClick={() => onIndexChange((viewer.index - 1 + viewer.attachments.length) % viewer.attachments.length)} className="absolute left-2 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 sm:left-5"><ChevronLeft className="h-5 w-5" /></button><button type="button" onClick={() => onIndexChange((viewer.index + 1) % viewer.attachments.length)} className="absolute right-2 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 sm:right-5"><ChevronRight className="h-5 w-5" /></button></> : null}
-      </div>
-      {viewer.attachments.length > 1 ? <div className="flex shrink-0 gap-1.5 overflow-x-auto px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-1 sm:px-5" onClick={event => event.stopPropagation()}>{viewer.attachments.slice(0, 20).map((rawUrl, index) => { const thumb = normalizeAttachmentUrl(rawUrl); const thumbKind = resolveAttachmentKind(viewer.messageType, thumb); return <button key={rawUrl + index} type="button" onClick={() => onIndexChange(index)} className={'h-14 w-14 shrink-0 overflow-hidden rounded-lg border ' + (index === viewer.index ? 'border-[#25d366] ring-2 ring-[#25d366]/35' : 'border-white/10 opacity-70')}>{thumbKind === 'image' ? <img src={thumb} alt="" className="h-full w-full object-cover" /> : thumbKind === 'video' ? <video src={thumb} muted playsInline className="h-full w-full object-cover" /> : thumbKind === 'audio' ? <div className="flex h-full w-full items-center justify-center bg-white/10"><Mic className="h-4 w-4 text-[#25d366]" /></div> : <div className="flex h-full w-full items-center justify-center bg-white/10"><FileText className="h-4 w-4 text-white/70" /></div>}</button>; })}</div> : null}
     </div>
   );
+
+  return createPortal(lightbox, document.body);
 }
+
 function extractChatUploadPayload(payload: unknown): {
   url: string;
   type?: AttachmentKind;
