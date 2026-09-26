@@ -4380,29 +4380,16 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
         <HomeCommunityGroupsSection
           isId={isId}
           groups={communityGroups}
-          isAuthenticated={isAuthenticated}
-          authFetch={authFetch}
           onChanged={() => void loadCommunityPostsPage()}
         />
         <CommunityPanel
           isId={isId}
-          isAuthenticated={isAuthenticated}
           activeTab={activeTab}
           onTabChange={setActiveTab}
-          avatarSrc={avatarSrc}
           posts={communityPosts}
           loading={communityLoading}
           loadError={communityError}
           onRetry={() => void loadCommunityPostsPage()}
-          onToggleLike={toggleCommunityPostLike}
-          onSubmitComment={createCommunityComment}
-          onRequireAuth={() => {
-            const currentPath = pathname || '/home';
-
-            router.push(
-              `/login?callbackUrl=${encodeURIComponent(currentPath)}`,
-            );
-          }}
         />
         <FeedColumnFooter isId={isId} />
       </main>
@@ -4463,29 +4450,16 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
                 <HomeCommunityGroupsSection
                   isId={isId}
                   groups={communityGroups}
-                  isAuthenticated={isAuthenticated}
-                  authFetch={authFetch}
                   onChanged={() => void loadCommunityPostsPage()}
                 />
                 <CommunityPanel
                   isId={isId}
-                  isAuthenticated={isAuthenticated}
                   activeTab={activeTab}
                   onTabChange={setActiveTab}
-                  avatarSrc={avatarSrc}
                   posts={communityPosts}
                   loading={communityLoading}
                   loadError={communityError}
                   onRetry={() => void loadCommunityPostsPage()}
-                  onToggleLike={toggleCommunityPostLike}
-                  onSubmitComment={createCommunityComment}
-                  onRequireAuth={() => {
-                    const currentPath = pathname || '/home';
-
-                    router.push(
-                      `/login?callbackUrl=${encodeURIComponent(currentPath)}`,
-                    );
-                  }}
                 />
               </div>
               <FeedColumnFooter isId={isId} />
