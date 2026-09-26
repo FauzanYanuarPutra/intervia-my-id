@@ -69,11 +69,12 @@ describe('GET /api/my-listings', () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       Response.json({
         items: [
-          { id: 'owned', owner_id: OWNER_ID, content_status: 'archived' },
+          { id: 'owned', owner_id: OWNER_ID, content_status: 'archived', content_type: 'service' },
           {
             id: 'unexpected-global-item',
             owner_id: '018a802e-fd95-7d3e-b32a-b9176135f6c7',
             content_status: 'archived',
+            content_type: 'service',
           },
         ],
       }),
