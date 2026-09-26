@@ -39,6 +39,24 @@ describe('chat attachment policy', () => {
     });
   });
 
+  it('accepts up to 100 media attachments but rejects 101', () => {
+    const urls = Array.from({ length: 100 }, (_, index) =>
+      `/api/chat/media/laju-chat/chat/dm_a_b/asset-${index + 1}.webp`,
+    );
+
+    expect(normalizeChatAttachments('image', urls)).toEqual({
+      ok: true,
+      attachments: urls,
+    });
+
+    expect(
+      normalizeChatAttachments('image', [
+        ...urls,
+        '/api/chat/media/laju-chat/chat/dm_a_b/asset-101.webp',
+      ]),
+    ).toEqual({ ok: false, error: 'invalid_attachments' });
+  });
+
   it('accepts encoded canonical room ids in protected media URLs', () => {
     const url =
       '/api/chat/media/laju-chat/chat/dm%3A11111111-1111-4111-8111-111111111111%3A22222222-2222-4222-8222-222222222222/file.webp';
