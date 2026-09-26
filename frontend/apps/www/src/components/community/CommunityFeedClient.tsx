@@ -540,7 +540,6 @@ export function CommunityComposer({
   const [saving, setSaving] = useState(false);
   const [draggingMedia, setDraggingMedia] = useState(false);
   const composerSurfaceRef = useRef<HTMLFormElement>(null);
-  const titleInputRef = useRef<HTMLInputElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
   const closeComposerRef = useRef<() => void>(() => undefined);
 
@@ -671,8 +670,7 @@ export function CommunityComposer({
     rememberReturnFocus();
 
     const focusFrame = window.requestAnimationFrame(() => {
-      const initialTarget =
-        titleInputRef.current || composerSurfaceRef.current;
+      const initialTarget = composerSurfaceRef.current;
       initialTarget?.focus({ preventScroll: true });
     });
 
@@ -1294,291 +1292,163 @@ export function CommunityComposer({
                 sm:p-3.5
               "
             >
-              {/* ================= MEDIA ================= */}
+              {/* ================= AUTHOR ================= */}
 
-              <label
-                onDragOver={event => {
-                  event.preventDefault();
-
-                  setDraggingMedia(true);
-                }}
-                onDragLeave={() =>
-                  setDraggingMedia(false)
-                }
-                onDrop={handleMediaDrop}
-                className={cn(
-                  `
-                    group relative block
-                    cursor-pointer
-                    overflow-hidden
-                    rounded-[14px]
-                    border border-dashed
-                    p-3
-                    text-center
-                    transition-colors
-                  `,
-                  draggingMedia
-                    ? `
-                        border-[color:var(--app-accent)]
-                        bg-[color:var(--app-accent-soft)]
-                      `
-                    : `
-                        border-[color:var(--app-border)]
-                        bg-[color:var(--app-surface-muted)]
-
-                        hover:border-[color:var(--app-accent-border)]
-                        hover:bg-white
-                      `,
-                )}
-              >
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime"
-                  multiple
-                  className="sr-only"
-                  onChange={event => {
-                    void handleMediaUpload(
-                      event.target.files,
-                    );
-
-                    event.currentTarget.value =
-                      '';
-                  }}
+              <div className="flex items-center gap-2.5">
+                <Image
+                  alt=""
+                  width={40}
+                  height={40}
+                  className="h-10 w-10 shrink-0 rounded-full object-cover"
+                  src={userAvatar}
                 />
-
-                {/* EMPTY MEDIA */}
-                {mediaUrls.length === 0 ? (
-                  <div className="flex items-center justify-center gap-2.5 py-1">
-                    <span
-                      className="
-                        grid h-9 w-9
-                        shrink-0
-                        place-items-center
-                        rounded-[11px]
-                        bg-white
-                        text-[color:var(--app-accent)]
-                        ring-1
-                        ring-[color:var(--app-border)]
-                      "
-                    >
-                      {uploading ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Upload className="h-4 w-4" />
-                      )}
-                    </span>
-
-                    <span className="min-w-0 text-left">
-                      <span className="block text-[11px] font-bold text-[color:var(--app-text)]">
-                        {uploading
-                          ? isId
-                            ? 'Mengupload media...'
-                            : 'Uploading media...'
-                          : isId
-                            ? 'Tambah foto atau video'
-                            : 'Add photo or video'}
-                      </span>
-
-                      <span className="mt-0.5 block text-[9px] font-medium text-[color:var(--app-text-soft)]">
-                        {isId
-                          ? 'Klik atau tarik file ke sini · maksimal 6'
-                          : 'Click or drop files here · up to 6'}
-                      </span>
-                    </span>
+                <div className="min-w-0">
+                  <p className="truncate text-[12px] font-bold text-[color:var(--app-text)]">
+                    {fallbackAuthor.name}
+                  </p>
+                  <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[10px] font-semibold text-[color:var(--app-text-soft)]">
+                    {lockedGroup ? (
+                      <>
+                        <span className="max-w-[220px] truncate">{lockedGroup.name}</span>
+                        <span aria-hidden="true">·</span>
+                      </>
+                    ) : null}
+                    <span>{modeLabel}</span>
                   </div>
-                ) : (
-                  /* MEDIA PREVIEW */
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[10px] font-bold text-[color:var(--app-text)]">
-                        {isId
-                          ? `${mediaUrls.length} media`
-                          : `${mediaUrls.length} media`}
-                      </span>
-
-                      <span className="text-[9px] font-medium text-[color:var(--app-accent)]">
-                        {uploading
-                          ? isId
-                            ? 'Mengupload...'
-                            : 'Uploading...'
-                          : isId
-                            ? 'Tambah lagi'
-                            : 'Add more'}
-                      </span>
-                    </div>
-
-                    <span
-                      className="
-                        grid grid-cols-3 gap-1.5
-                        sm:grid-cols-4
-                      "
-                    >
-                      {mediaUrls.map(url => {
-                        const resolvedUrl =
-                          resolveCommunityMediaSrc(
-                            url,
-                          );
-
-                        return (
-                          <span
-                            key={url}
-                            className="
-                              relative aspect-square
-                              overflow-hidden
-                              rounded-[10px]
-                              bg-white
-                              ring-1
-                              ring-[color:var(--app-border)]
-                            "
-                          >
-                            {isVideoMedia(
-                              url,
-                            ) &&
-                            resolvedUrl ? (
-                              <CommunityVideoFrame
-                                src={
-                                  resolvedUrl
-                                }
-                                alt="Video"
-                                isId={isId}
-                                variant="thumb"
-                                className="h-full w-full"
-                              />
-                            ) : (
-                              <CommunityImageFrame
-                                src={url}
-                                alt="Media"
-                                className="h-full w-full"
-                              />
-                            )}
-
-                            <button
-                              type="button"
-                              onClick={event => {
-                                event.preventDefault();
-                                event.stopPropagation();
-
-                                setMediaUrls(
-                                  current =>
-                                    current.filter(
-                                      item =>
-                                        item !==
-                                        url,
-                                    ),
-                                );
-                              }}
-                              className="
-                                absolute right-1 top-1
-                                grid h-5 w-5
-                                place-items-center
-                                rounded-full
-                                bg-black/65
-                                text-white
-                              "
-                              aria-label={
-                                isId
-                                  ? 'Hapus media'
-                                  : 'Remove media'
-                              }
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </span>
-                        );
-                      })}
-                    </span>
-                  </div>
-                )}
-              </label>
-
-              {/* ================= TITLE ================= */}
-
-              <div
-                className={cn(
-                  'grid gap-2',
-                  lockedGroup &&
-                    'sm:grid-cols-[minmax(0,1fr)_180px]',
-                )}
-              >
-                <input
-                  ref={titleInputRef}
-                  data-testid="community-compose-title-input"
-                  value={title}
-                  onChange={event =>
-                    setTitle(
-                      event.target.value,
-                    )
-                  }
-                  maxLength={110}
-                  placeholder={
-                    mode === 'question'
-                      ? isId
-                        ? 'Apa yang ingin kamu tanyakan?'
-                        : 'What do you want to ask?'
-                      : isId
-                        ? 'Judul singkat dan jelas'
-                        : 'Short, clear title'
-                  }
-                  className="
-                    min-h-10
-                    min-w-0
-                    rounded-[11px]
-                    border border-[color:var(--app-border)]
-                    bg-[color:var(--app-surface-muted)]
-                    px-3
-                    text-[12px]
-                    text-[color:var(--app-text)]
-                    outline-none
-
-                    placeholder:text-[color:var(--app-text-soft)]
-
-                    focus:border-[color:var(--app-accent-border)]
-                    focus:bg-white
-                  "
-                />
-
-                {lockedGroup ? (
-                  <div
-                    className="
-                      flex min-h-10
-                      min-w-0
-                      items-center
-                      rounded-[11px]
-                      border border-[color:var(--app-border)]
-                      bg-[color:var(--app-surface-muted)]
-                      px-3
-                      text-[11px] font-bold
-                      text-[color:var(--app-text)]
-                    "
-                  >
-                    <span className="truncate">
-                      {lockedGroup.name}
-                    </span>
-                  </div>
-                ) : null}
+                </div>
               </div>
 
-              <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-                <label className="min-w-0">
-                  <span className="sr-only">{isId ? 'Topik posting' : 'Post topic'}</span>
-                  <select
-                    value={topicTag}
-                    onChange={event => setTopicTag(event.target.value)}
-                    className="min-h-10 w-full rounded-[11px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-[11px] font-semibold text-[color:var(--app-text)] outline-none focus:border-[color:var(--app-accent-border)] focus:bg-white"
+              {/* ================= BODY ================= */}
+
+              <textarea
+                value={body}
+                onChange={event => setBody(event.target.value)}
+                rows={6}
+                maxLength={10000}
+                autoFocus
+                placeholder={
+                  mode === 'question'
+                    ? isId
+                      ? 'Apa yang ingin kamu tanyakan?'
+                      : 'What do you want to ask?'
+                    : mode === 'poll'
+                      ? isId
+                        ? 'Tulis pertanyaan polling...'
+                        : 'Write your poll question...'
+                      : mode === 'photo'
+                        ? isId
+                          ? 'Ceritakan tentang foto atau video ini...'
+                          : 'Tell people about this photo or video...'
+                        : isId
+                          ? 'Tulis sesuatu untuk dibagikan ke komunitas...'
+                          : 'Write something to share with the community...'
+                }
+                className="
+                  w-full resize-none border-0 bg-transparent px-0 py-1
+                  text-[15px] leading-6 text-[color:var(--app-text)]
+                  outline-none
+                  placeholder:text-[color:var(--app-text-soft)]
+                "
+              />
+
+              {/* ================= MEDIA ================= */}
+
+              {mediaUrls.length > 0 ? (
+                <div className="rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-2.5">
+                  <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4">
+                    {mediaUrls.map(url => {
+                      const resolvedUrl = resolveCommunityMediaSrc(url);
+
+                      return (
+                        <div
+                          key={url}
+                          className="relative aspect-square overflow-hidden rounded-[12px] bg-white ring-1 ring-[color:var(--app-border)]"
+                        >
+                          {isVideoMedia(url) && resolvedUrl ? (
+                            <CommunityVideoFrame
+                              src={resolvedUrl}
+                              alt="Video"
+                              isId={isId}
+                              variant="thumb"
+                              className="h-full w-full"
+                            />
+                          ) : (
+                            <CommunityImageFrame
+                              src={url}
+                              alt="Media"
+                              className="h-full w-full"
+                            />
+                          )}
+                          <button
+                            type="button"
+                            onClick={event => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              setMediaUrls(current =>
+                                current.filter(item => item !== url),
+                              );
+                            }}
+                            className="absolute right-1 top-1 grid h-7 w-7 place-items-center rounded-full bg-black/65 text-white"
+                            aria-label={isId ? 'Hapus media' : 'Remove media'}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-2.5">
+                <p className="px-1 text-[11px] font-bold text-[color:var(--app-text)]">
+                  {isId ? 'Tambahkan ke postingan' : 'Add to your post'}
+                </p>
+
+                <div className="mt-2 grid grid-cols-3 gap-1.5">
+                  <label className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-[12px] bg-white px-2 text-[10px] font-bold text-[color:var(--app-text)] ring-1 ring-[color:var(--app-border)] transition hover:bg-slate-50">
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime"
+                      multiple
+                      className="sr-only"
+                      onChange={event => {
+                        void handleMediaUpload(event.target.files);
+                        event.currentTarget.value = '';
+                      }}
+                    />
+                    {uploading ? (
+                      <Loader2 className="h-4 w-4 animate-spin text-[color:var(--app-accent)]" />
+                    ) : (
+                      <ImageIcon className="h-4 w-4 text-emerald-600" />
+                    )}
+                    <span>{isId ? 'Foto/video' : 'Photo/video'}</span>
+                  </label>
+
+                  <button
+                    type="button"
+                    onClick={() => setMode('poll')}
+                    className={cn(
+                      'inline-flex min-h-11 items-center justify-center gap-2 rounded-[12px] bg-white px-2 text-[10px] font-bold text-[color:var(--app-text)] ring-1 ring-[color:var(--app-border)] transition hover:bg-slate-50',
+                      mode === 'poll' && 'ring-2 ring-emerald-300',
+                    )}
                   >
-                    <option value="">{isId ? 'Topik tambahan (opsional)' : 'Additional topic (optional)'}</option>
-                    {(overview?.trendingTags || []).slice(0, 8).map(tag => (
-                      <option key={tag.id} value={tag.slug}>
-                        #{tag.slug || tag.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <span className="text-[9px] font-medium leading-4 text-[color:var(--app-text-soft)] sm:max-w-[190px]">
-                  {isId
-                    ? 'Topik membantu orang menemukan diskusi yang relevan.'
-                    : 'Topics help people discover relevant discussions.'}
-                </span>
+                    <BarChart3 className="h-4 w-4 text-amber-600" />
+                    <span>{isId ? 'Polling' : 'Poll'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setMode('feeling')}
+                    className={cn(
+                      'inline-flex min-h-11 items-center justify-center gap-2 rounded-[12px] bg-white px-2 text-[10px] font-bold text-[color:var(--app-text)] ring-1 ring-[color:var(--app-border)] transition hover:bg-slate-50',
+                      mode === 'feeling' && 'ring-2 ring-emerald-300',
+                    )}
+                  >
+                    <Sparkles className="h-4 w-4 text-violet-600" />
+                    <span>{isId ? 'Perasaan' : 'Feeling'}</span>
+                  </button>
+                </div>
               </div>
 
               {/* ================= FEELING ================= */}
@@ -2207,6 +2077,7 @@ export function CommunityPostCard({
   const [commentDraft, setCommentDraft] = useState('');
   const [commentSaving, setCommentSaving] = useState(false);
   const [replyTarget, setReplyTarget] = useState<ForumPostDetail | null>(null);
+  const [bodyExpanded, setBodyExpanded] = useState(false);
 
   const loginHref = buildLoginHref(pathname, searchParams.toString());
 
@@ -2297,6 +2168,10 @@ export function CommunityPostCard({
   useEffect(() => {
     setCommentCount(item.stats.comments);
   }, [item.stats.comments]);
+
+  useEffect(() => {
+    setBodyExpanded(false);
+  }, [item.id, item.body]);
 
   useEffect(() => {
     if (item.kind !== 'discussion' || !item.threadId) return;
@@ -2993,21 +2868,45 @@ export function CommunityPostCard({
 
         {/* ================= POST BODY ================= */}
 
-        <button
-          type="button"
-          onClick={openDetail}
-          className="block w-full text-left"
-        >
-          <h2 className="mt-3 line-clamp-2 text-[0.98rem] font-bold leading-5 text-[color:var(--app-text)]">
+        <div className="mt-3">
+          <button
+            type="button"
+            onClick={openDetail}
+            className="block text-left text-[0.98rem] font-bold leading-5 tracking-[-0.01em] text-[color:var(--app-text)] hover:text-[color:var(--app-accent)]"
+          >
             {item.title}
-          </h2>
+          </button>
 
           {displayBody ? (
-            <p className="mt-1.5 line-clamp-2 text-sm leading-6 text-[color:var(--app-text)]">
-              {displayBody}
-            </p>
+            <div className="mt-1.5">
+              <p
+                className={cn(
+                  'whitespace-pre-wrap text-sm leading-6 text-[color:var(--app-text)]',
+                  !bodyExpanded && 'line-clamp-3',
+                )}
+              >
+                {displayBody}
+              </p>
+
+              {displayBody.length > 240 ? (
+                <button
+                  type="button"
+                  onClick={() => setBodyExpanded(current => !current)}
+                  className="mt-1 inline-flex min-h-8 items-center rounded-full px-1 text-[11px] font-bold text-[color:var(--app-text-soft)] transition hover:text-[color:var(--app-text)]"
+                  aria-expanded={bodyExpanded}
+                >
+                  {bodyExpanded
+                    ? isId
+                      ? 'Sembunyikan'
+                      : 'See less'
+                    : isId
+                      ? 'Lihat selengkapnya'
+                      : 'See more'}
+                </button>
+              ) : null}
+            </div>
           ) : null}
-        </button>
+        </div>
 
         {/* TAGS */}
 
