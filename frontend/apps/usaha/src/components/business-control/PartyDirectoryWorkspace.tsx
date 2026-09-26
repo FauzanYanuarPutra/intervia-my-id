@@ -317,8 +317,8 @@ export function PartyDirectoryWorkspace({
     <div className="space-y-4">
       {loadError ? (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          <p className="font-black">Data pelanggan & mitra sementara tidak tersedia</p>
-          <p className="mt-0.5 text-xs leading-5">Coba muat ulang. Direktori tidak akan dibuat sebagai data palsu saat layanan Commercial Core sedang bermasalah.</p>
+          <p className="font-black">Sebagian data pelanggan & mitra belum tersedia</p>
+          <p className="mt-0.5 text-xs leading-5">Coba muat ulang. Lajukan tidak menebak saldo atau membuat data palsu saat Commercial Core sedang bermasalah.</p>
         </div>
       ) : null}
 
