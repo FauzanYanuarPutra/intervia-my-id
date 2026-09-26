@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { OperationsPriorityPanel } from "./OperationsPriorityPanel";
 import BusinessModerationWorkspace from "./BusinessModerationWorkspace";
 import { PipelineWorkspace } from "./PipelineWorkspace";
+import { MatchWorkspace } from "./MatchWorkspace";
 import { ContactWorkspace } from "./ContactWorkspace";
 import { ConversationWorkspace } from "./ConversationWorkspace";
 import { SupportRiskWorkspace } from "./SupportRiskWorkspace";
@@ -512,6 +513,8 @@ function relevantDataSources(page: PageId): string[] {
       return ["leads", "activities", "tickets", "orders", "trustProfiles", "listings", "users", "businesses"];
     case "pipeline":
       return ["leads"];
+    case "matching":
+      return [];
     case "users":
       return ["users", "trustProfiles", "orders", "tickets", "leads"];
     case "businesses":
@@ -1125,6 +1128,7 @@ export default function CrmCommandCenter() {
 
               {activePage === "dashboard" ? <OperationsOverview data={filteredData} onOpen={page => navigatePage(page)} /> : null}
               {activePage === "pipeline" ? <PipelineWorkspace leads={filteredData.leads} /> : null}
+              {activePage === "matching" ? <MatchWorkspace /> : null}
               {activePage === "users" ? (
                 <ContactWorkspace users={filteredData.users} listings={filteredData.listings} orders={data.orders} tickets={data.tickets} trustProfiles={data.trustProfiles} onTrustAction={handleUserTrustAction} />
               ) : null}
