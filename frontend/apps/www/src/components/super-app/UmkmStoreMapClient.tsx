@@ -57,6 +57,7 @@ type UmkmStoreMapClientProps = {
   focusMode?: 'stores' | 'viewer' | 'route' | 'selected' | 'indonesia';
   focusNonce?: number;
   controls?: boolean;
+  showPopups?: boolean;
   focusOffset?: UmkmMapFocusOffset;
   onBoundsChange?: (bounds: UmkmMapBounds) => void;
 };
@@ -1154,6 +1155,7 @@ function StoreMarkersLayer({
   onMarkerFocus?: (target: Omit<MarkerFocusTarget, 'nonce'>) => void;
   isId: boolean;
   interactive: boolean;
+  showPopups: boolean;
 }) {
   const map = useMap();
   const [zoom, setZoom] = useState(() => map.getZoom());
@@ -1258,13 +1260,15 @@ function StoreMarkersLayer({
               <Tooltip direction="top" offset={[0, -8]}>
                 {store.name}
               </Tooltip>
-              <Popup className="umkm-store-map-popup" maxWidth={270}>
-                <StorePopupSummary
-                  store={store}
-                  ui={ui}
-                  isId={isId}
-                />
-              </Popup>
+              {showPopups ? (
+                <Popup className="umkm-store-map-popup" maxWidth={270}>
+                  <StorePopupSummary
+                    store={store}
+                    ui={ui}
+                    isId={isId}
+                  />
+                </Popup>
+              ) : null}
             </Marker>
           );
         }
@@ -1303,7 +1307,7 @@ function StoreMarkersLayer({
                   : `${cluster.items.length} locations nearby. Click to zoom in.`}
             </Tooltip>
 
-            {allowPicker ? (
+            {allowPicker && showPopups ? (
               <Popup className="umkm-store-map-popup" maxWidth={250}>
                 <div className="w-[min(72vw,240px)] space-y-2">
                   <div>
@@ -1381,6 +1385,7 @@ export function UmkmStoreMapClient({
   focusOffset,
   onBoundsChange,
   controls = true,
+  showPopups = true,
 }: UmkmStoreMapClientProps) {
   const activeTheme = MAP_THEME_CONFIG[theme];
   // Keep every embedded Lajukan map on the key-free OpenStreetMap raster
@@ -1625,6 +1630,7 @@ export function UmkmStoreMapClient({
         onMarkerFocus={handleMarkerFocus}
         isId={isId}
         interactive={interactive}
+        showPopups={showPopups}
       />
 
       {routePositions ? (
