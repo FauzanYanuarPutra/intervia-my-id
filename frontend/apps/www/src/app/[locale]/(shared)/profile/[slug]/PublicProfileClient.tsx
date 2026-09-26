@@ -2405,7 +2405,7 @@ export default function PublicProfileClient({
           </section>
 
           <section className="mt-3 overflow-hidden rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-sm sm:rounded-[26px]">
-            <div className="sticky top-14 z-20 border-b border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)]/96 backdrop-blur sm:top-0">
+            <div className="sticky top-[calc(3.25rem+env(safe-area-inset-top))] z-20 border-b border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)]/96 backdrop-blur sm:top-0">
               <div
                 role="tablist"
                 aria-label={localeCode === 'id' ? 'Navigasi profil' : 'Profile navigation'}
