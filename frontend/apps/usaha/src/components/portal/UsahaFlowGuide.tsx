@@ -90,15 +90,19 @@ function stepsFor(business: BusinessRecord, section: PortalSection): GuideStep[]
     case 'home':
     default: {
       const setup = getSetupSteps(business);
-      const next = setup.find(step => !step.done);
+      const next = setup.find(step => !step.done && !step.optional) ?? setup.find(step => !step.done);
       const nextHref =
         next?.id === 'locations'
           ? href(id, '/locations')
           : next?.id === 'products'
             ? href(id, '/products')
-            : href(id, '/info');
+            : next?.id === 'operations'
+              ? href(id, '/operations')
+              : next?.id === 'buyer-page'
+                ? href(id, '/buyer-page')
+                : href(id, '/info');
       return [
-        { id: 'profile', label: 'Rapikan dasar', hint: next?.label ?? 'Profil usaha sudah siap.', href: nextHref },
+        { id: 'profile', label: 'Rapikan dasar', hint: next?.label ?? 'Data inti usaha sudah siap.', href: nextHref },
         { id: 'product', label: 'Isi barang', hint: 'Nama + harga sudah cukup untuk mulai.', href: href(id, '/products') },
         { id: 'sell', label: 'Mulai jual', hint: 'Pakai Kasir saat siap.', href: href(id, '/orders') },
       ];
@@ -109,7 +113,9 @@ function stepsFor(business: BusinessRecord, section: PortalSection): GuideStep[]
 export function UsahaFlowGuide({ business, currentSection }: UsahaFlowGuideProps) {
   const steps = stepsFor(business, currentSection);
 
-  const expandedByDefault = currentSection === 'home';
+  const expandedByDefault =
+    currentSection === 'home' &&
+    getSetupSteps(business).some(step => !step.done && !step.optional);
 
   return (
     <details
