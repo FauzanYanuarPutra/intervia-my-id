@@ -8515,7 +8515,7 @@ export default function ChatRoomPage() {
                       : activeDraftAttachment.status === 'error'
                         ? chatLocale === 'id'
                           ? 'Gagal mengunggah. Coba lagi.'
-                          : 'Upload failed.'
+                          : 'Failed to upload media.'
                         : chatLocale === 'id'
                           ? 'Siap dikirim'
                           : 'Ready to send'}
