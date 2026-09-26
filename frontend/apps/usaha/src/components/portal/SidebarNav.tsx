@@ -16,9 +16,9 @@ type SidebarNavProps = {
 export function SidebarNav({ business, currentSection }: SidebarNavProps) {
   if (!business) return null;
   const activeBusiness = business;
-  const primary = desktopPrimaryNavigation(activeBusiness.permissions);
+  const primary = desktopPrimaryNavigation(activeBusiness.permissions, activeBusiness);
   const primaryIds = new Set(primary.map(item => item.id));
-  const secondary = portalMenuNavigation(activeBusiness.permissions).filter(
+  const secondary = portalMenuNavigation(activeBusiness.permissions, activeBusiness).filter(
     item => !primaryIds.has(item.id) && item.id !== 'security',
   );
   const secondaryActive = secondary.some(item => item.id === currentSection);
