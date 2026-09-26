@@ -14,6 +14,8 @@ import {
 import { NewsArticleMedia } from '@/components/news/NewsMedia';
 import { NewsCarousel } from '@/components/news/NewsCarousel';
 import { serializeJsonLd } from '@/lib/seo/jsonLd';
+import { absoluteNewsMediaUrl } from '@/lib/newsMediaUrl';
+import { sanitizeNewsRichText } from '@/lib/newsRichText';
 import NewsAnalytics from './NewsAnalytics';
 import NewsShareActions from './NewsShareActions';
 
@@ -63,8 +65,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       locale: article.language === 'en' ? 'en_US' : 'id_ID',
       publishedTime: article.publishedAt,
       modifiedTime: article.updatedAt,
-      images: article.coverImage
-        ? [{ url: article.coverImage, alt: article.title }]
+      images: absoluteNewsMediaUrl(article.coverImage)
+        ? [{ url: absoluteNewsMediaUrl(article.coverImage)!, alt: article.title }]
         : [{ url: 'https://www.lajukan.com/opengraph-image.png', width: 1200, height: 630, alt: 'Lajukan News' }],
     },
     authors: [{ name: article.byline }],
@@ -73,7 +75,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       card: 'summary_large_image',
       title: article.title,
       description,
-      images: [article.coverImage || 'https://www.lajukan.com/opengraph-image.png'],
+      images: [absoluteNewsMediaUrl(article.coverImage) || 'https://www.lajukan.com/opengraph-image.png'],
     },
   };
 }
@@ -245,7 +247,7 @@ export default async function NewsArticlePage({ params }: PageProps) {
               <>
                 <section className="prose prose-slate max-w-none text-[15px] leading-8 sm:text-[15.5px] dark:prose-invert [&_p]:leading-8 [&_h2]:mt-9 [&_h2]:text-[22px] [&_h2]:font-black [&_h2]:tracking-tight [&_h3]:mt-8 [&_h3]:text-lg [&_h3]:font-black [&_a]:font-semibold [&_a]:text-emerald-700 [&_blockquote]:border-emerald-500 [&_img]:rounded-2xl [&_img]:shadow-sm">
                   {article.richBody ? (
-                    <div dangerouslySetInnerHTML={{ __html: article.richBody }} />
+                    <div dangerouslySetInnerHTML={{ __html: sanitizeNewsRichText(article.richBody) }} />
                   ) : (
                     paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)
                   )}
