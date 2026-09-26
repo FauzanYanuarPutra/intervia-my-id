@@ -116,6 +116,7 @@ export default async function HomePage({
   const canViewFinance = hasPermission(business, 'viewFinance');
   const canViewChannels = hasPermission(business, 'viewChannels');
   const canViewOrders = hasPermission(business, 'viewOrders');
+  const canViewSales = hasPermission(business, 'viewTransactions');
   const canManageInfo = hasPermission(business, 'manageInfo');
   const canManageInventory = hasPermission(business, 'manageInventory');
   const canViewBuyerPage = hasPermission(business, 'viewBuyerPage');
@@ -135,12 +136,12 @@ export default async function HomePage({
   const [financeCore, workItems, saleRecords] = await Promise.all([
     canViewFinance ? getFinanceCoreSummary(business.id).catch(() => null) : Promise.resolve(null),
     listBusinessWork(business.id).catch(() => []),
-    canViewOrders ? listControlSales(business.id).catch(() => []) : Promise.resolve([]),
+    canViewSales ? listControlSales(business.id).catch(() => []) : Promise.resolve([]),
   ]);
 
   const today = jakartaDateKey();
   const control = summarizeControlCenter({ ingredients, financeEntries, channels, today });
-  const todaySales = canViewOrders
+  const todaySales = canViewSales
     ? saleRecords
         .filter(item => item.sale.status === 'completed' && item.sale.occurred_on === today)
         .sort((left, right) => right.sale.created_at.localeCompare(left.sale.created_at))
@@ -237,11 +238,11 @@ export default async function HomePage({
       <MetricStrip items={dashboard.metrics.map(metric => ({
         label: metric.label,
         value: metric.key === 'revenue'
-          ? (canViewOrders ? money.format(metric.value) : '—')
+          ? (canViewSales ? money.format(metric.value) : '—')
           : metric.key === 'expense'
             ? (canViewFinance ? money.format(metric.value) : '—')
             : metric.key === 'transactions'
-              ? (canViewOrders ? metric.value : '—')
+              ? (canViewSales ? metric.value : '—')
               : metric.value,
       }))} />
 
@@ -256,7 +257,7 @@ export default async function HomePage({
       </section>
       {workItems.some(item => !['done','cancelled'].includes(item.status)) ? <section><div className="mb-2.5 flex items-end justify-between gap-3"><div><h2 className="font-black text-portal-ink">Pekerjaan yang berjalan</h2><p className="mt-0.5 text-xs text-portal-soft">Supaya kondisi usaha langsung berubah jadi tindakan.</p></div><Link href={`/businesses/${business.id}/work`} className="text-xs font-black text-portal-forest">Lihat semua</Link></div><div className="merchant-list border border-portal-line/80">{workItems.filter(item => !['done','cancelled'].includes(item.status)).slice(0,3).map(item => <Link key={item.id} href={`/businesses/${business.id}/work`} className="merchant-action-row"><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold text-portal-ink">{item.title}</p><p className="mt-0.5 text-[11px] text-portal-soft">{item.assignee_user_id ? 'Sudah ditugaskan' : 'Belum ditugaskan'}</p></div><span className="text-xs font-black text-portal-forest">Kerjakan</span></Link>)}</div></section> : null}
 
-      {canViewOrders && todaySales.length ? (
+      {canViewSales && todaySales.length ? (
         <section>
           <div className="mb-2.5 flex items-end justify-between gap-3">
             <div><h2 className="font-black text-portal-ink">Transaksi hari ini</h2><p className="mt-0.5 text-xs text-portal-soft">Penjualan yang sudah selesai dan tercatat hari ini.</p></div>
