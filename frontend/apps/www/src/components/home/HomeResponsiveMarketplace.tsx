@@ -2220,8 +2220,8 @@ function HomeListingCarouselSection({
             ? 'Membutuhkan'
             : 'People who need something'
           : isId
-            ? 'Rekomendasi penawaran untuk usahamu'
-            : 'Recommended offers for your business'
+            ? 'Yang ditawarkan untuk usahamu'
+            : 'What is being offered for your business'
       }
     >
       <div className="flex min-w-0 items-center gap-1.5 px-2 sm:px-3 md:px-4 lg:px-6">
@@ -2237,8 +2237,8 @@ function HomeListingCarouselSection({
               ? 'Orang sedang membutuhkan'
               : 'People are looking for'
             : isId
-              ? 'Rekomendasi penawaran'
-              : 'Recommended offers'}
+              ? 'Menawarkan'
+              : 'Offering'}
         </h2>
 
         <span className="hidden shrink-0 text-[9px] font-medium text-zinc-400 sm:inline">
