@@ -2227,17 +2227,26 @@ export default function ContentDetailClient({
   const isLiveContent = normalizedContentStatus === 'active' ||
     normalizedContentStatus === 'published' ||
     normalizedContentStatus === 'live';
-  const wasPreviouslyPublished = Boolean(item.published_at);
+  const ownerRevisionState = String(meta.owner_revision_state || '').trim().toLowerCase();
   const ownerNeedsReview =
     isOwner &&
     normalizedContentStatus === 'draft' &&
-    wasPreviouslyPublished;
+    ownerRevisionState === 'pending_review';
+
+  const ownerNeedsChanges =
+    isOwner &&
+    normalizedContentStatus === 'draft' &&
+    ownerRevisionState === 'needs_revision';
 
   const ownerStatusLabel = ownerNeedsReview
     ? locale === 'id'
       ? 'Menunggu review'
       : 'Waiting for review'
-    : normalizedContentStatus === 'draft'
+    : ownerNeedsChanges
+      ? locale === 'id'
+        ? 'Perlu revisi'
+        : 'Needs revision'
+      : normalizedContentStatus === 'draft'
       ? 'Draft'
       : normalizedContentStatus === 'paused'
         ? locale === 'id'
@@ -4731,13 +4740,17 @@ export default function ContentDetailClient({
                               ? locale === 'id'
                                 ? 'Perubahanmu sudah disimpan dan sedang menunggu persetujuan sebelum tayang lagi.'
                                 : 'Your changes are saved and waiting for approval before going live again.'
-                              : isLiveContent
+                              : ownerNeedsChanges
                                 ? locale === 'id'
-                                  ? 'Kamu adalah pemilik listing ini. Jika diedit, perubahan final akan masuk review sebelum tayang lagi.'
-                                  : 'You own this listing. Final edits return to review before going live again.'
-                                : locale === 'id'
-                                  ? 'Kamu adalah pemilik listing ini. Aksi pembeli disembunyikan dari tampilan kamu.'
-                                  : 'You own this listing. Buyer actions are hidden from your view.'}
+                                  ? 'Editor meminta perubahan. Perbaiki listing lalu simpan lagi untuk dikirim ke review.'
+                                  : 'The reviewer requested changes. Update the listing and save it to send it back for review.'
+                                : isLiveContent
+                                  ? locale === 'id'
+                                    ? 'Kamu adalah pemilik listing ini. Jika diedit, perubahan final akan masuk review sebelum tayang lagi.'
+                                    : 'You own this listing. Final edits return to review before going live again.'
+                                  : locale === 'id'
+                                    ? 'Kamu adalah pemilik listing ini. Aksi pembeli disembunyikan dari tampilan kamu.'
+                                    : 'You own this listing. Buyer actions are hidden from your view.'}
                           </p>
                         </div>
                       </div>
