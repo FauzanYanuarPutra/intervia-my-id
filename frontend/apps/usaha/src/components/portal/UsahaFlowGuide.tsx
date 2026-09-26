@@ -69,6 +69,12 @@ function stepsFor(business: BusinessRecord, section: PortalSection): GuideStep[]
         { id: 'schedule', label: 'Jam usaha', hint: 'Tulis jam yang realistis.', href: href(id, '/operations') },
         { id: 'stock', label: 'Cek gangguan', hint: 'Tangani stok yang menghambat jualan.', href: href(id, '/inventory') },
       ];
+    case 'work':
+      return [
+        { id: 'scan', label: 'Lihat pekerjaan', hint: 'Mulai dari tugas yang paling penting atau paling dekat jatuh tempo.', href: href(id, '/work') },
+        { id: 'assign', label: 'Bagikan tugas', hint: 'Pilih orang yang tepat saat pekerjaan perlu dikerjakan bersama.', href: href(id, '/work') },
+        { id: 'finish', label: 'Selesaikan & pantau', hint: 'Tandai selesai agar kondisi usaha tetap terbarui.', href: href(id, '/work') },
+      ];
     case 'team':
       return [
         { id: 'invite', label: 'Undang anggota', hint: 'Cari username Lajukan.', href: href(id, '/team') },
