@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Image from 'next/image';
 import { Newspaper } from 'lucide-react';
 import type { LajukanNewsArticle } from '@/lib/news';
+import { normalizeNewsMediaUrl } from '@/lib/newsMediaUrl';
 
 type NewsMediaVariant = 'hero' | 'card' | 'thumb' | 'detail';
 
@@ -28,13 +29,14 @@ export function NewsMedia({
   showLabels?: boolean;
 }) {
   const [failed, setFailed] = useState(false);
-  const showImage = Boolean(article.coverImage) && !failed;
+  const coverUrl = normalizeNewsMediaUrl(article.coverImage);
+  const showImage = Boolean(coverUrl) && !failed;
 
   return (
     <div className={'group relative overflow-hidden bg-slate-100 dark:bg-slate-800 ' + variantClass(variant) + ' ' + className}>
       {showImage ? (
         <img
-          src={article.coverImage as string}
+          src={coverUrl as string}
           alt={variant === 'thumb' ? '' : article.title}
           className="h-full w-full object-cover object-center transition duration-500 group-hover:scale-[1.035]"
           loading={priority ? 'eager' : 'lazy'}
@@ -110,13 +112,14 @@ export function NewsArticleMedia({
   isId: boolean;
 }) {
   const [failed, setFailed] = useState(false);
-  const showImage = Boolean(article.coverImage) && !failed;
+  const coverUrl = normalizeNewsMediaUrl(article.coverImage);
+  const showImage = Boolean(coverUrl) && !failed;
 
   return (
     <figure className="overflow-hidden rounded-[24px] border border-slate-200 bg-slate-100 shadow-[0_18px_48px_-34px_rgba(15,23,42,0.34)] dark:border-white/10 dark:bg-slate-800">
       {showImage ? (
         <img
-          src={article.coverImage as string}
+          src={coverUrl as string}
           alt={article.title}
           className="aspect-[16/9] w-full object-cover object-center"
           loading="eager"
