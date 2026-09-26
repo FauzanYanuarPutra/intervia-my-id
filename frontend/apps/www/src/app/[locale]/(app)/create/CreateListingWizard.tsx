@@ -5522,8 +5522,8 @@ export default function CreateListingWizard({
     currentStep === 1
       ? text(
           locale,
-          'Kamu mau mencari atau menawarkan?',
-          'Are you looking for something or offering something?',
+          'Kamu mau menawarkan atau membutuhkan?',
+          'Are you offering something or do you need something?',
         )
       : currentStep === 2
         ? intent === 'request'
@@ -6891,9 +6891,9 @@ export default function CreateListingWizard({
               {[
                 {
                   value: 'request' as const,
-                  titleId: 'Cari kebutuhan',
-                  titleEn: 'Find something',
-                  shortId: 'Saya butuh barang / jasa',
+                  titleId: 'Membutuhkan sesuatu',
+                  titleEn: 'Need something',
+                  shortId: 'Saya membutuhkan barang / jasa',
                   shortEn: 'I need a product / service',
                   imageSrc: '/images/create/kategori/cari.png',
                 },
