@@ -15,7 +15,7 @@ import {
   ChevronLeft,
   Filter,
   Loader2,
-  RefreshCcw,
+  SegarkanCcw,
   Search,
   ShoppingBag,
   TriangleAlert,
@@ -464,7 +464,7 @@ export default function MarketplaceClient() {
                 <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[color:var(--app-text-soft)]" />
                 <input
                   type="text"
-                  placeholder="Search products and services"
+                  placeholder="Cari produk atau jasa..."
                   className="w-full rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] py-2.5 pl-11 pr-3 text-sm outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] focus:border-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
                   value={draftFilters.search}
                   onChange={event =>
@@ -491,7 +491,7 @@ export default function MarketplaceClient() {
                 }
                 className="min-w-[150px] rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] focus:border-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
               >
-                <option value="">All categories</option>
+                <option value="">Semua kategori</option>
                 {categoryOptions.map(category => (
                   <option key={category} value={category}>
                     {category}
@@ -500,7 +500,7 @@ export default function MarketplaceClient() {
               </select>
               <input
                 type="text"
-                placeholder="Location filter"
+                placeholder="Lokasi usaha"
                 value={draftFilters.location}
                 onChange={event =>
                   setDraftFilters(prev => ({
@@ -520,7 +520,7 @@ export default function MarketplaceClient() {
             <input
               type="number"
               min={0}
-              placeholder="Min price"
+              placeholder="Harga minimal"
               value={draftFilters.minPrice}
               onChange={event =>
                 setDraftFilters(prev => ({
@@ -533,7 +533,7 @@ export default function MarketplaceClient() {
             <input
               type="number"
               min={0}
-              placeholder="Max price"
+              placeholder="Harga maksimal"
               value={draftFilters.maxPrice}
               onChange={event =>
                 setDraftFilters(prev => ({
@@ -553,9 +553,9 @@ export default function MarketplaceClient() {
               }
               className="min-w-[150px] rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] focus:border-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
             >
-              <option value="">Any condition</option>
+              <option value="">Kondisi apa saja</option>
               <option value="new">New</option>
-              <option value="like_new">Like New</option>
+              <option value="like_new">Seperti baru</option>
               <option value="good">Good</option>
               <option value="fair">Fair</option>
               <option value="refurbished">Refurbished</option>
@@ -570,9 +570,9 @@ export default function MarketplaceClient() {
               }
               className="min-w-[170px] rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] focus:border-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
             >
-              <option value="latest">Sort: Latest</option>
-              <option value="price_low">Sort: Price Low to High</option>
-              <option value="price_high">Sort: Price High to Low</option>
+              <option value="latest">Urutkan: terbaru</option>
+              <option value="price_low">Urutkan: harga termurah</option>
+              <option value="price_high">Urutkan: harga termahal</option>
             </select>
             <label className="inline-flex min-w-[136px] items-center gap-2 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2 text-sm dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]">
               <input
@@ -586,17 +586,17 @@ export default function MarketplaceClient() {
                 }
                 className="accent-lajukan-600"
               />
-              In stock only
+              Yang masih tersedia
             </label>
           </div>
 
           <div className="flex min-h-[32px] flex-wrap items-center gap-2">
             <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-[color:var(--app-text-soft)]">
-              <Filter className="h-3 w-3" /> Filters:
+              <Filter className="h-3 w-3" /> Filter:
             </span>
             {!hasActiveFilters ? (
               <span className="text-xs italic text-[color:var(--app-text-soft)]">
-                None
+                Belum ada filter
               </span>
             ) : (
               <div className="flex flex-wrap items-center gap-2">
@@ -632,7 +632,7 @@ export default function MarketplaceClient() {
                 ) : null}
                 {filters.inStockOnly ? (
                   <span className="rounded-lg border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-3 py-1 text-xs font-semibold text-[color:var(--app-accent)]">
-                    In stock
+                    Masih tersedia
                   </span>
                 ) : null}
                 <button
@@ -646,7 +646,7 @@ export default function MarketplaceClient() {
           </div>
 
           <p className="hidden text-[11px] font-semibold text-[color:var(--app-text-soft)] sm:block">
-            Auto-apply filter aktif
+            Filter otomatis aktif
           </p>
         </div>
       </header>
@@ -657,7 +657,7 @@ export default function MarketplaceClient() {
         <section className="mb-4 grid gap-2 sm:grid-cols-3">
           <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 py-3 text-xs dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]">
             <p className="font-semibold text-[color:var(--app-text)]">
-              Loaded Items
+              Item yang tampil
             </p>
             <p className="mt-1 text-lg font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
               {items.length}
@@ -665,7 +665,7 @@ export default function MarketplaceClient() {
           </div>
           <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 py-3 text-xs dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]">
             <p className="font-semibold text-[color:var(--app-text)]">
-              Avg Price
+              Harga rata-rata
             </p>
             <p className="mt-1 text-lg font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
               {avgPrice}
@@ -673,7 +673,7 @@ export default function MarketplaceClient() {
           </div>
           <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 py-3 text-xs dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]">
             <p className="font-semibold text-[color:var(--app-text)]">
-              In-stock Ratio
+              Yang masih tersedia
             </p>
             <p className="mt-1 text-lg font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
               {items.length > 0
@@ -692,7 +692,7 @@ export default function MarketplaceClient() {
                 onClick={() => loadData(true)}
                 className="font-semibold underline underline-offset-2"
               >
-                Retry
+                Coba lagi
               </button>
             </div>
           </div>
@@ -711,15 +711,15 @@ export default function MarketplaceClient() {
           <>
             <div className="mb-3 flex items-center justify-between">
               <div className="text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                {items.length} item(s) loaded
+                {items.length} item tampil
               </div>
               <button
                 type="button"
                 onClick={() => loadData(true)}
                 className="inline-flex items-center gap-1 rounded-full border border-[color:var(--app-border)] px-3 py-1.5 text-xs font-semibold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)] dark:hover:bg-[color:var(--app-surface-strong)]"
               >
-                <RefreshCcw className="h-3.5 w-3.5" />
-                Refresh
+                <SegarkanCcw className="h-3.5 w-3.5" />
+                Segarkan
               </button>
             </div>
 
@@ -751,7 +751,7 @@ export default function MarketplaceClient() {
                               : 'border border-[color:var(--app-danger-border)] bg-[color:var(--app-danger-soft)] text-[color:var(--app-danger)] dark:border-[color:var(--app-danger-border)] dark:bg-[color:color-mix(in_srgb,_var(--app-danger)_30%,_transparent)] dark:text-[color:var(--app-danger)]'
                             }`}
                         >
-                          {item.inStock ? 'In stock' : 'Out of stock'}
+                          {item.inStock ? 'Masih tersedia' : 'Sudah habis'}
                         </span>
                       </div>
                     </div>
@@ -771,11 +771,11 @@ export default function MarketplaceClient() {
                 </div>
               ) : hasMore ? (
                 <span className="text-xs italic text-[color:var(--app-text-soft)]">
-                  Scroll untuk muat otomatis
+                  Scroll ke bawah, nanti lanjut otomatis
                 </span>
               ) : (
                 <span className="text-xs italic text-[color:var(--app-text-soft)]">
-                  All catalog items loaded
+                  Semua item sudah tampil
                 </span>
               )}
             </div>
@@ -784,17 +784,17 @@ export default function MarketplaceClient() {
           <div className="flex flex-col items-center py-8 text-center">
             <ShoppingBag className="mb-3 h-12 w-12 text-[color:var(--app-text-soft)]" />
             <h2 className="text-xl font-bold dark:text-[color:var(--app-text-inverse)]">
-              No marketplace items found
+              Belum ketemu yang cocok
             </h2>
             <p className="mt-2 text-sm text-[color:var(--app-text)]">
-              Try different keywords or category filters.
+              Coba kata kunci atau filter yang lain ya.
             </p>
             <button
               onClick={resetFilters}
               className="mt-3 inline-flex items-center gap-2 rounded-2xl bg-[color:var(--app-accent)] px-5 py-2.5 font-bold text-[color:var(--app-text-inverse)] shadow-lg hover:bg-[color:var(--app-accent-strong)]"
             >
-              <RefreshCcw className="h-4 w-4" />
-              Reset filters
+              <SegarkanCcw className="h-4 w-4" />
+              Reset filter
             </button>
           </div>
         )}
