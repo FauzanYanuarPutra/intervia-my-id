@@ -829,9 +829,16 @@ export default function NewsEditorialWorkspace({
                   >
                     <div className="flex items-start justify-between gap-2">
                       <p className="line-clamp-2 text-sm font-black text-slate-950">{item.title}</p>
-                      <span className={'shrink-0 rounded-full border px-2 py-1 text-[9px] font-black ' + statusTone(itemStatus)}>
-                        {statusLabel(itemStatus)}
-                      </span>
+                      <div className="flex shrink-0 flex-wrap justify-end gap-1">
+                        {asString(itemMeta.revision_of_published) === 'true' || itemMeta.revision_of_published === true ? (
+                          <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-1 text-[9px] font-black text-sky-700">
+                            Revisi terbit
+                          </span>
+                        ) : null}
+                        <span className={'rounded-full border px-2 py-1 text-[9px] font-black ' + statusTone(itemStatus)}>
+                          {statusLabel(itemStatus)}
+                        </span>
+                      </div>
                     </div>
                     <p className="mt-2 line-clamp-2 text-xs font-semibold leading-5 text-slate-500">
                       {item.summary || item.body}
@@ -897,6 +904,11 @@ export default function NewsEditorialWorkspace({
                     <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-black text-slate-500">
                       {category}
                     </span>
+                    {meta.revision_of_published === true || asString(meta.revision_of_published) === 'true' ? (
+                      <span className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[10px] font-black text-sky-700">
+                        Revisi dari artikel terbit
+                      </span>
+                    ) : null}
                   </div>
                   <h2 className="mt-3 text-xl font-black tracking-[-0.04em] text-slate-950 sm:text-2xl">{selected.title}</h2>
                   <p className="mt-2 text-xs font-semibold text-slate-500">
@@ -917,6 +929,12 @@ export default function NewsEditorialWorkspace({
               {selected.cover_image ? (
                 <div className="overflow-hidden rounded-3xl border border-slate-200">
                   <img src={selected.cover_image} alt="" className="max-h-[330px] w-full object-cover" />
+                </div>
+              ) : null}
+
+              {meta.revision_of_published === true || asString(meta.revision_of_published) === 'true' ? (
+                <div className="rounded-2xl border border-sky-200 bg-sky-50 p-3 text-xs font-semibold leading-5 text-sky-900">
+                  Contributor mengubah artikel yang sebelumnya sudah terbit. Setelah disetujui, versi revisi ini menjadi versi publik terbaru.
                 </div>
               ) : null}
 
