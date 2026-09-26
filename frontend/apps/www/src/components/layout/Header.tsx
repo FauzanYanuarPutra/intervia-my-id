@@ -1933,7 +1933,28 @@ export function Header() {
             )}
           </div>
 
-          <div className="ml-auto flex lg:hidden">
+          <div className="ml-auto flex items-center gap-1.5 lg:hidden">
+            {isAuthenticated ? (
+              <>
+                <HeaderInboxDropdown
+                  kind="notifications"
+                  isId={isId}
+                  active={matchesRoute(
+                    cleanPath,
+                    '/notifications',
+                  )}
+                />
+                <HeaderInboxDropdown
+                  kind="chat"
+                  isId={isId}
+                  active={matchesRoute(
+                    cleanPath,
+                    '/chat',
+                  )}
+                />
+              </>
+            ) : null}
+
             <button
               type="button"
               onClick={toggleMobileMenu}
@@ -1947,7 +1968,12 @@ export function Header() {
                     ? 'Buka menu'
                     : 'Open menu'
               }
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)]"
+              className={cn(
+                'flex h-10 w-10 items-center justify-center rounded-full transition',
+                mobileOpen
+                  ? 'bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)]'
+                  : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)]',
+              )}
             >
               {mobileOpen ? (
                 <X className="h-5 w-5" />
