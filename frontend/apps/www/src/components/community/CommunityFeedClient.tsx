@@ -525,7 +525,6 @@ export function CommunityComposer({
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<ComposeMode>('post');
 
-  const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [mediaUrls, setMediaUrls] = useState<string[]>([]);
 
@@ -534,7 +533,6 @@ export function CommunityComposer({
   );
 
   const [pollOptions, setPollOptions] = useState(['', '']);
-  const [topicTag, setTopicTag] = useState('');
 
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -795,7 +793,6 @@ export function CommunityComposer({
           : cleanBody;
 
     const cleanTitle =
-      title.trim() ||
       cleanBody
         .split(/\s+/)
         .slice(0, 12)
@@ -842,9 +839,7 @@ export function CommunityComposer({
           : mode === 'photo'
             ? 'media-usaha'
             : 'update-usaha';
-    const selectedTags = Array.from(
-      new Set([modeTag, topicTag.trim()].filter(Boolean)),
-    ).slice(0, 2);
+    const selectedTags = [modeTag];
 
     try {
       const response = await authFetch(
