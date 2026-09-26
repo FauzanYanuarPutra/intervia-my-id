@@ -80,7 +80,7 @@ export default async function BusinessOrdersPage({ params, searchParams }: PageP
     canCloseCashShift ? getCurrentWave2CashShift(business.id) : Promise.resolve(null),
     canViewOrders ? listControlOrders(business.id) : Promise.resolve([]),
     canCreateSales && canViewChannels ? listControlChannels(business.id) : Promise.resolve([]),
-    canCreateSales ? listCommercialParties(business.id) : Promise.resolve([]),
+    canCreateSales ? listCommercialParties(business.id).catch(() => []) : Promise.resolve([]),
   ]);
 
   const saleProducts = business.products.filter(product => product.status === 'live').map(product => ({
