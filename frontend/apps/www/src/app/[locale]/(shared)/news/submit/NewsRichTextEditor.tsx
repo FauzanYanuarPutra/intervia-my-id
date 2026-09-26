@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { sanitizeNewsRichText } from '@/lib/newsRichText';
+import { normalizeNewsMediaUrl } from '@/lib/newsMediaUrl';
 import { Bold, Code2, Eye, Heading2, Heading3, ImagePlus, Italic, Link2, List, ListOrdered, Quote, Redo2, Undo2, Underline, Upload } from 'lucide-react';
 
 type Props = {
@@ -26,13 +28,13 @@ export default function NewsRichTextEditor({ value, onChange, locale }: Props) {
 
   useEffect(() => {
     if (!editorRef.current || editorRef.current.innerHTML === value) return;
-    editorRef.current.innerHTML = value || '<p><br></p>';
+    editorRef.current.innerHTML = sanitizeNewsRichText(value) || '<p><br></p>';
   }, [value]);
 
   const plainText = useMemo(() => textFromHtml(value), [value]);
 
   const emit = () => {
-    const html = editorRef.current?.innerHTML || '';
+    const html = sanitizeNewsRichText(editorRef.current?.innerHTML || '');
     const text = textFromHtml(html);
     onChange(html, text);
     try {
@@ -52,9 +54,9 @@ export default function NewsRichTextEditor({ value, onChange, locale }: Props) {
     const url = window.prompt(isId ? 'URL tautan' : 'Link URL');
     if (!url) return;
     try {
-      const parsed = new URL(url);
-      if (!['http:', 'https:'].includes(parsed.protocol)) return;
-      command('createLink', parsed.toString());
+      const safeUrl = normalizeNewsMediaUrl(url);
+      if (!safeUrl) return;
+      command('createLink', safeUrl);
     } catch {}
   };
 
@@ -62,11 +64,11 @@ export default function NewsRichTextEditor({ value, onChange, locale }: Props) {
     const url = window.prompt(isId ? 'URL gambar publik' : 'Public image URL');
     if (!url) return;
     try {
-      const parsed = new URL(url);
-      if (!['http:', 'https:'].includes(parsed.protocol)) return;
+      const safeUrl = normalizeNewsMediaUrl(url);
+      if (!safeUrl) return;
       const alt = window.prompt(isId ? 'Deskripsi singkat gambar (alt text)' : 'Short image description (alt text)', '') || '';
       const caption = window.prompt(isId ? 'Caption gambar (opsional)' : 'Image caption (optional)', '') || '';
-      document.execCommand('insertHTML', false, '<figure><img src="' + parsed.toString().replace(/"/g, '&quot;') + '" alt="' + alt.replace(/"/g, '&quot;') + '" loading="lazy" />' + (caption ? '<figcaption>' + caption.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</figcaption>' : '') + '</figure>');
+      document.execCommand('insertHTML', false, '<figure><img src="' + safeUrl.replace(/"/g, '&quot;') + '" alt="' + alt.replace(/"/g, '&quot;') + '" loading="lazy" />' + (caption ? '<figcaption>' + caption.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</figcaption>' : '') + '</figure>');
       emit();
     } catch {}
   };
@@ -99,7 +101,7 @@ export default function NewsRichTextEditor({ value, onChange, locale }: Props) {
     try {
       const draft = JSON.parse(localStorage.getItem('lajukan-news-draft') || 'null') as { value?: string };
       if (draft?.value && editorRef.current) {
-        editorRef.current.innerHTML = draft.value;
+        editorRef.current.innerHTML = sanitizeNewsRichText(draft.value);
         emit();
       }
     } catch {}
@@ -140,7 +142,12 @@ export default function NewsRichTextEditor({ value, onChange, locale }: Props) {
         <button type="button" onClick={() => setPreview(v => !v)} className="ml-auto inline-flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-bold text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-white/10"><Eye className="h-4 w-4" />{preview ? (isId ? 'Edit' : 'Edit') : (isId ? 'Preview' : 'Preview')}</button>
       </div>
       {preview ? (
-        <div className="prose prose-slate max-w-none min-h-[320px] p-5 dark:prose-invert" dangerouslySetInnerHTML={{ __html: value || '<p>Belum ada isi.</p>' }} />
+        <div
+          className="prose prose-slate max-w-none min-h-[320px] p-5 dark:prose-invert"
+          dangerouslySetInnerHTML={{
+            __html: sanitizeNewsRichText(value) || '<p>Belum ada isi.</p>',
+          }}
+        />
       ) : (
         <div
           ref={editorRef}
@@ -150,6 +157,26 @@ export default function NewsRichTextEditor({ value, onChange, locale }: Props) {
           aria-multiline="true"
           onInput={emit}
           onBlur={emit}
+          onPaste={event => {
+            const text = event.clipboardData.getData('text/plain');
+            if (!text || text.includes('\u0000')) return;
+            event.preventDefault();
+            document.execCommand(
+              'insertHTML',
+              false,
+              sanitizeNewsRichText(
+                text
+                  .replace(/&/g, '&amp;')
+                  .replace(/</g, '&lt;')
+                  .replace(/>/g, '&gt;')
+                  .replace(/\r\n?/g, '\n')
+                  .split(/\n{2,}/)
+                  .map(part => '<p>' + part.replace(/\n/g, '<br />') + '</p>')
+                  .join(''),
+              ),
+            );
+            emit();
+          }
           className="min-h-[320px] px-5 py-4 text-[15px] font-medium leading-8 text-slate-800 outline-none dark:text-slate-100 [&_blockquote]:my-4 [&_blockquote]:border-l-4 [&_blockquote]:border-emerald-500 [&_blockquote]:pl-4 [&_h2]:mt-5 [&_h2]:text-2xl [&_h2]:font-bold [&_h3]:mt-4 [&_h3]:text-xl [&_h3]:font-bold [&_figure]:my-5 [&_figure]:overflow-hidden [&_figure]:rounded-2xl [&_figure]:bg-slate-50 [&_figure]:dark:bg-white/[0.04] [&_img]:my-0 [&_img]:max-h-[520px] [&_img]:w-full [&_img]:object-cover [&_figcaption]:px-3 [&_figcaption]:py-2 [&_figcaption]:text-xs [&_figcaption]:font-semibold [&_figcaption]:text-slate-500 [&_li]:ml-6 [&_ol]:list-decimal [&_p]:my-3 [&_pre]:overflow-x-auto [&_pre]:rounded-xl [&_pre]:bg-slate-950 [&_pre]:p-4 [&_pre]:text-slate-100 [&_ul]:list-disc"
           data-placeholder={isId ? 'Tulis berita kamu di sini...' : 'Write your story here...'}
         />
