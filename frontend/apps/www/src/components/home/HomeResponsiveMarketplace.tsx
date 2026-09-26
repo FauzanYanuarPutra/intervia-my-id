@@ -127,6 +127,7 @@ import {
   GroupCard,
   GroupMembersModal,
 } from '@/components/community/CommunityFeedClient';
+import { normalizeCommunityMediaItems } from '@/components/community/community-feed-helpers';
 import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 import { UMKM_DISCOVERY_PATH } from '@/lib/umkmSurface';
 import {
@@ -3780,6 +3781,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
         status: 'active',
         side: 'demand',
         include_owner: '1',
+        database_only: '1',
       });
       addViewerLocation(params);
       if (viewerLocationKey) {
