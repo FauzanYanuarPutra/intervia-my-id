@@ -69,6 +69,20 @@ defmodule ChatService.AttachmentPolicyTest do
              )
   end
 
+    test "accepts a media batch up to 100 and rejects 101 items" do
+      urls =
+        Enum.map(1..100, fn index ->
+          "/api/chat/media/laju-chat/chat/dm_a_b/asset-#{index}.webp"
+        end)
+
+      assert {:ok, normalized} = AttachmentPolicy.normalize("image", urls)
+      assert length(normalized) == 100
+
+      too_many = urls ++ ["/api/chat/media/laju-chat/chat/dm_a_b/asset-101.webp"]
+      assert {:error, :invalid_attachments} =
+               AttachmentPolicy.normalize("image", too_many)
+    end
+
   describe "normalize/2 structured card policy" do
     test "keeps bounded commerce fields while dropping unsafe URL fields" do
       raw =
