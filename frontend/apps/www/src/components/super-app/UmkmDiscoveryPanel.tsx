@@ -1202,21 +1202,32 @@ export function UmkmDiscoveryPanel({
         setError(null);
         setSelectedStoreId(current => {
           if (append) return current;
+
+          const currentUrl =
+            typeof window !== 'undefined'
+              ? new URL(window.location.href)
+              : null;
+          const targetSlug =
+            currentUrl?.searchParams.get('store')?.trim() ||
+            currentUrl?.searchParams.get('business')?.trim() ||
+            '';
+          const targetStoreId =
+            currentUrl?.searchParams.get('storeId')?.trim() || '';
+
           if (current && items.some(item => item.id === current)) {
             return current;
           }
-          if (selectedSlug) {
-            const matchedBySlug = items.find(
-              item => item.slug === selectedSlug,
-            );
-            if (matchedBySlug) return matchedBySlug.id;
-          }
-          if (selectedStoreIdInitial) {
-            const matchedById = items.find(
-              item => item.id === selectedStoreIdInitial,
-            );
-            if (matchedById) return matchedById.id;
-          }
+
+          const matchedBySlug = targetSlug
+            ? items.find(item => item.slug === targetSlug)
+            : null;
+          if (matchedBySlug) return matchedBySlug.id;
+
+          const matchedById = targetStoreId
+            ? items.find(item => item.id === targetStoreId)
+            : null;
+          if (matchedById) return matchedById.id;
+
           return null;
         });
       } catch {
