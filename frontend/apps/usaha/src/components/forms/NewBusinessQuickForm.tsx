@@ -52,7 +52,7 @@ export function NewBusinessQuickForm({
   const provisionAttemptRef = useRef<ClientIdempotencyAttempt | null>(null);
 
   const preset = getBusinessTemplatePreset(templateKey);
-  const displayedCategory = category === 'Usaha lainnya'
+  const displayedCategory = category === 'Usaha umum' && customCategory.trim()
     ? customCategory.trim()
     : category;
 
