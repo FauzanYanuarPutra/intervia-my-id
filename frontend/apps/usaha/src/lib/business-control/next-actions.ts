@@ -30,8 +30,8 @@ export type MerchantNextActionInput = {
   productsMissingChannelPriceCount: number | null;
   unreconciledSettlementCount: number;
   financeEntryCount: number;
-  canViewBuyerPage: boolean;
-  buyerPageReady: boolean;
+  canViewBuyerPage?: boolean;
+  buyerPageReady?: boolean;
 };
 
 export function buildMerchantNextActions(input: MerchantNextActionInput): MerchantNextAction[] {
