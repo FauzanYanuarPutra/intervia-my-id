@@ -503,8 +503,8 @@ export default function ManageHubClient({ isId }: ManageHubClientProps) {
           counts.communityPosts,
         valueLabel: isId ? 'item' : 'items',
         helper: isId
-          ? \`${formatCount(counts.newsSubmissions, locale)} News · ${formatCount(counts.reels, locale)} Reels · ${formatCount(counts.communityPosts, locale)} Community\`
-          : \`${formatCount(counts.newsSubmissions, locale)} News · ${formatCount(counts.reels, locale)} Reels · ${formatCount(counts.communityPosts, locale)} Community\`,
+          ? `${formatCount(counts.newsSubmissions, locale)} News · ${formatCount(counts.reels, locale)} Reels · ${formatCount(counts.communityPosts, locale)} Community`
+          : `${formatCount(counts.newsSubmissions, locale)} News · ${formatCount(counts.reels, locale)} Reels · ${formatCount(counts.communityPosts, locale)} Community`,
       },
     ],
     [
