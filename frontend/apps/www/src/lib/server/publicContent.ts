@@ -1,6 +1,5 @@
 import 'server-only';
 
-import { cache } from 'react';
 import { headers } from 'next/headers';
 import { extractContentId } from '@/lib/content/routes';
 
@@ -92,19 +91,29 @@ export async function getViewerUserId(): Promise<string> {
   }
 }
 
-export const getPublicContent = cache(
-  async (routeId: string): Promise<PublicContentResolution> => {
-    const contentId = extractContentId(routeId) || routeId.trim();
-    if (!contentId) return { status: 'not_found' };
+export async function getPublicContent(
+  routeId: string,
+): Promise<PublicContentResolution> {
+    const requestHeadersFromServer = await headers();
+  const contentId = extractContentId(routeId) || routeId.trim();
+  if (!contentId) return { status: 'not_found' };
 
-    try {
+  try {
       const response = await fetch(
         new URL(
           `/v1/content/${encodeURIComponent(contentId)}`,
           MARKETPLACE_URL,
         ),
         {
-          headers: { Accept: 'application/json' },
+          headers: (() => {
+            const requestHeaders = new Headers();
+            requestHeaders.set('Accept', 'application/json');
+            const cookie = requestHeadersFromServer?.get('cookie');
+            const authorization = requestHeadersFromServer?.get('authorization');
+            if (cookie) requestHeaders.set('Cookie', cookie);
+            if (authorization) requestHeaders.set('Authorization', authorization);
+            return requestHeaders;
+          })(),
           cache: 'no-store',
           signal: AbortSignal.timeout(3_500),
         },
@@ -128,8 +137,7 @@ export const getPublicContent = cache(
     } catch {
       return { status: 'unavailable' };
     }
-  },
-);
+}
 
 export function isPublicEditorialContent(content: ContentRecord): boolean {
   const metadata = asRecord(content.metadata);
