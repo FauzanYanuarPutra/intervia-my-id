@@ -5198,12 +5198,12 @@ export default function ChatRoomPage() {
           notify({
             title:
               chatLocale === 'id'
-                ? 'Unggahan masih berjalan'
-                : 'Upload still in progress',
+                ? 'Media masih diunggah'
+                : 'Media is still uploading',
             description:
               chatLocale === 'id'
-                ? 'Tunggu sampai semua lampiran selesai diunggah.'
-                : 'Please wait until all attachments finish uploading.',
+                ? 'Tunggu sampai semua media selesai diunggah.'
+                : 'Please wait until all media finish uploading.',
             variant: 'info',
           });
           return;
@@ -7617,8 +7617,8 @@ export default function ChatRoomPage() {
                                   {messageReference.content ||
                                     (messageReference.attachments?.length
                                       ? chatLocale === 'id'
-                                        ? 'Lampiran'
-                                        : 'Attachment'
+                                        ? 'Media'
+                                        : 'Media'
                                       : 'Pesan')}
                                 </span>
                               </button>
@@ -8602,13 +8602,13 @@ export default function ChatRoomPage() {
                     className="absolute right-1.5 top-1.5 inline-flex h-8 w-8 items-center justify-center rounded-full bg-black/55 text-white"
                     title={
                       chatLocale === 'id'
-                        ? 'Hapus lampiran'
-                        : 'Remove attachment'
+                        ? 'Hapus media'
+                        : 'Remove media'
                     }
                     aria-label={
                       chatLocale === 'id'
-                        ? 'Hapus lampiran'
-                        : 'Remove attachment'
+                        ? 'Hapus media'
+                        : 'Remove media'
                     }
                   >
                     <X className="h-3.5 w-3.5" />
@@ -9086,8 +9086,8 @@ export default function ChatRoomPage() {
                     title={chatLocale === 'id' ? 'Media & file' : 'Media & files'}
                     aria-label={
                       chatLocale === 'id'
-                        ? 'Buka pilihan lampiran'
-                        : 'Open attachment options'
+                        ? 'Pilih media atau file'
+                        : 'Choose media or file'
                     }
                   >
                     {isUploadingAttachments ? (
@@ -11245,7 +11245,7 @@ export default function ChatRoomPage() {
           className="fixed inset-0 z-[11500] flex h-[100dvh] w-screen flex-col bg-[#0b141a] text-white"
           role="dialog"
           aria-modal="true"
-          aria-label={chatLocale === 'id' ? 'Pratinjau & kirim media' : 'Media preview before sending'}
+          aria-label={chatLocale === 'id' ? 'Pratinjau & kirim media' : 'Preview & send media'}
         >
           <div className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 px-3 py-2.5 sm:px-5">
             <div className="min-w-0">
