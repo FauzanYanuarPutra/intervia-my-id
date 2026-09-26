@@ -2237,7 +2237,6 @@ export function OwnerProfileSkeleton() {
                     </div>
                   </div>
                 </div>
-                <Pulse className="absolute hidden" />
               </article>
             ))}
           </div>
@@ -2255,8 +2254,8 @@ export function ProfileViewSkeleton() {
       aria-busy="true"
       aria-label="Loading profile"
     >
-      <div className="sticky top-0 z-30 border-b border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)]/95 px-3 py-2 backdrop-blur sm:hidden">
-        <div className="flex h-10 items-center gap-3">
+      <div className="sticky top-0 z-30 border-b border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)]/95 px-3 pb-2 pt-[calc(env(safe-area-inset-top)+0.35rem)] backdrop-blur sm:hidden">
+        <div className="mx-auto flex min-h-[40px] items-center gap-3">
           <Pulse className="h-9 w-9 shrink-0 rounded-full" />
           <div className="min-w-0 flex-1">
             <Pulse className="h-2.5 w-20 rounded-full" />
