@@ -154,7 +154,7 @@ export default function LoginClient() {
       setOtpToken('');
       setOtpResendAt(Date.now() + 30_000);
     } catch {
-      setError(isId ? 'Gagal kirim OTP email.' : 'Failed to send email OTP.');
+      setError(isId ? 'OTP email-nya belum terkirim. Coba lagi ya.' : 'Failed to send email OTP.');
     } finally {
       setSendingOtp(false);
     }
@@ -188,7 +188,7 @@ export default function LoginClient() {
 
       setOtpToken(data.token);
     } catch {
-      setError(isId ? 'Gagal verifikasi OTP.' : 'Failed to verify OTP.');
+      setError(isId ? 'Kode OTP-nya belum cocok. Coba cek lagi ya.' : 'Failed to verify OTP.');
     } finally {
       setVerifyingOtp(false);
     }
