@@ -553,7 +553,7 @@ export default function MyListingsPage() {
   }, [authLoading, legacyFilter, router]);
 
   useEffect(() => {
-    if (authLoading) return;
+    if (authLoading || legacyFilter) return;
     if (!user) {
       router.replace(buildLoginPath(locale, pathname, currentSearch));
       return;
