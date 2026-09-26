@@ -75,8 +75,7 @@ export function getStatusCopy(business: BusinessRecord) {
   const locations = business.locations ?? [];
   if (!business.infoComplete) return { label: 'Setup awal', description: 'Info dasar usaha masih perlu dirapikan.' };
   if (locations.length === 0) return { label: 'Lengkapi lokasi', description: 'Tambahkan lokasi utama agar pelanggan mudah menemukan usaha.' };
-  if (!business.buyerPageReady) return { label: 'Siapkan etalase', description: 'Lengkapi katalog agar halaman pembeli siap dibuka.' };
-  if (!business.isOpen) return { label: 'Siap buka', description: 'Tampilan publik rapi, tinggal aktifkan status buka.' };
+  if (!business.isOpen) return { label: 'Siap buka', description: 'Data inti sudah cukup. Tinggal aktifkan operasional saat siap menerima pelanggan.' };
   return { label: 'Sedang jalan', description: 'Operasional sudah aktif dan bisa dipantau tim.' };
 }
 
@@ -87,6 +86,6 @@ export function getSetupSteps(business: BusinessRecord): ProgressStep[] {
     { id: 'locations', label: 'Pastikan lokasi utama', hint: 'Alamat dan pin peta membantu pelanggan menemukan cabang.', done: locations.some(item => item.isPrimary) },
     { id: 'products', label: 'Isi menu / produk', hint: 'Tambah yang dijual, kasih harga, lalu sudah bisa mulai jualan.', done: business.productsCount > 0 },
     { id: 'operations', label: 'Atur jam usaha', hint: 'Atur jam buka sesuai kondisi lapangan.', done: business.schedule.trim().length >= 5 && business.schedule !== 'Belum diatur' },
-    { id: 'buyer-page', label: 'Siapkan tampilan pelanggan', hint: 'Opsional kalau ingin membagikan katalog atau link usaha.', done: business.buyerPageReady },
+    { id: 'buyer-page', label: 'Siapkan tampilan pelanggan', hint: 'Opsional. Bagikan katalog dan link usaha saat kamu sudah siap.', done: business.buyerPageReady, optional: true },
   ];
 }
