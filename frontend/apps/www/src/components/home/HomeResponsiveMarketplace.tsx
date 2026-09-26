@@ -82,6 +82,7 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 import { useChatInbox } from '@/context/ChatInboxContext';
+import { useToast } from '@/components/system/feedback/ToastProvider';
 import { Link, useRouter } from '@/i18n/navigation';
 import {
   formatLajukanCountLabel,
@@ -2891,6 +2892,7 @@ function HomeCommunityGroupsSection({
 }) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const router = useRouter();
+  const { notify } = useToast();
 
   const joinOrLeave = async (group: CommunityGroup) => {
     if (!isAuthenticated) {
@@ -2916,13 +2918,35 @@ function HomeCommunityGroupsSection({
         { method: 'POST' },
       );
 
+      const payload = (await response
+        .json()
+        .catch(() => ({}))) as { error?: string };
+
       if (!response.ok) {
-        throw new Error('group_action_failed');
+        throw new Error(payload.error || 'group_action_failed');
       }
 
       onChanged?.();
-    } catch {
-      onChanged?.();
+      notify({
+        title: joined
+          ? isId
+            ? 'Keluar dari grup'
+            : 'Left group'
+          : group.membershipPermission === 'approval'
+            ? isId
+              ? 'Permintaan join dikirim'
+              : 'Join request sent'
+            : isId
+              ? 'Berhasil join grup'
+              : 'Joined group',
+        variant: 'success',
+      });
+    } catch (error) {
+      notify({
+        title: isId ? 'Aksi grup gagal' : 'Group action failed',
+        description: error instanceof Error ? error.message : undefined,
+        variant: 'error',
+      });
     } finally {
       setBusyId(null);
     }
