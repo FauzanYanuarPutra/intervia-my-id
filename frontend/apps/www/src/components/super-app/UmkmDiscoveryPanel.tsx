@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   BadgeCheck,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   ChevronUp,
   Clock3,
@@ -1095,10 +1096,18 @@ export function UmkmDiscoveryPanel({
     setDiscoveryScope(scope);
     setListPage(1);
     setSelectedStoreId(null);
+    setShowRoute(false);
+    setRouteSummary(null);
+    setMapFocusMode('stores');
+    setMapFocusNonce(current => current + 1);
+
     if (typeof window === 'undefined') return;
     const url = new URL(window.location.href);
     url.searchParams.set('scope', scope);
-    window.history.replaceState(window.history.state, '', url.toString());
+    url.searchParams.delete('store');
+    url.searchParams.delete('storeId');
+    url.searchParams.delete('business');
+    window.history.replaceState(window.history.state, '', url.pathname + url.search);
   }, []);
   const deepLinkedInitialStore = useMemo(() => {
     const targetSlug = selectedSlug?.trim();
@@ -1626,12 +1635,26 @@ export function UmkmDiscoveryPanel({
 
   useEffect(() => {
     setListPage(1);
-    setSelectedStoreId(null);
     setShowRoute(false);
     setRouteSummary(null);
     setMapFocusMode('stores');
     setMapFocusNonce(current => current + 1);
     setSheetExpanded(variant === 'immersive');
+
+    if (typeof window === 'undefined') {
+      setSelectedStoreId(null);
+      return;
+    }
+
+    const params = new URL(window.location.href).searchParams;
+    const hasSelection =
+      Boolean(params.get('store')?.trim()) ||
+      Boolean(params.get('storeId')?.trim()) ||
+      Boolean(params.get('business')?.trim());
+
+    if (!hasSelection) {
+      setSelectedStoreId(null);
+    }
   }, [category, city, query, variant]);
 
   useEffect(() => {
@@ -2112,7 +2135,7 @@ export function UmkmDiscoveryPanel({
                         {selectedPlace.ui.kindLabel}
                       </span>
                       {selectedIsPublicReference ? (
-                        <PublicReferenceBadge isId={isId} compact />
+                        <PublicReferenceBadge isId={isId} />
                       ) : selectedTrustProfile ? (
                         <TrustStatusChip profile={selectedTrustProfile} compact />
                       ) : null}
