@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import NewsRichTextEditor from '../submit/NewsRichTextEditor';
@@ -173,6 +174,8 @@ async function requestSubmissions(isId: boolean): Promise<LoadResult> {
 
 export default function MyNewsSubmissions({ locale }: { locale: string }) {
   const isId = locale === 'id';
+  const searchParams = useSearchParams();
+  const requestedEditId = searchParams.get('edit')?.trim() || '';
   const [items, setItems] = useState<NewsItem[]>([]);
   const [selectedId, setSelectedId] = useState('');
   const [form, setForm] = useState<SubmissionForm>(EMPTY_FORM);
@@ -252,10 +255,15 @@ export default function MyNewsSubmissions({ locale }: { locale: string }) {
           return;
         }
 
-        const first = result.items[0] || null;
+        const preferred =
+          (requestedEditId
+            ? result.items.find(item => item.id === requestedEditId)
+            : null) ||
+          result.items[0] ||
+          null;
         setItems(result.items);
-        setSelectedId(first?.id || '');
-        setForm(first ? submissionFormFromItem(first) : EMPTY_FORM);
+        setSelectedId(preferred?.id || '');
+        setForm(preferred ? submissionFormFromItem(preferred) : EMPTY_FORM);
         setStatus({
           loading: false,
           saving: false,
@@ -281,7 +289,7 @@ export default function MyNewsSubmissions({ locale }: { locale: string }) {
     return () => {
       active = false;
     };
-  }, [isId]);
+  }, [isId, requestedEditId]);
 
   const reload = async (preferredId?: string) => {
     setStatus(current => ({ ...current, loading: true, error: '' }));
@@ -301,7 +309,9 @@ export default function MyNewsSubmissions({ locale }: { locale: string }) {
     }
 
     const nextSelected =
-      result.items.find(item => item.id === preferredId) ||
+      result.items.find(
+        item => item.id === (preferredId || requestedEditId),
+      ) ||
       result.items[0] ||
       null;
 
