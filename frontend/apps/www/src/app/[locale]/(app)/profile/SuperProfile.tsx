@@ -26,6 +26,7 @@ import {
   Heart,
   Loader2,
   MapPin,
+  Megaphone,
   MessageCircle,
   MoreVertical,
   Package,
@@ -2186,11 +2187,10 @@ export default function SuperProfile() {
       badge: draftListings.length,
     },
     {
-      key: 'chat',
-      label: isId ? 'Pesan' : 'Messages',
-      href: ROUTES.chat,
-      icon: MessageCircle,
-      badge: unreadChats,
+      key: 'promotion',
+      label: isId ? 'Promosi' : 'Promotion',
+      href: ROUTES.promotion,
+      icon: Megaphone,
     },
     {
       key: 'insights',
@@ -2203,7 +2203,7 @@ export default function SuperProfile() {
   const quickActionTone: Record<string, string> = {
     create: 'bg-emerald-600 text-white',
     'manage-listings': 'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300',
-    chat: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300',
+    promotion: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300',
     insights: 'bg-violet-50 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300',
   };
 
