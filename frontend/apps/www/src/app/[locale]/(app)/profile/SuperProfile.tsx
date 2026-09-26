@@ -1681,9 +1681,7 @@ export default function SuperProfile() {
           const payload = await activeResult.value.json().catch(() => null);
           nextActive = mapContentPayload(payload).filter(item => {
             const status = normalizeStatus(item);
-            return !['draft', 'archived', 'deleted', 'inactive'].includes(
-              status,
-            );
+            return ['active', 'published', 'live'].includes(status);
           });
         } else {
           hadListingFailure = true;
@@ -1693,7 +1691,11 @@ export default function SuperProfile() {
           const payload = await draftResult.value.json().catch(() => null);
           nextDrafts = mapContentPayload(payload).filter(item => {
             const status = normalizeStatus(item);
-            return status === 'draft' || !status;
+            return (
+              !['active', 'published', 'live', 'archived', 'deleted'].includes(
+                status,
+              ) && status !== ''
+            );
           });
         } else {
           hadListingFailure = true;
@@ -1716,16 +1718,19 @@ export default function SuperProfile() {
             if (nextActive.length === 0) {
               nextActive = allItems.filter(item => {
                 const status = normalizeStatus(item);
-                return !['draft', 'archived', 'deleted', 'inactive'].includes(
-                  status,
-                );
+                return ['active', 'published', 'live'].includes(status);
               });
             }
 
             if (nextDrafts.length === 0) {
-              nextDrafts = allItems.filter(
-                item => normalizeStatus(item) === 'draft',
-              );
+              nextDrafts = allItems.filter(item => {
+                const status = normalizeStatus(item);
+                return (
+                  !['active', 'published', 'live', 'archived', 'deleted'].includes(
+                    status,
+                  ) && status !== ''
+                );
+              });
             }
           }
         }
