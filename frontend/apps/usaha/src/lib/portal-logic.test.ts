@@ -7,6 +7,7 @@ describe('visiblePortalSections', () => {
     expect(visiblePortalSections(['viewOrders', 'viewOperations'])).toEqual([
       'home',
       'orders',
+      'parties',
       'operations',
       'work',
     ]);
