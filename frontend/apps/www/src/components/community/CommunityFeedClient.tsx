@@ -1071,55 +1071,54 @@ export function CommunityComposer({
     <section
       id="composer"
       className="
-        rounded-[16px]
+        overflow-hidden
+        rounded-[8px]
         border border-[color:var(--app-border)]
         bg-white
-        p-2.5
-        sm:p-3
+        shadow-[0_1px_2px_rgba(15,23,42,0.08)]
       "
     >
       {/* ================= QUICK COMPOSER ================= */}
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2.5 px-3 pt-3 sm:px-4 sm:pt-4">
         <Image
           alt=""
-          width={32}
-          height={32}
-          className="h-8 w-8 shrink-0 rounded-full object-cover"
+          width={40}
+          height={40}
+          className="h-10 w-10 shrink-0 rounded-full object-cover"
           src={userAvatar}
         />
 
         <button
           type="button"
-          onClick={() =>
-            openComposer('question')
-          }
+          onClick={() => openComposer('question')}
           className="
             flex min-h-11 min-w-0 flex-1
             items-center
             rounded-full
             border border-[color:var(--app-border)]
             bg-[color:var(--app-surface-muted)]
-            px-3
+            px-4
             text-left
-            text-[10px] font-medium
+            text-[12px] font-medium
             text-[color:var(--app-text-soft)]
-            transition-colors
-
+            transition
+            hover:bg-[color:var(--app-surface-strong)]
             hover:border-[color:var(--app-accent-border)]
-            hover:bg-white
-
-            sm:text-[11px]
+            focus-visible:outline-none
+            focus-visible:ring-2
+            focus-visible:ring-[color:var(--app-accent-border)]
+            sm:text-[13px]
           "
         >
           <span className="truncate">
             {isId
               ? lockedGroup
-                ? `Tanya atau bagikan sesuatu di ${lockedGroup.name}...`
-                : 'Tanya, bagikan pengalaman, atau temukan peluang...'
+                ? `Bagikan sesuatu di ${lockedGroup.name}...`
+                : 'Apa yang ingin kamu bagikan hari ini?'
               : lockedGroup
-                ? `Ask or share something in ${lockedGroup.name}...`
-                : 'Ask, share experience, or discover opportunities...'}
+                ? `Share something in ${lockedGroup.name}...`
+                : 'What would you like to share today?'}
           </span>
         </button>
       </div>
@@ -1128,11 +1127,9 @@ export function CommunityComposer({
 
       <div
         className="
-          mt-2 flex gap-1.5
-          overflow-x-auto
-          pb-0.5
-          [scrollbar-width:none]
-          [&::-webkit-scrollbar]:hidden
+          mt-2 grid grid-cols-2
+          border-t border-[color:var(--app-border)]
+          sm:grid-cols-5
         "
       >
         {actions.map(action => {
@@ -1146,22 +1143,21 @@ export function CommunityComposer({
                 openComposer(action.id)
               }
               className="
-                inline-flex min-h-10
-                shrink-0 items-center
+                inline-flex min-h-11
+                items-center
                 justify-center
                 gap-1.5
-                rounded-full
-                border border-[color:var(--app-border)]
-                bg-white
-                px-2.5
-                text-[9px] font-semibold
+                border-r border-b border-[color:var(--app-border)]
+                px-2
+                text-[10px] font-semibold
                 text-[color:var(--app-text-soft)]
                 transition-colors
-
                 hover:bg-[color:var(--app-surface-muted)]
                 hover:text-[color:var(--app-text)]
-
-                sm:text-[10px]
+                last:border-r-0
+                sm:border-b-0
+                sm:min-h-12
+                sm:text-[11px]
               "
             >
               <span
@@ -1216,16 +1212,17 @@ export function CommunityComposer({
               flex
               h-full max-h-full
               w-full
-              max-w-xl
+              max-w-[620px]
               flex-col
               overflow-hidden
-              border border-[color:var(--app-border)]
               bg-[color:var(--app-surface-strong)]
               shadow-2xl
 
               sm:h-auto
-              sm:max-h-[calc(var(--app-visual-viewport-height)-2rem)]
-              sm:rounded-[2rem]
+              sm:max-h-[min(760px,calc(var(--app-visual-viewport-height)-2rem))]
+              sm:rounded-[14px]
+              sm:border
+              sm:border-[color:var(--app-border)]
             "
           >
             {/* ================= MODAL HEADER ================= */}
@@ -1249,14 +1246,14 @@ export function CommunityComposer({
                   id="community-compose-title"
                   className="truncate text-[13px] font-bold text-[color:var(--app-text)]"
                 >
-                  {modeLabel}
+                  {isId ? 'Buat postingan' : 'Create post'}
                 </h2>
 
-                {lockedGroup ? (
-                  <p className="mt-0.5 truncate text-[9px] font-medium text-[color:var(--app-text-soft)]">
-                    {lockedGroup.name}
-                  </p>
-                ) : null}
+                <p className="mt-0.5 truncate text-[10px] font-medium text-[color:var(--app-text-soft)]">
+                  {lockedGroup
+                    ? (isId ? `Posting ke ${lockedGroup.name}` : `Posting to ${lockedGroup.name}`)
+                    : modeLabel}
+                </p>
               </div>
 
               <button
@@ -1297,6 +1294,77 @@ export function CommunityComposer({
                 sm:p-3.5
               "
             >
+              <div className="flex items-center gap-2.5 rounded-[10px] bg-white px-0.5 py-1">
+                <Image
+                  alt=""
+                  width={42}
+                  height={42}
+                  className="h-[42px] w-[42px] shrink-0 rounded-full object-cover"
+                  src={userAvatar}
+                />
+                <div className="min-w-0">
+                  <p className="truncate text-[13px] font-bold text-[color:var(--app-text)]">
+                    {fallbackAuthor.name}
+                  </p>
+                  <span className="mt-0.5 inline-flex items-center gap-1 rounded-[6px] bg-[color:var(--app-surface-muted)] px-2 py-0.5 text-[9px] font-semibold text-[color:var(--app-text-soft)]">
+                    <Earth className="h-3 w-3" />
+                    {isId ? 'Publik' : 'Public'}
+                  </span>
+                </div>
+              </div>
+
+              {/* ================= BODY ================= */}
+
+              <textarea
+                value={body}
+                onChange={event =>
+                  setBody(
+                    event.target.value,
+                  )
+                }
+                rows={4}
+                maxLength={10000}
+                placeholder={
+                  mode === 'question'
+                    ? isId
+                      ? 'Jelaskan konteks, kendala, lokasi, budget, atau hal penting agar orang lain bisa membantu dengan tepat...'
+                      : 'Explain the context, constraints, location, budget, or important details so others can help accurately...'
+                    : mode === 'poll'
+                      ? isId
+                      ? 'Tulis pertanyaan polling...'
+                      : 'Write your poll question...'
+                    : mode === 'photo'
+                      ? isId
+                        ? 'Ceritakan tentang foto atau peluang ini...'
+                        : 'Tell people about this photo or opportunity...'
+                      : mode ===
+                          'feeling'
+                        ? isId
+                          ? 'Ceritakan apa yang sedang kamu rasakan...'
+                          : 'Share what you are feeling...'
+                        : isId
+                          ? 'Tulis pertanyaan, info, pengalaman, atau peluang...'
+                          : 'Write a question, update, experience, or opportunity...'
+                }
+                className="
+                  w-full resize-none
+                  rounded-[12px]
+                  border border-[color:var(--app-border)]
+                  bg-[color:var(--app-surface-muted)]
+                  px-3 py-2.5
+                  text-[12px]
+                  leading-5
+                  text-[color:var(--app-text)]
+                  outline-none
+
+                  placeholder:text-[color:var(--app-text-soft)]
+
+                  focus:border-[color:var(--app-accent-border)]
+                  focus:bg-white
+                "
+              />
+
+
               {/* ================= MEDIA ================= */}
 
               <label
@@ -1494,6 +1562,7 @@ export function CommunityComposer({
                 )}
               </label>
 
+
               {/* ================= DESTINATION ================= */}
 
               {lockedGroup ? (
@@ -1526,6 +1595,7 @@ export function CommunityComposer({
                     : 'Topics help people discover relevant discussions.'}
                 </span>
               </div>
+
 
               {/* ================= FEELING ================= */}
 
@@ -1569,56 +1639,6 @@ export function CommunityComposer({
                 </select>
               ) : null}
 
-              {/* ================= BODY ================= */}
-
-              <textarea
-                value={body}
-                onChange={event =>
-                  setBody(
-                    event.target.value,
-                  )
-                }
-                rows={4}
-                maxLength={10000}
-                placeholder={
-                  mode === 'question'
-                    ? isId
-                      ? 'Jelaskan konteks, kendala, lokasi, budget, atau hal penting agar orang lain bisa membantu dengan tepat...'
-                      : 'Explain the context, constraints, location, budget, or important details so others can help accurately...'
-                    : mode === 'poll'
-                      ? isId
-                      ? 'Tulis pertanyaan polling...'
-                      : 'Write your poll question...'
-                    : mode === 'photo'
-                      ? isId
-                        ? 'Ceritakan tentang foto atau peluang ini...'
-                        : 'Tell people about this photo or opportunity...'
-                      : mode ===
-                          'feeling'
-                        ? isId
-                          ? 'Ceritakan apa yang sedang kamu rasakan...'
-                          : 'Share what you are feeling...'
-                        : isId
-                          ? 'Tulis pertanyaan, info, pengalaman, atau peluang...'
-                          : 'Write a question, update, experience, or opportunity...'
-                }
-                className="
-                  w-full resize-none
-                  rounded-[12px]
-                  border border-[color:var(--app-border)]
-                  bg-[color:var(--app-surface-muted)]
-                  px-3 py-2.5
-                  text-[12px]
-                  leading-5
-                  text-[color:var(--app-text)]
-                  outline-none
-
-                  placeholder:text-[color:var(--app-text-soft)]
-
-                  focus:border-[color:var(--app-accent-border)]
-                  focus:bg-white
-                "
-              />
 
               {/* ================= POLL ================= */}
 
@@ -1794,10 +1814,9 @@ export function CommunityComposer({
                 gap-2
                 border-t
                 border-[color:var(--app-border)]
-                bg-white/95
+                bg-white
                 px-3 pb-[calc(0.625rem+env(safe-area-inset-bottom))] pt-2.5
-                backdrop-blur
-                sm:px-3.5 sm:py-2.5
+                sm:px-4 sm:py-3
               "
             >
               <div className="min-w-0">
@@ -6913,6 +6932,15 @@ export default function CommunityFeedClient({
               )
             ) : (
               <>
+                <CommunityComposer
+                  isId={isId}
+                  userAvatar={avatar}
+                  isAuthenticated={isAuthenticated}
+                  overview={overview}
+                  lockedGroup={activeGroup}
+                  onCreated={handleComposerCreated}
+                />
+
                 {!activeGroup ? (
                   <GroupStrip
                     isId={isId}
@@ -6927,15 +6955,6 @@ export default function CommunityFeedClient({
                   group={activeGroup}
                   isId={isId}
                   onOpenMembers={setMembersModalGroup}
-                />
-
-                <CommunityComposer
-                  isId={isId}
-                  userAvatar={avatar}
-                  isAuthenticated={isAuthenticated}
-                  overview={overview}
-                  lockedGroup={activeGroup}
-                  onCreated={handleComposerCreated}
                 />
 
                 {loading ? <CommunityFeedSkeleton /> : null}
