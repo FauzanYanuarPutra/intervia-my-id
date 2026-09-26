@@ -38,6 +38,7 @@ export default async function BusinessPartiesPage({ params }: PageProps) {
   let parties: CommercialParty[] = [];
   let receivables: CommercialReceivable[] = [];
   let payables: CommercialPayable[] = [];
+  let loadError = false;
 
   try {
     [parties, receivables, payables] = await Promise.all([
@@ -46,7 +47,7 @@ export default async function BusinessPartiesPage({ params }: PageProps) {
       listCommercialPayables(business.id),
     ]);
   } catch {
-    // The workspace remains usable for the rest of the portal even if Commercial Core is temporarily unavailable.
+    loadError = true;
   }
 
   return (
@@ -68,6 +69,7 @@ export default async function BusinessPartiesPage({ params }: PageProps) {
         initialReceivables={receivables}
         initialPayables={payables}
         canManage={canManage}
+        loadError={loadError}
       />
     </PortalShell>
   );
