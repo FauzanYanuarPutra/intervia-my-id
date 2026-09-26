@@ -17,7 +17,7 @@ use uuid::Uuid;
 
 use crate::{
     clean_auth_id, clean_profile_avatar, clean_profile_text, clean_public_display_name,
-    fallback_forum_username, forum_user_id,
+    forum_user_id,
     forum_username, internal_error, is_platform_group_admin, looks_like_email,
     public_identity_user_id, require_actor, ApiError, ApiResult, AppState, AuthActor,
     ForumIdentityProfile, ForumUser, IdentityPublicProfile,
