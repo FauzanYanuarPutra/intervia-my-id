@@ -245,7 +245,7 @@ export default function CommunityGroupDirectoryClient({
               return (
                 <article
                   key={group.id}
-                  className="overflow-hidden rounded-[22px] border border-[color:var(--app-border)] bg-white shadow-[0_16px_34px_-30px_rgba(15,23,42,0.24)]"
+                  className="group relative flex h-full flex-col overflow-hidden rounded-[20px] border border-[color:var(--app-border)] bg-white text-left shadow-[0_10px_30px_-28px_rgba(15,23,42,0.3)] transition duration-200 hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:shadow-[0_22px_42px_-32px_rgba(15,23,42,0.34)]"
                 >
                   <Link
                     href={
@@ -254,7 +254,7 @@ export default function CommunityGroupDirectoryClient({
                     }
                     className="group block"
                   >
-                    <div className="relative aspect-[2.35/1] overflow-hidden bg-[linear-gradient(135deg,#ecfdf5,#eff6ff)]">
+                    <div className="relative aspect-[2.15/1] overflow-hidden bg-slate-100">
                       {group.coverUrl ? (
                         <LajukanImage
                           src={group.coverUrl}
@@ -278,13 +278,13 @@ export default function CommunityGroupDirectoryClient({
                     </div>
 
                     <div className="relative px-3.5 pb-3.5">
-                      <div className="-mt-8 grid h-16 w-16 place-items-center overflow-hidden rounded-[19px] border-[3px] border-white bg-[color:var(--app-accent-soft)] text-xl font-black text-[color:var(--app-accent)] shadow-[0_18px_28px_-24px_rgba(15,23,42,0.45)]">
+                      <div className="-mt-7 grid h-14 w-14 place-items-center overflow-hidden rounded-[17px] border-[3px] border-white bg-[color:var(--app-accent-soft)] text-lg font-black text-[color:var(--app-accent)] shadow-[0_16px_28px_-22px_rgba(15,23,42,0.45)]">
                         {group.avatarUrl ? (
                           <LajukanImage
                             src={group.avatarUrl}
                             alt=""
-                            width={64}
-                            height={64}
+                            width={56}
+                            height={56}
                             className="h-full w-full object-cover"
                           />
                         ) : (
@@ -292,11 +292,20 @@ export default function CommunityGroupDirectoryClient({
                         )}
                       </div>
 
-                      <h2 className="mt-2 truncate text-base font-black text-[color:var(--app-text)]">
-                        {group.name}
-                      </h2>
+                      <div className="mt-2 flex items-start gap-2">
+                        <h2 className="min-w-0 flex-1 truncate text-sm font-bold tracking-[-0.025em] text-[color:var(--app-text)]">
+                          {group.name}
+                        </h2>
+                        {(group.viewerRole === 'owner' || group.viewerRole === 'moderator') ? (
+                          <span className="shrink-0 rounded-full bg-amber-50 px-2 py-1 text-[9px] font-bold text-amber-700">
+                            {group.viewerRole === 'owner'
+                              ? (isId ? 'Admin' : 'Admin')
+                              : 'Moderator'}
+                          </span>
+                        ) : null}
+                      </div>
 
-                      <div className="mt-1 flex items-center gap-1.5 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+                      <div className="mt-1 flex items-center gap-1.5 text-[10px] font-semibold text-[color:var(--app-text-soft)]">
                         <span>
                           {compactNumber(group.memberCount)}{' '}
                           {isId ? 'anggota' : 'members'}
@@ -308,19 +317,19 @@ export default function CommunityGroupDirectoryClient({
                         </span>
                       </div>
 
-                      <p className="mt-2 line-clamp-2 min-h-10 text-xs leading-5 text-[color:var(--app-text-soft)]">
+                      <p className="mt-2 line-clamp-2 min-h-8 text-[11px] leading-4 text-[color:var(--app-text-soft)]">
                         {group.description}
                       </p>
                     </div>
                   </Link>
 
-                  <div className="flex items-center gap-2 border-t border-[color:var(--app-border)] px-3.5 py-3">
+                  <div className="mt-auto flex items-center gap-2 border-t border-[color:var(--app-border)] p-2.5">
                     <Link
                       href={
                         '/community/groups/' +
                         encodeURIComponent(group.slug || group.id)
                       }
-                      className="inline-flex min-h-10 flex-1 items-center justify-center rounded-[12px] border border-[color:var(--app-border)] bg-white text-xs font-bold text-[color:var(--app-text)]"
+                      className="inline-flex min-h-[38px] flex-1 items-center justify-center rounded-[13px] border border-[color:var(--app-border)] bg-white px-3 text-xs font-bold text-[color:var(--app-text)] transition hover:bg-slate-50"
                     >
                       {isId ? 'Lihat grup' : 'View group'}
                     </Link>
