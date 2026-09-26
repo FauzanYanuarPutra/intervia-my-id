@@ -349,7 +349,7 @@ export function getListingSideContextLabel(
   const normalizedType = normalizeType(type);
   if (locale === 'id') {
     if (normalizedType === 'company') return 'Profil Perusahaan';
-    if (normalizedType === 'job') return 'Pencari Kandidat';
+    if (normalizedType === 'job') return side === 'demand' ? 'Membutuhkan Kandidat' : 'Menawarkan Posisi';
     if (normalizedType === 'service')
       return side === 'demand' ? 'Membutuhkan Jasa' : 'Menawarkan Jasa';
     if (normalizedType === 'property')
