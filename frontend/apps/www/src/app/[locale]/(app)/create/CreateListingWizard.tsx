@@ -1477,6 +1477,9 @@ export default function CreateListingWizard({
   const [editingContentId, setEditingContentId] =
     useState<string | null>(null);
 
+  const [editingContentStatus, setEditingContentStatus] =
+    useState<string>('active');
+
   const [editingContentMetadata, setEditingContentMetadata] =
     useState<Record<string, unknown> | null>(null);
 
@@ -2024,6 +2027,7 @@ export default function CreateListingWizard({
           )
         ) {
           setEditingContentId(null);
+          setEditingContentStatus('draft');
           setEditingContentMetadata(null);
           setEditingContentType(null);
 
@@ -2068,34 +2072,36 @@ export default function CreateListingWizard({
           const contentStatus =
             valueAsString(
               content.content_status,
-            ).toLowerCase();
+            ).toLowerCase() ||
+            valueAsString(content.status).toLowerCase() ||
+            'draft';
 
-          if (
-            contentStatus === 'active' ||
-            contentStatus === 'published'
-          ) {
-            setEditingContentId(
-              content.id,
+          if (contentStatus === 'deleted') {
+            throw new Error(
+              text(
+                locale,
+                'Postingan ini sudah dihapus dan tidak bisa diedit lagi.',
+                'This post has been deleted and cannot be edited.',
+              ),
             );
-            setEditingContentMetadata(
-              valueAsRecord(
-                content.metadata,
-              ) || {},
-            );
-            setEditingContentType(
-              valueAsString(
-                content.content_type,
-              ) ||
-                valueAsString(
-                  content.type,
-                ) ||
-                null,
-            );
-          } else {
-            setEditingContentId(null);
-            setEditingContentMetadata(null);
-            setEditingContentType(null);
           }
+
+          setEditingContentId(content.id);
+          setEditingContentStatus(contentStatus);
+          setEditingContentMetadata(
+            valueAsRecord(
+              content.metadata,
+            ) || {},
+          );
+          setEditingContentType(
+            valueAsString(
+              content.content_type,
+            ) ||
+              valueAsString(
+                content.type,
+              ) ||
+              null,
+          );
 
           if (
             user?.id &&
@@ -2160,6 +2166,7 @@ export default function CreateListingWizard({
       }
 
       setEditingContentId(null);
+      setEditingContentStatus('draft');
       setEditingContentMetadata(null);
       setEditingContentType(null);
 
@@ -2951,7 +2958,9 @@ export default function CreateListingWizard({
                 category?.contentType ||
                 valueAsString(metadata.category),
               metadata,
-              content_status: 'active',
+              content_status: options.autosave
+                ? editingContentStatus || 'draft'
+                : 'active',
             };
 
             let response: Response | null = null;
@@ -3037,6 +3046,9 @@ export default function CreateListingWizard({
                 valueAsRecord(updatedRecord.metadata) ||
                 metadata,
               );
+            }
+            if (!options.autosave) {
+              setEditingContentStatus('active');
             }
             setSaveStatus('saved');
             setLastSavedAt(new Date().toISOString());
@@ -3158,6 +3170,7 @@ export default function CreateListingWizard({
         currentStep,
         editingContentId,
         editingContentMetadata,
+        editingContentStatus,
         editingContentType,
         industryIds,
         intent,
