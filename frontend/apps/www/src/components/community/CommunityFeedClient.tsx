@@ -5474,7 +5474,7 @@ function GroupDetailPanel({
   );
 }
 
-function GroupCard({
+export function GroupCard({
   group,
   isId,
   compact = false,
