@@ -26,12 +26,8 @@ export default async function ContentDetailPage({ params }: PageProps) {
   }
 
   const isActive = isPublicContentActive(result.content);
-  let isOwner = false;
-  if (!isActive) {
-    const viewerUserId = await getViewerUserId();
-    const ownerId = String(result.content.owner_id || '').trim();
-    isOwner = Boolean(viewerUserId && ownerId && viewerUserId === ownerId);
-    if (!isOwner) notFound();
+  if (!isActive && !result.content.owner_id) {
+    notFound();
   }
 
   if (
