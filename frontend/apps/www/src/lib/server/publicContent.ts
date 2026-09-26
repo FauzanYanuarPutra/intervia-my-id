@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { cache } from 'react';
+import { headers } from 'next/headers';
 import { extractContentId } from '@/lib/content/routes';
 
 type ContentRecord = Record<string, unknown>;
@@ -59,6 +60,35 @@ async function fetchOwnerProfile(
     );
   } catch {
     return null;
+  }
+}
+
+export async function getViewerUserId(): Promise<string> {
+  try {
+    const requestHeaders = await headers();
+    const forwardedHeaders: Record<string, string> = {
+      Accept: 'application/json',
+    };
+    const cookie = requestHeaders.get('cookie');
+    const authorization = requestHeaders.get('authorization');
+    if (cookie) forwardedHeaders.Cookie = cookie;
+    if (authorization) forwardedHeaders.Authorization = authorization;
+
+    const response = await fetch(new URL('/auth/me', IDENTITY_URL), {
+      headers: forwardedHeaders,
+      cache: 'no-store',
+      signal: AbortSignal.timeout(2_500),
+    });
+    if (!response.ok) return '';
+
+    const payload = asRecord(await response.json().catch(() => null));
+    const user =
+      asRecord(payload?.user) ||
+      asRecord(payload?.data) ||
+      asRecord(payload);
+    return readString(user?.id);
+  } catch {
+    return '';
   }
 }
 
