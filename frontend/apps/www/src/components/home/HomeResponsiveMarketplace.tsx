@@ -2152,7 +2152,7 @@ function RecommendationsLoadingSkeleton({
       aria-label={
         demand
           ? isId
-            ? 'Memuat kebutuhan yang sedang dicari'
+            ? 'Memuat kebutuhan yang sedang dipublikasikan'
             : 'Loading current requests'
           : isId
             ? 'Memuat rekomendasi listing'
@@ -2217,7 +2217,7 @@ function HomeListingCarouselSection({
       aria-label={
         isDemand
           ? isId
-            ? 'Orang sedang mencari'
+            ? 'Orang sedang membutuhkan'
             : 'What people are looking for'
           : isId
             ? 'Rekomendasi penawaran untuk usahamu'
@@ -2244,7 +2244,7 @@ function HomeListingCarouselSection({
         <span className="hidden shrink-0 text-[9px] font-medium text-zinc-400 sm:inline">
           {isDemand
             ? isId
-              ? 'Kebutuhan yang sedang dicari'
+              ? 'Kebutuhan yang sedang dipublikasikan'
               : 'Current needs posted by others'
             : isId
               ? 'Produk, jasa, lokasi & sewa'
