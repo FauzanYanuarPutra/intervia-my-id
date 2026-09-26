@@ -4,6 +4,8 @@ import { requireAuth } from '@/lib/serverAuth';
 import { parseJsonBody } from '@/lib/serverRequest';
 import { enforceRateLimit } from '@/lib/rateLimit';
 import { evaluateTrustSafety } from '@/lib/trustSafety';
+import { normalizeNewsMediaUrl } from '@/lib/newsMediaUrl';
+import { sanitizeNewsRichText } from '@/lib/newsRichText';
 
 const MARKETPLACE_URL = (
   process.env.INTERNAL_MARKETPLACE_URL ||
@@ -37,32 +39,11 @@ function sanitizeText(value: string, maxLength: number) {
 }
 
 function isSafePublicUrl(value: string): boolean {
-  return normalizeSafeExternalHttpUrl(value) !== null;
+  return Boolean(normalizeNewsMediaUrl(value));
 }
 
 function sanitizeRichText(value: string, maxLength: number) {
-  let html = value.replace(/<!--([\s\S]*?)-->/g, '');
-  html = html.replace(/<\/?(script|style|iframe|object|embed|form|input|button|textarea|select|svg|math)[^>]*>/gi, '');
-  html = html.replace(/\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '');
-  html = html.replace(/(href|src)\s*=\s*(['"]?)\s*(javascript:|data:|vbscript:)[^'">\s]*\2/gi, '$1=$2$2');
-  html = html.replace(/<img([^>]*)>/gi, (_m, attrs) => {
-    const src = attrs.match(/\ssrc\s*=\s*(['"])(.*?)\1/i)?.[2] || '';
-    const alt = attrs.match(/\salt\s*=\s*(['"])(.*?)\1/i)?.[2] || '';
-    if (!isSafePublicUrl(src)) return '';
-    return '<img src="' + src.replace(/"/g, '&quot;') + '" alt="' + alt.replace(/"/g, '&quot;').slice(0, 300) + '" loading="lazy" />';
-  });
-  html = html.replace(/<a([^>]*)href\s*=\s*(['"])(.*?)\2([^>]*)>/gi, (_m, before, _q, href, after) => {
-    try {
-      const url = new URL(href);
-      if (!['http:', 'https:'].includes(url.protocol) || !normalizeSafeExternalHttpUrl(url.toString())) return '<a>';
-      return '<a' + before + ' href="' + url.toString().replace(/"/g, '&quot;') + '" target="_blank" rel="noopener noreferrer nofollow"' + after + '>';
-    } catch {
-      return '<a>';
-    }
-  });
-  html = html.replace(/<figcaption([^>]*)>([\s\S]*?)<\/figcaption>/gi, '<figcaption>$2</figcaption>');
-  html = html.replace(/<(?!\/?(?:p|br|strong|b|em|i|u|s|h2|h3|blockquote|ul|ol|li|a|img|figure|figcaption|pre|code)(?:\s|>|\/))[^>]*>/gi, '');
-  return html.slice(0, maxLength);
+  return sanitizeNewsRichText(value, maxLength);
 }
 
 function sanitizeTopics(value: unknown): string[] {
@@ -126,7 +107,7 @@ export async function PATCH(
   const articleBody = body.body === undefined ? undefined : readString(body.body);
   const richBodyRaw = body.rich_body === undefined ? undefined : readString(body.rich_body);
   const richBody = richBodyRaw === undefined ? undefined : sanitizeRichText(richBodyRaw, 60_000);
-  const coverImage = body.cover_image === undefined ? undefined : readString(body.cover_image);
+  const coverImage = body.cover_image === undefined ? undefined : normalizeNewsMediaUrl(body.cover_image);
   const category = body.category === undefined ? undefined : readString(body.category);
   const kind = body.article_kind === undefined ? undefined : readString(body.article_kind);
   const location = body.location === undefined ? undefined : readString(body.location);
