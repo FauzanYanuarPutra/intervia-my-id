@@ -13,7 +13,11 @@ import {
   useSearchParams,
 } from 'next/navigation';
 
-import { ExploreSearchResults } from '@/components/explore/ExploreSearchResults';
+import {
+  ExploreSearchResults,
+  SEARCH_GROUPS,
+  SEARCH_GROUP_COPY,
+} from '@/components/explore/ExploreSearchResults';
 import { Modal } from '@/components/common/Modal';
 import { ExploreFilterDrawer } from '@/components/explore/ExploreFilterDrawer';
 import { EmblaDesktopControls } from '@/components/common/EmblaDesktopControls';
