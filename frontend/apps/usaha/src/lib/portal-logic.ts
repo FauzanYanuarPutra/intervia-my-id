@@ -33,6 +33,7 @@ const sectionOrder: PortalSection[] = [
   'inventory',
   'finance',
   'parties',
+  'growth',
   'channels',
   'reports',
   'operations',
@@ -48,6 +49,9 @@ export function visiblePortalSections(permissions: PermissionId[]): PortalSectio
   return sectionOrder.filter(section => {
     if (section === 'parties') {
       return permissions.some(permission => ['viewOrders', 'viewFinance', 'viewInventory'].includes(permission));
+    }
+    if (section === 'growth') {
+      return permissions.some(permission => ['viewReports', 'viewChannels', 'viewBuyerPage'].includes(permission));
     }
     const permission = sectionPermission[section];
     return !permission || permissions.includes(permission);
@@ -72,6 +76,7 @@ export function buildSectionHref(businessId: string, section: PortalSection) {
     case 'operations': return `/businesses/${businessId}/operations`;
     case 'work': return `/businesses/${businessId}/work`;
     case 'parties': return `/businesses/${businessId}/parties`;
+    case 'growth': return `/businesses/${businessId}/growth`;
     case 'team': return `/businesses/${businessId}/team`;
     case 'buyerPage': return `/businesses/${businessId}/buyer-page`;
     case 'security': return `/security?business=${businessId}`;
