@@ -89,7 +89,12 @@ describe('GET /api/my-listings', () => {
     expect(response.status).toBe(200);
     expect(payload).toEqual({
       results: [
-        { id: 'owned', owner_id: OWNER_ID, content_status: 'archived' },
+        {
+          id: 'owned',
+          owner_id: OWNER_ID,
+          content_status: 'archived',
+          content_type: 'service',
+        },
       ],
       total: 1,
     });
