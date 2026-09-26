@@ -1,5 +1,7 @@
 import { normalizeSafeExternalHttpUrl } from 'lajukan-ui';
 
+const SITE_URL = (process.env.NEXT_PUBLIC_APP_URL || 'https://www.lajukan.com').replace(/\/+$/, '');
+
 const SAFE_RELATIVE_PREFIXES = [
   '/api/content/media/',
   '/uploads/content/',
@@ -32,7 +34,7 @@ export function absoluteNewsMediaUrl(value: unknown): string | null {
   const normalized = normalizeNewsMediaUrl(value);
   if (!normalized) return null;
   if (normalized.startsWith('/')) {
-    return `https://www.lajukan.com${normalized}`;
+    return `${SITE_URL}${normalized}`;
   }
   return normalized;
 }
