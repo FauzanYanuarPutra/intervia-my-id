@@ -1,7 +1,7 @@
 import type { CrmNavItem, PageId } from './types';
 
 export const PRIMARY_CRM_PAGES = [
-  'dashboard', 'pipeline', 'users', 'businesses', 'listings', 'news', 'transactions', 'chat', 'disputes',
+  'dashboard', 'pipeline', 'matching', 'users', 'businesses', 'listings', 'news', 'transactions', 'chat', 'disputes',
 ] as const satisfies readonly PageId[];
 
 export const SECONDARY_CRM_PAGES = [
@@ -11,6 +11,7 @@ export const SECONDARY_CRM_PAGES = [
 export const CRM_NAV_ITEMS: readonly CrmNavItem[] = [
   { id: 'dashboard', label: 'Hari ini', hint: 'Prioritas hari ini', icon: 'dashboard' },
   { id: 'pipeline', label: 'Pipeline', hint: 'Lead dan follow-up', icon: 'pipeline' },
+  { id: 'matching', label: 'Lajukan Match', hint: 'Kebutuhan & koneksi', icon: 'search' },
   { id: 'users', label: 'User', hint: 'Profil & trust', icon: 'users' },
   { id: 'businesses', label: 'Usaha', hint: 'Verifikasi & penayangan usaha', icon: 'listings' },
   { id: 'listings', label: 'Listing', hint: 'Report & moderasi', icon: 'listings' },
