@@ -119,6 +119,7 @@ export default async function HomePage({
   const canViewOrders = hasPermission(business, 'viewOrders');
   const canManageInfo = hasPermission(business, 'manageInfo');
   const canManageInventory = hasPermission(business, 'manageInventory');
+  const canViewBuyerPage = hasPermission(business, 'viewBuyerPage');
 
   const { ingredients, financeEntries, channels } = await settleHomeControlData({
     ingredients: canViewCosting
@@ -175,6 +176,8 @@ export default async function HomePage({
     productsMissingChannelPriceCount: null,
     unreconciledSettlementCount,
     financeEntryCount: financeEntries.length,
+    canViewBuyerPage,
+    buyerPageReady: business.buyerPageReady,
   });
 
   const foundationAction = canManageInfo
