@@ -127,6 +127,7 @@ import {
   GroupCard,
   GroupMembersModal,
 } from '@/components/community/CommunityFeedClient';
+import { normalizeCommunityMediaItems } from '@/components/community/community-feed-helpers';
 import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 import { UMKM_DISCOVERY_PATH } from '@/lib/umkmSurface';
 import {
