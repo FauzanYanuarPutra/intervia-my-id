@@ -2552,9 +2552,11 @@ function RecommendationCard({
   );
 
   const price =
-    item.unit && item.unit !== 'item'
-      ? `${item.price} / ${item.unit}`
-      : item.price;
+    isDemand
+      ? item.price
+      : item.unit && item.unit !== 'item'
+        ? `${item.price} / ${item.unit}`
+        : item.price;
 
   const locationLabel =
     item.distanceLabel || item.location;
