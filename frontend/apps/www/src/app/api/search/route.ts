@@ -481,6 +481,15 @@ function mapContentItem(
     return null;
   }
 
+  const nestedMetadataSources = [
+    asRecord(metadata?.attributes),
+    asRecord(metadata?.values),
+    asRecord(metadata?.form_values),
+    asRecord(metadata?.listing_values),
+  ].filter(
+    (value): value is JsonRecord => Boolean(value),
+  );
+
   const owner =
     asRecord(
       item.owner_profile,
@@ -546,6 +555,13 @@ function mapContentItem(
       metadata?.unit,
       metadata?.quantity_unit,
       metadata?.unit_label,
+      ...nestedMetadataSources.flatMap(source => [
+        source.unit,
+        source.quantity_unit,
+        source.unit_label,
+        source.required_unit,
+        source.need_unit,
+      ]),
     );
 
   const budgetLabel =
@@ -832,6 +848,15 @@ function mapContentItem(
         firstString(
           item.price_unit,
           metadata?.price_unit,
+          metadata?.unit,
+          metadata?.unit_label,
+          ...nestedMetadataSources.flatMap(source => [
+            source.price_unit,
+            source.unit,
+            source.unit_label,
+            source.price_basis,
+            source.rate_unit,
+          ]),
         ),
 
       condition:
