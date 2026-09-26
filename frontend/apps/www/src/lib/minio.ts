@@ -139,10 +139,6 @@ export async function uploadToMinIO(
     throw new Error('MinIO object verification failed');
   }
 
-  const safePublicUrl =
-    publicUrl && normalizeSafeExternalHttpUrl(publicUrl)
-      ? normalizeSafeExternalHttpUrl(publicUrl)
-      : null;
   const canonicalPublicMediaUrl =
     `/api/content/media/${encodeURIComponent(bucket)}/${key.split('/').map(encodeURIComponent).join('/')}`;
   const url = personalAiUserId
