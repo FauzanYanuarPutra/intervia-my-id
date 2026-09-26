@@ -59,6 +59,16 @@ describe('buildMerchantNextActions', () => {
     ]);
   });
 
+  it('surfaces the storefront only as a secondary action', () => {
+    const actions = buildMerchantNextActions({
+      ...base,
+      canViewBuyerPage: true,
+      buyerPageReady: false,
+      lowStockCount: 0,
+    });
+    expect(actions.at(-1)?.kind).toBe('prepare_buyer_page');
+  });
+
   it('offers channel pricing and first money entry only when durable state and permissions say they are needed', () => {
     expect(buildMerchantNextActions({ ...base, enabledChannelCount: 1, productsMissingChannelPriceCount: 1 })[0]?.kind).toBe('set_channel_price');
     expect(buildMerchantNextActions({ ...base, canViewChannels: false, enabledChannelCount: 1, productsMissingChannelPriceCount: 1 }).some(action => action.kind === 'set_channel_price')).toBe(false);
