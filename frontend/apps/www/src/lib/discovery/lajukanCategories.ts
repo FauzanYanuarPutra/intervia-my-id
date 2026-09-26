@@ -223,7 +223,7 @@ export function normalizeExploreSide(
  * Convert marketplace side to UI text.
  *
  * supply -> Menawarkan
- * demand -> Membutuhkan
+ * demand -> Mencari
  */
 export function getExploreSideLabel({
   locale,
@@ -235,7 +235,7 @@ export function getExploreSideLabel({
 
   if (side === 'demand') {
     return locale === 'id'
-      ? 'Membutuhkan'
+      ? 'Mencari'
       : 'Looking for';
   }
 
