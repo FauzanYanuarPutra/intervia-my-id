@@ -219,7 +219,7 @@ function CartLines({ lines, onQuantity, onEdit }: { lines: DraftLine[]; onQuanti
   );
 }
 
-export function QuickSaleWorkspace({ businessId, products, channels = [], locations = [], defaultDate }: Props) {
+export function QuickSaleWorkspace({ businessId, products, channels = [], locations = [], parties = [], defaultDate }: Props) {
   const channelOptions = channels.length ? channels : fallbackChannelOptions;
   const defaultLocationId = locations.find(location => location.isPrimary)?.id ?? locations[0]?.id ?? null;
   const router = useRouter();
