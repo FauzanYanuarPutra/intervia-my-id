@@ -53,6 +53,30 @@ describe('POS checkout helpers', () => {
       .not.toBe(quickSale.quickSaleLineIdentity({ ...base, note: 'pakai sedotan' }));
   });
 
+  it('requires a customer for receivable checkout', () => {
+    expect(quickSale.canCompleteCheckout({ total: 25_000, paymentMethod: 'receivable', lineCount: 1, partyId: null })).toBe(false);
+    expect(quickSale.canCompleteCheckout({ total: 25_000, paymentMethod: 'receivable', lineCount: 1, partyId: 'party-1' })).toBe(true);
+    expect(quickSale.canCompleteCheckout({ total: 25_000, paymentMethod: 'cash', lineCount: 1, partyId: null, tenderedAmount: 25_000 })).toBe(true);
+  });
+
+  it('serializes selected customer into the sale request', () => {
+    const request = quickSale.buildQuickSaleRequest({
+      occurredOn: '2026-09-16',
+      channelKey: 'offline',
+      accountKey: 'receivable',
+      partyId: 'party-1',
+      lines: [{
+        productId: 'naga',
+        quantity: 1,
+        basePriceAmount: 12_000,
+        unitPricePreviewAmount: 12_000,
+        discountAmount: 0,
+      }],
+    });
+    expect(request).toHaveProperty('party_id', 'party-1');
+    expect(request.account_key).toBe('receivable');
+  });
+
   it('serializes selected IDs and note without client price authority', () => {
     const request = quickSale.buildQuickSaleRequest({
       occurredOn: '2026-09-16', channelKey: 'offline', accountKey: 'cash',
