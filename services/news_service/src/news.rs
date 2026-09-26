@@ -403,7 +403,11 @@ fn public_news_row(
         },
         tags: if is_retracted { None } else { row.tags },
         cover_image: if is_retracted { None } else { row.cover_image },
-        metadata: public_news_metadata(&row.metadata, public_sources, include_body),
+        metadata: public_news_metadata(
+            &row.metadata,
+            public_sources,
+            include_body && !is_retracted,
+        ),
         content_status: row.content_status,
         published_at: row.published_at,
         created_at: row.created_at,
