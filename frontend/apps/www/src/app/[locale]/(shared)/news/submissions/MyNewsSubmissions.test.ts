@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('@/i18n/navigation', () => ({ Link: 'a' }));
 import { submissionFormFromItem } from './MyNewsSubmissions';
 
 describe('submissionFormFromItem', () => {

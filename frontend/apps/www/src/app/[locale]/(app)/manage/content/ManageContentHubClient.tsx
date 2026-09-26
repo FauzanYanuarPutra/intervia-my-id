@@ -134,7 +134,10 @@ export default function ManageContentHubClient() {
 
   useEffect(() => {
     if (authLoading) return;
-    void loadData();
+    const task = globalThis.setTimeout(() => {
+      void loadData();
+    }, 0);
+    return () => globalThis.clearTimeout(task);
   }, [authLoading, loadData]);
 
   if (authLoading || loading) {

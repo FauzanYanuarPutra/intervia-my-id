@@ -1,5 +1,9 @@
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('@/context/AuthContext', () => ({
+  useAuth: () => ({ user: null }),
+}));
 
 import { ExploreListingCard } from '@/components/explore/cards/ExploreListingCard';
 import { NeedSearchCard } from './NeedSearchCard';
@@ -55,7 +59,7 @@ describe('search result card preview mode', () => {
       />,
     );
 
-    expect(html).toContain('Mencari');
+    expect(html).toContain('Membutuhkan');
     expect(html).toContain('Budget fleksibel');
     expect(html).not.toContain('LAJUKAN');
     expect(html).not.toContain('Buka brief');
@@ -75,7 +79,7 @@ describe('search result card preview mode', () => {
       />,
     );
 
-    expect(html).toContain('Mencari');
+    expect(html).toContain('Membutuhkan');
     expect(html).toContain('Budget fleksibel');
     expect(html).not.toContain('Menawarkan');
   });
