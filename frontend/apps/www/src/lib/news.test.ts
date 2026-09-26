@@ -54,6 +54,22 @@ describe('news SEO normalization', () => {
     expect(article?.tags).toEqual(['qris', 'harga pangan']);
   });
 
+  it('normalizes protected uploaded cover media', () => {
+    const article = normalizeNewsArticle({
+      id: '11111111-1111-1111-1111-111111111111',
+      slug: 'cover',
+      title: 'Berita dengan cover',
+      summary: 'Ringkasan berita yang cukup panjang untuk validasi.',
+      body: 'Isi berita',
+      cover_image: '/api/content/media/laju-chat/content/cover.webp',
+      metadata: { news: { category: 'Ekonomi' } },
+      created_at: '2026-09-18T00:00:00Z',
+    });
+    expect(article?.coverImage).toBe(
+      '/api/content/media/laju-chat/content/cover.webp',
+    );
+  });
+
   it('emits NewsArticle structured data', () => {
     const article = normalizeNewsArticle({
       id: '11111111-1111-1111-1111-111111111111',
