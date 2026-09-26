@@ -547,7 +547,7 @@ function summarizeMessageForAction(message: Message): string {
   if (kind === 'transaction') return 'Transaksi';
   if (kind === 'offer') return 'Penawaran';
   if (kind === 'application') return 'Lamaran';
-  if (message.attachments?.length) return 'Lampiran';
+  if (message.attachments?.length) return 'Media';
   return 'Pesan';
 }
 
@@ -791,7 +791,7 @@ function ChatReferenceMediaPreview({
       : kind === 'file'
         ? 'File'
         : locale === 'id'
-          ? 'Lampiran media'
+          ? 'Media'
           : 'Media attachment';
 
   return (
@@ -919,7 +919,7 @@ function ChatMediaLightbox({
         <button type="button" onClick={onClose} className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/10"><X className="h-5 w-5" /></button>
       </div>
       <div className="relative flex min-h-0 flex-1 items-center justify-center px-3 pb-3 sm:px-8" onClick={event => event.stopPropagation()}>
-        {kind === 'image' ? <img src={url} alt="" className="max-h-full max-w-full object-contain" /> : kind === 'video' ? <video src={url} controls autoPlay playsInline className="max-h-full max-w-full rounded-lg bg-black object-contain" /> : kind === 'audio' ? <div className="flex w-full max-w-lg flex-col items-center gap-4 rounded-2xl bg-white/8 p-6"><Mic className="h-10 w-10 text-[#25d366]" /><audio src={url} controls className="w-full" /></div> : <div className="flex max-w-lg flex-col items-center gap-4 rounded-2xl bg-white/8 p-6 text-center"><FileText className="h-12 w-12 text-white/75" /><p className="text-sm font-bold">{locale === 'id' ? 'Lampiran file' : 'File attachment'}</p><a href={url} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#25d366] px-4 text-sm font-bold text-[#0b141a]"><Download className="h-4 w-4" />{locale === 'id' ? 'Buka file' : 'Open file'}</a></div>}
+        {kind === 'image' ? <img src={url} alt="" className="max-h-full max-w-full object-contain" /> : kind === 'video' ? <video src={url} controls autoPlay playsInline className="max-h-full max-w-full rounded-lg bg-black object-contain" /> : kind === 'audio' ? <div className="flex w-full max-w-lg flex-col items-center gap-4 rounded-2xl bg-white/8 p-6"><Mic className="h-10 w-10 text-[#25d366]" /><audio src={url} controls className="w-full" /></div> : <div className="flex max-w-lg flex-col items-center gap-4 rounded-2xl bg-white/8 p-6 text-center"><FileText className="h-12 w-12 text-white/75" /><p className="text-sm font-bold">{locale === 'id' ? 'Dokumen' : 'Document'}</p><a href={url} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#25d366] px-4 text-sm font-bold text-[#0b141a]"><Download className="h-4 w-4" />{locale === 'id' ? 'Buka dokumen' : 'Open document'}</a></div>}
         {viewer.attachments.length > 1 ? <><button type="button" onClick={() => onIndexChange((viewer.index - 1 + viewer.attachments.length) % viewer.attachments.length)} className="absolute left-2 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 sm:left-5"><ChevronLeft className="h-5 w-5" /></button><button type="button" onClick={() => onIndexChange((viewer.index + 1) % viewer.attachments.length)} className="absolute right-2 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 sm:right-5"><ChevronRight className="h-5 w-5" /></button></> : null}
       </div>
       {viewer.attachments.length > 1 ? <div className="flex shrink-0 gap-1.5 overflow-x-auto px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-1 sm:px-5" onClick={event => event.stopPropagation()}>{viewer.attachments.slice(0, 20).map((rawUrl, index) => { const thumb = normalizeAttachmentUrl(rawUrl); const thumbKind = resolveAttachmentKind(viewer.messageType, thumb); return <button key={rawUrl + index} type="button" onClick={() => onIndexChange(index)} className={'h-14 w-14 shrink-0 overflow-hidden rounded-lg border ' + (index === viewer.index ? 'border-[#25d366] ring-2 ring-[#25d366]/35' : 'border-white/10 opacity-70')}>{thumbKind === 'image' ? <img src={thumb} alt="" className="h-full w-full object-cover" /> : thumbKind === 'video' ? <video src={thumb} muted playsInline className="h-full w-full object-cover" /> : thumbKind === 'audio' ? <div className="flex h-full w-full items-center justify-center bg-white/10"><Mic className="h-4 w-4 text-[#25d366]" /></div> : <div className="flex h-full w-full items-center justify-center bg-white/10"><FileText className="h-4 w-4 text-white/70" /></div>}</button>; })}</div> : null}
@@ -4048,7 +4048,7 @@ export default function ChatRoomPage() {
                 ? uploadData.error
                 : typeof uploadData.message === 'string'
                   ? uploadData.message
-                  : 'Upload media gagal.';
+                  : 'Gagal mengunggah media.';
             const retryable = isRetryableChatUploadStatus(uploadRes.status);
             if (retryable && attempt < 2) {
               await delayChatUpload(650 * (attempt + 1));
@@ -4060,7 +4060,7 @@ export default function ChatRoomPage() {
           const uploaded = extractChatUploadPayload(uploadData);
           const fileUrl = normalizeAttachmentUrl(uploaded.url);
           if (!fileUrl) {
-            throw new Error('Upload berhasil tetapi URL media tidak valid.');
+            throw new Error('Media berhasil diunggah, tetapi tautannya tidak valid.');
           }
 
           const uploadType =
@@ -8305,8 +8305,8 @@ export default function ChatRoomPage() {
                         : 'Uploading…'
                       : activeDraftAttachment.status === 'error'
                         ? chatLocale === 'id'
-                          ? 'Upload-nya gagal. Coba lagi ya'
-                          : 'Upload failed'
+                          ? 'Gagal mengunggah. Coba lagi.'
+                          : 'Upload failed.'
                         : chatLocale === 'id'
                           ? 'Siap dikirim'
                           : 'Ready to send'}
@@ -8317,7 +8317,7 @@ export default function ChatRoomPage() {
                   onClick={() => clearDraftAttachments()}
                   className="inline-flex h-8 shrink-0 items-center rounded-full bg-[#f0f2f5] px-2.5 text-[10px] font-bold text-[#54656f] transition hover:bg-[#e9edef] dark:bg-[#202c33] dark:text-[#aebac1] dark:hover:bg-[#2a3942]"
                 >
-                  {chatLocale === 'id' ? 'Hapus' : 'Clear'}
+                  {chatLocale === 'id' ? 'Hapus semua' : 'Clear all'}
                 </button>
               </div>
 
@@ -8413,7 +8413,7 @@ export default function ChatRoomPage() {
                         className="absolute left-1.5 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white"
                         aria-label={
                           chatLocale === 'id'
-                            ? 'Lampiran sebelumnya'
+                            ? 'Media sebelumnya'
                             : 'Previous attachment'
                         }
                       >
@@ -8425,7 +8425,7 @@ export default function ChatRoomPage() {
                         className="absolute right-1.5 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white"
                         aria-label={
                           chatLocale === 'id'
-                            ? 'Lampiran berikutnya'
+                            ? 'Media berikutnya'
                             : 'Next attachment'
                         }
                       >
@@ -8451,7 +8451,7 @@ export default function ChatRoomPage() {
                         }
                         className="inline-flex h-6 shrink-0 items-center rounded-full bg-white px-2 text-[9px] font-bold text-[#128c7e]"
                       >
-                        {chatLocale === 'id' ? 'Ulangi' : 'Retry'}
+                        {chatLocale === 'id' ? 'Coba lagi' : 'Try again'}
                       </button>
                     ) : (
                       <span className="inline-flex h-6 shrink-0 items-center rounded-full bg-[#25d366] px-2 text-[9px] font-bold text-[#0b141a]">
@@ -8476,7 +8476,7 @@ export default function ChatRoomPage() {
                             ? 'border-[#25d366] ring-2 ring-[#25d366]/25'
                             : 'border-black/5 opacity-75 hover:opacity-100 dark:border-white/8'
                         }`}
-                        aria-label={`${chatLocale === 'id' ? 'Buka media' : 'Open media'} ${index + 1}`}
+                        aria-label={`${chatLocale === 'id' ? 'Pilih media' : 'Select media'} ${index + 1}`}
                       >
                         {attachment.type === 'image' &&
                         attachment.previewUrl ? (
@@ -8508,7 +8508,7 @@ export default function ChatRoomPage() {
                           </span>
                         ) : attachment.status === 'error' ? (
                           <span className="absolute inset-x-1 bottom-1 rounded-full bg-white px-1 py-0.5 text-[8px] font-bold text-[#d14343]">
-                            {chatLocale === 'id' ? 'Ulangi' : 'Retry'}
+                            {chatLocale === 'id' ? 'Coba lagi' : 'Try again'}
                           </span>
                         ) : null}
                       </button>
@@ -8560,7 +8560,7 @@ export default function ChatRoomPage() {
                 onClick={() => setComposerAction(null)}
                 className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#54656f] transition hover:bg-black/5 dark:text-[#aebac1] dark:hover:bg-white/5 sm:h-10 sm:w-10"
                 aria-label={
-                  chatLocale === 'id' ? 'Batalkan aksi pesan' : 'Cancel action'
+                  chatLocale === 'id' ? 'Batalkan balasan' : 'Cancel reply'
                 }
               >
                 <X className="h-4 w-4" />
@@ -8658,7 +8658,7 @@ export default function ChatRoomPage() {
                         className="truncate text-[11px] font-bold text-[#008f72] dark:text-[#25d366]"
                       >
                         {chatLocale === 'id'
-                          ? 'Dengarkan sebelum dilampirkan'
+                          ? 'Dengarkan sebelum dikirim'
                           : 'Listen before attaching'}
                       </span>
                       <span className="shrink-0 text-[11px] tabular-nums text-[#667781] dark:text-[#aebac1]">
@@ -8682,13 +8682,13 @@ export default function ChatRoomPage() {
                     className="inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-full bg-[#00a884] px-3 text-xs font-bold text-white shadow-sm transition hover:bg-[#008f72] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#25d366]/40"
                     aria-label={
                       chatLocale === 'id'
-                        ? 'Lampirkan pesan suara'
+                        ? 'Pakai rekaman suara'
                         : 'Attach voice note'
                     }
                   >
                     <Check className="h-4 w-4" />
                     <span className="hidden sm:inline">
-                      {chatLocale === 'id' ? 'Lampirkan' : 'Attach'}
+                      {chatLocale === 'id' ? 'Pakai' : 'Use'}
                     </span>
                   </button>
                 </>
@@ -8726,18 +8726,18 @@ export default function ChatRoomPage() {
                       >
                         {voiceNoteStatus === 'requesting-permission'
                           ? chatLocale === 'id'
-                            ? 'Meminta izin mikrofon...'
+                            ? 'Meminta izin mikrofon…'
                             : 'Requesting microphone permission...'
                           : voiceNoteStatus === 'processing'
                             ? chatLocale === 'id'
-                              ? 'Menyiapkan rekaman...'
+                              ? 'Menyiapkan rekaman…'
                               : 'Preparing recording...'
                             : voiceNoteStatus === 'paused'
                               ? chatLocale === 'id'
                                 ? 'Rekaman dijeda'
                                 : 'Recording paused'
                               : chatLocale === 'id'
-                                ? 'Merekam pesan suara'
+                                ? 'Merekam…'
                                 : 'Recording voice note'}
                       </p>
                     </div>
@@ -8874,7 +8874,7 @@ export default function ChatRoomPage() {
                       isUploadingAttachments || isPeerBlocked || roomReadOnly
                     }
                     className="inline-flex h-11 w-11 items-center justify-center rounded-full text-[#54656f] transition hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-60 dark:text-[#aebac1] dark:hover:bg-white/5"
-                    title={chatLocale === 'id' ? 'Lampiran' : 'Attachments'}
+                    title={chatLocale === 'id' ? 'Media & file' : 'Media & files'}
                     aria-label={
                       chatLocale === 'id'
                         ? 'Buka pilihan lampiran'
@@ -11036,11 +11036,11 @@ export default function ChatRoomPage() {
           className="fixed inset-0 z-[11500] flex h-[100dvh] w-screen flex-col bg-[#0b141a] text-white"
           role="dialog"
           aria-modal="true"
-          aria-label={chatLocale === 'id' ? 'Pratinjau media sebelum dikirim' : 'Media preview before sending'}
+          aria-label={chatLocale === 'id' ? 'Pratinjau & kirim media' : 'Media preview before sending'}
         >
           <div className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 px-3 py-2.5 sm:px-5">
             <div className="min-w-0">
-              <p className="text-sm font-bold">{chatLocale === 'id' ? 'Pratinjau media' : 'Media preview'}</p>
+              <p className="text-sm font-bold">{chatLocale === 'id' ? 'Kirim media' : 'Send media'}</p>
               <p className="text-[10px] font-semibold text-white/55">
                 {activeDraftAttachmentIndex + 1}/{draftAttachments.length}
                 {isUploadingAttachments ? (chatLocale === 'id' ? ' · Mengunggah…' : ' · Uploading…') : ''}
@@ -11086,6 +11086,25 @@ export default function ChatRoomPage() {
               ))}
             </div>
             <div className="mx-auto flex w-full max-w-5xl items-end gap-2">
+              <button
+                type="button"
+                onClick={handleChooseFile}
+                disabled={isUploadingAttachments}
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/10 text-white disabled:opacity-40"
+                aria-label={chatLocale === 'id' ? 'Tambah media' : 'Add media'}
+                title={chatLocale === 'id' ? 'Tambah media' : 'Add media'}
+              >
+                <Paperclip className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => removeDraftAttachment(activeDraftAttachment.id)}
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/10 text-white"
+                aria-label={chatLocale === 'id' ? 'Hapus media ini' : 'Remove this media'}
+                title={chatLocale === 'id' ? 'Hapus media ini' : 'Remove this media'}
+              >
+                <Trash2 className="h-5 w-5" />
+              </button>
               <textarea value={newMessage} onChange={event => setNewMessage(event.target.value)} rows={2} placeholder={chatLocale === 'id' ? 'Tambahkan keterangan…' : 'Add a caption…'} className="min-h-11 min-w-0 flex-1 resize-none rounded-2xl border border-white/10 bg-[#202c33] px-3 py-2 text-sm font-medium text-white outline-none placeholder:text-white/40 focus:border-[#25d366]" />
               <button type="button" onClick={() => void handleSend()} disabled={sending || isUploadingAttachments || isPeerBlocked || roomReadOnly} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#25d366] text-[#0b141a] disabled:cursor-not-allowed disabled:opacity-45" aria-label={chatLocale === 'id' ? 'Kirim media' : 'Send media'}>
                 {sending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
