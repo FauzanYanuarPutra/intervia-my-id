@@ -20,6 +20,7 @@ const sectionPermission: Partial<Record<PortalSection, PermissionId>> = {
   channels: 'viewChannels',
   reports: 'viewReports',
   operations: 'viewOperations',
+  work: 'viewOperations',
   team: 'viewTeam',
   buyerPage: 'viewBuyerPage',
   security: 'manageSecurity',
@@ -34,6 +35,7 @@ const sectionOrder: PortalSection[] = [
   'channels',
   'reports',
   'operations',
+  'work',
   'info',
   'locations',
   'buyerPage',
@@ -64,6 +66,7 @@ export function buildSectionHref(businessId: string, section: PortalSection) {
     case 'channels': return `/businesses/${businessId}/channels`;
     case 'reports': return `/businesses/${businessId}/reports`;
     case 'operations': return `/businesses/${businessId}/operations`;
+    case 'work': return `/businesses/${businessId}/work`;
     case 'team': return `/businesses/${businessId}/team`;
     case 'buyerPage': return `/businesses/${businessId}/buyer-page`;
     case 'security': return `/security?business=${businessId}`;
