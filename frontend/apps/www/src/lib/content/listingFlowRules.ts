@@ -1319,8 +1319,9 @@ export function canTransitionContentStatus(
 
   const allowedNext: Record<string, Set<string>> = {
     draft: new Set(['active', 'archived', 'deleted']),
-    active: new Set(['paused', 'archived', 'deleted']),
-    paused: new Set(['active', 'archived', 'deleted']),
+    // Editing an existing published listing intentionally reopens moderation.
+    active: new Set(['draft', 'paused', 'archived', 'deleted']),
+    paused: new Set(['draft', 'active', 'archived', 'deleted']),
     archived: new Set(['draft', 'active', 'deleted']),
     deleted: new Set([]),
   };
