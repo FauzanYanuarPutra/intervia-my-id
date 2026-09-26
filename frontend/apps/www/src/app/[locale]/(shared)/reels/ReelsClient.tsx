@@ -895,35 +895,6 @@
       );
     }, []);
 
-    const recordSearchIntent = useCallback(
-      (query: string) => {
-        const trimmed = query.trim();
-        const tokens = tokenize(trimmed);
-        if (tokens.length === 0) return;
-
-        setSearchContextQuery(trimmed);
-
-        setProfile(current => {
-          const next = boostProfile(current, tokens, 1.1, trimmed);
-          writeProfile(next);
-          return next;
-        });
-
-        if (
-          trimmed.length >= 3 &&
-          activeReel &&
-          lastSearchSignalRef.current !== trimmed
-        ) {
-          lastSearchSignalRef.current = trimmed;
-          sendReelEvent(activeReel, 'search', {
-            query: trimmed,
-            source: 'search_input',
-          });
-        }
-      },
-      [activeReel, sendReelEvent],
-    );
-
     const sendReelEvent = useCallback(
       (
         reel: LajukanReel,
@@ -962,6 +933,35 @@
         performanceProfile.tier,
         replaceReel,
       ],
+    );
+
+    const recordSearchIntent = useCallback(
+      (query: string) => {
+        const trimmed = query.trim();
+        const tokens = tokenize(trimmed);
+        if (tokens.length === 0) return;
+
+        setSearchContextQuery(trimmed);
+
+        setProfile(current => {
+          const next = boostProfile(current, tokens, 1.1, trimmed);
+          writeProfile(next);
+          return next;
+        });
+
+        if (
+          trimmed.length >= 3 &&
+          activeReel &&
+          lastSearchSignalRef.current !== trimmed
+        ) {
+          lastSearchSignalRef.current = trimmed;
+          sendReelEvent(activeReel, 'search', {
+            query: trimmed,
+            source: 'search_input',
+          });
+        }
+      },
+      [activeReel, sendReelEvent],
     );
 
     const recordSignal = useCallback(
