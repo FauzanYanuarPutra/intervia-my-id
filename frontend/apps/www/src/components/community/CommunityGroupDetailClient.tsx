@@ -513,6 +513,7 @@ export default function CommunityGroupDetailClient({
   const [loadingMore, setLoadingMore] = useState(false);
   const [membersModalGroup, setMembersModalGroup] =
     useState<CommunityGroup | null>(null);
+  const [groupDescriptionExpanded, setGroupDescriptionExpanded] = useState(false);
 
   const selectedThreadId = searchParams.get('thread');
   const loginHref = buildLoginHref(pathname, searchParams.toString());
@@ -561,6 +562,10 @@ export default function CommunityGroupDetailClient({
       alive = false;
     };
   }, [slug, refreshKey]);
+
+  useEffect(() => {
+    setGroupDescriptionExpanded(false);
+  }, [group?.id, group?.description]);
 
   useEffect(() => {
     if (!group) return;
@@ -1148,9 +1153,34 @@ export default function CommunityGroupDetailClient({
             </div>
 
             <div className="grid gap-3 border-t border-slate-100 p-3.5 sm:p-4">
-              <p className="text-sm leading-6 text-[color:var(--app-text)]">
-                {group.description}
-              </p>
+              <div>
+                <p
+                  className={cn(
+                    'text-sm leading-6 text-[color:var(--app-text)]',
+                    !groupDescriptionExpanded && 'line-clamp-3',
+                  )}
+                >
+                  {group.description}
+                </p>
+                {group.description.length > 220 ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setGroupDescriptionExpanded(current => !current)
+                    }
+                    className="mt-1 inline-flex min-h-8 items-center rounded-full px-1 text-[11px] font-bold text-[color:var(--app-text-soft)] transition hover:text-[color:var(--app-text)]"
+                    aria-expanded={groupDescriptionExpanded}
+                  >
+                    {groupDescriptionExpanded
+                      ? isId
+                        ? 'Sembunyikan'
+                        : 'See less'
+                      : isId
+                        ? 'Lihat selengkapnya'
+                        : 'See more'}
+                  </button>
+                ) : null}
+              </div>
               <div className="flex flex-wrap gap-2 lg:flex-nowrap lg:justify-end">
                 <button
                   type="button"
