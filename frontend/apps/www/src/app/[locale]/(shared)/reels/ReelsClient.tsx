@@ -621,6 +621,7 @@
     const [searchContextQuery, setSearchContextQuery] = useState(
       initialSearchQuery.trim(),
     );
+    const lastSearchSignalRef = useRef('');
     const [muted, setMuted] = useState(() => readInitialMuted());
     const [soundUnlocked, setSoundUnlocked] = useState(() => !readInitialMuted());
     const [pausedByUser, setPausedByUser] = useState(false);
@@ -894,16 +895,34 @@
       );
     }, []);
 
-    const recordSearchIntent = useCallback((query: string) => {
-      const tokens = tokenize(query);
-      if (tokens.length === 0) return;
+    const recordSearchIntent = useCallback(
+      (query: string) => {
+        const trimmed = query.trim();
+        const tokens = tokenize(trimmed);
+        if (tokens.length === 0) return;
 
-      setProfile(current => {
-        const next = boostProfile(current, tokens, 1.1, query);
-        writeProfile(next);
-        return next;
-      });
-    }, []);
+        setSearchContextQuery(trimmed);
+
+        setProfile(current => {
+          const next = boostProfile(current, tokens, 1.1, trimmed);
+          writeProfile(next);
+          return next;
+        });
+
+        if (
+          trimmed.length >= 3 &&
+          activeReel &&
+          lastSearchSignalRef.current !== trimmed
+        ) {
+          lastSearchSignalRef.current = trimmed;
+          sendReelEvent(activeReel, 'search', {
+            query: trimmed,
+            source: 'search_input',
+          });
+        }
+      },
+      [activeReel, sendReelEvent],
+    );
 
     const sendReelEvent = useCallback(
       (
