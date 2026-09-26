@@ -407,6 +407,63 @@ async fn verify_google_oauth_schema(state: &Arc<AppState>) -> Result<bool, sqlx:
     .await
 }
 
+fn is_google_avatar_url(value: &str) -> bool {
+    value
+        .trim()
+        .to_ascii_lowercase()
+        .contains("googleusercontent.com")
+}
+
+fn is_default_profile_avatar_url(value: &str) -> bool {
+    let normalized = value.trim().to_ascii_lowercase();
+    normalized.is_empty()
+        || normalized == DEFAULT_PROFILE_AVATAR
+        || normalized.ends_with("/default-avatar.svg")
+        || normalized.contains("/default-avatar.svg?")
+}
+
+fn read_profile_avatar_candidate(metadata: Option<&Value>, picture: Option<&str>) -> Option<String> {
+    let metadata_avatar = metadata
+        .and_then(Value::as_object)
+        .and_then(|map| map.get("avatar_url"))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+
+    let metadata_media_avatar = metadata
+        .and_then(Value::as_object)
+        .and_then(|map| map.get("media"))
+        .and_then(Value::as_object)
+        .and_then(|media| media.get("avatar_url"))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+
+    metadata_avatar
+        .or(metadata_media_avatar)
+        .or_else(|| picture.map(str::trim).filter(|value| !value.is_empty()))
+        .map(str::to_string)
+}
+
+fn choose_google_login_avatar(
+    existing_picture: Option<&str>,
+    existing_metadata: Option<&Value>,
+    google_avatar: Option<&str>,
+) -> String {
+    let current = read_profile_avatar_candidate(existing_metadata, existing_picture);
+    if let Some(current) = current {
+        if !is_default_profile_avatar_url(&current) && !is_google_avatar_url(&current) {
+            return current;
+        }
+    }
+
+    google_avatar
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+        .unwrap_or_else(|| DEFAULT_PROFILE_AVATAR.to_string())
+}
+
 fn google_username_base(email: &str, name: Option<&str>) -> String {
     let source = name
         .map(str::trim)
@@ -567,6 +624,69 @@ async fn verify_google_id_token(
     })
 }
 // ------------------------------------------------------------------
+
+#[cfg(test)]
+mod media_persistence_tests {
+    use super::*;
+
+    #[test]
+    fn preserves_user_managed_avatar_when_google_logs_in_again() {
+        let metadata = json!({
+            "avatar_url": "/api/content/media/laju-chat/content/custom-avatar.jpg",
+            "avatar_source": "user_upload"
+        });
+
+        assert_eq!(
+            choose_google_login_avatar(
+                Some("/api/content/media/laju-chat/content/custom-avatar.jpg"),
+                Some(&metadata),
+                Some("https://lh3.googleusercontent.com/google-picture"),
+            ),
+            "/api/content/media/laju-chat/content/custom-avatar.jpg"
+        );
+    }
+
+    #[test]
+    fn uses_google_avatar_for_new_or_google_managed_profiles() {
+        assert_eq!(
+            choose_google_login_avatar(
+                None,
+                None,
+                Some("https://lh3.googleusercontent.com/google-picture"),
+            ),
+            "https://lh3.googleusercontent.com/google-picture"
+        );
+
+        let metadata = json!({
+            "avatar_url": "https://lh3.googleusercontent.com/old-picture"
+        });
+
+        assert_eq!(
+            choose_google_login_avatar(
+                Some("https://lh3.googleusercontent.com/old-picture"),
+                Some(&metadata),
+                Some("https://lh3.googleusercontent.com/new-picture"),
+            ),
+            "https://lh3.googleusercontent.com/new-picture"
+        );
+    }
+
+    #[test]
+    fn preserves_generated_lajukan_avatar_data_url() {
+        let generated =
+            "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%22%3E";
+        assert!(!is_google_avatar_url(generated));
+        assert!(!is_default_profile_avatar_url(generated));
+        assert_eq!(
+            choose_google_login_avatar(
+                None,
+                Some(&json!({ "avatar_url": generated })),
+                Some("https://lh3.googleusercontent.com/google-picture"),
+            ),
+            generated
+        );
+    }
+}
 
 // -------------------- Redis cache helpers -------------------------
 async fn invalidate_roles_cache_for_user(state: Arc<AppState>, user_id: Uuid) {
@@ -2308,9 +2428,63 @@ pub async fn oauth_google(
             .into_response();
     }
 
+    let existing_profile = match sqlx::query(
+        r#"
+        SELECT picture, metadata
+        FROM core.user_profiles
+        WHERE user_id = $1
+        LIMIT 1
+        "#,
+    )
+    .bind(user_id)
+    .fetch_optional(&state.db)
+    .await
+    {
+        Ok(row) => row,
+        Err(error) => {
+            tracing::error!("oauth google read current profile media failed: {:?}", error);
+            return (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(json!({"error":"database error"})),
+            )
+                .into_response();
+        }
+    };
+
+    let existing_picture = existing_profile
+        .as_ref()
+        .and_then(|row| row.try_get::<Option<String>, _>("picture").ok())
+        .flatten();
+    let existing_metadata = existing_profile
+        .as_ref()
+        .and_then(|row| row.try_get::<Option<Value>, _>("metadata").ok())
+        .flatten();
+
+    let effective_avatar_url = choose_google_login_avatar(
+        existing_picture.as_deref(),
+        existing_metadata.as_ref(),
+        avatar_url.as_deref(),
+    );
+
+    let current_avatar = read_profile_avatar_candidate(
+        existing_metadata.as_ref(),
+        existing_picture.as_deref(),
+    );
+    let avatar_source = if current_avatar
+        .as_deref()
+        .map(|value| !is_default_profile_avatar_url(value) && !is_google_avatar_url(value))
+        .unwrap_or(false)
+    {
+        "user_managed"
+    } else {
+        "google"
+    };
+
     let generated_username = generate_google_username(&state, &email, full_name.as_deref()).await;
     let profile_metadata = json!({
-        "avatar_url": avatar_url.clone(),
+        "avatar_url": effective_avatar_url.clone(),
+        "avatar_source": avatar_source,
+        "avatar_updated_at": Utc::now().to_rfc3339(),
         "auth_provider": "google",
         "google": {
             "provider_user_id": provider_user_id.clone(),
@@ -2368,7 +2542,7 @@ pub async fn oauth_google(
     .bind(user_id)
     .bind(full_name.clone())
     .bind(generated_username.clone())
-    .bind(avatar_url.clone())
+    .bind(Some(effective_avatar_url.clone()))
     .bind(profile_metadata)
     .execute(&state.db)
     .await
