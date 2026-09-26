@@ -530,7 +530,7 @@ function voiceNoteErrorMessage(
     case 'mime-mismatch':
       return 'Format rekaman ini belum dapat diunggah.';
     default:
-      return 'Perekaman suara gagal. Silakan coba lagi.';
+      return 'Perekaman suara gagal. Coba lagi ya.';
   }
 }
 
@@ -3868,7 +3868,7 @@ export default function ChatRoomPage() {
                 ? 'Panggilan gagal dimulai'
                 : 'Failed to start call',
             description:
-              chatLocale === 'id' ? 'Silakan coba lagi.' : 'Please try again.',
+              chatLocale === 'id' ? 'Coba lagi ya.' : 'Please try again.',
             variant: 'error',
           });
           return;
@@ -3891,7 +3891,7 @@ export default function ChatRoomPage() {
               ? 'Panggilan gagal dimulai'
               : 'Failed to start call',
           description:
-            chatLocale === 'id' ? 'Silakan coba lagi.' : 'Please try again.',
+            chatLocale === 'id' ? 'Coba lagi ya.' : 'Please try again.',
           variant: 'error',
         });
       }
@@ -4935,11 +4935,11 @@ export default function ChatRoomPage() {
         notify({
           title:
             chatLocale === 'id'
-              ? 'Mode baca dari cache'
+              ? 'Kamu sedang melihat salinan sementara'
               : 'Read-only cached mode',
           description:
             chatLocale === 'id'
-              ? 'Sambungkan kembali internet untuk mengirim pesan.'
+              ? 'Sambungkan internet lagi ya supaya kita bisa kirim pesan.'
               : 'Reconnect to send a message.',
           variant: 'info',
         });
@@ -4949,7 +4949,7 @@ export default function ChatRoomPage() {
         notify({
           title:
             chatLocale === 'id'
-              ? 'Pengguna ini sedang diblokir'
+              ? 'Kamu sedang memblokir pengguna ini'
               : 'This person is blocked',
           description:
             chatLocale === 'id'
@@ -8305,7 +8305,7 @@ export default function ChatRoomPage() {
                         : 'Uploading…'
                       : activeDraftAttachment.status === 'error'
                         ? chatLocale === 'id'
-                          ? 'Upload gagal'
+                          ? 'Upload-nya gagal. Coba lagi ya'
                           : 'Upload failed'
                         : chatLocale === 'id'
                           ? 'Siap dikirim'
