@@ -21,6 +21,7 @@ export type QuickSaleDraft = {
   locationId?: string | null;
   channelKey: string;
   accountKey: 'cash' | 'bank' | 'ewallet' | 'receivable';
+  partyId?: string | null;
   lines: QuickSaleLineDraft[];
 };
 
@@ -171,8 +172,10 @@ export function canCompleteCheckout(input: {
   paymentMethod: CheckoutPaymentMethod | string;
   tenderedAmount?: number;
   lineCount: number;
+  partyId?: string | null;
 }) {
   if (!Number.isFinite(input.total) || input.total <= 0 || input.lineCount <= 0) return false;
+  if (input.paymentMethod === 'receivable') return Boolean(input.partyId);
   if (input.paymentMethod !== 'cash') return true;
   return Number.isFinite(input.tenderedAmount) && (input.tenderedAmount ?? 0) >= input.total;
 }
