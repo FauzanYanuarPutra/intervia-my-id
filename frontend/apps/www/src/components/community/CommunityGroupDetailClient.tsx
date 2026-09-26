@@ -199,7 +199,7 @@ function MemberRow({
   isId: boolean;
 }) {
   return (
-    <article className="flex min-w-0 items-center gap-3 rounded-[18px] border border-[color:var(--app-border)] bg-white p-3">
+    <article className="flex min-w-0 items-center gap-3 rounded-[14px] border border-slate-200 bg-white p-3">
       <LajukanImage
         alt={member.name}
         src={profileAvatarSrc(
@@ -864,7 +864,7 @@ export default function CommunityGroupDetailClient({
   if (notFound || !group) {
     return (
       <main className="lajukan-home-compact min-h-screen bg-[color:var(--app-surface-muted)] px-1 pb-6 pt-3 sm:px-2 lg:px-0">
-        <section className="mx-auto mt-4 max-w-lg rounded-[24px] border border-[color:var(--app-border)] bg-white p-6 text-center shadow-[0_18px_38px_-34px_rgba(15,23,42,0.18)]">
+        <section className="mx-auto mt-4 max-w-lg rounded-[16px] border border-[color:var(--app-border)] bg-white p-6 text-center shadow-[0_18px_38px_-34px_rgba(15,23,42,0.18)]">
           <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-slate-50 text-[color:var(--app-text-soft)]">
             <Users className="h-7 w-7" />
           </div>
@@ -906,8 +906,8 @@ export default function CommunityGroupDetailClient({
   ];
 
   return (
-    <main className="lajukan-home-compact min-h-screen overflow-x-hidden bg-[color:var(--app-surface-muted)] px-1 pb-6 pt-3 sm:px-2 lg:h-[calc(var(--app-viewport-height)-(60px+env(safe-area-inset-top)))] lg:min-h-0 lg:overflow-hidden lg:px-0 lg:pb-0 lg:pt-0">
-      <div className="sticky top-0 z-30 -mx-1 mb-3 border-b border-[color:var(--app-border)] bg-white/94 px-1 py-2  lg:hidden">
+    <main className="min-h-screen overflow-x-hidden bg-[#f0f2f5] pb-10 pt-0">
+      <div className="sticky top-0 z-40 mb-0 border-b border-slate-200 bg-white/96 px-3 py-2 backdrop-blur lg:hidden">
         <div className="flex items-center gap-2">
           <Link
             href="/community"
@@ -952,9 +952,9 @@ export default function CommunityGroupDetailClient({
         </div>
       </div>
 
-      <div className="mx-auto grid min-h-0 w-full max-w-[1700px] gap-4 lg:h-[calc(var(--app-viewport-height)-4.625rem)] lg:grid-cols-[260px_minmax(0,1fr)] lg:overflow-hidden xl:grid-cols-[280px_minmax(0,1fr)_340px]">
-        <aside className="hidden min-h-0 overflow-y-auto overscroll-contain pb-6 lg:block">
-          <section className="rounded-[24px] border border-[color:var(--app-border)] bg-white p-4 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.14)]">
+      <div className="mx-auto grid w-full max-w-[1180px] grid-cols-1 gap-4 px-0 sm:px-2 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start lg:px-0">
+        <aside className="hidden">
+          <section className="rounded-[16px] border border-[color:var(--app-border)] bg-white p-4 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.14)]">
             <Link
               href="/community"
               className="inline-flex items-center gap-2 text-xs font-bold text-[color:var(--app-accent)]"
@@ -1045,11 +1045,11 @@ export default function CommunityGroupDetailClient({
         </aside>
 
         <section
-          className="min-w-0 space-y-3 lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:pr-1"
+          className="min-w-0 space-y-3 lg:pr-0"
           data-auto-scrollbar
         >
-          <section className="overflow-hidden rounded-[24px] border border-[color:var(--app-border)] bg-white shadow-[0_16px_32px_-30px_rgba(15,23,42,0.14)]">
-            <div className="relative min-h-[190px] bg-[linear-gradient(135deg,#dcfce7,#f8fafc)] p-4 sm:min-h-[235px]">
+          <section className="overflow-hidden rounded-none border-y border-slate-200 bg-white shadow-none sm:rounded-[18px] sm:border">
+            <div className="relative aspect-[2.5/1] min-h-[170px] bg-[linear-gradient(135deg,#dcfce7,#f8fafc)] p-3 sm:aspect-[3.1/1] sm:min-h-[220px] sm:p-4">
               {group.coverUrl ? (
                 <LajukanImage
                   src={group.coverUrl}
@@ -1147,7 +1147,7 @@ export default function CommunityGroupDetailClient({
               </div>
             </div>
 
-            <div className="grid gap-3 p-3.5 sm:p-4 lg:grid-cols-[minmax(0,1fr)_220px]">
+            <div className="grid gap-3 border-t border-slate-100 p-3.5 sm:p-4">
               <p className="text-sm leading-6 text-[color:var(--app-text)]">
                 {group.description}
               </p>
@@ -1192,7 +1192,7 @@ export default function CommunityGroupDetailClient({
             </div>
           </section>
 
-          <nav className="sticky top-[58px] z-20 flex gap-1 overflow-x-auto border-b border-[color:var(--app-border)] bg-white/96 px-1 py-1 backdrop-blur lg:top-2">
+          <nav className="sticky top-[58px] z-20 flex gap-1 overflow-x-auto border-y border-slate-200 bg-white px-1 py-1 backdrop-blur lg:top-0">
             {tabs.map(tab => (
               <button
                 key={tab.id}
@@ -1212,7 +1212,7 @@ export default function CommunityGroupDetailClient({
 
           {activeTab === 'discussion' ? (
             <>
-              <section className="rounded-[18px] border border-[color:var(--app-border)] bg-white p-3">
+              <section className="rounded-[14px] border border-slate-200 bg-white p-3">
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[color:var(--app-text-soft)]">
@@ -1256,7 +1256,7 @@ export default function CommunityGroupDetailClient({
               </section>
 
               {featuredItems.length ? (
-                <section className="rounded-[20px] border border-amber-100 bg-amber-50/60 p-3.5 shadow-[0_12px_28px_-26px_rgba(245,158,11,0.28)]">
+                <section className="rounded-[14px] border border-amber-100 bg-amber-50/60 p-3.5 shadow-[0_12px_28px_-26px_rgba(245,158,11,0.28)]">
                   <div className="flex items-start gap-3">
                     <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-[12px] bg-white text-amber-600 ring-1 ring-amber-100">
                       <Pin className="h-4 w-4" />
@@ -1302,7 +1302,7 @@ export default function CommunityGroupDetailClient({
                   onCreated={handleComposerCreated}
                 />
               ) : (
-                <section className="rounded-[20px] border border-[color:var(--app-border)] bg-white p-4 text-sm text-[color:var(--app-text-soft)] shadow-[0_10px_30px_-28px_rgba(15,23,42,0.15)]">
+                <section className="rounded-[14px] border border-[color:var(--app-border)] bg-white p-4 text-sm text-[color:var(--app-text-soft)] shadow-[0_10px_30px_-28px_rgba(15,23,42,0.15)]">
                   {isAuthenticated
                     ? isId
                       ? 'Kamu belum punya izin posting di grup ini.'
@@ -1315,7 +1315,7 @@ export default function CommunityGroupDetailClient({
 
               {loadingFeed ? <CommunityFeedSkeleton /> : null}
               {!loadingFeed && items.length === 0 ? (
-                <section className="rounded-[22px] border border-[color:var(--app-border)] bg-white p-6 text-center shadow-[0_16px_30px_-28px_rgba(15,23,42,0.13)]">
+                <section className="rounded-[14px] border border-[color:var(--app-border)] bg-white p-6 text-center shadow-[0_16px_30px_-28px_rgba(15,23,42,0.13)]">
                   <MessageCircle className="mx-auto h-8 w-8 text-[color:var(--app-accent)]" />
                   <p className="mt-3 text-sm font-semibold text-[color:var(--app-text)]">
                     {isId
@@ -1354,7 +1354,7 @@ export default function CommunityGroupDetailClient({
 
           {activeTab === 'featured' ? (
             <section className="space-y-3">
-              <section className="rounded-[20px] border border-amber-100 bg-amber-50/60 p-3.5">
+              <section className="rounded-[14px] border border-amber-100 bg-amber-50/60 p-3.5">
                 <p className="text-[10px] font-black uppercase tracking-[0.12em] text-amber-700">
                   Featured
                 </p>
@@ -1376,7 +1376,7 @@ export default function CommunityGroupDetailClient({
                   ))}
                 </div>
               ) : (
-                <section className="rounded-[20px] border border-[color:var(--app-border)] bg-white p-6 text-center">
+                <section className="rounded-[14px] border border-[color:var(--app-border)] bg-white p-6 text-center">
                   <Pin className="mx-auto h-7 w-7 text-amber-500" />
                   <p className="mt-3 text-sm font-bold text-[color:var(--app-text)]">
                     {isId ? 'Belum ada posting featured.' : 'No featured posts yet.'}
@@ -1387,7 +1387,7 @@ export default function CommunityGroupDetailClient({
           ) : null}
 
           {activeTab === 'members' ? (
-            <section className="rounded-[20px] border border-[color:var(--app-border)] bg-white p-3.5 shadow-[0_10px_30px_-28px_rgba(15,23,42,0.18)]">
+            <section className="rounded-[14px] border border-[color:var(--app-border)] bg-white p-3.5 shadow-[0_10px_30px_-28px_rgba(15,23,42,0.18)]">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <h2 className="text-base font-bold text-[color:var(--app-text)]">
@@ -1416,7 +1416,7 @@ export default function CommunityGroupDetailClient({
 
           {activeTab === 'media' ? (
             <section className="space-y-3">
-              <section className="rounded-[20px] border border-[color:var(--app-border)] bg-white p-4">
+              <section className="rounded-[14px] border border-[color:var(--app-border)] bg-white p-4">
                 <h2 className="text-base font-bold text-[color:var(--app-text)]">
                   {isId ? 'Media grup' : 'Group media'}
                 </h2>
@@ -1460,7 +1460,7 @@ export default function CommunityGroupDetailClient({
                   })}
                 </div>
               ) : (
-                <section className="rounded-[20px] border border-dashed border-[color:var(--app-border)] bg-white p-6 text-center">
+                <section className="rounded-[14px] border border-dashed border-[color:var(--app-border)] bg-white p-6 text-center">
                   <ImageIcon className="mx-auto h-7 w-7 text-[color:var(--app-text-soft)]" />
                   <p className="mt-3 text-sm font-bold text-[color:var(--app-text)]">
                     {isId ? 'Belum ada media.' : 'No media yet.'}
@@ -1472,7 +1472,7 @@ export default function CommunityGroupDetailClient({
 
           {activeTab === 'about' ? (
             <section className="space-y-3">
-              <section className="rounded-[24px] border border-[color:var(--app-border)] bg-white p-4 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.14)]">
+              <section className="rounded-[16px] border border-[color:var(--app-border)] bg-white p-4 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.14)]">
                 <h2 className="text-base font-bold text-[color:var(--app-text)]">
                   {isId ? 'Tentang grup' : 'About this group'}
                 </h2>
@@ -1521,7 +1521,7 @@ export default function CommunityGroupDetailClient({
                 </div>
               </section>
 
-              <section className="rounded-[24px] border border-[color:var(--app-border)] bg-white p-4 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.14)]">
+              <section className="rounded-[16px] border border-[color:var(--app-border)] bg-white p-4 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.14)]">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <h2 className="text-base font-bold text-[color:var(--app-text)]">
@@ -1561,7 +1561,7 @@ export default function CommunityGroupDetailClient({
               </section>
 
               {group.viewerCanManage ? (
-                <section className="rounded-[24px] border border-[color:var(--app-border)] bg-white p-4 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.14)]">
+                <section className="rounded-[16px] border border-[color:var(--app-border)] bg-white p-4 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.14)]">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <h2 className="text-base font-bold text-[color:var(--app-text)]">
@@ -1626,7 +1626,7 @@ export default function CommunityGroupDetailClient({
           ) : null}
 
           {activeTab === 'rules' ? (
-            <section className="rounded-[24px] border border-[color:var(--app-border)] bg-white p-4 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.14)]">
+            <section className="rounded-[16px] border border-[color:var(--app-border)] bg-white p-4 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.14)]">
               <h2 className="text-base font-bold text-[color:var(--app-text)]">
                 {isId ? 'Aturan grup' : 'Group rules'}
               </h2>
@@ -1653,7 +1653,7 @@ export default function CommunityGroupDetailClient({
         </section>
 
         <aside className="hidden min-h-0 overflow-y-auto overscroll-contain pb-6 xl:block">
-          <section className="rounded-[24px] border border-[color:var(--app-border)] bg-white p-4 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.14)]">
+          <section className="rounded-[16px] border border-[color:var(--app-border)] bg-white p-4 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.14)]">
             <h2 className="text-sm font-bold text-[color:var(--app-text)]">
               {isId ? 'Admin & moderator' : 'Admins & moderators'}
             </h2>
@@ -1671,7 +1671,7 @@ export default function CommunityGroupDetailClient({
               )}
             </div>
           </section>
-          <section className="mt-3 rounded-[24px] border border-[color:var(--app-border)] bg-white p-4 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.14)]">
+          <section className="mt-3 rounded-[16px] border border-[color:var(--app-border)] bg-white p-4 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.14)]">
             <h2 className="text-sm font-bold text-[color:var(--app-text)]">
               {isId ? 'Ringkas' : 'Summary'}
             </h2>
