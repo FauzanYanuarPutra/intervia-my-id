@@ -186,7 +186,7 @@ export function ExploreHubPage({ locale, initialIntent = 'supply' }: { locale: L
                   {isId ? 'pilih contoh untuk langsung mencari' : 'pick an example to search instantly'}
                 </span>
               </div>
-              <div ref={examplesRailRef} className="mt-1.5 w-full min-w-0 cursor-grab overflow-hidden active:cursor-grabbing" aria-label={isId ? 'Contoh pencarian' : 'Search examples'}>
+              <div ref={examplesRailRef} className="mt-1.5 w-full min-w-0 cursor-grab overflow-hidden active:cursor-grabbing pb-2" aria-label={isId ? 'Contoh pencarian' : 'Search examples'}>
                 <div className="flex touch-pan-y gap-1.5 [backface-visibility:hidden] [will-change:transform]">
                   {examples.map(example => (
                     <div key={example} className="shrink-0">
