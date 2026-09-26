@@ -4,6 +4,8 @@ import { enforceRateLimit, getClientIp } from '@/lib/rateLimit';
 import { requireAuth } from '@/lib/serverAuth';
 import { parseJsonBody } from '@/lib/serverRequest';
 import { evaluateTrustSafety } from '@/lib/trustSafety';
+import { normalizeNewsMediaUrl } from '@/lib/newsMediaUrl';
+import { plainTextToNewsHtml, sanitizeNewsRichText } from '@/lib/newsRichText';
 
 const MARKETPLACE_URL = (
   process.env.INTERNAL_MARKETPLACE_URL ||
@@ -82,34 +84,11 @@ function readSources(value: unknown): string[] {
 }
 
 function isSafePublicUrl(value: string): boolean {
-  return normalizeSafeExternalHttpUrl(value) !== null;
+  return Boolean(normalizeNewsMediaUrl(value));
 }
 
 function sanitizeRichText(value: string, maxLength: number) {
-  let html = value.replace(/<!--([\s\S]*?)-->/g, '');
-  html = html.replace(/<\/?(script|style|iframe|object|embed|form|input|button|textarea|select|svg|math)[^>]*>/gi, '');
-  html = html.replace(/\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '');
-  html = html.replace(/(href|src)\s*=\s*(['"]?)\s*(javascript:|data:|vbscript:)[^'">\s]*\2/gi, '$1=$2$2');
-  html = html.replace(/<(a)([^>]*)>/gi, (_m, _tag, attrs) => {
-    const safe = attrs.replace(/\s(?:href|target|rel|title)\s*=\s*(?:"[^"]*"|'[^']*')/gi, '').trim();
-    return safe ? '<a' + safe + '>' : '<a>';
-  });
-  html = html.replace(/<img([^>]*)>/gi, (_m, attrs) => {
-    const src = attrs.match(/\ssrc\s*=\s*(['"])(.*?)\1/i)?.[2] || '';
-    const alt = attrs.match(/\salt\s*=\s*(['"])(.*?)\1/i)?.[2] || '';
-    if (!isSafePublicUrl(src)) return '';
-    return '<img src="' + src.replace(/"/g, '&quot;') + '" alt="' + alt.replace(/"/g, '&quot;').slice(0, 300) + '" loading="lazy" />';
-  });
-  html = html.replace(/<a([^>]*)href\s*=\s*(['"])(.*?)\2([^>]*)>/gi, (_m, before, _q, href, after) => {
-    try {
-      const url = new URL(href);
-      if (!['http:', 'https:'].includes(url.protocol)) return '<a>';
-      return '<a' + before + ' href="' + url.toString().replace(/"/g, '&quot;') + '" target="_blank" rel="noopener noreferrer nofollow"' + after + '>';
-    } catch { return '<a>'; }
-  });
-  html = html.replace(/<figcaption([^>]*)>([\s\S]*?)<\/figcaption>/gi, '<figcaption>$2</figcaption>');
-  html = html.replace(/<(?!\/?(?:p|br|strong|b|em|i|u|s|h2|h3|blockquote|ul|ol|li|a|img|figure|figcaption|pre|code)(?:\s|>|\/))/gi, '&lt;');
-  return html.slice(0, maxLength);
+  return sanitizeNewsRichText(value, maxLength);
 }
 
 function sanitizeText(value: string, maxLength: number) {
@@ -172,7 +151,7 @@ export async function POST(request: NextRequest) {
   const rawSummary = readString(payload.summary);
   const rawBody = readString(payload.body);
   const rawRichBody = readString(payload.rich_body);
-  const coverImage = readString(payload.cover_image);
+  const coverImage = normalizeNewsMediaUrl(payload.cover_image);
   const category = readString(payload.category) || 'Ekonomi';
   const articleKind = readString(payload.article_kind) || 'news';
   const language = readString(payload.language) || 'id';
@@ -214,7 +193,7 @@ export async function POST(request: NextRequest) {
   const titleSafety = sanitizeText(rawTitle, 180);
   const summarySafety = sanitizeText(rawSummary, 1000);
   const bodySafety = sanitizeText(rawBody, 20_000);
-  const richBody = sanitizeRichText(rawRichBody || `<p>${rawBody.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n\n/g, '</p><p>')}</p>`, 60_000);
+  const richBody = sanitizeRichText(rawRichBody || plainTextToNewsHtml(rawBody), 60_000);
   if (!titleSafety.ok || !summarySafety.ok || !bodySafety.ok || !richBody.trim()) {
     return NextResponse.json(
       {
