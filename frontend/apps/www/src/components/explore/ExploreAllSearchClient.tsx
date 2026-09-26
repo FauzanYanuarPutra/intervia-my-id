@@ -1338,7 +1338,8 @@ export function ExploreAllSearchClient({
             : 'Search products, services, suppliers, or equipment...';
 
   return (
-    <div className="min-h-[100svh] overflow-x-clip bg-[color:var(--app-surface-muted)] pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-10">
+    <>
+      <div className="min-h-[100svh] overflow-x-clip bg-[color:var(--app-surface-muted)] pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-10">
       <div className="lg:hidden">
         <Header />
         <div className="h-[calc(52px+env(safe-area-inset-top))]" />
@@ -1969,6 +1970,6 @@ export function ExploreAllSearchClient({
           </div>
         </div>
       </Modal>
-
+    </>
   );
 }
