@@ -33,7 +33,8 @@ function missingContentMediaResponse(headOnly: boolean) {
   const headers = {
     'Content-Type': 'image/svg+xml',
     'Content-Disposition': 'inline',
-    'Cache-Control': 'public, max-age=60, stale-while-revalidate=300',
+    // A placeholder must never poison the browser/CDN cache.
+    'Cache-Control': 'no-store, max-age=0',
     'Content-Length': String(MISSING_CONTENT_MEDIA_SVG.byteLength),
   };
   return new NextResponse(headOnly ? null : MISSING_CONTENT_MEDIA_SVG, {
