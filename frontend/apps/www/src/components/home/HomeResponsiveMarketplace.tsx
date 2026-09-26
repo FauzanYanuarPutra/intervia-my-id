@@ -3924,6 +3924,35 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
     };
   }, [isId, userId, viewerLocationKey]);
 
+  const loadCommunityGroups = useCallback(async () => {
+    try {
+      const response = await fetch('/api/community/groups?limit=12', {
+        cache: 'no-store',
+        credentials: 'include',
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        data?: CommunityGroup[];
+        joined?: CommunityGroup[];
+        recommended?: CommunityGroup[];
+      };
+
+      const groups = [
+        ...(payload.data || []),
+        ...(payload.joined || []),
+        ...(payload.recommended || []),
+      ]
+        .filter(
+          (group, index, all) =>
+            all.findIndex(candidate => candidate.id === group.id) === index,
+        )
+        .slice(0, 8);
+
+      setCommunityGroups(groups);
+    } catch {
+      setCommunityGroups([]);
+    }
+  }, []);
+
   const loadCommunityPostsPage = useCallback(async () => {
     const requestSeq = communityRequestSeqRef.current + 1;
     communityRequestSeqRef.current = requestSeq;
@@ -3938,55 +3967,22 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
 
     try {
       const params = new URLSearchParams({
-        tab: activeTab,
+        tab: 'for-you',
         limit: String(HOME_COMMUNITY_PAGE_SIZE),
         cursor: '0',
       });
-      const groupsRequest = fetch('/api/community/groups?limit=12', {
+
+      const response = await fetch(`/api/community/feed?${params.toString()}`, {
         cache: 'no-store',
         credentials: 'include',
         signal: controller.signal,
-      }).catch(() => null);
-
-      const [response, groupsResponse] = await Promise.all([
-        fetch(`/api/community/feed?${params.toString()}`, {
-          cache: 'no-store',
-          credentials: 'include',
-          signal: controller.signal,
-        }),
-        groupsRequest,
-      ]);
+      });
 
       const payload = (await response
         .json()
         .catch(() => null)) as CommunityFeedResponse | null;
-      const groupsPayload = groupsResponse
-        ? ((await groupsResponse.json().catch(() => ({}))) as {
-            data?: CommunityGroup[];
-            joined?: CommunityGroup[];
-            recommended?: CommunityGroup[];
-          })
-        : null;
 
       if (communityRequestSeqRef.current !== requestSeq) return;
-
-      const groups = [
-        ...(groupsPayload?.data || []),
-        ...(groupsPayload?.joined || []),
-        ...(groupsPayload?.recommended || []),
-        ...(payload?.overview?.joinedGroups || []),
-        ...(payload?.overview?.recommendedGroups || []),
-        ...(payload?.overview?.groups || []),
-      ]
-        .filter(
-          (group, index, all) =>
-            all.findIndex(candidate => candidate.id === group.id) === index,
-        )
-        .slice(0, 8);
-
-      // Groups are a first-class Home discovery surface. Do not hide them just
-      // because the discussion feed itself is temporarily unavailable.
-      setCommunityGroups(groups);
 
       if (!response.ok) {
         setCommunityPosts([]);
@@ -3999,7 +3995,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
 
       const mapped = (payload?.items || [])
         .filter(item => item.kind !== 'reel')
-        .map(item => mapCommunityItemToPost(item, isId, activeTab))
+        .map(item => mapCommunityItemToPost(item, isId, 'for-you'))
         .slice(0, 3);
 
       setCommunityPosts(mapped);
@@ -4025,14 +4021,15 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
         setCommunityLoading(false);
       }
     }
-  }, [activeTab, isId]);
+  }, [isId]);
 
   useEffect(() => {
     setCommunityPosts([]);
     setCommunityGroups([]);
     setCommunityError(null);
+    void loadCommunityGroups();
     void loadCommunityPostsPage();
-  }, [loadCommunityPostsPage]);
+  }, [loadCommunityGroups, loadCommunityPostsPage]);
 
   useEffect(() => {
     let active = true;
