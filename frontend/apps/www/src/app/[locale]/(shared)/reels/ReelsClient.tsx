@@ -590,6 +590,7 @@
     const videoRefs = useRef<Record<string, HTMLVideoElement | null>>({});
     const rafRef = useRef<number | null>(null);
     const loadingRef = useRef(false);
+    const pendingEndedIndexRef = useRef<number | null>(null);
     const firstScrollDoneRef = useRef(false);
     const scrollLockRef = useRef(false);
     const normalizedInitialItems = useMemo(
@@ -615,6 +616,7 @@
 
     const [activeIndex, setActiveIndex] = useState(safeInitialIndex);
     const [feedTab, setFeedTab] = useState<ReelsFeedTab>('fyp');
+    const [feedResetNonce, setFeedResetNonce] = useState(0);
     const [followedCreatorIds, setFollowedCreatorIds] = useState<string[]>([]);
     const [searchContextQuery, setSearchContextQuery] = useState(
       initialSearchQuery.trim(),
@@ -622,7 +624,7 @@
     const [muted, setMuted] = useState(() => readInitialMuted());
     const [soundUnlocked, setSoundUnlocked] = useState(() => !readInitialMuted());
     const [pausedByUser, setPausedByUser] = useState(false);
-    const [autoScroll] = useState(false);
+    const autoScroll = false;
     const [bufferingId, setBufferingId] = useState<string | null>(null);
     const [pageVisible, setPageVisible] = useState(true);
     const [performanceProfile, setPerformanceProfile] =
@@ -1224,8 +1226,9 @@
       }
     }, [activeReel, isAuthenticated, loadReelActionState]);
 
-    const loadMore = useCallback(async () => {
-      if (loadingRef.current || !hasMore || cursor === null) return;
+    const loadMore = useCallback(async (reset = false) => {
+      const requestCursor = reset ? 0 : cursor;
+      if (loadingRef.current || !hasMore || requestCursor === null) return;
 
       loadingRef.current = true;
       setLoadingMore(true);
@@ -1238,11 +1241,13 @@
 
       try {
         const params = new URLSearchParams({
-          cursor: String(cursor),
+          cursor: String(requestCursor),
           limit: String(REELS_PAGE_SIZE),
+          tab: feedTab,
         });
-        if (initialSearchQuery.trim()) {
-          params.set('q', initialSearchQuery.trim());
+        const queryContext = searchContextQuery.trim() || initialSearchQuery.trim();
+        if (queryContext) {
+          params.set('q', queryContext);
         }
 
         const response = await fetch(`/api/reels?${params.toString()}`, {
@@ -1257,8 +1262,8 @@
         const data = (await response.json()) as ReelsPageResult;
 
         setItems(prev => {
-          const nextItems = normalizePlayableReels(data.items, prev.length);
-          return [...prev, ...rankItems(nextItems, profile)];
+          const nextItems = normalizePlayableReels(data.items, reset ? 0 : prev.length);
+          return reset ? rankItems(nextItems, profile) : [...prev, ...rankItems(nextItems, profile)];
         });
 
         setCursor(data.nextCursor);
@@ -1274,7 +1279,21 @@
         loadingRef.current = false;
         setLoadingMore(false);
       }
-    }, [cursor, hasMore, initialSearchQuery, locale, profile]);
+    }, [
+      cursor,
+      feedTab,
+      hasMore,
+      initialSearchQuery,
+      locale,
+      profile,
+      searchContextQuery,
+    ]);
+
+
+    useEffect(() => {
+      if (feedResetNonce === 0) return;
+      void loadMore(true);
+    }, [feedResetNonce, loadMore]);
 
     useEffect(() => {
       if (feedTab === 'fyp' || visibleItems.length >= 3 || !hasMore || loadingMore) {
@@ -1800,6 +1819,40 @@
       [locale, notify],
     );
 
+    const handleReelEnded = useCallback(
+      (index: number) => {
+        if (
+          index !== activeIndex ||
+          overlayOpen ||
+          !pageVisible ||
+          pausedByUser
+        ) {
+          return;
+        }
+
+        const nextIndex = index + 1;
+        if (nextIndex < visibleItems.length) {
+          scrollToIndex(nextIndex, 'smooth');
+          return;
+        }
+
+        if (hasMore) {
+          pendingEndedIndexRef.current = index;
+          void loadMore();
+        }
+      },
+      [
+        activeIndex,
+        hasMore,
+        loadMore,
+        overlayOpen,
+        pageVisible,
+        pausedByUser,
+        scrollToIndex,
+        visibleItems.length,
+      ],
+    );
+
     const handleScroll = useCallback(() => {
       if (rafRef.current !== null) return;
 
@@ -1931,6 +1984,17 @@
       pausedByUser,
       scrollToIndex,
     ]);
+
+    useEffect(() => {
+      const endedIndex = pendingEndedIndexRef.current;
+      if (endedIndex === null) return;
+      if (visibleItems.length > endedIndex + 1) {
+        pendingEndedIndexRef.current = null;
+        scrollToIndex(endedIndex + 1, 'smooth');
+      } else if (!hasMore && !loadingMore) {
+        pendingEndedIndexRef.current = null;
+      }
+    }, [hasMore, loadingMore, scrollToIndex, visibleItems.length]);
 
     useEffect(() => {
       setPausedByUser(false);
@@ -2066,9 +2130,15 @@
         }
 
         setFeedTab(nextTab);
+        setItems([]);
+        setCursor(0);
+        setHasMore(true);
+        setLoadError(null);
         setActiveIndex(0);
         setPausedByUser(false);
         setPlaybackError(null);
+        pendingEndedIndexRef.current = null;
+        setFeedResetNonce(current => current + 1);
         window.requestAnimationFrame(() => {
           containerRef.current?.scrollTo({ top: 0, behavior: 'auto' });
         });
@@ -2220,6 +2290,7 @@
                           if (bufferingId === reel.id) setBufferingId(null);
                           if (index === activeIndex) setPlaybackError(null);
                         }}
+                        onEnded={() => handleReelEnded(index)}
                         onError={() => {
                           if (index === activeIndex) setBufferingId(null);
                           if (index === activeIndex) {
@@ -2339,6 +2410,10 @@
             onSelect={(reelId, query) => {
               setSearchOpen(false);
               setSearchContextQuery(query.trim());
+              const selectedReel = items.find(item => item.id === reelId);
+              if (selectedReel && query.trim()) {
+                sendReelEvent(selectedReel, 'search', { query: query.trim() });
+              }
               setFeedTab('fyp');
               const nextIndex = fypItems.findIndex(item => item.id === reelId);
               const resolvedIndex = Math.max(0, nextIndex);
@@ -3563,6 +3638,7 @@
     onWaiting,
     onPlaying,
     onError,
+    onEnded,
     onTogglePlay,
     onToggleSound,
     actionState,
@@ -3588,6 +3664,7 @@
     onWaiting: () => void;
     onPlaying: () => void;
     onError: () => void;
+    onEnded: () => void;
     onTogglePlay: () => void;
     onToggleSound: () => void;
     actionState: ReelActionState;
@@ -3702,7 +3779,6 @@
           )}
           style={mediaStyle}
           muted={muted}
-          loop
           playsInline
           preload={
             active
