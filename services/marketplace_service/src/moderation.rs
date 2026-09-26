@@ -699,40 +699,64 @@ pub async fn moderate_content(
         _ => previous_status.as_str(),
     };
 
-    let case_row = match sqlx::query(
-        r#"
-        INSERT INTO internal_moderation.content_moderation_cases
-          (content_id, opened_by, assigned_to, source, status, severity, current_action,
-           current_reason_code, current_reason_note, legal_hold)
-        VALUES (
-          $1,$2,$2,'proactive',
-          CASE WHEN $3 = 'escalate' THEN 'escalated' ELSE 'reviewing' END,
-          $4,$3,$5,$6,$7
+    let owner_update_case_id = if action != "escalate" {
+        sqlx::query_scalar::<_, Uuid>(
+            r#"
+            SELECT id
+            FROM internal_moderation.content_moderation_cases
+            WHERE content_id = $1
+              AND source = 'owner_update'
+              AND status IN ('open', 'reviewing', 'escalated')
+            ORDER BY updated_at DESC
+            LIMIT 1
+            "#,
         )
-        RETURNING id
-        "#,
-    )
-    .bind(content_id)
-    .bind(actor_id)
-    .bind(action)
-    .bind(severity)
-    .bind(reason_code)
-    .bind(reason_note.as_deref())
-    .bind(legal_hold)
-    .fetch_one(&state.db)
-    .await
-    {
-        Ok(value) => value,
-        Err(error) => {
-            tracing::error!("moderate_content case create error: {:?}", error);
-            return err(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "failed to create moderation case",
-            )
-            .into_response();
-        }
+        .bind(content_id)
+        .fetch_optional(&state.db)
+        .await
+        .unwrap_or(None)
+    } else {
+        None
     };
-    let case_id: Uuid = case_row.get("id");
+
+    let case_id = if let Some(case_id) = owner_update_case_id {
+        case_id
+    } else {
+        let case_row = match sqlx::query(
+            r#"
+            INSERT INTO internal_moderation.content_moderation_cases
+              (content_id, opened_by, assigned_to, source, status, severity, current_action,
+               current_reason_code, current_reason_note, legal_hold)
+            VALUES (
+              $1,$2,$2,'proactive',
+              CASE WHEN $3 = 'escalate' THEN 'escalated' ELSE 'reviewing' END,
+              $4,$3,$5,$6,$7
+            )
+            RETURNING id
+            "#,
+        )
+        .bind(content_id)
+        .bind(actor_id)
+        .bind(action)
+        .bind(severity)
+        .bind(reason_code)
+        .bind(reason_note.as_deref())
+        .bind(legal_hold)
+        .fetch_one(&state.db)
+        .await
+        {
+            Ok(value) => value,
+            Err(error) => {
+                tracing::error!("moderate_content case create error: {:?}", error);
+                return err(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to create moderation case",
+                )
+                .into_response();
+            }
+        };
+        case_row.get("id")
+    };
 
     let snapshot = serde_json::to_value(&existing).unwrap_or_else(|_| json!({}));
 
@@ -753,6 +777,11 @@ pub async fn moderate_content(
             r#"
             UPDATE content_items
             SET content_status = $2,
+                listing_status = CASE
+                    WHEN $2 = 'active' THEN 'published'
+                    WHEN $2 IN ('archived', 'paused') THEN 'archived'
+                    ELSE 'draft'
+                END,
                 updated_at = NOW()
             WHERE id = $1
             RETURNING content_status
