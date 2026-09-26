@@ -493,7 +493,7 @@ export function QuickSaleWorkspace({ businessId, products, channels = [], locati
             <div className="mt-4 rounded-2xl bg-[#f5f7f3] p-4"><div className="flex items-center justify-between gap-3"><div><p className="text-sm font-bold text-portal-ink">{paymentOptions.find(option => option.value === accountKey)?.label}</p><p className="mt-0.5 text-xs leading-5 text-portal-soft">Pastikan pembayaran sudah diterima sebelum menyelesaikan transaksi.</p></div><CheckCircle2 className="h-5 w-5 shrink-0 text-portal-soft" /></div></div>
           )}
 
-          <details className="mt-4" open={advancedOpen} onToggle={event => setAdvancedOpen(event.currentTarget.open)}>
+          <details className="mt-4" open={advancedOpen || accountKey === 'receivable'} onToggle={event => setAdvancedOpen(event.currentTarget.open)}>
             <summary className="cursor-pointer text-xs font-bold text-portal-soft">Detail transaksi</summary>
             <div className="mt-3 space-y-3 rounded-2xl border border-portal-line p-3">
               <div><p className="text-xs font-semibold text-portal-soft">Kanal</p><div className="mt-2 flex flex-wrap gap-2">{channelOptions.map(option => <button key={option.value} type="button" onClick={() => { changed(); setChannelKey(option.value); }} className={`rounded-full border px-3 py-2 text-xs font-bold ${channelKey === option.value ? 'border-portal-ink bg-portal-ink text-white' : 'border-portal-line bg-white text-portal-ink'}`}>{option.label}</button>)}</div></div>
@@ -520,6 +520,7 @@ export function QuickSaleWorkspace({ businessId, products, channels = [], locati
             </div>
           </details>
           {accountKey === 'cash' && tenderedAmount < total ? <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">Uang diterima masih kurang <MoneyValue value={total - tenderedAmount} compact />.</p> : null}
+          {accountKey === 'receivable' && !partyId ? <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">Pilih pelanggan di bagian Detail transaksi sebelum menyimpan piutang.</p> : null}
           {feedback?.tone === 'error' ? <p role="alert" aria-live="assertive" className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">{feedback.text}</p> : null}
         </div>
         <div className="shrink-0 border-t border-portal-line bg-white px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3"><button type="button" className="portal-button-primary w-full justify-center py-3.5 text-base" disabled={saving || !canPay} onClick={submit}>{saving ? 'Menyimpan…' : accountKey === 'cash' ? 'Terima · ' : `Selesaikan ${paymentOptions.find(option => option.value === accountKey)?.label ?? ''}`}{!saving && accountKey === 'cash' ? <MoneyValue value={total} /> : null}</button></div>
