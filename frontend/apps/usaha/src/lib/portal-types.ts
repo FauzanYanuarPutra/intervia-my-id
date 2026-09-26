@@ -95,7 +95,7 @@ export type ProductRecord = {
 };
 export type OrderRecord = { id: string; buyer: string; itemSummary: string; amountLabel: string; status: OrderStatus; channel: string };
 export type ReservationRecord = { id: string; guest: string; schedule: string; pax: string; status: ReservationStatus };
-export type ProgressStep = { id: string; label: string; hint: string; done: boolean };
+export type ProgressStep = { id: string; label: string; hint: string; done: boolean; optional?: boolean };
 
 export type BusinessProfileSummary = {
   templateKey: BusinessTemplateKey | string;
