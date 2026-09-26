@@ -13,6 +13,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { createHash, randomUUID } from 'node:crypto';
 import path from 'node:path';
+import { normalizeSafeExternalHttpUrl } from 'lajukan-ui';
 
 const endpoint = process.env.MINIO_ENDPOINT;
 const accessKey = process.env.MINIO_ACCESS_KEY ?? process.env.MINIO_USER;
@@ -138,11 +139,15 @@ export async function uploadToMinIO(
     throw new Error('MinIO object verification failed');
   }
 
+  const safePublicUrl =
+    publicUrl && normalizeSafeExternalHttpUrl(publicUrl)
+      ? normalizeSafeExternalHttpUrl(publicUrl)
+      : null;
   const url = personalAiUserId
     ? `/api/ai/personal/media/${encodeURIComponent(bucket)}/${key.split('/').map(encodeURIComponent).join('/')}`
     : roomId === 'content' || roomId === 'forum'
-      ? publicUrl
-        ? `${publicUrl.replace(/\/$/, '')}/${bucket}/${key}`
+      ? safePublicUrl
+        ? `${safePublicUrl.replace(/\/$/, '')}/${bucket}/${key}`
         : `/api/content/media/${encodeURIComponent(bucket)}/${key.split('/').map(encodeURIComponent).join('/')}`
       : `/api/chat/media/${encodeURIComponent(bucket)}/chat/${encodeURIComponent(roomId)}/${contentHash}${ext}`;
 
