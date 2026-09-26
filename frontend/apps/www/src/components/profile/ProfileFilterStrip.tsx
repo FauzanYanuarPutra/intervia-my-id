@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Check, SlidersHorizontal, X } from 'lucide-react';
+import { Check, ChevronDown, SlidersHorizontal, X } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 
@@ -61,34 +61,31 @@ export function ProfileFilterStrip<T extends string>({
           aria-haspopup="dialog"
           aria-expanded={open}
           aria-label={activeItem ? `${mobileLabel}: ${activeItem.label}` : mobileLabel}
-          className="flex min-h-10 w-full items-center justify-between gap-2 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-left text-[color:var(--app-text)] shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/25 sm:hidden"
+          className="flex min-h-11 w-full items-center gap-2.5 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-left text-[color:var(--app-text)] shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/25 sm:hidden"
         >
-          <span className="flex min-w-0 items-center gap-2">
-            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
-              <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
+            <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[13px] font-black">
+              {activeItem?.label || mobileTitle}
             </span>
-            <span className="min-w-0">
-              <span className="block text-[9px] font-bold uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">
-                {mobileLabel}
-              </span>
-              <span className="block truncate text-xs font-black">
-                {activeItem?.label || mobileTitle}
-              </span>
+            <span className="mt-0.5 block truncate text-[10px] font-semibold text-[color:var(--app-text-soft)]">
+              {activeCount !== undefined
+                ? `${mobileLabel} · ${activeCount} ${mobileCountSuffix}`
+                : mobileLabel}
             </span>
           </span>
-          <span className="flex shrink-0 items-center gap-1.5">
-            {activeCount !== undefined ? (
-              <span className="rounded-full bg-[color:var(--app-surface-muted)] px-2 py-0.5 text-[10px] font-black text-[color:var(--app-text-soft)]">
-                {activeCount}
-              </span>
-            ) : null}
-            <span className="text-[10px] font-black text-emerald-700 dark:text-emerald-300">
-              Ubah
-            </span>
-          </span>
+          <ChevronDown
+            className="h-4 w-4 shrink-0 text-[color:var(--app-text-soft)]"
+            aria-hidden="true"
+          />
         </button>
 
-        <div data-filter-strip-fade className="relative hidden min-w-0 overflow-x-auto overscroll-x-contain pr-3 [scrollbar-width:none] sm:block [&::-webkit-scrollbar]:hidden">
+        <div
+          data-filter-strip-fade
+          className="relative hidden min-w-0 overflow-x-auto overscroll-x-contain pr-3 [scrollbar-width:none] sm:block [&::-webkit-scrollbar]:hidden"
+        >
           <div className="flex min-w-max items-center gap-1.5">
             {items.map(item => {
               const active = item.key === activeKey;
