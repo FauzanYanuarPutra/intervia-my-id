@@ -436,12 +436,6 @@ function buildCommunityPostHref(post: CommunityPost): string {
   return `/community?${params.toString()}`;
 }
 
-function buildCommunityTabHref(tab: CommunityTab): string {
-  const params = new URLSearchParams();
-  params.set('tab', tab);
-  return `/community?${params.toString()}`;
-}
-
 type ToneClassNames = {
   text: string;
   icon: string;
@@ -1117,7 +1111,6 @@ function formatCommunityTime(value: string, isId: boolean): string {
 function mapCommunityItemToPost(
   item: CommunityFeedItem,
   isId: boolean,
-  activeTab: CommunityTab,
 ): CommunityPost {
   const isReel = item.kind === 'reel';
   const threadId = String(item.threadId || '').trim();
@@ -1174,7 +1167,7 @@ function mapCommunityItemToPost(
     threadId,
     postId: item.postId || undefined,
 
-    tab: activeTab,
+    tab: 'for-you',
     href: item.href || undefined,
     kind: isReel ? 'reel' : 'discussion',
 
@@ -3993,7 +3986,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
 
       const mapped = (payload?.items || [])
         .filter(item => item.kind !== 'reel')
-        .map(item => mapCommunityItemToPost(item, isId, 'for-you'))
+        .map(item => mapCommunityItemToPost(item, isId))
         .slice(0, 3);
 
       setCommunityPosts(mapped);
@@ -4406,8 +4399,6 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
                 />
                 <CommunityPanel
                   isId={isId}
-                  activeTab={activeTab}
-                  onTabChange={setActiveTab}
                   posts={communityPosts}
                   loading={communityLoading}
                   loadError={communityError}
