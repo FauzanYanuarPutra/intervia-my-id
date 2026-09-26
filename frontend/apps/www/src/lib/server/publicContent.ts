@@ -98,10 +98,22 @@ export async function getPublicContent(
   const forwardedHeaders: Record<string, string> = {
     Accept: 'application/json',
   };
-  const cookie = requestHeadersFromServer.get('cookie');
   const authorization = requestHeadersFromServer.get('authorization');
-  if (cookie) forwardedHeaders.Cookie = cookie;
-  if (authorization) forwardedHeaders.Authorization = authorization;
+  if (authorization?.startsWith('Bearer ')) {
+    forwardedHeaders.Authorization = authorization;
+  } else {
+    const cookieHeader = requestHeadersFromServer.get('cookie') || '';
+    const accessToken = cookieHeader
+      .split(';')
+      .map(part => part.trim())
+      .find(part => part.startsWith('access_token='))
+      ?.slice('access_token='.length)
+      .trim();
+
+    if (accessToken) {
+      forwardedHeaders.Authorization = `Bearer ${decodeURIComponent(accessToken)}`;
+    }
+  }
 
   const contentId = extractContentId(routeId) || routeId.trim();
   if (!contentId) return { status: 'not_found' };
