@@ -13,7 +13,8 @@ describe('home dashboard', () => {
     const result = buildHomeDashboard({
       foundationAction: null,
       nextActions: [action(20, 'Rendah'), action(90, 'Penting'), action(50, 'Sedang')],
-      activeSales: 2,
+      todayRevenue: 275_000,
+      todayTransactions: 8,
       expenseToday: 45_000,
       stockAttention: 3,
       setupIncomplete: false,
@@ -26,7 +27,8 @@ describe('home dashboard', () => {
     const result = buildHomeDashboard({
       foundationAction: foundation,
       nextActions: [action(100, 'Isi stok')],
-      activeSales: 0,
+      todayRevenue: 0,
+      todayTransactions: 0,
       expenseToday: 0,
       stockAttention: 0,
       setupIncomplete: true,
@@ -39,7 +41,8 @@ describe('home dashboard', () => {
     const result = buildHomeDashboard({
       foundationAction: null,
       nextActions: [],
-      activeSales: 0,
+      todayRevenue: 0,
+      todayTransactions: 0,
       expenseToday: 0,
       stockAttention: 0,
       setupIncomplete: false,
@@ -51,13 +54,15 @@ describe('home dashboard', () => {
     const result = buildHomeDashboard({
       foundationAction: null,
       nextActions: [],
-      activeSales: 4,
+      todayRevenue: 400_000,
+      todayTransactions: 4,
       expenseToday: 125_000,
       stockAttention: 2,
       setupIncomplete: false,
     });
     expect(result.metrics).toEqual([
-      { key: 'sales', label: 'Jualan aktif', value: 4 },
+      { key: 'revenue', label: 'Omzet hari ini', value: 400_000 },
+      { key: 'transactions', label: 'Transaksi hari ini', value: 4 },
       { key: 'expense', label: 'Pengeluaran hari ini', value: 125_000 },
       { key: 'stock', label: 'Stok perlu perhatian', value: 2 },
     ]);
