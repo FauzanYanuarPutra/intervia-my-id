@@ -893,11 +893,9 @@ export function CommunityComposer({
         variant: 'success',
       });
 
-      setTitle('');
       setBody('');
       setMediaUrls([]);
       setPollOptions(['', '']);
-      setTopicTag('');
 
       closeComposer();
 
