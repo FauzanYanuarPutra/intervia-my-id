@@ -1803,7 +1803,7 @@ function DesktopSidebar({
               : 'bg-slate-50 text-[color:var(--app-text-soft)]',
           )}
         >
-          <Icon className="h-4.5 w-4.5" />
+          <Icon className="h-5 w-5" />
         </span>
         <span className="flex min-w-0 flex-1 items-center gap-2">
           <span className="truncate text-xs font-semibold">{item.label}</span>
@@ -2332,7 +2332,7 @@ function MarketplaceIntentPanel({ isId }: { isId: boolean }) {
           className="group flex min-h-[78px] min-w-0 items-center gap-3 rounded-[18px] border border-emerald-200 bg-emerald-50/70 px-3.5 py-3 transition hover:-translate-y-0.5 hover:border-emerald-300 hover:bg-emerald-50 dark:border-emerald-400/15 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/15"
         >
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-emerald-700 text-white shadow-sm">
-            <Store className="h-4.5 w-4.5" />
+            <Store className="h-5 w-5" />
           </span>
           <span className="min-w-0">
             <span className="block text-xs font-black text-emerald-950 dark:text-emerald-100">
@@ -2352,7 +2352,7 @@ function MarketplaceIntentPanel({ isId }: { isId: boolean }) {
           className="group flex min-h-[78px] min-w-0 items-center gap-3 rounded-[18px] border border-blue-200 bg-blue-50/70 px-3.5 py-3 transition hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-50 dark:border-blue-400/15 dark:bg-blue-500/10 dark:hover:bg-blue-500/15"
         >
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-blue-700 text-white shadow-sm">
-            <Search className="h-4.5 w-4.5" />
+            <Search className="h-5 w-5" />
           </span>
           <span className="min-w-0">
             <span className="block text-xs font-black text-blue-950 dark:text-blue-100">
@@ -3450,7 +3450,7 @@ function RightRail({
               </h2>
             </div>
             <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)]">
-              <BarChart3 className="h-4.5 w-4.5" />
+              <BarChart3 className="h-5 w-5" />
             </span>
           </div>
 
