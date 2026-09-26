@@ -120,21 +120,115 @@ export function priceUnitLabel(unit: unknown, locale: LocaleCode): string {
   return normalized.replace(/_/g, ' ');
 }
 
+function metadataRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function resolveNestedUnit(source: Record<string, unknown>): string {
+  const nestedCandidates = [
+    source.unit,
+    source.unit_label,
+    source.price_unit,
+    source.price_basis,
+    source.quantity_unit,
+    source.required_unit,
+    source.need_unit,
+    source.rate_unit,
+  ];
+
+  return nestedCandidates.map(normalizePriceUnit).find(Boolean) || '';
+}
+
+function isDemandContent(item: ContentItem, metadata: Record<string, unknown>): boolean {
+  const sideCandidates = [
+    item.listing_side,
+    item.market_side,
+    item.listing_intent,
+    item.market_intent,
+    item.intent,
+    metadata.side,
+    metadata.listing_side,
+    metadata.market_side,
+    metadata.listing_intent,
+    metadata.market_intent,
+    metadata.intent,
+  ]
+    .map(value => text(value).toLowerCase())
+    .filter(Boolean)
+    .join(' ');
+
+  return /demand|request|need|seeker|buyer|mencari|butuh|kebutuhan/.test(
+    sideCandidates,
+  );
+}
+
 export function resolveContentPriceUnit(item: ContentItem): string {
-  const metadata = item.metadata || {};
-  const direct =
-    normalizePriceUnit(item.price_unit) ||
-    normalizePriceUnit(metadata.price_unit) ||
-    normalizePriceUnit(metadata.unit) ||
-    normalizePriceUnit(metadata.unit_label) ||
-    normalizePriceUnit(metadata.price_basis) ||
-    normalizePriceUnit(metadata.rate_type) ||
-    normalizePriceUnit(metadata.rental_rate_type) ||
-    normalizePriceUnit(metadata.rental_period) ||
-    normalizePriceUnit(metadata.lease_term) ||
-    normalizePriceUnit(metadata.compensation_period) ||
-    normalizePriceUnit(metadata.salary_period) ||
-    normalizePriceUnit(metadata.minimum_order);
+  const metadata = metadataRecord(item.metadata);
+  const nestedAttributes = [
+    metadataRecord(metadata.attributes),
+    metadataRecord(metadata.values),
+    metadataRecord(metadata.form_values),
+    metadataRecord(metadata.listing_values),
+  ];
+
+  const nestedUnit =
+    nestedAttributes.map(resolveNestedUnit).find(Boolean) || '';
+
+  const demandUnit =
+    [
+      metadata.quantity_unit,
+      metadata.required_unit,
+      metadata.need_unit,
+      metadata.unit,
+      metadata.unit_label,
+      metadata.price_unit,
+      metadata.rate_unit,
+      ...nestedAttributes.flatMap(source => [
+        source.quantity_unit,
+        source.required_unit,
+        source.need_unit,
+        source.unit,
+        source.unit_label,
+        source.price_unit,
+        source.rate_unit,
+      ]),
+      nestedUnit,
+    ]
+      .map(normalizePriceUnit)
+      .find(Boolean) || '';
+
+  const supplyUnit =
+    [
+      item.price_unit,
+      metadata.price_unit,
+      metadata.unit,
+      metadata.unit_label,
+      metadata.price_basis,
+      metadata.rate_type,
+      metadata.rental_rate_type,
+      metadata.rental_period,
+      metadata.lease_term,
+      metadata.compensation_period,
+      metadata.salary_period,
+      metadata.minimum_order,
+      ...nestedAttributes.flatMap(source => [
+        source.price_unit,
+        source.unit,
+        source.unit_label,
+        source.price_basis,
+        source.rate_type,
+        source.rate_unit,
+      ]),
+      nestedUnit,
+    ]
+      .map(normalizePriceUnit)
+      .find(Boolean) || '';
+
+  const direct = isDemandContent(item, metadata)
+    ? demandUnit || supplyUnit
+    : supplyUnit || demandUnit;
 
   if (direct) return direct;
 
@@ -166,6 +260,7 @@ export function formatPriceWithUnit(
     !trimmed ||
     trimmed === '-' ||
     /nego|request|menyesuaikan|hubungi|contact/i.test(trimmed) ||
+    /budget\s+(fleksibel|maksimal|tetap|range|rentang)|^(flexible|fixed|maximum)\s+budget$/i.test(trimmed) ||
     /(^|[\s(])per\s+\S+|\/\s*\S+/i.test(trimmed) ||
     /^(nego|custom)$/i.test(unitLabel.trim())
   ) {
