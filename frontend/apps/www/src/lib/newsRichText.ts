@@ -1,3 +1,4 @@
+import { normalizeSafeExternalHttpUrl } from 'lajukan-ui';
 import { normalizeNewsMediaUrl } from './newsMediaUrl';
 
 const ALLOWED_BLOCK_TAGS = new Set([
@@ -70,7 +71,7 @@ export function sanitizeNewsRichText(value: string, maxLength = 60_000): string 
 
     if (tag === 'a') {
       const attrs = readAttrs(opening[2] || '');
-      const href = normalizeNewsMediaUrl(attrs.href);
+      const href = normalizeSafeExternalHttpUrl(attrs.href);
       if (!href) { output += '<a>'; continue; }
       output += '<a href="' + escapeAttr(href) + '" target="_blank" rel="noopener noreferrer nofollow">';
       continue;
