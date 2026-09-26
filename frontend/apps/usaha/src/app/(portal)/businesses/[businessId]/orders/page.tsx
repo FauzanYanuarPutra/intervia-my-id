@@ -11,6 +11,7 @@ import { PortalShell } from '@/components/portal/PortalShell';
 import { WorkspaceTabs } from '@/components/portal/WorkspaceTabs';
 import { getCurrentWave2CashShift } from '@/lib/business-wave2-server';
 import { listControlChannels, listControlOrders, listControlSales, type ControlSaleLine } from '@/lib/business-control-server';
+import { listCommercialParties } from '@/lib/business-commercial-core-server';
 import { jakartaDateKey } from '@/lib/business-control/insights';
 import { hasPermission } from '@/lib/portal-logic';
 import { resolvePortalBusinessPageState } from '@/lib/portal-server';
@@ -74,11 +75,12 @@ export default async function BusinessOrdersPage({ params, searchParams }: PageP
   const canViewCosting = hasPermission(business, 'viewCosting');
   const canViewChannels = hasPermission(business, 'viewChannels');
   const canVoidSales = hasPermission(business, 'voidSales');
-  const [sales, currentShift, canonicalOrders, channels] = await Promise.all([
+  const [sales, currentShift, canonicalOrders, channels, parties] = await Promise.all([
     canViewTransactions ? listControlSales(business.id) : Promise.resolve([]),
     canCloseCashShift ? getCurrentWave2CashShift(business.id) : Promise.resolve(null),
     canViewOrders ? listControlOrders(business.id) : Promise.resolve([]),
     canCreateSales && canViewChannels ? listControlChannels(business.id) : Promise.resolve([]),
+    canCreateSales ? listCommercialParties(business.id) : Promise.resolve([]),
   ]);
 
   const saleProducts = business.products.filter(product => product.status === 'live').map(product => ({
@@ -129,6 +131,7 @@ export default async function BusinessOrdersPage({ params, searchParams }: PageP
             products={saleProducts}
             channels={channels.filter(channel => channel.enabled).map(channel => ({ value: channel.channel_key, label: channel.display_name }))}
             locations={(business.locations ?? []).filter(location => location.status !== 'inactive').map(location => ({ id: location.id, name: location.name, city: location.city, isPrimary: location.isPrimary }))}
+            parties={parties.filter(party => party.status === 'active' && (party.party_kind === 'customer' || party.party_kind === 'both')).map(party => ({ id: party.id, name: party.display_name, kind: party.party_kind }))}
             defaultDate={jakartaDateKey()}
           />
         </div>
