@@ -476,6 +476,9 @@ export async function PUT(
     );
   }
   const currentState = existingData as Record<string, unknown>;
+  const isWizardAutosave =
+    req.headers.get('x-lajukan-autosave') === '1';
+
   const currentStatus =
     normalizeStatus(currentState.content_status) ||
     normalizeStatus(currentState.status) ||
@@ -584,9 +587,6 @@ export async function PUT(
     }
     setNestedString(forwardPayload, candidate.field, safety.sanitizedText);
   }
-
-  const isWizardAutosave =
-    req.headers.get('x-lajukan-autosave') === '1';
 
   if (!isWizardAutosave) {
     const creatorBudget = await enforceCreatorBudget({
