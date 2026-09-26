@@ -1682,7 +1682,6 @@ async fn withdraw_news_submission(
     .bind(content_id)
     .bind(owner_id)
     .bind(&from_status)
-    .bind(None::<&str>)
     .execute(&mut *tx)
     .await
     {
