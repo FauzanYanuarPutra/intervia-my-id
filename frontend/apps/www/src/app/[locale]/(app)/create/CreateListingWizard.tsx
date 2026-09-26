@@ -3196,6 +3196,12 @@ export default function CreateListingWizard({
    * delayed a little to avoid one API call per keystroke.
    */
   useEffect(() => {
+    const editingLiveContent =
+      Boolean(editingContentId) &&
+      ['active', 'published', 'live'].includes(
+        editingContentStatus.trim().toLowerCase(),
+      );
+
     if (
       !hydrated ||
       pendingStoredDraft ||
@@ -3203,7 +3209,8 @@ export default function CreateListingWizard({
       !draftOwnerId ||
       hydratedOwnerId !== draftOwnerId ||
       currentStep < 4 ||
-      !serverDraftRef.current?.id
+      !serverDraftRef.current?.id ||
+      editingLiveContent
     ) {
       return;
     }
@@ -3252,6 +3259,8 @@ export default function CreateListingWizard({
     media,
     subcategorySlug,
     industryIds,
+    editingContentId,
+    editingContentStatus,
     saveServerDraft,
   ]);
 
@@ -3796,8 +3805,15 @@ export default function CreateListingWizard({
   useEffect(() => {
     if (!isAuthenticated) return;
 
+    const editingLiveContent =
+      Boolean(editingContentId) &&
+      ['active', 'published', 'live'].includes(
+        editingContentStatus.trim().toLowerCase(),
+      );
+
     const handleOnline = () => {
       if (
+        editingLiveContent ||
         currentStep >= 4 &&
         serverDraftRef.current?.id
       ) {
@@ -3822,6 +3838,8 @@ export default function CreateListingWizard({
       );
   }, [
     currentStep,
+    editingContentId,
+    editingContentStatus,
     isAuthenticated,
     media,
     saveServerDraft,
