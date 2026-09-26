@@ -43,7 +43,7 @@ mod rate_limit;
 mod runtime_metrics;
 mod schema_contract;
 
-use auth::{is_moderator, optional_actor, request_ip, require_actor, AuthActor};
+use auth::{is_moderator, is_platform_group_admin, optional_actor, request_ip, require_actor, AuthActor};
 use health::{health, ready, root, service_metrics};
 use media::{
     content_type_for_filename, extension_for, first_feed_media_url, has_valid_media_signature,
@@ -2007,7 +2007,7 @@ async fn ensure_forum_user(db: &PgPool, actor: &AuthActor) -> ApiResult<ForumUse
         })
         .unwrap_or_else(|| "/default-avatar.svg".to_string());
 
-    sqlx::query_as::<_, ForumUser>(
+    let forum_user = sqlx::query_as::<_, ForumUser>(
         r#"
         INSERT INTO forum.lajukan_forum_users
           (id, username, name, avatar_url, title, reputation, base_reputation, badges, created_at, updated_at)
@@ -2029,7 +2029,41 @@ async fn ensure_forum_user(db: &PgPool, actor: &AuthActor) -> ApiResult<ForumUse
     .map_err(|error| {
         tracing::error!("ensure_forum_user error: {:?}", error);
         ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "Failed to ensure forum user")
-    })
+    })?;
+
+    ensure_platform_group_admin_memberships(db, &forum_user.id, actor).await?;
+    Ok(forum_user)
+}
+
+async fn ensure_platform_group_admin_memberships(
+    db: &PgPool,
+    forum_user_id: &str,
+    actor: &AuthActor,
+) -> ApiResult<()> {
+    if !is_platform_group_admin(actor) {
+        return Ok(());
+    }
+
+    sqlx::query(
+        r#"
+        INSERT INTO lajukan_group_members (
+            group_id, user_id, role, status, joined_at, updated_at
+        )
+        SELECT g.id, $1, 'owner', 'active', now(), now()
+        FROM lajukan_groups g
+        WHERE g.status = 'active'
+        ON CONFLICT (group_id, user_id) DO UPDATE
+        SET role = 'owner',
+            status = 'active',
+            updated_at = now()
+        "#,
+    )
+    .bind(forum_user_id)
+    .execute(db)
+    .await
+    .map_err(internal_error)?;
+
+    Ok(())
 }
 
 async fn sync_current_profile(
