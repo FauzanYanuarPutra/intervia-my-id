@@ -1,10 +1,9 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ImageIcon, Search, Trash2, X } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { EmptyState } from '@/components/system/feedback/EmptyState';
-import CreateMarketplaceShell from '@/app/[locale]/(app)/create/CreateMarketplaceShell';
 import {
   readSearchCartSession,
   removeSearchCartItem,
@@ -17,7 +16,6 @@ import {
   subscribeListingViewHistory,
   type ListingViewHistoryItem,
 } from '@/lib/listingViewHistory';
-import { useEffect } from 'react';
 
 type CollectionMode = 'saved' | 'history';
 
@@ -110,8 +108,8 @@ export default function MyContentCollectionClient({ mode }: Props) {
   };
 
   return (
-    <CreateMarketplaceShell>
-      <div className="mx-auto w-full max-w-5xl px-0 pb-8 sm:px-2 lg:px-3">
+    <main className="page-shell min-w-0 max-w-full overflow-x-clip pb-8 pt-4 sm:py-6">
+      <div className="mx-auto w-full max-w-5xl px-0 sm:px-2 lg:px-3">
         <header className="border-b border-slate-200 bg-white px-3 pb-3 pt-2 dark:border-white/10 dark:bg-slate-950 sm:rounded-t-[20px] sm:px-4 sm:pt-4">
           <div className="flex min-w-0 items-center justify-between gap-3">
             <div className="min-w-0">
@@ -270,6 +268,6 @@ export default function MyContentCollectionClient({ mode }: Props) {
           )}
         </section>
       </div>
-    </CreateMarketplaceShell>
+    </main>
   );
 }
