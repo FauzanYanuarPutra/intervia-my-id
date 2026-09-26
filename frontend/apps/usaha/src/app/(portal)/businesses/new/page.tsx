@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { CheckCircle2, MapPinned, Store } from 'lucide-react';
+import { Building2, MapPinned, Store } from 'lucide-react';
 import { NewBusinessQuickForm } from '@/components/forms/NewBusinessQuickForm';
 import { PageHeader } from '@/components/portal/PageHeader';
 import { PortalShell } from '@/components/portal/PortalShell';
@@ -21,9 +21,9 @@ export default async function NewBusinessPage() {
 
         <section className="merchant-surface-bordered overflow-hidden">
           <div className="grid grid-cols-3 divide-x divide-portal-line/70 border-b border-portal-line/70 bg-[#fafbf9]">
-            <div className="px-3 py-3 text-center"><Store className="mx-auto h-4 w-4 text-portal-forest" /><p className="mt-1 text-[11px] font-bold text-portal-ink">Info usaha</p></div>
+            <div className="px-3 py-3 text-center"><Store className="mx-auto h-4 w-4 text-portal-forest" /><p className="mt-1 text-[11px] font-bold text-portal-ink">Jenis usaha</p></div>
+            <div className="px-3 py-3 text-center"><Building2 className="mx-auto h-4 w-4 text-portal-forest" /><p className="mt-1 text-[11px] font-bold text-portal-ink">Info usaha</p></div>
             <div className="px-3 py-3 text-center"><MapPinned className="mx-auto h-4 w-4 text-portal-forest" /><p className="mt-1 text-[11px] font-bold text-portal-ink">Lokasi</p></div>
-            <div className="px-3 py-3 text-center"><CheckCircle2 className="mx-auto h-4 w-4 text-portal-forest" /><p className="mt-1 text-[11px] font-bold text-portal-ink">Siap dipakai</p></div>
           </div>
           <div className="p-4 sm:p-6">
             <NewBusinessQuickForm
