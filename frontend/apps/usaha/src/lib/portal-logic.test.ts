@@ -8,6 +8,7 @@ describe('visiblePortalSections', () => {
       'home',
       'orders',
       'operations',
+      'work',
     ]);
   });
 
