@@ -73,6 +73,7 @@ type UmkmStoreMapProps = {
   focusMode?: 'stores' | 'viewer' | 'route' | 'selected' | 'indonesia';
   focusNonce?: number;
   controls?: boolean;
+  showPopups?: boolean;
   focusOffset?: UmkmMapFocusOffset;
   onBoundsChange?: (bounds: UmkmMapBounds) => void;
 };
