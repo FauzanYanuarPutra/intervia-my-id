@@ -238,6 +238,7 @@ type RecommendationItem = {
   side: 'supply' | 'demand';
   imageAttribution?: string;
   ownerId?: string | null;
+  contentStatus: string;
   updatedAt?: number;
 };
 
@@ -1034,6 +1035,12 @@ function mapContentToRecommendation(
     side,
     imageAttribution: contentImageAttribution(item) || undefined,
     ownerId: item.owner_id || null,
+    contentStatus:
+      readText(item.content_status) ||
+      readText(item.status) ||
+      readText(item.metadata?.content_status) ||
+      readText(item.metadata?.contentStatus) ||
+      'active',
     updatedAt: item.updated_at ? Date.parse(item.updated_at) || undefined : undefined,
   };
 }
@@ -2539,6 +2546,7 @@ function RecommendationCard({
   item: RecommendationItem;
   isId: boolean;
 }) {
+  const { user } = useAuth();
   const image = normalizeMediaUrl(
     item.image || item.images?.[0],
   );
@@ -2553,10 +2561,38 @@ function RecommendationCard({
 
   const fallbackTitle = isId ? 'Gambar produk' : 'Product image';
   const isDemand = item.side === 'demand';
+  const normalizedStatus = String(item.contentStatus || 'active')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
+  const isPublic =
+    normalizedStatus === 'active' ||
+    normalizedStatus === 'published' ||
+    normalizedStatus === 'live';
+  const viewerId = String(user?.id || '').trim().toLowerCase();
+  const ownerId = String(item.ownerId || '').trim().toLowerCase();
+  const isOwner = Boolean(viewerId && ownerId && viewerId === ownerId);
+  const destinationHref = isPublic
+    ? item.href
+    : isOwner
+      ? '/create?draft=' + encodeURIComponent(item.id)
+      : null;
+  const ownerStatusLabel =
+    normalizedStatus === 'draft'
+      ? isId ? 'Draft' : 'Draft'
+      : ['pending', 'pending_review', 'review'].includes(normalizedStatus)
+        ? isId ? 'Menunggu ditinjau' : 'Under review'
+        : ['paused', 'inactive'].includes(normalizedStatus)
+          ? isId ? 'Dijeda' : 'Paused'
+          : isId ? 'Belum tayang' : 'Not published';
+
+  if (!destinationHref) {
+    return null;
+  }
 
   return (
     <a
-      href={item.href}
+      href={destinationHref}
       data-testid={
         item.side === 'demand'
           ? 'home-demand-listing-card'
@@ -2686,6 +2722,15 @@ function RecommendationCard({
           </span>
         ) : null}
 
+        {isOwner && !isPublic ? (
+          <span
+            className="absolute right-2 top-2 inline-flex max-w-[68%] items-center truncate rounded-full border border-amber-200 bg-amber-50/95 px-2.5 py-1.5 text-[8px] font-black leading-none text-amber-900 shadow-sm backdrop-blur-md sm:text-[9px]"
+            title={ownerStatusLabel}
+          >
+            {ownerStatusLabel}
+          </span>
+        ) : null}
+
         {/* VERIFIED */}
         {item.verified ? (
           <span
@@ -2769,6 +2814,12 @@ function RecommendationCard({
         >
           {item.title}
         </h3>
+
+        {isOwner && !isPublic ? (
+          <p className="mt-1 truncate text-[9px] font-bold text-amber-700 dark:text-amber-300">
+            {isId ? 'Edit & tayangkan' : 'Edit & publish'}
+          </p>
+        ) : null}
 
         {/* PRICE */}
         {price ? (
