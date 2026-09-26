@@ -94,49 +94,49 @@ export async function getViewerUserId(): Promise<string> {
 export async function getPublicContent(
   routeId: string,
 ): Promise<PublicContentResolution> {
-    const requestHeadersFromServer = await headers();
+  const requestHeadersFromServer = await headers();
+  const forwardedHeaders: Record<string, string> = {
+    Accept: 'application/json',
+  };
+  const cookie = requestHeadersFromServer.get('cookie');
+  const authorization = requestHeadersFromServer.get('authorization');
+  if (cookie) forwardedHeaders.Cookie = cookie;
+  if (authorization) forwardedHeaders.Authorization = authorization;
+
   const contentId = extractContentId(routeId) || routeId.trim();
   if (!contentId) return { status: 'not_found' };
 
   try {
-      const response = await fetch(
-        new URL(
-          `/v1/content/${encodeURIComponent(contentId)}`,
-          MARKETPLACE_URL,
-        ),
-        {
-          headers: (() => {
-            const requestHeaders = new Headers();
-            requestHeaders.set('Accept', 'application/json');
-            const cookie = requestHeadersFromServer?.get('cookie');
-            const authorization = requestHeadersFromServer?.get('authorization');
-            if (cookie) requestHeaders.set('Cookie', cookie);
-            if (authorization) requestHeaders.set('Authorization', authorization);
-            return requestHeaders;
-          })(),
-          cache: 'no-store',
-          signal: AbortSignal.timeout(3_500),
-        },
-      );
+    const response = await fetch(
+      new URL(
+        `/v1/content/${encodeURIComponent(contentId)}`,
+        MARKETPLACE_URL,
+      ),
+      {
+        headers: forwardedHeaders,
+        cache: 'no-store',
+        signal: AbortSignal.timeout(3_500),
+      },
+    );
 
-      if ([400, 404, 410, 422].includes(response.status)) {
-        return { status: 'not_found' };
-      }
-      if (!response.ok) return { status: 'unavailable' };
-
-      const content = asRecord(await response.json().catch(() => null));
-      if (!content?.id) return { status: 'unavailable' };
-
-      const ownerId = readString(content.owner_id);
-      if (ownerId && !asRecord(content.owner_profile)) {
-        const ownerProfile = await fetchOwnerProfile(ownerId);
-        if (ownerProfile) content.owner_profile = ownerProfile;
-      }
-
-      return { status: 'found', content };
-    } catch {
-      return { status: 'unavailable' };
+    if ([400, 404, 410, 422].includes(response.status)) {
+      return { status: 'not_found' };
     }
+    if (!response.ok) return { status: 'unavailable' };
+
+    const content = asRecord(await response.json().catch(() => null));
+    if (!content?.id) return { status: 'unavailable' };
+
+    const ownerId = readString(content.owner_id);
+    if (ownerId && !asRecord(content.owner_profile)) {
+      const ownerProfile = await fetchOwnerProfile(ownerId);
+      if (ownerProfile) content.owner_profile = ownerProfile;
+    }
+
+    return { status: 'found', content };
+  } catch {
+    return { status: 'unavailable' };
+  }
 }
 
 export function isPublicEditorialContent(content: ContentRecord): boolean {
