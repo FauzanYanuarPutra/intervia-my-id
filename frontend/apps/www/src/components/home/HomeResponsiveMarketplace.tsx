@@ -100,7 +100,11 @@ import {
 } from '@/lib/content/catalog';
 import { resolveContentPriceUnitLabel } from '@/lib/content/priceUnit';
 import { buildContentHref } from '@/lib/content/routes';
-import { resolveListingSide } from '@/lib/content/listingSide';
+import {
+  getListingSideVerbLabel,
+  getListingValueFallback,
+  resolveListingSide,
+} from '@/lib/content/listingSide';
 import { readPublicReference } from '@/lib/content/publicReference';
 import { isHomeRecommendationEligible } from '@/lib/homeRecommendationRules';
 import {
@@ -976,10 +980,11 @@ function mapContentToRecommendation(
     metadataText(item, 'city', 'location', 'address');
   const price =
     typeof item.price_cents === 'number' && item.price_cents > 0
-      ? formatCurrencyFromCents(item.price_cents, item.currency)
-      : isId
-        ? 'Tanya harga'
-        : 'Ask price';
+      ? side === 'demand'
+        ? (isId ? 'Anggaran ' : 'Budget ') +
+          formatCurrencyFromCents(item.price_cents, item.currency)
+        : formatCurrencyFromCents(item.price_cents, item.currency)
+      : getListingValueFallback(side, isId ? 'id' : 'en', type);
   const unit =
     resolveContentPriceUnitLabel(item, isId ? 'id' : 'en') ||
     metadataText(item, 'unit', 'rate_type', 'min_order_qty', 'lease_term');
@@ -2040,11 +2045,25 @@ function QuickCategoriesSection({ isId }: { isId: boolean }) {
   );
 }
 
-function RecommendationsLoadingSkeleton({ isId }: { isId: boolean }) {
+function RecommendationsLoadingSkeleton({
+  isId,
+  demand = false,
+}: {
+  isId: boolean;
+  demand?: boolean;
+}) {
   return (
     <section
       className="w-full min-w-0 overflow-hidden py-1.5 sm:py-2"
-      aria-label={isId ? 'Memuat rekomendasi listing' : 'Loading listing recommendations'}
+      aria-label={
+        demand
+          ? isId
+            ? 'Memuat kebutuhan yang sedang dicari'
+            : 'Loading current requests'
+          : isId
+            ? 'Memuat rekomendasi listing'
+            : 'Loading listing recommendations'
+      }
       aria-busy="true"
       data-testid="home-recommendations-skeleton"
     >
@@ -2073,12 +2092,14 @@ function RecommendationsLoadingSkeleton({ isId }: { isId: boolean }) {
   );
 }
 
-export function RecommendationsSection({
+function HomeListingCarouselSection({
   isId,
   items,
+  mode,
 }: {
   isId: boolean;
   items: RecommendationItem[];
+  mode: 'supply' | 'demand';
 }) {
   const [emblaRef, emblaApi] = useEmblaCarousel({
     align: 'start',
@@ -2089,37 +2110,73 @@ export function RecommendationsSection({
 
   useEmblaWheelGestures(emblaApi);
 
+  const isDemand = mode === 'demand';
+
   return (
     <section
       className="w-full min-w-0 overflow-hidden py-1.5 sm:py-2"
-      data-testid="home-recommendations-section"
+      data-testid={
+        isDemand
+          ? 'home-demand-listings-section'
+          : 'home-recommendations-section'
+      }
       aria-label={
-        isId
-          ? 'Rekomendasi penawaran untuk usahamu'
-          : 'Recommended offers for your business'
+        isDemand
+          ? isId
+            ? 'Orang sedang mencari'
+            : 'What people are looking for'
+          : isId
+            ? 'Rekomendasi penawaran untuk usahamu'
+            : 'Recommended offers for your business'
       }
     >
-      {/* HEADER */}
       <div className="flex min-w-0 items-center gap-1.5 px-2 sm:px-3 md:px-4 lg:px-6">
-        <Sparkles className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+        {isDemand ? (
+          <Search className="h-3.5 w-3.5 shrink-0 text-blue-600" />
+        ) : (
+          <Sparkles className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+        )}
 
         <h2 className="min-w-0 truncate text-[11px] font-bold leading-5 tracking-tight text-[color:var(--app-text)] sm:text-xs">
-          {isId ? 'Rekomendasi listing' : 'Recommended listings'}
+          {isDemand
+            ? isId
+              ? 'Orang sedang mencari'
+              : 'People are looking for'
+            : isId
+              ? 'Rekomendasi penawaran'
+              : 'Recommended offers'}
         </h2>
 
         <span className="hidden shrink-0 text-[9px] font-medium text-zinc-400 sm:inline">
-          {isId ? 'Produk, jasa, lokasi & sewa' : 'Products, services, places & rentals'}
+          {isDemand
+            ? isId
+              ? 'Kebutuhan yang sedang dicari'
+              : 'Current needs posted by others'
+            : isId
+              ? 'Produk, jasa, lokasi & sewa'
+              : 'Products, services, places & rentals'}
         </span>
+
+        <Link
+          href={isDemand ? '/explore?side=demand' : '/explore?side=supply'}
+          className="ml-auto inline-flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-1 text-[9px] font-bold text-[color:var(--app-accent)] hover:bg-[color:var(--app-accent-soft)]"
+        >
+          {isId ? 'Lihat semua' : 'See all'}
+          <ChevronRight className="h-3 w-3" />
+        </Link>
       </div>
 
-      {/* EMPTY */}
       {items.length === 0 ? (
         <div className="mt-1.5 px-2 sm:px-3 md:px-4 lg:px-6">
           <div className="rounded-xl border border-dashed border-zinc-200 bg-zinc-50/60 px-3 py-4 text-center dark:border-zinc-800 dark:bg-zinc-900/40">
             <p className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400 sm:text-[11px]">
-              {isId
-                ? 'Belum ada rekomendasi saat ini.'
-                : 'No recommendations right now.'}
+              {isDemand
+                ? isId
+                  ? 'Belum ada kebutuhan yang dipublikasikan saat ini.'
+                  : 'No active requests have been posted yet.'
+                : isId
+                  ? 'Belum ada rekomendasi saat ini.'
+                  : 'No recommendations right now.'}
             </p>
           </div>
         </div>
@@ -2144,11 +2201,8 @@ export function RecommendationsSection({
                   key={item.id}
                   className="
                     min-w-0 shrink-0 grow-0 select-none
-
                     basis-[calc((100vw-32px)/2.08)]
-
                     min-[390px]:basis-[calc((100vw-36px)/2.15)]
-
                     sm:basis-[180px]
                     md:basis-[190px]
                     lg:basis-[200px]
@@ -2163,7 +2217,6 @@ export function RecommendationsSection({
             </div>
           </div>
 
-          {/* Desktop controls jika component ini sudah tersedia di Home */}
           <div className="hidden md:block">
             <EmblaDesktopControls api={emblaApi} compact />
           </div>
@@ -2171,6 +2224,26 @@ export function RecommendationsSection({
       )}
     </section>
   );
+}
+
+export function RecommendationsSection({
+  isId,
+  items,
+}: {
+  isId: boolean;
+  items: RecommendationItem[];
+}) {
+  return <HomeListingCarouselSection isId={isId} items={items} mode="supply" />;
+}
+
+export function DemandListingsSection({
+  isId,
+  items,
+}: {
+  isId: boolean;
+  items: RecommendationItem[];
+}) {
+  return <HomeListingCarouselSection isId={isId} items={items} mode="demand" />;
 }
 
 export function PublicReferencesSection({
@@ -2690,7 +2763,7 @@ function RecommendationCard({
           {/* SIDE */}
           {item.side ? (
             <span
-              title={item.side}
+              title={getListingSideVerbLabel(item.side, isId ? 'id' : 'en')}
               className="
                 max-w-[42%]
                 shrink-0
@@ -2711,7 +2784,7 @@ function RecommendationCard({
                 dark:text-zinc-300
               "
             >
-              {item.side}
+              {getListingSideVerbLabel(item.side, isId ? 'id' : 'en')}
             </span>
           ) : null}
         </div>
@@ -4262,6 +4335,11 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
     [],
   );
   const [recommendationsLoading, setRecommendationsLoading] = useState(true);
+  const [demandRecommendations, setDemandRecommendations] = useState<
+    RecommendationItem[]
+  >([]);
+  const [demandRecommendationsLoading, setDemandRecommendationsLoading] =
+    useState(true);
   const [publicReferences, setPublicReferences] = useState<
     PublicReferenceItem[]
   >([]);
@@ -4444,9 +4522,14 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
   useEffect(() => {
     let active = true;
     const listingController = new AbortController();
+    const demandController = new AbortController();
     const referenceController = new AbortController();
     const listingTimeoutId = window.setTimeout(
       () => listingController.abort(),
+      HOME_CONTENT_REQUEST_TIMEOUT_MS,
+    );
+    const demandTimeoutId = window.setTimeout(
+      () => demandController.abort(),
       HOME_CONTENT_REQUEST_TIMEOUT_MS,
     );
     const referenceTimeoutId = window.setTimeout(
@@ -4480,6 +4563,28 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok) throw new Error('content_supply_unavailable');
+      return extractContentItems(payload);
+    };
+
+    const loadDemandListings = async () => {
+      const params = new URLSearchParams({
+        limit: '12',
+        status: 'active',
+        side: 'demand',
+        include_owner: '1',
+        database_only: '1',
+      });
+      addViewerLocation(params);
+      if (viewerLocationKey) {
+        params.set('nearby', '1');
+      }
+      const response = await fetch(`/api/content?${params.toString()}`, {
+        cache: 'no-store',
+        credentials: 'include',
+        signal: demandController.signal,
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error('content_demand_unavailable');
       return extractContentItems(payload);
     };
 
@@ -4536,6 +4641,39 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
       }
     };
 
+    const loadHomeDemandListings = async () => {
+      setDemandRecommendationsLoading(true);
+      try {
+        const listingItems = rankRecommendations(
+          (await loadDemandListings())
+            .filter(isHomeRecommendationEligible)
+            .map(item =>
+              mapContentToRecommendation(
+                item,
+                isId,
+                Boolean(viewerLocationKey),
+              ),
+            )
+            .filter((item): item is RecommendationItem => Boolean(item))
+            .filter(item => item.side === 'demand')
+            .filter(item => !userId || item.ownerId !== userId)
+            .filter(
+              (item, index, allItems) =>
+                allItems.findIndex(candidate => candidate.id === item.id) ===
+                index,
+            ),
+        ).slice(0, 12);
+
+        if (!active) return;
+        setDemandRecommendations(listingItems);
+      } catch {
+        if (!active) return;
+        setDemandRecommendations([]);
+      } finally {
+        if (active) setDemandRecommendationsLoading(false);
+      }
+    };
+
     const loadHomeReferences = async () => {
       try {
         const referenceItems = (await loadReferences())
@@ -4559,6 +4697,9 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
     void loadHomeListings().finally(() =>
       window.clearTimeout(listingTimeoutId),
     );
+    void loadHomeDemandListings().finally(() =>
+      window.clearTimeout(demandTimeoutId),
+    );
     void loadHomeReferences().finally(() =>
       window.clearTimeout(referenceTimeoutId),
     );
@@ -4566,11 +4707,13 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
     return () => {
       active = false;
       window.clearTimeout(listingTimeoutId);
+      window.clearTimeout(demandTimeoutId);
       window.clearTimeout(referenceTimeoutId);
       listingController.abort();
+      demandController.abort();
       referenceController.abort();
     };
-  }, [isId, viewerLocationKey]);
+  }, [isId, userId, viewerLocationKey]);
 
   const loadCommunityPostsPage = useCallback(async () => {
     const requestSeq = communityRequestSeqRef.current + 1;
@@ -4977,6 +5120,11 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
         ) : recommendations.length > 0 ? (
           <RecommendationsSection isId={isId} items={recommendations} />
         ) : null}
+        {demandRecommendationsLoading ? (
+          <RecommendationsLoadingSkeleton isId={isId} demand />
+        ) : (
+          <DemandListingsSection isId={isId} items={demandRecommendations} />
+        )}
         <HomeNewsSection locale={locale} items={homeNewsItems} />
         <ReelsPanel isId={isId} items={reels} />
         <HomeCommunityGroupsSection
@@ -5051,7 +5199,12 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
               ) : recommendations.length > 0 ? (
                 <RecommendationsSection isId={isId} items={recommendations} />
               ) : null}
-              <HomeNewsSection locale={locale} items={homeNewsItems} />
+              {demandRecommendationsLoading ? (
+          <RecommendationsLoadingSkeleton isId={isId} demand />
+        ) : (
+          <DemandListingsSection isId={isId} items={demandRecommendations} />
+        )}
+        <HomeNewsSection locale={locale} items={homeNewsItems} />
               <div className="grid gap-4">
                 <ReelsPanel isId={isId} items={reels} />
                 <HomeCommunityGroupsSection
