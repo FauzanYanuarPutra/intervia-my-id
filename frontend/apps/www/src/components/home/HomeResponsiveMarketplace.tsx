@@ -100,7 +100,11 @@ import {
 } from '@/lib/content/catalog';
 import { resolveContentPriceUnitLabel } from '@/lib/content/priceUnit';
 import { buildContentHref } from '@/lib/content/routes';
-import { resolveListingSide } from '@/lib/content/listingSide';
+import {
+  getListingSideVerbLabel,
+  getListingValueFallback,
+  resolveListingSide,
+} from '@/lib/content/listingSide';
 import { readPublicReference } from '@/lib/content/publicReference';
 import { isHomeRecommendationEligible } from '@/lib/homeRecommendationRules';
 import {
@@ -4262,6 +4266,11 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
     [],
   );
   const [recommendationsLoading, setRecommendationsLoading] = useState(true);
+  const [demandRecommendations, setDemandRecommendations] = useState<
+    RecommendationItem[]
+  >([]);
+  const [demandRecommendationsLoading, setDemandRecommendationsLoading] =
+    useState(true);
   const [publicReferences, setPublicReferences] = useState<
     PublicReferenceItem[]
   >([]);
@@ -4444,9 +4453,14 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
   useEffect(() => {
     let active = true;
     const listingController = new AbortController();
+    const demandController = new AbortController();
     const referenceController = new AbortController();
     const listingTimeoutId = window.setTimeout(
       () => listingController.abort(),
+      HOME_CONTENT_REQUEST_TIMEOUT_MS,
+    );
+    const demandTimeoutId = window.setTimeout(
+      () => demandController.abort(),
       HOME_CONTENT_REQUEST_TIMEOUT_MS,
     );
     const referenceTimeoutId = window.setTimeout(
@@ -4480,6 +4494,28 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok) throw new Error('content_supply_unavailable');
+      return extractContentItems(payload);
+    };
+
+    const loadDemandListings = async () => {
+      const params = new URLSearchParams({
+        limit: '12',
+        status: 'active',
+        side: 'demand',
+        include_owner: '1',
+        database_only: '1',
+      });
+      addViewerLocation(params);
+      if (viewerLocationKey) {
+        params.set('nearby', '1');
+      }
+      const response = await fetch(`/api/content?${params.toString()}`, {
+        cache: 'no-store',
+        credentials: 'include',
+        signal: demandController.signal,
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error('content_demand_unavailable');
       return extractContentItems(payload);
     };
 
@@ -4536,6 +4572,39 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
       }
     };
 
+    const loadHomeDemandListings = async () => {
+      setDemandRecommendationsLoading(true);
+      try {
+        const listingItems = rankRecommendations(
+          (await loadDemandListings())
+            .filter(isHomeRecommendationEligible)
+            .map(item =>
+              mapContentToRecommendation(
+                item,
+                isId,
+                Boolean(viewerLocationKey),
+              ),
+            )
+            .filter((item): item is RecommendationItem => Boolean(item))
+            .filter(item => item.side === 'demand')
+            .filter(item => !userId || item.ownerId !== userId)
+            .filter(
+              (item, index, allItems) =>
+                allItems.findIndex(candidate => candidate.id === item.id) ===
+                index,
+            ),
+        ).slice(0, 12);
+
+        if (!active) return;
+        setDemandRecommendations(listingItems);
+      } catch {
+        if (!active) return;
+        setDemandRecommendations([]);
+      } finally {
+        if (active) setDemandRecommendationsLoading(false);
+      }
+    };
+
     const loadHomeReferences = async () => {
       try {
         const referenceItems = (await loadReferences())
@@ -4559,6 +4628,9 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
     void loadHomeListings().finally(() =>
       window.clearTimeout(listingTimeoutId),
     );
+    void loadHomeDemandListings().finally(() =>
+      window.clearTimeout(demandTimeoutId),
+    );
     void loadHomeReferences().finally(() =>
       window.clearTimeout(referenceTimeoutId),
     );
@@ -4566,8 +4638,10 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
     return () => {
       active = false;
       window.clearTimeout(listingTimeoutId);
+      window.clearTimeout(demandTimeoutId);
       window.clearTimeout(referenceTimeoutId);
       listingController.abort();
+      demandController.abort();
       referenceController.abort();
     };
   }, [isId, viewerLocationKey]);
