@@ -111,7 +111,7 @@ export default async function HomePage({
 
   const locations = business.locations ?? [];
   const setupSteps = getSetupSteps(business);
-  const incompleteSetup = setupSteps.some(step => !step.done);
+  const incompleteSetup = setupSteps.some(step => !step.done && !step.optional);
   const status = getStatusCopy(business);
   const canViewCosting = hasPermission(business, 'viewCosting');
   const canViewFinance = hasPermission(business, 'viewFinance');
@@ -236,9 +236,13 @@ export default async function HomePage({
 
       <MetricStrip items={dashboard.metrics.map(metric => ({
         label: metric.label,
-        value: metric.key === 'revenue' || metric.key === 'expense'
-          ? (canViewFinance || metric.key === 'revenue' ? money.format(metric.value) : '—')
-          : metric.value,
+        value: metric.key === 'revenue'
+          ? (canViewOrders ? money.format(metric.value) : '—')
+          : metric.key === 'expense'
+            ? (canViewFinance ? money.format(metric.value) : '—')
+            : metric.key === 'transactions'
+              ? (canViewOrders ? metric.value : '—')
+              : metric.value,
       }))} />
 
       <section className="merchant-surface-bordered overflow-hidden">
