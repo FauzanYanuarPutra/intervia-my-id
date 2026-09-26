@@ -1765,7 +1765,7 @@ export function ExploreCategoryClient({
                   >
                     {isId
                       ? 'Membutuhkan'
-                      : 'Looking for'}
+                      : 'Needs'}
                   </button>
                 </div>
               ) : null}
