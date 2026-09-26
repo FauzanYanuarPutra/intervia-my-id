@@ -882,13 +882,13 @@ function DiscoveryScopeControl({
     },
     {
       value: 'registered',
-      label: isId ? 'Usaha terdaftar' : 'Registered',
+      label: isId ? 'Usaha' : 'Businesses',
       activeClass:
         'bg-emerald-600 text-white shadow-sm shadow-emerald-600/20',
     },
     {
       value: 'references',
-      label: isId ? 'Referensi publik' : 'Public data',
+      label: isId ? 'Sumber publik' : 'Public source',
       activeClass:
         'bg-sky-600 text-white shadow-sm shadow-sky-600/20',
     },
@@ -1708,10 +1708,10 @@ export function UmkmDiscoveryPanel({
         : 'references'
       : discoveryScope === 'registered'
         ? isId
-          ? 'usaha terdaftar'
-          : 'registered businesses'
+          ? 'usaha'
+          : 'businesses'
         : isId
-          ? 'lokasi'
+          ? 'titik'
           : 'locations';
   const resultHasMore =
     discoveryScope === 'references' ? canLoadMoreReferences : hasMore;
