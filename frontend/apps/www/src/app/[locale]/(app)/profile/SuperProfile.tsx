@@ -34,6 +34,7 @@ import {
   Plus,
   RefreshCw,
   Search,
+  Sparkles,
   Star,
   Store,
   Users,
@@ -43,6 +44,7 @@ import {
 import { ImageCropModal } from '@/components/common/ImageCropModal';
 
 import { ProfileFilterStrip } from '@/components/profile/ProfileFilterStrip';
+import { ProfileAiDraftModal } from './ProfileAiDraftModal';
 import { OwnerProfileSkeleton } from '@/components/system/feedback/RouteSkeletons';
 import { LocalizedLink } from '@/components/ui-kit';
 import { useAuth } from '@/context/AuthContext';
@@ -1359,6 +1361,7 @@ export default function SuperProfile() {
   const [refreshing, setRefreshing] = useState(false);
   const [profileError, setProfileError] = useState('');
   const [statsPartial, setStatsPartial] = useState(false);
+  const [profileAiOpen, setProfileAiOpen] = useState(false);
 
   const [activeTab, setActiveTab] = useState<OwnerTab>('posts');
   const [activeFilter, setActiveFilter] = useState<ListingFilter>('all');
@@ -2332,6 +2335,14 @@ export default function SuperProfile() {
                   <Eye className="h-4 w-4" />
                   {copy.publicProfile}
                 </LocalizedLink>
+                <button
+                  type="button"
+                  onClick={() => setProfileAiOpen(true)}
+                  className="col-span-2 inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 text-xs font-black text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-500/25 dark:bg-emerald-500/10 dark:text-emerald-300 sm:col-span-1"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  {isId ? 'AI Profil' : 'Profile AI'}
+                </button>
               </div>
             </div>
           </section>
@@ -2524,6 +2535,17 @@ export default function SuperProfile() {
         followingCount={followingCount}
         onTabChange={changeSocialTab}
         onClose={closeProfileModal}
+      />
+
+      <ProfileAiDraftModal
+        open={profileAiOpen}
+        detail={detail}
+        listings={activeListings}
+        isId={isId}
+        onClose={() => setProfileAiOpen(false)}
+        onSaved={async () => {
+          await loadProfile('refresh');
+        }}
       />
 
       <OwnerProfileEditModal
