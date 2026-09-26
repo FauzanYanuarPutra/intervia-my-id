@@ -848,6 +848,7 @@ pub async fn get_me_profile(
             up.bio,
             up.location,
             up.metadata,
+            up.picture,
             u.is_active,
             u.email_verified,
             u.phone_verified,
@@ -890,6 +891,30 @@ pub async fn get_me_profile(
     let metadata = row
         .get::<Option<Value>, _>("metadata")
         .unwrap_or_else(|| json!({}));
+    let picture = row.get::<Option<String>, _>("picture");
+    let avatar_url = metadata
+        .get("avatar_url")
+        .and_then(Value::as_str)
+        .or_else(|| {
+            metadata
+                .get("media")
+                .and_then(Value::as_object)
+                .and_then(|media| media.get("avatar_url"))
+                .and_then(Value::as_str)
+        })
+        .map(str::to_string)
+        .or(picture);
+    let cover_image = metadata
+        .get("cover_image")
+        .and_then(Value::as_str)
+        .or_else(|| {
+            metadata
+                .get("media")
+                .and_then(Value::as_object)
+                .and_then(|media| media.get("cover_image"))
+                .and_then(Value::as_str)
+        })
+        .map(str::to_string);
     let is_active = row.get::<bool, _>("is_active");
     let email_verified = row.get::<bool, _>("email_verified");
     let phone_verified = row.get::<bool, _>("phone_verified");
@@ -916,6 +941,8 @@ pub async fn get_me_profile(
             "full_name": full_name,
             "bio": bio,
             "location": location,
+            "avatar_url": avatar_url,
+            "cover_image": cover_image,
             "metadata": metadata,
             "email_verified": verification_state.email_verified,
             "phone_verified": verification_state.phone_verified,
@@ -1284,6 +1311,15 @@ pub async fn update_me_profile(
             }
             if let Some(avatar_generated_at) = map.get("avatar_generated_at").cloned() {
                 metadata_patch.insert("avatar_generated_at".to_string(), avatar_generated_at);
+            }
+            if let Some(avatar_source) = map.get("avatar_source").cloned() {
+                metadata_patch.insert("avatar_source".to_string(), avatar_source);
+            }
+            if let Some(avatar_updated_at) = map.get("avatar_updated_at").cloned() {
+                metadata_patch.insert("avatar_updated_at".to_string(), avatar_updated_at);
+            }
+            if let Some(cover_updated_at) = map.get("cover_updated_at").cloned() {
+                metadata_patch.insert("cover_updated_at".to_string(), cover_updated_at);
             }
         }
         metadata_patch.insert("extended".to_string(), metadata);
