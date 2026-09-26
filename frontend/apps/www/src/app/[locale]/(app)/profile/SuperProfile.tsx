@@ -784,6 +784,19 @@ function formatPrice(
 
 function getListingHref(item: OwnerListing): string {
   const type = normalizeListingType(item);
+  const status = normalizeStatus(item);
+  const isPubliclyVisible = ['active', 'published', 'live'].includes(status);
+
+  // Owner profile cards can also contain drafts, archived items, or other
+  // non-public states. Never send those states to the public detail route:
+  // that route intentionally returns 404 for non-public content.
+  if (!isPubliclyVisible) {
+    if (type === 'news') {
+      return `/news/submissions?edit=${encodeURIComponent(item.id)}`;
+    }
+    return `/create?draft=${encodeURIComponent(item.id)}`;
+  }
+
   if (type === 'news' && item.slug) {
     return `/news/${encodeURIComponent(item.slug)}`;
   }
