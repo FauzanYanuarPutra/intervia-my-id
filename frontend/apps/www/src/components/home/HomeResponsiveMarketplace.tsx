@@ -3605,58 +3605,6 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
   const [walletModeLabel, setWalletModeLabel] = useState<string | null>(null);
   const [walletLoading, setWalletLoading] = useState(false);
 
-  const toggleCommunityPostLike = useCallback(
-    async (threadId: string, liked: boolean) => {
-      const response = await authFetch(
-        `/api/forum/threads/${encodeURIComponent(threadId)}/vote`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            value: liked ? 1 : 0,
-          }),
-        },
-      );
-
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({}));
-
-        throw new Error(
-          payload?.error || 'Like request failed',
-        );
-      }
-    },
-    [authFetch],
-  );
-
-  const createCommunityComment = useCallback(
-    async (threadId: string, body: string) => {
-      const response = await authFetch(
-        `/api/forum/threads/${encodeURIComponent(threadId)}/posts`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            content: body,
-          }),
-        },
-      );
-
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({}));
-
-        throw new Error(
-          payload?.error || 'Comment request failed',
-        );
-      }
-    },
-    [authFetch],
-  );
-
   useEffect(() => {
     let active = true;
     let idleId: number | null = null;
