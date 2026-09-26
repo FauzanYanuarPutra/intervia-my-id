@@ -589,11 +589,11 @@ export default function SettingsPage() {
     deleteReason: locale === 'id' ? 'Alasan (opsional)' : 'Reason (optional)',
     deleteConfirm:
       locale === 'id'
-        ? 'Apakah Anda yakin ingin menghapus akun?'
+        ? 'Yakin mau hapus akun? Tindakan ini permanen, ya.'
         : 'Are you sure you want to delete this account?',
     deletePasswordRequired:
       locale === 'id'
-        ? 'Password diperlukan untuk menghapus akun.'
+        ? 'Masukkan password akun dulu ya.'
         : 'Password is required to delete the account.',
     deleteSuccess:
       locale === 'id'
@@ -607,7 +607,7 @@ export default function SettingsPage() {
         : 'Export request received. We will email you.',
     exportFailed:
       locale === 'id'
-        ? 'Export belum tersedia. Silakan coba lagi nanti.'
+        ? 'Fitur export belum siap. Coba lagi nanti ya.'
         : 'Export is not available yet. Please try again later.',
     signOut: locale === 'id' ? 'Keluar' : 'Sign out',
   };
