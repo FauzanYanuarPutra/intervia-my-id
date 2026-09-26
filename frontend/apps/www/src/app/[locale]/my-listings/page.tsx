@@ -1114,7 +1114,7 @@ export default function MyListingsPage() {
                           ? null
                           : {
                               label: locale === 'id' ? 'Edit' : 'Edit',
-                              href: `/create?draft=${id}`,
+                              href: editHref,
                               tone: 'border border-slate-200 bg-white text-slate-800 hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 dark:text-white',
                             };
 
