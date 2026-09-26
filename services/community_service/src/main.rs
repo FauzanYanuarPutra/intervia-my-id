@@ -357,6 +357,7 @@ struct ReelsQuery {
     tag: Option<String>,
     creator: Option<String>,
     mine: Option<String>,
+    tab: Option<String>,
     cursor: Option<i64>,
     limit: Option<i64>,
 }
@@ -6294,6 +6295,12 @@ async fn list_reels(
     let tag = clean_optional(query.tag);
     let creator = clean_optional(query.creator);
     let mine = parse_query_bool(query.mine.as_deref());
+    let tab = query
+        .tab
+        .as_deref()
+        .unwrap_or("fyp")
+        .trim()
+        .to_ascii_lowercase();
     let actor_user_id = actor.as_ref().map(|item| item.user_id.as_str());
     let actor_forum_user_id = actor.as_ref().map(forum_user_id);
 
@@ -6338,6 +6345,89 @@ async fn list_reels(
             AND cr.visibility = 'public'
             AND cr.creator_user_id IN (r.creator_user_id, p.id)
         ) creator_reels ON true
+        LEFT JOIN LATERAL (
+          SELECT COALESCE(SUM(
+            CASE a.action
+              WHEN 'like' THEN 18.0
+              WHEN 'save' THEN 15.0
+              WHEN 'follow' THEN 12.0
+              ELSE 0.0
+            END
+          ), 0.0)::double precision AS score
+          FROM lajukan_reel_user_actions a
+          WHERE $6::text IS NOT NULL
+            AND a.actor_user_id = $6
+            AND (
+              a.reel_id = r.id
+              OR (
+                a.action = 'follow'
+                AND a.target_user_id IN (r.creator_user_id, p.id)
+              )
+            )
+        ) viewer_reel_affinity ON true
+        LEFT JOIN LATERAL (
+          SELECT COALESCE(SUM(
+            CASE e.event_type
+              WHEN 'watch' THEN
+                CASE
+                  WHEN NULLIF(e.metadata->>'completion_ratio', '') ~ '^[0-9]+(?:\\.[0-9]+)?$'
+                    AND (e.metadata->>'completion_ratio')::double precision >= 0.90 THEN 10.0
+                  WHEN NULLIF(e.metadata->>'completion_ratio', '') ~ '^[0-9]+(?:\\.[0-9]+)?$'
+                    AND (e.metadata->>'completion_ratio')::double precision >= 0.50 THEN 6.0
+                  WHEN NULLIF(e.metadata->>'completion_ratio', '') ~ '^[0-9]+(?:\\.[0-9]+)?$'
+                    AND (e.metadata->>'completion_ratio')::double precision >= 0.25 THEN 2.5
+                  ELSE 0.5
+                END
+              WHEN 'share' THEN 7.0
+              WHEN 'open_product' THEN 6.0
+              WHEN 'open_store' THEN 5.0
+              WHEN 'view' THEN 0.5
+              ELSE 0.0
+            END
+          ), 0.0)::double precision AS score
+          FROM lajukan_reel_events e
+          JOIN reel.lajukan_reels watched
+            ON watched.id = e.reel_id
+          WHERE $6::text IS NOT NULL
+            AND e.actor_user_id = $6
+            AND watched.creator_user_id IN (r.creator_user_id, p.id)
+            AND e.created_at >= now() - interval '180 days'
+        ) creator_affinity ON true
+        LEFT JOIN LATERAL (
+          SELECT COALESCE(SUM(
+            CASE
+              WHEN lower(COALESCE(watched.tag, '')) = lower(COALESCE(r.tag, '')) THEN 8.0
+              WHEN lower(COALESCE(watched.title, '')) LIKE '%' || lower(COALESCE(r.tag, '')) || '%'
+                AND NULLIF(trim(COALESCE(r.tag, '')), '') IS NOT NULL THEN 3.0
+              ELSE 0.0
+            END
+          ), 0.0)::double precision AS score
+          FROM lajukan_reel_events e
+          JOIN reel.lajukan_reels watched
+            ON watched.id = e.reel_id
+          WHERE $6::text IS NOT NULL
+            AND e.actor_user_id = $6
+            AND e.event_type = 'watch'
+            AND e.created_at >= now() - interval '180 days'
+        ) topic_affinity ON true
+        LEFT JOIN LATERAL (
+          SELECT COALESCE(SUM(
+            CASE
+              WHEN lower(r.title) LIKE '%' || lower(trim(COALESCE(e.metadata->>'query', e.metadata->>'search_query', ''))) || '%'
+                OR lower(r.caption) LIKE '%' || lower(trim(COALESCE(e.metadata->>'query', e.metadata->>'search_query', ''))) || '%'
+                OR lower(r.tag) LIKE '%' || lower(trim(COALESCE(e.metadata->>'query', e.metadata->>'search_query', ''))) || '%'
+                OR lower(COALESCE(r.product_name, '')) LIKE '%' || lower(trim(COALESCE(e.metadata->>'query', e.metadata->>'search_query', ''))) || '%'
+              THEN 13.0
+              ELSE 0.0
+            END
+          ), 0.0)::double precision AS score
+          FROM lajukan_reel_events e
+          WHERE $6::text IS NOT NULL
+            AND e.actor_user_id = $6
+            AND e.event_type IN ('search', 'watch')
+            AND NULLIF(trim(COALESCE(e.metadata->>'query', e.metadata->>'search_query', '')), '') IS NOT NULL
+            AND e.created_at >= now() - interval '90 days'
+        ) search_affinity ON true
         WHERE r.status = 'published'
           AND (
             $1::text IS NULL OR
@@ -6403,7 +6493,82 @@ async fn list_reels(
               )
             )
           )
-        ORDER BY r.published_at DESC, r.id ASC
+          AND (
+            $8::text <> 'following'
+            OR (
+              $6::text IS NOT NULL
+              AND EXISTS (
+                SELECT 1
+                FROM lajukan_reel_user_actions followed
+                WHERE followed.actor_user_id = $6
+                  AND followed.action = 'follow'
+                  AND followed.target_user_id IN (r.creator_user_id, p.id)
+              )
+            )
+          )
+          AND (
+            $8::text <> 'friends'
+            OR (
+              $6::text IS NOT NULL
+              AND EXISTS (
+                SELECT 1
+                FROM lajukan_reel_user_actions outgoing
+                WHERE outgoing.actor_user_id = $6
+                  AND outgoing.action = 'follow'
+                  AND outgoing.target_user_id IN (r.creator_user_id, p.id)
+              )
+              AND EXISTS (
+                SELECT 1
+                FROM lajukan_reel_user_actions incoming
+                WHERE incoming.actor_user_id IN (r.creator_user_id, p.id)
+                  AND incoming.action = 'follow'
+                  AND incoming.target_user_id = $6
+              )
+            )
+          )
+        ORDER BY
+          CASE WHEN $8::text IN ('following', 'friends') THEN 0.0 ELSE 1.0 END DESC,
+          CASE
+            WHEN $8::text IN ('following', 'friends') THEN
+              EXTRACT(EPOCH FROM COALESCE(r.published_at, now()))
+            ELSE 0.0
+          END DESC,
+          CASE
+            WHEN $1::text IS NOT NULL AND (
+              lower(r.title) LIKE '%' || lower($1) || '%' OR
+              lower(r.tag) LIKE '%' || lower($1) || '%' OR
+              lower(COALESCE(r.product_name, '')) LIKE '%' || lower($1) || '%'
+            ) THEN 42.0
+            ELSE 0.0
+          END
+          + viewer_reel_affinity.score
+          + creator_affinity.score
+          + topic_affinity.score
+          + search_affinity.score
+          + CASE
+              WHEN $6::text IS NOT NULL AND EXISTS (
+                SELECT 1
+                FROM lajukan_reel_user_actions followed_creator
+                WHERE followed_creator.actor_user_id = $6
+                  AND followed_creator.action = 'follow'
+                  AND followed_creator.target_user_id IN (r.creator_user_id, p.id)
+              ) THEN 28.0
+              ELSE 0.0
+            END
+          + (ln(1.0 + GREATEST(r.likes_count, 0)) * 2.0)
+          + (ln(1.0 + GREATEST(r.shares_count, 0)) * 3.5)
+          + (ln(1.0 + GREATEST(r.comments_count, 0)) * 1.2)
+          + (ln(1.0 + GREATEST(COALESCE(followers.followers_count, 0), 0)) * 0.7)
+          + (
+              24.0 * exp(
+                -GREATEST(
+                  EXTRACT(EPOCH FROM (now() - COALESCE(r.published_at, now()))) / 86400.0,
+                  0.0
+                ) / 14.0
+              )
+            ) DESC,
+          r.published_at DESC,
+          r.id ASC
         LIMIT $9 OFFSET $10
         "#,
     )
@@ -6414,6 +6579,7 @@ async fn list_reels(
     .bind(actor_user_id)
     .bind(actor_forum_user_id.as_deref())
     .bind(actor.as_ref().is_some_and(is_moderator))
+    .bind(tab.as_str())
     .bind(limit + 1)
     .bind(cursor)
     .fetch_all(&state.db)
@@ -6437,7 +6603,6 @@ async fn list_reels(
         has_more,
     }))
 }
-
 async fn list_reels_feed(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
