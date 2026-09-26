@@ -31,22 +31,9 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import {
-  readSearchCartSession,
-  removeSearchCartItem,
-  subscribeSearchCartSession,
-  type SearchCartItem,
-} from '@/lib/searchCartSession';
-import {
-  readListingViewHistory,
-  removeListingViewHistoryItem,
-  subscribeListingViewHistory,
-  type ListingViewHistoryItem,
-} from '@/lib/listingViewHistory';
 import CreateMarketplaceShell from '../(app)/create/CreateMarketplaceShell';
 
 type ListingStatus = 'draft' | 'active' | 'archived';
-type ListingCollectionMode = 'mine' | 'favorites' | 'history';
 type ListingActivityKind =
   | 'available_today'
   | 'stock_updated'
@@ -469,14 +456,7 @@ export default function MyListingsPage() {
   const { user, loading: authLoading, authFetch } = useAuth();
   const { confirm } = useDialog();
   const currentSearch = searchParams?.toString() || '';
-  const filterParam = (searchParams?.get('filter') || '').toLowerCase();
-  const isFavoritesMode = filterParam === 'favorites';
-  const isHistoryMode = filterParam === 'history';
-  const collectionMode: ListingCollectionMode = isFavoritesMode
-    ? 'favorites'
-    : isHistoryMode
-      ? 'history'
-      : 'mine';
+  const legacyFilter = (searchParams?.get('filter') || '').toLowerCase();
 
   const [activeStatus, setActiveStatus] = useState<ListingStatus>('active');
   const [sideFilter, setSideFilter] = useState<ListingSideFilter>('all');
@@ -485,10 +465,6 @@ export default function MyListingsPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [items, setItems] = useState<ListingItem[]>([]);
-  const [savedReferences, setSavedReferences] = useState<SearchCartItem[]>([]);
-  const [viewedReferences, setViewedReferences] = useState<
-    ListingViewHistoryItem[]
-  >([]);
   const [updatingActivityId, setUpdatingActivityId] = useState('');
   const [updatingStatusId, setUpdatingStatusId] = useState('');
   const [deletingDraftId, setDeletingDraftId] = useState('');
@@ -503,27 +479,6 @@ export default function MyListingsPage() {
       {
         id: 'archived' as const,
         label: locale === 'id' ? 'Arsip' : 'Archived',
-      },
-    ],
-    [locale],
-  );
-
-  const collectionTabs = useMemo(
-    () => [
-      {
-        id: 'mine',
-        href: '/my-listings',
-        label: locale === 'id' ? 'Milik saya' : 'Mine',
-      },
-      {
-        id: 'favorites',
-        href: '/my-listings?filter=favorites',
-        label: locale === 'id' ? 'Disimpan' : 'Saved',
-      },
-      {
-        id: 'history',
-        href: '/my-listings?filter=history',
-        label: locale === 'id' ? 'Riwayat' : 'History',
       },
     ],
     [locale],
@@ -599,76 +554,19 @@ export default function MyListingsPage() {
     return counts;
   }, [items]);
 
-  const filteredReferences = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    if (!normalizedQuery) return savedReferences;
-    return savedReferences.filter(item => {
-      const text = [
-        item.title,
-        item.summary,
-        item.typeLabel,
-        item.actionLabel,
-        item.location,
-        item.priceLabel,
-        item.storeName,
-        item.kind,
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
-      return text.includes(normalizedQuery);
-    });
-  }, [query, savedReferences]);
-
-  const filteredViewedReferences = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    if (!normalizedQuery) return viewedReferences;
-    return viewedReferences.filter(item => {
-      const text = [
-        item.title,
-        item.summary,
-        item.typeLabel,
-        item.actionLabel,
-        item.location,
-        item.priceLabel,
-        item.storeName,
-        item.kind,
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
-      return text.includes(normalizedQuery);
-    });
-  }, [query, viewedReferences]);
-
   useEffect(() => {
-    const syncSavedReferences = () => {
-      setSavedReferences(readSearchCartSession().items);
-    };
-
-    syncSavedReferences();
-    return subscribeSearchCartSession(syncSavedReferences);
-  }, []);
-
-  useEffect(() => {
-    const syncViewedReferences = () => {
-      setViewedReferences(readListingViewHistory());
-    };
-
-    syncViewedReferences();
-    return subscribeListingViewHistory(syncViewedReferences);
-  }, []);
+    if (authLoading || !legacyFilter) return;
+    if (legacyFilter === 'favorites') {
+      router.replace('/saved');
+    } else if (legacyFilter === 'history') {
+      router.replace('/history');
+    }
+  }, [authLoading, legacyFilter, router]);
 
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
       router.replace(buildLoginPath(locale, pathname, currentSearch));
-      return;
-    }
-
-    if (isFavoritesMode || isHistoryMode) {
-      setLoading(false);
-      setError('');
       return;
     }
 
@@ -706,8 +604,6 @@ export default function MyListingsPage() {
     authFetch,
     authLoading,
     currentSearch,
-    isFavoritesMode,
-    isHistoryMode,
     locale,
     pathname,
     router,
@@ -721,14 +617,6 @@ export default function MyListingsPage() {
       </CreateMarketplaceShell>
     );
   }
-
-  const removeReference = (itemId: string) => {
-    setSavedReferences(removeSearchCartItem(itemId).items);
-  };
-
-  const removeViewedReference = (itemId: string) => {
-    setViewedReferences(removeListingViewHistoryItem(itemId));
-  };
 
   const updateDailyActivity = async (
     item: ListingItem,
@@ -910,33 +798,13 @@ export default function MyListingsPage() {
   };
 
 
-    const isMine = collectionMode === 'mine';
     const pageTitle =
-      collectionMode === 'favorites'
-        ? locale === 'id'
-          ? 'Disimpan'
-          : 'Saved'
-        : collectionMode === 'history'
-          ? locale === 'id'
-            ? 'Riwayat'
-            : 'History'
-          : locale === 'id'
-            ? 'Kelola listing'
-            : 'Manage listings';
+      locale === 'id' ? 'Kelola listing' : 'Manage listings';
 
     const pageDescription =
-      collectionMode === 'favorites'
-        ? locale === 'id'
-          ? 'Yang kamu simpan untuk dibuka lagi.'
-          : 'Things you saved for later.'
-        : collectionMode === 'history'
-          ? locale === 'id'
-            ? 'Postingan yang baru kamu lihat.'
-            : 'Listings you recently viewed.'
-          : locale === 'id'
-            ? 'Kelola semua yang kamu tawarkan dan yang sedang kamu cari.'
-            : 'Manage everything you offer and everything you are looking for.';
-
+      locale === 'id'
+        ? 'Kelola semua yang kamu tawarkan dan yang sedang kamu cari.'
+        : 'Manage everything you offer and everything you are looking for.';
     const closeDetails = (target: EventTarget & HTMLElement) => {
       target.closest('details')?.removeAttribute('open');
     };
@@ -956,43 +824,17 @@ export default function MyListingsPage() {
               </div>
 
               <Link
-                href={isMine ? '/create' : '/explore'}
+                href="/create"
                 className="inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-full bg-emerald-700 px-3.5 text-xs font-bold text-white transition hover:bg-emerald-800 sm:px-4 sm:text-sm"
               >
-                {isMine ? <Plus className="h-4 w-4" /> : <Search className="h-4 w-4" />}
-                {isMine
-                  ? locale === 'id'
-                    ? 'Buat baru'
-                    : 'Create'
-                  : locale === 'id'
-                    ? 'Jelajahi'
-                    : 'Explore'}
+                <Plus className="h-4 w-4" />
+                {locale === 'id' ? 'Buat baru' : 'Create'}
               </Link>
             </div>
 
-            <nav className="mt-3 grid grid-cols-3 gap-1 rounded-[14px] bg-slate-100 p-1 dark:bg-white/[0.05]" aria-label={locale === 'id' ? 'Bagian postingan' : 'Listing sections'}>
-              {collectionTabs.map(tab => {
-                const active = tab.id === collectionMode;
-                return (
-                  <Link
-                    key={tab.id}
-                    href={tab.href}
-                    aria-current={active ? 'page' : undefined}
-                    className={`inline-flex min-h-9 items-center justify-center rounded-[11px] px-2 text-xs font-bold transition sm:text-[13px] ${
-                      active
-                        ? 'bg-white text-emerald-700 shadow-sm dark:bg-slate-900 dark:text-emerald-300'
-                        : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
-                    }`}
-                  >
-                    {tab.label}
-                  </Link>
-                );
-              })}
-            </nav>
 
             <div className="mt-2 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
-              {isMine ? (
-                <div className="grid shrink-0 grid-cols-3 gap-1 rounded-[13px] bg-slate-100 p-1 dark:bg-white/[0.05] sm:w-[310px]">
+              <div className="grid shrink-0 grid-cols-3 gap-1 rounded-[13px] bg-slate-100 p-1 dark:bg-white/[0.05] sm:w-[310px]">
                   {statusTabs.map(tab => (
                     <button
                       key={tab.id}
@@ -1009,7 +851,6 @@ export default function MyListingsPage() {
                     </button>
                   ))}
                 </div>
-              ) : null}
 
               <label className="flex min-h-10 min-w-0 flex-1 items-center gap-2 rounded-[13px] border border-slate-200 bg-white px-3 transition focus-within:border-emerald-400 focus-within:ring-2 focus-within:ring-emerald-100 dark:border-white/10 dark:bg-slate-950 dark:focus-within:ring-emerald-400/15">
                 <Search className="h-4 w-4 shrink-0 text-slate-400" />
@@ -1116,7 +957,7 @@ export default function MyListingsPage() {
           ) : null}
 
           <section className="bg-white dark:bg-slate-950 sm:rounded-b-[20px] sm:border-x sm:border-b sm:border-slate-200 sm:dark:border-white/10">
-            {collectionMode === 'mine' ? (
+            {
               loading ? (
                 <div className="p-3 sm:p-4">
                   <MyListingsListSkeleton count={4} />
@@ -1148,7 +989,7 @@ export default function MyListingsPage() {
                         : 'Try another keyword or clear search.'
                       : activeStatus === 'active'
                         ? locale === 'id'
-                          ? 'Postingan yang sudah diterbitkan akan muncul di sini.'
+                          ? 'Listing yang sudah diterbitkan akan muncul di sini.'
                           : 'Published listings will appear here.'
                         : activeStatus === 'draft'
                           ? locale === 'id'
@@ -1173,7 +1014,7 @@ export default function MyListingsPage() {
                         className="inline-flex min-h-10 items-center gap-1.5 rounded-full bg-emerald-700 px-4 text-sm font-bold text-white hover:bg-emerald-800"
                       >
                         <Plus className="h-4 w-4" />
-                        {locale === 'id' ? 'Buat postingan' : 'Create listing'}
+                        {locale === 'id' ? 'Buat listing' : 'Create listing'}
                       </Link>
                     )
                   }
@@ -1420,72 +1261,7 @@ export default function MyListingsPage() {
                     );
                   })}
                 </div>
-              )
-            ) : collectionMode === 'favorites' ? (
-              filteredReferences.length === 0 ? (
-                <EmptyState
-                  className="px-4 py-12"
-                  title={query ? (locale === 'id' ? 'Tidak ditemukan' : 'No match') : locale === 'id' ? 'Belum ada yang disimpan' : 'Nothing saved yet'}
-                  description={query ? (locale === 'id' ? 'Coba kata lain atau hapus pencarian.' : 'Try another keyword or clear search.') : locale === 'id' ? 'Simpan produk, jasa, atau usaha dari Explore supaya gampang ditemukan lagi.' : 'Save products, services, or businesses from Explore to find them again quickly.'}
-                  action={!query ? (
-                    <Link href="/explore" className="inline-flex min-h-10 items-center rounded-full bg-emerald-700 px-4 text-sm font-bold text-white hover:bg-emerald-800">
-                      {locale === 'id' ? 'Jelajahi' : 'Explore'}
-                    </Link>
-                  ) : undefined}
-                />
-              ) : (
-                <div className="divide-y divide-slate-100 dark:divide-white/8">
-                  {filteredReferences.map(item => {
-                    const imageStyle = item.image ? { backgroundImage: `url("${item.image.replace(/"/g, '%22')}")` } : undefined;
-                    return (
-                      <article key={item.id} className="flex min-w-0 items-center gap-3 p-3 sm:p-4">
-                        <Link href={item.href} className="relative h-16 w-16 shrink-0 overflow-hidden rounded-[13px] bg-slate-100 bg-cover bg-center ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-white/10" style={imageStyle}>
-                          {!item.image ? <span className="absolute inset-0 grid place-items-center"><ImageIcon className="h-5 w-5 text-slate-400" /></span> : null}
-                        </Link>
-                        <div className="min-w-0 flex-1">
-                          <Link href={item.href} className="line-clamp-2 text-sm font-bold text-slate-950 hover:text-emerald-700 dark:text-white dark:hover:text-emerald-300">{item.title}</Link>
-                          <p className="mt-1 truncate text-[11px] font-semibold text-slate-500 dark:text-slate-400">{[item.typeLabel, item.priceLabel, item.location].filter(Boolean).join(' • ')}</p>
-                        </div>
-                        <button type="button" onClick={() => removeReference(item.id)} className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-400 transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-400/10" aria-label={locale === 'id' ? 'Hapus dari simpanan' : 'Remove saved'}>
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </article>
-                    );
-                  })}
-                </div>
-              )
-            ) : filteredViewedReferences.length === 0 ? (
-              <EmptyState
-                className="px-4 py-12"
-                title={query ? (locale === 'id' ? 'Tidak ditemukan' : 'No match') : locale === 'id' ? 'Riwayat masih kosong' : 'History is empty'}
-                description={query ? (locale === 'id' ? 'Coba kata lain atau hapus pencarian.' : 'Try another keyword or clear search.') : locale === 'id' ? 'Postingan yang kamu buka dari Explore atau Search akan muncul di sini.' : 'Listings you open from Explore or Search will appear here.'}
-                action={!query ? (
-                  <Link href="/explore" className="inline-flex min-h-10 items-center rounded-full bg-emerald-700 px-4 text-sm font-bold text-white hover:bg-emerald-800">
-                    {locale === 'id' ? 'Jelajahi' : 'Explore'}
-                  </Link>
-                ) : undefined}
-              />
-            ) : (
-              <div className="divide-y divide-slate-100 dark:divide-white/8">
-                {filteredViewedReferences.map(item => {
-                  const imageStyle = item.image ? { backgroundImage: `url("${item.image.replace(/"/g, '%22')}")` } : undefined;
-                  return (
-                    <article key={item.id} className="flex min-w-0 items-center gap-3 p-3 sm:p-4">
-                      <Link href={item.href} className="relative h-16 w-16 shrink-0 overflow-hidden rounded-[13px] bg-slate-100 bg-cover bg-center ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-white/10" style={imageStyle}>
-                        {!item.image ? <span className="absolute inset-0 grid place-items-center"><ImageIcon className="h-5 w-5 text-slate-400" /></span> : null}
-                      </Link>
-                      <div className="min-w-0 flex-1">
-                        <Link href={item.href} className="line-clamp-2 text-sm font-bold text-slate-950 hover:text-emerald-700 dark:text-white dark:hover:text-emerald-300">{item.title}</Link>
-                        <p className="mt-1 truncate text-[11px] font-semibold text-slate-500 dark:text-slate-400">{[item.typeLabel, item.priceLabel, item.location].filter(Boolean).join(' • ')}</p>
-                      </div>
-                      <button type="button" onClick={() => removeViewedReference(item.id)} className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/8 dark:hover:text-white" aria-label={locale === 'id' ? 'Hapus dari riwayat' : 'Remove from history'}>
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </article>
-                  );
-                })}
-              </div>
-            )}
+              )}
           </section>
         </div>
       </CreateMarketplaceShell>
