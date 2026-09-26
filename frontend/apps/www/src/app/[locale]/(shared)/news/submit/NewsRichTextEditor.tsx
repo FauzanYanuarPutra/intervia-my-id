@@ -84,11 +84,12 @@ export default function NewsRichTextEditor({ value, onChange, locale }: Props) {
       const response = await fetch('/api/content/upload-images', { method: 'POST', body: data });
       const payload = await response.json().catch(() => ({})) as { urls?: string[]; files?: Array<{ url?: string }>; error?: string };
       const url = payload.urls?.[0] || payload.files?.[0]?.url;
-      if (!response.ok || !url) throw new Error(payload.error || (isId ? 'Gagal mengunggah gambar.' : 'Image upload failed.'));
+      const safeUrl = normalizeNewsMediaUrl(url);
+      if (!response.ok || !safeUrl) throw new Error(payload.error || (isId ? 'Gagal mengunggah gambar.' : 'Image upload failed.'));
       editorRef.current?.focus();
       const alt = window.prompt(isId ? 'Deskripsi singkat gambar (alt text)' : 'Short image description (alt text)', '') || '';
       const caption = window.prompt(isId ? 'Caption gambar (opsional)' : 'Image caption (optional)', '') || '';
-      document.execCommand('insertHTML', false, '<figure><img src="' + url.replace(/"/g, '&quot;') + '" alt="' + alt.replace(/"/g, '&quot;') + '" loading="lazy" />' + (caption ? '<figcaption>' + caption.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</figcaption>' : '') + '</figure>');
+      document.execCommand('insertHTML', false, '<figure><img src="' + safeUrl.replace(/"/g, '&quot;') + '" alt="' + alt.replace(/"/g, '&quot;') + '" loading="lazy" />' + (caption ? '<figcaption>' + caption.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</figcaption>' : '') + '</figure>');
       emit();
     } catch (error) {
       window.alert(error instanceof Error ? error.message : (isId ? 'Gagal mengunggah gambar.' : 'Image upload failed.'));
