@@ -1241,13 +1241,20 @@ function communityPostToFeedItem(post: CommunityPost): CommunityFeedItem {
 
   const normalizedPostMedia = normalizeCommunityMediaItems(
     post.mediaItems.flatMap(media => {
-      const src = typeof media.src === 'string' ? media.src.trim() : '';
+      const isString = typeof media === 'string';
+      const src = isString
+        ? media.trim()
+        : typeof media.src === 'string'
+          ? media.src.trim()
+          : '';
       if (!src) return [];
-      return [{
-        src,
-        type: media.type === 'video' ? ('video' as const) : ('image' as const),
-        alt: media.alt || post.title,
-      }];
+      const type = isString
+        ? 'image'
+        : media.type === 'video'
+          ? 'video'
+          : 'image';
+      const alt = isString ? post.title : media.alt || post.title;
+      return [{ src, type, alt }];
     }),
     post.title,
   );
