@@ -12,7 +12,7 @@ use axum::{
     Json,
 };
 use chrono::{DateTime, Duration, Utc};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sqlx::Row;
 use std::{
@@ -82,7 +82,7 @@ pub struct MatchingFeedbackRequest {
     pub metadata: Option<Value>,
 }
 
-#[derive(Debug, sqlx::FromRow)]
+#[derive(Debug, Serialize, sqlx::FromRow)]
 struct RequirementReview {
     id: Uuid,
     source_type: String,
@@ -95,7 +95,7 @@ struct RequirementReview {
     original_metadata_snapshot: Value,
 }
 
-#[derive(Debug, sqlx::FromRow)]
+#[derive(Debug, Serialize, sqlx::FromRow)]
 struct RequirementItem {
     id: Uuid,
     source_id: Uuid,
@@ -128,7 +128,7 @@ struct CandidateItem {
     updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, sqlx::FromRow)]
+#[derive(Debug, Serialize, sqlx::FromRow)]
 struct MatchingRunRow {
     id: Uuid,
     requirement_review_id: Uuid,
@@ -283,7 +283,7 @@ fn trust_score(candidate: &CandidateItem) -> f64 {
     .map(|v| matches!(text(v).as_str(), "verified" | "trusted" | "approved"))
     .unwrap_or(false);
 
-    let rating = candidate.rating.unwrap_or(0.0).clamp(0.0, 5.0);
+    let rating = f64::from(candidate.rating.unwrap_or(0.0)).clamp(0.0, 5.0);
     let reviews = candidate.review_count.unwrap_or(0).max(0) as f64;
     let rating_component = (rating / 5.0) * 6.0;
     let verification_component = if verified { 4.0 } else { 1.0 };
@@ -414,7 +414,7 @@ fn score_candidate(requirement: &RequirementItem, candidate: &CandidateItem) -> 
         matched_fields.push(format!("{} kata kunci", overlap));
         reasons.push("Konten penyedia memiliki istilah yang selaras dengan kebutuhan.".to_string());
     } else {
-        missing_fields.push("keyword_fit");
+        missing_fields.push("keyword_fit".to_string());
         warnings.push("Tidak ada kecocokan kata kunci yang kuat.".to_string());
     }
     if category_fit >= 14.0 {
@@ -430,12 +430,12 @@ fn score_candidate(requirement: &RequirementItem, candidate: &CandidateItem) -> 
     } else if req_city.is_some() {
         warnings.push("Lokasi belum cukup presisi untuk menghitung jarak.".to_string());
     } else {
-        missing_fields.push("location");
+        missing_fields.push("location".to_string());
     }
     if candidate.price_cents.is_some() && (budget_min.is_some() || budget_max.is_some()) {
         matched_fields.push("price_budget".to_string());
     } else {
-        missing_fields.push("price_or_budget");
+        missing_fields.push("price_or_budget".to_string());
     }
     if candidate.review_count.unwrap_or(0) > 0 || candidate.rating.unwrap_or(0.0) > 0.0 {
         matched_fields.push("trust".to_string());
@@ -770,7 +770,7 @@ pub async fn run_match(
     if inferred_category.is_none() { missing_fields.push("category".to_string()); }
     if budget_min.is_none() && budget_max.is_none() { missing_fields.push("budget".to_string()); }
 
-    let extraction_confidence = 0.55
+    let extraction_confidence: f64 = 0.55
         + if inferred_category.is_some() { 0.15 } else { 0.0 }
         + if inferred_city.is_some() { 0.10 } else { 0.0 }
         + if !extraction_tokens.is_empty() { 0.10 } else { 0.0 };
@@ -1284,7 +1284,7 @@ pub async fn create_connection(
     .bind(provider_user_id)
     .bind(provider_business_id)
     .bind(provider_entity_type)
-    .bind(provider_entity_id)
+    .bind(&provider_entity_id)
     .bind(channel)
     .bind(payload.notes)
     .bind(payload.idempotency_key)
@@ -1435,8 +1435,8 @@ pub async fn create_matching_feedback(
     .bind(payload.requirement_review_id)
     .bind(text(&payload.feedback_source))
     .bind(text(&payload.feedback_type))
-    .bind(payload.reason_code.map(text))
-    .bind(payload.note)
+    .bind(payload.reason_code.as_ref().map(text))
+    .bind(payload.note.clone())
     .bind(payload.metadata)
     .bind(actor)
     .fetch_one(&state.db)
