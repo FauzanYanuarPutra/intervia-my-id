@@ -448,7 +448,7 @@ export default function ManageHubClient({ isId }: ManageHubClientProps) {
         id: 'chat',
         href: '/chat',
         title: 'Chat',
-        description: isId ? 'Balas calon pembeli.' : 'Reply to potential buyers.',
+        description: isId ? 'Balas calon pembeli atau penyedia.' : 'Reply to buyers or providers.',
         icon: MessageCircle,
         value: counts.unreadChats,
         valueLabel: isId ? 'belum dibaca' : 'unread',

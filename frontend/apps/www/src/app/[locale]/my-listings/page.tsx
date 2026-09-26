@@ -572,6 +572,33 @@ export default function MyListingsPage() {
     });
   }, [activeStatus, categoryFilter, items, locale, query, sideFilter]);
 
+  const filterCounts = useMemo<Record<string, number>>(() => {
+    const counts: Record<string, number> = {
+      all: items.length,
+      supply: 0,
+      demand: 0,
+      supplies: 0,
+      service: 0,
+      equipment: 0,
+      property: 0,
+      opportunity: 0,
+    };
+
+    for (const item of items) {
+      const side = resolveListingSide({
+        type: item.type || item.content_type || 'listing',
+        metadata: item.metadata,
+        title: item.title,
+        summary: item.summary,
+      });
+      const category = listingManagementCategoryId(item);
+      counts[side] = (counts[side] || 0) + 1;
+      counts[category] = (counts[category] || 0) + 1;
+    }
+
+    return counts;
+  }, [items]);
+
   const filteredReferences = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     if (!normalizedQuery) return savedReferences;
@@ -1040,7 +1067,10 @@ export default function MyListingsPage() {
                           : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50')
                       }
                     >
-                      {listingSideFilterLabel(side, locale)}
+                      <span>{listingSideFilterLabel(side, locale)}</span>
+                      <span className="text-[10px] opacity-70">
+                        {filterCounts[side]}
+                      </span>
                     </button>
                   );
                 })}
@@ -1062,7 +1092,10 @@ export default function MyListingsPage() {
                           : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50')
                       }
                     >
-                      {listingManagementCategoryLabel(category, locale)}
+                      <span>{listingManagementCategoryLabel(category, locale)}</span>
+                      <span className="text-[10px] opacity-70">
+                        {filterCounts[category]}
+                      </span>
                     </button>
                   );
                 })}

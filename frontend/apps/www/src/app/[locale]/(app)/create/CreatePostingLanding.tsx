@@ -229,8 +229,8 @@ function IntentTile({
       <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
         <div className="text-[11px] font-semibold text-slate-500">
           {locale === 'id'
-            ? 'Langsung ke form yang relevan'
-            : 'Jump straight to the relevant form'}
+            ? 'Langsung ke form yang sesuai'
+            : 'Jump to the right form'}
         </div>
         <span
           className={cn(
@@ -286,12 +286,12 @@ function MobileMock({ locale }: { locale: 'id' | 'en' }) {
               locale={locale}
               item={{
                 key: 'find',
-                titleId: 'Saya sedang membutuhkan',
-                titleEn: 'I need something',
+                titleId: 'Saya Mau Mencari',
+                titleEn: 'I Want To Find',
                 descriptionId:
-                  'Temukan supplier, partner, investor, atau peluang yang Anda butuhkan.',
+                  'Cari supplier, partner, investor, atau peluang yang kamu butuhkan.',
                 descriptionEn:
-                  'Find suppliers, partners, investors, or the opportunity you need.',
+                  'Find suppliers, partners, investors, or opportunities you need.',
                 examples: FIND_EXAMPLES,
                 imageSrc: '/images/create/kategori/cari.png',
                 href: findHref,
@@ -384,12 +384,12 @@ export default function CreatePostingLanding() {
 
   const findIntent: IntentCard = {
     key: 'find',
-    titleId: 'Saya sedang membutuhkan',
-    titleEn: 'I need something',
+    titleId: 'Saya Mau Mencari',
+    titleEn: 'I Want To Find',
     descriptionId:
-      'Temukan supplier, partner, investor, atau peluang yang Anda butuhkan.',
+      'Cari supplier, partner, investor, atau peluang yang kamu butuhkan.',
     descriptionEn:
-      'Find suppliers, partners, investors, or the opportunity you need.',
+      'Find suppliers, partners, investors, or opportunities you need.',
     examples: FIND_EXAMPLES,
     imageSrc: '/images/create/kategori/cari.png',
     href: findHref,
@@ -413,7 +413,7 @@ export default function CreatePostingLanding() {
 
             <div className="min-w-0 px-0 py-4 lg:px-6 lg:py-0">
               <h1 className="text-[28px] font-bold tracking-[-0.04em] text-slate-900">
-                {locale === 'id' ? 'Buat Postingan Baru' : 'Create New Posting'}
+                {locale === 'id' ? 'Buat Listing Baru' : 'Create New Listing'}
               </h1>
               <p className="mt-1 text-[13px] text-slate-500">
                 {locale === 'id'
@@ -448,7 +448,7 @@ export default function CreatePostingLanding() {
               <SidebarCard
                 icon={Lightbulb}
                 title={
-                  locale === 'id' ? 'Progres Postingan' : 'Posting progress'
+                  locale === 'id' ? 'Progres Listing' : 'Listing progress'
                 }
                 description={
                   locale === 'id' ? 'Langkah 1 dari 6' : 'Step 1 of 6'
@@ -467,8 +467,8 @@ export default function CreatePostingLanding() {
                 title={locale === 'id' ? 'Tips' : 'Tips'}
                 description={
                   locale === 'id'
-                    ? 'Semakin lengkap informasi yang Anda berikan, semakin besar peluang postingan dilihat.'
-                    : 'The more complete your info, the better the chance your posting gets noticed.'
+                    ? 'Semakin lengkap informasi yang kamu berikan, semakin mudah listing ditemukan.'
+                    : 'The more complete your info, the better the chance your listing gets discovered.'
                 }
               />
 
@@ -491,8 +491,8 @@ export default function CreatePostingLanding() {
                 title={locale === 'id' ? 'Butuh bantuan?' : 'Need help?'}
                 description={
                   locale === 'id'
-                    ? 'Kami siap membantu Anda membuat postingan terbaik.'
-                    : 'We can help you create the best posting.'
+                    ? 'Kami siap membantu membuat listing yang jelas dan mudah ditemukan.'
+                    : 'We can help you create a clear, discoverable listing.'
                 }
                 className="mt-auto"
               >
