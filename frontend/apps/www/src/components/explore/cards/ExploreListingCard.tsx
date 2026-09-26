@@ -7,6 +7,10 @@ import { LocalizedAnchor as Link } from '@/components/navigation/LocalizedAnchor
 import { NeedSearchCard } from '@/components/search/result-cards/NeedSearchCard';
 import { getSideLabel } from '@/components/search/result-cards/SearchCardParts';
 import { getListingValueFallback } from '@/lib/content/listingSide';
+import {
+  formatPriceWithUnit,
+  priceUnitLabel,
+} from '@/lib/content/priceUnit';
 import { getExploreResultAction } from '@/lib/discovery/exploreResultConversion';
 import type { GlobalSearchItem } from '@/lib/search/globalSearch';
 import { cn } from '@/lib/utils';
@@ -73,8 +77,17 @@ export function ExploreListingCard({
     (isService
       ? locale === 'id' ? 'Jasa' : 'Service'
       : locale === 'id' ? 'Produk' : 'Product');
-  const valueLabel =
-    item.priceLabel || getListingValueFallback('supply', locale, String(listingType));
+  const baseValueLabel =
+    item.priceLabel ||
+    getListingValueFallback('supply', locale, String(listingType));
+  const resolvedPriceUnit = priceUnitLabel(
+    item.metadata.priceUnit ||
+      item.metadata.price_unit ||
+      item.metadata.unit ||
+      item.metadata.unit_label,
+    locale,
+  );
+  const valueLabel = formatPriceWithUnit(baseValueLabel, resolvedPriceUnit);
   const action = getExploreResultAction(isService ? 'services' : 'products', locale);
 
   const normalizedStatus = String(
