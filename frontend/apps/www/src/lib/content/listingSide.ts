@@ -248,9 +248,9 @@ export function getListingSideLabel(
   locale: LocaleCode,
 ): string {
   if (locale === 'id') {
-    return side === 'demand' ? 'Pencari' : 'Penyedia';
+    return side === 'demand' ? 'Membutuhkan' : 'Menawarkan';
   }
-  return side === 'demand' ? 'Looking For' : 'Offering';
+  return side === 'demand' ? 'Needs' : 'Offering';
 }
 
 export function getListingSideActorLabel(
@@ -268,9 +268,9 @@ export function getListingSideVerbLabel(
   locale: LocaleCode,
 ): string {
   if (locale === 'id') {
-    return side === 'demand' ? 'Mencari' : 'Menawarkan';
+    return side === 'demand' ? 'Membutuhkan' : 'Menawarkan';
   }
-  return side === 'demand' ? 'Looking for' : 'Offering';
+  return side === 'demand' ? 'Needs' : 'Offering';
 }
 
 export function getListingSideObjectLabel(
@@ -351,14 +351,14 @@ export function getListingSideContextLabel(
     if (normalizedType === 'company') return 'Profil Perusahaan';
     if (normalizedType === 'job') return 'Pencari Kandidat';
     if (normalizedType === 'service')
-      return side === 'demand' ? 'Pencari Jasa' : 'Penyedia Jasa';
+      return side === 'demand' ? 'Membutuhkan Jasa' : 'Menawarkan Jasa';
     if (normalizedType === 'property')
-      return side === 'demand' ? 'Pencari Properti' : 'Penyedia Properti';
+      return side === 'demand' ? 'Membutuhkan Properti' : 'Menawarkan Properti';
     if (normalizedType === 'tool_rental')
-      return side === 'demand' ? 'Pencari Sewa' : 'Penyedia Sewa';
+      return side === 'demand' ? 'Membutuhkan Sewa' : 'Menawarkan Sewa';
     if (normalizedType === 'business_transfer')
-      return side === 'demand' ? 'Cari Oper Usaha' : 'Oper Usaha';
-    return side === 'demand' ? 'Pencari Produk' : 'Penyedia Produk';
+      return side === 'demand' ? 'Membutuhkan Oper Usaha' : 'Menawarkan Oper Usaha';
+    return side === 'demand' ? 'Membutuhkan Produk' : 'Menawarkan Produk';
   }
 
   if (normalizedType === 'company') return 'Company Profile';
