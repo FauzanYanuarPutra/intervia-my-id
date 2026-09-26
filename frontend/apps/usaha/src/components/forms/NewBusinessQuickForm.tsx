@@ -6,7 +6,6 @@ import { ArrowLeft, ArrowRight, Building2, MapPinned, Phone } from 'lucide-react
 import { BusinessLocationField } from '@/components/forms/BusinessLocationField';
 import { ChoiceChips } from '@/components/interaction/ChoiceChips';
 import {
-  BUSINESS_TEMPLATE_PRESETS,
   getBusinessTemplatePreset,
   type BusinessTemplateKey,
 } from '@/lib/business-templates';
