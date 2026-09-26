@@ -16,14 +16,15 @@ import { resolveIdempotencyAttempt, type ClientIdempotencyAttempt } from '@/lib/
 import { businessApiErrorMessage } from '@/lib/business-api-error';
 
 const CATEGORY_CHOICES = [
-  'Makanan & minuman',
-  'Toko & retail',
-  'Jasa',
-  'Manufaktur',
-  'Grosir / distributor',
-  'Pendidikan / kursus',
-  'Profesional',
-  'Usaha lainnya',
+  { value: 'Makanan dan minuman', label: 'Makanan & minuman' },
+  { value: 'Kopi dan cafe', label: 'Kopi & cafe' },
+  { value: 'Laundry', label: 'Laundry' },
+  { value: 'Toko kelontong', label: 'Toko kelontong' },
+  { value: 'Retail', label: 'Toko & retail' },
+  { value: 'Jasa', label: 'Jasa' },
+  { value: 'Manufaktur', label: 'Manufaktur' },
+  { value: 'Grosir / distributor', label: 'Grosir / distributor' },
+  { value: 'Usaha umum', label: 'Usaha lainnya' },
 ] as const;
 
 type NewBusinessQuickFormProps = {
@@ -292,11 +293,12 @@ export function NewBusinessQuickForm({
                   onChange={value => {
                     setCategory(value);
                     setCustomCategory('');
+                    setError('');
                   }}
                   ariaLabel="Kategori usaha"
-                  options={CATEGORY_CHOICES.map(value => ({ value, label: value }))}
+                  options={CATEGORY_CHOICES.map(option => ({ value: option.value, label: option.label }))}
                 />
-                {category === 'Usaha lainnya' ? (
+                {category === 'Usaha umum' ? (
                   <input
                     className="portal-input"
                     value={customCategory}
