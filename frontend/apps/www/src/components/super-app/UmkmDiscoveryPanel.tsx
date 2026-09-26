@@ -1589,13 +1589,9 @@ export function UmkmDiscoveryPanel({
       const params = new URL(window.location.href).searchParams;
       const targetSlug =
         params.get('store')?.trim() ||
-        selectedSlug?.trim() ||
         params.get('business')?.trim() ||
         '';
-      const targetStoreId =
-        params.get('storeId')?.trim() ||
-        selectedStoreIdInitial?.trim() ||
-        '';
+      const targetStoreId = params.get('storeId')?.trim() || '';
 
       const matchedStore = visibleStores.find(
         item =>
