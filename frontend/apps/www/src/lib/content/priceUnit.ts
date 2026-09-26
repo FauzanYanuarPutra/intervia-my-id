@@ -1,4 +1,5 @@
 import type { ContentItem } from './catalog';
+import { resolveListingSide } from './listingSide';
 
 type LocaleCode = 'id' | 'en';
 
@@ -142,21 +143,13 @@ function resolveNestedUnit(source: Record<string, unknown>): string {
 }
 
 function isDemandContent(item: ContentItem, metadata: Record<string, unknown>): boolean {
-  const sideCandidates = [
-    metadata.side,
-    metadata.listing_side,
-    metadata.market_side,
-    metadata.listing_intent,
-    metadata.market_intent,
-    metadata.intent,
-    metadata.market_intent,
-  ]
-    .map(value => text(value).toLowerCase())
-    .filter(Boolean)
-    .join(' ');
-
-  return /demand|request|need|seeker|buyer|mencari|butuh|kebutuhan/.test(
-    sideCandidates,
+  return (
+    resolveListingSide({
+      type: item.content_type || item.category,
+      metadata,
+      title: item.title,
+      summary: item.summary,
+    }) === 'demand'
   );
 }
 
