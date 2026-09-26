@@ -7512,7 +7512,7 @@ async fn record_reel_event(
         .to_ascii_lowercase();
     if !matches!(
         event.as_str(),
-        "view" | "watch" | "like" | "share" | "comment" | "open_store" | "open_product"
+        "view" | "watch" | "search" | "like" | "share" | "comment" | "open_store" | "open_product"
     ) {
         return Err(ApiError::new(StatusCode::BAD_REQUEST, "Invalid reel event"));
     }
