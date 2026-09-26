@@ -638,7 +638,67 @@ function normalizeProfileSocialSummary(
 }
 
 function normalizeStatus(item: OwnerListing): string {
-  return firstString(item.content_status, item.status).toLowerCase();
+  return firstString(item.content_status, item.status)
+    .toLowerCase()
+    .trim()
+    .replace(/[\s-]+/g, '_');
+}
+
+function getOwnerListingStatusPresentation(status: string, isId: boolean) {
+  const normalized = status || 'unknown';
+
+  if (['active', 'published', 'live'].includes(normalized)) {
+    return {
+      label: isId ? 'Sudah tayang' : 'Live',
+      className: 'bg-emerald-50/95 text-emerald-700',
+      action: isId ? 'Lihat listing' : 'View listing',
+    };
+  }
+
+  if (['pending', 'pending_review', 'review', 'in_review'].includes(normalized)) {
+    return {
+      label: isId ? 'Sedang dicek' : 'Under review',
+      className: 'bg-sky-50/95 text-sky-700',
+      action: isId ? 'Cek & edit lagi' : 'Review & edit',
+    };
+  }
+
+  if (
+    [
+      'needs_revision',
+      'revision_requested',
+      'changes_requested',
+      'rejected',
+    ].includes(normalized)
+  ) {
+    return {
+      label: isId ? 'Perlu diperbaiki' : 'Needs changes',
+      className: 'bg-rose-50/95 text-rose-700',
+      action: isId ? 'Perbaiki & kirim lagi' : 'Fix & resubmit',
+    };
+  }
+
+  if (['paused', 'inactive'].includes(normalized)) {
+    return {
+      label: isId ? 'Sedang dijeda' : 'Paused',
+      className: 'bg-amber-50/95 text-amber-700',
+      action: isId ? 'Edit & aktifkan lagi' : 'Edit & activate',
+    };
+  }
+
+  if (['archived', 'deleted'].includes(normalized)) {
+    return {
+      label: isId ? 'Diarsipkan' : 'Archived',
+      className: 'bg-slate-100/95 text-slate-700',
+      action: isId ? 'Buka & edit' : 'Open & edit',
+    };
+  }
+
+  return {
+    label: isId ? 'Belum tayang' : 'Not live yet',
+    className: 'bg-amber-50/95 text-amber-700',
+    action: isId ? 'Edit & tayangkan' : 'Edit & publish',
+  };
 }
 
 function normalizeListingType(item: OwnerListing): ListingFilter {
@@ -1266,6 +1326,8 @@ function ListingCard({
   const type = normalizeListingType(item);
   const presentation = getTypePresentation(type, isId);
   const status = normalizeStatus(item);
+  const isPubliclyVisible = ['active', 'published', 'live'].includes(status);
+  const statusPresentation = getOwnerListingStatusPresentation(status, isId);
   const views = readListingMetric(item, ['view_count', 'views_count', 'views']);
   const favorites = readListingMetric(item, [
     'favorite_count',
@@ -1310,12 +1372,10 @@ function ListingCard({
           <span
             className={cn(
               'absolute bottom-2 left-2 inline-flex rounded-full px-2 py-1 text-[8px] font-black shadow-sm backdrop-blur-sm',
-              status === 'draft'
-                ? 'bg-amber-50/95 text-amber-700'
-                : 'bg-emerald-50/95 text-emerald-700',
+              statusPresentation.className,
             )}
           >
-            {status === 'draft' ? copy.drafts : copy.active}
+            {statusPresentation.label}
           </span>
         </div>
 
@@ -1337,16 +1397,31 @@ function ListingCard({
               {formatCompactNumber(favorites, locale)}
             </span>
           </div>
+
+          {!isPubliclyVisible ? (
+            <span className="mt-2 inline-flex max-w-full items-center gap-1.5 truncate text-[10px] font-black text-amber-700 dark:text-amber-300">
+              <PencilLine className="h-3.5 w-3.5 shrink-0" />
+              {statusPresentation.action}
+            </span>
+          ) : null}
         </div>
       </LocalizedLink>
 
       <LocalizedLink
-        href={`${ROUTES.manageListings}?listing=${encodeURIComponent(item.id)}`}
-        aria-label={copy.manage}
-        title={copy.manage}
+        href={
+          isPubliclyVisible
+            ? `${ROUTES.manageListings}?listing=${encodeURIComponent(item.id)}`
+            : getListingHref(item)
+        }
+        aria-label={isPubliclyVisible ? copy.manage : statusPresentation.action}
+        title={isPubliclyVisible ? copy.manage : statusPresentation.action}
         className="absolute right-2 top-2 grid h-9 w-9 place-items-center rounded-full bg-black/48 text-white shadow-sm backdrop-blur-md transition hover:bg-black/68"
       >
-        <MoreVertical className="h-[18px] w-[18px]" />
+        {isPubliclyVisible ? (
+          <MoreVertical className="h-[18px] w-[18px]" />
+        ) : (
+          <PencilLine className="h-[17px] w-[17px]" />
+        )}
       </LocalizedLink>
     </article>
   );
