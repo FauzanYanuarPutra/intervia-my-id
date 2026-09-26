@@ -1,4 +1,6 @@
-import { ArrowRight, BadgeCheck, MapPin, Package2, Store, Wrench } from 'lucide-react';
+'use client';
+
+import { ArrowRight, BadgeCheck, Clock3, MapPin, Package2, Pencil, Store, Wrench } from 'lucide-react';
 
 import { ExploreCardMedia } from '@/components/explore/cards/ExploreCardMedia';
 import { LocalizedAnchor as Link } from '@/components/navigation/LocalizedAnchor';
@@ -8,6 +10,7 @@ import { getListingValueFallback } from '@/lib/content/listingSide';
 import { getExploreResultAction } from '@/lib/discovery/exploreResultConversion';
 import type { GlobalSearchItem } from '@/lib/search/globalSearch';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/context/AuthContext';
 
 const PUBLIC_MEDIA_BASE = 'https://www.lajukan.com/api/content/media';
 
@@ -47,6 +50,7 @@ export function ExploreListingCard({
   locale: 'id' | 'en';
   interactive?: boolean;
 }) {
+  const { user } = useAuth();
   const isNeed = item.side === 'demand' || item.kind === 'needs';
 
   if (isNeed) {
@@ -73,6 +77,51 @@ export function ExploreListingCard({
     item.priceLabel || getListingValueFallback('supply', locale, String(listingType));
   const action = getExploreResultAction(isService ? 'services' : 'products', locale);
 
+  const normalizedStatus = String(
+    item.metadata.contentStatus ||
+      item.metadata.content_status ||
+      item.metadata.status ||
+      'active',
+  )
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
+
+  const isPublic =
+    normalizedStatus === 'active' ||
+    normalizedStatus === 'published' ||
+    normalizedStatus === 'live';
+
+  const ownerId = String(
+    item.metadata.ownerId ||
+      item.metadata.owner_id ||
+      '',
+  )
+    .trim()
+    .toLowerCase();
+
+  const viewerId = String(user?.id || '').trim().toLowerCase();
+  const isOwner = Boolean(viewerId && ownerId && viewerId === ownerId);
+  const destinationHref = isPublic
+    ? item.href
+    : isOwner
+      ? '/create?draft=' + encodeURIComponent(item.id)
+      : '';
+  const statusLabel =
+    normalizedStatus === 'draft'
+      ? 'Draft'
+      : ['pending', 'pending_review', 'review'].includes(normalizedStatus)
+        ? locale === 'id' ? 'Menunggu ditinjau' : 'Under review'
+        : ['paused', 'inactive'].includes(normalizedStatus)
+          ? locale === 'id' ? 'Dijeda' : 'Paused'
+          : ['archived', 'deleted'].includes(normalizedStatus)
+            ? locale === 'id' ? 'Diarsipkan' : 'Archived'
+            : locale === 'id' ? 'Belum tayang' : 'Not published';
+
+  const actionLabel = isOwner && !isPublic
+    ? locale === 'id' ? 'Edit & tayangkan' : 'Edit & publish'
+    : action.label;
+
   const card = (
     <article
       data-testid="canonical-listing-card"
@@ -93,6 +142,12 @@ export function ExploreListingCard({
         <span className="absolute left-2 top-2 inline-flex min-h-7 items-center rounded-full border border-white/70 bg-white/90 px-2.5 text-[10px] font-black text-emerald-800 shadow-sm backdrop-blur">
           {sideLabel}
         </span>
+        {isOwner && !isPublic ? (
+          <span className="absolute right-2 top-2 inline-flex min-h-7 items-center gap-1 rounded-full border border-amber-200 bg-amber-50/95 px-2.5 text-[10px] font-black text-amber-900 shadow-sm backdrop-blur">
+            <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
+            {statusLabel}
+          </span>
+        ) : null}
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col p-2.5 sm:p-3">
@@ -134,21 +189,34 @@ export function ExploreListingCard({
         </div>
 
         {interactive ? (
-          <p className="mt-auto flex items-center gap-1 pt-2 text-[10px] font-black text-[color:var(--app-accent)] sm:text-[11px]">
-            {action.label}
-            <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" aria-hidden="true" />
+          <p className={cn(
+            "mt-auto flex items-center gap-1 pt-2 text-[10px] font-black sm:text-[11px]",
+            isOwner && !isPublic
+              ? "text-amber-700 dark:text-amber-300"
+              : "text-[color:var(--app-accent)]",
+          )}>
+            {isOwner && !isPublic ? <Pencil className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> : null}
+            {actionLabel}
+            {destinationHref ? (
+              <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" aria-hidden="true" />
+            ) : null}
           </p>
         ) : null}
       </div>
     </article>
   );
 
-  if (!interactive) return card;
+  if (!interactive || !destinationHref) return card;
 
   return (
     <Link
-      href={item.href}
+      href={destinationHref}
       className="group block h-full rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--app-surface-muted)]"
+      aria-label={
+        isOwner && !isPublic
+          ? (locale === 'id' ? 'Edit ' : 'Edit ') + item.title
+          : undefined
+      }
     >
       {card}
     </Link>
