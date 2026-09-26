@@ -1,6 +1,7 @@
 import {
   BarChart3,
   ClipboardList,
+  ClipboardCheck,
   Eye,
   Globe,
   LayoutDashboard,
