@@ -5,7 +5,29 @@ import { Archive, Handshake, Mail, MapPin, PencilLine, Phone, Plus, Search, User
 import { ModalSurface } from '@/components/interaction/ModalSurface';
 import { businessApiErrorMessage } from '@/lib/business-api-error';
 import { resolveIdempotencyAttempt, type ClientIdempotencyAttempt } from '@/lib/client-idempotency';
-import type { CommercialPayable, CommercialParty, CommercialReceivable } from '@/lib/business-commercial-core-server';
+type CommercialParty = {
+  id: string;
+  party_kind: string;
+  display_name: string;
+  legal_name: string | null;
+  phone: string | null;
+  email: string | null;
+  tax_identifier: string | null;
+  address: string | null;
+  note: string;
+  status: string;
+  version: number;
+};
+
+type CommercialReceivable = {
+  party_id: string | null;
+  outstanding_amount: number;
+};
+
+type CommercialPayable = {
+  party_id: string | null;
+  outstanding_amount: number;
+};
 
 type PartyKind = 'customer' | 'supplier' | 'both' | 'other';
 type FilterKind = 'all' | PartyKind;
@@ -16,6 +38,7 @@ type Props = {
   initialReceivables: CommercialReceivable[];
   initialPayables: CommercialPayable[];
   canManage: boolean;
+  loadError?: boolean;
 };
 
 type FormState = {
@@ -108,6 +131,7 @@ export function PartyDirectoryWorkspace({
   initialReceivables,
   initialPayables,
   canManage,
+  loadError = false,
 }: Props) {
   const [parties, setParties] = useState(initialParties);
   const [query, setQuery] = useState('');
@@ -253,6 +277,7 @@ export function PartyDirectoryWorkspace({
 
   async function archive() {
     if (!editing) return;
+    if (!window.confirm(`Arsipkan ${editing.display_name}? Data tidak akan tampil di daftar aktif.`)) return;
     setArchiving(true);
     setFeedback(null);
     try {
@@ -290,6 +315,13 @@ export function PartyDirectoryWorkspace({
 
   return (
     <div className="space-y-4">
+      {loadError ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <p className="font-black">Data pelanggan & mitra sementara tidak tersedia</p>
+          <p className="mt-0.5 text-xs leading-5">Coba muat ulang. Direktori tidak akan dibuat sebagai data palsu saat layanan Commercial Core sedang bermasalah.</p>
+        </div>
+      ) : null}
+
       <section className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
         {[
           ['Aktif', String(metrics.active)],
