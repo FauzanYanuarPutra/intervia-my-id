@@ -3375,7 +3375,7 @@ export default function ChatRoomPage() {
           setLoadError(
             typeof payload.error === 'string'
               ? payload.error
-              : 'Could not load messages',
+              : chatLocale === 'id'\n                ? 'Chat belum bisa dimuat. Coba lagi ya.'\n                : 'Could not load messages. Please try again.',
           );
         }
       }
@@ -3384,7 +3384,7 @@ export default function ChatRoomPage() {
         requestId === messageLoadRequestRef.current &&
         messagesRef.current.length === 0
       ) {
-        setLoadError('Connection error. Check chat service.');
+        setLoadError(\n          chatLocale === 'id'\n            ? 'Koneksi chat bermasalah. Coba sambungkan lagi ya.'\n            : 'Chat connection failed. Please reconnect and try again.',\n        );
       }
     } finally {
       messageFetchInFlightRoomsRef.current.delete(requestRoomId);
@@ -4177,7 +4177,7 @@ export default function ChatRoomPage() {
         throw new Error(
           typeof createData.error === 'string'
             ? createData.error
-            : 'Failed to create chat',
+            : chatLocale === 'id'\n              ? 'Gagal memulai chat. Coba lagi ya.'\n              : 'Could not start the chat. Please try again.',
         );
       }
       await refetchInbox().catch(() => {});
