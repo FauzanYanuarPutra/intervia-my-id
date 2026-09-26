@@ -285,7 +285,7 @@ const EMPTY_DASHBOARD_STATS: DashboardStats = {
 function buildCopy(isId: boolean) {
   return isId
     ? {
-        login: 'Silakan masuk terlebih dahulu',
+        login: 'Masuk dulu ya, baru kita lanjut.',
         loadError: 'Profil belum berhasil dimuat.',
         retry: 'Coba lagi',
         refresh: 'Muat ulang',
@@ -312,7 +312,7 @@ function buildCopy(isId: boolean) {
         reels: 'Reels',
         reelsHint: 'Video pendek aktif',
         socialTitle: 'Pengikut & Mengikuti',
-        noFollowers: 'Belum ada pengikut yang terekam.',
+        noFollowers: 'Belum ada yang mengikuti kamu.',
         noFollowing: 'Kamu belum mengikuti akun lain.',
         openPublicProfile: 'Buka profil publik',
         viewed: 'Kunjungan',
@@ -371,8 +371,8 @@ function buildCopy(isId: boolean) {
         identityVerification: 'Verifikasi akun',
         updateSuccess: 'Foto profil berhasil diperbarui.',
         coverSuccess: 'Sampul profil berhasil diperbarui.',
-        uploadError: 'Gagal mengunggah gambar.',
-        saveError: 'Gagal menyimpan perubahan profil.',
+        uploadError: 'Gambarnya belum berhasil diunggah. Coba lagi ya.',
+        saveError: 'Perubahan profil belum tersimpan. Coba lagi ya.',
         coverLabel: 'Ubah sampul',
         avatarLabel: 'Ubah foto profil',
         profileFallback:
