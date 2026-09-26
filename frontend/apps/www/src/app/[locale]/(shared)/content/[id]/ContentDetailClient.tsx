@@ -2209,15 +2209,15 @@ export default function ContentDetailClient({
     .map(value => value.trim());
   const peerUserId =
     ownerCandidateIds.find(value => isUuidLike(value)) ||
-    (isUuidLike(item.owner_id) ? item.owner_id.trim() : '');
+    ownerCandidateIds[0] ||
+    '';
+  const viewerId = String(user?.id || '').trim().toLowerCase();
+  const normalizedPeerUserId = peerUserId.trim().toLowerCase();
   const isOwner =
-    Boolean(user?.id) &&
-    Boolean(peerUserId) &&
-    (user?.id || '').trim().toLowerCase() === peerUserId.toLowerCase();
-  const isSelfPeer =
-    Boolean(user?.id) &&
-    Boolean(peerUserId) &&
-    (user?.id || '').trim().toLowerCase() === peerUserId.toLowerCase();
+    Boolean(viewerId) &&
+    Boolean(normalizedPeerUserId) &&
+    viewerId === normalizedPeerUserId;
+  const isSelfPeer = isOwner;
   const sectorId = meta.sector as string | undefined;
   const sectorObj = sectorId ? getSectorById(sectorId) : null;
   const images = getImages(item);
@@ -4678,6 +4678,30 @@ export default function ContentDetailClient({
                   className={`${detailSurfaceClass} p-3.5 sm:p-5`}
                   data-testid="content-detail-summary"
                 >
+                  {isOwner && !publicReference ? (
+                    <div
+                      className="mb-3 flex flex-col gap-3 rounded-[16px] border border-emerald-200 bg-emerald-50/80 px-3.5 py-3 dark:border-emerald-400/20 dark:bg-emerald-500/10 sm:flex-row sm:items-center sm:justify-between"
+                      data-testid="content-owner-banner"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300">
+                          {locale === 'id' ? 'Punya kamu' : 'Yours'}
+                        </p>
+                        <p className="mt-1 text-xs font-semibold leading-5 text-emerald-900 dark:text-emerald-100">
+                          {locale === 'id'
+                            ? 'Kamu adalah pemilik listing ini. Aksi pembeli disembunyikan dari tampilan kamu.'
+                            : 'You own this listing. Buyer actions are hidden from your view.'}
+                        </p>
+                      </div>
+                      <Link
+                        href={`/create?draft=${encodeURIComponent(item.id)}`}
+                        className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-full bg-emerald-700 px-3.5 text-xs font-black text-white transition hover:bg-emerald-800"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        {locale === 'id' ? 'Edit listing' : 'Edit listing'}
+                      </Link>
+                    </div>
+                  ) : null}
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
                       <span
