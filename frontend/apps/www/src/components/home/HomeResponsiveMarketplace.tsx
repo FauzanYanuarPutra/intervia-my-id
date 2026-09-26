@@ -2763,7 +2763,7 @@ function RecommendationCard({
           {/* SIDE */}
           {item.side ? (
             <span
-              title={item.side}
+              title={getListingSideVerbLabel(item.side, isId ? 'id' : 'en')}
               className="
                 max-w-[42%]
                 shrink-0
@@ -4713,7 +4713,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
       demandController.abort();
       referenceController.abort();
     };
-  }, [isId, viewerLocationKey]);
+  }, [isId, userId, viewerLocationKey]);
 
   const loadCommunityPostsPage = useCallback(async () => {
     const requestSeq = communityRequestSeqRef.current + 1;
@@ -5122,9 +5122,9 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
         ) : null}
         {demandRecommendationsLoading ? (
           <RecommendationsLoadingSkeleton isId={isId} demand />
-        ) : demandRecommendations.length > 0 ? (
+        ) : (
           <DemandListingsSection isId={isId} items={demandRecommendations} />
-        ) : null}
+        )}
         <HomeNewsSection locale={locale} items={homeNewsItems} />
         <ReelsPanel isId={isId} items={reels} />
         <HomeCommunityGroupsSection
@@ -5201,9 +5201,9 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
               ) : null}
               {demandRecommendationsLoading ? (
           <RecommendationsLoadingSkeleton isId={isId} demand />
-        ) : demandRecommendations.length > 0 ? (
+        ) : (
           <DemandListingsSection isId={isId} items={demandRecommendations} />
-        ) : null}
+        )}
         <HomeNewsSection locale={locale} items={homeNewsItems} />
               <div className="grid gap-4">
                 <ReelsPanel isId={isId} items={reels} />
