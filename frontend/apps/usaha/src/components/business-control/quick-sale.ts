@@ -117,6 +117,7 @@ export function buildQuickSaleRequest(draft: QuickSaleDraft) {
     channel_key: draft.channelKey.trim() || null,
     ...(draft.locationId ? { location_id: draft.locationId } : {}),
     account_key: draft.accountKey,
+    ...(draft.partyId ? { party_id: draft.partyId } : {}),
     lines,
   };
 }
