@@ -47,10 +47,10 @@ describe('portal navigation', () => {
     expect(mobilePrimaryNavigation(ownerPermissions).map(item => item.id)).toEqual([
       'home',
       'orders',
-      'products',
+      'inventory',
       'finance',
     ]);
-    expect(portalMenuNavigation(ownerPermissions).map(item => item.id)).toContain('inventory');
+    expect(portalMenuNavigation(ownerPermissions).map(item => item.id)).toContain('products');
   });
 
   it('preserves primary order when permissions hide destinations', () => {
