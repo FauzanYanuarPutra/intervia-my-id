@@ -19,7 +19,6 @@ const endpoint = process.env.MINIO_ENDPOINT;
 const accessKey = process.env.MINIO_ACCESS_KEY ?? process.env.MINIO_USER;
 const secretKey = process.env.MINIO_SECRET_KEY ?? process.env.MINIO_PASS;
 const bucket = process.env.MINIO_BUCKET ?? 'laju-chat';
-const publicUrl = process.env.MINIO_PUBLIC_URL ?? '';
 const appEnv = process.env.APP_ENV || process.env.ENV || process.env.NODE_ENV;
 
 let cachedClient: S3Client | null = null;
