@@ -22,15 +22,6 @@ export default async function SubmitNewsPage({ params }: PageProps) {
   const isId = locale === 'id';
   return (
     <main className="page-shell page-shell-readable page-rhythm pb-12 pt-6">
-<div className="flex flex-wrap gap-2">
-      <Link href="/news" className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 hover:border-emerald-200 hover:text-emerald-700 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200">
-        <ArrowLeft className="h-3.5 w-3.5" />
-        Lajukan News
-      </Link>
-        <Link href="/news/submissions" className="inline-flex min-h-9 items-center rounded-full border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 hover:border-emerald-200 hover:text-emerald-700 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200">
-          {isId ? 'Kiriman saya' : 'My submissions'}
-        </Link>
-      </div>
 
       <section className="rounded-[32px] border border-slate-200 bg-white p-5 shadow-[0_24px_64px_-48px_rgba(15,23,42,0.34)] dark:border-white/10 dark:bg-slate-900 sm:p-8">
         <div className="mb-7">
