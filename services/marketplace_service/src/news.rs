@@ -1681,12 +1681,8 @@ async fn withdraw_news_submission(
     )
     .bind(content_id)
     .bind(owner_id)
-    .bind(from_status)
-    .bind(if revision_of_published {
-        Some("Contributor submitted a revision to an already published article.")
-    } else {
-        None
-    })
+    .bind(&from_status)
+    .bind(None::<&str>)
     .execute(&mut *tx)
     .await
     {
@@ -2057,7 +2053,7 @@ async fn update_news_submission(
     )
     .bind(content_id)
     .bind(owner_id)
-    .bind(from_status)
+    .bind(&from_status)
     .bind(if revision_of_published {
         Some("Contributor submitted a revision to an already published article.")
     } else {
