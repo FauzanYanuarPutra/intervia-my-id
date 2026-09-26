@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowRight,
   ExternalLink,
+  Info,
   Search,
   SlidersHorizontal,
 } from 'lucide-react';
@@ -13,6 +14,7 @@ import {
 } from 'next/navigation';
 
 import { ExploreSearchResults } from '@/components/explore/ExploreSearchResults';
+import { Modal } from '@/components/common/Modal';
 import { ExploreFilterDrawer } from '@/components/explore/ExploreFilterDrawer';
 import { EmblaDesktopControls } from '@/components/common/EmblaDesktopControls';
 import { Header } from '@/components/layout/Header';
@@ -200,6 +202,7 @@ export function ExploreAllSearchClient({
     );
 
   const isId = locale === 'id';
+  const [showResultsInfo, setShowResultsInfo] = useState(false);
 
   const referenceMode =
     state.tab === 'references';
@@ -1889,6 +1892,30 @@ export function ExploreAllSearchClient({
 
         {filterOpen && !referenceMode && !peopleMode ? <ExploreFilterDrawer onClose={()=>setFilterOpen(false)} value={{location:state.location,distanceKm:state.distanceKm,sort:state.sort}} onApply={changes=>updateParams(changes,'replace')} onClear={clearAdvancedFilters} isId={isId} /> : null}
 
+        <div className="mb-2 flex items-center justify-between gap-3 rounded-[14px] border border-zinc-200/80 bg-white px-3 py-2.5 dark:border-zinc-800 dark:bg-zinc-950">
+          <div className="min-w-0">
+            <p className="text-[10px] font-black text-zinc-800 dark:text-zinc-100">
+              {isId
+                ? 'Hasil di sini bisa berasal dari beberapa bagian Lajukan.'
+                : 'Results here can come from several parts of Lajukan.'}
+            </p>
+            <p className="mt-0.5 truncate text-[10px] font-medium text-zinc-500 dark:text-zinc-400">
+              {isId
+                ? 'Pakai tab untuk mempersempit jenis hasil.'
+                : 'Use the tabs to narrow the result type.'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowResultsInfo(true)}
+            className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border border-zinc-200 bg-zinc-50 px-3 text-[10px] font-extrabold text-zinc-600 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/25 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-emerald-800 dark:hover:bg-emerald-950/40 dark:hover:text-emerald-200"
+            aria-label={isId ? 'Jelaskan jenis hasil' : 'Explain result types'}
+          >
+            <Info className="h-3.5 w-3.5" aria-hidden="true" />
+            {isId ? 'Info' : 'Info'}
+          </button>
+        </div>
+
         <section className="mt-2 min-w-0 sm:mt-3">
           <ExploreSearchResults
             payload={payload}
@@ -1914,5 +1941,34 @@ export function ExploreAllSearchClient({
         </section>
       </main>
     </div>
+      <Modal
+        open={showResultsInfo}
+        title={isId ? 'Mengenal hasil Jelajahi' : 'Understanding Explore results'}
+        onClose={() => setShowResultsInfo(false)}
+      >
+        <div className="space-y-3 overflow-y-auto pr-1">
+          <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-300">
+            {isId
+              ? 'Setiap bagian punya tujuan berbeda. Hasil penawaran dan kebutuhan bisa ditindaklanjuti di Lajukan, sedangkan data referensi publik bukan berarti penawaran Lajukan.'
+              : 'Each section has a different purpose. Offers and needs can be acted on in Lajukan, while public references are not Lajukan offers.'}
+          </p>
+          <div className="space-y-2">
+            {SEARCH_GROUPS.map(kind => {
+              const copy = SEARCH_GROUP_COPY[kind];
+              return (
+                <div key={kind} className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900/60">
+                  <p className="text-xs font-black text-zinc-900 dark:text-zinc-100">
+                    {isId ? copy.labelId : copy.labelEn}
+                  </p>
+                  <p className="mt-1.5 text-[11px] leading-5 text-zinc-600 dark:text-zinc-300">
+                    {isId ? copy.descriptionId : copy.descriptionEn}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </Modal>
+
   );
 }
