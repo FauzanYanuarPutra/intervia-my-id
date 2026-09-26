@@ -6,6 +6,7 @@ export type MerchantNextActionKind =
   | 'record_money'
   | 'reconcile_settlement'
   | 'restock'
+  | 'prepare_buyer_page'
   | 'healthy';
 
 export type MerchantNextAction = {
@@ -29,6 +30,8 @@ export type MerchantNextActionInput = {
   productsMissingChannelPriceCount: number | null;
   unreconciledSettlementCount: number;
   financeEntryCount: number;
+  canViewBuyerPage: boolean;
+  buyerPageReady: boolean;
 };
 
 export function buildMerchantNextActions(input: MerchantNextActionInput): MerchantNextAction[] {
@@ -107,6 +110,16 @@ export function buildMerchantNextActions(input: MerchantNextActionInput): Mercha
       description: 'Mulai dari uang masuk atau uang keluar yang benar-benar terjadi.',
       href: `${base}/finance`,
       priority: 55,
+    });
+  }
+
+  if (input.canViewBuyerPage && !input.buyerPageReady) {
+    actions.push({
+      kind: 'prepare_buyer_page',
+      title: 'Rapikan tampilan pelanggan',
+      description: 'Siapkan katalog publik dan link usaha supaya pelanggan bisa menemukan dan menghubungi usaha.',
+      href: `${base}/buyer-page`,
+      priority: 45,
     });
   }
 
