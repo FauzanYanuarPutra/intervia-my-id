@@ -1,6 +1,7 @@
 export type PageId =
   | 'dashboard'
   | 'pipeline'
+  | 'matching'
   | 'users'
   | 'businesses'
   | 'listings'
