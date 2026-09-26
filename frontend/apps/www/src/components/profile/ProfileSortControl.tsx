@@ -24,7 +24,7 @@ export function ProfileSortControl({
         <span className="text-[9px] font-black uppercase tracking-[0.08em] text-[color:var(--app-text-soft)] sm:hidden">
           {isId ? 'Urutan' : 'Sort'}
         </span>
-        <span className="sr-only sm:not-sr-only sm:text-[10px] sm:font-black sm:text-[color:var(--app-text-soft)]">
+        <span className="hidden text-[10px] font-black text-[color:var(--app-text-soft)] sm:block">
           {isId ? 'Urutkan' : 'Sort'}
         </span>
       </span>
