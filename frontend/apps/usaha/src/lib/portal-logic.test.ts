@@ -8,10 +8,14 @@ describe('visiblePortalSections', () => {
       'home',
       'orders',
       'parties',
-      'growth',
       'operations',
       'work',
     ]);
+  });
+
+  it('shows the growth center when at least one growth signal is viewable', () => {
+    expect(visiblePortalSections(['viewReports'])).toContain('growth');
+    expect(visiblePortalSections(['viewOrders', 'viewOperations'])).not.toContain('growth');
   });
 
   it('separates read-only business info from location editing and owner-only destinations', () => {
