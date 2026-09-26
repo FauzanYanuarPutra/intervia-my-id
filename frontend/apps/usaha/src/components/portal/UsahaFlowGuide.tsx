@@ -85,7 +85,7 @@ function stepsFor(business: BusinessRecord, section: PortalSection): GuideStep[]
           ]
         : [
             { id: 'open', label: 'Siap jualan', hint: 'Kasir siap dipakai saat transaksi masuk.', href: href(id, '/orders') },
-            { id: 'sell', label: 'Catat jualan', hint: 'Tap ${catalogNoun}, atur jumlah, lalu bayar.', href: href(id, '/orders') },
+            { id: 'sell', label: 'Catat jualan', hint: `Tap ${catalogNoun}, atur jumlah, lalu bayar.`, href: href(id, '/orders') },
             { id: 'review', label: 'Cek transaksi', hint: 'Pastikan semua jualan hari ini sudah tersimpan.', href: href(id, '/orders?view=transaksi') },
           ];
     case 'finance':
