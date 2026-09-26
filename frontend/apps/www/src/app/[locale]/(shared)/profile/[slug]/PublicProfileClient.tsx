@@ -36,6 +36,7 @@ import {
 import { LajukanImage as Image } from '@/components/common/LajukanImage';
 import { DetailMobileTopBar } from '@/components/layout/DetailMobileTopBar';
 import { ProfileFilterStrip } from '@/components/profile/ProfileFilterStrip';
+import { ProfileSortControl, type ProfileSortMode } from '@/components/profile/ProfileSortControl';
 import { ProfileViewSkeleton } from '@/components/system/feedback/RouteSkeletons';
 import { useAuth } from '@/context/AuthContext';
 import { Link, useRouter } from '@/i18n/navigation';
@@ -1475,9 +1476,7 @@ export default function PublicProfileClient({
     useState<PublicProfileTab>('posts');
   const [activeContentTab, setActiveContentTab] =
     useState<ProfileContentTab>('all');
-  const [listingSort, setListingSort] = useState<
-    'newest' | 'most_viewed' | 'oldest'
-  >('newest');
+  const [listingSort, setListingSort] = useState<ProfileSortMode>('newest');
   const [socialModalTab, setSocialModalTab] = useState<ProfileSocialTab | null>(
     null,
   );
@@ -2459,26 +2458,11 @@ export default function PublicProfileClient({
                     onChange={setActiveContentTab}
                   />
 
-                  <label className="flex min-h-11 items-center justify-between gap-2 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-[color:var(--app-text)] sm:min-h-9 sm:rounded-full sm:px-2.5">
-                    <span className="flex min-w-0 items-center gap-1.5">
-                      <span className="text-[9px] font-black uppercase tracking-[0.08em] text-[color:var(--app-text-soft)] sm:hidden">
-                        {localeCode === 'id' ? 'Urutan' : 'Sort'}
-                      </span>
-                      <span className="hidden text-[10px] font-black text-[color:var(--app-text-soft)] sm:block">
-                        {localeCode === 'id' ? 'Urutkan' : 'Sort'}
-                      </span>
-                    </span>
-                    <select
-                      value={listingSort}
-                      onChange={event => setListingSort(event.target.value as 'newest' | 'most_viewed' | 'oldest')}
-                      className="min-w-0 bg-transparent text-[11px] font-black outline-none sm:max-w-36 sm:text-xs"
-                      aria-label={localeCode === 'id' ? 'Urutkan postingan' : 'Sort posts'}
-                    >
-                      <option value="newest">{localeCode === 'id' ? 'Terbaru' : 'Newest'}</option>
-                      <option value="most_viewed">{localeCode === 'id' ? 'Paling dilihat' : 'Most viewed'}</option>
-                      <option value="oldest">{localeCode === 'id' ? 'Terlama' : 'Oldest'}</option>
-                    </select>
-                  </label>
+                  <ProfileSortControl
+                    value={listingSort}
+                    onChange={setListingSort}
+                    isId={localeCode === 'id'}
+                  />
                 </div>
 
                 {visibleListings.length > 0 ? (
