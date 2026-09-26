@@ -1004,8 +1004,8 @@ export default function MyListingsPage() {
                           : 'Nothing live yet'
                         : activeStatus === 'draft'
                           ? locale === 'id'
-                            ? 'Tidak ada draft'
-                            : 'No drafts'
+                            ? 'Tidak ada yang masih diproses'
+                            : 'Nothing waiting'
                           : locale === 'id'
                             ? 'Arsip masih kosong'
                             : 'Archive is empty'
@@ -1021,8 +1021,8 @@ export default function MyListingsPage() {
                           : 'Published listings will appear here.'
                         : activeStatus === 'draft'
                           ? locale === 'id'
-                            ? 'Draft tersimpan otomatis saat kamu belum selesai membuat postingan.'
-                            : 'Drafts are saved when you have not finished a listing.'
+                            ? 'Draft, konten yang sedang dicek, atau yang diminta diperbaiki akan muncul di sini.'
+                            : 'Drafts, items under review, and items needing changes appear here.'
                           : locale === 'id'
                             ? 'Postingan yang kamu arsipkan akan tetap tersimpan di sini.'
                             : 'Archived listings stay available here.'
@@ -1141,7 +1141,7 @@ export default function MyListingsPage() {
                             <div className="flex min-w-0 items-start justify-between gap-2">
                               <div className="min-w-0">
                                 <Link
-                                  href={cardStatus === 'draft' ? `/create?draft=${id}` : `/content/${id}`}
+                                  href={cardStatus === 'draft' ? editHref : `/content/${id}`}
                                   className="line-clamp-2 text-[14px] font-bold leading-snug text-slate-950 hover:text-emerald-700 dark:text-white dark:hover:text-emerald-300 sm:text-[15px]"
                                 >
                                   {item.title || (locale === 'id' ? 'Tanpa judul' : 'Untitled')}
@@ -1214,24 +1214,36 @@ export default function MyListingsPage() {
                                   ) : null}
 
                                   {cardStatus === 'draft' ? (
-                                    <button
-                                      type="button"
-                                      disabled={deletingDraftId === item.id}
-                                      onClick={event => {
-                                        closeDetails(event.currentTarget);
-                                        void deleteDraft(item);
-                                      }}
-                                      className="flex w-full items-center gap-2 rounded-[10px] px-2.5 py-2 text-left text-xs font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-50 dark:text-red-300 dark:hover:bg-red-400/10"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                      {deletingDraftId === item.id
-                                        ? locale === 'id'
-                                          ? 'Menghapus...'
-                                          : 'Deleting...'
-                                        : locale === 'id'
-                                          ? 'Hapus draft'
-                                          : 'Delete draft'}
-                                    </button>
+                                    <>
+                                      <Link
+                                        href={editHref}
+                                        onClick={event => closeDetails(event.currentTarget)}
+                                        className="flex w-full items-center gap-2 rounded-[10px] px-2.5 py-2 text-left text-xs font-semibold text-amber-700 transition hover:bg-amber-50 dark:text-amber-200 dark:hover:bg-amber-400/10"
+                                      >
+                                        <PencilLine className="h-4 w-4" />
+                                        {locale === 'id' ? 'Edit sekarang' : 'Edit now'}
+                                      </Link>
+                                      {normalizedStatus === 'draft' ? (
+                                        <button
+                                          type="button"
+                                          disabled={deletingDraftId === item.id}
+                                          onClick={event => {
+                                            closeDetails(event.currentTarget);
+                                            void deleteDraft(item);
+                                          }}
+                                          className="flex w-full items-center gap-2 rounded-[10px] px-2.5 py-2 text-left text-xs font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-50 dark:text-red-300 dark:hover:bg-red-400/10"
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                          {deletingDraftId === item.id
+                                            ? locale === 'id'
+                                              ? 'Menghapus...'
+                                              : 'Deleting...'
+                                            : locale === 'id'
+                                              ? 'Hapus draft'
+                                              : 'Delete draft'}
+                                        </button>
+                                      ) : null}
+                                    </>
                                   ) : null}
                                 </div>
                               </details>
