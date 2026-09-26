@@ -34,14 +34,14 @@ import type {
 } from '@/lib/search/globalSearch';
 import { cn } from '@/lib/utils';
 
-const SEARCH_GROUPS: GlobalSearchGroupKey[] = [
+export const SEARCH_GROUPS: GlobalSearchGroupKey[] = [
   'products', 'services', 'businesses', 'references', 'needs', 'communities', 'videos', 'users',
 ];
 const DEFAULT_SEARCH_GROUPS: GlobalSearchGroupKey[] = ['products', 'services', 'businesses'];
 const SUPPLY_RESULT_TABS: GlobalSearchTab[] = ['all', 'products', 'services', 'businesses'];
 const DEDICATED_TABS = new Set<GlobalSearchTab>(['needs', 'users', 'references']);
 
-const SEARCH_GROUP_COPY: Record<GlobalSearchGroupKey, { labelId: string; labelEn: string; descriptionId: string; descriptionEn: string }> = {
+export const SEARCH_GROUP_COPY: Record<GlobalSearchGroupKey, { labelId: string; labelEn: string; descriptionId: string; descriptionEn: string }> = {
   products: { labelId: 'Produk', labelEn: 'Products', descriptionId: 'Produk, bahan, stok, dan alat yang bisa kamu bandingkan.', descriptionEn: 'Materials, stock, tools, and goods you can compare.' },
   services: { labelId: 'Jasa', labelEn: 'Services', descriptionId: 'Jasa untuk kebutuhan operasional, kreatif, teknis, dan usaha.', descriptionEn: 'Operational, creative, technical, and business services.' },
   businesses: { labelId: 'Usaha', labelEn: 'Businesses', descriptionId: 'Toko, UMKM, dan usaha yang sesuai dengan pencarianmu.', descriptionEn: 'Relevant stores, MSMEs, and provider profiles.' },
