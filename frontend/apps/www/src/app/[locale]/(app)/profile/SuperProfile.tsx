@@ -34,7 +34,6 @@ import {
   Plus,
   RefreshCw,
   Search,
-  Settings2,
   Star,
   Store,
   Users,
@@ -2118,11 +2117,6 @@ export default function SuperProfile() {
     { key: 'other', label: copy.others, count: sourceListings.filter(item => normalizeListingType(item) === 'other').length },
   ];
 
-  const sortOptions: Array<{ value: SortMode; label: string }> = [
-    { value: 'newest', label: copy.newest },
-    { value: 'most_viewed', label: copy.mostViewed },
-    { value: 'oldest', label: copy.oldest },
-  ];
 
   return (
     <>
