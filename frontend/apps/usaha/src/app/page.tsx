@@ -19,6 +19,8 @@ import {
   listControlChannels,
   listControlFinanceEntries,
   listControlIngredients,
+  listControlSales,
+  listControlSettlements,
 } from '@/lib/business-control-server';
 import { buildHomeDashboard } from '@/lib/business-control/home-dashboard';
 import { jakartaDateKey, summarizeControlCenter } from '@/lib/business-control/insights';
@@ -114,6 +116,7 @@ export default async function HomePage({
   const canViewCosting = hasPermission(business, 'viewCosting');
   const canViewFinance = hasPermission(business, 'viewFinance');
   const canViewChannels = hasPermission(business, 'viewChannels');
+  const canViewOrders = hasPermission(business, 'viewOrders');
   const canManageInfo = hasPermission(business, 'manageInfo');
   const canManageInventory = hasPermission(business, 'manageInventory');
 
@@ -129,13 +132,29 @@ export default async function HomePage({
       : Promise.resolve([]),
   });
 
-  const [financeCore, workItems] = await Promise.all([
+  const [financeCore, workItems, saleRecords, settlementRecords] = await Promise.all([
     canViewFinance ? getFinanceCoreSummary(business.id).catch(() => null) : Promise.resolve(null),
     listBusinessWork(business.id).catch(() => []),
+    canViewOrders ? listControlSales(business.id).catch(() => []) : Promise.resolve([]),
+    canViewFinance ? listControlSettlements(business.id).catch(() => []) : Promise.resolve([]),
   ]);
 
   const today = jakartaDateKey();
   const control = summarizeControlCenter({ ingredients, financeEntries, channels, today });
+  const todaySales = canViewOrders
+    ? saleRecords
+        .filter(item => item.sale.status === 'completed' && item.sale.occurred_on === today)
+        .sort((left, right) => right.sale.created_at.localeCompare(left.sale.created_at))
+    : [];
+  const todayRevenue = todaySales.reduce((total, item) => total + Math.max(0, item.sale.final_amount), 0);
+  const todayTransactions = todaySales.length;
+  const todayCostIncomplete = todaySales.some(
+    item => !item.sale.cost_complete || item.sale.cogs_amount === null,
+  );
+  const todayGrossProfit = todayCostIncomplete
+    ? null
+    : todayRevenue - todaySales.reduce((total, item) => total + Math.max(0, item.sale.cogs_amount ?? 0), 0);
+  const unreconciledSettlementCount = settlementRecords.filter(item => item.status !== 'matched').length;
   const stockAttention =
     (business.lowStockProductsCount ?? 0) +
     (business.stockCheckCount ?? 0) +
@@ -154,7 +173,7 @@ export default async function HomePage({
     lowStockCount: stockAttention,
     enabledChannelCount: control.enabledChannelCount,
     productsMissingChannelPriceCount: null,
-    unreconciledSettlementCount: 0,
+    unreconciledSettlementCount,
     financeEntryCount: financeEntries.length,
   });
 
@@ -179,7 +198,8 @@ export default async function HomePage({
   const dashboard = buildHomeDashboard({
     foundationAction,
     nextActions,
-    activeSales: business.activeOrders,
+    todayRevenue,
+    todayTransactions,
     expenseToday: canViewFinance ? control.financeToday.operatingExpenses : 0,
     stockAttention,
     setupIncomplete: incompleteSetup,
@@ -216,18 +236,37 @@ export default async function HomePage({
 
       <MetricStrip items={dashboard.metrics.map(metric => ({
         label: metric.label,
-        value: metric.key === 'expense' ? (canViewFinance ? money.format(metric.value) : '—') : metric.value,
+        value: metric.key === 'revenue' || metric.key === 'expense'
+          ? (canViewFinance || metric.key === 'revenue' ? money.format(metric.value) : '—')
+          : metric.value,
       }))} />
 
       <section className="merchant-surface-bordered overflow-hidden">
         <div className="border-b border-portal-line px-4 py-3.5 sm:px-5"><p className="text-[10px] font-black uppercase tracking-[0.1em] text-portal-soft">Kondisi usaha</p><h2 className="mt-1 text-base font-black text-portal-ink">Yang perlu kamu tahu sekarang</h2></div>
         <div className="grid gap-px bg-portal-line sm:grid-cols-2 lg:grid-cols-4">
-          {canViewFinance ? <><div className="bg-white p-4"><p className="text-xs text-portal-soft">Kas</p><p className="mt-1 text-lg font-black text-portal-ink">{money.format(financeCore?.accounts.find(account => account.account_key === 'cash')?.balance ?? 0)}</p></div><div className="bg-white p-4"><p className="text-xs text-portal-soft">E-wallet</p><p className="mt-1 text-lg font-black text-portal-ink">{money.format(financeCore?.accounts.find(account => account.account_key === 'ewallet')?.balance ?? 0)}</p></div></> : null}
+          <div className="bg-white p-4"><p className="text-xs text-portal-soft">Laba kotor hari ini</p><p className="mt-1 text-lg font-black text-portal-ink">{todaySales.length === 0 ? '—' : todayGrossProfit === null ? 'HPP belum lengkap' : money.format(todayGrossProfit)}</p></div>
+          {canViewFinance ? <div className="bg-white p-4"><p className="text-xs text-portal-soft">Kas</p><p className="mt-1 text-lg font-black text-portal-ink">{money.format(financeCore?.accounts.find(account => account.account_key === 'cash')?.balance ?? 0)}</p></div> : null}
           <div className="bg-white p-4"><p className="text-xs text-portal-soft">Stok perlu perhatian</p><p className="mt-1 text-lg font-black text-portal-ink">{stockAttention}</p></div>
           <div className="bg-white p-4"><p className="text-xs text-portal-soft">Pekerjaan terbuka</p><p className="mt-1 text-lg font-black text-portal-ink">{workItems.filter(item => !['done','cancelled'].includes(item.status)).length}</p></div>
         </div>
       </section>
       {workItems.some(item => !['done','cancelled'].includes(item.status)) ? <section><div className="mb-2.5 flex items-end justify-between gap-3"><div><h2 className="font-black text-portal-ink">Pekerjaan yang berjalan</h2><p className="mt-0.5 text-xs text-portal-soft">Supaya kondisi usaha langsung berubah jadi tindakan.</p></div><Link href={`/businesses/${business.id}/work`} className="text-xs font-black text-portal-forest">Lihat semua</Link></div><div className="merchant-list border border-portal-line/80">{workItems.filter(item => !['done','cancelled'].includes(item.status)).slice(0,3).map(item => <Link key={item.id} href={`/businesses/${business.id}/work`} className="merchant-action-row"><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold text-portal-ink">{item.title}</p><p className="mt-0.5 text-[11px] text-portal-soft">{item.assignee_user_id ? 'Sudah ditugaskan' : 'Belum ditugaskan'}</p></div><span className="text-xs font-black text-portal-forest">Kerjakan</span></Link>)}</div></section> : null}
+
+      {canViewOrders && todaySales.length ? (
+        <section>
+          <div className="mb-2.5 flex items-end justify-between gap-3">
+            <div><h2 className="font-black text-portal-ink">Transaksi hari ini</h2><p className="mt-0.5 text-xs text-portal-soft">Penjualan yang sudah selesai dan tercatat hari ini.</p></div>
+            <Link href={`/businesses/${business.id}/orders`} className="text-xs font-black text-portal-forest">Buka jual</Link>
+          </div>
+          <div className="merchant-list border border-portal-line/80">
+            {todaySales.slice(0, 5).map(item => {
+              const channel = item.sale.channel_key ? channels.find(entry => entry.channel_key === item.sale.channel_key)?.display_name ?? item.sale.channel_key : 'Kasir';
+              const summary = item.lines.slice(0, 2).map(line => `${line.product_name} ×${line.quantity}`).join(', ');
+              return <div key={item.sale.id} className="merchant-action-row"><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold text-portal-ink">{summary || item.sale.document_number}</p><p className="mt-0.5 text-[11px] text-portal-soft">{channel} · {item.sale.document_number}</p></div><strong className="shrink-0 text-sm text-portal-ink">{money.format(item.sale.final_amount)}</strong></div>;
+            })}
+          </div>
+        </section>
+      ) : null}
 
       <section className="merchant-surface-bordered overflow-hidden">
         <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
