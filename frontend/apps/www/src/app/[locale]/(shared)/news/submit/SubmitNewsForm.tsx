@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { Link } from '@/i18n/navigation';
 import NewsRichTextEditor from './NewsRichTextEditor';
+import { normalizeNewsMediaUrl } from '@/lib/newsMediaUrl';
 
 const CATEGORIES = ['Ekonomi', 'Bisnis', 'UMKM', 'Teknologi', 'Keuangan', 'Regulasi', 'Industri', 'Daerah'];
 
@@ -46,7 +47,7 @@ export default function SubmitNewsForm({ locale }: Props) {
     try { localStorage.setItem('lajukan-news-form-draft', JSON.stringify(form)); } catch {}
   }, [form]);
 
-  const handleCoverUpload = async (event: React.ChangeEvent<HTMLInputElement>) => { const file = event.target.files?.[0]; event.target.value = ''; if (!file) return; setUploadingCover(true); try { const data = new FormData(); data.append('image', file); const response = await fetch('/api/content/upload-images', { method: 'POST', body: data }); const payload = (await response.json().catch(() => ({}))) as { urls?: string[]; files?: Array<{ url?: string }>; error?: string }; const url = payload.urls?.[0] || payload.files?.[0]?.url; if (!response.ok || !url) throw new Error(payload.error || (isId ? 'Gagal mengunggah gambar.' : 'Image upload failed.')); setForm(current => ({ ...current, cover_image: url })); } catch (error) { setState(current => ({ ...current, error: error instanceof Error ? error.message : (isId ? 'Gagal mengunggah gambar.' : 'Image upload failed.') })); } finally { setUploadingCover(false); } };
+  const handleCoverUpload = async (event: React.ChangeEvent<HTMLInputElement>) => { const file = event.target.files?.[0]; event.target.value = ''; if (!file) return; setUploadingCover(true); try { const data = new FormData(); data.append('image', file); const response = await fetch('/api/content/upload-images', { method: 'POST', body: data }); const payload = (await response.json().catch(() => ({}))) as { urls?: string[]; files?: Array<{ url?: string }>; error?: string }; const url = payload.urls?.[0] || payload.files?.[0]?.url; const safeUrl = normalizeNewsMediaUrl(url); if (!response.ok || !safeUrl) throw new Error(payload.error || (isId ? 'Gagal mengunggah gambar.' : 'Image upload failed.')); setForm(current => ({ ...current, cover_image: safeUrl })); } catch (error) { setState(current => ({ ...current, error: error instanceof Error ? error.message : (isId ? 'Gagal mengunggah gambar.' : 'Image upload failed.') })); } finally { setUploadingCover(false); } };
 
   const update = (key: keyof typeof form, value: string) => {
     setForm(current => ({ ...current, [key]: value }));
