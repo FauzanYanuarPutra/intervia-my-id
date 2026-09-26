@@ -67,6 +67,7 @@ import {
 import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 import { cn } from '@/lib/utils';
 import { normalizeProfileContentTab } from '@/lib/profile/profileContentTabs';
+import { ProfileSortControl, type ProfileSortMode } from '@/components/profile/ProfileSortControl';
 import { OwnerProfileEditModal, OwnerProfileEditSection } from './OwnerProfileEditModal';
 
 type MetaRecord = Record<string, unknown>;
@@ -82,7 +83,7 @@ type ListingFilter =
   | 'community'
   | 'reels'
   | 'other';
-type SortMode = 'newest' | 'oldest' | 'most_viewed';
+type SortMode = ProfileSortMode;
 
 type UserDetail = {
   id: string;
@@ -2456,29 +2457,18 @@ export default function SuperProfile() {
               }}
             />
 
-            <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5 border-b border-[color:var(--app-border)]/70 bg-[color:var(--app-surface-strong)] px-2.5 py-2 sm:px-5 sm:py-2.5">
+            <div className="grid gap-2 border-b border-[color:var(--app-border)]/70 bg-[color:var(--app-surface-strong)] px-2.5 py-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-5 sm:py-2.5">
               <FilterRail
                 activeFilter={activeFilter}
                 items={filterItems}
                 onChange={setActiveFilter}
                 isId={isId}
               />
-              <label className="flex h-8 shrink-0 items-center gap-1 rounded-full border border-transparent bg-[color:var(--app-surface-muted)] px-2 text-[color:var(--app-text)] transition hover:bg-emerald-50 dark:bg-white/5 dark:text-[color:var(--app-text-inverse)] dark:hover:bg-emerald-500/10 sm:h-9 sm:px-2.5">
-                <Settings2 className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-300" />
-                <span className="sr-only">{isId ? 'Urutkan berdasarkan' : 'Sort by'}</span>
-                <select
-                  value={sortMode}
-                  onChange={event => setSortMode(event.target.value as SortMode)}
-                  className="max-w-[5.8rem] bg-transparent text-[10px] font-black outline-none sm:max-w-36 sm:text-xs"
-                  aria-label={isId ? 'Urutkan postingan' : 'Sort posts'}
-                >
-                  {sortOptions.map(option => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <ProfileSortControl
+                value={sortMode}
+                onChange={setSortMode}
+                isId={isId}
+              />
             </div>
 
             {visibleListings.length > 0 ? (
