@@ -11287,12 +11287,17 @@ export default function ChatRoomPage() {
           </div>
           <div className="shrink-0 border-t border-white/10 bg-[#111b21] px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2.5 sm:px-5">
             <div className="mx-auto flex w-full max-w-5xl gap-2 overflow-x-auto pb-2">
-              {draftAttachments.map((attachment, index) => (
+              {draftAttachments.slice(0, 20).map((attachment, index) => (
                 <button key={attachment.id} type="button" onClick={() => setActiveDraftAttachmentId(attachment.id)} className={'relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border ' + (attachment.id === activeDraftAttachment.id ? 'border-[#25d366] ring-2 ring-[#25d366]/35' : 'border-white/10 opacity-70')} aria-label={(chatLocale === 'id' ? 'Pilih media ' : 'Select media ') + String(index + 1)}>
                   {attachment.type === 'image' && attachment.previewUrl ? <img src={attachment.previewUrl} alt="" className="h-full w-full object-cover" /> : attachment.type === 'video' && attachment.previewUrl ? <video src={attachment.previewUrl} muted playsInline className="h-full w-full object-cover" /> : attachment.type === 'audio' ? <div className="flex h-full w-full items-center justify-center bg-[#0b141a] text-[#25d366]"><Mic className="h-4 w-4" /></div> : <div className="flex h-full w-full items-center justify-center bg-white/8 text-white/70"><FileText className="h-4 w-4" /></div>}
                   {attachment.status === 'uploading' ? <span className="absolute inset-0 flex items-center justify-center bg-black/40"><Loader2 className="h-3.5 w-3.5 animate-spin" /></span> : null}
                 </button>
               ))}
+              {draftAttachments.length > 20 ? (
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-white/8 text-xs font-bold text-white/75">
+                  +{draftAttachments.length - 20}
+                </div>
+              ) : null}
             </div>
             <div className="mx-auto flex w-full max-w-5xl items-end gap-2">
               <button
