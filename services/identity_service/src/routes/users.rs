@@ -1182,13 +1182,16 @@ pub async fn update_me_profile(
 
     let upsert_res = sqlx::query(
         r#"
-        INSERT INTO core.user_profiles (user_id, full_name, username, bio, location, updated_at)
-        VALUES ($1, $2, $3, $4, $5, NOW())
+        INSERT INTO core.user_profiles (
+            user_id, full_name, username, bio, location, picture, updated_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, NOW())
         ON CONFLICT (user_id) DO UPDATE SET
             full_name = COALESCE(EXCLUDED.full_name, user_profiles.full_name),
             username = COALESCE(EXCLUDED.username, user_profiles.username),
             bio = COALESCE(EXCLUDED.bio, user_profiles.bio),
             location = COALESCE(EXCLUDED.location, user_profiles.location),
+            picture = COALESCE(EXCLUDED.picture, user_profiles.picture),
             updated_at = NOW()
         "#,
     )
@@ -1197,6 +1200,7 @@ pub async fn update_me_profile(
     .bind(username.clone())
     .bind(bio.clone())
     .bind(location.clone())
+    .bind(avatar_url.clone())
     .execute(&mut *tx)
     .await;
 
