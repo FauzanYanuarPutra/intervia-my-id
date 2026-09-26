@@ -540,7 +540,6 @@ export function CommunityComposer({
   const [saving, setSaving] = useState(false);
   const [draggingMedia, setDraggingMedia] = useState(false);
   const composerSurfaceRef = useRef<HTMLFormElement>(null);
-  const titleInputRef = useRef<HTMLInputElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
   const closeComposerRef = useRef<() => void>(() => undefined);
 
@@ -671,9 +670,7 @@ export function CommunityComposer({
     rememberReturnFocus();
 
     const focusFrame = window.requestAnimationFrame(() => {
-      const initialTarget =
-        titleInputRef.current || composerSurfaceRef.current;
-      initialTarget?.focus({ preventScroll: true });
+      composerSurfaceRef.current?.focus({ preventScroll: true });
     });
 
     const handleKeyDown = (
