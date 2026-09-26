@@ -175,15 +175,15 @@ export default function NewsRichTextEditor({ value, onChange, locale }: Props) {
       ) : (
         <div
           ref={editorRef}
-          contentEditable
-          suppressContentEditableWarning
+          className="min-h-[320px] px-5 py-4 text-[15px] font-medium leading-8 text-slate-800 outline-none dark:text-slate-100 [&_blockquote]:my-4 [&_blockquote]:border-l-4 [&_blockquote]:border-emerald-500 [&_blockquote]:pl-4 [&_h2]:mt-5 [&_h2]:text-2xl [&_h2]:font-bold [&_h3]:mt-4 [&_h3]:text-xl [&_h3]:font-bold [&_figure]:my-5 [&_figure]:overflow-hidden [&_figure]:rounded-2xl [&_figure]:bg-slate-50 [&_figure]:dark:bg-white/[0.04] [&_img]:my-0 [&_img]:max-h-[520px] [&_img]:w-full [&_img]:object-cover [&_figcaption]:px-3 [&_figcaption]:py-2 [&_figcaption]:text-xs [&_figcaption]:font-semibold [&_figcaption]:text-slate-500 [&_li]:ml-6 [&_ol]:list-decimal [&_p]:my-3 [&_pre]:overflow-x-auto [&_pre]:rounded-xl [&_pre]:bg-slate-950 [&_pre]:p-4 [&_pre]:text-slate-100 [&_ul]:list-disc"
+          contentEditable={true}
+          suppressContentEditableWarning={true}
           role="textbox"
-          aria-multiline="true"
+          aria-multiline={true}
+          data-placeholder={isId ? 'Tulis berita kamu di sini...' : 'Write your story here...'}
           onInput={emit}
           onBlur={emit}
-           onPaste={handlePaste}
-           className="min-h-[320px] px-5 py-4 text-[15px] font-medium leading-8 text-slate-800 outline-none dark:text-slate-100 [&_blockquote]:my-4 [&_blockquote]:border-l-4 [&_blockquote]:border-emerald-500 [&_blockquote]:pl-4 [&_h2]:mt-5 [&_h2]:text-2xl [&_h2]:font-bold [&_h3]:mt-4 [&_h3]:text-xl [&_h3]:font-bold [&_figure]:my-5 [&_figure]:overflow-hidden [&_figure]:rounded-2xl [&_figure]:bg-slate-50 [&_figure]:dark:bg-white/[0.04] [&_img]:my-0 [&_img]:max-h-[520px] [&_img]:w-full [&_img]:object-cover [&_figcaption]:px-3 [&_figcaption]:py-2 [&_figcaption]:text-xs [&_figcaption]:font-semibold [&_figcaption]:text-slate-500 [&_li]:ml-6 [&_ol]:list-decimal [&_p]:my-3 [&_pre]:overflow-x-auto [&_pre]:rounded-xl [&_pre]:bg-slate-950 [&_pre]:p-4 [&_pre]:text-slate-100 [&_ul]:list-disc"
-          data-placeholder={isId ? 'Tulis berita kamu di sini...' : 'Write your story here...'}
+          onPaste={handlePaste}
         />
       )}
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 px-4 py-2 text-xs font-semibold text-slate-500 dark:border-white/10 dark:text-slate-400">
