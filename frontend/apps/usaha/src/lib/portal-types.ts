@@ -49,6 +49,7 @@ export type PortalSection =
   | 'operations'
   | 'work'
   | 'parties'
+  | 'growth'
   | 'team'
   | 'buyerPage'
   | 'security';
