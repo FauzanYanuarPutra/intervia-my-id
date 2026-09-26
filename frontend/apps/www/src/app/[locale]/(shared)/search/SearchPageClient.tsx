@@ -1214,7 +1214,7 @@ function getSearchCartActionLabel(
   if (kind === 'tool_rental') return 'Tanya stok sewa';
   if (kind === 'business_transfer') return 'Tanya oper usaha';
   if (kind === 'umkm') return 'Buka usaha';
-  return 'Buka detail';
+  return 'Lihat detail';
 }
 
 function buildSearchCartInput(
@@ -1576,7 +1576,7 @@ function SearchResultScopeCard({
 //             'relative h-full min-h-[112px] w-full self-stretch overflow-hidden sm:min-h-[148px] xl:min-h-full',
 //             visual.imageClass,
 //           )}
-//           aria-label={isId ? 'Buka detail' : 'Open details'}
+//           aria-label={isId ? 'Lihat detail' : 'Open details'}
 //         >
 //           {previewImages.length > 0 ? (
 //             <MediaPreviewCarousel
@@ -2744,7 +2744,7 @@ export default function SearchPageClient({
       : 'Nearest to me'
     : nearbyEnabled
       ? isId
-        ? 'Lokasi belum aktif'
+        ? 'Lokasinya belum aktif'
         : 'Location not active yet'
       : isId
         ? 'Urutan biasa'
@@ -3001,7 +3001,7 @@ export default function SearchPageClient({
           throw new Error(
             (payload as { error?: string }).error ||
               (isId
-                ? 'Gagal memuat hasil pencarian'
+                ? 'Hasilnya belum bisa dimuat. Coba lagi ya'
                 : 'Failed to load search results'),
           );
         }
@@ -3107,7 +3107,7 @@ export default function SearchPageClient({
         if (!response.ok) {
           throw new Error(
             (payload as { error?: string }).error ||
-              (isId ? 'Gagal memuat usaha' : 'Failed to load businesses'),
+              (isId ? 'Data usahanya belum bisa dimuat. Coba lagi ya' : 'Failed to load businesses'),
           );
         }
 
@@ -3370,7 +3370,7 @@ export default function SearchPageClient({
   const resultsSubheading =
     loading && visibleItems.length === 0
       ? isId
-        ? 'Memuat hasil...'
+        ? 'Sebentar ya, lagi cari yang cocok...'
         : 'Loading results...'
       : isId
         ? `${sideCounts.supply} penawaran · ${sideCounts.demand} kebutuhan · ${sideCounts.reference} referensi`
