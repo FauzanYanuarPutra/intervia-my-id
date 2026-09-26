@@ -2213,7 +2213,7 @@ export default function SuperProfile() {
                   />
                 </div>
 
-                <div className="min-w-0 flex-1 pb-0 text-center sm:pb-1.5 sm:text-left">
+                <div className="min-w-0 flex-1 pb-0 text-center sm:pb-1.5 sm:text-left sm:mb-[-20px]">
                   <div className="flex min-w-0 items-center justify-center gap-1.5 sm:justify-start">
                     <h1 className="min-w-0 max-w-full truncate text-xl font-black leading-tight tracking-[-0.025em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-2xl">
                       {displayName}
