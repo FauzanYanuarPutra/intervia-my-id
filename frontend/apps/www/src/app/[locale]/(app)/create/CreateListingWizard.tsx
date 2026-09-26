@@ -7735,7 +7735,7 @@ export default function CreateListingWizard({
                   {text(
                     locale,
                     'Progres tersimpan',
-                    'Progress kamu sudah tersimpan',
+                    'Your progress is saved',
                   )}{' '}
                   {Math.min(
                     100,
