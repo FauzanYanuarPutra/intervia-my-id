@@ -3810,6 +3810,7 @@
           onWaiting={onWaiting}
           onPlaying={onPlaying}
           onCanPlay={onPlaying}
+          onEnded={onEnded}
           onError={onError}
         />
         <StudioEffectOverlay effect={studioEffect} />
