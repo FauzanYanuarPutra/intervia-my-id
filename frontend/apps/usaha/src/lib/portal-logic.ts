@@ -21,7 +21,6 @@ const sectionPermission: Partial<Record<PortalSection, PermissionId>> = {
   reports: 'viewReports',
   operations: 'viewOperations',
   work: 'viewOperations',
-  parties: 'viewOrders',
   team: 'viewTeam',
   buyerPage: 'viewBuyerPage',
   security: 'manageSecurity',
@@ -47,6 +46,9 @@ const sectionOrder: PortalSection[] = [
 
 export function visiblePortalSections(permissions: PermissionId[]): PortalSection[] {
   return sectionOrder.filter(section => {
+    if (section === 'parties') {
+      return permissions.some(permission => ['viewOrders', 'viewFinance', 'viewInventory'].includes(permission));
+    }
     const permission = sectionPermission[section];
     return !permission || permissions.includes(permission);
   });
