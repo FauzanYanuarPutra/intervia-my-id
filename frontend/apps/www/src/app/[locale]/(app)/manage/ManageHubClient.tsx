@@ -18,7 +18,6 @@ import {
   Loader2,
   Megaphone,
   MessageCircle,
-  Newspaper,
   Package,
   Plus,
   RefreshCw,
@@ -36,8 +35,6 @@ type ManageHubClientProps = {
 
 type CountState = {
   activeListings: number;
-  newsSubmissions: number;
-  newsNeedsAction: number;
   draftListings: number;
   archivedListings: number;
   communityPosts: number;
@@ -79,8 +76,6 @@ type ShortcutItem = {
 
 const EMPTY_COUNTS: CountState = {
   activeListings: 0,
-  newsSubmissions: 0,
-  newsNeedsAction: 0,
   draftListings: 0,
   archivedListings: 0,
   communityPosts: 0,
@@ -334,9 +329,6 @@ export default function ManageHubClient({ isId }: ManageHubClientProps) {
           authFetch('/api/super-app/umkm/stores?mine=1&limit=80', {
             cache: 'no-store',
           }),
-          authFetch('/api/news/submissions', {
-            cache: 'no-store',
-          }),
         ]);
 
         const responses = results.map(result =>
@@ -356,19 +348,7 @@ export default function ManageHubClient({ isId }: ManageHubClientProps) {
           transactionPayload,
           inboxPayload,
           storesPayload,
-          newsPayload,
         ] = payloads;
-
-        const newsItems = listFromPayload(newsPayload);
-        const newsNeedsAction = newsItems.filter(item => {
-          const metadata = asRecord(item.metadata);
-          const news = asRecord(metadata?.news);
-          const status =
-            typeof news?.editorial_status === 'string'
-              ? news.editorial_status.trim().toLowerCase()
-              : '';
-          return ['needs_revision', 'rejected'].includes(status);
-        }).length;
 
         const activeTransactions = listFromPayload(transactionPayload).filter(
           item => {
@@ -396,8 +376,6 @@ export default function ManageHubClient({ isId }: ManageHubClientProps) {
           activeTransactions,
           unreadChats: countUnreadInbox(inboxPayload),
           businesses: countPayload(storesPayload),
-          newsSubmissions: newsItems.length,
-          newsNeedsAction,
         });
 
         setPartialError(
@@ -447,18 +425,6 @@ export default function ManageHubClient({ isId }: ManageHubClientProps) {
       });
     }
 
-    if (counts.newsNeedsAction > 0) {
-      items.push({
-        id: 'news',
-        href: '/news/submissions',
-        title: isId ? 'Tindak lanjuti News' : 'Follow up News',
-        detail: isId
-          ? formatCount(counts.newsNeedsAction, locale) + ' kiriman perlu revisi'
-          : formatCount(counts.newsNeedsAction, locale) + ' submissions need revision',
-        icon: Newspaper,
-        priority: 'high',
-      });
-    }
 
     if (counts.draftListings > 0) {
       items.push({
@@ -474,7 +440,7 @@ export default function ManageHubClient({ isId }: ManageHubClientProps) {
     }
 
     return items.slice(0, 3);
-  }, [counts.activeTransactions, counts.draftListings, counts.newsNeedsAction, counts.unreadChats, isId, locale]);
+  }, [counts.activeTransactions, counts.draftListings, counts.unreadChats, isId, locale]);
 
   const manageItems = useMemo<ManageItem[]>(
     () => [
@@ -490,8 +456,8 @@ export default function ManageHubClient({ isId }: ManageHubClientProps) {
       {
         id: 'listing',
         href: '/my-listings',
-        title: isId ? 'Postingan' : 'Listings',
-        description: isId ? 'Produk, jasa, dan kebutuhan.' : 'Products, services, and needs.',
+        title: isId ? 'Listing' : 'Listings',
+        description: isId ? 'Yang kamu tawarkan dan yang kamu cari.' : 'What you offer and what you are looking for.',
         icon: ClipboardList,
         value: counts.activeListings + counts.draftListings + counts.archivedListings,
         valueLabel: isId ? 'total' : 'total',
@@ -535,20 +501,6 @@ export default function ManageHubClient({ isId }: ManageHubClientProps) {
         value: counts.communityPosts,
         valueLabel: isId ? 'postingan' : 'posts',
       },
-      {
-        id: 'news',
-        href: '/news/submissions',
-        title: 'News',
-        description: isId ? 'Pantau kiriman dan revisi berita.' : 'Track submissions and news revisions.',
-        icon: Newspaper,
-        value: counts.newsSubmissions,
-        valueLabel: isId ? 'kiriman' : 'submissions',
-        helper: isId
-          ? formatCount(counts.newsNeedsAction, locale) + ' perlu revisi'
-          : formatCount(counts.newsNeedsAction, locale) + ' need revision',
-        attentionValue: counts.newsNeedsAction,
-      },
-
     ],
     [
       counts.activeListings,
@@ -559,8 +511,6 @@ export default function ManageHubClient({ isId }: ManageHubClientProps) {
       counts.draftListings,
       counts.reels,
       counts.unreadChats,
-      counts.newsNeedsAction,
-      counts.newsSubmissions,
       isId,
       locale,
     ],
@@ -568,12 +518,6 @@ export default function ManageHubClient({ isId }: ManageHubClientProps) {
 
   const shortcuts = useMemo<ShortcutItem[]>(
     () => [
-      {
-        id: 'news-submit',
-        href: '/news/submit',
-        label: isId ? 'Kirim News' : 'Submit news',
-        icon: Newspaper,
-      },
       {
         id: 'promotion',
         href: '/create?mode=promotion',

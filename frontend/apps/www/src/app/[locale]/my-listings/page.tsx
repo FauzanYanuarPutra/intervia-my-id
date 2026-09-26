@@ -7,6 +7,13 @@ import { useAuth } from '@/context/AuthContext';
 import { useLocale } from 'next-intl';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { normalizeContentMediaUrl } from '@/lib/content/catalog';
+import {
+  getListingSideObjectLabel,
+  getListingSideVerbLabel,
+  resolveListingSide,
+  type ListingSide,
+} from '@/lib/content/listingSide';
+import { getExploreCategoryById, getExploreCategoryBySlug } from '@/lib/discovery/lajukanCategories';
 import { EmptyState } from '@/components/system/feedback/EmptyState';
 import { useDialog } from '@/components/system/feedback/DialogProvider';
 import {
@@ -362,6 +369,56 @@ function listingTypeLabel(value: string, locale: string): string {
     .replace(/\b\w/g, token => token.toUpperCase());
 }
 
+type ListingSideFilter = 'all' | ListingSide;
+type ListingCategoryFilter = 'all' | 'supplies' | 'service' | 'equipment' | 'property' | 'opportunity';
+
+function listingManagementCategoryId(item: ListingItem): ListingCategoryFilter {
+  const metadata = readRecord(item.metadata) || {};
+  const candidates = [
+    metadata.explore_category,
+    metadata.explore_category_slug,
+    metadata.category_slug,
+    metadata.marketplace_category,
+    metadata.category,
+  ];
+
+  for (const candidate of candidates) {
+    const value = readString(candidate).toLowerCase();
+    if (!value) continue;
+    const byId = getExploreCategoryById(value);
+    if (byId && ['supplies', 'service', 'equipment', 'property', 'opportunity'].includes(byId.id)) {
+      return byId.id as ListingCategoryFilter;
+    }
+    const bySlug = getExploreCategoryBySlug(value);
+    if (bySlug && ['supplies', 'service', 'equipment', 'property', 'opportunity'].includes(bySlug.id)) {
+      return bySlug.id as ListingCategoryFilter;
+    }
+  }
+
+  const type = payloadListingType(item);
+  if (type === 'product') return 'supplies';
+  if (type === 'service' || type === 'job' || type === 'company') return 'service';
+  if (type === 'tool_rental') return 'equipment';
+  if (type === 'property') return 'property';
+  if (type === 'business_transfer') return 'opportunity';
+  return 'all';
+}
+
+function listingManagementCategoryLabel(
+  category: ListingCategoryFilter,
+  locale: string,
+): string {
+  if (category === 'all') return locale === 'id' ? 'Semua kategori' : 'All categories';
+  const resolved = getExploreCategoryById(category);
+  if (!resolved) return category;
+  return locale === 'id' ? resolved.labelId : resolved.labelEn;
+}
+
+function listingSideFilterLabel(side: ListingSideFilter, locale: string): string {
+  if (side === 'all') return locale === 'id' ? 'Semua' : 'All';
+  return getListingSideVerbLabel(side, locale === 'id' ? 'id' : 'en');
+}
+
 function listingStatusLabel(value: string, locale: string): string {
   const normalized = value.toLowerCase();
   if (normalized === 'active') return locale === 'id' ? 'Tayang' : 'Live';
@@ -422,6 +479,8 @@ export default function MyListingsPage() {
       : 'mine';
 
   const [activeStatus, setActiveStatus] = useState<ListingStatus>('active');
+  const [sideFilter, setSideFilter] = useState<ListingSideFilter>('all');
+  const [categoryFilter, setCategoryFilter] = useState<ListingCategoryFilter>('all');
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -472,10 +531,27 @@ export default function MyListingsPage() {
 
   const filteredItems = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
-    if (!normalizedQuery) return items;
+
     return items.filter(item => {
       const rawType = item.type || item.content_type || 'listing';
       const rawStatus = item.content_status || item.status || activeStatus;
+      const side = resolveListingSide({
+        type: rawType,
+        metadata: item.metadata,
+        title: item.title,
+        summary: item.summary,
+      });
+      const category = listingManagementCategoryId(item);
+
+      if (sideFilter !== 'all' && side !== sideFilter) return false;
+      if (categoryFilter !== 'all' && category !== categoryFilter) return false;
+      if (!normalizedQuery) return true;
+
+      const sideText = [
+        getListingSideVerbLabel(side, locale === 'id' ? 'id' : 'en'),
+        getListingSideObjectLabel(side, locale === 'id' ? 'id' : 'en'),
+      ];
+
       const text = [
         item.title,
         item.summary,
@@ -484,14 +560,17 @@ export default function MyListingsPage() {
         item.content_status,
         item.status,
         listingTypeLabel(rawType, locale),
+        listingManagementCategoryLabel(category, locale),
         listingStatusLabel(rawStatus, locale),
+        ...sideText,
       ]
         .filter(Boolean)
         .join(' ')
         .toLowerCase();
+
       return text.includes(normalizedQuery);
     });
-  }, [activeStatus, items, locale, query]);
+  }, [activeStatus, categoryFilter, items, locale, query, sideFilter]);
 
   const filteredReferences = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -815,7 +894,7 @@ export default function MyListingsPage() {
             ? 'Riwayat'
             : 'History'
           : locale === 'id'
-            ? 'Kelola postingan'
+            ? 'Kelola listing'
             : 'Manage listings';
 
     const pageDescription =
@@ -828,8 +907,8 @@ export default function MyListingsPage() {
             ? 'Postingan yang baru kamu lihat.'
             : 'Listings you recently viewed.'
           : locale === 'id'
-            ? 'Edit, tayangkan, atau arsipkan dari satu tempat.'
-            : 'Edit, publish, or archive from one place.';
+            ? 'Kelola semua yang kamu tawarkan dan yang sedang kamu cari.'
+            : 'Manage everything you offer and everything you are looking for.';
 
     const closeDetails = (target: EventTarget & HTMLElement) => {
       target.closest('details')?.removeAttribute('open');
@@ -939,6 +1018,56 @@ export default function MyListingsPage() {
                 ) : null}
               </label>
             </div>
+
+            {isMine ? (
+              <div className="mt-2 flex min-w-0 gap-2 overflow-x-auto pb-0.5">
+                {(['all', 'supply', 'demand'] as ListingSideFilter[]).map(side => {
+                  const active = sideFilter === side;
+                  return (
+                    <button
+                      key={side}
+                      type="button"
+                      onClick={() => setSideFilter(side)}
+                      aria-pressed={active}
+                      className={
+                        'inline-flex min-h-9 shrink-0 items-center rounded-full px-3 text-xs font-bold transition ' +
+                        (active
+                          ? side === 'demand'
+                            ? 'bg-sky-100 text-sky-800'
+                            : side === 'supply'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : 'bg-slate-900 text-white'
+                          : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50')
+                      }
+                    >
+                      {listingSideFilterLabel(side, locale)}
+                    </button>
+                  );
+                })}
+
+                <span className="my-1 w-px shrink-0 bg-slate-200" aria-hidden="true" />
+
+                {(['all', 'supplies', 'service', 'equipment', 'property', 'opportunity'] as ListingCategoryFilter[]).map(category => {
+                  const active = categoryFilter === category;
+                  return (
+                    <button
+                      key={category}
+                      type="button"
+                      onClick={() => setCategoryFilter(category)}
+                      aria-pressed={active}
+                      className={
+                        'inline-flex min-h-9 shrink-0 items-center rounded-full px-3 text-xs font-bold transition ' +
+                        (active
+                          ? 'bg-emerald-700 text-white'
+                          : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50')
+                      }
+                    >
+                      {listingManagementCategoryLabel(category, locale)}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
           </header>
 
           {error ? (
@@ -1022,6 +1151,17 @@ export default function MyListingsPage() {
                     const id = parseId(item.id);
                     const rawType = item.type || item.content_type || 'listing';
                     const typeLabel = listingTypeLabel(rawType, locale);
+                    const itemSide = resolveListingSide({
+                      type: rawType,
+                      metadata: item.metadata,
+                      title: item.title,
+                      summary: item.summary,
+                    });
+                    const itemCategory = listingManagementCategoryId(item);
+                    const itemSideLabel = getListingSideVerbLabel(
+                      itemSide,
+                      locale === 'id' ? 'id' : 'en',
+                    );
                     const rawStatus = item.content_status || item.status || activeStatus;
                     const normalizedStatus = rawStatus.toLowerCase();
                     const cardStatus: ListingStatus =
@@ -1087,8 +1227,11 @@ export default function MyListingsPage() {
                                 >
                                   {item.title || (locale === 'id' ? 'Tanpa judul' : 'Untitled')}
                                 </Link>
-                                <p className="mt-1 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[10px] font-semibold text-slate-500 dark:text-slate-400 sm:text-[11px]">
-                                  <span>{typeLabel}</span>
+                                <p className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-[10px] font-semibold text-slate-500 dark:text-slate-400 sm:text-[11px]">
+                                  <span className={`rounded-full px-2 py-0.5 font-black ${itemSide === 'demand' ? 'bg-sky-50 text-sky-700' : 'bg-emerald-50 text-emerald-700'}`}>
+                                    {itemSideLabel}
+                                  </span>
+                                  <span>{listingManagementCategoryLabel(itemCategory, locale)}</span>
                                   <span aria-hidden="true">•</span>
                                   <span>{formatDate(item.updated_at || item.created_at)}</span>
                                   {activityLabel && cardStatus === 'active' ? (
