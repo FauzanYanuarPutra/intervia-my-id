@@ -58,6 +58,7 @@ export const portalSectionVisual: Record<PortalSection, PortalSectionVisual> = {
   reports: { icon: BarChart3, ...roles.money },
   channels: { icon: Globe, ...roles.sale },
   operations: { icon: ClipboardList, ...roles.system },
+  work: { icon: ClipboardCheck, ...roles.system },
   info: { icon: Settings2, ...roles.system },
   locations: { icon: MapPinned, ...roles.system },
   buyerPage: { icon: Eye, ...roles.catalog },
