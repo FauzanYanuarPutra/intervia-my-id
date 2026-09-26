@@ -78,6 +78,7 @@ describe('portal navigation', () => {
     expect(labels.reports).toBe('Laporan');
     expect(labels.channels).toBe('Kanal Jual');
     expect(labels.info).toBe('Pengaturan Usaha');
+    expect(labels.work).toBe('Pekerjaan');
     expect(labels.team).toBe('Tim & Akses');
     expect(labels.buyerPage).toBe('Tampilan Toko');
     expect(portalMenuNavigation(ownerPermissions).some(item => item.id === 'operations')).toBe(true);
