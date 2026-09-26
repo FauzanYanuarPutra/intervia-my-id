@@ -1574,22 +1574,63 @@ export function UmkmDiscoveryPanel({
     referenceNextOffset,
   ]);
   useEffect(() => {
-    const targetSlug = selectedSlug?.trim();
-    const targetStoreId = selectedStoreIdInitial?.trim();
-    if (!targetSlug && !targetStoreId) return;
-    const matchedStore = visibleStores.find(
-      item =>
-        (targetSlug && item.store.slug === targetSlug) ||
-        (targetStoreId && item.store.id === targetStoreId),
-    );
-    if (!matchedStore) return;
-    setSelectedStoreId(matchedStore.store.id);
-    setMapFocusMode('selected');
-    setMapFocusNonce(current => current + 1);
+    const syncSelectionFromUrl = () => {
+      if (typeof window === 'undefined') return;
+
+      const params = new URL(window.location.href).searchParams;
+      const targetSlug =
+        params.get('store')?.trim() ||
+        selectedSlug?.trim() ||
+        params.get('business')?.trim() ||
+        '';
+      const targetStoreId =
+        params.get('storeId')?.trim() ||
+        selectedStoreIdInitial?.trim() ||
+        '';
+
+      const matchedStore = visibleStores.find(
+        item =>
+          (targetSlug && item.store.slug === targetSlug) ||
+          (targetStoreId && item.store.id === targetStoreId),
+      );
+
+      if (!matchedStore) {
+        if (!targetSlug && !targetStoreId) {
+          setSelectedStoreId(current => {
+            if (current === null) return current;
+            setShowRoute(false);
+            setRouteSummary(null);
+            setMapFocusMode('stores');
+            setMapFocusNonce(value => value + 1);
+            return null;
+          });
+        }
+        return;
+      }
+
+      setSelectedStoreId(current =>
+        current === matchedStore.store.id ? current : matchedStore.store.id,
+      );
+      setShowRoute(false);
+      setRouteSummary(null);
+      setMapFocusMode('selected');
+      setMapFocusNonce(current => current + 1);
+      setSheetExpanded(true);
+      setMapOnly(false);
+    };
+
+    syncSelectionFromUrl();
+    window.addEventListener('popstate', syncSelectionFromUrl);
+    return () => window.removeEventListener('popstate', syncSelectionFromUrl);
   }, [selectedSlug, selectedStoreIdInitial, visibleStores]);
 
   useEffect(() => {
     setListPage(1);
+    setSelectedStoreId(null);
+    setShowRoute(false);
+    setRouteSummary(null);
+    setMapFocusMode('stores');
+    setMapFocusNonce(current => current + 1);
     setSheetExpanded(variant === 'immersive');
   }, [category, city, query, variant]);
 
@@ -1618,22 +1659,70 @@ export function UmkmDiscoveryPanel({
 
   const handleSelectStore = useCallback(
     (storeId: string, options?: { scrollToPreview?: boolean }) => {
+      const store = visibleStores.find(item => item.store.id === storeId)?.store;
+      if (!store) return;
+
       pendingScrollStoreIdRef.current = options?.scrollToPreview
         ? storeId
         : null;
+
       if (variant === 'immersive') {
         setSheetExpanded(true);
         setMapOnly(false);
       }
+
       setShowRoute(false);
       setRouteSummary(null);
       setMapFocusMode('selected');
       setMapFocusNonce(current => current + 1);
-      if (selectedStoreId === storeId) return;
       setSelectedStoreId(storeId);
+
+      if (typeof window !== 'undefined') {
+        const url = new URL(window.location.href);
+        const selectionKey = store.slug?.trim() || store.id;
+        const currentSelection =
+          url.searchParams.get('store')?.trim() ||
+          url.searchParams.get('storeId')?.trim() ||
+          url.searchParams.get('business')?.trim() ||
+          '';
+
+        url.searchParams.set('view', 'map');
+        url.searchParams.set('store', selectionKey);
+        url.searchParams.delete('storeId');
+        url.searchParams.delete('business');
+
+        if (currentSelection !== selectionKey) {
+          window.history.pushState(
+            { ...window.history.state, umkmStore: selectionKey },
+            '',
+            url.pathname + url.search,
+          );
+        }
+      }
     },
-    [selectedStoreId, variant],
+    [variant, visibleStores],
   );
+
+  const handleClearSelectedStore = useCallback(() => {
+    setSelectedStoreId(null);
+    setShowRoute(false);
+    setRouteSummary(null);
+    setMapFocusMode('stores');
+    setMapFocusNonce(current => current + 1);
+
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('store');
+      url.searchParams.delete('storeId');
+      url.searchParams.delete('business');
+      url.searchParams.set('view', 'map');
+      window.history.replaceState(
+        { ...window.history.state, umkmStore: null },
+        '',
+        url.pathname + url.search,
+      );
+    }
+  }, []);
   const handleMapSelectStore = useCallback(
     (storeId: string) => {
       handleSelectStore(storeId, { scrollToPreview: true });
@@ -1793,6 +1882,7 @@ export function UmkmDiscoveryPanel({
             onSelectStore={
               edgeToEdge ? handleEdgeMapSelectStore : handleMapSelectStore
             }
+            showPopups={false}
             className={className}
           />
           <div
@@ -2001,16 +2091,12 @@ export function UmkmDiscoveryPanel({
               >
                 <button
                   type="button"
-                  onClick={() => {
-                    setSelectedStoreId(null);
-                    setShowRoute(false);
-                    setRouteSummary(null);
-                    setMapFocusMode('stores');
-                    setMapFocusNonce(current => current + 1);
-                  }}
-                  className="mb-2 inline-flex min-h-7 items-center rounded-full bg-slate-100 px-2.5 text-[10px] font-semibold text-slate-600 transition hover:bg-slate-200 hover:text-slate-900 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+                  onClick={handleClearSelectedStore}
+                  className="mb-2 inline-flex min-h-7 items-center gap-1 rounded-full bg-slate-100 px-2.5 text-[10px] font-semibold text-slate-600 transition hover:bg-slate-200 hover:text-slate-900 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+                  aria-label={isId ? 'Kembali ke hasil peta' : 'Back to map results'}
                 >
-                  {isId ? '← Kembali ke hasil' : '← Back to results'}
+                  <ChevronLeft className="h-3.5 w-3.5" aria-hidden="true" />
+                  {isId ? 'Kembali' : 'Back'}
                 </button>
                 <article
                   className="space-y-3 bg-transparent p-0 shadow-none ring-0"
@@ -2020,58 +2106,55 @@ export function UmkmDiscoveryPanel({
                       : 'umkm-selected-business'
                   }
                 >
-                  <div className="grid min-w-0 grid-cols-[72px_minmax(0,1fr)] gap-2.5 sm:grid-cols-[78px_minmax(0,1fr)]">
-                    <div className="relative">
-                      <PlaceThumb
-                        src={
-                          selectedPlace.ui.gallery[0] ||
-                          selectedPlace.ui.coverImage
-                        }
-                        alt={selectedPlace.store.name}
-                        className="h-[64px] w-[64px] rounded-xl sm:h-[68px] sm:w-[68px]"
-                      />
-                      <span
-                        className={cn(
-                          'absolute -bottom-1 left-1/2 inline-flex -translate-x-1/2 whitespace-nowrap rounded-full px-2 py-0.5 text-[9px] font-bold shadow-sm ',
-                          selectedIsPublicReference
-                            ? 'bg-sky-600/94 text-white'
-                            : selectedPlace.ui.openNow === true
-                              ? 'bg-emerald-500/94 text-white'
-                              : selectedPlace.ui.openNow === false
-                                ? 'bg-slate-700/88 text-white'
-                                : 'bg-amber-100 text-amber-800',
-                        )}
-                      >
-                        {selectedOpenStatus?.label}
+                  <div className="min-w-0">
+                    <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-[10px] font-bold text-[color:var(--app-text-soft)]">
+                      <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-200">
+                        {selectedPlace.ui.kindLabel}
                       </span>
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex min-w-0 items-center gap-1.5 text-[10px] font-bold text-[color:var(--app-text-soft)]">
-                        <span className="truncate rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-200">
-                          {selectedPlace.ui.kindLabel}
-                        </span>
-                        {selectedIsPublicReference ? (
-                          <PublicReferenceBadge isId={isId} />
-                        ) : selectedTrustProfile ? (
-                          <TrustStatusChip
-                            profile={selectedTrustProfile}
-                            compact
+                      {selectedIsPublicReference ? (
+                        <PublicReferenceBadge isId={isId} compact />
+                      ) : selectedTrustProfile ? (
+                        <TrustStatusChip profile={selectedTrustProfile} compact />
+                      ) : null}
+                      {selectedOpenStatus ? (
+                        <span
+                          className={cn(
+                            'inline-flex items-center gap-1',
+                            selectedPlace.ui.openNow === true
+                              ? 'text-emerald-700 dark:text-emerald-300'
+                              : selectedPlace.ui.openNow === false
+                                ? 'text-slate-600 dark:text-slate-300'
+                                : 'text-amber-700 dark:text-amber-300',
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              'h-1.5 w-1.5 rounded-full',
+                              selectedPlace.ui.openNow === true
+                                ? 'bg-emerald-500'
+                                : selectedPlace.ui.openNow === false
+                                  ? 'bg-slate-400'
+                                  : 'bg-amber-400',
+                            )}
                           />
-                        ) : null}
+                          {selectedOpenStatus.label}
+                        </span>
+                      ) : null}
+                      {selectedLocationLabel ? (
                         <span className="inline-flex min-w-0 items-center gap-1">
                           <MapPin className="h-3 w-3 shrink-0 text-[color:var(--app-accent)]" />
-                          <span className="truncate">
-                            {selectedLocationLabel}
-                          </span>
+                          <span className="truncate">{selectedLocationLabel}</span>
                         </span>
-                      </div>
-                      <h3 className="mt-1 line-clamp-2 text-[1.02rem] font-bold leading-tight tracking-[-0.035em] text-[color:var(--app-text)]">
-                        {selectedPlace.store.name}
-                      </h3>
-                      <p className="mt-1 line-clamp-1 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
-                        {selectedAddressLabel}
-                      </p>
+                      ) : null}
                     </div>
+
+                    <h3 className="mt-1.5 line-clamp-2 text-[1.08rem] font-bold leading-tight tracking-[-0.035em] text-[color:var(--app-text)]">
+                      {selectedPlace.store.name}
+                    </h3>
+
+                    <p className="mt-1 line-clamp-2 text-[11px] font-semibold leading-4 text-[color:var(--app-text-soft)]">
+                      {selectedAddressLabel}
+                    </p>
                   </div>
 
                   <div
@@ -2093,11 +2176,11 @@ export function UmkmDiscoveryPanel({
                       <span className="truncate">
                         {selectedIsPublicReference
                           ? isId
-                            ? 'Lihat referensi'
-                            : 'View reference'
+                            ? 'Lihat sumber'
+                            : 'View source'
                           : isId
-                            ? 'Lihat usaha'
-                            : 'View business'}
+                            ? 'Buka usaha'
+                            : 'Open business'}
                       </span>
                     </Link>
                     {selectedIsPublicReference &&
