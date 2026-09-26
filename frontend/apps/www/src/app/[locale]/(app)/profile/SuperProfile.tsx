@@ -1849,8 +1849,19 @@ export default function SuperProfile() {
         metadata: {
           ...mergedMetadata,
           media: nextMedia,
-          ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
-          ...(coverUrl ? { cover_image: coverUrl } : {}),
+          ...(avatarUrl
+            ? {
+                avatar_url: avatarUrl,
+                avatar_source: 'user_upload',
+                avatar_updated_at: new Date().toISOString(),
+              }
+            : {}),
+          ...(coverUrl
+            ? {
+                cover_image: coverUrl,
+                cover_updated_at: new Date().toISOString(),
+              }
+            : {}),
         },
       };
 
