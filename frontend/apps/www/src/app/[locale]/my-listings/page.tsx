@@ -460,8 +460,6 @@ export default function MyListingsPage() {
   const [updatingStatusId, setUpdatingStatusId] = useState('');
   const [deletingDraftId, setDeletingDraftId] = useState('');
   const [activityNotice, setActivityNotice] = useState('');
-  const createHref = '/create';
-  const createLabel = locale === 'id' ? 'Buat baru' : 'Create new';
 
   const statusTabs = useMemo(
     () => [
