@@ -4,6 +4,7 @@ import {
   ArrowRight,
   BanknoteArrowDown,
   Building2,
+  BriefcaseBusiness,
   PackagePlus,
   ShoppingBag,
   Store,
@@ -28,6 +29,7 @@ import { getSetupSteps, getStatusCopy, hasPermission } from '@/lib/portal-logic'
 import { getFinanceCoreSummary } from '@/lib/finance-core-server';
 import { listBusinessWork } from '@/lib/business-work-server';
 import { resolvePortalHomeState } from '@/lib/portal-server';
+import { businessHasCapability } from '@/lib/business-templates';
 
 const money = new Intl.NumberFormat('id-ID', {
   style: 'currency',
@@ -116,6 +118,31 @@ export default async function HomePage({
   const canViewChannels = hasPermission(business, 'viewChannels');
   const canManageInfo = hasPermission(business, 'manageInfo');
   const canManageInventory = hasPermission(business, 'manageInventory');
+  const hasInventory = businessHasCapability(
+    {
+      templateKey: business.templateKey ?? business.profile?.templateKey,
+      activeCapabilityKeys: business.activeCapabilityKeys,
+      category: business.category,
+    },
+    'inventory',
+  );
+  const hasWorkFlow =
+    businessHasCapability(
+      {
+        templateKey: business.templateKey ?? business.profile?.templateKey,
+        activeCapabilityKeys: business.activeCapabilityKeys,
+        category: business.category,
+      },
+      'work_orders',
+    ) ||
+    businessHasCapability(
+      {
+        templateKey: business.templateKey ?? business.profile?.templateKey,
+        activeCapabilityKeys: business.activeCapabilityKeys,
+        category: business.category,
+      },
+      'appointments',
+    );
 
   const { ingredients, financeEntries, channels } = await settleHomeControlData({
     ingredients: canViewCosting
@@ -209,9 +236,19 @@ export default async function HomePage({
             <BanknoteArrowDown className="h-5 w-5 sm:h-4 sm:w-4" /> Catat pengeluaran
           </Link>
         ) : null}
-        <Link href={`/businesses/${business.id}/inventory`} className="merchant-action-stock min-h-14 flex-col gap-1 px-2 text-xs sm:flex-row sm:text-sm">
-          <PackagePlus className="h-5 w-5 sm:h-4 sm:w-4" /> {canManageInventory ? 'Tambah stok' : 'Stok'}
-        </Link>
+        {hasInventory ? (
+          <Link href={`/businesses/${business.id}/inventory`} className="merchant-action-stock min-h-14 flex-col gap-1 px-2 text-xs sm:flex-row sm:text-sm">
+            <PackagePlus className="h-5 w-5 sm:h-4 sm:w-4" /> {canManageInventory ? 'Tambah stok' : 'Stok'}
+          </Link>
+        ) : hasWorkFlow ? (
+          <Link href={`/businesses/${business.id}/work`} className="merchant-action-stock min-h-14 flex-col gap-1 px-2 text-xs sm:flex-row sm:text-sm">
+            <BriefcaseBusiness className="h-5 w-5 sm:h-4 sm:w-4" /> Pekerjaan
+          </Link>
+        ) : (
+          <Link href={`/businesses/${business.id}/products`} className="merchant-action-stock min-h-14 flex-col gap-1 px-2 text-xs sm:flex-row sm:text-sm">
+            <Store className="h-5 w-5 sm:h-4 sm:w-4" /> Kelola katalog
+          </Link>
+        )}
       </section>
 
       <MetricStrip items={dashboard.metrics.map(metric => ({

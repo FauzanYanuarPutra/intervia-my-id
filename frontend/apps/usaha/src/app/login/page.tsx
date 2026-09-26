@@ -76,7 +76,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             <div className="mt-5 divide-y divide-portal-line/70 border-t border-portal-line/70">
               {[
                 'Tidak perlu membuat password baru',
-                'Akses usaha mengikuti peran yang diberikan',
+                'Tim dan cabang bisa ditambahkan saat usaha berkembang',
                 'Satu akun untuk Lajukan dan Lajukan Usaha',
               ].map(item => (
                 <div key={item} className="flex min-h-11 items-center gap-2.5 py-2.5 text-xs font-semibold text-portal-soft">

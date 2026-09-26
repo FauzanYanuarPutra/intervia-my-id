@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import type { BusinessRecord, PortalSection } from '@/lib/portal-types';
 import { getSetupSteps } from '@/lib/portal-logic';
+import { businessHasCapability } from '@/lib/business-templates';
 
 type GuideStep = {
   id: string;
@@ -17,75 +18,125 @@ type UsahaFlowGuideProps = {
 
 const href = (businessId: string, path = '') => '/businesses/' + businessId + path;
 
+function businessKind(business: BusinessRecord) {
+  const template = business.templateKey ?? business.profile?.templateKey ?? 'general';
+  const category = business.category.trim().toLocaleLowerCase('id-ID');
+
+  switch (template) {
+    case 'juice_fnb':
+      return 'food';
+    case 'mart_retail':
+      return 'retail';
+    case 'laundry':
+    case 'ac_field_service':
+      return 'service';
+    default:
+      if (/jasa|servis|service|konsultan|laundry|teknisi/.test(category)) return 'service';
+      if (/makanan|minuman|f&b|kopi|cafe|resto|kuliner/.test(category)) return 'food';
+      if (/toko|retail|grosir|distributor|dagang/.test(category)) return 'retail';
+      return 'general';
+  }
+}
+
 function stepsFor(business: BusinessRecord, section: PortalSection): GuideStep[] {
   const id = business.id;
+  const kind = businessKind(business);
+  const hasInventory = businessHasCapability(
+    {
+      templateKey: business.templateKey ?? business.profile?.templateKey,
+      activeCapabilityKeys: business.activeCapabilityKeys,
+      category: business.category,
+    },
+    'inventory',
+  );
+  const catalogNoun =
+    kind === 'food' ? 'menu' :
+    kind === 'service' ? 'layanan' :
+    kind === 'retail' ? 'produk' :
+    'produk atau layanan';
 
   switch (section) {
     case 'products':
-      return [
-        { id: 'products', label: 'Tambah barang', hint: 'Nama + harga dulu.', href: href(id, '/products') },
-        { id: 'hpp', label: 'Hitung modal', hint: 'Masukkan bahan yang dipakai.', href: href(id, '/products/hpp') },
-        { id: 'sell', label: 'Mulai jual', hint: 'Pakai Kasir setelah produk siap.', href: href(id, '/orders') },
-      ];
+      return kind === 'service'
+        ? [
+            { id: 'services', label: 'Tambah layanan', hint: 'Nama + harga dulu.', href: href(id, '/products') },
+            { id: 'work', label: 'Atur pekerjaan', hint: 'Gunakan alur kerja saat order masuk.', href: href(id, '/work') },
+            { id: 'sell', label: 'Catat transaksi', hint: 'Simpan pembayaran setelah pekerjaan selesai.', href: href(id, '/orders') },
+          ]
+        : [
+            { id: 'products', label: `Tambah ${catalogNoun}`, hint: 'Nama + harga dulu.', href: href(id, '/products') },
+            ...(kind === 'food'
+              ? [{ id: 'cost', label: 'Hitung modal', hint: 'Lengkapi bahan bila ingin menghitung laba.', href: href(id, '/products/hpp') }]
+              : []),
+            { id: 'sell', label: 'Mulai jualan', hint: 'Catat transaksi saat pelanggan membeli.', href: href(id, '/orders') },
+          ];
     case 'inventory':
       return [
-        { id: 'stock', label: 'Cek stok', hint: 'Tangani yang tipis/habis.', href: href(id, '/inventory') },
-        { id: 'ingredients', label: 'Rapikan bahan', hint: 'Harga beli + satuan dipakai untuk HPP.', href: href(id, '/inventory?tab=ingredients') },
-        { id: 'hpp', label: 'Pakai di HPP', hint: 'Bahan siap dipilih di resep.', href: href(id, '/products/hpp') },
+        { id: 'stock', label: 'Cek stok', hint: 'Tangani yang tipis atau habis dulu.', href: href(id, '/inventory') },
+        { id: 'purchase', label: 'Tambah stok', hint: 'Catat barang yang baru masuk.', href: href(id, '/inventory?tab=purchase') },
+        { id: 'review', label: 'Cocokkan', hint: 'Pastikan jumlah di Lajukan sesuai kondisi nyata.', href: href(id, '/inventory') },
       ];
     case 'orders':
-      return [
-        { id: 'open', label: 'Buka kas', hint: 'Pastikan shift siap bila dipakai.', href: href(id, '/orders') },
-        { id: 'sell', label: 'Catat jualan', hint: 'Tap produk, atur pesanan, bayar.', href: href(id, '/orders') },
-        { id: 'close', label: 'Tutup & cek', hint: 'Pastikan transaksi dan kas cocok.', href: href(id, '/orders?view=transaksi') },
-      ];
+      return kind === 'service'
+        ? [
+            { id: 'receive', label: 'Terima order', hint: 'Catat kebutuhan pelanggan.', href: href(id, '/orders') },
+            { id: 'work', label: 'Kerjakan', hint: 'Pantau pekerjaan dan orang yang menangani.', href: href(id, '/work') },
+            { id: 'finish', label: 'Selesaikan & bayar', hint: 'Tutup pekerjaan setelah beres.', href: href(id, '/orders') },
+          ]
+        : [
+            { id: 'open', label: 'Siap jualan', hint: 'Kasir siap dipakai saat transaksi masuk.', href: href(id, '/orders') },
+            { id: 'sell', label: 'Catat jualan', hint: `Tap ${catalogNoun}, atur jumlah, lalu bayar.`, href: href(id, '/orders') },
+            { id: 'review', label: 'Cek transaksi', hint: 'Pastikan semua jualan hari ini sudah tersimpan.', href: href(id, '/orders?view=transaksi') },
+          ];
     case 'finance':
       return [
-        { id: 'income', label: 'Catat uang masuk', hint: 'Gunakan penjualan yang sudah tercatat.', href: href(id, '/finance') },
-        { id: 'expense', label: 'Catat uang keluar', hint: 'Simpan biaya saat terjadi.', href: href(id, '/finance') },
-        { id: 'review', label: 'Cek saldo', hint: 'Bandingkan dengan kas nyata.', href: href(id, '/reports') },
+        { id: 'income', label: 'Uang masuk', hint: 'Jualan yang dicatat akan masuk otomatis.', href: href(id, '/finance') },
+        { id: 'expense', label: 'Uang keluar', hint: 'Catat biaya saat benar-benar terjadi.', href: href(id, '/finance') },
+        { id: 'review', label: 'Cek hasil', hint: 'Lihat saldo dan angka yang sudah tercatat.', href: href(id, '/reports') },
       ];
     case 'channels':
       return [
-        { id: 'choose', label: 'Pilih kanal', hint: 'Aktifkan yang benar-benar dipakai.', href: href(id, '/channels') },
-        { id: 'price', label: 'Atur harga online', hint: 'Hitung setelah HPP siap.', href: href(id, '/channels') },
-        { id: 'test', label: 'Cek hasil', hint: 'Pastikan harga masih masuk akal.', href: href(id, '/reports') },
+        { id: 'choose', label: 'Pilih tempat jual', hint: 'Aktifkan yang benar-benar kamu gunakan.', href: href(id, '/channels') },
+        { id: 'price', label: 'Atur harga online', hint: 'Sesuaikan harga dengan potongan kanal.', href: href(id, '/channels') },
+        { id: 'test', label: 'Cek hasil', hint: 'Pastikan harga dan hasilnya masih masuk akal.', href: href(id, '/reports') },
       ];
     case 'info':
       return [
-        { id: 'identity', label: 'Profil usaha', hint: 'Nama, kategori, kontak.', href: href(id, '/info') },
-        { id: 'location', label: 'Lokasi', hint: 'Pastikan alamat + pin benar.', href: href(id, '/locations') },
-        { id: 'store', label: 'Tampilan toko', hint: 'Cek apa yang dilihat pelanggan.', href: href(id, '/buyer-page') },
+        { id: 'identity', label: 'Profil usaha', hint: 'Nama, kategori, dan kontak.', href: href(id, '/info') },
+        { id: 'location', label: 'Lokasi', hint: 'Alamat + pin harus tepat.', href: href(id, '/locations') },
+        { id: 'store', label: 'Tampilan pelanggan', hint: 'Cek halaman yang dilihat pelanggan.', href: href(id, '/buyer-page') },
       ];
     case 'locations':
       return [
-        { id: 'one', label: 'Lokasi utama', hint: 'Pastikan minimal satu outlet utama.', href: href(id, '/locations') },
+        { id: 'one', label: 'Lokasi utama', hint: 'Pastikan outlet atau area utama sudah benar.', href: href(id, '/locations') },
         { id: 'map', label: 'Pin tepat', hint: 'Geser marker bila perlu.', href: href(id, '/locations') },
         { id: 'store', label: 'Cek publik', hint: 'Pastikan pelanggan mudah menemukan.', href: href(id, '/buyer-page') },
       ];
     case 'operations':
       return [
-        { id: 'status', label: 'Status buka/tutup', hint: 'Sesuaikan kondisi hari ini.', href: href(id, '/operations') },
-        { id: 'schedule', label: 'Jam usaha', hint: 'Tulis jam yang realistis.', href: href(id, '/operations') },
-        { id: 'stock', label: 'Cek gangguan', hint: 'Tangani stok yang menghambat jualan.', href: href(id, '/inventory') },
+        { id: 'status', label: 'Buka / tutup', hint: 'Sesuaikan kondisi usaha hari ini.', href: href(id, '/operations') },
+        { id: 'schedule', label: 'Jam usaha', hint: 'Tulis jam yang benar-benar berlaku.', href: href(id, '/operations') },
+        ...(hasInventory
+          ? [{ id: 'stock', label: 'Cek stok', hint: 'Tangani stok yang menghambat jualan.', href: href(id, '/inventory') }]
+          : [{ id: 'work', label: 'Cek pekerjaan', hint: 'Pastikan pekerjaan yang berjalan tidak tertinggal.', href: href(id, '/work') }]),
       ];
     case 'team':
       return [
-        { id: 'invite', label: 'Undang anggota', hint: 'Cari username Lajukan.', href: href(id, '/team') },
-        { id: 'role', label: 'Pilih peran', hint: 'Kasir, manager, atau pantau.', href: href(id, '/team') },
-        { id: 'access', label: 'Cek akses', hint: 'Pastikan tugas sesuai perannya.', href: href(id, '/team') },
+        { id: 'invite', label: 'Undang anggota', hint: 'Tambahkan orang yang membantu usaha.', href: href(id, '/team') },
+        { id: 'role', label: 'Pilih peran', hint: 'Atur siapa mengerjakan apa.', href: href(id, '/team') },
+        { id: 'access', label: 'Cek akses', hint: 'Pastikan akses sesuai tugas.', href: href(id, '/team') },
       ];
     case 'reports':
       return [
         { id: 'sales', label: 'Penjualan', hint: 'Pastikan transaksi sudah tercatat.', href: href(id, '/orders?view=transaksi') },
-        { id: 'cost', label: 'HPP', hint: 'Lengkapi bahan agar laba tidak kosong.', href: href(id, '/products/hpp') },
+        { id: 'cost', label: kind === 'service' ? 'Biaya' : 'Modal', hint: 'Lengkapi data biaya bila ingin melihat hasil yang lebih lengkap.', href: kind === 'food' ? href(id, '/products/hpp') : href(id, '/finance') },
         { id: 'review', label: 'Baca hasil', hint: 'Lihat angka yang benar-benar tercatat.', href: href(id, '/reports') },
       ];
     case 'buyerPage':
       return [
         { id: 'profile', label: 'Profil', hint: 'Nama, kontak, dan deskripsi.', href: href(id, '/info') },
-        { id: 'products', label: 'Produk', hint: 'Pastikan produk aktif dan harganya benar.', href: href(id, '/products') },
-        { id: 'publish', label: 'Buka toko', hint: 'Bagikan storefront setelah siap.', href: business.publicUrl },
+        { id: 'catalog', label: `${catalogNoun[0].toUpperCase()}${catalogNoun.slice(1)}`, hint: 'Pastikan yang ditampilkan sudah benar.', href: href(id, '/products') },
+        { id: 'publish', label: 'Buka halaman', hint: 'Bagikan halaman usaha saat sudah siap.', href: business.publicUrl },
       ];
     case 'home':
     default: {
@@ -97,15 +148,25 @@ function stepsFor(business: BusinessRecord, section: PortalSection): GuideStep[]
           : next?.id === 'products'
             ? href(id, '/products')
             : href(id, '/info');
+
+      if (kind === 'service') {
+        return [
+          { id: 'profile', label: next?.id === 'products' ? 'Isi layanan' : 'Rapikan dasar', hint: next?.hint ?? 'Profil usaha sudah siap.', href: nextHref },
+          { id: 'work', label: 'Siapkan pekerjaan', hint: 'Buat layanan lalu gunakan alur kerja saat order datang.', href: href(id, '/work') },
+          { id: 'sell', label: 'Terima transaksi', hint: 'Catat pembayaran setelah pekerjaan selesai.', href: href(id, '/orders') },
+        ];
+      }
+
       return [
         { id: 'profile', label: 'Rapikan dasar', hint: next?.label ?? 'Profil usaha sudah siap.', href: nextHref },
-        { id: 'product', label: 'Isi barang', hint: 'Nama + harga sudah cukup untuk mulai.', href: href(id, '/products') },
-        { id: 'sell', label: 'Mulai jual', hint: 'Pakai Kasir saat siap.', href: href(id, '/orders') },
+        { id: 'catalog', label: kind === 'food' ? 'Isi menu' : kind === 'retail' ? 'Isi produk' : 'Isi katalog', hint: 'Nama + harga sudah cukup untuk mulai.', href: href(id, '/products') },
+        ...(hasInventory
+          ? [{ id: 'stock', label: 'Cek stok', hint: 'Pastikan yang dijual tersedia.', href: href(id, '/inventory') }]
+          : [{ id: 'sell', label: 'Mulai transaksi', hint: 'Catat jualan saat pelanggan membeli.', href: href(id, '/orders') }]),
       ];
     }
   }
 }
-
 export function UsahaFlowGuide({ business, currentSection }: UsahaFlowGuideProps) {
   const steps = stepsFor(business, currentSection);
 

@@ -82,4 +82,32 @@ describe('portal navigation', () => {
     expect(labels.buyerPage).toBe('Tampilan Toko');
     expect(portalMenuNavigation(ownerPermissions).some(item => item.id === 'operations')).toBe(true);
   });
+
+  it('keeps inventory out of the primary menu for service businesses', () => {
+    const serviceBusiness = {
+      templateKey: 'laundry',
+      activeCapabilityKeys: ['business_core', 'catalog', 'services', 'customers', 'sales', 'payments', 'finance_basic', 'reporting'],
+    };
+    expect(desktopPrimaryNavigation(ownerPermissions, serviceBusiness).map(item => item.id)).toEqual([
+      'home',
+      'orders',
+      'products',
+      'finance',
+    ]);
+    expect(portalMenuNavigation(ownerPermissions, serviceBusiness).map(item => item.id)).not.toContain('inventory');
+  });
+
+  it('keeps stock prominent for businesses that actually manage stock', () => {
+    const retailBusiness = {
+      templateKey: 'mart_retail',
+      activeCapabilityKeys: ['business_core', 'catalog', 'inventory', 'sales', 'payments', 'finance_basic', 'reporting'],
+    };
+    expect(desktopPrimaryNavigation(ownerPermissions, retailBusiness).map(item => item.id)).toEqual([
+      'home',
+      'orders',
+      'products',
+      'inventory',
+      'finance',
+    ]);
+  });
 });

@@ -18,8 +18,8 @@ export type BusinessTemplatePreset = {
 export const BUSINESS_TEMPLATE_PRESETS: readonly BusinessTemplatePreset[] = [
   {
     key: 'juice_fnb',
-    label: 'Juice / F&B',
-    description: 'Menu, bahan, resep, stok, kasir, delivery, dan tutup hari.',
+    label: 'Makanan & Minuman',
+    description: 'Cocok untuk makanan, minuman, kedai, warung, dan usaha sejenis.',
     defaultCategory: 'Makanan dan minuman',
     legacyCapabilityKey: 'food_beverage',
     quickStart: ['Tambah menu', 'Tambah bahan', 'Isi stok', 'Mulai jualan'],
@@ -45,8 +45,8 @@ export const BUSINESS_TEMPLATE_PRESETS: readonly BusinessTemplatePreset[] = [
   },
   {
     key: 'mart_retail',
-    label: 'Mart / Retail',
-    description: 'Produk, barcode, stok, pembelian, kasir, settlement, dan tutup hari.',
+    label: 'Toko & Retail',
+    description: 'Cocok untuk toko, kios, minimarket, grosir, dan penjualan barang.',
     defaultCategory: 'Retail',
     legacyCapabilityKey: 'retail',
     quickStart: ['Tambah atau import produk', 'Isi stok', 'Buka kasir'],
@@ -54,8 +54,8 @@ export const BUSINESS_TEMPLATE_PRESETS: readonly BusinessTemplatePreset[] = [
   },
   {
     key: 'general',
-    label: 'Usaha umum',
-    description: 'Fondasi sederhana untuk usaha lain; fitur lanjutan dapat diaktifkan kemudian.',
+    label: 'Usaha lainnya',
+    description: 'Untuk usaha apa pun yang tidak pas dengan pilihan di atas. Mulai sederhana, lalu tambahkan kebutuhan saat berkembang.',
     defaultCategory: 'Usaha umum',
     legacyCapabilityKey: 'general',
     quickStart: ['Lengkapi profil', 'Tambah katalog', 'Mulai transaksi'],
@@ -70,4 +70,49 @@ export function isBusinessTemplateKey(value: string): value is BusinessTemplateK
 export function getBusinessTemplatePreset(key: BusinessTemplateKey): BusinessTemplatePreset {
   return BUSINESS_TEMPLATE_PRESETS.find(preset => preset.key === key)
     ?? BUSINESS_TEMPLATE_PRESETS[BUSINESS_TEMPLATE_PRESETS.length - 1];
+}
+
+
+export type BusinessCapabilityContext = {
+  templateKey?: string | null;
+  activeCapabilityKeys?: readonly string[] | null;
+  category?: string | null;
+};
+
+export function resolvedBusinessCapabilityKeys(
+  context: BusinessCapabilityContext,
+): readonly string[] {
+  const active = Array.isArray(context.activeCapabilityKeys)
+    ? context.activeCapabilityKeys.map(value => value.trim()).filter(Boolean)
+    : [];
+  if (active.length > 0) return active;
+
+  const templateKey =
+    typeof context.templateKey === 'string' && isBusinessTemplateKey(context.templateKey)
+      ? context.templateKey
+      : 'general';
+
+  return getBusinessTemplatePreset(templateKey).capabilityHighlights;
+}
+
+function categorySuggestsInventory(category: string | null | undefined) {
+  const value = category?.trim().toLocaleLowerCase('id-ID') ?? '';
+  return /makanan|minuman|f&b|toko|retail|grosir|distributor|manufaktur|produksi|bengkel/.test(value);
+}
+
+export function businessHasCapability(
+  context: BusinessCapabilityContext,
+  capability: string,
+): boolean {
+  const keys = resolvedBusinessCapabilityKeys(context);
+  if (keys.includes(capability)) return true;
+
+  const templateKey =
+    typeof context.templateKey === 'string' && isBusinessTemplateKey(context.templateKey)
+      ? context.templateKey
+      : 'general';
+
+  return templateKey === 'general' &&
+    capability === 'inventory' &&
+    categorySuggestsInventory(context.category);
 }
