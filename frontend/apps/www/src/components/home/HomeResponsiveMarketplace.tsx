@@ -2879,10 +2879,55 @@ function normalizeMediaUrl(value?: string | null): string | null {
 function HomeCommunityGroupsSection({
   isId,
   groups,
+  isAuthenticated,
+  authFetch,
+  onChanged,
 }: {
   isId: boolean;
   groups: CommunityGroup[];
+  isAuthenticated: boolean;
+  authFetch: ReturnType<typeof useAuth>['authFetch'];
+  onChanged?: () => void;
 }) {
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const router = useRouter();
+
+  const joinOrLeave = async (group: CommunityGroup) => {
+    if (!isAuthenticated) {
+      router.push(
+        \`/login?callbackUrl=\${encodeURIComponent('/community/groups')}\`,
+      );
+      return;
+    }
+
+    if (group.viewerRole === 'owner') {
+      router.push(
+        \`/community/groups/\${encodeURIComponent(group.slug || group.id)}\`,
+      );
+      return;
+    }
+
+    const joined = group.viewerMembershipStatus === 'active';
+    setBusyId(group.id);
+
+    try {
+      const response = await authFetch(
+        \`/api/community/groups/\${encodeURIComponent(group.id)}/\${joined ? 'leave' : 'join'}\`,
+        { method: 'POST' },
+      );
+
+      if (!response.ok) {
+        throw new Error('group_action_failed');
+      }
+
+      onChanged?.();
+    } catch {
+      onChanged?.();
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   return (
     <section
       className="w-full rounded-[20px] border border-[color:var(--app-border)] bg-white p-3.5 shadow-[0_10px_30px_-28px_rgba(15,23,42,0.18)]"
@@ -2902,7 +2947,6 @@ function HomeCommunityGroupsSection({
               : 'Find communities that fit your business interests.'}
           </p>
         </div>
-
         <Link
           href="/community/groups"
           className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-[10px] px-2 text-[10px] font-bold text-[color:var(--app-accent)] transition hover:bg-[color:var(--app-accent-soft)]"
@@ -2914,72 +2958,123 @@ function HomeCommunityGroupsSection({
 
       {groups.length ? (
         <div className="-mx-1 mt-3 flex gap-2 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {groups.map(group => (
-          <Link
-            key={group.id}
-            href={'/community/groups/' + encodeURIComponent(group.slug || group.id)}
-            className="group flex min-w-[218px] max-w-[240px] shrink-0 flex-col overflow-hidden rounded-[18px] border border-[color:var(--app-border)] bg-white transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:shadow-[0_18px_32px_-28px_rgba(15,23,42,0.28)]"
-          >
-            <div className="relative h-[84px] overflow-hidden bg-[linear-gradient(135deg,#ecfdf5,#eff6ff)]">
-              {group.coverUrl ? (
-                <Image
-                  src={group.coverUrl}
-                  alt={group.name}
-                  fill
-                  sizes="240px"
-                  className="object-cover transition duration-500 group-hover:scale-[1.03]"
-                />
-              ) : (
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,rgba(16,185,129,0.26),transparent_32%),radial-gradient(circle_at_85%_15%,rgba(59,130,246,0.20),transparent_28%)]" />
-              )}
-              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(15,23,42,0.02),rgba(15,23,42,0.32))]" />
-              <div className="absolute right-2 top-2 rounded-full bg-white/94 px-2 py-1 text-[9px] font-bold text-[color:var(--app-text)] shadow-sm">
-                {group.privacy === 'public'
-                  ? isId
-                    ? 'Publik'
-                    : 'Public'
-                  : isId
-                    ? 'Privat'
-                    : 'Private'}
-              </div>
-            </div>
+          {groups.map(group => {
+            const joined = group.viewerMembershipStatus === 'active';
+            const pending = group.viewerMembershipStatus === 'pending';
+            const owner = group.viewerRole === 'owner';
+            const href =
+              '/community/groups/' +
+              encodeURIComponent(group.slug || group.id);
 
-            <div className="relative flex flex-1 flex-col px-2.5 pb-2.5">
-              <div className="-mt-7 flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-[17px] border-[3px] border-white bg-[color:var(--app-accent-soft)] text-lg font-bold text-[color:var(--app-accent)] shadow-[0_16px_26px_-22px_rgba(15,23,42,0.45)]">
-                {group.avatarUrl ? (
-                  <Image
-                    src={group.avatarUrl}
-                    alt=""
-                    width={56}
-                    height={56}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  group.name.trim().slice(0, 1).toUpperCase() || (
-                    <Users className="h-6 w-6" />
-                  )
-                )}
-              </div>
-              <div className="mt-1.5 min-w-0">
-                <h3 className="truncate text-xs font-bold text-[color:var(--app-text)]">
-                  {group.name}
-                </h3>
-                <p className="mt-0.5 text-[10px] font-semibold text-[color:var(--app-text-soft)]">
-                  {formatCompactCount(group.memberCount, '0')}{' '}
-                  {isId ? 'anggota' : 'members'} · {formatCompactCount(group.postCount, '0')}{' '}
-                  {isId ? 'post' : 'posts'}
-                </p>
-                <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-[color:var(--app-text-soft)]">
-                  {group.description}
-                </p>
-              </div>
+            return (
+              <article
+                key={group.id}
+                className="group flex min-w-[236px] max-w-[260px] shrink-0 flex-col overflow-hidden rounded-[20px] border border-[color:var(--app-border)] bg-white shadow-[0_10px_30px_-28px_rgba(15,23,42,0.3)] transition duration-200 hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:shadow-[0_22px_42px_-32px_rgba(15,23,42,0.34)]"
+              >
+                <Link href={href} className="block">
+                  <div className="relative aspect-[2.15/1] overflow-hidden bg-slate-100">
+                    {group.coverUrl ? (
+                      <Image
+                        src={group.coverUrl}
+                        alt={group.name}
+                        fill
+                        sizes="260px"
+                        className="object-cover transition duration-500 group-hover:scale-[1.03]"
+                      />
+                    ) : (
+                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,rgba(16,185,129,0.30),transparent_32%),radial-gradient(circle_at_85%_15%,rgba(59,130,246,0.24),transparent_30%),linear-gradient(135deg,#ecfdf5,#f8fafc)]" />
+                    )}
+                    <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(15,23,42,0.02),rgba(15,23,42,0.34))]" />
+                    <div className="absolute right-2.5 top-2.5 inline-flex items-center gap-1 rounded-full bg-white/94 px-2 py-1 text-[9px] font-bold text-[color:var(--app-text)] shadow-sm backdrop-blur">
+                      {group.privacy === 'public' ? (
+                        <Globe2 className="h-3 w-3 text-[color:var(--app-accent)]" />
+                      ) : (
+                        <LockKeyhole className="h-3 w-3 text-[color:var(--app-text-soft)]" />
+                      )}
+                      {group.privacy === 'public'
+                        ? isId ? 'Publik' : 'Public'
+                        : isId ? 'Privat' : 'Private'}
+                    </div>
+                  </div>
 
-              <span className="mt-auto pt-2 text-[10px] font-bold text-[color:var(--app-accent)]">
-                {isId ? 'Buka grup →' : 'Open group →'}
-              </span>
-            </div>
-            </Link>
-          ))}
+                  <div className="relative px-2.5 pb-2.5">
+                    <span className="-mt-7 inline-flex h-14 w-14 overflow-hidden rounded-[17px] border-[3px] border-white bg-white shadow-[0_16px_28px_-22px_rgba(15,23,42,0.5)]">
+                      {group.avatarUrl ? (
+                        <Image
+                          src={group.avatarUrl}
+                          alt=""
+                          width={56}
+                          height={56}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <span className="grid h-full w-full place-items-center bg-[color:var(--app-accent-soft)] text-lg font-black text-[color:var(--app-accent)]">
+                          {group.name.trim().slice(0, 1).toUpperCase() || (
+                            <Users className="h-6 w-6" />
+                          )}
+                        </span>
+                      )}
+                    </span>
+
+                    <h3 className="mt-2 line-clamp-1 text-sm font-bold tracking-[-0.025em] text-[color:var(--app-text)]">
+                      {group.name}
+                    </h3>
+
+                    <div className="mt-1 flex items-center gap-1.5 text-[10px] font-semibold text-[color:var(--app-text-soft)]">
+                      <span>
+                        {formatCompactCount(group.memberCount, '0')} {isId ? 'anggota' : 'members'}
+                      </span>
+                      <span aria-hidden="true">·</span>
+                      <span>
+                        {formatCompactCount(group.postCount, '0')} {isId ? 'postingan' : 'posts'}
+                      </span>
+                    </div>
+
+                    <p className="mt-2 line-clamp-2 min-h-8 text-[10px] leading-4 text-[color:var(--app-text-soft)]">
+                      {group.description}
+                    </p>
+                  </div>
+                </Link>
+
+                <div className="mt-auto flex items-center gap-2 border-t border-[color:var(--app-border)] p-2.5">
+                  <Link
+                    href={href}
+                    className="inline-flex min-h-[34px] flex-1 items-center justify-center rounded-[12px] border border-[color:var(--app-border)] bg-white px-2 text-[11px] font-bold text-[color:var(--app-text)] transition hover:bg-slate-50"
+                  >
+                    {isId ? 'Lihat grup' : 'View group'}
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => void joinOrLeave(group)}
+                    disabled={busyId === group.id || pending}
+                    className={cn(
+                      'inline-flex min-h-[34px] flex-1 items-center justify-center gap-1 rounded-[12px] px-2 text-[11px] font-bold transition disabled:cursor-wait disabled:opacity-60',
+                      joined
+                        ? 'border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] hover:bg-slate-100'
+                        : 'bg-[color:var(--app-accent)] text-white hover:bg-[color:var(--app-accent-strong)]',
+                    )}
+                  >
+                    {busyId === group.id ? (
+                      <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    ) : joined ? (
+                      <ShieldCheck className="h-3.5 w-3.5" />
+                    ) : owner ? (
+                      <Settings className="h-3.5 w-3.5" />
+                    ) : (
+                      <Plus className="h-3.5 w-3.5" />
+                    )}
+                    {pending
+                      ? 'Pending'
+                      : owner
+                        ? isId ? 'Kelola' : 'Manage'
+                        : joined
+                          ? isId ? 'Sudah join' : 'Joined'
+                          : isId ? 'Gabung' : 'Join'}
+                  </button>
+                </div>
+              </article>
+            );
+          })}
         </div>
       ) : (
         <div className="mt-3 flex items-center justify-between gap-3 rounded-[16px] border border-dashed border-emerald-200 bg-emerald-50/55 px-3.5 py-3">
@@ -2997,13 +3092,14 @@ function HomeCommunityGroupsSection({
             href="/community/groups"
             className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-full bg-[color:var(--app-accent)] px-3 text-[10px] font-bold text-white"
           >
-            {isId ? 'Jelajah grup' : 'Explore groups'}
+            {isId ? 'Jelajah' : 'Explore'}
           </Link>
         </div>
       )}
     </section>
   );
 }
+
 
 function CommunityPanel({
   isId,
@@ -3067,6 +3163,7 @@ function CommunityPanel({
   const [commentOpen, setCommentOpen] = useState(false);
   const [commentDraft, setCommentDraft] = useState('');
   const [commentSubmitting, setCommentSubmitting] = useState(false);
+  const [bodyExpanded, setBodyExpanded] = useState(false);
   const [interactionError, setInteractionError] = useState<string | null>(null);
 
   const tabs = getCommunityTabs(isId);
@@ -3118,6 +3215,12 @@ function CommunityPanel({
       .replace(/\n+\s*(?:Polling|Poll|Jajak pendapat)\s*:\s*[\s\S]*$/i, '')
       .trim();
   };
+
+  const canExpandPostBody = Boolean(
+    post &&
+      (cleanPreviewBody(post).trim().length > 240 ||
+        cleanPreviewBody(post).includes('\n')),
+  );
 
   const renderContext = (target: CommunityPost, compact = false) => {
     const contexts: Array<{
@@ -3411,6 +3514,7 @@ function CommunityPanel({
     setShareFeedback(null);
     setCommentOpen(false);
     setCommentDraft('');
+    setBodyExpanded(false);
     setInteractionError(null);
   }, [activeTab, post?.id]);
 
@@ -3617,14 +3721,35 @@ function CommunityPanel({
 
             <div className="mt-2">{renderContext(post)}</div>
 
-            <h3 className="mt-1.5 line-clamp-2 text-[13px] font-bold leading-[18px] text-[color:var(--app-text)]">
+            <h3 className="mt-1.5 text-[13px] font-bold leading-[18px] text-[color:var(--app-text)]">
               {post.title}
             </h3>
 
             {cleanPreviewBody(post) ? (
-              <p className="mt-1 line-clamp-2 text-[11px] leading-[17px] text-[color:var(--app-text-soft)]">
-                {cleanPreviewBody(post)}
-              </p>
+              <div className="mt-1 text-[11px] leading-[17px] text-[color:var(--app-text-soft)]">
+                <p className={cn(!bodyExpanded && 'line-clamp-2')}>
+                  {cleanPreviewBody(post)}
+                </p>
+                {canExpandPostBody ? (
+                  <button
+                    type="button"
+                    onClick={event => {
+                      event.stopPropagation();
+                      setBodyExpanded(current => !current);
+                    }}
+                    aria-expanded={bodyExpanded}
+                    className="mt-0.5 font-semibold text-[color:var(--app-text)] hover:text-[color:var(--app-accent)]"
+                  >
+                    {bodyExpanded
+                      ? isId
+                        ? 'Sembunyikan'
+                        : 'See less'
+                      : isId
+                        ? 'Lihat selengkapnya'
+                        : 'See more'}
+                  </button>
+                ) : null}
+              </div>
             ) : null}
 
             {post.tags.filter(tag => !/^(tanya|question|ask|help|support|poll|polling|survey|media-usaha|update-usaha)$/i.test(tag)).length > 0 ? (
@@ -4356,7 +4481,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
   const [walletLoading, setWalletLoading] = useState(false);
 
   const toggleCommunityPostLike = useCallback(
-    async (threadId: string, _liked: boolean) => {
+    async (threadId: string, liked: boolean) => {
       const response = await authFetch(
         `/api/forum/threads/${encodeURIComponent(threadId)}/vote`,
         {
@@ -4365,7 +4490,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            value: 1,
+            value: liked ? 1 : 0,
           }),
         },
       );
@@ -5130,6 +5255,9 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
         <HomeCommunityGroupsSection
           isId={isId}
           groups={communityGroups}
+          isAuthenticated={isAuthenticated}
+          authFetch={authFetch}
+          onChanged={() => void loadCommunityPostsPage()}
         />
         <CommunityPanel
           isId={isId}
@@ -5210,6 +5338,9 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
                 <HomeCommunityGroupsSection
                   isId={isId}
                   groups={communityGroups}
+                  isAuthenticated={isAuthenticated}
+                  authFetch={authFetch}
+                  onChanged={() => void loadCommunityPostsPage()}
                 />
                 <CommunityPanel
                   isId={isId}
