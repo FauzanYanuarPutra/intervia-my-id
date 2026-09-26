@@ -50,7 +50,7 @@ describe('home dashboard', () => {
     expect(result.priority.title).toBe('Usaha aman. Tidak ada yang mendesak.');
   });
 
-  it('always exposes exactly three compact daily metrics', () => {
+  it('exposes the complete compact daily metrics', () => {
     const result = buildHomeDashboard({
       foundationAction: null,
       nextActions: [],
