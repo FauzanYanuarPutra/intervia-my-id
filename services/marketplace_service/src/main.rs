@@ -12179,10 +12179,25 @@ async fn update_content(
         }
     }
 
-    let content_status = normalize_content_status(payload.content_status)
+    let autosave = headers
+        .get("x-lajukan-autosave")
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| value.trim() == "1" || value.eq_ignore_ascii_case("true"));
+
+    let mut content_status = normalize_content_status(payload.content_status)
         .unwrap_or_else(|| existing.content_status.clone().to_lowercase());
     if !is_valid_content_status(&content_status) {
         return err(StatusCode::BAD_REQUEST, "invalid content_status").into_response();
+    }
+
+    // A published listing must never remain live while its owner is changing
+    // substantive content. Autosave may keep the live state temporarily;
+    // the explicit save moves it back into the moderation queue.
+    let owner_revision_pending = existing.content_status.eq_ignore_ascii_case("active")
+        && !autosave
+        && content_status.eq_ignore_ascii_case("active");
+    if owner_revision_pending {
+        content_status = "draft".to_string();
     }
 
     let pricing_mode = normalize_pricing_mode(payload.pricing_mode)
@@ -12393,6 +12408,87 @@ async fn update_content(
 
     match updated {
         Ok(row) => {
+            if owner_revision_pending {
+                let open_case = sqlx::query_scalar::<_, Uuid>(
+                    r#"
+                    SELECT id
+                    FROM internal_moderation.content_moderation_cases
+                    WHERE content_id = $1
+                      AND source = 'owner_update'
+                      AND status IN ('open', 'reviewing', 'escalated')
+                    ORDER BY updated_at DESC
+                    LIMIT 1
+                    "#,
+                )
+                .bind(row.id)
+                .fetch_optional(&state.db)
+                .await;
+
+                match open_case {
+                    Ok(Some(case_id)) => {
+                        if let Err(error) = sqlx::query(
+                            r#"
+                            UPDATE internal_moderation.content_moderation_cases
+                            SET status = 'reviewing',
+                                current_action = 'owner_update',
+                                current_reason_code = 'quality',
+                                current_reason_note = 'Pemilik memperbarui listing yang sebelumnya tayang; perlu persetujuan sebelum tayang kembali.',
+                                updated_at = NOW()
+                            WHERE id = $1
+                            "#,
+                        )
+                        .bind(case_id)
+                        .execute(&state.db)
+                        .await
+                        {
+                            tracing::error!(
+                                "update_content refresh owner revision case error: {:?}",
+                                error
+                            );
+                        }
+                    }
+                    Ok(None) => {
+                        if let Err(error) = sqlx::query(
+                            r#"
+                            INSERT INTO internal_moderation.content_moderation_cases
+                              (content_id, opened_by, source, status, severity, current_action,
+                               current_reason_code, current_reason_note, legal_hold)
+                            VALUES
+                              ($1, $2, 'owner_update', 'reviewing', 'low', 'owner_update',
+                               'quality',
+                               'Pemilik memperbarui listing yang sebelumnya tayang; perlu persetujuan sebelum tayang kembali.',
+                               FALSE)
+                            "#,
+                        )
+                        .bind(row.id)
+                        .bind(row.owner_id)
+                        .execute(&state.db)
+                        .await
+                        {
+                            tracing::error!(
+                                "update_content create owner revision case error: {:?}",
+                                error
+                            );
+                        }
+                    }
+                    Err(error) => {
+                        tracing::error!(
+                            "update_content lookup owner revision case error: {:?}",
+                            error
+                        );
+                    }
+                }
+
+                let _ = state.notification_tx.send(RealtimeNotificationEnvelope {
+                    user_id: row.owner_id,
+                    payload: json!({
+                        "type": "content_revision_pending",
+                        "content_id": row.id,
+                        "message": "Perubahan listing sudah disimpan sebagai draft dan masuk antrean review sebelum tayang kembali."
+                    }),
+                });
+            }
+
             let seller_stats = match fetch_seller_stats(&state.db, &[row.owner_id]).await {
                 Ok(map) => map.get(&row.owner_id).cloned(),
                 Err(e) => {
