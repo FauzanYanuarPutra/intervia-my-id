@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import type { BusinessRecord, PortalSection } from '@/lib/portal-types';
 import { getSetupSteps } from '@/lib/portal-logic';
+import { businessHasCapability } from '@/lib/business-templates';
 
 type GuideStep = {
   id: string;
@@ -19,6 +20,8 @@ const href = (businessId: string, path = '') => '/businesses/' + businessId + pa
 
 function businessKind(business: BusinessRecord) {
   const template = business.templateKey ?? business.profile?.templateKey ?? 'general';
+  const category = business.category.trim().toLocaleLowerCase('id-ID');
+
   switch (template) {
     case 'juice_fnb':
       return 'food';
@@ -28,6 +31,9 @@ function businessKind(business: BusinessRecord) {
     case 'ac_field_service':
       return 'service';
     default:
+      if (/jasa|servis|service|konsultan|laundry|teknisi/.test(category)) return 'service';
+      if (/makanan|minuman|f&b|kopi|cafe|resto|kuliner/.test(category)) return 'food';
+      if (/toko|retail|grosir|distributor|dagang/.test(category)) return 'retail';
       return 'general';
   }
 }
@@ -35,10 +41,14 @@ function businessKind(business: BusinessRecord) {
 function stepsFor(business: BusinessRecord, section: PortalSection): GuideStep[] {
   const id = business.id;
   const kind = businessKind(business);
-  const hasInventory = (business.activeCapabilityKeys ?? []).includes('inventory') ||
-    ['juice_fnb', 'mart_retail', 'ac_field_service'].includes(
-      business.templateKey ?? business.profile?.templateKey ?? '',
-    );
+  const hasInventory = businessHasCapability(
+    {
+      templateKey: business.templateKey ?? business.profile?.templateKey,
+      activeCapabilityKeys: business.activeCapabilityKeys,
+      category: business.category,
+    },
+    'inventory',
+  );
   const catalogNoun =
     kind === 'food' ? 'menu' :
     kind === 'service' ? 'layanan' :
