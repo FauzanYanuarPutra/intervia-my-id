@@ -1,5 +1,9 @@
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('@/context/AuthContext', () => ({
+  useAuth: () => ({ user: null }),
+}));
 
 import { ExploreListingCard } from '@/components/explore/cards/ExploreListingCard';
 import { NeedSearchCard } from './NeedSearchCard';
