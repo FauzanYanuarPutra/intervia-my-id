@@ -143,17 +143,13 @@ function resolveNestedUnit(source: Record<string, unknown>): string {
 
 function isDemandContent(item: ContentItem, metadata: Record<string, unknown>): boolean {
   const sideCandidates = [
-    item.listing_side,
-    item.market_side,
-    item.listing_intent,
-    item.market_intent,
-    item.intent,
     metadata.side,
     metadata.listing_side,
     metadata.market_side,
     metadata.listing_intent,
     metadata.market_intent,
     metadata.intent,
+    metadata.market_intent,
   ]
     .map(value => text(value).toLowerCase())
     .filter(Boolean)
