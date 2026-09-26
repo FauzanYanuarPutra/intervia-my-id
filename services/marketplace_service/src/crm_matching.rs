@@ -605,6 +605,45 @@ pub async fn get_requirement(
     }
 }
 
+async fn write_audit(
+    db: &sqlx::PgPool,
+    entity_type: &str,
+    entity_id: &str,
+    action: &str,
+    actor_user_id: Option<Uuid>,
+    before: Option<Value>,
+    after: Option<Value>,
+    reason: Option<String>,
+) {
+    let result = sqlx::query(
+        r#"
+        INSERT INTO crm_audit_logs (
+            entity_type, entity_id, action, actor_user_id, before, after, reason
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        "#,
+    )
+    .bind(entity_type)
+    .bind(entity_id)
+    .bind(action)
+    .bind(actor_user_id)
+    .bind(before)
+    .bind(after)
+    .bind(reason)
+    .execute(db)
+    .await;
+
+    if let Err(error) = result {
+        tracing::warn!(
+            entity_type,
+            entity_id,
+            action,
+            error = ?error,
+            "failed to write CRM matching audit log"
+        );
+    }
+}
+
 async fn load_requirement_content(db: &sqlx::PgPool, review: &RequirementReview) -> Result<RequirementItem, sqlx::Error> {
     let source_id = review
         .source_id
@@ -932,6 +971,22 @@ pub async fn run_match(
         return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "failed to commit match"}))).into_response()
     }
 
+    write_audit(
+        &state.db,
+        "matching_run",
+        &run.id.to_string(),
+        "match.run_completed",
+        Some(actor),
+        None,
+        Some(json!({
+            "status": run_status,
+            "candidate_count": ranked.len(),
+            "top_score": top_score,
+            "scoring_version": MATCHING_SCORE_VERSION
+        })),
+        None,
+    ).await;
+
     (StatusCode::CREATED, Json(json!({
         "run": {
             "id": run.id,
@@ -1037,29 +1092,82 @@ pub async fn review_candidate(
         _ => return (StatusCode::BAD_REQUEST, Json(json!({"error": "admin_status must be pending, approved, rejected, or held"}))).into_response(),
     };
 
+    let existing = sqlx::query(
+        r#"
+        SELECT admin_status, admin_reason, matching_run_id
+        FROM crm_matching_candidates
+        WHERE id = $1
+        LIMIT 1
+        "#,
+    )
+    .bind(id)
+    .fetch_optional(&state.db)
+    .await;
+
+    let existing = match existing {
+        Ok(Some(row)) => row,
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(json!({"error": "candidate not found"}))).into_response(),
+        Err(error) => {
+            tracing::error!("load candidate for review failed: {:?}", error);
+            return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "failed to load candidate"}))).into_response();
+        }
+    };
+
+    let before = json!({
+        "admin_status": existing.get::<String, _>("admin_status"),
+        "admin_reason": existing.get::<Option<String>, _>("admin_reason"),
+        "matching_run_id": existing.get::<Uuid, _>("matching_run_id"),
+    });
+
     let updated = sqlx::query(
         r#"
         UPDATE crm_matching_candidates
         SET admin_status = $2, admin_reason = $3, reviewed_by = $4, reviewed_at = NOW()
         WHERE id = $1
+        RETURNING id, admin_status, admin_reason, reviewed_at
         "#,
     )
     .bind(id)
-    .bind(status)
+    .bind(status.clone())
     .bind(payload.admin_reason.clone())
     .bind(actor)
-    .execute(&state.db)
+    .fetch_one(&state.db)
     .await;
 
     match updated {
-        Ok(result) if result.rows_affected() == 1 => (StatusCode::OK, Json(json!({"ok": true, "candidate_id": id}))).into_response(),
-        Ok(_) => (StatusCode::NOT_FOUND, Json(json!({"error": "candidate not found"}))).into_response(),
+        Ok(row) => {
+            write_audit(
+                &state.db,
+                "matching_candidate",
+                &id.to_string(),
+                "match.candidate_reviewed",
+                Some(actor),
+                Some(before),
+                Some(json!({
+                    "admin_status": row.get::<String, _>("admin_status"),
+                    "admin_reason": row.get::<Option<String>, _>("admin_reason"),
+                    "reviewed_at": row.get::<Option<DateTime<Utc>>, _>("reviewed_at"),
+                })),
+                payload.admin_reason.clone(),
+            ).await;
+
+            (
+                StatusCode::OK,
+                Json(json!({
+                    "ok": true,
+                    "candidate_id": id,
+                    "admin_status": row.get::<String, _>("admin_status"),
+                    "matching_run_id": existing.get::<Uuid, _>("matching_run_id"),
+                })),
+            ).into_response()
+        }
         Err(error) => {
             tracing::error!("review candidate failed: {:?}", error);
             (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "failed to review candidate"}))).into_response()
         }
     }
 }
+
 
 pub async fn create_connection(
     State(state): State<Arc<AppState>>,
@@ -1075,9 +1183,64 @@ pub async fn create_connection(
     if !["lajukan_chat", "whatsapp", "phone", "manual"].contains(&channel.as_str()) {
         return (StatusCode::BAD_REQUEST, Json(json!({"error": "invalid connection channel"}))).into_response();
     }
+
     let provider_entity_type = text(&payload.provider_entity_type);
     if provider_entity_type.is_empty() || payload.provider_entity_id.trim().is_empty() {
         return (StatusCode::BAD_REQUEST, Json(json!({"error": "provider entity is required"}))).into_response();
+    }
+
+    let mut provider_user_id = payload.provider_user_id;
+    let mut provider_business_id = payload.provider_business_id;
+    let mut provider_entity_id = payload.provider_entity_id.trim().to_string();
+    let mut candidate_status: Option<String> = None;
+    let mut linked_review_id = payload.requirement_review_id;
+
+    if let Some(candidate_id) = payload.matching_candidate_id {
+        let candidate = sqlx::query(
+            r#"
+            SELECT
+                c.admin_status,
+                c.candidate_type,
+                c.candidate_id,
+                c.provider_user_id,
+                c.provider_business_id,
+                r.requirement_review_id
+            FROM crm_matching_candidates c
+            JOIN crm_matching_runs r ON r.id = c.matching_run_id
+            WHERE c.id = $1
+            LIMIT 1
+            "#,
+        )
+        .bind(candidate_id)
+        .fetch_optional(&state.db)
+        .await;
+
+        let candidate = match candidate {
+            Ok(Some(row)) => row,
+            Ok(None) => return (StatusCode::NOT_FOUND, Json(json!({"error": "matching candidate not found"}))).into_response(),
+            Err(error) => {
+                tracing::error!("load candidate before connection failed: {:?}", error);
+                return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "failed to validate candidate"}))).into_response();
+            }
+        };
+
+        candidate_status = Some(candidate.get::<String, _>("admin_status"));
+        if candidate.get::<String, _>("admin_status") != "approved" {
+            return (StatusCode::CONFLICT, Json(json!({"error": "candidate must be approved before creating a connection"}))).into_response();
+        }
+
+        linked_review_id = candidate.get::<Uuid, _>("requirement_review_id");
+        if linked_review_id != payload.requirement_review_id {
+            return (StatusCode::CONFLICT, Json(json!({"error": "candidate does not belong to this requirement"}))).into_response();
+        }
+
+        provider_user_id = provider_user_id.or_else(|| candidate.get::<Option<Uuid>, _>("provider_user_id"));
+        provider_business_id = provider_business_id.or_else(|| candidate.get::<Option<Uuid>, _>("provider_business_id"));
+        provider_entity_id = candidate.get::<String, _>("candidate_id");
+
+        if payload.provider_entity_type.trim().is_empty() {
+            return (StatusCode::BAD_REQUEST, Json(json!({"error": "provider_entity_type is required"}))).into_response();
+        }
     }
 
     if let Some(key) = payload.idempotency_key.as_deref().map(str::trim).filter(|v| !v.is_empty()) {
@@ -1111,17 +1274,17 @@ pub async fn create_connection(
             $7, $8, $9, 'draft', $10,
             $11, $12
         )
-        RETURNING id, status
+        RETURNING id, status, created_at
         "#,
     )
-    .bind(payload.requirement_review_id)
+    .bind(linked_review_id)
     .bind(payload.matching_run_id)
     .bind(payload.matching_candidate_id)
     .bind(payload.requester_user_id)
-    .bind(payload.provider_user_id)
-    .bind(payload.provider_business_id)
+    .bind(provider_user_id)
+    .bind(provider_business_id)
     .bind(provider_entity_type)
-    .bind(payload.provider_entity_id.trim())
+    .bind(provider_entity_id)
     .bind(channel)
     .bind(payload.notes)
     .bind(payload.idempotency_key)
@@ -1130,12 +1293,34 @@ pub async fn create_connection(
     .await;
 
     match inserted {
-        Ok(row) => (StatusCode::CREATED, Json(json!({
-            "connection": {
-                "id": row.get::<Uuid, _>("id"),
-                "status": row.get::<String, _>("status")
-            }
-        }))).into_response(),
+        Ok(row) => {
+            write_audit(
+                &state.db,
+                "connection",
+                &row.get::<Uuid, _>("id").to_string(),
+                "connection.created",
+                Some(actor),
+                None,
+                Some(json!({
+                    "requirement_review_id": linked_review_id,
+                    "matching_run_id": payload.matching_run_id,
+                    "matching_candidate_id": payload.matching_candidate_id,
+                    "provider_user_id": provider_user_id,
+                    "provider_business_id": provider_business_id,
+                    "provider_entity_id": provider_entity_id,
+                    "candidate_status": candidate_status,
+                })),
+                None,
+            ).await;
+
+            (StatusCode::CREATED, Json(json!({
+                "connection": {
+                    "id": row.get::<Uuid, _>("id"),
+                    "status": row.get::<String, _>("status"),
+                    "created_at": row.get::<DateTime<Utc>, _>("created_at")
+                }
+            }))).into_response()
+        }
         Err(sqlx::Error::Database(db_err)) if db_err.code().as_deref() == Some("23505") => {
             (StatusCode::CONFLICT, Json(json!({"error": "connection already exists for this idempotency key"}))).into_response()
         }
@@ -1145,6 +1330,7 @@ pub async fn create_connection(
         }
     }
 }
+
 
 pub async fn patch_connection(
     State(state): State<Arc<AppState>>,
@@ -1257,12 +1443,32 @@ pub async fn create_matching_feedback(
     .await;
 
     match inserted {
-        Ok(row) => (StatusCode::CREATED, Json(json!({
-            "feedback": {
-                "id": row.get::<Uuid, _>("id"),
-                "created_at": row.get::<DateTime<Utc>, _>("created_at")
-            }
-        }))).into_response(),
+        Ok(row) => {
+            write_audit(
+                &state.db,
+                "matching_feedback",
+                &row.get::<Uuid, _>("id").to_string(),
+                "matching_feedback.created",
+                Some(actor),
+                None,
+                Some(json!({
+                    "connection_id": payload.connection_id,
+                    "matching_candidate_id": payload.matching_candidate_id,
+                    "requirement_review_id": payload.requirement_review_id,
+                    "feedback_source": text(&payload.feedback_source),
+                    "feedback_type": text(&payload.feedback_type),
+                    "reason_code": payload.reason_code,
+                })),
+                payload.note.clone(),
+            ).await;
+
+            (StatusCode::CREATED, Json(json!({
+                "feedback": {
+                    "id": row.get::<Uuid, _>("id"),
+                    "created_at": row.get::<DateTime<Utc>, _>("created_at")
+                }
+            }))).into_response()
+        },
         Err(error) => {
             tracing::error!("create matching feedback failed: {:?}", error);
             (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "failed to create feedback"}))).into_response()
