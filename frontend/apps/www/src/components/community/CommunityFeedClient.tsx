@@ -6484,6 +6484,7 @@ export default function CommunityFeedClient({
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
+  const feedScopeKeyRef = useRef('');
   const [refreshKey, setRefreshKey] = useState(0);
   const [membersModalGroup, setMembersModalGroup] =
     useState<CommunityGroup | null>(null);
@@ -6551,6 +6552,19 @@ export default function CommunityFeedClient({
       ? '/api/community/groups/feed'
       : '/api/community/feed';
 
+  const feedScopeKey = useMemo(() => {
+    const category = searchParams.get('category') || '';
+    const tag = searchParams.get('tag') || '';
+    return [
+      feedApiPath,
+      activeTab,
+      submittedQuery.trim(),
+      category,
+      tag,
+      refreshKey,
+    ].join('|');
+  }, [activeTab, feedApiPath, refreshKey, searchParams, submittedQuery]);
+
   const feedUrl = useMemo(() => {
     const params = new URLSearchParams();
     params.set('tab', activeTab);
@@ -6580,8 +6594,13 @@ export default function CommunityFeedClient({
 
   useEffect(() => {
     let alive = true;
+    feedScopeKeyRef.current = feedScopeKey;
     queueMicrotask(() => {
       if (alive) {
+        setItems([]);
+        setNextCursor(0);
+        setHasMore(false);
+        setLoadingMore(false);
         setLoading(true);
         setLoadMoreError(null);
         setFeedError(null);
@@ -6599,7 +6618,7 @@ export default function CommunityFeedClient({
         return payload;
       })
       .then(payload => {
-        if (!alive) return;
+        if (!alive || feedScopeKeyRef.current !== feedScopeKey) return;
         setItems(communityDiscussionItems(payload.items));
         setOverview(payload.overview || null);
         setNextCursor(payload.nextCursor ?? null);
@@ -6699,6 +6718,7 @@ export default function CommunityFeedClient({
         .json()
         .catch(() => ({}))) as Partial<CommunityFeedResponse>;
       if (!response.ok) throw new Error('Failed to load community page');
+      if (feedScopeKeyRef.current !== feedScopeKey) return;
       setItems(current => {
         const existing = new Set(current.map(item => item.id));
         return [
@@ -6717,11 +6737,14 @@ export default function CommunityFeedClient({
           : 'Failed to load more discussions. Try again.',
       );
     } finally {
-      setLoadingMore(false);
+      if (feedScopeKeyRef.current === feedScopeKey) {
+        setLoadingMore(false);
+      }
     }
   }, [
     activeTab,
     feedApiPath,
+    feedScopeKey,
     hasMore,
     isId,
     loadingMore,
@@ -6735,6 +6758,10 @@ export default function CommunityFeedClient({
     const root = sentinel?.closest<HTMLElement>('[data-community-feed-scroll]');
     if (!sentinel || !root || !hasMore || loading || loadingMore) return;
 
+    const rootIsScrollContainer =
+      window.getComputedStyle(root).overflowY === 'auto' ||
+      window.getComputedStyle(root).overflowY === 'scroll';
+
     const observer = new IntersectionObserver(
       entries => {
         if (entries.some(entry => entry.isIntersecting)) {
@@ -6742,7 +6769,7 @@ export default function CommunityFeedClient({
         }
       },
       {
-        root,
+        root: rootIsScrollContainer ? root : null,
         rootMargin: '900px 0px',
         threshold: 0.01,
       },
