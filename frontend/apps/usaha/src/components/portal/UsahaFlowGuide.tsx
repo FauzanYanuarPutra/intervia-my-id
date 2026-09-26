@@ -75,6 +75,12 @@ function stepsFor(business: BusinessRecord, section: PortalSection): GuideStep[]
         { id: 'assign', label: 'Bagikan tugas', hint: 'Pilih orang yang tepat saat pekerjaan perlu dikerjakan bersama.', href: href(id, '/work') },
         { id: 'finish', label: 'Selesaikan & pantau', hint: 'Tandai selesai agar kondisi usaha tetap terbarui.', href: href(id, '/work') },
       ];
+    case 'parties':
+      return [
+        { id: 'add', label: 'Simpan kontak', hint: 'Nama + telepon sudah cukup untuk mulai.', href: href(id, '/parties') },
+        { id: 'role', label: 'Pilih peran', hint: 'Tandai sebagai pelanggan, supplier, atau keduanya.', href: href(id, '/parties') },
+        { id: 'settle', label: 'Pantau saldo', hint: 'Piutang dan utang akan mengikuti transaksi yang terkait.', href: href(id, '/parties') },
+      ];
     case 'team':
       return [
         { id: 'invite', label: 'Undang anggota', hint: 'Cari username Lajukan.', href: href(id, '/team') },
