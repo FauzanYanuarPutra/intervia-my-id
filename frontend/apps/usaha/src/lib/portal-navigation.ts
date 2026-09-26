@@ -1,9 +1,15 @@
 import { visiblePortalSections } from './portal-logic';
 import type { PermissionId, PortalSection } from './portal-types';
+import { businessHasCapability } from './business-templates';
 
 export type PortalNavigationItem = {
   id: PortalSection;
   label: string;
+};
+
+export type PortalNavigationBusinessContext = {
+  templateKey?: string | null;
+  activeCapabilityKeys?: readonly string[] | null;
 };
 
 const labels: Record<PortalSection, string> = {
@@ -51,22 +57,30 @@ export function canAccessPortalSection(
   return visiblePortalSections(permissions).includes(section);
 }
 
-function selectNavigation(order: PortalSection[], permissions: PermissionId[]) {
+function selectNavigation(
+  order: PortalSection[],
+  permissions: PermissionId[],
+  business?: PortalNavigationBusinessContext,
+) {
   return order
     .filter(id => canAccessPortalSection(permissions, id))
+    .filter(id => {
+      if (id !== 'inventory' || !business) return true;
+      return businessHasCapability(business, 'inventory');
+    })
     .map(id => ({ id, label: labels[id] } satisfies PortalNavigationItem));
 }
 
-export function desktopPrimaryNavigation(permissions: PermissionId[]) {
-  return selectNavigation(desktopPrimaryOrder, permissions);
+export function desktopPrimaryNavigation(permissions: PermissionId[], business?: PortalNavigationBusinessContext) {
+  return selectNavigation(desktopPrimaryOrder, permissions, business);
 }
 
-export function mobilePrimaryNavigation(permissions: PermissionId[]) {
-  return selectNavigation(mobilePrimaryOrder, permissions);
+export function mobilePrimaryNavigation(permissions: PermissionId[], business?: PortalNavigationBusinessContext) {
+  return selectNavigation(mobilePrimaryOrder, permissions, business);
 }
 
-export function portalMenuNavigation(permissions: PermissionId[]) {
-  return selectNavigation(menuOrder, permissions);
+export function portalMenuNavigation(permissions: PermissionId[], business?: PortalNavigationBusinessContext) {
+  return selectNavigation(menuOrder, permissions, business);
 }
 
 export function portalSectionLabel(section: PortalSection) {
