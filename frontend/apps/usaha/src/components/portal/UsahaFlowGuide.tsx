@@ -81,6 +81,12 @@ function stepsFor(business: BusinessRecord, section: PortalSection): GuideStep[]
         { id: 'role', label: 'Pilih peran', hint: 'Tandai sebagai pelanggan, supplier, atau keduanya.', href: href(id, '/parties') },
         { id: 'settle', label: 'Pantau saldo', hint: 'Piutang dan utang akan mengikuti transaksi yang terkait.', href: href(id, '/parties') },
       ];
+    case 'growth':
+      return [
+        { id: 'presence', label: 'Siapkan etalase', hint: 'Pastikan profil, produk, dan link publik rapi.', href: href(id, '/growth') },
+        { id: 'sell', label: 'Aktifkan kanal', hint: 'Pilih kanal jual yang memang dipakai usaha.', href: href(id, '/growth') },
+        { id: 'review', label: 'Baca hasil', hint: 'Gunakan laporan dan saran untuk menentukan tindakan berikutnya.', href: href(id, '/growth') },
+      ];
     case 'team':
       return [
         { id: 'invite', label: 'Undang anggota', hint: 'Cari username Lajukan.', href: href(id, '/team') },
