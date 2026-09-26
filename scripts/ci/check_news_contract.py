@@ -365,10 +365,9 @@ require(
     "frontend/apps/www/src/app/[locale]/(app)/manage/ManageHubClient.tsx",
     (
         "newsSubmissions",
-        "newsNeedsAction",
-        "/news/submissions",
-        "/news/submit",
-        "Tindak lanjuti News",
+        "id: 'content'",
+        "href: '/manage/content'",
+        "News, Reels, dan Community punya ruang sendiri.",
     ),
 )
 
