@@ -194,8 +194,9 @@ export default function MyNewsSubmissions({ locale }: { locale: string }) {
     text(meta.editorial_status) || selected?.content_status || '';
   const editable = Boolean(
     selected &&
-      ['pending_review', 'needs_revision', 'rejected'].includes(editorialStatus),
+      ['pending_review', 'needs_revision', 'rejected', 'published'].includes(editorialStatus),
   );
+  const publishedRevision = editorialStatus === 'published';
 
   const uploadCover = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -372,9 +373,13 @@ export default function MyNewsSubmissions({ locale }: { locale: string }) {
       setStatus(current => ({
         ...current,
         saving: false,
-        success: isId
-          ? 'Revisi dikirim kembali ke antrean editorial.'
-          : 'Revision resubmitted to the editorial queue.',
+        success: publishedRevision
+          ? isId
+            ? 'Revisi artikel terbit dikirim ke antrean editorial. Artikel akan tampil lagi setelah disetujui.'
+            : 'Your published-article revision is back in the editorial queue. It will be visible again after approval.'
+          : isId
+            ? 'Revisi dikirim kembali ke antrean editorial.'
+            : 'Revision resubmitted to the editorial queue.',
       }));
     } catch {
       setStatus(current => ({
@@ -545,6 +550,13 @@ export default function MyNewsSubmissions({ locale }: { locale: string }) {
                 <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-900 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-100">
                   <strong>{isId ? 'Catatan editor:' : 'Editor note:'}</strong>{' '}
                   {text(meta.review_note)}
+                </div>
+              ) : null}
+              {publishedRevision ? (
+                <div className="mt-3 rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs font-semibold leading-5 text-sky-900 dark:border-sky-400/20 dark:bg-sky-400/10 dark:text-sky-100">
+                  {isId
+                    ? 'Artikel ini sudah terbit. Kamu bisa mengubahnya, tetapi setelah mengirim revisi artikel masuk antrean review lagi dan sementara tidak tampil sampai disetujui editor.'
+                    : 'This article is already published. You can edit it, but once you submit the revision it returns to editorial review and is temporarily hidden until approved.'}
                 </div>
               ) : null}
               {status.success ? (
@@ -755,25 +767,31 @@ export default function MyNewsSubmissions({ locale }: { locale: string }) {
                       ? isId
                         ? 'Mengirim revisi...'
                         : 'Resubmitting...'
-                      : isId
-                        ? 'Kirim revisi'
-                        : 'Resubmit revision'}
+                      : publishedRevision
+                        ? isId
+                          ? 'Ajukan revisi & review ulang'
+                          : 'Submit revision for re-review'
+                        : isId
+                          ? 'Kirim revisi'
+                          : 'Resubmit revision'}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => void withdraw()}
-                    disabled={status.saving || deleting}
-                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 text-sm font-bold text-rose-700 transition hover:border-rose-300 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-200"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    {deleting
-                      ? isId
-                        ? 'Menghapus...'
-                        : 'Removing...'
-                      : isId
-                        ? 'Hapus kiriman'
-                        : 'Remove submission'}
-                  </button>
+                  {!publishedRevision ? (
+                    <button
+                      type="button"
+                      onClick={() => void withdraw()}
+                      disabled={status.saving || deleting}
+                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 text-sm font-bold text-rose-700 transition hover:border-rose-300 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-200"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      {deleting
+                        ? isId
+                          ? 'Menghapus...'
+                          : 'Removing...'
+                        : isId
+                          ? 'Hapus kiriman'
+                          : 'Remove submission'}
+                    </button>
+                  ) : null}
                 </div>
               ) : (
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
