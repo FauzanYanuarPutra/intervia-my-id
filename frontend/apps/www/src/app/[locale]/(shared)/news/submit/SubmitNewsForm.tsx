@@ -75,8 +75,8 @@ export default function SubmitNewsForm({ locale }: Props) {
           loading: false,
           error:
             response.status === 401
-              ? (isId ? 'Silakan masuk ke akun Lajukan sebelum mengirim berita.' : 'Please sign in before submitting news.')
-              : payload.error || (isId ? 'Kiriman belum dapat diproses.' : 'Submission could not be processed.'),
+              ? (isId ? 'Masuk dulu ya, biar beritanya bisa kamu kirim.' : 'Please sign in before submitting news.')
+              : payload.error || (isId ? 'Belum bisa diproses. Coba cek lagi sebentar ya.' : 'Submission could not be processed.'),
           success: '',
         });
         return;
@@ -100,7 +100,7 @@ export default function SubmitNewsForm({ locale }: Props) {
       setState({
         loading: false,
         error: '',
-        success: payload.message || (isId ? 'Kiriman diterima dan menunggu review editorial.' : 'Submission received for editorial review.'),
+        success: payload.message || (isId ? 'Sudah masuk. Tim editorial akan cek dulu ya.' : 'Submission received for editorial review.'),
       });
     } catch {
       setState({
@@ -210,7 +210,7 @@ export default function SubmitNewsForm({ locale }: Props) {
 
       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs font-semibold leading-6 text-slate-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300">
         {isId
-          ? 'Kiriman tidak langsung tayang. Tim editorial dapat menyetujui, meminta revisi, menolak, mengoreksi, atau menarik publikasi. Opini dan diskusi bebas sebaiknya diposting di Community.'
+          ? 'Setelah kamu kirim, beritanya belum langsung tayang ya. Tim editorial akan cek dulu. Kalau perlu diperbaiki, nanti kamu akan diberi tahu. Buat obrolan santai dan diskusi bebas, pakai Community ya.'
           : 'Submissions are not published immediately. Editors may approve, request revisions, reject, correct, or retract publication. Open opinion and discussion belong in Community.'}
       </div>
 
