@@ -6,15 +6,18 @@ import {
   getListingSideCounterpartyLabel,
   getListingSideObjectLabel,
   getListingSideVerbLabel,
+  getListingSideLabel,
   getListingValueFallback,
   resolveListingSide,
 } from './listingSide';
 
 describe('listing side presentation', () => {
   it('keeps buyer demand and provider supply labels distinct', () => {
+    expect(getListingSideLabel('demand', 'id')).toBe('Membutuhkan');
+    expect(getListingSideLabel('supply', 'id')).toBe('Menawarkan');
     expect(getListingSideActorLabel('demand', 'id')).toBe('Pembeli');
     expect(getListingSideActorLabel('supply', 'id')).toBe('Penyedia');
-    expect(getListingSideVerbLabel('demand', 'id')).toBe('Mencari');
+    expect(getListingSideVerbLabel('demand', 'id')).toBe('Membutuhkan');
     expect(getListingSideVerbLabel('supply', 'id')).toBe('Menawarkan');
     expect(getListingSideObjectLabel('demand', 'id')).toBe('Kebutuhan');
     expect(getListingSideObjectLabel('supply', 'id')).toBe('Penawaran');

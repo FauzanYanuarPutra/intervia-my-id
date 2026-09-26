@@ -61,12 +61,12 @@ export const CREATE_STEPS: CreateStepSchema[] = [
     id: 'intent',
     labelId: 'Aksi',
     labelEn: 'Purpose',
-    titleId: 'Kamu mau apa?',
+    titleId: 'Kamu mau menawarkan atau membutuhkan?',
     titleEn: 'What do you want to do?',
     descriptionId:
       'Pilih satu. Nanti pertanyaan berikutnya menyesuaikan otomatis.',
     descriptionEn:
-      'Choose whether you want to offer something or request something.',
+      'Choose whether you want to offer something or need something.',
   },
   {
     id: 'category',

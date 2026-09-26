@@ -3473,8 +3473,8 @@ export default function CreateListingWizard({
       if (step === 1 && !intent) {
         setErrorFor(
           '__intent',
-          'Pilih dulu: mau menawarkan atau sedang mencari.',
-          'Choose whether you want to offer something or request something.',
+          'Pilih dulu: mau menawarkan atau membutuhkan sesuatu.',
+          'Choose whether you want to offer something or need something.',
         );
         return errors;
       }
@@ -5195,15 +5195,15 @@ export default function CreateListingWizard({
     'request'
       ? text(
           locale,
-          'Sedang mencari',
-          'Request',
+          'Membutuhkan',
+          'Needs',
         )
       : pendingStoredDraft?.intent ===
           'offer'
         ? text(
             locale,
             'Menawarkan',
-            'Offer',
+            'Offering',
           )
         : text(
             locale,
@@ -5522,15 +5522,15 @@ export default function CreateListingWizard({
     currentStep === 1
       ? text(
           locale,
-          'Kamu mau mencari atau menawarkan?',
-          'Are you looking for something or offering something?',
+          'Kamu mau menawarkan atau membutuhkan?',
+          'Are you offering something or do you need something?',
         )
       : currentStep === 2
         ? intent === 'request'
           ? text(
               locale,
-              'Apa yang sedang kamu cari?',
-              'What are you looking for?',
+              'Apa yang sedang kamu butuhkan?',
+              'What do you need?',
             )
           : text(
               locale,
@@ -5620,7 +5620,7 @@ export default function CreateListingWizard({
             ? intent === 'request'
               ? text(
                   locale,
-                  'Tulis seperti sedang chat dengan supplier: apa yang dicari, jumlahnya, budget kalau ada, dan kapan dibutuhkan.',
+                  'Tulis seperti sedang chat dengan supplier: apa yang dibutuhkan, jumlahnya, budget kalau ada, dan kapan dibutuhkan.',
                   'Write it like a message to a supplier: what you need, quantity, budget if any, and when you need it.',
                 )
               : text(
@@ -6891,9 +6891,9 @@ export default function CreateListingWizard({
               {[
                 {
                   value: 'request' as const,
-                  titleId: 'Cari kebutuhan',
-                  titleEn: 'Find something',
-                  shortId: 'Saya butuh barang / jasa',
+                  titleId: 'Membutuhkan sesuatu',
+                  titleEn: 'Need something',
+                  shortId: 'Saya membutuhkan barang / jasa',
                   shortEn: 'I need a product / service',
                   imageSrc: '/images/create/kategori/cari.png',
                 },
