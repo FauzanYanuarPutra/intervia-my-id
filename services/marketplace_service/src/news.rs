@@ -2916,13 +2916,22 @@ async fn moderate_news(
     }
 
     let reviewed_at = Utc::now();
+    let revision_of_published = current
+        .metadata
+        .get("news")
+        .and_then(Value::as_object)
+        .and_then(|news| news.get("revision_of_published"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
     let approved_publish_at = if action == "approve" {
-        Some(
+        Some(if revision_of_published {
+            requested_publish_at.unwrap_or(reviewed_at)
+        } else {
             current
                 .published_at
                 .or(requested_publish_at)
-                .unwrap_or(reviewed_at),
-        )
+                .unwrap_or(reviewed_at)
+        })
     } else {
         None
     };
@@ -2945,6 +2954,12 @@ async fn moderate_news(
         "editorial_status".to_string(),
         Value::String(next_editorial_status.to_string()),
     );
+    if action == "approve" && revision_of_published {
+        news.insert(
+            "revision_approved_at".to_string(),
+            Value::String(reviewed_at.to_rfc3339()),
+        );
+    }
     news.insert(
         "reviewed_at".to_string(),
         Value::String(reviewed_at.to_rfc3339()),
