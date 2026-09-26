@@ -217,10 +217,11 @@ export default function MyNewsSubmissions({ locale }: { locale: string }) {
         error?: string;
       };
       const url = payload.urls?.[0] || payload.files?.[0]?.url;
-      if (!response.ok || !url) {
+      const safeUrl = normalizeNewsMediaUrl(url);
+      if (!response.ok || !safeUrl) {
         throw new Error(payload.error || (isId ? 'Gagal mengunggah gambar.' : 'Image upload failed.'));
       }
-      setForm(current => ({ ...current, cover_image: url }));
+      setForm(current => ({ ...current, cover_image: safeUrl }));
     } catch (error) {
       setStatus(current => ({
         ...current,
