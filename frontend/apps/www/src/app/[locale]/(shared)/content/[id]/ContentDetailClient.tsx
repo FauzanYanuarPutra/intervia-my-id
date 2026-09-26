@@ -4692,6 +4692,15 @@ export default function ContentDetailClient({
                   </>
                 ) : null}
               </div>
+              {isOwner && !publicReference ? (
+                <Link
+                  href={`/create?draft=${encodeURIComponent(item.id)}`}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-emerald-700 px-3 py-2 font-bold text-white shadow-sm transition hover:bg-emerald-800"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                  {locale === 'id' ? 'Edit' : 'Edit'}
+                </Link>
+              ) : null}
               <button
                 type="button"
                 onClick={() => void handleNativeShare()}
