@@ -408,22 +408,10 @@ async fn verify_google_oauth_schema(state: &Arc<AppState>) -> Result<bool, sqlx:
 }
 
 fn is_google_avatar_url(value: &str) -> bool {
-    let trimmed = value.trim();
-    if trimmed.is_empty() {
-        return false;
-    }
-
-    if trimmed.contains("googleusercontent.com") {
-        return true;
-    }
-
-    match reqwest::Url::parse(trimmed) {
-        Ok(url) => url
-            .host_str()
-            .map(|host| host.ends_with("googleusercontent.com"))
-            .unwrap_or(false),
-        Err(_) => false,
-    }
+    value
+        .trim()
+        .to_ascii_lowercase()
+        .contains("googleusercontent.com")
 }
 
 fn is_default_profile_avatar_url(value: &str) -> bool {
@@ -474,11 +462,6 @@ fn choose_google_login_avatar(
         .filter(|value| !value.is_empty())
         .map(str::to_string)
         .unwrap_or_else(|| DEFAULT_PROFILE_AVATAR.to_string())
-}
-
-fn is_google_avatar_source(value: &str) -> bool {
-    let normalized = value.trim().to_ascii_lowercase();
-    normalized == "google" || normalized == "google_oauth"
 }
 
 fn google_username_base(email: &str, name: Option<&str>) -> String {
@@ -2481,27 +2464,18 @@ pub async fn oauth_google(
         avatar_url.as_deref(),
     );
 
-    let avatar_source = if existing_picture
+    let current_avatar = read_profile_avatar_candidate(
+        existing_metadata.as_ref(),
+        existing_picture.as_deref(),
+    );
+    let avatar_source = if current_avatar
         .as_deref()
         .map(|value| !is_default_profile_avatar_url(value) && !is_google_avatar_url(value))
         .unwrap_or(false)
-        || read_profile_avatar_candidate(existing_metadata.as_ref(), existing_picture.as_deref())
-            .as_deref()
-            .map(|value| !is_default_profile_avatar_url(value) && !is_google_avatar_url(value))
-            .unwrap_or(false)
     {
         "user_managed"
-    } else if is_google_avatar_source(
-        existing_metadata
-            .as_ref()
-            .and_then(|value| value.get("avatar_source"))
-            .and_then(Value::as_str)
-            .unwrap_or(""),
-    ) || is_google_avatar_url(&effective_avatar_url)
-    {
-        "google"
     } else {
-        "user_managed"
+        "google"
     };
 
     let generated_username = generate_google_username(&state, &email, full_name.as_deref()).await;
