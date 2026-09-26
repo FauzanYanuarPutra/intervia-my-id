@@ -2960,7 +2960,9 @@ export default function CreateListingWizard({
               metadata,
               content_status: options.autosave
                 ? editingContentStatus || 'draft'
-                : 'active',
+                : editingContentStatus === 'active'
+                  ? 'draft'
+                  : editingContentStatus || 'draft',
             };
 
             let response: Response | null = null;
@@ -3048,7 +3050,12 @@ export default function CreateListingWizard({
               );
             }
             if (!options.autosave) {
-              setEditingContentStatus('active');
+              const nextStatus =
+                valueAsString(updatedRecord.content_status) ||
+                valueAsString(updatedRecord.status) ||
+                editingContentStatus ||
+                'draft';
+              setEditingContentStatus(nextStatus);
             }
             setSaveStatus('saved');
             setLastSavedAt(new Date().toISOString());
