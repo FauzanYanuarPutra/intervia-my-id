@@ -2435,7 +2435,7 @@ export default function PublicProfileClient({
 
             {activeProfileTab === 'posts' ? (
               <div className="p-2.5 sm:p-5">
-                <div className="grid gap-2 min-[520px]:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
                   <ProfileFilterStrip
                     activeKey={resolvedContentTab}
                     ariaLabel={localeCode === 'id' ? 'Filter etalase' : 'Storefront filter'}
