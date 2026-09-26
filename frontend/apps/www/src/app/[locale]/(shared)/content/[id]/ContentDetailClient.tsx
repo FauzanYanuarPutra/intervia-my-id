@@ -2197,7 +2197,9 @@ export default function ContentDetailClient({
   const localeCode = locale === 'id' ? 'id' : 'en';
   const ownerCandidateIds = [
     item.owner_id,
+    item.owner_profile?.id,
     typeof meta.owner_id === 'string' ? meta.owner_id : null,
+    typeof meta.owner_profile_id === 'string' ? meta.owner_profile_id : null,
     typeof meta.seller_id === 'string' ? meta.seller_id : null,
     typeof meta.user_id === 'string' ? meta.user_id : null,
     typeof meta.contact_user_id === 'string' ? meta.contact_user_id : null,
