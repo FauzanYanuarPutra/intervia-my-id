@@ -1338,7 +1338,7 @@ pub async fn patch_connection(
     Path(id): Path<Uuid>,
     Json(payload): Json<ConnectionPatch>,
 ) -> impl IntoResponse {
-    let actor = match require_agent(&headers, &state) {
+    let _actor = match require_agent(&headers, &state) {
         Ok(user_id) => user_id,
         Err(response) => return response,
     };
