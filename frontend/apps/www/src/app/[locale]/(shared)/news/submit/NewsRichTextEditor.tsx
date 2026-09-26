@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { sanitizeNewsRichText } from '@/lib/newsRichText';
+import { normalizeSafeExternalHttpUrl } from 'lajukan-ui';
 import { normalizeNewsMediaUrl } from '@/lib/newsMediaUrl';
 import { Bold, Code2, Eye, Heading2, Heading3, ImagePlus, Italic, Link2, List, ListOrdered, Quote, Redo2, Undo2, Underline, Upload } from 'lucide-react';
 
@@ -54,7 +55,7 @@ export default function NewsRichTextEditor({ value, onChange, locale }: Props) {
     const url = window.prompt(isId ? 'URL tautan' : 'Link URL');
     if (!url) return;
     try {
-      const safeUrl = normalizeNewsMediaUrl(url);
+      const safeUrl = normalizeSafeExternalHttpUrl(url);
       if (!safeUrl) return;
       command('createLink', safeUrl);
     } catch {}
