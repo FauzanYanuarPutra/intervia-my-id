@@ -2320,6 +2320,57 @@ function HomeListingCarouselSection({
   );
 }
 
+function MarketplaceIntentPanel({ isId }: { isId: boolean }) {
+  return (
+    <section
+      className="w-full min-w-0 py-1.5 sm:py-2"
+      aria-label={isId ? 'Mulai di Lajukan' : 'Start on Lajukan'}
+    >
+      <div className="grid min-w-0 gap-2 px-1 sm:grid-cols-2 sm:px-3 md:px-6">
+        <Link
+          href="/create?side=supply"
+          className="group flex min-h-[78px] min-w-0 items-center gap-3 rounded-[18px] border border-emerald-200 bg-emerald-50/70 px-3.5 py-3 transition hover:-translate-y-0.5 hover:border-emerald-300 hover:bg-emerald-50 dark:border-emerald-400/15 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/15"
+        >
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-emerald-700 text-white shadow-sm">
+            <Store className="h-4.5 w-4.5" />
+          </span>
+          <span className="min-w-0">
+            <span className="block text-xs font-black text-emerald-950 dark:text-emerald-100">
+              {isId ? 'Menawarkan' : 'Offering'}
+            </span>
+            <span className="mt-0.5 block truncate text-[10px] font-semibold text-emerald-800/75 dark:text-emerald-200/75">
+              {isId
+                ? 'Tampilkan produk, jasa, atau peluang usahamu.'
+                : 'Show your products, services, or business opportunities.'}
+            </span>
+          </span>
+          <ChevronRight className="ml-auto h-4 w-4 shrink-0 text-emerald-700 transition-transform group-hover:translate-x-0.5 dark:text-emerald-200" />
+        </Link>
+
+        <Link
+          href="/create?side=demand"
+          className="group flex min-h-[78px] min-w-0 items-center gap-3 rounded-[18px] border border-blue-200 bg-blue-50/70 px-3.5 py-3 transition hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-50 dark:border-blue-400/15 dark:bg-blue-500/10 dark:hover:bg-blue-500/15"
+        >
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-blue-700 text-white shadow-sm">
+            <Search className="h-4.5 w-4.5" />
+          </span>
+          <span className="min-w-0">
+            <span className="block text-xs font-black text-blue-950 dark:text-blue-100">
+              {isId ? 'Membutuhkan' : 'Needs'}
+            </span>
+            <span className="mt-0.5 block truncate text-[10px] font-semibold text-blue-800/75 dark:text-blue-200/75">
+              {isId
+                ? 'Tulis kebutuhan agar penyedia yang relevan bisa menemukanmu.'
+                : 'Post a need so relevant providers can find you.'}
+            </span>
+          </span>
+          <ChevronRight className="ml-auto h-4 w-4 shrink-0 text-blue-700 transition-transform group-hover:translate-x-0.5 dark:text-blue-200" />
+        </Link>
+      </div>
+    </section>
+  );
+}
+
 export function RecommendationsSection({
   isId,
   items,
@@ -4359,6 +4410,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
         <HomeBusinessMapSection locale={locale} />
         <DailyLoginRewardCard locale={locale} compact />
         <TrendingSearchSection isId={isId} />
+        <MarketplaceIntentPanel isId={isId} />
 
         <PublicReferencesSection isId={isId} items={publicReferences} />
         {recommendationsLoading ? (
@@ -4428,6 +4480,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
         <HomeBusinessMapSection locale={locale} />
               <DailyLoginRewardCard locale={locale} compact />
               <TrendingSearchSection isId={isId} />
+              <MarketplaceIntentPanel isId={isId} />
 
               <PublicReferencesSection isId={isId} items={publicReferences} />
               {recommendationsLoading ? (
