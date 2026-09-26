@@ -2218,6 +2218,41 @@ export default function ContentDetailClient({
     Boolean(normalizedPeerUserId) &&
     viewerId === normalizedPeerUserId;
   const isSelfPeer = isOwner;
+  const normalizedContentStatus = String(
+    item.content_status || item.status || meta.content_status || meta.status || '',
+  )
+    .trim()
+    .toLowerCase();
+
+  const isLiveContent = normalizedContentStatus === 'active' ||
+    normalizedContentStatus === 'published' ||
+    normalizedContentStatus === 'live';
+  const wasPreviouslyPublished = Boolean(item.published_at);
+  const ownerNeedsReview =
+    isOwner &&
+    normalizedContentStatus === 'draft' &&
+    wasPreviouslyPublished;
+
+  const ownerStatusLabel = ownerNeedsReview
+    ? locale === 'id'
+      ? 'Menunggu review'
+      : 'Waiting for review'
+    : normalizedContentStatus === 'draft'
+      ? 'Draft'
+      : normalizedContentStatus === 'paused'
+        ? locale === 'id'
+          ? 'Dijeda'
+          : 'Paused'
+        : normalizedContentStatus === 'archived'
+          ? locale === 'id'
+            ? 'Diarsipkan'
+            : 'Archived'
+          : isLiveContent
+            ? locale === 'id'
+              ? 'Tayang'
+              : 'Live'
+            : normalizedContentStatus || (locale === 'id' ? 'Belum tayang' : 'Not live');
+
   const sectorId = meta.sector as string | undefined;
   const sectorObj = sectorId ? getSectorById(sectorId) : null;
   const images = getImages(item);
@@ -4687,18 +4722,37 @@ export default function ContentDetailClient({
                         <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300">
                           {locale === 'id' ? 'Punya kamu' : 'Yours'}
                         </p>
-                        <p className="mt-1 text-xs font-semibold leading-5 text-emerald-900 dark:text-emerald-100">
-                          {locale === 'id'
-                            ? 'Kamu adalah pemilik listing ini. Aksi pembeli disembunyikan dari tampilan kamu.'
-                            : 'You own this listing. Buyer actions are hidden from your view.'}
-                        </p>
+                        <div className="mt-1 flex flex-wrap items-center gap-2">
+                          <span className="inline-flex min-h-6 items-center rounded-full bg-white/75 px-2 py-1 text-[10px] font-black text-emerald-800 ring-1 ring-emerald-200/70 dark:bg-white/10 dark:text-emerald-100 dark:ring-emerald-300/20">
+                            {ownerStatusLabel}
+                          </span>
+                          <p className="text-xs font-semibold leading-5 text-emerald-900 dark:text-emerald-100">
+                            {ownerNeedsReview
+                              ? locale === 'id'
+                                ? 'Perubahanmu sudah disimpan dan sedang menunggu persetujuan sebelum tayang lagi.'
+                                : 'Your changes are saved and waiting for approval before going live again.'
+                              : isLiveContent
+                                ? locale === 'id'
+                                  ? 'Kamu adalah pemilik listing ini. Jika diedit, perubahan final akan masuk review sebelum tayang lagi.'
+                                  : 'You own this listing. Final edits return to review before going live again.'
+                                : locale === 'id'
+                                  ? 'Kamu adalah pemilik listing ini. Aksi pembeli disembunyikan dari tampilan kamu.'
+                                  : 'You own this listing. Buyer actions are hidden from your view.'}
+                          </p>
+                        </div>
                       </div>
                       <Link
                         href={`/create?draft=${encodeURIComponent(item.id)}`}
                         className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-full bg-emerald-700 px-3.5 text-xs font-black text-white transition hover:bg-emerald-800"
                       >
                         <Pencil className="h-3.5 w-3.5" />
-                        {locale === 'id' ? 'Edit listing' : 'Edit listing'}
+                        {ownerNeedsReview
+                          ? locale === 'id'
+                            ? 'Lanjutkan edit'
+                            : 'Continue editing'
+                          : locale === 'id'
+                            ? 'Edit listing'
+                            : 'Edit listing'}
                       </Link>
                     </div>
                   ) : null}
