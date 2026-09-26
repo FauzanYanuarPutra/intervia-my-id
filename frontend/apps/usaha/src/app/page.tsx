@@ -20,7 +20,6 @@ import {
   listControlFinanceEntries,
   listControlIngredients,
   listControlSales,
-  listControlSettlements,
 } from '@/lib/business-control-server';
 import { buildHomeDashboard } from '@/lib/business-control/home-dashboard';
 import { jakartaDateKey, summarizeControlCenter } from '@/lib/business-control/insights';
@@ -133,11 +132,10 @@ export default async function HomePage({
       : Promise.resolve([]),
   });
 
-  const [financeCore, workItems, saleRecords, settlementRecords] = await Promise.all([
+  const [financeCore, workItems, saleRecords] = await Promise.all([
     canViewFinance ? getFinanceCoreSummary(business.id).catch(() => null) : Promise.resolve(null),
     listBusinessWork(business.id).catch(() => []),
     canViewOrders ? listControlSales(business.id).catch(() => []) : Promise.resolve([]),
-    canViewFinance ? listControlSettlements(business.id).catch(() => []) : Promise.resolve([]),
   ]);
 
   const today = jakartaDateKey();
@@ -155,7 +153,6 @@ export default async function HomePage({
   const todayGrossProfit = todayCostIncomplete
     ? null
     : todayRevenue - todaySales.reduce((total, item) => total + Math.max(0, item.sale.cogs_amount ?? 0), 0);
-  const unreconciledSettlementCount = settlementRecords.filter(item => item.status !== 'matched').length;
   const stockAttention =
     (business.lowStockProductsCount ?? 0) +
     (business.stockCheckCount ?? 0) +
@@ -174,7 +171,7 @@ export default async function HomePage({
     lowStockCount: stockAttention,
     enabledChannelCount: control.enabledChannelCount,
     productsMissingChannelPriceCount: null,
-    unreconciledSettlementCount,
+    unreconciledSettlementCount: 0,
     financeEntryCount: financeEntries.length,
     canViewBuyerPage,
     buyerPageReady: business.buyerPageReady,
