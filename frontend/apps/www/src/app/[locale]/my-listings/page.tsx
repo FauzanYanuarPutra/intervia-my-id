@@ -14,6 +14,7 @@ import {
   type ListingSide,
 } from '@/lib/content/listingSide';
 import { getExploreCategoryById, getExploreCategoryBySlug } from '@/lib/discovery/lajukanCategories';
+import { isListingContentType } from '@/lib/content/listingTypes';
 import { EmptyState } from '@/components/system/feedback/EmptyState';
 import { useDialog } from '@/components/system/feedback/DialogProvider';
 import {
@@ -62,16 +63,6 @@ type ListingItem = {
   created_at?: string;
   metadata?: Record<string, unknown> | null;
 };
-
-const VALID_LISTING_TYPES = new Set([
-  'product',
-  'service',
-  'job',
-  'property',
-  'tool_rental',
-  'company',
-  'business_transfer',
-]);
 
 const DAILY_ACTIVITY_OPTIONS: Array<{
   id: ListingActivityKind;
@@ -189,7 +180,7 @@ function readListingActivity(item: ListingItem): {
 
 function payloadListingType(item: ListingItem): string {
   const raw = (item.content_type || item.type || '').toLowerCase();
-  return VALID_LISTING_TYPES.has(raw) ? raw : 'product';
+  return isListingContentType(raw) ? raw : 'product';
 }
 
 function buildDailyActivityMetadata(
