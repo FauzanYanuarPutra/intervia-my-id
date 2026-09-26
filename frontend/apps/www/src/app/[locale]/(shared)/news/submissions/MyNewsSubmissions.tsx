@@ -5,6 +5,8 @@ import { useSearchParams } from 'next/navigation';
 import { Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import NewsRichTextEditor from '../submit/NewsRichTextEditor';
+import { plainTextToNewsHtml } from '@/lib/newsRichText';
+import { normalizeNewsMediaUrl } from '@/lib/newsMediaUrl';
 
 type NewsItem = {
   id: string;
@@ -85,12 +87,7 @@ function escapeHtml(value: string): string {
 }
 
 function fallbackRichBody(value: string): string {
-  return value
-    .split(/\r?\n\r?\n+/)
-    .map(paragraph => paragraph.trim())
-    .filter(Boolean)
-    .map(paragraph => `<p>${escapeHtml(paragraph)}</p>`)
-    .join('');
+  return plainTextToNewsHtml(value);
 }
 
 function formatDate(value?: string | null, locale = 'id-ID'): string {
@@ -140,7 +137,7 @@ export function submissionFormFromItem(item: NewsItem): SubmissionForm {
     category,
     article_kind: kind,
     location: text(news.location),
-    cover_image: text(item.cover_image),
+    cover_image: normalizeNewsMediaUrl(item.cover_image) || '',
     topics: topics(item.tags, category, kind).join(', '),
     source_urls: urls(news.source_urls).join('\n'),
   };
