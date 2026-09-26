@@ -1,3 +1,5 @@
+import { absoluteNewsMediaUrl, normalizeNewsMediaUrl } from './newsMediaUrl';
+
 const SITE_URL = (process.env.NEXT_PUBLIC_APP_URL || 'https://www.lajukan.com').replace(/\/+$/, '');
 const MARKETPLACE_URL = (
   process.env.INTERNAL_MARKETPLACE_URL ||
@@ -134,7 +136,7 @@ export function normalizeNewsArticle(row: RawNewsRow): LajukanNewsArticle | null
     body: readString(row.body),
     richBody: readString(news.rich_body),
     tags: publicTags,
-    coverImage: readString(row.cover_image) || null,
+    coverImage: normalizeNewsMediaUrl(row.cover_image),
     category,
     articleKind,
     editorialStatus,
@@ -342,7 +344,7 @@ export function buildNewsArticleJsonLd(article: LajukanNewsArticle, locale: stri
     '@id': `${url}#newsarticle`,
     headline: article.title,
     description: article.summary || undefined,
-    image: article.coverImage ? [article.coverImage] : [`${SITE_URL}/opengraph-image.png`],
+    image: article.coverImage ? [absoluteNewsMediaUrl(article.coverImage) || `${SITE_URL}/opengraph-image.png`] : [`${SITE_URL}/opengraph-image.png`],
     datePublished: article.publishedAt,
     dateModified: article.updatedAt,
     inLanguage: article.language === 'en' ? 'en-US' : 'id-ID',
