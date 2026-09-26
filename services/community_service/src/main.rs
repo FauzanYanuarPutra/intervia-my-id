@@ -2007,7 +2007,7 @@ async fn ensure_forum_user(db: &PgPool, actor: &AuthActor) -> ApiResult<ForumUse
         })
         .unwrap_or_else(|| "/default-avatar.svg".to_string());
 
-    sqlx::query_as::<_, ForumUser>(
+    let forum_user = sqlx::query_as::<_, ForumUser>(
         r#"
         INSERT INTO forum.lajukan_forum_users
           (id, username, name, avatar_url, title, reputation, base_reputation, badges, created_at, updated_at)
@@ -2029,7 +2029,10 @@ async fn ensure_forum_user(db: &PgPool, actor: &AuthActor) -> ApiResult<ForumUse
     .map_err(|error| {
         tracing::error!("ensure_forum_user error: {:?}", error);
         ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "Failed to ensure forum user")
-    })
+    })?;
+
+    ensure_platform_group_admin_memberships(db, &forum_user.id, actor).await?;
+    Ok(forum_user)
 }
 
 async fn ensure_platform_group_admin_memberships(
@@ -2069,7 +2072,6 @@ async fn sync_current_profile(
 ) -> ApiResult<Json<ForumUser>> {
     let actor = require_actor(&headers, &state)?;
     let forum_user = ensure_forum_user(&state.db, &actor).await?;
-    ensure_platform_group_admin_memberships(&state.db, &forum_user.id, &actor).await?;
     Ok(Json(forum_user))
 }
 
