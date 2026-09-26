@@ -15,7 +15,7 @@ import { NewsArticleMedia } from '@/components/news/NewsMedia';
 import { NewsCarousel } from '@/components/news/NewsCarousel';
 import { serializeJsonLd } from '@/lib/seo/jsonLd';
 import { absoluteNewsMediaUrl } from '@/lib/newsMediaUrl';
-import { sanitizeNewsRichText } from '@/lib/newsRichText';
+import { plainTextToNewsHtml, sanitizeNewsRichText } from '@/lib/newsRichText';
 import NewsAnalytics from './NewsAnalytics';
 import NewsShareActions from './NewsShareActions';
 
@@ -124,7 +124,9 @@ export default async function NewsArticlePage({ params }: PageProps) {
 
   const isRetracted = article.editorialStatus === 'retracted';
   const relatedArticles = isRetracted ? [] : await getRelatedNewsArticles(article, 4);
-  const paragraphs = article.body.split(/\n{2,}/).map(part => part.trim()).filter(Boolean);
+  const articleRichHtml = sanitizeNewsRichText(
+    article.richBody || plainTextToNewsHtml(article.body),
+  );
   const articleText = article.body || article.richBody.replace(/<[^>]+>/g, ' ');
   const estimatedMinutes = readingMinutes(articleText);
 
@@ -245,12 +247,10 @@ export default async function NewsArticlePage({ params }: PageProps) {
               </section>
             ) : (
               <>
-                <section className="prose prose-slate max-w-none text-[15px] leading-8 sm:text-[15.5px] dark:prose-invert [&_p]:leading-8 [&_h2]:mt-9 [&_h2]:text-[22px] [&_h2]:font-black [&_h2]:tracking-tight [&_h3]:mt-8 [&_h3]:text-lg [&_h3]:font-black [&_a]:font-semibold [&_a]:text-emerald-700 [&_blockquote]:border-emerald-500 [&_img]:rounded-2xl [&_img]:shadow-sm">
-                  {article.richBody ? (
-                    <div dangerouslySetInnerHTML={{ __html: sanitizeNewsRichText(article.richBody) }} />
-                  ) : (
-                    paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)
-                  )}
+                <section className="prose prose-slate max-w-none text-[15px] leading-8 sm:text-[15.5px] dark:prose-invert [&_p]:mb-5 [&_p]:leading-8 [&_p:last-child]:mb-0 [&_h2]:mt-9 [&_h2]:text-[22px] [&_h2]:font-black [&_h2]:tracking-tight [&_h3]:mt-8 [&_h3]:text-lg [&_h3]:font-black [&_a]:font-semibold [&_a]:text-emerald-700 [&_blockquote]:border-emerald-500 [&_img]:rounded-2xl [&_img]:shadow-sm">
+                  {articleRichHtml ? (
+                    <div dangerouslySetInnerHTML={{ __html: articleRichHtml }} />
+                  ) : null}
                 </section>
 
                 {article.businessImpact ? (
