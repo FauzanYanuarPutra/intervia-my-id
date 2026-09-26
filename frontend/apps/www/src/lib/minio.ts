@@ -143,12 +143,12 @@ export async function uploadToMinIO(
     publicUrl && normalizeSafeExternalHttpUrl(publicUrl)
       ? normalizeSafeExternalHttpUrl(publicUrl)
       : null;
+  const canonicalPublicMediaUrl =
+    `/api/content/media/${encodeURIComponent(bucket)}/${key.split('/').map(encodeURIComponent).join('/')}`;
   const url = personalAiUserId
     ? `/api/ai/personal/media/${encodeURIComponent(bucket)}/${key.split('/').map(encodeURIComponent).join('/')}`
     : roomId === 'content' || roomId === 'forum'
-      ? safePublicUrl
-        ? `${safePublicUrl.replace(/\/$/, '')}/${bucket}/${key}`
-        : `/api/content/media/${encodeURIComponent(bucket)}/${key.split('/').map(encodeURIComponent).join('/')}`
+      ? canonicalPublicMediaUrl
       : `/api/chat/media/${encodeURIComponent(bucket)}/chat/${encodeURIComponent(roomId)}/${contentHash}${ext}`;
 
   return { url, key };
