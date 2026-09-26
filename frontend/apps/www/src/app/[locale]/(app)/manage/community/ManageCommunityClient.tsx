@@ -18,7 +18,6 @@ import {
   ExternalLink,
   Heart,
   ImageIcon,
-  LayoutGrid,
   Loader2,
   MessageCircle,
   Plus,
@@ -136,7 +135,6 @@ type ManageCopy = Record<
   | 'loadFailed'
   | 'noSearch'
   | 'open'
-  | 'otherTools'
   | 'partialLoadFailed'
   | 'postContent'
   | 'posts'
@@ -273,8 +271,6 @@ export default function ManageCommunityClient({
             review: 'Ditinjau',
             inactive: 'Tidak aktif',
             result: 'konten',
-            otherTools: 'Kelola lainnya',
-            listings: 'Listing',
           }
         : {
             title:
@@ -830,27 +826,7 @@ export default function ManageCommunityClient({
         ) : null}
       </section>
 
-      <section className="flex flex-wrap items-center gap-2 border-t border-[color:var(--app-border)] pt-3">
-        <span className="mr-1 text-[11px] font-bold text-[color:var(--app-text-soft)]">
-          {copy.otherTools}
-        </span>
-        <Link
-          href="/my-listings"
-          className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-[11px] font-bold text-[color:var(--app-text-soft)] transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)]"
-        >
-          <LayoutGrid className="h-3.5 w-3.5" />
-          {copy.listings}
-        </Link>
-        {mode !== 'community' ? null : (
-          <Link
-            href="/manage/reels"
-            className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-[11px] font-bold text-[color:var(--app-text-soft)] transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)]"
-          >
-            <Clapperboard className="h-3.5 w-3.5" />
-            {copy.reels}
-          </Link>
-        )}
-      </section>
+
 
       <EditorModal
         editor={editor}
