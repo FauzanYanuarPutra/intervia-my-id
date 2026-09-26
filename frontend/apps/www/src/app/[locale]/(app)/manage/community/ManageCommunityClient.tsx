@@ -232,7 +232,7 @@ export default function ManageCommunityClient({
             refresh: 'Perbarui',
             createPost: 'Buat postingan',
             createReel: 'Buat reels',
-            back: 'Pusat kelola',
+            back: 'Kembali ke Konten',
             searchPlaceholder:
               activeTab === 'community'
                 ? 'Cari judul atau tag...'
@@ -294,7 +294,7 @@ export default function ManageCommunityClient({
             refresh: 'Refresh',
             createPost: 'Create post',
             createReel: 'Create reel',
-            back: 'Manage hub',
+            back: 'Back to Content',
             searchPlaceholder:
               activeTab === 'community'
                 ? 'Search title or tag...'
@@ -672,7 +672,7 @@ export default function ManageCommunityClient({
       <header className="flex min-w-0 flex-col gap-3 border-b border-[color:var(--app-border)] pb-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
           <Link
-            href="/manage"
+            href="/manage/content"
             className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[color:var(--app-text-soft)] transition hover:text-[color:var(--app-accent)] sm:text-xs"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
