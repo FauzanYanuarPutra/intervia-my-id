@@ -1301,7 +1301,7 @@ export default function TransactionsPage() {
         throw new Error(
           asString('error' in payload ? payload.error : '') ||
           (locale === 'id'
-            ? 'Riwayat transaksi belum bisa dimuat.'
+            ? 'Riwayat transaksi belum bisa dimuat. Coba lagi ya.'
             : 'Unable to load transactions.'),
         );
       }
@@ -1319,7 +1319,7 @@ export default function TransactionsPage() {
         resolveFriendlyFetchError(
           locale,
           error,
-          'Riwayat transaksi belum bisa dimuat. Coba lagi sebentar.',
+          'Riwayat transaksi belum bisa dimuat. Coba lagi ya. Coba lagi ya.',
           'Unable to load transactions right now. Please try again.',
         ),
       );
@@ -1344,7 +1344,7 @@ export default function TransactionsPage() {
           'error' in payload && payload.error
             ? payload.error
             : locale === 'id'
-              ? 'Gagal memuat saldo wallet.'
+              ? 'Saldo wallet belum bisa dimuat. Coba lagi ya.'
               : 'Failed to load wallet balance.',
         );
       }
@@ -1363,7 +1363,7 @@ export default function TransactionsPage() {
         error instanceof Error
           ? error.message
           : locale === 'id'
-            ? 'Gagal memuat saldo wallet.'
+            ? 'Saldo wallet belum bisa dimuat. Coba lagi ya.'
             : 'Failed to load wallet balance.',
       );
     } finally {
@@ -1387,7 +1387,7 @@ export default function TransactionsPage() {
         throw new Error(
           payload.error ||
           (locale === 'id'
-            ? 'Gagal memuat saldo koin.'
+            ? 'Saldo koin belum bisa dimuat. Coba lagi ya.'
             : 'Failed to load coin balance.'),
         );
       }
@@ -1398,7 +1398,7 @@ export default function TransactionsPage() {
         error instanceof Error
           ? error.message
           : locale === 'id'
-            ? 'Gagal memuat saldo koin.'
+            ? 'Saldo koin belum bisa dimuat. Coba lagi ya.'
             : 'Failed to load coin balance.',
       );
     } finally {
@@ -2288,7 +2288,7 @@ export default function TransactionsPage() {
     if (!cancelReasonCode.trim()) {
       setCancelError(
         locale === 'id'
-          ? 'Pilih alasan pembatalan.'
+          ? 'Pilih alasannya dulu ya.'
           : 'Choose a cancellation reason.',
       );
       return;
