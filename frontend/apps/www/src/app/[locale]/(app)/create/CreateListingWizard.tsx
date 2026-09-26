@@ -1496,7 +1496,7 @@ export default function CreateListingWizard({
       'idle',
     );
 
-  const [lastSavedAt, setLastSavedAt] =
+  const [lastTersimpanAt, setLastTersimpanAt] =
     useState<
       string | undefined
     >();
@@ -1686,7 +1686,7 @@ export default function CreateListingWizard({
         draftVersionRef.current =
           draft.draftVersion;
 
-        setLastSavedAt(
+        setLastTersimpanAt(
           draft.updatedAt,
         );
 
@@ -2310,7 +2310,7 @@ export default function CreateListingWizard({
             },
           );
 
-        setLastSavedAt(
+        setLastTersimpanAt(
           next.updatedAt,
         );
 
@@ -2683,7 +2683,7 @@ export default function CreateListingWizard({
           'saved',
         );
 
-        setLastSavedAt(
+        setLastTersimpanAt(
           new Date().toISOString(),
         );
 
@@ -3058,7 +3058,7 @@ export default function CreateListingWizard({
               setEditingContentStatus(nextStatus);
             }
             setSaveStatus('saved');
-            setLastSavedAt(new Date().toISOString());
+            setLastTersimpanAt(new Date().toISOString());
             return;
           }
 
@@ -3149,7 +3149,7 @@ export default function CreateListingWizard({
             syncServerDraftState(nextDraft);
           }
           setSaveStatus('saved');
-          setLastSavedAt(new Date().toISOString());
+          setLastTersimpanAt(new Date().toISOString());
         };
 
         const promise = execute()
@@ -5232,7 +5232,7 @@ export default function CreateListingWizard({
           )
         : text(
             locale,
-            'Belum memilih tujuan',
+            'Kita tentukan dulu ya: kamu mau menawarkan atau sedang mencari sesuatu?',
             'Purpose not selected',
           );
 
@@ -5626,7 +5626,7 @@ export default function CreateListingWizard({
     currentStep === 1
       ? text(
           locale,
-          'Pilih satu. Setelah itu Lajukan akan menyesuaikan pertanyaannya.',
+          'Pilih satu dulu ya. Setelah itu pertanyaannya akan menyesuaikan sendiri.',
           'Choose one. Lajukan will adapt the next questions for you.',
         )
       : currentStep === 2
@@ -7629,7 +7629,7 @@ export default function CreateListingWizard({
                   ? text(
                       locale,
                       'Tersimpan di perangkat. Akan dicoba lagi saat online.',
-                      'Saved on this device. We will retry when online.',
+                      'Sudah disimpan di perangkat ini. Kalau koneksi balik, kita coba lagi otomatis.',
                     )
                   : saveStatus ===
                       'error'
@@ -7638,16 +7638,16 @@ export default function CreateListingWizard({
                         'Ada masalah saat menyimpan ke server. Data di perangkat tetap aman.',
                         'There was a server save problem. Your local data is still safe.',
                       )
-                    : lastSavedAt
+                    : lastTersimpanAt
                       ? text(
                           locale,
                           'Tersimpan',
-                          'Saved',
+                          'Tersimpan',
                         )
                       : text(
                           locale,
                           'Tersimpan di perangkat',
-                          'Saved on this device',
+                          'Sudah disimpan di perangkat ini',
                         )}
             </span>
 
@@ -7735,7 +7735,7 @@ export default function CreateListingWizard({
                   {text(
                     locale,
                     'Progres tersimpan',
-                    'Saved progress',
+                    'Progress kamu sudah tersimpan',
                   )}{' '}
                   {Math.min(
                     100,
