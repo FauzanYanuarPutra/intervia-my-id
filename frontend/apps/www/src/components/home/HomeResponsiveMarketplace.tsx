@@ -4034,7 +4034,45 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
         );
       }
 
-      const mapped = (payload?.items || [])
+      let feedPayload = payload;
+
+      // A guest/"For you" feed can legitimately return no rows when there is no
+      // personalization context yet. Home should still surface real community
+      // discussions instead of showing a misleading empty state.
+      if (
+        response.ok &&
+        activeTab === 'for-you' &&
+        (payload?.items || []).filter(item => item.kind !== 'reel').length === 0
+      ) {
+        try {
+          const fallbackParams = new URLSearchParams({
+            tab: 'community',
+            limit: String(HOME_COMMUNITY_PAGE_SIZE),
+            cursor: '0',
+            sort: 'new-posts',
+          });
+          const fallbackResponse = await fetch(
+            `/api/community/feed?${fallbackParams.toString()}`,
+            {
+              cache: 'no-store',
+              credentials: 'include',
+              signal: controller.signal,
+            },
+          );
+          const fallbackPayload = (await fallbackResponse
+            .json()
+            .catch(() => null)) as CommunityFeedResponse | null;
+
+          if (fallbackResponse.ok && (fallbackPayload?.items || []).length > 0) {
+            feedPayload = fallbackPayload;
+          }
+        } catch {
+          // Keep the original response. The existing empty/error UI remains the
+          // final fallback when both personalized and public feeds are empty.
+        }
+      }
+
+      const mapped = (feedPayload?.items || [])
         .filter(item => item.kind !== 'reel')
         .map(item => mapCommunityItemToPost(item, isId, activeTab))
         .slice(0, 3);
