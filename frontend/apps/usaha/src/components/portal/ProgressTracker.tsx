@@ -5,14 +5,15 @@ import type { ProgressStep } from '@/lib/portal-types';
 type ProgressTrackerProps = { steps: ProgressStep[] };
 
 export function ProgressTracker({ steps }: ProgressTrackerProps) {
-  const completedSteps = steps.filter(step => step.done).length;
-  const nextStepIndex = steps.findIndex(step => !step.done);
-  const percentage = steps.length ? Math.round((completedSteps / steps.length) * 100) : 0;
+  const requiredSteps = steps.filter(step => !step.optional);
+  const completedSteps = requiredSteps.filter(step => step.done).length;
+  const nextStepIndex = steps.findIndex(step => !step.done && !step.optional);
+  const percentage = requiredSteps.length ? Math.round((completedSteps / requiredSteps.length) * 100) : 100;
 
   return (
     <div className="space-y-4">
       <div>
-        <div className="flex items-center justify-between gap-3 text-xs font-semibold text-portal-soft"><span>{completedSteps}/{steps.length} langkah selesai</span><span>{percentage}%</span></div>
+        <div className="flex items-center justify-between gap-3 text-xs font-semibold text-portal-soft"><span>{completedSteps}/{requiredSteps.length} langkah inti selesai</span><span>{percentage}%</span></div>
         <div className="mt-2 h-2 overflow-hidden rounded-full bg-portal-mist"><div className="h-full rounded-full bg-portal-forest transition-all" style={{ width: `${percentage}%` }} /></div>
         <p className="mt-2 text-xs leading-5 text-portal-soft">{nextStepIndex >= 0 ? `Berikutnya: ${steps[nextStepIndex].label}` : 'Semua langkah inti sudah selesai.'}</p>
       </div>
@@ -24,7 +25,7 @@ export function ProgressTracker({ steps }: ProgressTrackerProps) {
               {step.done ? <Check className="h-3.5 w-3.5" /> : <Circle className="h-3.5 w-3.5" />}
             </span>
             <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-bold text-portal-ink">{step.label}</p><StatusBadge tone={step.done ? 'success' : index === nextStepIndex ? 'warning' : 'neutral'}>{step.done ? 'Selesai' : index === nextStepIndex ? 'Berikutnya' : 'Menunggu'}</StatusBadge></div>
+              <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-bold text-portal-ink">{step.label}</p><StatusBadge tone={step.done ? 'success' : step.optional ? 'neutral' : index === nextStepIndex ? 'warning' : 'neutral'}>{step.done ? 'Selesai' : step.optional ? 'Opsional' : index === nextStepIndex ? 'Berikutnya' : 'Menunggu'}</StatusBadge></div>
               <p className="mt-1 text-xs leading-5 text-portal-soft">{step.hint}</p>
             </div>
           </article>
