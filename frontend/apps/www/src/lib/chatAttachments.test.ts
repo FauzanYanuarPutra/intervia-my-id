@@ -83,6 +83,25 @@ describe('chat attachment policy', () => {
     ).toEqual({ ok: false, error: 'invalid_attachments' });
   });
 
+  it('accepts a media batch up to 100 and rejects 101 items', () => {
+    const urls = Array.from(
+      { length: 100 },
+      (_, index) => `/api/chat/media/laju-chat/chat/dm_a_b/asset-${index + 1}.webp`,
+    );
+
+    expect(normalizeChatAttachments('image', urls)).toEqual({
+      ok: true,
+      attachments: urls,
+    });
+
+    expect(
+      normalizeChatAttachments('image', [
+        ...urls,
+        '/api/chat/media/laju-chat/chat/dm_a_b/asset-101.webp',
+      ]),
+    ).toEqual({ ok: false, error: 'invalid_attachments' });
+  });
+
   it('keeps commerce data but strips unsafe URL fields recursively', () => {
     const raw = JSON.stringify({
       content_id: 'listing-123',
