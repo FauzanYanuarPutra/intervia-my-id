@@ -12301,6 +12301,17 @@ async fn update_content(
                 (None, None, metadata_before_taxonomy)
             }
         };
+
+    let mut metadata = metadata;
+    if owner_revision_pending {
+        let root = metadata
+            .as_object_mut()
+            .expect("content metadata should remain an object");
+        root.insert(
+            "owner_revision_state".to_string(),
+            json!("pending_review"),
+        );
+    }
     if !metadata_within_limit(&metadata) {
         return err(StatusCode::BAD_REQUEST, "metadata payload is too large").into_response();
     }
