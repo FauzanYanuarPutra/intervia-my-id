@@ -25,11 +25,8 @@ function errorResponse(message: string, status: 404 | 503) {
   );
 }
 
-function missingContentMediaResponse(headOnly: boolean) {
-  return errorResponse(
-    headOnly ? 'Media not found' : 'Media not found',
-    404,
-  );
+function missingContentMediaResponse() {
+  return errorResponse('Media not found', 404);
 }
 
 function successHeaders(metadata: PublicMediaMetadata): HeadersInit {
@@ -116,7 +113,7 @@ async function handlePublicMedia(
     if (parsed.key.startsWith('content/')) {
       const local = await localFallback(parsed.key, headOnly);
       if (local.status === 200) return local;
-      return missingContentMediaResponse(headOnly);
+      return missingContentMediaResponse();
     }
     return errorResponse('Not found', 404);
   }
