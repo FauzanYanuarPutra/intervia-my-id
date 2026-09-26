@@ -145,26 +145,53 @@ export default function NewsRichTextEditor({ value, onChange, locale }: Props) {
 
   return (
     <div className="mt-1 overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950">
-      <div className="flex flex-wrap items-center gap-1 border-b border-slate-200 bg-slate-50 p-2 dark:border-white/10 dark:bg-white/[0.04]" role="toolbar" aria-label={isId ? 'Format tulisan' : 'Text formatting'}>
-        {tools.map(({ action, Icon }) => (
-          <button key={action} type="button" title={action} onMouseDown={e => e.preventDefault()} onClick={() => {
-            const [name, arg] = action.split(':');
-            command(name, arg);
-          }} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 hover:bg-white hover:text-emerald-700 dark:text-slate-300 dark:hover:bg-white/10">
-            <Icon className="h-4 w-4" />
-          </button>
-        ))}
+      <div
+        className="flex flex-wrap items-center gap-1 border-b border-slate-200 bg-slate-50 p-2 dark:border-white/10 dark:bg-white/[0.04]"
+        role="toolbar"
+        aria-label={isId ? 'Format tulisan' : 'Text formatting'}
+      >
+        {tools.map(({ action, Icon }) => {
+          const [name, arg] = action.split(':');
+          return (
+            <button
+              key={action}
+              type="button"
+              title={action}
+              onMouseDown={event => event.preventDefault()}
+              onClick={() => command(name, arg)}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 hover:bg-white hover:text-emerald-700 dark:text-slate-300 dark:hover:bg-white/10"
+            >
+              <Icon className="h-4 w-4" />
+            </button>
+          );
+        })}
         <span className="mx-1 h-6 w-px bg-slate-200 dark:bg-white/10" />
-        <button type="button" title="Link" onMouseDown={e => e.preventDefault()} onClick={insertLink} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 hover:bg-white hover:text-emerald-700 dark:text-slate-300 dark:hover:bg-white/10"><Link2 className="h-4 w-4" /></button>
-        <button type="button" title="Image URL" onMouseDown={e => e.preventDefault()} onClick={insertImage} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 hover:bg-white hover:text-emerald-700 dark:text-slate-300 dark:hover:bg-white/10"><ImagePlus className="h-4 w-4" /></button>
+        <button type="button" title="Link" onMouseDown={event => event.preventDefault()} onClick={insertLink} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 hover:bg-white hover:text-emerald-700 dark:text-slate-300 dark:hover:bg-white/10">
+          <Link2 className="h-4 w-4" />
+        </button>
+        <button type="button" title="Image URL" onMouseDown={event => event.preventDefault()} onClick={insertImage} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 hover:bg-white hover:text-emerald-700 dark:text-slate-300 dark:hover:bg-white/10">
+          <ImagePlus className="h-4 w-4" />
+        </button>
         <label title={isId ? 'Upload gambar' : 'Upload image'} className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-slate-600 hover:bg-white hover:text-emerald-700 dark:text-slate-300 dark:hover:bg-white/10">
-          {uploadingImage ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-600" /> : <Upload className="h-4 w-4" />}
+          {uploadingImage ? (
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-600" />
+          ) : (
+            <Upload className="h-4 w-4" />
+          )}
           <input type="file" accept="image/*" className="sr-only" disabled={uploadingImage} onChange={uploadImage} />
         </label>
-        <button type="button" title="Undo" onClick={() => command('undo')} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-white/10"><Undo2 className="h-4 w-4" /></button>
-        <button type="button" title="Redo" onClick={() => command('redo')} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-white/10"><Redo2 className="h-4 w-4" /></button>
-        <button type="button" onClick={() => setPreview(v => !v)} className="ml-auto inline-flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-bold text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-white/10"><Eye className="h-4 w-4" />{preview ? (isId ? 'Edit' : 'Edit') : (isId ? 'Preview' : 'Preview')}</button>
+        <button type="button" title="Undo" onClick={() => command('undo')} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-white/10">
+          <Undo2 className="h-4 w-4" />
+        </button>
+        <button type="button" title="Redo" onClick={() => command('redo')} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-white/10">
+          <Redo2 className="h-4 w-4" />
+        </button>
+        <button type="button" onClick={() => setPreview(value => !value)} className="ml-auto inline-flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-bold text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-white/10">
+          <Eye className="h-4 w-4" />
+          {preview ? 'Edit' : 'Preview'}
+        </button>
       </div>
+
       {preview ? (
         <div
           className="prose prose-slate max-w-none min-h-[320px] p-5 dark:prose-invert"
@@ -181,17 +208,32 @@ export default function NewsRichTextEditor({ value, onChange, locale }: Props) {
           aria-multiline="true"
           onInput={emit}
           onBlur={emit}
-           onPaste={handlePaste}
-           className="min-h-[320px] px-5 py-4 text-[15px] font-medium leading-8 text-slate-800 outline-none dark:text-slate-100 [&_blockquote]:my-4 [&_blockquote]:border-l-4 [&_blockquote]:border-emerald-500 [&_blockquote]:pl-4 [&_h2]:mt-5 [&_h2]:text-2xl [&_h2]:font-bold [&_h3]:mt-4 [&_h3]:text-xl [&_h3]:font-bold [&_figure]:my-5 [&_figure]:overflow-hidden [&_figure]:rounded-2xl [&_figure]:bg-slate-50 [&_figure]:dark:bg-white/[0.04] [&_img]:my-0 [&_img]:max-h-[520px] [&_img]:w-full [&_img]:object-cover [&_figcaption]:px-3 [&_figcaption]:py-2 [&_figcaption]:text-xs [&_figcaption]:font-semibold [&_figcaption]:text-slate-500 [&_li]:ml-6 [&_ol]:list-decimal [&_p]:my-3 [&_pre]:overflow-x-auto [&_pre]:rounded-xl [&_pre]:bg-slate-950 [&_pre]:p-4 [&_pre]:text-slate-100 [&_ul]:list-disc"
+          onPaste={handlePaste}
           data-placeholder={isId ? 'Tulis berita kamu di sini...' : 'Write your story here...'}
+          className="min-h-[320px] px-5 py-4 text-[15px] font-medium leading-8 text-slate-800 outline-none dark:text-slate-100"
         />
       )}
+
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 px-4 py-2 text-xs font-semibold text-slate-500 dark:border-white/10 dark:text-slate-400">
-        <span>{plainText.length.toLocaleString()} / {MAX_CHARS.toLocaleString()} {isId ? 'karakter' : 'characters'}</span>
-        <span>{saved ? (isId ? 'Draft tersimpan di perangkat' : 'Draft saved locally') : (isId ? 'Tersimpan otomatis' : 'Autosaved')}</span>
+        <span>
+          {plainText.length.toLocaleString()} / {MAX_CHARS.toLocaleString()} {isId ? 'karakter' : 'characters'}
+        </span>
+        <span>
+          {saved
+            ? isId ? 'Draft tersimpan di perangkat' : 'Draft saved locally'
+            : isId ? 'Tersimpan otomatis' : 'Autosaved'}
+        </span>
       </div>
-      {plainText.length > MAX_CHARS ? <p className="px-4 pb-3 text-xs font-bold text-red-600">{isId ? 'Isi terlalu panjang.' : 'Content is too long.'}</p> : null}
-      <button type="button" onClick={restoreDraft} className="hidden">Restore draft</button>
+
+      {plainText.length > MAX_CHARS ? (
+        <p className="px-4 pb-3 text-xs font-bold text-red-600">
+          {isId ? 'Isi terlalu panjang.' : 'Content is too long.'}
+        </p>
+      ) : null}
+
+      <button type="button" onClick={restoreDraft} className="hidden">
+        Restore draft
+      </button>
     </div>
   );
 }
