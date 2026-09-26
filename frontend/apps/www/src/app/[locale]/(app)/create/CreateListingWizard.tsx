@@ -3473,8 +3473,8 @@ export default function CreateListingWizard({
       if (step === 1 && !intent) {
         setErrorFor(
           '__intent',
-          'Pilih dulu: mau menawarkan atau sedang mencari.',
-          'Choose whether you want to offer something or request something.',
+          'Pilih dulu: mau menawarkan atau membutuhkan sesuatu.',
+          'Choose whether you want to offer something or need something.',
         );
         return errors;
       }
@@ -5195,15 +5195,15 @@ export default function CreateListingWizard({
     'request'
       ? text(
           locale,
-          'Sedang mencari',
-          'Request',
+          'Membutuhkan',
+          'Needs',
         )
       : pendingStoredDraft?.intent ===
           'offer'
         ? text(
             locale,
             'Menawarkan',
-            'Offer',
+            'Offering',
           )
         : text(
             locale,
@@ -5529,8 +5529,8 @@ export default function CreateListingWizard({
         ? intent === 'request'
           ? text(
               locale,
-              'Apa yang sedang kamu cari?',
-              'What are you looking for?',
+              'Apa yang sedang kamu butuhkan?',
+              'What do you need?',
             )
           : text(
               locale,
@@ -5620,7 +5620,7 @@ export default function CreateListingWizard({
             ? intent === 'request'
               ? text(
                   locale,
-                  'Tulis seperti sedang chat dengan supplier: apa yang dicari, jumlahnya, budget kalau ada, dan kapan dibutuhkan.',
+                  'Tulis seperti sedang chat dengan supplier: apa yang dibutuhkan, jumlahnya, budget kalau ada, dan kapan dibutuhkan.',
                   'Write it like a message to a supplier: what you need, quantity, budget if any, and when you need it.',
                 )
               : text(
