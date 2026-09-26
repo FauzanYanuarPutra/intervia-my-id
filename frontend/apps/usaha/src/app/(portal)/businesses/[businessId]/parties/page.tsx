@@ -40,15 +40,23 @@ export default async function BusinessPartiesPage({ params }: PageProps) {
   let payables: CommercialPayable[] = [];
   let loadError = false;
 
-  try {
-    [parties, receivables, payables] = await Promise.all([
-      listCommercialParties(business.id),
-      listCommercialReceivables(business.id),
-      listCommercialPayables(business.id),
-    ]);
-  } catch {
-    loadError = true;
-  }
+  const [partyResult, receivableResult, payableResult] = await Promise.all([
+    listCommercialParties(business.id).catch(() => {
+      loadError = true;
+      return [] as CommercialParty[];
+    }),
+    listCommercialReceivables(business.id).catch(() => {
+      loadError = true;
+      return [] as CommercialReceivable[];
+    }),
+    listCommercialPayables(business.id).catch(() => {
+      loadError = true;
+      return [] as CommercialPayable[];
+    }),
+  ]);
+  parties = partyResult;
+  receivables = receivableResult;
+  payables = payableResult;
 
   return (
     <PortalShell
