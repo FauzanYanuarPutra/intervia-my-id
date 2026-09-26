@@ -76,6 +76,7 @@ export function getBusinessTemplatePreset(key: BusinessTemplateKey): BusinessTem
 export type BusinessCapabilityContext = {
   templateKey?: string | null;
   activeCapabilityKeys?: readonly string[] | null;
+  category?: string | null;
 };
 
 export function resolvedBusinessCapabilityKeys(
@@ -94,9 +95,24 @@ export function resolvedBusinessCapabilityKeys(
   return getBusinessTemplatePreset(templateKey).capabilityHighlights;
 }
 
+function categorySuggestsInventory(category: string | null | undefined) {
+  const value = category?.trim().toLocaleLowerCase('id-ID') ?? '';
+  return /makanan|minuman|f&b|toko|retail|grosir|distributor|manufaktur|produksi|bengkel/.test(value);
+}
+
 export function businessHasCapability(
   context: BusinessCapabilityContext,
   capability: string,
 ): boolean {
-  return resolvedBusinessCapabilityKeys(context).includes(capability);
+  const keys = resolvedBusinessCapabilityKeys(context);
+  if (keys.includes(capability)) return true;
+
+  const templateKey =
+    typeof context.templateKey === 'string' && isBusinessTemplateKey(context.templateKey)
+      ? context.templateKey
+      : 'general';
+
+  return templateKey === 'general' &&
+    capability === 'inventory' &&
+    categorySuggestsInventory(context.category);
 }
