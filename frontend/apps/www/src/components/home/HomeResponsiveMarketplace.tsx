@@ -2551,6 +2551,8 @@ function RecommendationCard({
     item.image || item.images?.[0],
   );
 
+  const isDemand = item.side === 'demand';
+
   const price =
     isDemand
       ? item.price
@@ -2562,7 +2564,6 @@ function RecommendationCard({
     item.distanceLabel || item.location;
 
   const fallbackTitle = isId ? 'Gambar produk' : 'Product image';
-  const isDemand = item.side === 'demand';
   const normalizedStatus = String(item.contentStatus || 'active')
     .trim()
     .toLowerCase()
