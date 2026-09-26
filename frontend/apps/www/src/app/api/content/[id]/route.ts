@@ -524,6 +524,48 @@ export async function PUT(
     forwardPayload.content_status = requestedStatus;
   }
 
+  /*
+   * Explicit owner edits reopen moderation. Autosave is intentionally
+   * excluded so a background save cannot make a live listing disappear.
+   */
+  const currentMetadata =
+    currentState.metadata &&
+    typeof currentState.metadata === 'object' &&
+    !Array.isArray(currentState.metadata)
+      ? { ...(currentState.metadata as Record<string, unknown>) }
+      : {};
+  const forwardMetadata =
+    forwardPayload.metadata &&
+    typeof forwardPayload.metadata === 'object' &&
+    !Array.isArray(forwardPayload.metadata)
+      ? {
+          ...currentMetadata,
+          ...(forwardPayload.metadata as Record<string, unknown>),
+        }
+      : currentMetadata;
+
+  const currentRevisionState =
+    typeof currentMetadata.owner_revision_state === 'string'
+      ? currentMetadata.owner_revision_state.trim().toLowerCase()
+      : '';
+  const shouldReopenModeration =
+    !isWizardAutosave &&
+    (currentStatus === 'active' ||
+      currentStatus === 'published' ||
+      currentStatus === 'live' ||
+      currentRevisionState === 'needs_revision' ||
+      currentRevisionState === 'pending_review');
+
+  if (shouldReopenModeration) {
+    forwardPayload.content_status = 'draft';
+    forwardMetadata.owner_revision_state = 'pending_review';
+    forwardMetadata.owner_revision_requested_at = new Date().toISOString();
+    forwardMetadata.owner_revision_requested_by = auth.ctx.userId;
+    forwardMetadata.owner_revision_previous_status = currentStatus;
+  }
+
+  forwardPayload.metadata = forwardMetadata;
+
   const trustSafetyCandidates = collectTrustSafetyCandidates(forwardPayload);
   for (const candidate of trustSafetyCandidates) {
     const safety = evaluateTrustSafety(candidate.value, {
