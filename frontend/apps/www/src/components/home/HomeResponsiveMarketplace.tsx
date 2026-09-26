@@ -3042,66 +3042,53 @@ function HomeCommunityGroupsSection({
 
 function CommunityPanel({
   isId,
-  activeTab,
-  onTabChange,
   posts,
   loading = false,
   loadError = null,
   onRetry,
 }: {
   isId: boolean;
-  activeTab: CommunityTab;
-  onTabChange: (tab: CommunityTab) => void;
   posts: CommunityPost[];
   loading?: boolean;
   loadError?: string | null;
   onRetry?: () => void;
 }) {
   const router = useRouter();
-  const tabs = getCommunityTabs(isId);
-  const cards = posts
-    .filter(post => post.tab === activeTab)
-    .slice(0, 3)
-    .map(communityPostToFeedItem);
+  const cards = posts.slice(0, 3).map(communityPostToFeedItem);
 
   return (
-    <section className="w-full min-w-0 py-1.5 sm:py-2" aria-label={isId ? 'Komunitas' : 'Community'}>
+    <section
+      className="w-full min-w-0 py-1.5 sm:py-2"
+      aria-label={isId ? 'Diskusi komunitas' : 'Community discussions'}
+    >
       <div className="flex items-center gap-2 px-1 sm:px-3 md:px-6">
-        <Users className="h-4 w-4 shrink-0 text-[color:var(--app-accent)]" />
+        <MessageCircle className="h-4 w-4 shrink-0 text-[color:var(--app-accent)]" />
         <div className="min-w-0">
           <h2 className="truncate text-[11px] font-bold leading-5 tracking-tight text-[color:var(--app-text)] sm:text-xs">
-            {isId ? 'Diskusi komunitas' : 'Community discussions'}
+            {isId ? 'Diskusi terbaru' : 'Latest discussions'}
           </h2>
           <p className="hidden text-[9px] font-semibold text-[color:var(--app-text-soft)] sm:block">
-            {isId ? 'Format posting mengikuti halaman Community.' : 'Same post interactions as the Community page.'}
+            {isId
+              ? 'Percakapan yang relevan tanpa mencampur discovery grup.'
+              : 'Relevant conversations, kept separate from group discovery.'}
           </p>
         </div>
-        <Link href="/community" className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold text-[color:var(--app-accent)] hover:bg-[color:var(--app-accent-soft)]">
-          {isId ? 'Buka komunitas' : 'Open Community'}
+        <Link
+          href="/community"
+          className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold text-[color:var(--app-accent)] hover:bg-[color:var(--app-accent-soft)]"
+        >
+          {isId ? 'Buka diskusi' : 'Open discussions'}
           <ChevronRight className="h-3.5 w-3.5" />
         </Link>
-      </div>
-
-      <div className="mt-2 flex items-center gap-4 overflow-x-auto border-b border-[color:var(--app-border)] px-1 sm:px-3 md:px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {tabs.map(tab => {
-          const Icon = tab.icon;
-          const active = tab.id === activeTab;
-          return (
-            <button key={tab.id} type="button" onClick={() => onTabChange(tab.id)} className={cn(
-              'inline-flex min-h-10 shrink-0 items-center gap-1.5 border-b-2 px-0.5 text-[10px] font-bold transition',
-              active ? 'border-[color:var(--app-accent)] text-[color:var(--app-accent)]' : 'border-transparent text-[color:var(--app-text-soft)] hover:text-[color:var(--app-text)]',
-            )}>
-              <Icon className="h-3.5 w-3.5" />
-              {tab.label}
-            </button>
-          );
-        })}
       </div>
 
       {loading ? (
         <div className="mt-2 space-y-2 px-1 sm:px-3 md:px-6" aria-busy="true">
           {Array.from({ length: 2 }).map((_, index) => (
-            <section key={index} className="overflow-hidden rounded-[20px] border border-[color:var(--app-border)] bg-white">
+            <section
+              key={index}
+              className="overflow-hidden rounded-[20px] border border-[color:var(--app-border)] bg-white"
+            >
               <div className="space-y-2 p-3.5">
                 <Skeleton className="h-4 w-32 rounded-full" />
                 <Skeleton className="h-3 w-48 rounded-full" />
@@ -3112,9 +3099,16 @@ function CommunityPanel({
         </div>
       ) : loadError ? (
         <div className="mt-2 px-1 sm:px-3 md:px-6">
-          <section role="alert" className="rounded-[18px] border border-amber-200 bg-amber-50 p-4">
+          <section
+            role="alert"
+            className="rounded-[18px] border border-amber-200 bg-amber-50 p-4"
+          >
             <p className="text-xs font-bold text-amber-900">{loadError}</p>
-            <button type="button" onClick={() => onRetry?.()} className="mt-3 inline-flex min-h-9 items-center gap-2 rounded-full bg-amber-900 px-3 text-[10px] font-bold text-white">
+            <button
+              type="button"
+              onClick={() => onRetry?.()}
+              className="mt-3 inline-flex min-h-9 items-center gap-2 rounded-full bg-amber-900 px-3 text-[10px] font-bold text-white"
+            >
               <RotateCcw className="h-3.5 w-3.5" />
               {isId ? 'Coba lagi' : 'Try again'}
             </button>
@@ -3128,7 +3122,9 @@ function CommunityPanel({
               item={card}
               isId={isId}
               onOpenDetail={threadId =>
-                router.push(`/community?thread=${encodeURIComponent(threadId)}`)
+                router.push(
+                  `/community?thread=${encodeURIComponent(threadId)}`,
+                )
               }
             />
           ))}
@@ -3140,7 +3136,9 @@ function CommunityPanel({
             {isId ? 'Belum ada diskusi.' : 'No discussions yet.'}
           </p>
           <p className="mt-0.5 text-[10px] leading-4 text-[color:var(--app-text-soft)]">
-            {isId ? 'Buka Community untuk membuat posting pertama.' : 'Open Community to create the first post.'}
+            {isId
+              ? 'Buka Community untuk melihat atau membuat posting.'
+              : 'Open Community to browse or create a post.'}
           </p>
         </section>
       )}
@@ -4336,12 +4334,10 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
         <HomeCommunityGroupsSection
           isId={isId}
           groups={communityGroups}
-          onChanged={() => void loadCommunityPostsPage()}
+          onChanged={() => void loadCommunityGroups()}
         />
         <CommunityPanel
           isId={isId}
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
           posts={communityPosts}
           loading={communityLoading}
           loadError={communityError}
@@ -4406,7 +4402,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
                 <HomeCommunityGroupsSection
                   isId={isId}
                   groups={communityGroups}
-                  onChanged={() => void loadCommunityPostsPage()}
+                  onChanged={() => void loadCommunityGroups()}
                 />
                 <CommunityPanel
                   isId={isId}
