@@ -23,9 +23,9 @@ export function MobileNav({ business, currentSection }: MobileNavProps) {
 
   if (!business) return null;
   const activeBusiness = business;
-  const primary = mobilePrimaryNavigation(activeBusiness.permissions);
+  const primary = mobilePrimaryNavigation(activeBusiness.permissions, activeBusiness);
   const primaryIds = new Set(primary.map(item => item.id));
-  const more = portalMenuNavigation(activeBusiness.permissions).filter(item => !primaryIds.has(item.id));
+  const more = portalMenuNavigation(activeBusiness.permissions, activeBusiness).filter(item => !primaryIds.has(item.id));
   const management = more.filter(item => ['inventory', 'reports', 'channels', 'buyerPage'].includes(item.id));
   const settings = more.filter(item => !management.some(groupItem => groupItem.id === item.id));
 
