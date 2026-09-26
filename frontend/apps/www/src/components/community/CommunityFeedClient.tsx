@@ -6483,6 +6483,7 @@ export default function CommunityFeedClient({
   const [feedError, setFeedError] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
+  const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [membersModalGroup, setMembersModalGroup] =
     useState<CommunityGroup | null>(null);
@@ -6545,6 +6546,11 @@ export default function CommunityFeedClient({
     };
   }, [searchParams]);
 
+  const feedApiPath =
+    activeTab === 'community'
+      ? '/api/community/groups/feed'
+      : '/api/community/feed';
+
   const feedUrl = useMemo(() => {
     const params = new URLSearchParams();
     params.set('tab', activeTab);
@@ -6558,8 +6564,8 @@ export default function CommunityFeedClient({
     if (category) params.set('category', category);
     if (tag) params.set('tag', tag);
     if (thread) params.set('thread', thread);
-    return `/api/community/feed?${params.toString()}`;
-  }, [activeTab, searchParams, submittedQuery, refreshKey]);
+    return `${feedApiPath}?${params.toString()}`;
+  }, [activeTab, feedApiPath, searchParams, submittedQuery, refreshKey]);
 
   const searchUrl = useMemo(() => {
     const cleanQuery = submittedQuery.trim();
@@ -6671,7 +6677,7 @@ export default function CommunityFeedClient({
     };
   }, [isId, searchUrl]);
 
-  const loadMore = async () => {
+  const loadMore = useCallback(async () => {
     if (!hasMore || nextCursor == null || loadingMore) return;
     setLoadingMore(true);
     setLoadMoreError(null);
@@ -6685,7 +6691,7 @@ export default function CommunityFeedClient({
       const tag = searchParams.get('tag');
       if (category) params.set('category', category);
       if (tag) params.set('tag', tag);
-      const response = await fetch(`/api/community/feed?${params.toString()}`, {
+      const response = await fetch(`${feedApiPath}?${params.toString()}`, {
         cache: 'no-store',
         credentials: 'include',
       });
@@ -6713,7 +6719,38 @@ export default function CommunityFeedClient({
     } finally {
       setLoadingMore(false);
     }
-  };
+  }, [
+    activeTab,
+    feedApiPath,
+    hasMore,
+    isId,
+    loadingMore,
+    nextCursor,
+    searchParams,
+    submittedQuery,
+  ]);
+
+  useEffect(() => {
+    const sentinel = loadMoreSentinelRef.current;
+    const root = sentinel?.closest<HTMLElement>('[data-community-feed-scroll]');
+    if (!sentinel || !root || !hasMore || loading || loadingMore) return;
+
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries.some(entry => entry.isIntersecting)) {
+          void loadMore();
+        }
+      },
+      {
+        root,
+        rootMargin: '900px 0px',
+        threshold: 0.01,
+      },
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, loading, loadingMore, loadMore]);
 
   const handleSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -6815,6 +6852,7 @@ export default function CommunityFeedClient({
           <section
             className="min-w-0 space-y-3 pt-2 lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:pr-1"
             data-auto-scrollbar
+            data-community-feed-scroll
           >
             <section className="border-y border-[color:var(--app-border)] bg-white px-3 py-3 sm:rounded-[18px] sm:border-x sm:px-4">
               <div className="flex items-start justify-between gap-3">
@@ -6941,7 +6979,7 @@ export default function CommunityFeedClient({
                   onCreated={handleComposerCreated}
                 />
 
-                {!activeGroup ? (
+                {activeTab === 'community' && !activeGroup ? (
                   <GroupStrip
                     isId={isId}
                     overview={overview}
@@ -7013,10 +7051,15 @@ export default function CommunityFeedClient({
                   </p>
                 ) : null}
                 {hasMore ? (
-                  <div className="flex justify-center py-2">
+                  <div className="flex flex-col items-center gap-2 py-2">
+                    <div
+                      ref={loadMoreSentinelRef}
+                      aria-hidden="true"
+                      className="h-px w-full"
+                    />
                     <button
                       type="button"
-                      onClick={loadMore}
+                      onClick={() => void loadMore()}
                       disabled={loadingMore}
                       className="inline-flex min-h-[40px] items-center justify-center gap-2 rounded-full border border-[color:var(--app-border)] bg-white px-4 text-sm font-semibold text-[color:var(--app-text)] disabled:opacity-60"
                     >
