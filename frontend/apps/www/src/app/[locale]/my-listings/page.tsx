@@ -858,19 +858,7 @@ export default function MyListingsPage() {
                   type="search"
                   value={query}
                   onChange={event => setQuery(event.target.value)}
-                  placeholder={
-                    locale === 'id'
-                      ? isMine
-                        ? 'Cari postingan'
-                        : collectionMode === 'favorites'
-                          ? 'Cari yang disimpan'
-                          : 'Cari riwayat'
-                      : isMine
-                        ? 'Search listings'
-                        : collectionMode === 'favorites'
-                          ? 'Search saved'
-                          : 'Search history'
-                  }
+                  placeholder={locale === 'id' ? 'Cari listing' : 'Search listings'}
                   className="w-full min-w-0 bg-transparent text-[13px] font-semibold text-slate-900 outline-none placeholder:text-slate-400 dark:text-white"
                   aria-label={locale === 'id' ? 'Cari' : 'Search'}
                 />
@@ -887,8 +875,7 @@ export default function MyListingsPage() {
               </label>
             </div>
 
-            {isMine ? (
-              <div className="mt-2 flex min-w-0 gap-2 overflow-x-auto pb-0.5">
+            <div className="mt-2 flex min-w-0 gap-2 overflow-x-auto pb-0.5">
                 {(['all', 'supply', 'demand'] as ListingSideFilter[]).map(side => {
                   const active = sideFilter === side;
                   return (
@@ -941,7 +928,6 @@ export default function MyListingsPage() {
                   );
                 })}
               </div>
-            ) : null}
           </header>
 
           {error ? (
