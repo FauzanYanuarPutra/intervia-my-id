@@ -22,11 +22,40 @@ function isSafeRelativeNewsMediaUrl(value: string): boolean {
   }
 }
 
+function normalizeLegacyContentMediaUrl(value: string): string | null {
+  try {
+    const parsed = new URL(value);
+    const segments = parsed.pathname
+      .split('/')
+      .filter(Boolean)
+      .map(segment => decodeURIComponent(segment));
+    const bucketIndex = segments.findIndex(segment => segment === 'laju-chat');
+    if (bucketIndex < 0) return null;
+
+    const key = segments.slice(bucketIndex + 1);
+    if (
+      key.length < 2 ||
+      key[0] !== 'content' ||
+      key.some(segment => !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,180}$/.test(segment))
+    ) {
+      return null;
+    }
+
+    return `/api/content/media/laju-chat/${key.map(encodeURIComponent).join('/')}`;
+  } catch {
+    return null;
+  }
+}
+
 export function normalizeNewsMediaUrl(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const clean = value.trim();
   if (!clean) return null;
   if (isSafeRelativeNewsMediaUrl(clean)) return clean;
+
+  const legacyCanonical = normalizeLegacyContentMediaUrl(clean);
+  if (legacyCanonical) return legacyCanonical;
+
   return normalizeSafeExternalHttpUrl(clean);
 }
 
