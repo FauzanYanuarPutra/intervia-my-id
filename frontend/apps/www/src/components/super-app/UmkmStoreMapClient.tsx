@@ -1148,6 +1148,7 @@ function StoreMarkersLayer({
   onMarkerFocus,
   isId,
   interactive,
+  showPopups,
 }: {
   storePresentations: StorePresentation[];
   selectedStoreId?: string | null;
