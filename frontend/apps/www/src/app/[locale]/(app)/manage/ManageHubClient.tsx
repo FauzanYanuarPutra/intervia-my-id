@@ -13,16 +13,15 @@ import {
   Bot,
   CheckCircle2,
   ChevronRight,
-  Clapperboard,
   ClipboardList,
   Loader2,
   Megaphone,
   MessageCircle,
+  Newspaper,
   Package,
   Plus,
   RefreshCw,
   Store,
-  Users,
 } from 'lucide-react';
 
 import { useAuth } from '@/context/AuthContext';
@@ -39,6 +38,7 @@ type CountState = {
   archivedListings: number;
   communityPosts: number;
   reels: number;
+  newsSubmissions: number;
   activeTransactions: number;
   unreadChats: number;
   businesses: number;
@@ -80,6 +80,7 @@ const EMPTY_COUNTS: CountState = {
   archivedListings: 0,
   communityPosts: 0,
   reels: 0,
+  newsSubmissions: 0,
   activeTransactions: 0,
   unreadChats: 0,
   businesses: 0,
@@ -320,6 +321,9 @@ export default function ManageHubClient({ isId }: ManageHubClientProps) {
           authFetch('/api/reels?mine=true&limit=50', {
             cache: 'no-store',
           }),
+          authFetch('/api/news/submissions?limit=50', {
+            cache: 'no-store',
+          }),
           authFetch('/api/transactions?limit=50', {
             cache: 'no-store',
           }),
@@ -345,6 +349,7 @@ export default function ManageHubClient({ isId }: ManageHubClientProps) {
           archivedPayload,
           communityPayload,
           reelsPayload,
+          newsPayload,
           transactionPayload,
           inboxPayload,
           storesPayload,
@@ -373,6 +378,7 @@ export default function ManageHubClient({ isId }: ManageHubClientProps) {
           archivedListings: countPayload(archivedPayload),
           communityPosts: countPayload(communityPayload),
           reels: countPayload(reelsPayload),
+          newsSubmissions: countPayload(newsPayload),
           activeTransactions,
           unreadChats: countUnreadInbox(inboxPayload),
           businesses: countPayload(storesPayload),
@@ -484,22 +490,21 @@ export default function ManageHubClient({ isId }: ManageHubClientProps) {
         valueLabel: isId ? 'usaha' : 'businesses',
       },
       {
-        id: 'reels',
-        href: '/manage/reels',
-        title: 'Reels',
-        description: isId ? 'Kelola video usahamu.' : 'Manage your business videos.',
-        icon: Clapperboard,
-        value: counts.reels,
-        valueLabel: 'reels',
-      },
-      {
-        id: 'community',
-        href: '/manage/community',
-        title: isId ? 'Komunitas' : 'Community',
-        description: isId ? 'Kelola diskusi dan postingan.' : 'Manage discussions and posts.',
-        icon: Users,
-        value: counts.communityPosts,
-        valueLabel: isId ? 'postingan' : 'posts',
+        id: 'content',
+        href: '/manage/content',
+        title: isId ? 'Konten' : 'Content',
+        description: isId
+          ? 'News, Reels, dan Community punya ruang sendiri.'
+          : 'News, Reels, and Community each have their own space.',
+        icon: Newspaper,
+        value:
+          counts.newsSubmissions +
+          counts.reels +
+          counts.communityPosts,
+        valueLabel: isId ? 'item' : 'items',
+        helper: isId
+          ? \`${formatCount(counts.newsSubmissions, locale)} News · ${formatCount(counts.reels, locale)} Reels · ${formatCount(counts.communityPosts, locale)} Community\`
+          : \`${formatCount(counts.newsSubmissions, locale)} News · ${formatCount(counts.reels, locale)} Reels · ${formatCount(counts.communityPosts, locale)} Community\`,
       },
     ],
     [
@@ -508,6 +513,7 @@ export default function ManageHubClient({ isId }: ManageHubClientProps) {
       counts.archivedListings,
       counts.businesses,
       counts.communityPosts,
+      counts.newsSubmissions,
       counts.draftListings,
       counts.reels,
       counts.unreadChats,
