@@ -19,6 +19,7 @@ import {
   getListingSideVerbLabel,
   getListingValueFallback,
 } from '@/lib/content/listingSide';
+import { priceUnitLabel } from '@/lib/content/priceUnit';
 import { getExploreResultAction } from '@/lib/discovery/exploreResultConversion';
 import type { GlobalSearchItem } from '@/lib/search/globalSearch';
 import { SearchCardEyebrow, searchCardBorderClass } from './SearchCardParts';
@@ -59,6 +60,34 @@ function humanizeMetadataValue(value: string, locale: 'id' | 'en'): string {
   const label = labels[normalized];
   if (label) return locale === 'id' ? label.id : label.en;
   return value.replace(/[_-]+/g, ' ').trim();
+}
+
+function readMetadataUnit(
+  item: GlobalSearchItem,
+  locale: 'id' | 'en',
+): string {
+  const sources = [
+    item.metadata,
+    item.metadata?.attributes,
+    item.metadata?.values,
+    item.metadata?.form_values,
+  ];
+
+  for (const source of sources) {
+    if (!source || typeof source !== 'object' || Array.isArray(source)) continue;
+    const record = source as Record<string, unknown>;
+    const value =
+      record.quantity_unit ??
+      record.required_unit ??
+      record.unit ??
+      record.unit_label ??
+      record.need_unit;
+    if (value != null && String(value).trim()) {
+      return priceUnitLabel(value, locale);
+    }
+  }
+
+  return '';
 }
 
 function requestStatusLabel(item: GlobalSearchItem, locale: 'id' | 'en') {
@@ -103,7 +132,7 @@ export function NeedSearchCard({
     );
   const quantityLabel = [
     readMetadataText(item, locale, 'quantity', 'required_quantity'),
-    readMetadataText(item, locale, 'unit', 'quantity_unit'),
+    readMetadataUnit(item, locale),
   ]
     .filter(Boolean)
     .join(' ');
