@@ -26,7 +26,7 @@ export function MobileNav({ business, currentSection }: MobileNavProps) {
   const primary = mobilePrimaryNavigation(activeBusiness.permissions);
   const primaryIds = new Set(primary.map(item => item.id));
   const more = portalMenuNavigation(activeBusiness.permissions).filter(item => !primaryIds.has(item.id));
-  const management = more.filter(item => ['inventory', 'reports', 'channels', 'buyerPage'].includes(item.id));
+  const management = more.filter(item => ['products', 'reports', 'channels', 'buyerPage'].includes(item.id));
   const settings = more.filter(item => !management.some(groupItem => groupItem.id === item.id));
 
   function menuLink(item: (typeof more)[number]) {
@@ -110,7 +110,7 @@ export function MobileNav({ business, currentSection }: MobileNavProps) {
         <div className="flex items-start justify-between gap-4 border-b border-portal-line px-4 pb-3 pt-3">
           <div>
             <p className="text-base font-black text-portal-ink">Lainnya</p>
-            <p className="mt-0.5 text-xs text-portal-soft">Stok, laporan, toko, dan pengaturan usaha.</p>
+            <p className="mt-0.5 text-xs text-portal-soft">Produk, laporan, kanal jual, dan pengaturan usaha.</p>
           </div>
           <button
             type="button"
