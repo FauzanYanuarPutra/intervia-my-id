@@ -35,6 +35,7 @@ mod blog;
 mod business_moderation;
 mod businesses;
 mod content_projection;
+mod crm_matching;
 mod health;
 mod identity_projection;
 mod moderation;
@@ -2352,6 +2353,38 @@ async fn main() -> anyhow::Result<()> {
             post(create_support_reply),
         )
         .route("/v1/crm/leads", get(list_crm_leads).post(create_crm_lead))
+        .route(
+            "/v1/crm/requirements",
+            get(crm_matching::list_requirements),
+        )
+        .route(
+            "/v1/crm/requirements/{id}",
+            get(crm_matching::get_requirement),
+        )
+        .route(
+            "/v1/crm/requirements/{id}/match",
+            post(crm_matching::run_match),
+        )
+        .route(
+            "/v1/crm/match-runs/{id}",
+            get(crm_matching::get_match_run),
+        )
+        .route(
+            "/v1/crm/match-candidates/{id}",
+            axum::routing::patch(crm_matching::review_candidate),
+        )
+        .route(
+            "/v1/crm/connections",
+            post(crm_matching::create_connection),
+        )
+        .route(
+            "/v1/crm/connections/{id}",
+            axum::routing::patch(crm_matching::patch_connection),
+        )
+        .route(
+            "/v1/crm/matching-feedback",
+            post(crm_matching::create_matching_feedback),
+        )
         .route(
             "/v1/crm/leads/{id}",
             get(get_crm_lead).patch(update_crm_lead),
