@@ -26,7 +26,7 @@ export function MobileNav({ business, currentSection }: MobileNavProps) {
   const primary = mobilePrimaryNavigation(activeBusiness.permissions);
   const primaryIds = new Set(primary.map(item => item.id));
   const more = portalMenuNavigation(activeBusiness.permissions).filter(item => !primaryIds.has(item.id));
-  const management = more.filter(item => ['parties', 'products', 'reports', 'channels', 'buyerPage', 'work'].includes(item.id));
+  const management = more.filter(item => ['growth', 'parties', 'products', 'reports', 'channels', 'buyerPage', 'work'].includes(item.id));
   const settings = more.filter(item => !management.some(groupItem => groupItem.id === item.id));
 
   function menuLink(item: (typeof more)[number]) {
