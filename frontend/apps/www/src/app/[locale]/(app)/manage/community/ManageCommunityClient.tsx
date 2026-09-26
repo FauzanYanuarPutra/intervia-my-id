@@ -130,7 +130,6 @@ type ManageCopy = Record<
   | 'failed'
   | 'inactive'
   | 'likes'
-  | 'listings'
   | 'live'
   | 'loadFailed'
   | 'noSearch'
