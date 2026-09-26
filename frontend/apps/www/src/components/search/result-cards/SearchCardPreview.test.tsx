@@ -59,7 +59,7 @@ describe('search result card preview mode', () => {
       />,
     );
 
-    expect(html).toContain('Mencari');
+    expect(html).toContain('Membutuhkan');
     expect(html).toContain('Budget fleksibel');
     expect(html).not.toContain('LAJUKAN');
     expect(html).not.toContain('Buka brief');
