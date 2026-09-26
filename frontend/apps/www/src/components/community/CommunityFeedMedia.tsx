@@ -2,6 +2,7 @@
 
 import { LajukanImage as Image } from '@/components/common/LajukanImage';
 import { MediaPreviewCarousel } from '@/components/common/MediaPreviewCarousel';
+import { createPortal } from 'react-dom';
 import { useEffect, useMemo, useState } from 'react';
 import { Expand, ImageIcon, PlayCircle, X } from 'lucide-react';
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
@@ -347,9 +348,11 @@ function CommunityMediaLightbox({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
-  return (
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
     <div
-      className="ui-layer-preview fixed inset-0 z-[100] flex h-[var(--app-visual-viewport-height)] w-screen items-center justify-center overflow-hidden bg-black/96"
+      className="ui-layer-preview fixed inset-0 z-[2147483647] flex h-[100dvh] w-[100vw] items-center justify-center overflow-hidden bg-black/[0.98]"
       role="dialog"
       aria-modal="true"
       aria-label={isId ? 'Preview media' : 'Media preview'}
@@ -357,7 +360,7 @@ function CommunityMediaLightbox({
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-[2] h-24 bg-gradient-to-b from-black/75 to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-[2] h-28 bg-gradient-to-b from-black/85 to-transparent" />
 
       <header className="absolute inset-x-0 top-0 z-[3] flex items-center gap-3 px-3 pb-4 pt-[calc(env(safe-area-inset-top)+0.75rem)] text-white sm:px-5">
         <div className="min-w-0 flex-1">
@@ -378,13 +381,13 @@ function CommunityMediaLightbox({
         </button>
       </header>
 
-      <div className="h-[calc(var(--app-visual-viewport-height)-7.5rem)] w-full max-w-[1500px] px-0 sm:h-[calc(var(--app-visual-viewport-height)-8.5rem)] sm:px-8">
+      <div className="flex h-[calc(100dvh-6.75rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] w-full max-w-[1800px] items-center justify-center px-1 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-[calc(env(safe-area-inset-top)+4.75rem)] sm:px-6 sm:pb-6">
         <MediaPreviewCarousel
           items={items}
           alt={title}
           aspectClassName="h-full w-full"
-          className="rounded-none bg-transparent sm:rounded-[18px]"
-          viewportClassName="rounded-none sm:rounded-[18px]"
+          className="h-full w-full rounded-none bg-transparent sm:rounded-[20px]"
+          viewportClassName="h-full w-full rounded-none sm:rounded-[20px]"
           sizes="100vw"
           controls
           lightbox={false}
@@ -402,7 +405,8 @@ function CommunityMediaLightbox({
           {items.length} {isId ? 'media' : 'media'}
         </span>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
