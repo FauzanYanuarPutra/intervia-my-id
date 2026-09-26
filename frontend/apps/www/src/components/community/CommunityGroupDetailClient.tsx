@@ -906,36 +906,49 @@ export default function CommunityGroupDetailClient({
   ];
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[#f0f2f5] pb-10 pt-0">
-      <div className="sticky top-0 z-40 mb-0 border-b border-slate-200 bg-white/96 px-3 py-2 backdrop-blur lg:hidden">
-        <div className="flex items-center gap-2">
+    <main className="min-h-screen overflow-x-hidden bg-[color:var(--app-surface-muted)] pb-[max(24px,env(safe-area-inset-bottom))] pt-0">
+      <div className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 px-3 py-2 pt-[max(8px,env(safe-area-inset-top))] backdrop-blur lg:hidden">
+        <div className="flex min-h-9 items-center gap-2">
           <Link
             href="/community"
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-50 text-[color:var(--app-text)]"
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[color:var(--app-text)] transition active:scale-95"
             aria-label={isId ? 'Balik ke Komunitas' : 'Back to Community'}
           >
             <ChevronLeft className="h-4 w-4" />
           </Link>
           <GroupAvatarMark
             group={group}
-            className="h-9 w-9 rounded-[13px] text-sm"
+            className="h-9 w-9 rounded-[12px] text-sm"
             sizes="36px"
           />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-bold text-[color:var(--app-text)]">
+            <p className="truncate text-sm font-extrabold text-[color:var(--app-text)]">
               {group.name}
             </p>
-            <p className="truncate text-[11px] text-[color:var(--app-text-soft)]">
-              {compactNumber(group.memberCount)} member
+            <p className="truncate text-[11px] font-medium text-[color:var(--app-text-soft)]">
+              {compactNumber(group.memberCount)} {isId ? 'anggota' : 'members'} · {compactNumber(group.postCount)} post
             </p>
           </div>
           <button
             type="button"
             onClick={joinOrLeave}
             disabled={busyJoin || pending || group.viewerRole === 'owner'}
-            className="inline-flex min-h-[34px] shrink-0 items-center justify-center rounded-full bg-[color:var(--app-accent)] px-3 text-[11px] font-bold text-white disabled:opacity-60"
+            className={cn(
+              'inline-flex min-h-[34px] shrink-0 items-center justify-center rounded-full px-3 text-[11px] font-extrabold transition active:scale-95 disabled:opacity-60',
+              joined
+                ? 'bg-slate-100 text-[color:var(--app-text)]'
+                : 'bg-[color:var(--app-accent)] text-white',
+            )}
           >
-            {joined ? (isId ? 'Joined' : 'Joined') : isId ? 'Gabung' : 'Join'}
+            {pending
+              ? 'Pending'
+              : joined
+                ? isId
+                  ? 'Joined'
+                  : 'Joined'
+                : isId
+                  ? 'Gabung'
+                  : 'Join'}
           </button>
           {group.viewerCanManage ? (
             <button
@@ -943,7 +956,7 @@ export default function CommunityGroupDetailClient({
               onClick={() =>
                 router.push(`/community/groups/${encodeURIComponent(slug)}/settings`)
               }
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-50 text-[color:var(--app-text)]"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[color:var(--app-text)] transition active:scale-95"
               aria-label={isId ? 'Edit group' : 'Edit group'}
             >
               <Settings className="h-4 w-4" />
@@ -952,7 +965,7 @@ export default function CommunityGroupDetailClient({
         </div>
       </div>
 
-      <div className="mx-auto grid w-full max-w-[1180px] grid-cols-1 gap-4 px-0 sm:px-2 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start lg:px-0">
+      <div className="mx-auto grid w-full max-w-[1180px] grid-cols-1 gap-4 px-0 sm:px-2 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start lg:px-3 xl:px-0">
         <aside className="hidden">
           <section className="rounded-[16px] border border-[color:var(--app-border)] bg-white p-4 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.14)]">
             <Link
@@ -1048,24 +1061,23 @@ export default function CommunityGroupDetailClient({
           className="min-w-0 space-y-3 lg:pr-0"
           data-auto-scrollbar
         >
-          <section className="overflow-hidden rounded-none border-y border-slate-200 bg-white shadow-none sm:rounded-[18px] sm:border">
-            <div className="relative aspect-[2.5/1] min-h-[170px] bg-[linear-gradient(135deg,#dcfce7,#f8fafc)] p-3 sm:aspect-[3.1/1] sm:min-h-[220px] sm:p-4">
+          <section className="overflow-hidden rounded-none border-b border-slate-200 bg-white shadow-none sm:rounded-[22px] sm:border sm:shadow-[0_20px_50px_-42px_rgba(15,23,42,0.28)]">
+            <div className="relative h-[180px] overflow-hidden bg-[linear-gradient(135deg,#dcfce7,#f8fafc)] sm:h-[250px]">
               {group.coverUrl ? (
                 <LajukanImage
                   src={group.coverUrl}
                   alt={group.name}
                   fill
-                  sizes="(max-width: 1023px) 100vw, 900px"
+                  sizes="(max-width: 639px) 100vw, (max-width: 1023px) 100vw, 780px"
                   className="object-cover"
                 />
               ) : (
-                <div className="absolute right-5 top-5 grid h-16 w-16 place-items-center rounded-[24px] bg-white/78 text-[color:var(--app-accent)] shadow-[0_20px_38px_-32px_rgba(15,23,42,0.35)]">
-                  <Users className="h-8 w-8" />
-                </div>
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(16,185,129,0.24),transparent_38%),linear-gradient(135deg,#dcfce7,#f8fafc)]" />
               )}
-              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.10),rgba(15,23,42,0.50))]" />
+              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(15,23,42,0.02),rgba(15,23,42,0.28))]" />
+              <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/35 to-transparent" />
               {group.viewerCanManage ? (
-                <label className="absolute right-4 top-4 z-[2] inline-flex min-h-[34px] cursor-pointer items-center gap-2 rounded-full bg-white/94 px-3 text-xs font-bold text-[color:var(--app-text)] shadow-sm transition hover:text-[color:var(--app-accent)]">
+                <label className="absolute right-3 top-3 z-[2] inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-full bg-white/92 px-3 text-[11px] font-extrabold text-[color:var(--app-text)] shadow-[0_10px_24px_-18px_rgba(15,23,42,0.55)] backdrop-blur">
                   <input
                     type="file"
                     accept="image/*"
@@ -1078,147 +1090,179 @@ export default function CommunityGroupDetailClient({
                   ) : (
                     <ImageIcon className="h-4 w-4" />
                   )}
-                  {isId ? 'Ganti cover' : 'Change cover'}
+                  <span className="hidden sm:inline">{isId ? 'Ganti cover' : 'Change cover'}</span>
+                  <span className="sm:hidden">{isId ? 'Cover' : 'Cover'}</span>
                 </label>
               ) : null}
-              <div className="relative z-[1] flex min-h-[158px] flex-col justify-between sm:min-h-[203px]">
-                <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-bold">
-                  <Link
-                    href="/community"
-                    className="rounded-full bg-white/92 px-2.5 py-1 text-[color:var(--app-accent)]"
-                  >
-                    {isId ? 'Komunitas' : 'Community'}
-                  </Link>
-                  <span className="rounded-full bg-white/80 px-2 py-1 text-[color:var(--app-text)]">
-                    {group.name}
-                  </span>
-                </div>
-                <div className="flex items-end gap-3">
-                  {group.viewerCanManage ? (
-                    <label className="relative inline-flex cursor-pointer">
-                      <GroupAvatarMark
-                        group={group}
-                        className="h-24 w-24 rounded-[26px] border-[4px] border-white text-3xl shadow-[0_22px_38px_-28px_rgba(15,23,42,0.5)]"
-                        sizes="96px"
-                      />
-                      <span className="absolute -bottom-1 -right-1 grid h-8 w-8 place-items-center rounded-full border-2 border-white bg-[color:var(--app-accent)] text-white shadow-sm">
-                        {uploadingMedia === 'avatar' ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Camera className="h-4 w-4" />
-                        )}
-                      </span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="sr-only"
-                        disabled={uploadingMedia !== null}
-                        onChange={event =>
-                          handleGroupMediaInput(event, 'avatar')
-                        }
-                      />
-                    </label>
-                  ) : (
+            </div>
+
+            <div className="relative px-4 pb-4 pt-0 sm:px-5 sm:pb-5">
+              <div className="-mt-11 flex items-end justify-between gap-3 sm:-mt-12">
+                {group.viewerCanManage ? (
+                  <label className="relative inline-flex shrink-0 cursor-pointer">
                     <GroupAvatarMark
                       group={group}
-                      className="h-24 w-24 rounded-[26px] border-[4px] border-white text-3xl shadow-[0_22px_38px_-28px_rgba(15,23,42,0.5)]"
+                      className="h-[84px] w-[84px] rounded-[24px] border-[4px] border-white bg-white text-2xl shadow-[0_18px_38px_-28px_rgba(15,23,42,0.55)] sm:h-24 sm:w-24 sm:rounded-[28px] sm:text-3xl"
                       sizes="96px"
                     />
-                  )}
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="inline-flex items-center gap-1 rounded-full bg-white/92 px-2.5 py-1 text-[11px] font-bold text-[color:var(--app-accent)]">
-                        {groupJoinLabel(group, isId)}
-                      </span>
-                      <span className="inline-flex items-center gap-1 rounded-full bg-white/92 px-2.5 py-1 text-[11px] font-bold text-[color:var(--app-text)]">
-                        {group.privacy === 'public' ? (
-                          <Earth className="h-3.5 w-3.5" />
-                        ) : (
-                          <Lock className="h-3.5 w-3.5" />
-                        )}
-                        {groupPrivacyLabel(group, isId)}
-                      </span>
-                    </div>
-                    <h2 className="mt-2 max-w-2xl text-[1.65rem] font-bold leading-tight tracking-[-0.05em] text-white sm:text-[2.35rem]">
-                      {group.name}
-                    </h2>
+                    <span className="absolute bottom-1 right-1 grid h-7 w-7 place-items-center rounded-full border-2 border-white bg-[color:var(--app-accent)] text-white">
+                      {uploadingMedia === 'avatar' ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Camera className="h-3.5 w-3.5" />
+                      )}
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="sr-only"
+                      disabled={uploadingMedia !== null}
+                      onChange={event => handleGroupMediaInput(event, 'avatar')}
+                    />
+                  </label>
+                ) : (
+                  <GroupAvatarMark
+                    group={group}
+                    className="h-[84px] w-[84px] rounded-[24px] border-[4px] border-white bg-white text-2xl shadow-[0_18px_38px_-28px_rgba(15,23,42,0.55)] sm:h-24 sm:w-24 sm:rounded-[28px] sm:text-3xl"
+                    sizes="96px"
+                  />
+                )}
+                <div className="flex min-w-0 flex-1 justify-end pb-1">
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void handleShareGroup()}
+                      className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full border border-[color:var(--app-border)] bg-white px-3 text-[11px] font-extrabold text-[color:var(--app-text)] shadow-sm transition hover:bg-slate-50 active:scale-95"
+                    >
+                      <Share2 className="h-3.5 w-3.5" />
+                      <span>{isId ? 'Bagikan' : 'Share'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMembersModalGroup(group)}
+                      className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full border border-[color:var(--app-border)] bg-white px-3 text-[11px] font-extrabold text-[color:var(--app-text)] shadow-sm transition hover:bg-slate-50 active:scale-95"
+                    >
+                      <Users className="h-3.5 w-3.5" />
+                      <span>{isId ? 'Anggota' : 'Members'}</span>
+                    </button>
                   </div>
                 </div>
               </div>
-            </div>
 
-            <div className="grid gap-3 border-t border-slate-100 p-3.5 sm:p-4">
-              <p className="text-sm leading-6 text-[color:var(--app-text)]">
-                {group.description}
-              </p>
-              <div className="flex flex-wrap gap-2 lg:flex-nowrap lg:justify-end">
-                <button
-                  type="button"
-                  onClick={() => void handleShareGroup()}
-                  className="inline-flex min-h-[40px] items-center justify-center gap-2 rounded-[14px] border border-[color:var(--app-border)] bg-white px-3 text-xs font-bold text-[color:var(--app-text)]"
-                >
-                  <Share2 className="h-4 w-4" />
-                  {isId ? 'Bagikan' : 'Share'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMembersModalGroup(group)}
-                  className="rounded-[16px] bg-slate-50 p-2"
-                >
-                  <span className="block text-base font-bold text-[color:var(--app-text)]">
-                    {compactNumber(group.memberCount)}
+              <div className="mt-3 min-w-0">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-[color:var(--app-accent-soft)] px-2.5 py-1 text-[10px] font-extrabold text-[color:var(--app-accent)]">
+                    {groupJoinLabel(group, isId)}
                   </span>
-                  <span className="block text-[10px] font-semibold text-[color:var(--app-text-soft)]">
-                    Member
-                  </span>
-                </button>
-                <div className="rounded-[16px] bg-slate-50 p-2">
-                  <span className="block text-base font-bold text-[color:var(--app-text)]">
-                    {compactNumber(group.postCount)}
-                  </span>
-                  <span className="block text-[10px] font-semibold text-[color:var(--app-text-soft)]">
-                    Post
+                  <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-extrabold text-[color:var(--app-text)]">
+                    {group.privacy === 'public' ? (
+                      <Earth className="h-3 w-3" />
+                    ) : (
+                      <Lock className="h-3 w-3" />
+                    )}
+                    {groupPrivacyLabel(group, isId)}
                   </span>
                 </div>
-                <div className="rounded-[16px] bg-slate-50 p-2">
-                  <span className="block truncate text-xs font-bold text-[color:var(--app-text)]">
-                    {groupPostLabel(group, isId)}
+
+                <h1 className="mt-2 break-words text-[1.65rem] font-black leading-tight tracking-[-0.045em] text-[color:var(--app-text)] sm:text-[2.15rem]">
+                  {group.name}
+                </h1>
+
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-[color:var(--app-text-soft)] sm:text-[15px]">
+                  {group.description}
+                </p>
+
+                <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-bold text-[color:var(--app-text-soft)]">
+                  <button
+                    type="button"
+                    onClick={() => setMembersModalGroup(group)}
+                    className="transition hover:text-[color:var(--app-accent)]"
+                  >
+                    <strong className="text-[color:var(--app-text)]">{compactNumber(group.memberCount)}</strong> {isId ? 'anggota' : 'members'}
+                  </button>
+                  <span aria-hidden="true">·</span>
+                  <span>
+                    <strong className="text-[color:var(--app-text)]">{compactNumber(group.postCount)}</strong> post
                   </span>
-                  <span className="block text-[10px] font-semibold text-[color:var(--app-text-soft)]">
-                    Posting
-                  </span>
+                  <span aria-hidden="true">·</span>
+                  <span>{groupPostLabel(group, isId)}</span>
+                </div>
+
+                <div className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+                  <button
+                    type="button"
+                    onClick={joinOrLeave}
+                    disabled={busyJoin || pending || group.viewerRole === 'owner'}
+                    className={cn(
+                      'inline-flex min-h-11 items-center justify-center gap-2 rounded-[14px] px-4 text-sm font-extrabold transition active:scale-[0.99] disabled:opacity-60 sm:min-w-[150px]',
+                      joined
+                        ? 'border border-[color:var(--app-border)] bg-white text-[color:var(--app-text)]'
+                        : 'bg-[color:var(--app-accent)] text-white',
+                    )}
+                  >
+                    {busyJoin ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                    {pending
+                      ? isId
+                        ? 'Menunggu approve'
+                        : 'Pending approval'
+                      : joined
+                        ? isId
+                          ? 'Sudah join'
+                          : 'Joined'
+                        : isId
+                          ? 'Gabung grup'
+                          : 'Join group'}
+                  </button>
+
+                  {group.viewerCanManage ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        router.push(`/community/groups/${encodeURIComponent(slug)}/settings`)
+                      }
+                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[14px] border border-[color:var(--app-border)] bg-white px-4 text-sm font-extrabold text-[color:var(--app-text)] transition hover:bg-slate-50 active:scale-[0.99] sm:min-w-[132px]"
+                    >
+                      <Settings className="h-4 w-4" />
+                      {isId ? 'Kelola' : 'Manage'}
+                    </button>
+                  ) : null}
                 </div>
               </div>
             </div>
           </section>
 
-          <nav className="sticky top-[58px] z-20 flex gap-1 overflow-x-auto border-y border-slate-200 bg-white px-1 py-1 backdrop-blur lg:top-0">
-            {tabs.map(tab => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-                className={cn(
-                  'min-h-[44px] flex-1 rounded-[10px] border-b-2 px-3 text-sm font-bold transition',
-                  activeTab === tab.id
-                    ? 'border-[color:var(--app-accent)] text-[color:var(--app-accent)]'
-                    : 'border-transparent text-[color:var(--app-text-soft)] hover:bg-slate-50',
-                )}
-              >
-                {tab.label}
-              </button>
-            ))}
+          <nav
+            className="sticky top-[calc(58px+env(safe-area-inset-top))] z-20 -mx-0 flex min-w-0 overflow-x-auto border-y border-slate-200 bg-white/96 px-2 py-1.5 backdrop-blur lg:top-0"
+            aria-label={isId ? 'Navigasi group' : 'Group navigation'}
+          >
+            <div className="flex w-max min-w-full items-center gap-1">
+              {tabs.map(tab => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  className={cn(
+                    'min-h-9 shrink-0 snap-start rounded-full px-3.5 text-[11px] font-extrabold transition sm:text-xs',
+                    activeTab === tab.id
+                      ? 'bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
+                      : 'text-[color:var(--app-text-soft)] hover:bg-slate-100 hover:text-[color:var(--app-text)]',
+                  )}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
           </nav>
 
           {activeTab === 'discussion' ? (
             <>
-              <section className="rounded-[14px] border border-slate-200 bg-white p-3">
-                <div className="flex items-center justify-between gap-3">
+              <section className="rounded-[16px] border border-[color:var(--app-border)] bg-white p-3 sm:p-3.5">
+                <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
                     <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[color:var(--app-text-soft)]">
                       {isId ? 'Urutan posting' : 'Post order'}
                     </p>
-                    <p className="mt-0.5 text-xs font-semibold text-[color:var(--app-text)]">
+                    <p className="mt-0.5 truncate text-xs font-bold text-[color:var(--app-text)]">
                       {feedSort === 'most-relevant'
                         ? isId
                           ? 'Paling relevan'
@@ -1237,7 +1281,7 @@ export default function CommunityGroupDetailClient({
                     onChange={event =>
                       setFeedSort(event.target.value as GroupFeedSort)
                     }
-                    className="min-h-9 rounded-[11px] border border-[color:var(--app-border)] bg-white px-2.5 text-[11px] font-bold text-[color:var(--app-text)] outline-none"
+                    className="min-h-10 w-full rounded-[12px] border border-[color:var(--app-border)] bg-slate-50 px-3 text-xs font-extrabold text-[color:var(--app-text)] outline-none sm:w-auto sm:min-w-[170px]"
                     aria-label={
                       isId ? 'Urutan posting grup' : 'Group post order'
                     }
