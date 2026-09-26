@@ -3046,7 +3046,7 @@ function HomeCommunityGroupsSection({
                   <button
                     type="button"
                     onClick={() => void joinOrLeave(group)}
-                    disabled={Boolean(busyId) || pending}
+                    disabled={busyId === group.id || pending}
                     className={cn(
                       'inline-flex min-h-[34px] flex-1 items-center justify-center gap-1 rounded-[12px] px-2 text-[11px] font-bold transition disabled:cursor-wait disabled:opacity-60',
                       joined
