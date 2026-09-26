@@ -1682,6 +1682,11 @@ async fn withdraw_news_submission(
     .bind(content_id)
     .bind(owner_id)
     .bind(from_status)
+    .bind(if revision_of_published {
+        Some("Contributor submitted a revision to an already published article.")
+    } else {
+        None
+    })
     .execute(&mut *tx)
     .await
     {
@@ -1794,12 +1799,13 @@ async fn update_news_submission(
         return response_error(StatusCode::FORBIDDEN, "forbidden");
     }
     let from_status = editorial_status(&current.content_status, &current.metadata);
-    if matches!(from_status.as_str(), "published" | "retracted") {
+    if from_status == "retracted" {
         return response_error(
             StatusCode::CONFLICT,
-            "published news cannot be edited as a submission",
+            "retracted news must be submitted as a new article",
         );
     }
+    let revision_of_published = from_status == "published";
 
     let title = trimmed(payload.title).unwrap_or_else(|| current.title.clone());
     if title.len() < 10 || title.len() > 180 {
@@ -1957,6 +1963,21 @@ async fn update_news_submission(
             "contributor_id".to_string(),
             Value::String(owner_id.to_string()),
         );
+        news.insert(
+            "revision_of_published".to_string(),
+            Value::Bool(revision_of_published),
+        );
+        if revision_of_published {
+            news.insert(
+                "previous_published_at".to_string(),
+                current
+                    .published_at
+                    .map(|value| Value::String(value.to_rfc3339()))
+                    .unwrap_or(Value::Null),
+            );
+        } else {
+            news.remove("previous_published_at");
+        }
     }
 
     let final_sources = news_source_urls(&metadata);
@@ -2031,7 +2052,7 @@ async fn update_news_submission(
         INSERT INTO news_editorial_events (
             content_id, actor_id, actor_role, action, from_status, to_status, note
         )
-        VALUES ($1, $2, 'contributor', 'resubmit', $3, 'pending_review', NULL)
+        VALUES ($1, $2, 'contributor', 'resubmit', $3, 'pending_review', $4)
         "#,
     )
     .bind(content_id)
@@ -2104,7 +2125,18 @@ async fn update_news_submission(
         );
     }
 
-    (StatusCode::OK, Json(updated)).into_response()
+    (
+        StatusCode::OK,
+        Json(json!({
+            "id": updated.id,
+            "title": updated.title,
+            "editorial_status": "pending_review",
+            "previous_status": from_status,
+            "revision_of_published": revision_of_published,
+            "article": updated,
+        })),
+    )
+        .into_response()
 }
 
 async fn edit_news_editorial(
