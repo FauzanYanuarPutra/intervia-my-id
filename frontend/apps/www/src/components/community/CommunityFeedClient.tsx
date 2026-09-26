@@ -1041,6 +1041,12 @@ export function CommunityComposer({
       icon: BarChart3,
       tone: 'text-slate-600 bg-slate-100',
     },
+    {
+      id: 'feeling' as const,
+      label: isId ? 'Perasaan/aktivitas' : 'Feeling/activity',
+      icon: Sparkles,
+      tone: 'text-amber-700 bg-amber-50',
+    },
   ];
 
   const modeLabel =
@@ -1491,72 +1497,15 @@ export function CommunityComposer({
                 )}
               </label>
 
-              {/* ================= TITLE ================= */}
+              {/* ================= DESTINATION ================= */}
 
-              <div
-                className={cn(
-                  'grid gap-2',
-                  lockedGroup &&
-                    'sm:grid-cols-[minmax(0,1fr)_180px]',
-                )}
-              >
-                <input
-                  ref={titleInputRef}
-                  data-testid="community-compose-title-input"
-                  value={title}
-                  onChange={event =>
-                    setTitle(
-                      event.target.value,
-                    )
-                  }
-                  maxLength={110}
-                  placeholder={
-                    mode === 'question'
-                      ? isId
-                        ? 'Apa yang ingin kamu tanyakan?'
-                        : 'What do you want to ask?'
-                      : isId
-                        ? 'Judul singkat dan jelas'
-                        : 'Short, clear title'
-                  }
-                  className="
-                    min-h-10
-                    min-w-0
-                    rounded-[11px]
-                    border border-[color:var(--app-border)]
-                    bg-[color:var(--app-surface-muted)]
-                    px-3
-                    text-[12px]
-                    text-[color:var(--app-text)]
-                    outline-none
-
-                    placeholder:text-[color:var(--app-text-soft)]
-
-                    focus:border-[color:var(--app-accent-border)]
-                    focus:bg-white
-                  "
-                />
-
-                {lockedGroup ? (
-                  <div
-                    className="
-                      flex min-h-10
-                      min-w-0
-                      items-center
-                      rounded-[11px]
-                      border border-[color:var(--app-border)]
-                      bg-[color:var(--app-surface-muted)]
-                      px-3
-                      text-[11px] font-bold
-                      text-[color:var(--app-text)]
-                    "
-                  >
-                    <span className="truncate">
-                      {lockedGroup.name}
-                    </span>
-                  </div>
-                ) : null}
-              </div>
+              {lockedGroup ? (
+                <div className="flex min-h-10 min-w-0 items-center rounded-[11px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-[11px] font-bold text-[color:var(--app-text)]">
+                  <span className="truncate">
+                    {lockedGroup.name}
+                  </span>
+                </div>
+              ) : null}
 
               <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
                 <label className="min-w-0">
@@ -2192,6 +2141,7 @@ export function CommunityPostCard({
   const [commentCount, setCommentCount] = useState(item.stats.comments);
   const [likeSaving, setLikeSaving] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
+  const [bodyExpanded, setBodyExpanded] = useState(false);
 
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
@@ -2216,6 +2166,8 @@ export function CommunityPostCard({
   );
 
   const displayBody = poll ? poll.body : item.body;
+  const canExpandBody =
+    displayBody.trim().length > 240 || displayBody.includes('\n');
   const isQuestionPost = item.tags.some(tag =>
     /^(tanya|question|ask|help|support)$/i.test(tag.slug || tag.name),
   );
@@ -2282,6 +2234,10 @@ export function CommunityPostCard({
     setLocalVote(item.viewerVote || 0);
     setReactionCount(item.stats.reactions);
   }, [item.id, item.stats.reactions, item.viewerVote]);
+
+  useEffect(() => {
+    setBodyExpanded(false);
+  }, [item.id]);
 
   const {
     bookmarked: saved,
@@ -2993,21 +2949,40 @@ export function CommunityPostCard({
 
         {/* ================= POST BODY ================= */}
 
-        <button
-          type="button"
-          onClick={openDetail}
-          className="block w-full text-left"
-        >
-          <h2 className="mt-3 line-clamp-2 text-[0.98rem] font-bold leading-5 text-[color:var(--app-text)]">
+        <h2 className="mt-3 text-[0.98rem] font-bold leading-5 text-[color:var(--app-text)]">
+          <button
+            type="button"
+            onClick={openDetail}
+            className="text-left hover:text-[color:var(--app-accent)]"
+          >
             {item.title}
-          </h2>
+          </button>
+        </h2>
 
-          {displayBody ? (
-            <p className="mt-1.5 line-clamp-2 text-sm leading-6 text-[color:var(--app-text)]">
+        {displayBody ? (
+          <div className="mt-1.5 text-sm leading-6 text-[color:var(--app-text)]">
+            <p className={cn(!bodyExpanded && 'line-clamp-2')}>
               {displayBody}
             </p>
-          ) : null}
-        </button>
+
+            {canExpandBody ? (
+              <button
+                type="button"
+                onClick={() => setBodyExpanded(current => !current)}
+                aria-expanded={bodyExpanded}
+                className="mt-0.5 inline-flex font-semibold text-[color:var(--app-text-soft)] hover:text-[color:var(--app-text)]"
+              >
+                {bodyExpanded
+                  ? isId
+                    ? 'Sembunyikan'
+                    : 'See less'
+                  : isId
+                    ? 'Lihat selengkapnya'
+                    : 'See more'}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
 
         {/* TAGS */}
 
