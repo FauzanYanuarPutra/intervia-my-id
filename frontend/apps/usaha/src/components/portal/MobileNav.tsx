@@ -110,7 +110,7 @@ export function MobileNav({ business, currentSection }: MobileNavProps) {
         <div className="flex items-start justify-between gap-4 border-b border-portal-line px-4 pb-3 pt-3">
           <div>
             <p className="text-base font-black text-portal-ink">Lainnya</p>
-            <p className="mt-0.5 text-xs text-portal-soft">Pelanggan, pekerjaan, produk, laporan, kanal jual, dan pengaturan usaha.</p>
+            <p className="mt-0.5 text-xs text-portal-soft">Tumbuh, pelanggan, pekerjaan, produk, laporan, kanal jual, dan pengaturan usaha.</p>
           </div>
           <button
             type="button"
