@@ -159,7 +159,8 @@ export function ExploreHubPage({ locale, initialIntent = 'supply' }: { locale: L
   };
 
   return (
-    <div className="min-h-[100svh] overflow-x-clip bg-[color:var(--app-surface-muted)] pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-10">
+    <>
+      <div className="min-h-[100svh] overflow-x-clip bg-[color:var(--app-surface-muted)] pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-10">
       <div className="lg:hidden"><Header /><div className="h-[calc(52px+env(safe-area-inset-top))]" /></div>
       <main className="mx-auto w-full min-w-0 max-w-[1120px] px-3 py-3 sm:px-5 sm:py-5 lg:px-6 lg:py-6 xl:px-4">
         <ExploreSurface elevated className="p-3.5 sm:p-5 lg:p-6">
@@ -294,6 +295,6 @@ export function ExploreHubPage({ locale, initialIntent = 'supply' }: { locale: L
           </div>
         </div>
       </Modal>
-
+    </>
   );
 }
