@@ -6,7 +6,7 @@ export type HomePriorityAction = {
 };
 
 export type HomeMetric = {
-  key: 'sales' | 'expense' | 'stock';
+  key: 'revenue' | 'transactions' | 'expense' | 'stock';
   label: string;
   value: number;
 };
@@ -14,7 +14,8 @@ export type HomeMetric = {
 export function buildHomeDashboard(input: {
   foundationAction: HomePriorityAction | null;
   nextActions: HomePriorityAction[];
-  activeSales: number;
+  todayRevenue: number;
+  todayTransactions: number;
   expenseToday: number;
   stockAttention: number;
   setupIncomplete: boolean;
@@ -30,7 +31,8 @@ export function buildHomeDashboard(input: {
     };
 
   const metrics: HomeMetric[] = [
-    { key: 'sales', label: 'Jualan aktif', value: Math.max(0, input.activeSales) },
+    { key: 'revenue', label: 'Omzet hari ini', value: Math.max(0, input.todayRevenue) },
+    { key: 'transactions', label: 'Transaksi hari ini', value: Math.max(0, input.todayTransactions) },
     { key: 'expense', label: 'Pengeluaran hari ini', value: Math.max(0, input.expenseToday) },
     { key: 'stock', label: 'Stok perlu perhatian', value: Math.max(0, input.stockAttention) },
   ];
