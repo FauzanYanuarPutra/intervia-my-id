@@ -486,6 +486,24 @@ function mapContentItem(
       item.owner_profile,
     );
 
+  const ownerId =
+    firstString(
+      item.owner_id,
+      item.user_id,
+      owner?.id,
+      metadata?.owner_id,
+      metadata?.user_id,
+    );
+
+  const contentStatus =
+    firstString(
+      item.content_status,
+      item.status,
+      metadata?.content_status,
+      metadata?.contentStatus,
+    ) ||
+    'active';
+
   const kind =
     contentKind(
       item,
@@ -844,6 +862,10 @@ function mapContentItem(
         ),
 
       requestStatus,
+
+      contentStatus,
+
+      ownerId,
 
       updatedAt:
         firstString(
