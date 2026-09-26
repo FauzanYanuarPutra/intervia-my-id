@@ -397,19 +397,50 @@ function listingSideFilterLabel(side: ListingSideFilter, locale: string): string
   return getListingSideVerbLabel(side, locale === 'id' ? 'id' : 'en');
 }
 
+function normalizeManagementStatus(value: string): string {
+  return value.toLowerCase().trim().replace(/[\s-]+/g, '_');
+}
+
+function isLiveManagementStatus(value: string): boolean {
+  return ['active', 'published', 'live'].includes(normalizeManagementStatus(value));
+}
+
+function isArchivedManagementStatus(value: string): boolean {
+  return ['archived', 'deleted'].includes(normalizeManagementStatus(value));
+}
+
 function listingStatusLabel(value: string, locale: string): string {
-  const normalized = value.toLowerCase();
-  if (normalized === 'active') return locale === 'id' ? 'Tayang' : 'Live';
-  if (normalized === 'archived') return locale === 'id' ? 'Arsip' : 'Archived';
-  return locale === 'id' ? 'Draft' : 'Draft';
+  const normalized = normalizeManagementStatus(value);
+  if (['active', 'published', 'live'].includes(normalized)) {
+    return locale === 'id' ? 'Tayang' : 'Live';
+  }
+  if (['pending', 'pending_review', 'review', 'in_review'].includes(normalized)) {
+    return locale === 'id' ? 'Sedang dicek' : 'Under review';
+  }
+  if (['needs_revision', 'revision_requested', 'changes_requested', 'rejected'].includes(normalized)) {
+    return locale === 'id' ? 'Perlu diperbaiki' : 'Needs changes';
+  }
+  if (['paused', 'inactive'].includes(normalized)) {
+    return locale === 'id' ? 'Dijeda' : 'Paused';
+  }
+  if (['archived', 'deleted'].includes(normalized)) {
+    return locale === 'id' ? 'Arsip' : 'Archived';
+  }
+  return locale === 'id' ? 'Belum tayang' : 'Not live yet';
 }
 
 function statusToneClass(status: string): string {
-  const normalized = status.toLowerCase();
-  if (normalized === 'active') {
+  const normalized = normalizeManagementStatus(status);
+  if (['active', 'published', 'live'].includes(normalized)) {
     return 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-400/12 dark:text-emerald-200 dark:ring-emerald-400/20';
   }
-  if (normalized === 'archived') {
+  if (['pending', 'pending_review', 'review', 'in_review'].includes(normalized)) {
+    return 'bg-sky-50 text-sky-700 ring-1 ring-sky-100 dark:bg-sky-400/12 dark:text-sky-200 dark:ring-sky-400/20';
+  }
+  if (['needs_revision', 'revision_requested', 'changes_requested', 'rejected'].includes(normalized)) {
+    return 'bg-rose-50 text-rose-700 ring-1 ring-rose-100 dark:bg-rose-400/12 dark:text-rose-200 dark:ring-rose-400/20';
+  }
+  if (['archived', 'deleted'].includes(normalized)) {
     return 'bg-slate-100 text-slate-600 ring-1 ring-slate-200 dark:bg-white/8 dark:text-slate-300 dark:ring-white/10';
   }
   return 'bg-amber-50 text-amber-700 ring-1 ring-amber-100 dark:bg-amber-400/12 dark:text-amber-200 dark:ring-amber-400/20';
@@ -464,7 +495,7 @@ export default function MyListingsPage() {
   const statusTabs = useMemo(
     () => [
       { id: 'active' as const, label: locale === 'id' ? 'Tayang' : 'Live' },
-      { id: 'draft' as const, label: locale === 'id' ? 'Draft' : 'Draft' },
+      { id: 'draft' as const, label: locale === 'id' ? 'Belum tayang' : 'Not live yet' },
       {
         id: 'archived' as const,
         label: locale === 'id' ? 'Arsip' : 'Archived',
@@ -479,6 +510,7 @@ export default function MyListingsPage() {
     return items.filter(item => {
       const rawType = item.type || item.content_type || 'listing';
       const rawStatus = item.content_status || item.status || activeStatus;
+      const normalizedStatus = normalizeManagementStatus(rawStatus);
       const side = resolveListingSide({
         type: rawType,
         metadata: item.metadata,
@@ -489,6 +521,23 @@ export default function MyListingsPage() {
 
       if (sideFilter !== 'all' && side !== sideFilter) return false;
       if (categoryFilter !== 'all' && category !== categoryFilter) return false;
+
+      if (
+        activeStatus === 'active' &&
+        !isLiveManagementStatus(normalizedStatus)
+      ) return false;
+
+      if (
+        activeStatus === 'draft' &&
+        (isLiveManagementStatus(normalizedStatus) ||
+          isArchivedManagementStatus(normalizedStatus))
+      ) return false;
+
+      if (
+        activeStatus === 'archived' &&
+        !isArchivedManagementStatus(normalizedStatus)
+      ) return false;
+
       if (!normalizedQuery) return true;
 
       const sideText = [
@@ -564,7 +613,11 @@ export default function MyListingsPage() {
       setLoading(true);
       setError('');
       try {
-        const res = await authFetch(`/api/my-listings?status=${activeStatus}`);
+        const requestUrl =
+          activeStatus === 'draft'
+            ? '/api/my-listings?limit=100'
+            : `/api/my-listings?status=${activeStatus}`;
+        const res = await authFetch(requestUrl);
         const data = (await res.json().catch(() => ({}))) as {
           results?: ListingItem[];
           error?: string;
@@ -1012,12 +1065,18 @@ export default function MyListingsPage() {
                       locale === 'id' ? 'id' : 'en',
                     );
                     const rawStatus = item.content_status || item.status || activeStatus;
-                    const normalizedStatus = rawStatus.toLowerCase();
+                    const normalizedStatus = normalizeManagementStatus(rawStatus);
                     const cardStatus: ListingStatus =
-                      normalizedStatus === 'active' || normalizedStatus === 'archived'
-                        ? normalizedStatus
-                        : 'draft';
+                      isLiveManagementStatus(normalizedStatus)
+                        ? 'active'
+                        : isArchivedManagementStatus(normalizedStatus)
+                          ? 'archived'
+                          : 'draft';
                     const itemStatus = listingStatusLabel(rawStatus, locale);
+                    const editHref =
+                      String(rawType).toLowerCase() === 'news'
+                        ? `/news/submissions?edit=${encodeURIComponent(id)}`
+                        : `/create?draft=${encodeURIComponent(id)}`;
                     const progress = readProgress(item);
                     const imageUrl = resolveListingImage(item);
                     const imageStyle = imageUrl
@@ -1036,8 +1095,19 @@ export default function MyListingsPage() {
                     const primaryAction =
                       cardStatus === 'draft'
                         ? {
-                            label: locale === 'id' ? 'Lanjutkan' : 'Continue',
-                            href: `/create?draft=${id}`,
+                            label:
+                              ['pending', 'pending_review', 'review', 'in_review'].includes(normalizedStatus)
+                                ? locale === 'id'
+                                  ? 'Lihat & edit'
+                                  : 'Review & edit'
+                                : ['needs_revision', 'revision_requested', 'changes_requested', 'rejected'].includes(normalizedStatus)
+                                  ? locale === 'id'
+                                    ? 'Perbaiki sekarang'
+                                    : 'Fix it now'
+                                  : locale === 'id'
+                                    ? 'Lanjutkan'
+                                    : 'Continue',
+                            href: editHref,
                             tone: 'bg-amber-600 text-white hover:bg-amber-700',
                           }
                         : cardStatus === 'archived'
@@ -1052,7 +1122,7 @@ export default function MyListingsPage() {
                       <article key={item.id} className="relative p-3 sm:p-4">
                         <div className="flex min-w-0 gap-3">
                           <Link
-                            href={cardStatus === 'draft' ? `/create?draft=${id}` : `/content/${id}`}
+                            href={cardStatus === 'draft' ? editHref : `/content/${id}`}
                             className="relative h-[82px] w-[82px] shrink-0 overflow-hidden rounded-[14px] bg-slate-100 bg-cover bg-center ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-white/10 sm:h-[92px] sm:w-[92px]"
                             style={imageStyle}
                             aria-label={item.title || typeLabel}
@@ -1221,7 +1291,7 @@ export default function MyListingsPage() {
                                       : statusToggle.label}
                                   </button>
                                   <Link
-                                    href={`/create?draft=${id}`}
+                                    href={editHref}
                                     className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full px-2.5 text-xs font-bold text-slate-600 transition hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/8 dark:hover:text-white"
                                   >
                                     <PencilLine className="h-3.5 w-3.5" />
