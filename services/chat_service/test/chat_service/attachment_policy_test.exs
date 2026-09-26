@@ -39,6 +39,21 @@ defmodule ChatService.AttachmentPolicyTest do
                ])
     end
 
+    test "accepts up to 100 media attachments but rejects 101" do
+      urls =
+        for index <- 1..100 do
+          "/api/chat/media/laju-chat/chat/dm_a_b/asset-#{index}.webp"
+        end
+
+      assert {:ok, normalized} = AttachmentPolicy.normalize("image", urls)
+      assert length(normalized) == 100
+
+      too_many = urls ++ ["/api/chat/media/laju-chat/chat/dm_a_b/asset-101.webp"]
+
+      assert {:error, :invalid_attachments} =
+               AttachmentPolicy.normalize("image", too_many)
+    end
+
     test "does not let user messages attach media to text or remote sticker URLs" do
       assert {:error, :invalid_attachments} =
                AttachmentPolicy.normalize("text", [
