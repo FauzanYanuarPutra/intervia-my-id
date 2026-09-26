@@ -1,6 +1,7 @@
-import { notFound, permanentRedirect } from 'next/navigation';
+import { notFound, permanentRedirect, redirect } from 'next/navigation';
 import {
   getPublicContent,
+  getViewerUserId,
   getPublicEditorialLanguage,
   getPublicEditorialSlug,
   isPublicContentActive,
@@ -25,8 +26,17 @@ export default async function ContentDetailPage({ params }: PageProps) {
   }
 
   const isActive = isPublicContentActive(result.content);
-  if (!isActive && !result.content.owner_id) {
-    notFound();
+  const ownerId = String(result.content.owner_id || '').trim().toLowerCase();
+  const viewerId = (await getViewerUserId()).trim().toLowerCase();
+  const isOwner = Boolean(ownerId && viewerId && ownerId === viewerId);
+
+  // Never expose unpublished listings as a public detail surface.
+  // Owners go straight back into the authenticated editor.
+  if (!isActive) {
+    if (!isOwner) notFound();
+    redirect(
+      `/${locale}/create?draft=${encodeURIComponent(String(result.content.id || id))}`,
+    );
   }
 
   if (
