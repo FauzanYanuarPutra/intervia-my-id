@@ -5,7 +5,7 @@ import { normalizeCreateBusinessCategorySegment } from './createBusinessData';
 import type { CreateFlowIntent } from './createPageUtils';
 
 export const metadata: Metadata = {
-  title: 'Create Posting | Lajukan',
+  title: 'Create Listing | Lajukan',
   description:
     'Buat kebutuhan atau penawaran usaha dari brief singkat. Detail tambahan, foto, dokumen, dan lokasi bisa dilengkapi seperlunya.',
 };
