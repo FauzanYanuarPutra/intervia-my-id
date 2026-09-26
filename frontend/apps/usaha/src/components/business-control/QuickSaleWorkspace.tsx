@@ -79,6 +79,7 @@ type Props = {
   products: ProductOption[];
   channels?: SaleChannelOption[];
   locations?: SaleLocationOption[];
+  parties?: Array<{ id: string; name: string; kind: string }>;
   defaultDate: string;
 };
 
@@ -226,6 +227,7 @@ export function QuickSaleWorkspace({ businessId, products, channels = [], locati
   const [channelKey, setChannelKey] = useState(channels[0]?.value ?? 'offline');
   const [locationId, setLocationId] = useState<string | null>(defaultLocationId);
   const [accountKey, setAccountKey] = useState<CheckoutPaymentMethod>('cash');
+  const [partyId, setPartyId] = useState<string>('');
   const [lines, setLines] = useState<DraftLine[]>([]);
   const [search, setSearch] = useState('');
   const [filterKey, setFilterKey] = useState('all');
@@ -247,7 +249,7 @@ export function QuickSaleWorkspace({ businessId, products, channels = [], locati
   const filteredProducts = useMemo(() => filterQuickSaleProducts(products, search).filter(product => productMatchesFilter(product, filterKey)), [products, search, filterKey]);
   const cashPresets = useMemo(() => buildCashTenderPresets(total, quickTenderAmounts(total)), [total]);
   const cashChange = calculateCashChange(total, tenderedAmount);
-  const canPay = canCompleteCheckout({ total, paymentMethod: accountKey, tenderedAmount, lineCount: lines.length });
+  const canPay = canCompleteCheckout({ total, paymentMethod: accountKey, tenderedAmount, lineCount: lines.length, partyId });
   const editingLine = editingLineKey ? lines.find(line => line.key === editingLineKey) ?? null : null;
 
   function changed() {
@@ -329,6 +331,7 @@ export function QuickSaleWorkspace({ businessId, products, channels = [], locati
     setReceipt(null);
     setFeedback(null);
     setAccountKey('cash');
+    setPartyId('');
     setChannelKey(channels[0]?.value ?? 'offline');
     setSearch('');
     setFilterKey('all');
@@ -360,7 +363,7 @@ export function QuickSaleWorkspace({ businessId, products, channels = [], locati
   async function submit() {
     if (!canPay || saving) return;
     try {
-      const payload = buildQuickSaleRequest({ occurredOn, channelKey, accountKey, locationId, lines });
+      const payload = buildQuickSaleRequest({ occurredOn, channelKey, accountKey, partyId: partyId || null, locationId, lines });
       const idempotencyKey = attemptKey.current ?? crypto.randomUUID();
       attemptKey.current = idempotencyKey;
       setSaving(true);
@@ -494,6 +497,25 @@ export function QuickSaleWorkspace({ businessId, products, channels = [], locati
             <summary className="cursor-pointer text-xs font-bold text-portal-soft">Detail transaksi</summary>
             <div className="mt-3 space-y-3 rounded-2xl border border-portal-line p-3">
               <div><p className="text-xs font-semibold text-portal-soft">Kanal</p><div className="mt-2 flex flex-wrap gap-2">{channelOptions.map(option => <button key={option.value} type="button" onClick={() => { changed(); setChannelKey(option.value); }} className={`rounded-full border px-3 py-2 text-xs font-bold ${channelKey === option.value ? 'border-portal-ink bg-portal-ink text-white' : 'border-portal-line bg-white text-portal-ink'}`}>{option.label}</button>)}</div></div>
+              <div>
+                <label htmlFor="checkout-party" className="text-xs font-semibold text-portal-soft">Pelanggan</label>
+                <select
+                  id="checkout-party"
+                  value={partyId}
+                  onChange={event => { changed(); setPartyId(event.target.value); }}
+                  className="portal-input mt-2"
+                >
+                  <option value="">Tanpa pelanggan</option>
+                  {(parties ?? []).filter(item => item.kind === 'customer' || item.kind === 'both').map(item => (
+                    <option key={item.id} value={item.id}>{item.name}</option>
+                  ))}
+                </select>
+                {accountKey === 'receivable' && !partyId ? (
+                  <p className="mt-1.5 text-[11px] font-semibold text-amber-700">Pilih pelanggan untuk transaksi piutang.</p>
+                ) : (
+                  <p className="mt-1.5 text-[11px] text-portal-soft">Opsional untuk penjualan tunai, QRIS, atau transfer.</p>
+                )}
+              </div>
               <label className="grid gap-1 text-xs font-semibold text-portal-soft">Tanggal<input className="portal-input" type="date" value={occurredOn} onChange={event => { changed(); setOccurredOn(event.target.value); }} /></label>
             </div>
           </details>
