@@ -3,7 +3,6 @@ import {
   getPublicContent,
   getPublicEditorialLanguage,
   getPublicEditorialSlug,
-  getViewerUserId,
   isPublicContentActive,
   isPublicEditorialContent,
 } from '@/lib/server/publicContent';
