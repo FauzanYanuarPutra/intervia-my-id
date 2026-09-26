@@ -5120,12 +5120,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
         ) : recommendations.length > 0 ? (
           <RecommendationsSection isId={isId} items={recommendations} />
         ) : null}
-{demandRecommendationsLoading ? (
-          <RecommendationsLoadingSkeleton isId={isId} demand />
-        ) : demandRecommendations.length > 0 ? (
-          <DemandListingsSection isId={isId} items={demandRecommendations} />
-        ) : null}
-{demandRecommendationsLoading ? (
+        {demandRecommendationsLoading ? (
           <RecommendationsLoadingSkeleton isId={isId} demand />
         ) : demandRecommendations.length > 0 ? (
           <DemandListingsSection isId={isId} items={demandRecommendations} />
@@ -5204,7 +5199,12 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
               ) : recommendations.length > 0 ? (
                 <RecommendationsSection isId={isId} items={recommendations} />
               ) : null}
-              <HomeNewsSection locale={locale} items={homeNewsItems} />
+              {demandRecommendationsLoading ? (
+          <RecommendationsLoadingSkeleton isId={isId} demand />
+        ) : demandRecommendations.length > 0 ? (
+          <DemandListingsSection isId={isId} items={demandRecommendations} />
+        ) : null}
+        <HomeNewsSection locale={locale} items={homeNewsItems} />
               <div className="grid gap-4">
                 <ReelsPanel isId={isId} items={reels} />
                 <HomeCommunityGroupsSection
