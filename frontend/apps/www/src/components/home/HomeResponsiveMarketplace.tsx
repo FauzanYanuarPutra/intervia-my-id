@@ -58,7 +58,9 @@ import {
   Store,
   Video,
   Play,
-   ExternalLink,
+  ExternalLink,
+  Plus,
+  RotateCcw,
 } from 'lucide-react';
 import {
   MagnifyingGlassIcon,
@@ -1017,7 +1019,9 @@ function mapContentToRecommendation(
     unit,
     image,
     images,
-    href: buildContentHref(item.id, item.title, item.slug),
+    href:
+      readText(item.metadata?.public_path) ||
+      buildContentHref(item.id, item.title, item.slug),
     badge: item.promo_label || undefined,
     badgeTone: item.promo_label ? 'rose' : undefined,
     typeLabel: labelForContentType(isId, type),
@@ -1267,12 +1271,14 @@ function communityPostToFeedItem(post: CommunityPost): CommunityFeedItem {
           alt: post.title,
         }
       : null,
-    mediaItems: post.mediaItems.map(item => ({
-      src: item.src,
-      type: item.type === 'video' ? 'video' : 'image',
-      alt: item.alt || post.title,
-    })),
-    imageUrls: post.mediaItems.map(item => item.src),
+    mediaItems: normalizeCommunityMediaItems(
+      post.mediaItems,
+      post.title,
+    ),
+    imageUrls: normalizeCommunityMediaItems(
+      post.mediaItems,
+      post.title,
+    ).map(item => item.src),
     stats: {
       reactions: Math.max(post.likes, 0),
       comments: Math.max(post.comments, 0),
@@ -2535,7 +2541,11 @@ function RecommendationCard({
   return (
     <a
       href={item.href}
-      data-testid="home-recommendation-card"
+      data-testid={
+        item.side === 'demand'
+          ? 'home-demand-listing-card'
+          : 'home-recommendation-card'
+      }
       className="
         group
         flex h-full min-w-0 w-full flex-col
@@ -3080,7 +3090,7 @@ function CommunityPanel({
               active ? 'border-[color:var(--app-accent)] text-[color:var(--app-accent)]' : 'border-transparent text-[color:var(--app-text-soft)] hover:text-[color:var(--app-text)]',
             )}>
               <Icon className="h-3.5 w-3.5" />
-              {isId ? tab.labelId : tab.labelEn}
+              {tab.label}
             </button>
           );
         })}
@@ -3770,7 +3780,6 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
         status: 'active',
         side: 'demand',
         include_owner: '1',
-        database_only: '1',
       });
       addViewerLocation(params);
       if (viewerLocationKey) {
