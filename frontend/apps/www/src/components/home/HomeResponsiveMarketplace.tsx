@@ -1239,6 +1239,19 @@ function mapCommunityItemToPost(
 function communityPostToFeedItem(post: CommunityPost): CommunityFeedItem {
   const safeThreadId = String(post.threadId || post.id).trim();
 
+  const normalizedPostMedia = normalizeCommunityMediaItems(
+    post.mediaItems.flatMap(media => {
+      const src = typeof media.src === 'string' ? media.src.trim() : '';
+      if (!src) return [];
+      return [{
+        src,
+        type: media.type === 'video' ? ('video' as const) : ('image' as const),
+        alt: media.alt || post.title,
+      }];
+    }),
+    post.title,
+  );
+
   return {
     id: post.id,
     kind: post.kind,
@@ -1272,30 +1285,8 @@ function communityPostToFeedItem(post: CommunityPost): CommunityFeedItem {
           alt: post.title,
         }
       : null,
-    mediaItems: normalizeCommunityMediaItems(
-      post.mediaItems.flatMap(media => {
-        const src = typeof media.src === 'string' ? media.src.trim() : '';
-        if (!src) return [];
-        return [{
-          src,
-          type: media.type === 'video' ? 'video' : 'image',
-          alt: media.alt || post.title,
-        }];
-      }),
-      post.title,
-    ),
-    imageUrls: normalizeCommunityMediaItems(
-      post.mediaItems.flatMap(media => {
-        const src = typeof media.src === 'string' ? media.src.trim() : '';
-        if (!src) return [];
-        return [{
-          src,
-          type: media.type === 'video' ? 'video' : 'image',
-          alt: media.alt || post.title,
-        }];
-      }),
-      post.title,
-    ).map(item => item.src),
+    mediaItems: normalizedPostMedia,
+    imageUrls: normalizedPostMedia.map(item => item.src),
     stats: {
       reactions: Math.max(post.likes, 0),
       comments: Math.max(post.comments, 0),
