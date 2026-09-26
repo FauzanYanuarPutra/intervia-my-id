@@ -772,6 +772,26 @@ pub async fn moderate_content(
     };
 
     let mut updated = existing.clone();
+    let mut moderation_metadata = existing.metadata.clone();
+    if !moderation_metadata.is_object() {
+        moderation_metadata = json!({});
+    }
+    if let Some(root) = moderation_metadata.as_object_mut() {
+        if action == "approve" || action == "restore" {
+            root.remove("owner_revision_state");
+        } else if action == "needs_revision" {
+            root.insert(
+                "owner_revision_state".to_string(),
+                json!("needs_revision"),
+            );
+        } else if action == "reject" || action == "restrict" || action == "remove" {
+            root.insert(
+                "owner_revision_state".to_string(),
+                json!("rejected"),
+            );
+        }
+    }
+
     if moderation_action_changes_visibility(action) {
         let update = sqlx::query(
             r#"
@@ -782,6 +802,7 @@ pub async fn moderate_content(
                     WHEN $2 IN ('archived', 'paused') THEN 'archived'
                     ELSE 'draft'
                 END,
+                metadata = $3,
                 updated_at = NOW()
             WHERE id = $1
             RETURNING content_status
@@ -789,6 +810,7 @@ pub async fn moderate_content(
         )
         .bind(content_id)
         .bind(new_status)
+        .bind(&moderation_metadata)
         .fetch_one(&mut *tx)
         .await;
 
@@ -805,6 +827,7 @@ pub async fn moderate_content(
             }
         }
         updated.content_status = new_status.to_string();
+        updated.metadata = moderation_metadata.clone();
         updated.updated_at = Utc::now();
     }
 
