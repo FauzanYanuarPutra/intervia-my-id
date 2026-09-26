@@ -25,21 +25,8 @@ function errorResponse(message: string, status: 404 | 503) {
   );
 }
 
-const MISSING_CONTENT_MEDIA_SVG = Buffer.from(
-  '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400" viewBox="0 0 640 400" role="img" aria-label="Media tidak tersedia"><rect width="640" height="400" fill="#f1f5f9"/><rect x="220" y="120" width="200" height="140" rx="24" fill="#e2e8f0"/><path d="M255 220l45-55 38 42 28-31 42 44" fill="none" stroke="#94a3b8" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/><circle cx="330" cy="166" r="12" fill="#94a3b8"/><text x="320" y="305" text-anchor="middle" font-family="system-ui,sans-serif" font-size="24" font-weight="600" fill="#64748b">Media tidak tersedia</text></svg>',
-);
-
-function missingContentMediaResponse(headOnly: boolean) {
-  const headers = {
-    'Content-Type': 'image/svg+xml',
-    'Content-Disposition': 'inline',
-    'Cache-Control': 'public, max-age=60, stale-while-revalidate=300',
-    'Content-Length': String(MISSING_CONTENT_MEDIA_SVG.byteLength),
-  };
-  return new NextResponse(headOnly ? null : MISSING_CONTENT_MEDIA_SVG, {
-    status: 200,
-    headers,
-  });
+function missingContentMediaResponse() {
+  return errorResponse('Media not found', 404);
 }
 
 function successHeaders(metadata: PublicMediaMetadata): HeadersInit {
@@ -126,7 +113,7 @@ async function handlePublicMedia(
     if (parsed.key.startsWith('content/')) {
       const local = await localFallback(parsed.key, headOnly);
       if (local.status === 200) return local;
-      return missingContentMediaResponse(headOnly);
+      return missingContentMediaResponse();
     }
     return errorResponse('Not found', 404);
   }
