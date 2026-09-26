@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, Search } from 'lucide-react';
+import { ArrowRight, Info, Search } from 'lucide-react';
+import { Modal } from '@/components/common/Modal';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 
@@ -118,6 +119,7 @@ export function ExploreHubPage({ locale, initialIntent = 'supply' }: { locale: L
   const isId = locale === 'id';
   const [query, setQuery] = useState('');
   const [intent, setIntent] = useState<HubIntent>(initialIntent);
+  const [showExploreInfo, setShowExploreInfo] = useState(false);
 
   useEffect(() => {
     setIntent(initialIntent);
@@ -164,6 +166,15 @@ export function ExploreHubPage({ locale, initialIntent = 'supply' }: { locale: L
           <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(260px,0.82fr)_minmax(0,1.18fr)] lg:items-end lg:gap-7">
             <div className="min-w-0">
               <h1 className="text-[clamp(1.55rem,5vw,2.55rem)] font-black leading-[1.02] tracking-[-0.045em] text-zinc-950 dark:text-white">{intent === 'demand' ? isId ? 'Temukan calon pembeli untuk penawaranmu' : 'Find buyers for what you offer' : isId ? 'Temukan yang dibutuhkan usahamu' : 'Find what your business needs'}</h1>
+              <button
+                type="button"
+                onClick={() => setShowExploreInfo(true)}
+                className="mt-3 inline-flex min-h-9 items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-[10px] font-extrabold text-zinc-600 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/25 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:border-emerald-800 dark:hover:bg-emerald-950/40 dark:hover:text-emerald-200"
+                aria-label={isId ? 'Pelajari cara kerja Jelajahi' : 'Learn how Explore works'}
+              >
+                <Info className="h-3.5 w-3.5" aria-hidden="true" />
+                {isId ? 'Cara kerja Jelajahi' : 'How Explore works'}
+              </button>
               <p className="mt-2 max-w-[560px] text-[11px] font-medium leading-5 text-zinc-500 dark:text-zinc-400 sm:text-xs">{intent === 'demand' ? isId ? 'Cari kebutuhan pembeli berdasarkan produk, jasa, kategori, dan lokasi.' : 'Find buyer needs by product, service, category, and location.' : isId ? 'Cari supplier, jasa, mesin, tempat usaha, orang dengan keahlian, atau kebutuhan pembeli.' : 'Find suppliers, services, equipment, business places, skilled people, or buyer needs.'}</p>
               <ExploreModeTabs value={intent} options={[{ value: 'supply' as const, label: isId ? 'Saya mencari' : 'I am looking for', hint: isId ? 'Supplier, produk, jasa & lainnya' : 'Suppliers, products, services & more' },{ value: 'demand' as const, label: isId ? 'Saya menawarkan' : 'I am offering', hint: isId ? 'Temukan kebutuhan pembeli' : 'Find buyer needs' }]} onChange={handleIntentChange} ariaLabel={isId ? 'Tujuan pencarian' : 'Search purpose'} className="mt-3 w-full max-w-[560px]" />
             </div>
@@ -228,5 +239,61 @@ export function ExploreHubPage({ locale, initialIntent = 'supply' }: { locale: L
         </section>
       </main>
     </div>
+      <Modal
+        open={showExploreInfo}
+        title={isId ? 'Cara kerja Jelajahi' : 'How Explore works'}
+        onClose={() => setShowExploreInfo(false)}
+      >
+        <div className="space-y-3 overflow-y-auto pr-1">
+          <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-300">
+            {isId
+              ? 'Jelajahi dipakai untuk menemukan hal yang relevan untuk usahamu. Pilih tujuan pencarian dulu, lalu gunakan kategori atau kata kunci.'
+              : 'Explore helps you discover things relevant to your business. Choose the search goal first, then use categories or keywords.'}
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-3 dark:border-emerald-900/60 dark:bg-emerald-950/30">
+              <p className="text-xs font-black text-emerald-900 dark:text-emerald-100">
+                {isId ? 'Saya mencari' : 'I am looking for'}
+              </p>
+              <p className="mt-1.5 text-[11px] leading-5 text-emerald-900/75 dark:text-emerald-100/75">
+                {isId
+                  ? 'Untuk mencari produk, supplier, jasa, alat, tempat usaha, orang, komunitas, dan kebutuhan lain.'
+                  : 'Find products, suppliers, services, equipment, places, people, communities, and more.'}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-blue-200 bg-blue-50/70 p-3 dark:border-blue-900/60 dark:bg-blue-950/30">
+              <p className="text-xs font-black text-blue-900 dark:text-blue-100">
+                {isId ? 'Saya menawarkan' : 'I am offering'}
+              </p>
+              <p className="mt-1.5 text-[11px] leading-5 text-blue-900/75 dark:text-blue-100/75">
+                {isId
+                  ? 'Untuk menemukan kebutuhan pembeli yang bisa cocok dengan produk atau jasa yang kamu tawarkan.'
+                  : 'Find buyer needs that may match the products or services you offer.'}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900/60">
+              <p className="text-xs font-black text-zinc-900 dark:text-zinc-100">
+                {isId ? 'Hasil pencarian' : 'Search results'}
+              </p>
+              <p className="mt-1.5 text-[11px] leading-5 text-zinc-600 dark:text-zinc-300">
+                {isId
+                  ? 'Tab seperti Produk, Jasa, Usaha, Kebutuhan, Video, Komunitas, dan Orang membantu mempersempit hasil.'
+                  : 'Tabs such as Products, Services, Businesses, Needs, Videos, Communities, and Users help narrow results.'}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-violet-200 bg-violet-50/70 p-3 dark:border-violet-900/60 dark:bg-violet-950/30">
+              <p className="text-xs font-black text-violet-900 dark:text-violet-100">
+                {isId ? 'Bingung?' : 'Not sure?'}
+              </p>
+              <p className="mt-1.5 text-[11px] leading-5 text-violet-900/75 dark:text-violet-100/75">
+                {isId
+                  ? 'Mulai dari kata kunci sederhana. Lajukan akan menampilkan jenis hasil yang tersedia dan kamu bisa mempersempitnya kemudian.'
+                  : 'Start with a simple keyword. Lajukan shows the available result types, and you can narrow them down afterwards.'}
+              </p>
+            </div>
+          </div>
+        </div>
+      </Modal>
+
   );
 }
