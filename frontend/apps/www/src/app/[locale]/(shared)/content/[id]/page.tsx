@@ -3,6 +3,7 @@ import {
   getPublicContent,
   getPublicEditorialLanguage,
   getPublicEditorialSlug,
+  getViewerUserId,
   isPublicContentActive,
   isPublicEditorialContent,
 } from '@/lib/server/publicContent';
@@ -17,17 +18,27 @@ export default async function ContentDetailPage({ params }: PageProps) {
   const { locale, id } = await params;
   const result = await getPublicContent(id);
 
-  if (
-    result.status === 'not_found' ||
-    (result.status === 'found' && !isPublicContentActive(result.content))
-  ) {
+  if (result.status === 'not_found') {
     notFound();
   }
   if (result.status === 'unavailable') {
     throw new Error('Marketplace service unavailable');
   }
 
-  if (result.status === 'found' && isPublicEditorialContent(result.content)) {
+  const isActive = isPublicContentActive(result.content);
+  let isOwner = false;
+  if (!isActive) {
+    const viewerUserId = await getViewerUserId();
+    const ownerId = String(result.content.owner_id || '').trim();
+    isOwner = Boolean(viewerUserId && ownerId && viewerUserId === ownerId);
+    if (!isOwner) notFound();
+  }
+
+  if (
+    result.status === 'found' &&
+    isActive &&
+    isPublicEditorialContent(result.content)
+  ) {
     const slug = getPublicEditorialSlug(result.content);
     if (slug) {
       const language = getPublicEditorialLanguage(result.content, locale);
