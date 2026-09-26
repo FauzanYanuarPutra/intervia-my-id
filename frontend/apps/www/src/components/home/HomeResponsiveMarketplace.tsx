@@ -2217,8 +2217,8 @@ function HomeListingCarouselSection({
       aria-label={
         isDemand
           ? isId
-            ? 'Orang sedang membutuhkan'
-            : 'What people are looking for'
+            ? 'Membutuhkan'
+            : 'People who need something'
           : isId
             ? 'Rekomendasi penawaran untuk usahamu'
             : 'Recommended offers for your business'
@@ -3363,7 +3363,7 @@ function RightRail({
     },
     {
       id: 'requests',
-      label: isId ? 'Permintaan aktif' : 'Active requests',
+      label: isId ? 'Membutuhkan' : 'Needs',
       value: resolveCountLabel(summary?.requests?.active, '0'),
       icon: ClipboardList,
       tone: 'bg-amber-50 text-amber-700 ring-amber-100 dark:bg-amber-950/40 dark:text-amber-200 dark:ring-amber-900/60',
@@ -4201,7 +4201,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
             ? [
                 {
                   id: 'requests',
-                  label: isId ? 'Permintaan' : 'My Requests',
+                  label: isId ? 'Membutuhkan' : 'My Needs',
                   caption: isId ? 'Kebutuhan aktif' : 'Active briefs and needs',
                   href: '/my-projects',
                   icon: ClipboardList,
@@ -4324,7 +4324,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
             ? [
                 {
                   id: 'requests',
-                  label: isId ? 'Permintaan Saya' : 'My Requests',
+                  label: isId ? 'Membutuhkan Saya' : 'My Needs',
                   caption: isId ? 'Login untuk akses' : 'Login to access',
                   href: '/login',
                   icon: ClipboardList,
