@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/serverAuth';
+import { isListingContentType } from '@/lib/content/listingTypes';
 
 const MARKETPLACE_URL =
   process.env.INTERNAL_MARKETPLACE_URL ||
@@ -88,9 +89,10 @@ export async function GET(request: NextRequest) {
     const list = normalizeContentList(data);
     // Keep the BFF fail-closed even if an upstream implementation ignores the
     // owner filter. This also protects compatibility with older service builds.
-    const results = list.filter(
-      item => String(item.owner_id ?? '') === ownerId,
-    );
+    const results = list.filter(item => {
+      if (String(item.owner_id ?? '') !== ownerId) return false;
+      return isListingContentType(item.content_type ?? item.type);
+    });
 
     return NextResponse.json({ results, total: results.length });
   } catch (e) {
