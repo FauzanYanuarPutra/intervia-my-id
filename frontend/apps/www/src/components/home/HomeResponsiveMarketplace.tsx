@@ -2234,8 +2234,8 @@ function HomeListingCarouselSection({
         <h2 className="min-w-0 truncate text-[11px] font-bold leading-5 tracking-tight text-[color:var(--app-text)] sm:text-xs">
           {isDemand
             ? isId
-              ? 'Orang sedang membutuhkan'
-              : 'People are looking for'
+              ? 'Membutuhkan'
+              : 'People who need something'
             : isId
               ? 'Menawarkan'
               : 'Offering'}
