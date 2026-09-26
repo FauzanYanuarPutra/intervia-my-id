@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   activeListingNeedsPrimaryImage,
+  canTransitionContentStatus,
   toUpsertListingPayload,
   validateListingPayload,
 } from './listingFlowRules';
@@ -454,6 +455,23 @@ describe('validateListingPayload', () => {
         issue.includes('metadata.transferable_channels is required'),
       ),
     ).toBe(true);
+  });
+});
+
+
+describe('canTransitionContentStatus', () => {
+  it.each([
+    ['published', 'active'],
+    ['live', 'active'],
+    ['published', 'published'],
+    ['live', 'live'],
+    ['ACTIVE', 'paused'],
+  ])('allows %s -> %s as a normalized marketplace transition', (current, next) => {
+    expect(canTransitionContentStatus(current, next)).toBe(true);
+  });
+
+  it('does not allow deleted content to be edited back into an active listing', () => {
+    expect(canTransitionContentStatus('deleted', 'active')).toBe(false);
   });
 });
 
