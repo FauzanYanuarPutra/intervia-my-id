@@ -74,7 +74,7 @@ export function buildSectionHref(businessId: string, section: PortalSection) {
 export function getStatusCopy(business: BusinessRecord) {
   const locations = business.locations ?? [];
   if (!business.infoComplete) return { label: 'Setup awal', description: 'Info dasar usaha masih perlu dirapikan.' };
-  if (locations.length === 0) return { label: 'Lengkapi lokasi', description: 'Tambahkan lokasi utama agar pelanggan mudah menemukan usaha.' };
+  if (locations.length === 0 || !locations.some(item => item.isPrimary)) return { label: 'Lengkapi lokasi', description: 'Tetapkan satu lokasi utama agar operasional dan pelanggan punya acuan yang jelas.' };
   if (!business.isOpen) return { label: 'Siap buka', description: 'Data inti sudah cukup. Tinggal aktifkan operasional saat siap menerima pelanggan.' };
   return { label: 'Sedang jalan', description: 'Operasional sudah aktif dan bisa dipantau tim.' };
 }
