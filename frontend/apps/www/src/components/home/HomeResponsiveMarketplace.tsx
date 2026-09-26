@@ -4025,25 +4025,18 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
       // because the discussion feed itself is temporarily unavailable.
       setCommunityGroups(groups);
 
-      if (!response.ok) {
-        setCommunityPosts([]);
-        throw new Error(
-          isId
-            ? 'Diskusi komunitas belum bisa dimuat. Coba lagi sebentar.'
-            : 'Community discussions could not be loaded. Please try again.',
-        );
-      }
-
       let feedPayload = payload;
+      const primaryDiscussionItems = (payload?.items || []).filter(
+        item => item.kind !== 'reel',
+      );
 
-      // A guest/"For you" feed can legitimately return no rows when there is no
-      // personalization context yet. Home should still surface real community
-      // discussions instead of showing a misleading empty state.
-      if (
-        response.ok &&
+      // "For you" is personalized. When it is empty or unavailable, Home should
+      // still surface public business discussions that already exist.
+      const shouldFallbackToPublic =
         activeTab === 'for-you' &&
-        (payload?.items || []).filter(item => item.kind !== 'reel').length === 0
-      ) {
+        (!response.ok || primaryDiscussionItems.length === 0);
+
+      if (shouldFallbackToPublic) {
         try {
           const fallbackParams = new URLSearchParams({
             tab: 'community',
@@ -4063,12 +4056,15 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
             .json()
             .catch(() => null)) as CommunityFeedResponse | null;
 
-          if (fallbackResponse.ok && (fallbackPayload?.items || []).length > 0) {
+          if (
+            fallbackResponse.ok &&
+            (fallbackPayload?.items || []).some(item => item.kind !== 'reel')
+          ) {
             feedPayload = fallbackPayload;
           }
         } catch {
-          // Keep the original response. The existing empty/error UI remains the
-          // final fallback when both personalized and public feeds are empty.
+          // Preserve the primary response. The final empty/error state below
+          // remains the last resort when both feeds are unavailable.
         }
       }
 
@@ -4076,6 +4072,15 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
         .filter(item => item.kind !== 'reel')
         .map(item => mapCommunityItemToPost(item, isId, activeTab))
         .slice(0, 3);
+
+      if (!response.ok && feedPayload === payload) {
+        setCommunityPosts([]);
+        throw new Error(
+          isId
+            ? 'Diskusi komunitas belum bisa dimuat. Coba lagi sebentar.'
+            : 'Community discussions could not be loaded. Please try again.',
+        );
+      }
 
       setCommunityPosts(mapped);
       setCommunityError(null);
