@@ -286,7 +286,7 @@ export default function PropertyClient() {
         setPage(reset ? 2 : currentPage + 1);
       } catch (err) {
         console.error('[property] failed to load data', err);
-        setLoadError('Gagal memuat properti dari backend.');
+        setLoadError('Datanya belum berhasil dimuat. Coba lagi ya.');
         if (reset) setItems([]);
       } finally {
         autoLoadLockRef.current = false;
@@ -533,7 +533,7 @@ export default function PropertyClient() {
             </h2>
             <p className="mt-2 max-w-xs text-sm text-[color:var(--app-text)]">
               Kami tidak menemukan properti yang sesuai dengan filter Anda.
-              Silakan coba atur kembali filter Anda.
+              Coba ubah filternya sedikit ya.
             </p>
             <button
               onClick={handleReset}
