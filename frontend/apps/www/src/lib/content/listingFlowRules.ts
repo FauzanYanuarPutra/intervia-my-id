@@ -1301,9 +1301,20 @@ export function canTransitionContentStatus(
   currentStatus: string,
   nextStatus: string,
 ): boolean {
-  const current = currentStatus.trim().toLowerCase();
-  const next = nextStatus.trim().toLowerCase();
+  const normalize = (value: string) =>
+    value
+      .trim()
+      .toLowerCase()
+      .replace(/[\s-]+/g, '_');
+
+  let current = normalize(currentStatus);
+  let next = normalize(nextStatus);
   if (!current || !next) return false;
+
+  // Published/live are public-state aliases of active for marketplace edits.
+  if (current === 'published' || current === 'live') current = 'active';
+  if (next === 'published' || next === 'live') next = 'active';
+
   if (current === next) return true;
 
   const allowedNext: Record<string, Set<string>> = {
