@@ -155,11 +155,15 @@ function isDemandContent(item: ContentItem, metadata: Record<string, unknown>): 
 
 export function resolveContentPriceUnit(item: ContentItem): string {
   const metadata = metadataRecord(item.metadata);
+  const itemRecord = item as unknown as Record<string, unknown>;
   const nestedAttributes = [
     metadataRecord(metadata.attributes),
     metadataRecord(metadata.values),
     metadataRecord(metadata.form_values),
     metadataRecord(metadata.listing_values),
+    metadataRecord(itemRecord.attributes),
+    metadataRecord(itemRecord.values),
+    metadataRecord(itemRecord.form_values),
   ];
 
   const nestedUnit =
