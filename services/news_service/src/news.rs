@@ -349,7 +349,11 @@ fn normalize_news_category_filter(value: Option<String>) -> Result<Option<String
     Ok(Some(canonical.to_string()))
 }
 
-fn public_news_metadata(metadata: &Value, source_urls: Option<&[String]>) -> Value {
+fn public_news_metadata(
+    metadata: &Value,
+    source_urls: Option<&[String]>,
+    include_rich_body: bool,
+) -> Value {
     let source = metadata.get("news").and_then(Value::as_object);
     let mut public = serde_json::Map::new();
     for key in [
@@ -367,6 +371,11 @@ fn public_news_metadata(metadata: &Value, source_urls: Option<&[String]>) -> Val
     ] {
         if let Some(value) = source.and_then(|news| news.get(key)) {
             public.insert(key.to_string(), value.clone());
+        }
+    }
+    if include_rich_body {
+        if let Some(rich_body) = source.and_then(|news| news.get("rich_body")) {
+            public.insert("rich_body".to_string(), rich_body.clone());
         }
     }
     if let Some(source_urls) = source_urls {
@@ -394,7 +403,7 @@ fn public_news_row(
         },
         tags: if is_retracted { None } else { row.tags },
         cover_image: if is_retracted { None } else { row.cover_image },
-        metadata: public_news_metadata(&row.metadata, public_sources),
+        metadata: public_news_metadata(&row.metadata, public_sources, include_body),
         content_status: row.content_status,
         published_at: row.published_at,
         created_at: row.created_at,
@@ -3285,11 +3294,12 @@ mod tests {
                 "reviewer_id": "22222222-2222-2222-2222-222222222222",
                 "review_note": "catatan internal",
                 "previous_review_note": "catatan lama",
+                "rich_body": "<p>Paragraf satu</p><p>Paragraf dua</p>",
                 "source_urls": ["https://unverified.example/"]
             }
         });
         let verified_sources = vec!["https://www.bi.go.id/".to_string()];
-        let public = public_news_metadata(&metadata, Some(&verified_sources));
+        let public = public_news_metadata(&metadata, Some(&verified_sources), true);
 
         assert_eq!(
             public
@@ -3307,6 +3317,15 @@ mod tests {
         assert!(public.pointer("/news/reviewer_id").is_none());
         assert!(public.pointer("/news/review_note").is_none());
         assert!(public.pointer("/news/previous_review_note").is_none());
+        assert_eq!(
+            public
+                .pointer("/news/rich_body")
+                .and_then(|value| value.as_str()),
+            Some("<p>Paragraf satu</p><p>Paragraf dua</p>")
+        );
+
+        let list_public = public_news_metadata(&metadata, Some(&verified_sources), false);
+        assert!(list_public.pointer("/news/rich_body").is_none());
     }
 
     #[test]
