@@ -1475,6 +1475,9 @@ export default function PublicProfileClient({
     useState<PublicProfileTab>('posts');
   const [activeContentTab, setActiveContentTab] =
     useState<ProfileContentTab>('all');
+  const [listingSort, setListingSort] = useState<
+    'newest' | 'most_viewed' | 'oldest'
+  >('newest');
   const [socialModalTab, setSocialModalTab] = useState<ProfileSocialTab | null>(
     null,
   );
@@ -1960,8 +1963,19 @@ export default function PublicProfileClient({
     ? activeContentTab
     : 'all';
 
-  const visibleListings =
-    resolvedContentTab === 'all' ? listings : listingGroups[resolvedContentTab];
+  const visibleListings = [
+    ...(resolvedContentTab === 'all'
+      ? listings
+      : listingGroups[resolvedContentTab]),
+  ].sort((a, b) => {
+    if (listingSort === 'most_viewed') {
+      return (b.view_count || 0) - (a.view_count || 0);
+    }
+
+    const aTime = Date.parse(a.created_at || a.updated_at || '') || 0;
+    const bTime = Date.parse(b.created_at || b.updated_at || '') || 0;
+    return listingSort === 'oldest' ? aTime - bTime : bTime - aTime;
+  });
 
   const businessCategory =
     firstString(
@@ -2310,20 +2324,20 @@ export default function PublicProfileClient({
             </div>
 
             <div className="px-3 pb-3 sm:px-6 sm:pb-4">
-              <div className="-mt-10 flex min-w-0 items-end gap-3 sm:-mt-11 sm:gap-4">
-                <div className="relative h-[72px] w-[72px] shrink-0 overflow-hidden rounded-full border-[4px] border-[color:var(--app-surface-strong)] bg-[color:var(--app-surface-muted)] shadow-md sm:h-[88px] sm:w-[88px] sm:border-[5px]">
+              <div className="-mt-10 flex min-w-0 flex-col items-center gap-2 sm:-mt-11 sm:flex-row sm:items-end sm:gap-4">
+                <div className="relative h-[76px] w-[76px] shrink-0 overflow-hidden rounded-full border-[4px] border-[color:var(--app-surface-strong)] bg-[color:var(--app-surface-muted)] shadow-md sm:h-[88px] sm:w-[88px] sm:border-[5px]">
                   <Image src={avatarUrl} alt={detail.displayName} fill priority unoptimized sizes="96px" className="object-cover" />
                 </div>
-                <div className="min-w-0 flex-1 pb-0.5">
-                  <div className="flex min-w-0 items-center gap-1.5">
-                    <h1 className="min-w-0 truncate text-[20px] font-black leading-tight tracking-[-0.02em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[26px]">{detail.displayName}</h1>
+                <div className="min-w-0 flex-1 pb-0 text-center sm:pb-0.5 sm:text-left">
+                  <div className="flex min-w-0 items-center justify-center gap-1.5 sm:justify-start">
+                    <h1 className="min-w-0 max-w-full truncate text-[20px] font-black leading-tight tracking-[-0.02em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[26px]">{detail.displayName}</h1>
                     {profile.identity_verified ? <BadgeCheck className="h-5 w-5 shrink-0 fill-emerald-600 text-white" aria-label={copy.verified} /> : null}
                   </div>
                   <p className="mt-0.5 truncate text-[11px] font-medium text-[color:var(--app-text-soft)] sm:text-xs">@{detail.handle}</p>
                 </div>
               </div>
 
-              <div className="mt-2 flex min-w-0 flex-wrap gap-1.5">
+              <div className="mt-2 flex min-w-0 flex-wrap justify-center gap-1.5 sm:justify-start">
                 {businessCategory ? <span className="inline-flex max-w-full items-center rounded-full bg-[color:var(--app-accent-soft)] px-2.5 py-1 text-[10px] font-bold text-[color:var(--app-accent)] sm:text-[11px]"><span className="truncate">{businessCategory}</span></span> : null}
                 {profile.location ? <span className="inline-flex max-w-full items-center gap-1 rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[10px] font-medium text-[color:var(--app-text-soft)] sm:text-[11px]"><MapPin className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{profile.location}</span></span> : null}
               </div>
@@ -2422,27 +2436,50 @@ export default function PublicProfileClient({
 
             {activeProfileTab === 'posts' ? (
               <div className="p-2.5 sm:p-5">
-                <ProfileFilterStrip
-                  activeKey={resolvedContentTab}
-                  ariaLabel={localeCode === 'id' ? 'Filter etalase' : 'Storefront filter'}
-                  className="w-full"
-                  mobileLabel={localeCode === 'id' ? 'Jenis postingan' : 'Post type'}
-                  mobileTitle={localeCode === 'id' ? 'Pilih isi etalase' : 'Choose storefront content'}
-                  mobileDescription={
-                    localeCode === 'id'
-                      ? 'Pilih satu jenis untuk menyaring postingan profil ini.'
-                      : 'Choose one type to filter this profile storefront.'
-                  }
-                  mobileDoneLabel={localeCode === 'id' ? 'Selesai' : 'Done'}
-                  mobileCloseLabel={localeCode === 'id' ? 'Tutup' : 'Close'}
-                  mobileCountSuffix={localeCode === 'id' ? 'item' : 'items'}
-                  items={availableContentTabs.map(tab => ({
-                    key: tab,
-                    label: tab === 'all' ? copy.all : getProfileContentTabLabel(tab, localeCode),
-                    count: tab === 'all' ? listings.length : listingGroups[tab].length,
-                  }))}
-                  onChange={setActiveContentTab}
-                />
+                <div className="grid gap-2 min-[520px]:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                  <ProfileFilterStrip
+                    activeKey={resolvedContentTab}
+                    ariaLabel={localeCode === 'id' ? 'Filter etalase' : 'Storefront filter'}
+                    className="w-full"
+                    mobileLabel={localeCode === 'id' ? 'Filter' : 'Filter'}
+                    mobileTitle={localeCode === 'id' ? 'Jenis postingan' : 'Post type'}
+                    mobileDescription={
+                      localeCode === 'id'
+                        ? 'Pilih jenis postingan yang ingin ditampilkan di etalase profil ini.'
+                        : 'Choose which post type should appear in this storefront.'
+                    }
+                    mobileDoneLabel={localeCode === 'id' ? 'Tampilkan' : 'Show'}
+                    mobileCloseLabel={localeCode === 'id' ? 'Tutup' : 'Close'}
+                    mobileCountSuffix={localeCode === 'id' ? 'item' : 'items'}
+                    items={availableContentTabs.map(tab => ({
+                      key: tab,
+                      label: tab === 'all' ? copy.all : getProfileContentTabLabel(tab, localeCode),
+                      count: tab === 'all' ? listings.length : listingGroups[tab].length,
+                    }))}
+                    onChange={setActiveContentTab}
+                  />
+
+                  <label className="flex min-h-11 items-center justify-between gap-2 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-[color:var(--app-text)] sm:min-h-9 sm:rounded-full sm:px-2.5">
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <span className="text-[9px] font-black uppercase tracking-[0.08em] text-[color:var(--app-text-soft)] sm:hidden">
+                        {localeCode === 'id' ? 'Urutan' : 'Sort'}
+                      </span>
+                      <span className="hidden text-[10px] font-black text-[color:var(--app-text-soft)] sm:block">
+                        {localeCode === 'id' ? 'Urutkan' : 'Sort'}
+                      </span>
+                    </span>
+                    <select
+                      value={listingSort}
+                      onChange={event => setListingSort(event.target.value as 'newest' | 'most_viewed' | 'oldest')}
+                      className="min-w-0 bg-transparent text-[11px] font-black outline-none sm:max-w-36 sm:text-xs"
+                      aria-label={localeCode === 'id' ? 'Urutkan postingan' : 'Sort posts'}
+                    >
+                      <option value="newest">{localeCode === 'id' ? 'Terbaru' : 'Newest'}</option>
+                      <option value="most_viewed">{localeCode === 'id' ? 'Paling dilihat' : 'Most viewed'}</option>
+                      <option value="oldest">{localeCode === 'id' ? 'Terlama' : 'Oldest'}</option>
+                    </select>
+                  </label>
+                </div>
 
                 {visibleListings.length > 0 ? (
                   <div className="mt-3 grid gap-2.5 min-[480px]:grid-cols-2 sm:gap-3 lg:grid-cols-4">
