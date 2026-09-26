@@ -30,10 +30,10 @@ export default async function BusinessWorkPage({ params }: PageProps) {
       activeBusiness={business}
       availableBusinesses={businesses}
       viewerName={account.name}
-      currentSection="team"
+      currentSection="work"
     >
       <PageHeader
-        eyebrow="Tim & akses"
+        eyebrow="Operasional"
         title="Pekerjaan usaha"
         description="Kondisi usaha diterjemahkan menjadi pekerjaan yang jelas, lalu dibagikan ke orang yang tepat."
         meta={<span className="portal-icon-tile"><ClipboardCheck className="h-4 w-4" /></span>}
