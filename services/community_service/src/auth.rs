@@ -18,6 +18,8 @@ struct AccessClaims {
     #[serde(default)]
     username: Option<String>,
     #[serde(default)]
+    email: Option<String>,
+    #[serde(default)]
     name: Option<String>,
     #[serde(default)]
     full_name: Option<String>,
@@ -30,6 +32,7 @@ pub(crate) struct AuthActor {
     pub(crate) user_id: String,
     pub(crate) roles: Vec<String>,
     pub(crate) username: Option<String>,
+    pub(crate) email: Option<String>,
     pub(crate) name: Option<String>,
 }
 
@@ -135,6 +138,7 @@ pub(crate) fn optional_actor(headers: &HeaderMap, state: &AppState) -> Option<Au
         user_id: claims.sub,
         roles: claims.roles,
         username: claims.username,
+        email: claims.email,
         name: claims.name.or(claims.full_name).or(claims.display_name),
     })
 }
@@ -142,6 +146,23 @@ pub(crate) fn optional_actor(headers: &HeaderMap, state: &AppState) -> Option<Au
 pub(crate) fn require_actor(headers: &HeaderMap, state: &AppState) -> ApiResult<AuthActor> {
     optional_actor(headers, state)
         .ok_or_else(|| ApiError::new(StatusCode::UNAUTHORIZED, "Unauthorized"))
+}
+
+pub(crate) fn is_platform_group_admin(actor: &AuthActor) -> bool {
+    let configured = env::var("COMMUNITY_PLATFORM_ADMIN_EMAILS")
+        .unwrap_or_else(|_| "lajukan001@gmail.com".to_string());
+    let candidate = actor
+        .email
+        .as_deref()
+        .or_else(|| actor.username.as_deref().filter(|value| value.contains('@')))
+        .map(str::trim)
+        .unwrap_or_default();
+    !candidate.is_empty()
+        && configured
+            .split(',')
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .any(|value| value.eq_ignore_ascii_case(candidate))
 }
 
 pub(crate) fn is_moderator(actor: &AuthActor) -> bool {
@@ -175,6 +196,7 @@ mod tests {
             user_id: "user".to_string(),
             roles: vec!["moderator".to_string()],
             username: None,
+            email: None,
             name: None,
         };
         assert!(is_moderator(&actor));
