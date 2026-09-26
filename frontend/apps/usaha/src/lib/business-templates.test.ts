@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   BUSINESS_TEMPLATE_PRESETS,
+  businessHasCapability,
   getBusinessTemplatePreset,
   isBusinessTemplateKey,
 } from './business-templates';
@@ -31,5 +32,19 @@ describe('business template presets', () => {
     expect(getBusinessTemplatePreset('mart_retail').quickStart).toContain('Buka kasir');
     expect(isBusinessTemplateKey('laundry')).toBe(true);
     expect(isBusinessTemplateKey('restaurant_v99')).toBe(false);
+  });
+  it('keeps inventory contextual instead of forcing stock onto every business', () => {
+    expect(
+      businessHasCapability({ templateKey: 'laundry', activeCapabilityKeys: ['work_orders'] }, 'inventory'),
+    ).toBe(false);
+    expect(
+      businessHasCapability({ templateKey: 'mart_retail', activeCapabilityKeys: ['inventory'] }, 'inventory'),
+    ).toBe(true);
+    expect(
+      businessHasCapability({ templateKey: 'general', category: 'Manufaktur' }, 'inventory'),
+    ).toBe(true);
+    expect(
+      businessHasCapability({ templateKey: 'general', category: 'Konsultan' }, 'inventory'),
+    ).toBe(false);
   });
 });
