@@ -171,9 +171,9 @@
       "reuse_mode": "persistent_import",
       "license": "ODbL 1.0",
       "attribution": "© OpenStreetMap contributors",
-      "endpoint": "https://overpass.private.coffee/api/interpreter",
+      "endpoint": "https://overpass-api.de/api/interpreter",
       "auto_publish_reference": true,
-      "notes": "Governed persistent OSM reference import via Overpass. Lajukan preserves provenance and attribution; ownership remains unclaimed. Publication requires compliance with ODbL obligations.",
+      "notes": "Governed persistent OSM reference import via Overpass. Runtime memakai fallback endpoint jika mirror utama gagal. Lajukan preserves provenance and attribution; ownership remains unclaimed.",
       "license_url": "https://opendatacommons.org/licenses/odbl/1-0/",
       "terms_url": "https://www.openstreetmap.org/copyright"
     },
