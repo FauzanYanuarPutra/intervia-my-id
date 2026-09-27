@@ -168,12 +168,12 @@
       "provider": "OpenStreetMap contributors",
       "kind": "osm_overpass",
       "url": "https://www.openstreetmap.org/",
-      "reuse_mode": "persistent_import",
+      "reuse_mode": "live_only",
       "license": "ODbL 1.0",
       "attribution": "© OpenStreetMap contributors",
       "endpoint": "https://overpass.private.coffee/api/interpreter",
-      "auto_publish_reference": true,
-      "notes": "Read-only public OSM reference import. Governed by ODbL attribution; reference/unclaimed only. No private contact fields."
+      "auto_publish_reference": false,
+      "notes": "Live-only OSM source for map/reference lookup. Persistent Overpass ingestion is intentionally disabled until the dedicated Overpass adapter is enabled; existing governed OSM reference records remain available."
     },
     {
       "id": "wikimedia-commons",
