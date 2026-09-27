@@ -16,7 +16,7 @@ function readGalleryMedia(store: Awaited<ReturnType<typeof getUmkmStoreById>>) {
   const metadata = store && store.metadata && typeof store.metadata === 'object' ? store.metadata as Record<string, unknown> : {};
   const value = metadata.gallery_media;
   if (!Array.isArray(value)) return [];
-  return value.filter((item): item is string => typeof item === 'string' && item.trim()).map(item => item.trim());
+  return value.filter((item): item is string => typeof item === 'string' && Boolean(item.trim())).map(item => item.trim());
 }
 
 async function getAuthorizedStore(req: NextRequest, storeId: string) {
