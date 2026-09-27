@@ -8391,7 +8391,11 @@ export default function ChatRoomPage() {
                               >
                                 {displayContent}
                               </span>
-                            ) : msg.attachments?.length ? (
+                            ) :
+                              msg.attachments?.length &&
+                              ['image', 'video', 'audio', 'file'].includes(
+                                String(msg.message_type || '').toLowerCase(),
+                              ) ? (
                               <div className="space-y-1.5">
                                 <ChatMediaGallery
                                   attachments={msg.attachments}
