@@ -1108,6 +1108,7 @@ struct ListUmkmStoresQuery {
     city: Option<String>,
     slug: Option<String>,
     id: Option<Uuid>,
+    include_references: Option<bool>,
     limit: Option<i64>,
     min_lat: Option<f64>,
     max_lat: Option<f64>,
@@ -8069,23 +8070,34 @@ async fn find_public_umkm_store_row(
         FROM umkm_stores s
         WHERE (($1::uuid IS NOT NULL AND s.id = $1) OR lower(s.slug) = $2)
           AND s.is_active = TRUE
-          AND lower(COALESCE(s.metadata->>'is_transactional', 'true')) <> 'false'
-          AND lower(COALESCE(s.metadata->>'market_side', '')) <> 'reference'
-          AND lower(COALESCE(s.metadata->>'record_kind', '')) NOT LIKE '%reference%'
           AND lower(COALESCE(s.metadata->>'outlet_active', 'true')) <> 'false'
-          AND EXISTS (
-            SELECT 1 FROM business_locations location
-            WHERE location.store_id = s.id
-              AND location.public_visibility = TRUE
-              AND location.status = 'active'
+          AND (
+            (
+              lower(COALESCE(s.metadata->>'is_transactional', 'true')) = 'false'
+              AND (
+                lower(COALESCE(s.metadata->>'market_side', '')) = 'reference'
+                OR lower(COALESCE(s.metadata->>'record_kind', '')) LIKE '%reference%'
+              )
+            )
+            OR (
+              lower(COALESCE(s.metadata->>'is_transactional', 'true')) <> 'false'
+              AND lower(COALESCE(s.metadata->>'market_side', '')) <> 'reference'
+              AND lower(COALESCE(s.metadata->>'record_kind', '')) NOT LIKE '%reference%'
+              AND EXISTS (
+                SELECT 1 FROM business_locations location
+                WHERE location.store_id = s.id
+                  AND location.public_visibility = TRUE
+                  AND location.status = 'active'
+              )
+              AND COALESCE((
+                SELECT latest.current_action
+                FROM internal_moderation.business_moderation_cases latest
+                WHERE latest.business_id = s.id
+                ORDER BY latest.updated_at DESC
+                LIMIT 1
+              ), 'approve') NOT IN ('hide', 'reject')
+            )
           )
-          AND COALESCE((
-            SELECT latest.current_action
-            FROM internal_moderation.business_moderation_cases latest
-            WHERE latest.business_id = s.id
-            ORDER BY latest.updated_at DESC
-            LIMIT 1
-          ), 'approve') NOT IN ('hide', 'reject')
         LIMIT 1
         "#,
     )
@@ -8407,7 +8419,42 @@ async fn list_umkm_stores(
         .unwrap_or((None, None));
 
     let use_nearest_index = viewer.is_some();
-    let visibility_filter = r#"
+    let include_references = query.include_references.unwrap_or(true);
+    let visibility_filter = if include_references {
+        r#"
+      AND is_active = TRUE
+      AND lower(COALESCE(metadata->>'outlet_active', 'true')) <> 'false'
+      AND (
+        (
+          lower(COALESCE(metadata->>'is_transactional', 'true')) = 'false'
+          AND (
+            lower(COALESCE(metadata->>'market_side', '')) = 'reference'
+            OR lower(COALESCE(metadata->>'record_kind', '')) LIKE '%reference%'
+          )
+        )
+        OR (
+          lower(COALESCE(metadata->>'is_transactional', 'true')) <> 'false'
+          AND lower(COALESCE(metadata->>'market_side', '')) <> 'reference'
+          AND lower(COALESCE(metadata->>'record_kind', '')) NOT LIKE '%reference%'
+          AND EXISTS (
+            SELECT 1
+            FROM business_locations location
+            WHERE location.store_id = umkm_stores.id
+              AND location.public_visibility = TRUE
+              AND location.status = 'active'
+          )
+          AND COALESCE((
+            SELECT latest.current_action
+            FROM internal_moderation.business_moderation_cases latest
+            WHERE latest.business_id = umkm_stores.id
+            ORDER BY latest.updated_at DESC
+            LIMIT 1
+          ), 'approve') NOT IN ('hide', 'reject')
+        )
+      )
+    "#
+    } else {
+        r#"
       AND is_active = TRUE
       AND lower(COALESCE(metadata->>'is_transactional', 'true')) <> 'false'
       AND lower(COALESCE(metadata->>'market_side', '')) <> 'reference'
@@ -8427,7 +8474,8 @@ async fn list_umkm_stores(
         ORDER BY latest.updated_at DESC
         LIMIT 1
       ), 'approve') NOT IN ('hide', 'reject')
-    "#;
+    "#
+    };
     let ranking_order = if use_nearest_index {
         // Keep KNN distance as the complete ORDER BY expression. Adding
         // updated_at/id tie-breakers makes PostgreSQL scan and sort every
@@ -10441,10 +10489,77 @@ async fn list_map_references(
             'gallery_images', metadata->'gallery_images'
           )) AS metadata,
           updated_at
-        FROM content_items
-        WHERE content_status = 'active'
-          AND content_status = 'active'
-          AND metadata->>'reference_publication_status' = 'published'
+        FROM (
+          SELECT
+            id,
+            slug,
+            title,
+            summary,
+            cover_image,
+            metadata,
+            updated_at
+          FROM content_items
+          WHERE content_status = 'active'
+            AND metadata->>'reference_publication_status' = 'published'
+
+          UNION ALL
+
+          SELECT
+            s.id,
+            s.slug,
+            s.name AS title,
+            s.description AS summary,
+            COALESCE(
+              s.metadata->>'cover_image',
+              s.metadata->>'cover_image_url',
+              s.metadata->>'image_url'
+            ) AS cover_image,
+            jsonb_strip_nulls(jsonb_build_object(
+              'record_kind', s.metadata->'record_kind',
+              'marketplace_category_slug', s.metadata->'marketplace_category_slug',
+              'marketplace_subcategory_slug', s.metadata->'marketplace_subcategory_slug',
+              'category', s.metadata->'category',
+              'category_label', s.metadata->'category_label',
+              'city', s.city,
+              'location', s.address,
+              'address', s.address,
+              'latitude', public.lajukan_safe_map_coordinate(s.lat::text),
+              'longitude', public.lajukan_safe_map_coordinate(s.lng::text),
+              'external_id', s.metadata->'source_record_id',
+              'source_dataset', s.metadata->'source_id',
+              'source_url', s.metadata->'source_url',
+              'source_title', s.name,
+              'source_license', s.metadata->'source_license',
+              'source_license_url', s.metadata->'source_license_url',
+              'source_attribution', s.metadata->'attribution',
+              'image_attribution', s.metadata->'attribution',
+              'image_source_provider', s.metadata->'source_id',
+              'image_url', s.metadata->'image_url',
+              'gallery_images', s.metadata->'gallery_images',
+              'search_text', s.metadata->'search_text',
+              'brand', s.metadata->'brand',
+              'operator', s.metadata->'operator',
+              'osm_tags', s.metadata->'osm_tags',
+              'claimable', true,
+              'reference_subtype', 'place_reference',
+              'market_side', 'reference',
+              'is_transactional', false,
+              'trust_note', 'Referensi tempat/usaha dari sumber publik; belum diklaim dan bukan verifikasi kepemilikan.'
+            )) AS metadata,
+            s.updated_at
+          FROM umkm_stores s
+          WHERE s.is_active = TRUE
+            AND lower(COALESCE(s.metadata->>'is_transactional', 'true')) = 'false'
+            AND lower(COALESCE(s.metadata->>'record_kind', '')) LIKE '%reference%'
+            AND NULLIF(btrim(COALESCE(s.metadata->>'source_url', '')), '') IS NOT NULL
+            AND NULLIF(btrim(COALESCE(s.metadata->>'source_license', '')), '') IS NOT NULL
+            AND s.lat BETWEEN -90.0 AND 90.0
+            AND s.lng BETWEEN -180.0 AND 180.0
+        ) reference_rows
+        WHERE (
+            metadata->>'reference_publication_status' = 'published'
+            OR metadata->>'reference_subtype' = 'place_reference'
+          )
           AND (
             metadata->>'claimable' = 'true'
             OR metadata->>'reference_subtype' = 'place_reference'
@@ -10457,7 +10572,8 @@ async fn list_map_references(
             'open_data_reference',
             'licensed_reference',
             'external_content_reference',
-            'real_openstreetmap_reference'
+            'real_openstreetmap_reference',
+            'osm_provider_reference'
           )
           AND NULLIF(btrim(COALESCE(metadata->>'source_url', '')), '') IS NOT NULL
           AND (

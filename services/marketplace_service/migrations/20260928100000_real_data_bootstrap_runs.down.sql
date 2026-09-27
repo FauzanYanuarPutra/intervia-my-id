@@ -1,0 +1,1 @@
+DROP TABLE IF EXISTS real_data_bootstrap_runs;

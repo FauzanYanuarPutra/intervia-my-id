@@ -487,6 +487,15 @@ jobs:
           deployment_started=1
           docker compose "\${compose[@]}" up -d --remove-orphans --wait --wait-timeout 420
 
+          echo "Verifying external real-data bootstrap service"
+          crawler_state="\$(docker compose \"\${compose[@]}\" ps -a --format \"{{.Service}}|{{.State}}|{{.ExitCode}}\" real_data_bootstrap || true)"
+          printf "real_data_bootstrap state=%s\\n" "\$crawler_state"
+          if ! printf "%s" "\$crawler_state" | grep -Eq "real_data_bootstrap\\|(exited|running)\\|0$"; then
+            echo "External real-data bootstrap service did not finish successfully." >&2
+            docker compose "\${compose[@]}" logs --no-color --tail=200 real_data_bootstrap || true
+            exit 1
+          fi
+          docker compose "\${compose[@]}" logs --no-color --tail=120 real_data_bootstrap || true
           echo "Verifying Lajukan real-data bootstrap"
           bootstrap_ready=0
           for attempt in \$(seq 1 60); do

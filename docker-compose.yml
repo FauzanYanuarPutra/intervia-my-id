@@ -416,6 +416,26 @@ services:
       start_period: 180s
     networks: [app, data]
 
+  real_data_bootstrap:
+    <<: *service-defaults
+    restart: "no"
+    build:
+      context: .
+      dockerfile: services/real_data_bootstrap/Dockerfile
+    environment:
+      ENV: ${ENV:-development}
+      REAL_DATA_REFRESH_HOURS: ${REAL_DATA_REFRESH_HOURS:-24}
+      REAL_DATA_MAX_PROVIDERS: ${REAL_DATA_MAX_PROVIDERS:-5000}
+      REAL_DATA_MAX_BUYERS: ${REAL_DATA_MAX_BUYERS:-1000}
+      REAL_DATA_MAX_COMMUNITY_MEDIA: ${REAL_DATA_MAX_COMMUNITY_MEDIA:-80}
+      REAL_DATA_REQUEST_SLEEP_SECONDS: ${REAL_DATA_REQUEST_SLEEP_SECONDS:-1}
+      MARKETPLACE_DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@marketplace_db:5432/marketplace_db
+      COMMUNITY_DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@community_db:5432/community_db
+    depends_on:
+      marketplace_service: { condition: service_healthy }
+      community_service: { condition: service_healthy }
+    networks: [data]
+
   # ---------------------------------------------------------------------------
   # TARGET DOMAIN SERVICES (safe, traffic-neutral until cutover)
   # ---------------------------------------------------------------------------
