@@ -67,6 +67,144 @@ fn ckan_action_url(api_url: &str, action: &str) -> Option<String> {
     Some(format!("{base}/api/3/action/{action}"))
 }
 
+fn resource_is_json(resource: &Value) -> bool {
+    let format = resource
+        .get("format")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    let mime = resource
+        .get("mimetype")
+        .or_else(|| resource.get("mime_type"))
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    let url = resource
+        .get("url")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_ascii_lowercase();
+
+    format == "json"
+        || format == "geojson"
+        || mime.contains("application/json")
+        || mime.contains("application/geo+json")
+        || url.ends_with(".json")
+        || url.ends_with(".geojson")
+}
+
+fn json_resource_records(payload: Value) -> Vec<Value> {
+    if let Some(features) = payload
+        .get("features")
+        .and_then(Value::as_array)
+        .cloned()
+    {
+        return features
+            .into_iter()
+            .map(|feature| {
+                let mut record = serde_json::Map::new();
+                if let Some(properties) = feature.get("properties").and_then(Value::as_object) {
+                    record.extend(properties.clone());
+                }
+                if let Some(id) = feature.get("id") {
+                    record.insert("id".to_string(), id.clone());
+                }
+                if let Some(point) = feature
+                    .get("geometry")
+                    .and_then(|value| value.get("type").and_then(Value::as_str).zip(
+                        value.get("coordinates").and_then(Value::as_array),
+                    ))
+                    .filter(|(geometry_type, coordinates)| {
+                        *geometry_type == "Point" && coordinates.len() >= 2
+                    })
+                {
+                    if let (Some(lng), Some(lat)) =
+                        (point.1[0].as_f64(), point.1[1].as_f64())
+                    {
+                        record.insert("longitude".to_string(), Value::from(lng));
+                        record.insert("latitude".to_string(), Value::from(lat));
+                    }
+                }
+                Value::Object(record)
+            })
+            .collect();
+    }
+
+    if let Some(records) = payload.get("records").and_then(Value::as_array) {
+        return records.clone();
+    }
+
+    if let Some(result) = payload.get("result") {
+        if let Some(records) = result.get("records").and_then(Value::as_array) {
+            return records.clone();
+        }
+    }
+
+    if let Some(items) = payload.as_array() {
+        return items.clone();
+    }
+
+    payload
+        .as_object()
+        .filter(|object| {
+            !object.contains_key("result")
+                && !object.contains_key("resources")
+                && !object.contains_key("success")
+        })
+        .map(|object| vec![Value::Object(object.clone())])
+        .unwrap_or_default()
+}
+
+async fn persist_reference_record(
+    state: &Arc<AppState>,
+    job_id: Uuid,
+    source: &SourceRow,
+    resource_url: Option<&str>,
+    resource_license: &str,
+    raw: &Value,
+) -> Result<Uuid, sqlx::Error> {
+    let safe = if source.7 { raw.clone() } else { redact(raw) };
+    let record_id = raw
+        .get("_id")
+        .map(|value| value.to_string())
+        .or_else(|| raw.get("id").map(|value| value.to_string()))
+        .unwrap_or_else(|| hash(&safe));
+    let source_hash = hash(&safe);
+    let kind = if source.2 == "government_open_data" {
+        "government_reference"
+    } else {
+        "open_data_reference"
+    };
+
+    sqlx::query(
+        "INSERT INTO data_import_records (job_id,source_id,source_record_id,source_url,source_hash,record_kind,license_snapshot,attribution_snapshot,raw_metadata,validation_status,validation_reason,last_seen_at,updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'accepted',$10,NOW(),NOW()) ON CONFLICT (source_id,source_record_id) DO UPDATE SET job_id=EXCLUDED.job_id,source_url=EXCLUDED.source_url,source_hash=EXCLUDED.source_hash,raw_metadata=EXCLUDED.raw_metadata,validation_status='accepted',last_seen_at=NOW(),updated_at=NOW()",
+    )
+    .bind(job_id)
+    .bind(source.0)
+    .bind(&record_id)
+    .bind(resource_url)
+    .bind(source_hash)
+    .bind(kind)
+    .bind(if resource_license.is_empty() {
+        source.5.as_deref()
+    } else {
+        Some(resource_license)
+    })
+    .bind(source.9.as_deref())
+    .bind(&safe)
+    .bind("validated resource; sensitive fields removed when policy disallows PII import")
+    .execute(&state.db)
+    .await?;
+
+    sqlx::query_scalar::<_, Uuid>(
+        "SELECT id FROM data_import_records WHERE source_id=$1 AND source_record_id=$2 LIMIT 1",
+    )
+    .bind(source.0)
+    .bind(&record_id)
+    .fetch_one(&state.db)
+    .await
+}
+
 async fn run_inner(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
     let job = sqlx::query_as::<_, (Uuid, Uuid, String, String)>(
         "UPDATE data_import_jobs SET status='running', started_at=NOW(), error_summary=NULL WHERE id=$1 AND status='queued' RETURNING id, source_id, mode, status"
@@ -131,15 +269,121 @@ async fn run_inner(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
             .get("datastore_active")
             .and_then(Value::as_bool)
             .unwrap_or(false);
+        let json_resource = resource_is_json(&resource);
         let resource_license = resource
             .get("license")
             .or_else(|| resource.get("license_title"))
             .and_then(Value::as_str)
             .unwrap_or("");
         let license_ok = !resource_license.trim().is_empty()
-            || source.5.as_deref().is_some_and(|v| !v.trim().is_empty());
-        if !active || !license_ok {
+            || source
+                .5
+                .as_deref()
+                .is_some_and(|value| !value.trim().is_empty());
+        if (!license_ok || (!active && !json_resource)) {
             rejected += 1;
+            continue;
+        }
+
+        if json_resource && !active {
+            let resource_url = match resource.get("url").and_then(Value::as_str) {
+                Some(value) if value.starts_with("https://") || value.starts_with("http://") => {
+                    value
+                }
+                _ => {
+                    rejected += 1;
+                    continue;
+                }
+            };
+            let response = state
+                .http_client
+                .get(resource_url)
+                .header(reqwest::header::ACCEPT, "application/json, application/geo+json")
+                .send()
+                .await?;
+            let status = response.status();
+            let body = response.text().await?;
+            if !status.is_success() {
+                return Err(anyhow!(
+                    "JSON resource fetch failed status={} url={} body={}",
+                    status,
+                    resource_url,
+                    body.chars().take(1000).collect::<String>()
+                ));
+            }
+            if body.len() > 8 * 1024 * 1024 {
+                rejected += 1;
+                tracing::warn!(
+                    resource_url,
+                    "JSON resource exceeds 8 MiB safety limit"
+                );
+                continue;
+            }
+            let payload = serde_json::from_str::<Value>(&body)
+                .map_err(|error| anyhow!("invalid JSON resource payload: {error}"))?;
+            for raw in json_resource_records(payload) {
+                discovered += 1;
+                if discovered > 100_000 {
+                    break;
+                }
+                if job.2 == "dry_run" {
+                    accepted += 1;
+                    continue;
+                }
+                let safe = if source.7 { raw.clone() } else { redact(&raw) };
+                match persist_reference_record(
+                    &state,
+                    job_id,
+                    &source,
+                    Some(resource_url),
+                    resource_license,
+                    &safe,
+                )
+                .await
+                {
+                    Ok(import_record_id) => {
+                        accepted += 1;
+                        match crate::data_entity_resolution::index_record(
+                            &state.db,
+                            source.0,
+                            import_record_id,
+                            &safe,
+                        )
+                        .await
+                        {
+                            Ok(entity_id) => {
+                                if let Err(error) =
+                                    crate::reference_promotion::generate_for_entity(
+                                        &state.db, entity_id
+                                    )
+                                    .await
+                                {
+                                    errors += 1;
+                                    tracing::warn!(
+                                        entity_id=%entity_id,
+                                        "reference promotion candidate generation failed (import remains accepted): {:?}",
+                                        error
+                                    );
+                                }
+                            }
+                            Err(error) => {
+                                errors += 1;
+                                tracing::warn!(
+                                    "entity normalization failed: {:?}",
+                                    error
+                                );
+                            }
+                        }
+                    }
+                    Err(error) => {
+                        errors += 1;
+                        tracing::warn!("JSON record import failed: {:?}", error);
+                    }
+                }
+            }
+            if discovered >= 100_000 {
+                break;
+            }
             continue;
         }
 
@@ -173,7 +417,7 @@ async fn run_inner(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
                 .map_err(|error| anyhow!("invalid CKAN datastore_search JSON: {error}"))?;
             let records = payload
                 .get("result")
-                .and_then(|v| v.get("records"))
+                .and_then(|value| value.get("records"))
                 .and_then(Value::as_array)
                 .cloned()
                 .unwrap_or_default();
@@ -187,67 +431,55 @@ async fn run_inner(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
                     break;
                 }
 
-                let safe = if source.7 { raw.clone() } else { redact(raw) };
                 if job.2 == "dry_run" {
                     accepted += 1;
                     continue;
                 }
-                let record_id = raw
-                    .get("_id")
-                    .map(|v| v.to_string())
-                    .or_else(|| raw.get("id").map(|v| v.to_string()))
-                    .unwrap_or_else(|| hash(&safe));
-                let source_hash = hash(&safe);
-                let kind = if source.2 == "government_open_data" {
-                    "government_reference"
-                } else {
-                    "open_data_reference"
-                };
 
-                let result = sqlx::query(
-                    "INSERT INTO data_import_records (job_id,source_id,source_record_id,source_url,source_hash,record_kind,license_snapshot,attribution_snapshot,raw_metadata,validation_status,validation_reason,last_seen_at,updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'accepted',$10,NOW(),NOW()) ON CONFLICT (source_id,source_record_id) DO UPDATE SET job_id=EXCLUDED.job_id,source_url=EXCLUDED.source_url,source_hash=EXCLUDED.source_hash,raw_metadata=EXCLUDED.raw_metadata,validation_status='accepted',last_seen_at=NOW(),updated_at=NOW()"
+                let safe = if source.7 { raw.clone() } else { redact(raw) };
+                match persist_reference_record(
+                    &state,
+                    job_id,
+                    &source,
+                    resource.get("url").and_then(Value::as_str),
+                    resource_license,
+                    &safe,
                 )
-                .bind(job_id).bind(source.0).bind(&record_id)
-                .bind(resource.get("url").and_then(Value::as_str))
-                .bind(source_hash).bind(kind)
-                .bind(if resource_license.is_empty() { source.5.as_deref() } else { Some(resource_license) })
-                .bind(source.9.as_deref()).bind(&safe)
-                .bind("validated resource; sensitive fields removed when policy disallows PII import")
-                .execute(&state.db).await;
-
-                match result {
-                    Ok(_) => {
-                        match sqlx::query_scalar::<_, uuid::Uuid>(
-                            "SELECT id FROM data_import_records WHERE source_id=$1 AND source_record_id=$2 LIMIT 1"
+                .await
+                {
+                    Ok(import_record_id) => {
+                        accepted += 1;
+                        match crate::data_entity_resolution::index_record(
+                            &state.db,
+                            source.0,
+                            import_record_id,
+                            &safe,
                         )
-                        .bind(source.0)
-                        .bind(&record_id)
-                        .fetch_one(&state.db)
-                        .await {
-                            Ok(import_record_id) => {
-                                match crate::data_entity_resolution::index_record(
-                                    &state.db, source.0, import_record_id, &safe
-                                ).await {
-                                    Ok(entity_id) => {
-                                        if let Err(error) = crate::reference_promotion::generate_for_entity(
-                                            &state.db, entity_id
-                                        ).await {
-                                            errors += 1;
-                                            tracing::warn!("reference promotion candidate generation failed (import remains accepted): {:?}", error);
-                                        }
-                                    }
-                                    Err(error) => {
-                                        errors += 1;
-                                        tracing::warn!("entity normalization failed: {:?}", error);
-                                    }
+                        .await
+                        {
+                            Ok(entity_id) => {
+                                if let Err(error) =
+                                    crate::reference_promotion::generate_for_entity(
+                                        &state.db, entity_id
+                                    )
+                                    .await
+                                {
+                                    errors += 1;
+                                    tracing::warn!(
+                                        entity_id=%entity_id,
+                                        "reference promotion candidate generation failed (import remains accepted): {:?}",
+                                        error
+                                    );
                                 }
                             }
                             Err(error) => {
                                 errors += 1;
-                                tracing::warn!("import record lookup failed: {:?}", error);
+                                tracing::warn!(
+                                    "entity normalization failed: {:?}",
+                                    error
+                                );
                             }
                         }
-                        accepted += 1;
                     }
                     Err(error) => {
                         errors += 1;
@@ -261,6 +493,11 @@ async fn run_inner(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
             }
             offset += 500;
         }
+        if discovered >= 100_000 {
+            break;
+        }
+    }
+
         if discovered >= 100_000 {
             break;
         }
