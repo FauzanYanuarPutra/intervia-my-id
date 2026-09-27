@@ -10891,7 +10891,7 @@ async fn fetch_liked_content_ids(
         FROM content_item_likes
         WHERE user_id = $1
           AND content_id = ANY($2)
-        "###,,
+        "###,
     )
     .bind(user_id)
     .bind(&content_ids)
@@ -24477,7 +24477,7 @@ async fn list_content(
           created_at DESC,
           id ASC
         LIMIT $16 OFFSET $17
-        "###
+        "###,
     )
     .bind(typ)
     .bind(q)
