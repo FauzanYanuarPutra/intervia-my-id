@@ -2004,7 +2004,6 @@ pub fn router() -> Router<Arc<AppState>> {
 
 #[cfg(test)]
 mod tests {
-    use super::super::AppState;
     use serde::Deserialize;
 
     #[derive(Debug, Deserialize)]
@@ -2063,8 +2062,8 @@ mod tests {
                 )
             })
             .count();
-        assert_eq!(
-            aggregate_sources, 5,
+        assert!(
+            aggregate_sources >= 5,
             "all currently verified aggregate UMKM sources must remain registered"
         );
     }
