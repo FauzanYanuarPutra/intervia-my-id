@@ -1572,7 +1572,7 @@ pub async fn bootstrap_persistent_imports(state: Arc<AppState>) -> Result<u64, s
                         FROM data_import_jobs
                         WHERE source_id = $1
                           AND status = 'failed'
-                          AND finished_at > NOW() - INTERVAL '6 hours'
+                          AND finished_at > NOW() - INTERVAL '30 minutes'
                     )
                     "#,
                 )
