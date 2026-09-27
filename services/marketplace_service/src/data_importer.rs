@@ -98,6 +98,10 @@ pub async fn run(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
                 if discovered > 100_000 { break; }
 
                 let safe = if source.7 { raw.clone() } else { redact(raw) };
+                if job.2 == "dry_run" {
+                    accepted += 1;
+                    continue;
+                }
                 let record_id = raw.get("_id").map(|v| v.to_string())
                     .or_else(|| raw.get("id").map(|v| v.to_string()))
                     .unwrap_or_else(|| hash(&safe));
