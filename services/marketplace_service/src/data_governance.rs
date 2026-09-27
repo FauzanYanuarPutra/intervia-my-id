@@ -1127,42 +1127,64 @@ pub async fn bootstrap_persistent_imports(state: Arc<AppState>) -> Result<u64, s
 
     let mut queued = 0u64;
     for (source_id, source_key, api_url, refresh_hours) in sources {
-        let recent = sqlx::query_scalar::<_, bool>(
+        let existing = sqlx::query_as::<_, (Uuid, String)>(
             r#"
-            SELECT EXISTS (
-                SELECT 1
-                FROM data_import_jobs
-                WHERE source_id = $1
-                  AND status IN ('queued','running')
-            ) OR EXISTS (
-                SELECT 1
-                FROM data_import_jobs
-                WHERE source_id = $1
-                  AND status IN ('succeeded','partial')
-                  AND finished_at > NOW() - ($2::text || ' hours')::interval
+            SELECT id, status
+            FROM data_import_jobs
+            WHERE source_id = $1
+              AND status IN ('queued','running')
+            ORDER BY created_at ASC
+            LIMIT 1
+            "#
+        )
+        .bind(source_id)
+        .fetch_optional(db)
+        .await?;
+
+        let job = if let Some((job_id, status)) = existing {
+            if status == "queued" {
+                tracing::info!(source_key=%source_key, job_id=%job_id, "resuming queued persistent source import");
+                Some(job_id)
+            } else {
+                None
+            }
+        } else {
+            let recent_success = sqlx::query_scalar::<_, bool>(
+                r#"
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM data_import_jobs
+                    WHERE source_id = $1
+                      AND status IN ('succeeded','partial')
+                      AND finished_at > NOW() - ($2::text || ' hours')::interval
+                )
+                "#
             )
-            "#
-        )
-        .bind(source_id)
-        .bind(refresh_hours)
-        .fetch_one(db)
-        .await?;
+            .bind(source_id)
+            .bind(refresh_hours)
+            .fetch_one(db)
+            .await?;
 
-        if recent {
+            if recent_success {
+                None
+            } else {
+                Some(sqlx::query_scalar::<_, Uuid>(
+                    r#"
+                    INSERT INTO data_import_jobs (source_id, job_key, mode, status)
+                    VALUES ($1, $2, 'import', 'queued')
+                    RETURNING id
+                    "#
+                )
+                .bind(source_id)
+                .bind(format!("bootstrap:{}:{}", source_key, Uuid::new_v4().simple()))
+                .fetch_one(db)
+                .await?)
+            }
+        };
+
+        let Some(job) = job else {
             continue;
-        }
-
-        let job = sqlx::query_scalar::<_, Uuid>(
-            r#"
-            INSERT INTO data_import_jobs (source_id, job_key, mode, status)
-            VALUES ($1, $2, 'import', 'queued')
-            RETURNING id
-            "#
-        )
-        .bind(source_id)
-        .bind(format!("bootstrap:{}:{}", source_key, Uuid::new_v4().simple()))
-        .fetch_one(db)
-        .await?;
+        };
 
         queued += 1;
         let state_for_job = state.clone();
