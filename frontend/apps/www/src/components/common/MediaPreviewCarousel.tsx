@@ -7,6 +7,8 @@ import {
   useRef,
   useState,
   type ReactNode,
+  type TouchEvent as ReactTouchEvent,
+  type WheelEvent as ReactWheelEvent,
 } from 'react';
 import {
   ChevronLeft,
@@ -189,6 +191,125 @@ export function MediaPreviewCarousel({
     [visibleMediaItems.length],
   );
 
+  const mediaTouchGestureRef = useRef<{
+    startX: number;
+    startY: number;
+    active: boolean;
+    claimed: boolean;
+    ignored: boolean;
+  } | null>(null);
+  const mediaWheelBurstRef = useRef(false);
+  const mediaWheelBurstTimerRef = useRef<number | null>(null);
+
+  const shouldIgnoreMediaGesture = useCallback((target: EventTarget | null) => {
+    const element = target instanceof HTMLElement ? target : null;
+    if (!element) return false;
+    return Boolean(
+      element.closest(
+        'button,a,input,textarea,select,[contenteditable="true"],[data-media-gesture-ignore]',
+      ),
+    );
+  }, []);
+
+  const handleMediaWheel = useCallback(
+    (event: ReactWheelEvent<HTMLDivElement>) => {
+      if (event.ctrlKey || shouldIgnoreMediaGesture(event.target)) return;
+
+      const delta =
+        Math.abs(event.deltaX) > 0
+          ? event.deltaX
+          : event.shiftKey
+            ? event.deltaY
+            : 0;
+      if (Math.abs(delta) < 4 || !hasMany) return;
+
+      event.preventDefault();
+
+      if (mediaWheelBurstRef.current) return;
+      mediaWheelBurstRef.current = true;
+
+      if (mediaWheelBurstTimerRef.current !== null) {
+        window.clearTimeout(mediaWheelBurstTimerRef.current);
+      }
+      mediaWheelBurstTimerRef.current = window.setTimeout(() => {
+        mediaWheelBurstRef.current = false;
+        mediaWheelBurstTimerRef.current = null;
+      }, 180);
+
+      scrollToIndex(active + (delta > 0 ? 1 : -1));
+    },
+    [active, hasMany, scrollToIndex, shouldIgnoreMediaGesture],
+  );
+
+  const handleMediaTouchStart = useCallback(
+    (event: ReactTouchEvent<HTMLDivElement>) => {
+      const touch = event.touches[0];
+      if (!touch) return;
+
+      mediaTouchGestureRef.current = {
+        startX: touch.clientX,
+        startY: touch.clientY,
+        active: true,
+        claimed: false,
+        ignored: shouldIgnoreMediaGesture(event.target),
+      };
+    },
+    [shouldIgnoreMediaGesture],
+  );
+
+  const handleMediaTouchMove = useCallback(
+    (event: ReactTouchEvent<HTMLDivElement>) => {
+      const gesture = mediaTouchGestureRef.current;
+      if (!gesture?.active || gesture.ignored) return;
+
+      const touch = event.touches[0];
+      if (!touch) return;
+
+      const deltaX = touch.clientX - gesture.startX;
+      const deltaY = touch.clientY - gesture.startY;
+
+      if (!gesture.claimed) {
+        if (Math.max(Math.abs(deltaX), Math.abs(deltaY)) < 10) return;
+        if (Math.abs(deltaY) > Math.abs(deltaX) * 1.2) {
+          gesture.ignored = true;
+          return;
+        }
+        gesture.claimed = true;
+      }
+
+      event.preventDefault();
+    },
+    [],
+  );
+
+  const handleMediaTouchEnd = useCallback(
+    (event: ReactTouchEvent<HTMLDivElement>) => {
+      const gesture = mediaTouchGestureRef.current;
+      mediaTouchGestureRef.current = null;
+
+      if (!gesture?.active || gesture.ignored || !gesture.claimed || !hasMany) {
+        return;
+      }
+
+      const touch = event.changedTouches[0];
+      if (!touch) return;
+
+      const deltaX = touch.clientX - gesture.startX;
+      const threshold = Math.max(
+        28,
+        (viewportRef.current?.clientWidth || 320) * 0.12,
+      );
+
+      if (Math.abs(deltaX) < threshold) return;
+      scrollToIndex(active + (deltaX < 0 ? 1 : -1));
+    },
+    [active, hasMany, scrollToIndex],
+  );
+
+  const handleMediaTouchCancel = useCallback(() => {
+    mediaTouchGestureRef.current = null;
+  }, []);
+
   useBodyScrollLock(lightboxOpen);
 
   useEffect(() => {
@@ -279,15 +400,20 @@ export function MediaPreviewCarousel({
           <div
             ref={viewportRef}
             onScroll={updateIndexFromScroll}
+            onWheel={handleMediaWheel}
+            onTouchStart={handleMediaTouchStart}
+            onTouchMove={handleMediaTouchMove}
+            onTouchEnd={handleMediaTouchEnd}
+            onTouchCancel={handleMediaTouchCancel}
             className={cn(
-              'relative flex h-full min-h-0 w-full snap-x snap-mandatory overflow-x-auto scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+              'relative flex h-full min-h-0 w-full snap-x snap-mandatory overflow-x-hidden scroll-smooth [scrollbar-width:none] [touch-action:none] [&::-webkit-scrollbar]:hidden',
               viewportClassName,
             )}
           >
             {visibleMediaItems.map((item, index) => (
               <div
                 key={`${item.src}-${index}`}
-                className="relative h-full min-h-0 w-full min-w-full shrink-0 grow-0 basis-full snap-center overflow-hidden bg-slate-100 dark:bg-slate-950"
+                className="relative h-full min-h-0 w-full min-w-full shrink-0 grow-0 basis-full snap-center [scroll-snap-stop:always] overflow-hidden bg-slate-100 dark:bg-slate-950"
               >
                 {renderMedia(item, index)}
                 {item.type === 'video' ? (
