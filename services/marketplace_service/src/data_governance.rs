@@ -1060,7 +1060,9 @@ async fn bootstrap_status(State(state): State<Arc<AppState>>) -> impl IntoRespon
             let external_provider_count = row
                 .try_get::<i64, _>("external_provider_count")
                 .unwrap_or(0);
-            let external_buyer_count = row.try_get::<i64, _>("external_buyer_count").unwrap_or(0);
+            let external_buyer_count = row
+                .try_get::<i64, _>("external_buyer_count")
+                .unwrap_or(0);
             let external_community_media_count = row
                 .try_get::<i64, _>("external_community_media_count")
                 .unwrap_or(0);
