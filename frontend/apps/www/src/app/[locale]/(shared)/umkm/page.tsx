@@ -6,7 +6,9 @@ import type { DiscoveryStore } from '@/components/super-app/UmkmDiscoveryPanel';
 import {
   getUmkmStoreById,
   getUmkmStoreBySlug,
+  listUmkmProducts,
   listUmkmStores,
+  type UmkmProduct,
   type UmkmStore,
 } from '@/lib/super-app/umkm-commerce';
 import {
@@ -28,7 +30,10 @@ type PageProps = {
   }>;
 };
 
-function toDiscoveryStore(store: UmkmStore): DiscoveryStore {
+function toDiscoveryStore(
+  store: UmkmStore,
+  products: UmkmProduct[] = [],
+): DiscoveryStore {
   const publicStore = projectPublicUmkmStore(store);
   return {
     id: publicStore.id,
@@ -43,6 +48,15 @@ function toDiscoveryStore(store: UmkmStore): DiscoveryStore {
     metadata: publicStore.metadata,
     online_order_enabled: publicStore.online_order_enabled,
     offline_order_enabled: publicStore.offline_order_enabled,
+    products: products.slice(0, 8).map(product => ({
+      id: product.id,
+      name: product.name,
+      description: product.description,
+      category: product.category,
+      price_cents: product.price_cents,
+      image_url: product.image_url,
+      is_available: product.is_available,
+    })),
   };
 }
 
@@ -115,7 +129,22 @@ export default async function UmkmPage({ params, searchParams }: PageProps) {
     getDeepLinkedStore(deepLinkedSlug, deepLinkedStoreId),
   ]);
   const listedStores = listedStoresResult.status === 'fulfilled' ? listedStoresResult.value.filter(isPublicUmkmStoreVisible).map(toDiscoveryStore) : undefined;
-  const deepLinkedStore = deepLinkedStoreResult.status === 'fulfilled' && deepLinkedStoreResult.value && isPublicUmkmStoreVisible(deepLinkedStoreResult.value) ? toDiscoveryStore(deepLinkedStoreResult.value) : null;
+  const deepLinkedStoreRaw =
+    deepLinkedStoreResult.status === 'fulfilled' &&
+    deepLinkedStoreResult.value &&
+    isPublicUmkmStoreVisible(deepLinkedStoreResult.value)
+      ? deepLinkedStoreResult.value
+      : null;
+  const deepLinkedProducts = deepLinkedStoreRaw
+    ? await listUmkmProducts({
+        storeId: deepLinkedStoreRaw.id,
+        includeUnavailable: false,
+        limit: 8,
+      }).catch(() => [])
+    : [];
+  const deepLinkedStore = deepLinkedStoreRaw
+    ? toDiscoveryStore(deepLinkedStoreRaw, deepLinkedProducts)
+    : null;
   const initialStores = listedStores === undefined && !deepLinkedStore
     ? undefined
     : mergeDeepLinkedUmkmStore(listedStores || [], deepLinkedStore);
