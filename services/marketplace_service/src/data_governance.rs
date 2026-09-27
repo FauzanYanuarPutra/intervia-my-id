@@ -964,19 +964,18 @@ async fn approve_persistent_import(
                license_url=$3,
                notes=COALESCE(notes,'') || E'\\nPersistent import approved by agent: ' || $4,
                updated_at=NOW()
-           WHERE source_key=$1 AND enabled=TRUE
-           RETURNING source_key"#,
+           WHERE source_key=$1 AND enabled=TRUE"#,
     )
     .bind(source_key.trim())
     .bind(license_name)
     .bind(clean(payload.license_url, 2_000))
     .bind(note)
-    .fetch_optional(&state.db)
+    .execute(&state.db)
     .await;
 
     match result {
-        Ok(Some(row)) => (StatusCode::OK, Json(json!({"source_key":row.get::<String,_>("source_key"),"reuse_mode":"persistent_import"}))).into_response(),
-        Ok(None) => (StatusCode::NOT_FOUND, Json(json!({"error":"enabled source not found"}))).into_response(),
+        Ok(result) if result.rows_affected() == 1 => (StatusCode::OK, Json(json!({"source_key":source_key,"reuse_mode":"persistent_import"}))).into_response(),
+        Ok(_) => (StatusCode::NOT_FOUND, Json(json!({"error":"enabled source not found"}))).into_response(),
         Err(error) => {
             tracing::error!("approve_persistent_import failed: {:?}", error);
             (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"failed to approve source"}))).into_response()
