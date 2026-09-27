@@ -14,7 +14,7 @@ import {
 import { getExploreResultAction } from '@/lib/discovery/exploreResultConversion';
 import type { GlobalSearchItem } from '@/lib/search/globalSearch';
 import { cn } from '@/lib/utils';
-import { useAuth } from '@/context/AuthContext';
+import { useOptionalAuth } from '@/context/AuthContext';
 
 const PUBLIC_MEDIA_BASE = 'https://www.lajukan.com/api/content/media';
 
@@ -54,7 +54,8 @@ export function ExploreListingCard({
   locale: 'id' | 'en';
   interactive?: boolean;
 }) {
-  const { user } = useAuth();
+  const auth = useOptionalAuth();
+  const user = auth?.user ?? null;
   const isNeed = item.side === 'demand' || item.kind === 'needs';
 
   if (isNeed) {
