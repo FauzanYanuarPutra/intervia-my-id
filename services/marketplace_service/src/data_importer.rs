@@ -64,7 +64,15 @@ fn base_url(api_url: &str) -> Option<&str> {
 
 fn ckan_action_url(api_url: &str, action: &str) -> Option<String> {
     let base = base_url(api_url)?;
-    Some(format!("{base}/api/3/action/{action}"))
+    let endpoint = format!("{base}/api/3/action/{action}");
+    if action == "package_show" {
+        let query = api_url.split_once('?').map(|(_, value)| value.trim());
+        return match query {
+            Some(value) if !value.is_empty() => Some(format!("{endpoint}?{value}")),
+            _ => Some(endpoint),
+        };
+    }
+    Some(endpoint)
 }
 
 fn resource_is_json(resource: &Value) -> bool {
