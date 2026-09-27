@@ -65,7 +65,7 @@ fn geo_similarity(a_lat: Option<f64>, a_lon: Option<f64>, b_lat: Option<f64>, b_
     if meters <= 30.0 { 1.0 } else if meters <= 250.0 { 0.8 } else if meters <= 1000.0 { 0.4 } else { 0.0 }
 }
 
-pub async fn index_record(db: &PgPool, source_id: Uuid, record_id: Uuid, raw: &Value) -> Result<(), sqlx::Error> {
+pub async fn index_record(db: &PgPool, source_id: Uuid, record_id: Uuid, raw: &Value) -> Result<Uuid, sqlx::Error> {
     let name = normalize_text(text_field(raw, &["name","nama","nama_usaha","nama_umkm","business_name","merchant_name"]));
     let address = normalize_text(text_field(raw, &["address","alamat","alamat_usaha","street","jalan"]));
     let city = normalize_text(text_field(raw, &["city","kota","kabupaten","kabupaten_kota"]));
@@ -145,7 +145,7 @@ pub async fn index_record(db: &PgPool, source_id: Uuid, record_id: Uuid, raw: &V
         .bind("heuristic similarity; human review remains authoritative")
         .execute(db).await?;
     }
-    Ok(())
+    Ok(entity_id)
 }
 
 #[cfg(test)]
