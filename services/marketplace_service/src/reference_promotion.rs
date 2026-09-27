@@ -358,6 +358,142 @@ fn osm_identity(source_key: &str, source_record_id: &str) -> (Option<String>, Op
     }
 }
 
+
+fn aggregate_reference_slug(source_key: &str, source_record_id: &str) -> String {
+    let mut input = format!("{source_key}-{source_record_id}");
+    input.retain(|ch| ch.is_ascii_alphanumeric() || ch == '-');
+    let digest = sha2::Sha256::digest(input.as_bytes());
+    format!("data-reference-{:x}", digest)[..32].to_string()
+}
+
+fn aggregate_reference_body(
+    provider_name: &str,
+    source_record_id: &str,
+    source_url: &str,
+    raw: &Value,
+) -> String {
+    let mut lines = vec![
+        format!("Sumber: {provider_name}"),
+        format!("Record sumber: {source_record_id}"),
+        format!("URL sumber: {source_url}"),
+        String::new(),
+        "Ringkasan data publik:".to_string(),
+    ];
+    if let Some(object) = raw.as_object() {
+        for (key, value) in object.iter().take(20) {
+            if value.is_object() || value.is_array() || key.starts_with('_') {
+                continue;
+            }
+            let rendered = match value {
+                Value::String(text) => text.chars().take(300).collect::<String>(),
+                Value::Number(number) => number.to_string(),
+                Value::Bool(flag) => flag.to_string(),
+                Value::Null => continue,
+                _ => continue,
+            };
+            if !rendered.trim().is_empty() {
+                lines.push(format!("- {key}: {rendered}"));
+            }
+        }
+    }
+    lines.join("\n").chars().take(8_000).collect()
+}
+
+pub(crate) async fn publish_aggregate_reference(
+    db: &PgPool,
+    record_id: Uuid,
+) -> Result<Option<Uuid>, sqlx::Error> {
+    let row = sqlx::query_as::<_, (
+        Uuid, Uuid, String, String, String, String,
+        Option<String>, Option<String>, Value
+    )>(
+        r#"
+        SELECT r.id, r.source_id, r.source_record_id, COALESCE(r.source_url, s.source_url),
+               s.provider_name, s.source_key,
+               COALESCE(r.license_snapshot, s.license_name),
+               COALESCE(r.attribution_snapshot, s.attribution_text),
+               r.raw_metadata
+        FROM data_import_records r
+        JOIN data_source_registry s ON s.id = r.source_id
+        WHERE r.id = $1
+          AND s.source_kind = 'government_open_data'
+          AND s.reuse_mode = 'persistent_import'
+          AND s.storage_allowed = TRUE
+        LIMIT 1
+        "#
+    )
+    .bind(record_id)
+    .fetch_optional(db)
+    .await?;
+
+    let Some((record_id, source_id, source_record_id, source_url, provider_name, source_key,
+              license_name, attribution, raw)) = row else {
+        return Ok(None);
+    };
+    let Some(license_name) = license_name.filter(|v| !v.trim().is_empty()) else {
+        return Ok(None);
+    };
+
+    let slug = aggregate_reference_slug(&source_key, &source_record_id);
+    let title = format!("Data referensi — {provider_name}");
+    let summary = format!(
+        "Record data publik dari {provider_name}. Ini adalah data agregat/referensi, bukan profil usaha dan bukan bukti kepemilikan."
+    );
+    let body = aggregate_reference_body(&provider_name, &source_record_id, &source_url, &raw);
+
+    let metadata = json!({
+        "record_kind": "government_reference",
+        "reference_subtype": "aggregate_data",
+        "market_side": "reference",
+        "is_transactional": false,
+        "reference_publication_status": "published",
+        "claimable": false,
+        "source_dataset": source_key,
+        "source_provider": provider_name,
+        "source_url": source_url,
+        "source_license": license_name,
+        "source_attribution": attribution,
+        "external_id": source_record_id,
+        "source_id": source_id,
+        "source_record_id": source_record_id,
+        "trust_note": "Data agregat/referensi dari sumber publik; bukan profil usaha individual."
+    });
+
+    let content_id = sqlx::query_scalar::<_, Uuid>(
+        r#"
+        INSERT INTO content_items (
+          owner_id, content_type, slug, title, summary, body,
+          pricing_mode, currency, tags, category, content_status,
+          metadata, listing_status, listing_intent, current_step,
+          completion_percentage, last_saved_at, published_at
+        ) VALUES (
+          NULL, 'article', $1, $2, $3, $4,
+          'fixed', 'IDR', ARRAY['data-reference','open-data','umkm']::text[],
+          'data_reference', 'active',
+          $5, 'published', 'offer', 1, 100, NOW(), NOW()
+        )
+        ON CONFLICT (slug) DO UPDATE SET
+          title = EXCLUDED.title,
+          summary = EXCLUDED.summary,
+          body = EXCLUDED.body,
+          metadata = EXCLUDED.metadata,
+          content_status = 'active',
+          listing_status = 'published',
+          updated_at = NOW()
+        RETURNING id
+        "#
+    )
+    .bind(&slug).bind(&title).bind(&summary).bind(&body).bind(metadata)
+    .fetch_one(db)
+    .await?;
+
+    sqlx::query(
+        "UPDATE data_import_records SET target_content_id=$2, validation_reason='published as aggregate public-data reference; not an individual business profile', updated_at=NOW() WHERE id=$1"
+    )
+    .bind(record_id).bind(content_id).execute(db).await?;
+    Ok(Some(content_id))
+}
+
 async fn promote_candidate(db: &PgPool, candidate_id: Uuid) -> AnyhowResult<Value> {
     let mut tx = db.begin().await?;
 
