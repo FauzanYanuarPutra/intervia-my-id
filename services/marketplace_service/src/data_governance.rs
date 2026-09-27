@@ -988,7 +988,7 @@ async fn bootstrap_status(State(state): State<Arc<AppState>>) -> impl IntoRespon
              FROM data_import_jobs
             WHERE status='failed'
               AND created_at > NOW() - INTERVAL '24 hours') AS last_error
-        "#
+        "#,
     )
     .fetch_one(&state.db)
     .await;
@@ -1028,7 +1028,7 @@ async fn bootstrap_status(State(state): State<Arc<AppState>>) -> impl IntoRespon
         FROM data_source_registry s
         WHERE s.reuse_mode='persistent_import'
         ORDER BY s.source_key
-        "#
+        "#,
     )
     .fetch_all(&state.db)
     .await;
@@ -1041,7 +1041,10 @@ async fn bootstrap_status(State(state): State<Arc<AppState>>) -> impl IntoRespon
             let accepted_records = row.try_get::<i64, _>("accepted_records").unwrap_or(0);
             let published_references = row.try_get::<i64, _>("published_references").unwrap_or(0);
             let aggregate_references = row.try_get::<i64, _>("aggregate_references").unwrap_or(0);
-            let last_error = row.try_get::<Option<String>, _>("last_error").ok().flatten();
+            let last_error = row
+                .try_get::<Option<String>, _>("last_error")
+                .ok()
+                .flatten();
             let hydrated = published_references > 0 || aggregate_references > 0;
             let status = if hydrated {
                 "ready"
@@ -1085,7 +1088,8 @@ async fn bootstrap_status(State(state): State<Arc<AppState>>) -> impl IntoRespon
                     "last_error": last_error,
                     "sources": sources
                 })),
-            ).into_response()
+            )
+                .into_response()
         }
         (Err(error), _) | (_, Err(error)) => {
             tracing::error!("bootstrap_status failed: {:?}", error);
@@ -1097,7 +1101,6 @@ async fn bootstrap_status(State(state): State<Arc<AppState>>) -> impl IntoRespon
         }
     }
 }
-
 
 async fn list_sources(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     match sqlx::query_as::<_, DataSourceRow>(
@@ -1616,7 +1619,7 @@ pub async fn bootstrap_persistent_imports(state: Arc<AppState>) -> Result<u64, s
               AND status IN ('queued','running')
             ORDER BY created_at ASC
             LIMIT 1
-            "#
+            "#,
         )
         .bind(source_id)
         .fetch_optional(db)
@@ -1632,7 +1635,7 @@ pub async fn bootstrap_persistent_imports(state: Arc<AppState>) -> Result<u64, s
                 WHERE source_id = $1
                 ORDER BY created_at DESC
                 LIMIT 1
-                "#
+                "#,
             )
             .bind(source_id)
             .fetch_optional(db)
@@ -1652,7 +1655,7 @@ pub async fn bootstrap_persistent_imports(state: Arc<AppState>) -> Result<u64, s
                         SELECT finished_at > NOW() - ($2::text || ' hours')::interval
                         FROM data_import_jobs
                         WHERE id = $1
-                        "#
+                        "#,
                     )
                     .bind(job_id)
                     .bind(refresh_hours)
@@ -1667,10 +1670,14 @@ pub async fn bootstrap_persistent_imports(state: Arc<AppState>) -> Result<u64, s
                                 INSERT INTO data_import_jobs (source_id, job_key, mode, status)
                                 VALUES ($1, $2, 'import', 'queued')
                                 RETURNING id
-                                "#
+                                "#,
                             )
                             .bind(source_id)
-                            .bind(format!("bootstrap:{}:{}", source_key, Uuid::new_v4().simple()))
+                            .bind(format!(
+                                "bootstrap:{}:{}",
+                                source_key,
+                                Uuid::new_v4().simple()
+                            ))
                             .fetch_one(db)
                             .await?,
                         )
@@ -1682,7 +1689,7 @@ pub async fn bootstrap_persistent_imports(state: Arc<AppState>) -> Result<u64, s
                         SELECT finished_at > NOW() - INTERVAL '30 minutes'
                         FROM data_import_jobs
                         WHERE id = $1
-                        "#
+                        "#,
                     )
                     .bind(job_id)
                     .fetch_one(db)
@@ -1696,10 +1703,14 @@ pub async fn bootstrap_persistent_imports(state: Arc<AppState>) -> Result<u64, s
                                 INSERT INTO data_import_jobs (source_id, job_key, mode, status)
                                 VALUES ($1, $2, 'refresh', 'queued')
                                 RETURNING id
-                                "#
+                                "#,
                             )
                             .bind(source_id)
-                            .bind(format!("retry-partial:{}:{}", source_key, Uuid::new_v4().simple()))
+                            .bind(format!(
+                                "retry-partial:{}:{}",
+                                source_key,
+                                Uuid::new_v4().simple()
+                            ))
                             .fetch_one(db)
                             .await?,
                         )
