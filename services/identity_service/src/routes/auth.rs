@@ -422,7 +422,10 @@ fn is_default_profile_avatar_url(value: &str) -> bool {
         || normalized.contains("/default-avatar.svg?")
 }
 
-fn read_profile_avatar_candidate(metadata: Option<&Value>, picture: Option<&str>) -> Option<String> {
+fn read_profile_avatar_candidate(
+    metadata: Option<&Value>,
+    picture: Option<&str>,
+) -> Option<String> {
     let metadata_avatar = metadata
         .and_then(Value::as_object)
         .and_then(|map| map.get("avatar_url"))
@@ -2444,7 +2447,10 @@ pub async fn oauth_google(
     {
         Ok(row) => row,
         Err(error) => {
-            tracing::error!("oauth google read current profile media failed: {:?}", error);
+            tracing::error!(
+                "oauth google read current profile media failed: {:?}",
+                error
+            );
             return (
                 StatusCode::SERVICE_UNAVAILABLE,
                 Json(json!({"error":"database error"})),
@@ -2468,10 +2474,8 @@ pub async fn oauth_google(
         avatar_url.as_deref(),
     );
 
-    let current_avatar = read_profile_avatar_candidate(
-        existing_metadata.as_ref(),
-        existing_picture.as_deref(),
-    );
+    let current_avatar =
+        read_profile_avatar_candidate(existing_metadata.as_ref(), existing_picture.as_deref());
     let avatar_source = if current_avatar
         .as_deref()
         .map(|value| !is_default_profile_avatar_url(value) && !is_google_avatar_url(value))
