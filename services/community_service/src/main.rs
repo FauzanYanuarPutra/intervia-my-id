@@ -7648,7 +7648,6 @@ async fn get_community_feed(
                 OR (
                     $4::text = 'community'
                     AND t.group_id IS NOT NULL
-                    AND c.slug ILIKE '%community%'
                 )
             )
 
