@@ -405,6 +405,13 @@ async fn run_inner(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
                         .await
                         {
                             Ok(entity_id) => {
+                                publish_aggregate_if_needed(
+                                    &state,
+                                    &source,
+                                    import_record_id,
+                                    entity_id,
+                                )
+                                .await;
                                 if let Err(error) = crate::reference_promotion::generate_for_entity(
                                     &state.db, entity_id,
                                 )
@@ -507,6 +514,13 @@ async fn run_inner(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
                         .await
                         {
                             Ok(entity_id) => {
+                                publish_aggregate_if_needed(
+                                    &state,
+                                    &source,
+                                    import_record_id,
+                                    entity_id,
+                                )
+                                .await;
                                 if let Err(error) = crate::reference_promotion::generate_for_entity(
                                     &state.db, entity_id,
                                 )
