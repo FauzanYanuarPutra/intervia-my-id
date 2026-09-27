@@ -94,6 +94,7 @@ defmodule ChatService.AttachmentPolicyTest do
     assert length(normalized) == 100
 
     too_many = urls ++ ["/api/chat/media/laju-chat/chat/dm_a_b/asset-101.webp"]
+
     assert {:error, :invalid_attachments} =
              AttachmentPolicy.normalize("image", too_many)
   end
