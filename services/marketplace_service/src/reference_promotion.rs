@@ -781,6 +781,21 @@ pub fn router() -> axum::Router<Arc<AppState>> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn score_entity_allows_missing_address_for_geocoded_reference() {
+        let (score, reasons) = score_entity(
+            Some("Toko Contoh"),
+            None,
+            Some("jakarta"),
+            Some("dki jakarta"),
+            Some(-6.2),
+            Some(106.8),
+            "new",
+        );
+        assert!(score >= 0.8);
+        assert!(!reasons.iter().any(|reason| reason == "missing_address"));
+    }
+
     use super::*;
 
     #[test]
