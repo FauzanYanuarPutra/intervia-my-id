@@ -63,6 +63,7 @@ marketplace_runtime_metrics = read("services/marketplace_service/src/runtime_met
 community_runtime_metrics = read("services/community_service/src/runtime_metrics.rs")
 ai_runtime_metrics = read("services/ai_service/src/runtime_metrics.rs")
 community_main_source = read("services/community_service/src/main.rs")
+community_identity_sync_source = read("services/community_service/src/identity_sync.rs")
 marketplace_auth_source = read("services/marketplace_service/src/auth.rs")
 community_auth_source = read("services/community_service/src/auth.rs")
 community_health_source = read("services/community_service/src/health.rs")
@@ -374,7 +375,7 @@ for marker in (
     "RETURNING inbox.id, inbox.payload, inbox.available_at AS lease_until",
     "AND available_at = $2",
 ):
-    if marker not in community_main_source:
+    if marker not in community_identity_sync_source:
         errors.append(f"Community multi-replica inbox claim contract missing: {marker}")
 
 for marker in (
@@ -382,7 +383,7 @@ for marker in (
     "BasicQosOptions",
     ".basic_qos(prefetch",
 ):
-    if marker not in community_main_source:
+    if marker not in community_identity_sync_source:
         errors.append(f"Community RabbitMQ backpressure contract missing: {marker}")
 
 for marker in (
