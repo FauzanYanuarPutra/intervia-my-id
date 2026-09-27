@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { BookOpenText, CalendarDays, ExternalLink, Hash, MapPin, Timer } from 'lucide-react';
 import { notFound, permanentRedirect } from 'next/navigation';
+import { getViewerUserId } from '@/lib/server/publicContent';
 import { Link } from '@/i18n/navigation';
 import {
   buildNewsArticleJsonLd,
@@ -123,6 +124,12 @@ export default async function NewsArticlePage({ params }: PageProps) {
   }
 
   const isRetracted = article.editorialStatus === 'retracted';
+  const viewerId = article.contributorUserId ? await getViewerUserId() : '';
+  const isOwner = Boolean(
+    article.contributorUserId &&
+      viewerId &&
+      article.contributorUserId.trim().toLowerCase() === viewerId.trim().toLowerCase(),
+  );
   const relatedArticles = isRetracted ? [] : await getRelatedNewsArticles(article, 4);
   const articleRichHtml = sanitizeNewsRichText(
     article.richBody || plainTextToNewsHtml(article.body),
@@ -217,15 +224,25 @@ export default async function NewsArticlePage({ params }: PageProps) {
             </nav>
           ) : null}
 
-          {!isRetracted ? (
-            <NewsShareActions
-              articleId={article.id}
-              slug={article.slug}
-              category={article.category}
-              title={article.title}
-              isId={isId}
-            />
-          ) : null}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {!isRetracted ? (
+              <NewsShareActions
+                articleId={article.id}
+                slug={article.slug}
+                category={article.category}
+                title={article.title}
+                isId={isId}
+              />
+            ) : null}
+            {isOwner ? (
+              <Link
+                href={`/news/submissions?edit=${encodeURIComponent(article.id)}`}
+                className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-emerald-200 bg-white px-3.5 text-xs font-black text-emerald-800 transition hover:border-emerald-300 hover:bg-emerald-50 dark:border-emerald-400/20 dark:bg-slate-900 dark:text-emerald-200 dark:hover:bg-emerald-400/10"
+              >
+                {isId ? 'Edit berita' : 'Edit story'}
+              </Link>
+            ) : null}
+          </div>
         </header>
 
         <div className="mt-6">
