@@ -1060,9 +1060,7 @@ async fn bootstrap_status(State(state): State<Arc<AppState>>) -> impl IntoRespon
             let external_provider_count = row
                 .try_get::<i64, _>("external_provider_count")
                 .unwrap_or(0);
-            let external_buyer_count = row
-                .try_get::<i64, _>("external_buyer_count")
-                .unwrap_or(0);
+            let external_buyer_count = row.try_get::<i64, _>("external_buyer_count").unwrap_or(0);
             let external_community_media_count = row
                 .try_get::<i64, _>("external_community_media_count")
                 .unwrap_or(0);
@@ -1070,11 +1068,11 @@ async fn bootstrap_status(State(state): State<Arc<AppState>>) -> impl IntoRespon
                 .try_get::<Option<DateTime<Utc>>, _>("external_last_success_at")
                 .ok()
                 .flatten();
-            let external_hydrated =
-                external_provider_count > 0
-                    || external_buyer_count > 0
-                    || external_community_media_count > 0;
-            let hydrated = published_references > 0 || aggregate_references > 0 || external_hydrated;
+            let external_hydrated = external_provider_count > 0
+                || external_buyer_count > 0
+                || external_community_media_count > 0;
+            let hydrated =
+                published_references > 0 || aggregate_references > 0 || external_hydrated;
             let status = if hydrated {
                 "ready"
             } else if active_jobs > 0 {
