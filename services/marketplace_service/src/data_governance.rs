@@ -258,22 +258,31 @@ async fn claim_status(
         }
     };
 
-    let pending_claim_count = sqlx::query_scalar::<_, i64>(
+    let pending_claim_count = match sqlx::query_scalar::<_, i64>(
         "SELECT COUNT(*) FROM business_claims WHERE content_id = $1 AND status IN ('pending','under_review')",
     )
     .bind(content.0)
     .fetch_one(&state.db)
-    .await
-    .unwrap_or(0);
+    .await {
+        Ok(value) => value,
+        Err(error) => {
+            tracing::error!("claim_status pending count failed: {:?}", error);
+            return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"failed to load claim status"}))).into_response();
+        }
+    };
 
-    let owner = sqlx::query_scalar::<_, Uuid>(
+    let owner = match sqlx::query_scalar::<_, Uuid>(
         "SELECT user_id FROM business_ownership_grants WHERE content_id = $1 AND role = 'owner' AND revoked_at IS NULL ORDER BY granted_at DESC LIMIT 1",
     )
     .bind(content.0)
     .fetch_optional(&state.db)
-    .await
-    .ok()
-    .flatten();
+    .await {
+        Ok(value) => value,
+        Err(error) => {
+            tracing::error!("claim_status owner lookup failed: {:?}", error);
+            return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"failed to load ownership status"}))).into_response();
+        }
+    };
 
     let actor = user_id_from_auth(&headers, &state.jwt_secret);
     let claimed = owner.is_some();
@@ -326,14 +335,18 @@ async fn create_claim(
         }))).into_response();
     }
 
-    let active_owner = sqlx::query_scalar::<_, Uuid>(
+    let active_owner = match sqlx::query_scalar::<_, Uuid>(
         "SELECT user_id FROM business_ownership_grants WHERE content_id = $1 AND role = 'owner' AND revoked_at IS NULL LIMIT 1",
     )
     .bind(content_id)
     .fetch_optional(&state.db)
-    .await
-    .ok()
-    .flatten();
+    .await {
+        Ok(value) => value,
+        Err(error) => {
+            tracing::error!("create_claim owner lookup failed: {:?}", error);
+            return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"failed to check ownership"}))).into_response();
+        }
+    };
 
     if active_owner.is_some() || owner_id == Some(claimant_user_id) {
         return (StatusCode::CONFLICT, Json(json!({"error":"business is already claimed","code":"already_claimed"}))).into_response();
