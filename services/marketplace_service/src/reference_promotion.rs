@@ -455,7 +455,11 @@ pub(crate) async fn promote_candidate(db: &PgPool, candidate_id: Uuid) -> Anyhow
         existing_id
     } else {
         let metadata = json!({
-            "record_kind": if record_kind == "government_reference" { "government_reference" } else { "open_data_reference" },
+            "record_kind": match record_kind.as_str() {
+                "government_reference" => "government_reference",
+                "real_openstreetmap_reference" => "real_openstreetmap_reference",
+                _ => "open_data_reference",
+            },
             "market_side": "reference",
             "is_transactional": false,
             "reference_publication_status": "published",
