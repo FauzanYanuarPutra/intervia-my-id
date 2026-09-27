@@ -802,6 +802,133 @@ async fn list_import_jobs(
     }
 }
 
+async fn inspect_source(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(source_key): Path<String>,
+) -> impl IntoResponse {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+        Some(value) => value,
+        None => return (StatusCode::UNAUTHORIZED, Json(json!({"error":"unauthorized"}))).into_response(),
+    };
+    if !has_agent_access(&claims) {
+        return (StatusCode::FORBIDDEN, Json(json!({"error":"agent role required"}))).into_response();
+    }
+
+    let source = match sqlx::query_as::<_, DataSourceRow>(
+        r#"SELECT id, source_key, provider_name, source_kind, source_url, api_url, terms_url,
+            license_name, license_url, attribution_text, reuse_mode, storage_allowed,
+            media_storage_allowed, pii_import_allowed, enabled, refresh_interval_hours,
+            last_checked_at, last_success_at, last_error_at, notes, created_at, updated_at
+            FROM data_source_registry WHERE source_key = $1 LIMIT 1"#,
+    )
+    .bind(source_key.trim())
+    .fetch_optional(&state.db)
+    .await {
+        Ok(Some(row)) => row,
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(json!({"error":"source not found"}))).into_response(),
+        Err(error) => {
+            tracing::error!("inspect_source lookup failed: {:?}", error);
+            return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"failed to load source"}))).into_response();
+        }
+    };
+
+    let Some(api_url) = source.api_url.clone() else {
+        return (StatusCode::CONFLICT, Json(json!({
+            "error":"source has no machine-readable catalog endpoint",
+            "source_key":source.source_key
+        }))).into_response();
+    };
+
+    let response = match state.http_client.get(&api_url).send().await {
+        Ok(response) => response,
+        Err(error) => {
+            tracing::error!("inspect_source request failed: {:?}", error);
+            return (StatusCode::BAD_GATEWAY, Json(json!({"error":"source catalog request failed"}))).into_response();
+        }
+    };
+
+    let status = response.status();
+    if !status.is_success() {
+        return (StatusCode::BAD_GATEWAY, Json(json!({
+            "error":"source catalog returned non-success status",
+            "upstream_status":status.as_u16()
+        }))).into_response();
+    }
+
+    let body = match response.json::<Value>().await {
+        Ok(value) => value,
+        Err(error) => {
+            tracing::error!("inspect_source JSON decode failed: {:?}", error);
+            return (StatusCode::BAD_GATEWAY, Json(json!({"error":"source catalog returned invalid JSON"}))).into_response();
+        }
+    };
+
+    let package = body.get("result").cloned().unwrap_or_else(|| body.clone());
+    let resources = package.get("resources").and_then(Value::as_array).cloned().unwrap_or_default();
+    let mut resource_report = Vec::with_capacity(resources.len());
+    let mut redistributable_candidates = 0usize;
+
+    for resource in resources.iter().take(500) {
+        let license = resource.get("license").or_else(|| resource.get("license_title"));
+        let license_text = license.and_then(Value::as_str).unwrap_or("").trim();
+        let format = resource.get("format").and_then(Value::as_str).unwrap_or("").trim();
+        let datastore_active = resource.get("datastore_active").and_then(Value::as_bool).unwrap_or(false);
+        let has_url = resource.get("url").and_then(Value::as_str).is_some_and(|value| !value.trim().is_empty());
+        let license_known = !license_text.is_empty()
+            || source.license_name.as_deref().is_some_and(|value| !value.trim().is_empty());
+        if license_known && has_url {
+            redistributable_candidates += 1;
+        }
+        resource_report.push(json!({
+            "id": resource.get("id"),
+            "name": resource.get("name"),
+            "format": format,
+            "mimetype": resource.get("mimetype"),
+            "url": resource.get("url"),
+            "license": license,
+            "datastore_active": datastore_active,
+            "license_known": license_known,
+            "has_url": has_url
+        }));
+    }
+
+    let dataset_license = package.get("license_title")
+        .or_else(|| package.get("license_id"))
+        .or_else(|| package.get("license_url"));
+
+    let can_enable_persistent_import = source.reuse_mode == "persistent_import"
+        && source.storage_allowed
+        && redistributable_candidates > 0;
+
+    let _ = sqlx::query(
+        "UPDATE data_source_registry SET last_checked_at = NOW(), last_error_at = NULL, updated_at = NOW() WHERE id = $1",
+    )
+    .bind(source.id)
+    .execute(&state.db)
+    .await;
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "source": {
+                "source_key":source.source_key,
+                "provider":source.provider_name,
+                "reuse_mode":source.reuse_mode,
+                "storage_allowed":source.storage_allowed,
+                "configured_license":source.license_name
+            },
+            "dataset_license":dataset_license,
+            "resource_count":resources.len(),
+            "resource_limit_applied":resources.len() > 500,
+            "redistributable_candidates":redistributable_candidates,
+            "can_enable_persistent_import":can_enable_persistent_import,
+            "resources":resource_report,
+            "note":"This is a metadata inspection only. It does not copy dataset rows into Lajukan."
+        }))
+    ).into_response()
+}
+
 async fn create_import_job(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -941,6 +1068,7 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/v1/data/sources", get(list_sources))
         .route("/v1/data/import-jobs", get(list_import_jobs))
         .route("/v1/data/import-jobs/{source_key}", post(create_import_job))
+        .route("/v1/data/sources/{source_key}/inspect", post(inspect_source))
         .route("/v1/businesses/{content_ref}/claim", get(claim_status).post(create_claim))
         .route("/v1/businesses/{content_ref}/claims", get(claim_status).post(create_claim))
         .route("/v1/business-claims", get(list_my_claims))
