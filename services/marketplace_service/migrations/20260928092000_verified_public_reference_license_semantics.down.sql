@@ -1,0 +1,2 @@
+-- No destructive rollback: the source_license field was intentionally omitted
+-- because the place-source page is not being asserted as a license.
