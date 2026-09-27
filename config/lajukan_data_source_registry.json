@@ -30,9 +30,9 @@
       "url": "https://data.go.id/dataset/dataset/umkm",
       "dataset_id": "4a6e5e83-237a-49f9-b7a1-97fadd82f6c3",
       "reuse_mode": "persistent_import",
-      "auto_publish_reference": true,
+      "auto_publish_reference": false,
       "license": "Creative Commons Attribution (as stated in dataset metadata)",
-      "notes": "Lisensi Creative Commons Attribution dinyatakan pada metadata dataset. Persistent import diizinkan; data tetap dipublikasikan sebagai reference/unclaimed dan tidak menjadi bukti kepemilikan."
+      "notes": "Dataset ini merupakan data agregat UMKM menurut wilayah/kategori, bukan daftar profil usaha individual. Persistent import diizinkan untuk staging/Insight dengan provenance; tidak dipublikasikan sebagai profil usaha individual."
     },
     {
       "id": "data-go-id-sukoharjo-umkm",
