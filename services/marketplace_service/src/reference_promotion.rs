@@ -359,7 +359,6 @@ fn osm_identity(source_key: &str, source_record_id: &str) -> (Option<String>, Op
     }
 }
 
-
 fn aggregate_reference_slug(source_key: &str, source_record_id: &str) -> String {
     let mut input = format!("{source_key}-{source_record_id}");
     input.retain(|ch| ch.is_ascii_alphanumeric() || ch == '-');
@@ -404,10 +403,20 @@ pub(crate) async fn publish_aggregate_reference(
     db: &PgPool,
     record_id: Uuid,
 ) -> Result<Option<Uuid>, sqlx::Error> {
-    let row = sqlx::query_as::<_, (
-        Uuid, Uuid, String, String, String, String,
-        Option<String>, Option<String>, Value
-    )>(
+    let row = sqlx::query_as::<
+        _,
+        (
+            Uuid,
+            Uuid,
+            String,
+            String,
+            String,
+            String,
+            Option<String>,
+            Option<String>,
+            Value,
+        ),
+    >(
         r#"
         SELECT r.id, r.source_id, r.source_record_id, COALESCE(r.source_url, s.source_url),
                s.provider_name, s.source_key,
@@ -421,14 +430,24 @@ pub(crate) async fn publish_aggregate_reference(
           AND s.reuse_mode = 'persistent_import'
           AND s.storage_allowed = TRUE
         LIMIT 1
-        "#
+        "#,
     )
     .bind(record_id)
     .fetch_optional(db)
     .await?;
 
-    let Some((record_id, source_id, source_record_id, source_url, provider_name, source_key,
-              license_name, attribution, raw)) = row else {
+    let Some((
+        record_id,
+        source_id,
+        source_record_id,
+        source_url,
+        provider_name,
+        source_key,
+        license_name,
+        attribution,
+        raw,
+    )) = row
+    else {
         return Ok(None);
     };
     let Some(license_name) = license_name.filter(|v| !v.trim().is_empty()) else {
@@ -482,9 +501,13 @@ pub(crate) async fn publish_aggregate_reference(
           listing_status = 'published',
           updated_at = NOW()
         RETURNING id
-        "#
+        "#,
     )
-    .bind(&slug).bind(&title).bind(&summary).bind(&body).bind(metadata)
+    .bind(&slug)
+    .bind(&title)
+    .bind(&summary)
+    .bind(&body)
+    .bind(metadata)
     .fetch_one(db)
     .await?;
 

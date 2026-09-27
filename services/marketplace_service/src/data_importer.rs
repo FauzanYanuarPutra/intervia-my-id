@@ -210,7 +210,6 @@ async fn persist_reference_record(
     .await
 }
 
-
 async fn publish_aggregate_if_needed(
     state: &Arc<AppState>,
     source: &SourceRow,
