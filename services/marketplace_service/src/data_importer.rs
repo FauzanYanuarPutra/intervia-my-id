@@ -168,7 +168,7 @@ async fn persist_reference_record(
     resource_license: &str,
     raw: &Value,
 ) -> Result<Uuid, sqlx::Error> {
-    let safe = if source.7 { raw.clone() } else { redact(raw) };
+    let safe = if source.8 { raw.clone() } else { redact(raw) };
     let record_id = raw
         .get("_id")
         .map(|value| value.to_string())
@@ -335,7 +335,7 @@ async fn run_inner(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
                     accepted += 1;
                     continue;
                 }
-                let safe = if source.7 { raw.clone() } else { redact(&raw) };
+                let safe = if source.8 { raw.clone() } else { redact(&raw) };
                 match persist_reference_record(
                     &state,
                     job_id,
@@ -437,7 +437,7 @@ async fn run_inner(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
                     continue;
                 }
 
-                let safe = if source.7 { raw.clone() } else { redact(raw) };
+                let safe = if source.8 { raw.clone() } else { redact(raw) };
                 match persist_reference_record(
                     &state,
                     job_id,
