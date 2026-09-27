@@ -15,7 +15,7 @@ import {
   ChevronLeft,
   Filter,
   Loader2,
-  SegarkanCcw,
+  RefreshCcw,
   Search,
   ShoppingBag,
   TriangleAlert,
@@ -718,7 +718,7 @@ export default function MarketplaceClient() {
                 onClick={() => loadData(true)}
                 className="inline-flex items-center gap-1 rounded-full border border-[color:var(--app-border)] px-3 py-1.5 text-xs font-semibold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)] dark:hover:bg-[color:var(--app-surface-strong)]"
               >
-                <SegarkanCcw className="h-3.5 w-3.5" />
+                <RefreshCcw className="h-3.5 w-3.5" />
                 Segarkan
               </button>
             </div>
@@ -793,7 +793,7 @@ export default function MarketplaceClient() {
               onClick={resetFilters}
               className="mt-3 inline-flex items-center gap-2 rounded-2xl bg-[color:var(--app-accent)] px-5 py-2.5 font-bold text-[color:var(--app-text-inverse)] shadow-lg hover:bg-[color:var(--app-accent-strong)]"
             >
-              <SegarkanCcw className="h-4 w-4" />
+              <RefreshCcw className="h-4 w-4" />
               Reset filter
             </button>
           </div>
