@@ -171,7 +171,7 @@
       "reuse_mode": "persistent_import",
       "license": "ODbL 1.0",
       "attribution": "© OpenStreetMap contributors",
-      "endpoint": "https://overpass-api.de/api/interpreter",
+      "endpoint": "https://overpass.private.coffee/api/interpreter",
       "auto_publish_reference": true,
       "notes": "Read-only public OSM reference import. Governed by ODbL attribution; reference/unclaimed only. No private contact fields."
     },
