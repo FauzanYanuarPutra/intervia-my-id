@@ -7,6 +7,7 @@ set -eu
 REFRESH_HOURS="${REAL_DATA_REFRESH_HOURS:-24}"
 MAX_PROVIDERS="${REAL_DATA_MAX_PROVIDERS:-5000}"
 MAX_BUYERS="${REAL_DATA_MAX_BUYERS:-1000}"
+MAX_INSIGHTS="${REAL_DATA_MAX_INSIGHTS:-2000}"
 MAX_MEDIA="${REAL_DATA_MAX_COMMUNITY_MEDIA:-80}"
 SLEEP_SECONDS="${REAL_DATA_REQUEST_SLEEP_SECONDS:-1}"
 BOOTSTRAP_VERSION="${REAL_DATA_BOOTSTRAP_VERSION:-2026-09-28-v4}"
@@ -37,7 +38,7 @@ MARKETPLACE_SQL="$TMP_DIR/marketplace.sql"
 COMMUNITY_SQL="$TMP_DIR/community.sql"
 
 echo "[real-data] crawling approved public/open sources..."
-python /workspace/scripts/import_real_marketplace_open_data.py --out "$MARKETPLACE_SQL" --community-out "$COMMUNITY_SQL" --max-providers "$MAX_PROVIDERS" --max-buyers "$MAX_BUYERS" --max-community-media "$MAX_MEDIA" --sleep "$SLEEP_SECONDS" --allow-image-less-records
+python /workspace/scripts/import_real_marketplace_open_data.py --out "$MARKETPLACE_SQL" --community-out "$COMMUNITY_SQL" --max-providers "$MAX_PROVIDERS" --max-buyers "$MAX_BUYERS" --max-insights "$MAX_INSIGHTS" --max-community-media "$MAX_MEDIA" --sleep "$SLEEP_SECONDS" --allow-image-less-records
 
 echo "[real-data] applying marketplace data..."
 if [ -s "$MARKETPLACE_SQL" ]; then psql "$MARKETPLACE_DATABASE_URL" -v ON_ERROR_STOP=1 -f "$MARKETPLACE_SQL"; fi
