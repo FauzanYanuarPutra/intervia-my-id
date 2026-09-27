@@ -586,7 +586,8 @@ fn allowed_seller_transitions(order: &SellerOrderRecord) -> Vec<OrderState> {
 
     match current {
         OrderState::Draft => vec![OrderState::Cancelled],
-        OrderState::PendingPayment => vec![OrderState::Paid, OrderState::Rejected],
+        // Payment transitions are owned by the payment flow, not the seller.
+        OrderState::PendingPayment => vec![OrderState::Rejected],
         OrderState::Paid => vec![OrderState::Processing, OrderState::Cancelled],
         OrderState::Processing => {
             if order.category_type == "SERVICE_MARKETPLACE" {
