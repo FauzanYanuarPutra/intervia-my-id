@@ -874,6 +874,44 @@ try {
         exit $UpExitCode
     }
 
+    # Governed real-data bootstrap runs asynchronously inside marketplace_service.
+    # Verify actual publication through the service API so a healthy container is
+    # not mistaken for a populated database.
+    if ($Services.Count -eq 0 -or $Services -contains "marketplace_service") {
+        Write-Host "Verifying Lajukan real-data bootstrap..." -ForegroundColor Cyan
+        $DataReady = $false
+        for ($DataAttempt = 1; $DataAttempt -le 36; $DataAttempt++) {
+            $StatusProbe = @(
+                & docker @ComposeArgs exec -T marketplace_service curl -fsS http://127.0.0.1:8081/v1/data/bootstrap-status 2>&1
+            )
+            if ($LASTEXITCODE -eq 0) {
+                try {
+                    $StatusJson = ($StatusProbe -join "").Trim() | ConvertFrom-Json
+                    Write-Host ("  data status={0} sources={1} active_jobs={2} published_references={3} active_reference_content={4}" -f $StatusJson.status, $StatusJson.persistent_sources, $StatusJson.active_jobs, $StatusJson.published_references, $StatusJson.active_reference_content) -ForegroundColor DarkGray
+                    if ([int64]$StatusJson.published_references -gt 0) {
+                        $DataReady = $true
+                        break
+                    }
+                    if ([int64]$StatusJson.active_jobs -eq 0 -and [int64]$StatusJson.persistent_sources -gt 0 -and [int64]$StatusJson.completed_jobs -gt 0) {
+                        break
+                    }
+                }
+                catch {
+                    Write-Verbose "Bootstrap status response belum dapat diparse: $($_.Exception.Message)"
+                }
+            }
+            Start-Sleep -Seconds 5
+        }
+
+        if ($DataReady) {
+            Write-Host "Lajukan real-data bootstrap is active." -ForegroundColor Green
+        }
+        else {
+            Write-Warning "Real-data bootstrap belum menghasilkan reference content dalam bounded startup window. Stack tetap berjalan; cek marketplace_service logs."
+            & docker @ComposeArgs logs --no-color --tail 160 marketplace_service
+        }
+    }
+
 
     # Caddyfile is bind-mounted. `docker compose up` does not reload an already
     # running Caddy process when only the mounted file content changes. Always
