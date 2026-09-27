@@ -333,34 +333,30 @@ export default function CommunityGroupDirectoryClient({
                     >
                       {isId ? 'Lihat grup' : 'View group'}
                     </Link>
-                    <button
-                      type="button"
-                      onClick={() => void joinOrLeave(group)}
-                      disabled={busyId === group.id || pending}
-                      className={cn(
-                        'inline-flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-[12px] px-3 text-xs font-bold disabled:opacity-60',
-                        joined
-                          ? 'border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)]'
-                          : 'bg-[color:var(--app-accent)] text-white',
-                      )}
-                    >
-                      {busyId === group.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : joined ? (
+                    {joined ? (
+                      <span className="inline-flex min-h-[38px] flex-1 items-center justify-center gap-1.5 rounded-[12px] border border-emerald-200 bg-emerald-50 px-3 text-xs font-bold text-emerald-700">
                         <ShieldCheck className="h-4 w-4" />
-                      ) : (
-                        <Users className="h-4 w-4" />
-                      )}
-                      {pending
-                        ? 'Pending'
-                        : joined
-                          ? isId
-                            ? 'Sudah join'
-                            : 'Joined'
-                          : isId
-                            ? 'Gabung'
-                            : 'Join'}
-                    </button>
+                        {isId ? 'Sudah bergabung' : 'Joined'}
+                      </span>
+                    ) : pending ? (
+                      <span className="inline-flex min-h-[38px] flex-1 items-center justify-center rounded-[12px] border border-amber-200 bg-amber-50 px-3 text-xs font-bold text-amber-700">
+                        {isId ? 'Menunggu approval' : 'Pending approval'}
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => void joinOrLeave(group)}
+                        disabled={busyId === group.id}
+                        className="inline-flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-[12px] bg-[color:var(--app-accent)] px-3 text-xs font-bold text-white disabled:opacity-60"
+                      >
+                        {busyId === group.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Users className="h-4 w-4" />
+                        )}
+                        {isId ? 'Gabung' : 'Join'}
+                      </button>
+                    )}
                   </div>
                 </article>
               );
