@@ -37,6 +37,7 @@ mod businesses;
 mod content_projection;
 mod crm_matching;
 mod data_governance;
+mod data_importer;
 mod health;
 mod identity_projection;
 mod moderation;
