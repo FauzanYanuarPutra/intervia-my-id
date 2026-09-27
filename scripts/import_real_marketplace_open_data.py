@@ -1761,7 +1761,7 @@ def provider_store_sql(stores: list[ProviderStore]) -> list[str]:
         "  COALESCE(metadata->>'image_url', metadata->>'cover_image_url'),",
         "  'umkm_reference', 'active',",
         "  metadata || jsonb_build_object(",
-        "    'record_kind', 'osm_provider_reference',",
+        "    'record_kind', 'real_openstreetmap_reference',",
         "    'reference_subtype', 'business_reference',",
         "    'reference_publication_status', 'published',",
         "    'claimable', true,",
