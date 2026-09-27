@@ -1118,7 +1118,7 @@ pub async fn bootstrap_persistent_imports(state: Arc<AppState>) -> Result<u64, s
           AND storage_allowed = TRUE
           AND reuse_mode = 'persistent_import'
           AND api_url IS NOT NULL
-          AND source_kind = 'government_open_data'
+          AND source_kind IN ('government_open_data', 'osm_overpass')
         ORDER BY source_key
         "#
     )
@@ -1279,6 +1279,7 @@ pub async fn sync_static_source_registry(db: &PgPool) -> Result<(), sqlx::Error>
     struct SourceSeed {
         id: String, provider: String, kind: String, url: String,
         #[serde(default)] dataset_id: Option<String>,
+        #[serde(default)] endpoint: Option<String>,
         #[serde(default)] reuse_mode: Option<String>,
         #[serde(default)] license: Option<String>,
         #[serde(default)] attribution: Option<String>,
@@ -1301,7 +1302,7 @@ pub async fn sync_static_source_registry(db: &PgPool) -> Result<(), sqlx::Error>
         };
         let storage_allowed = reuse_mode == "persistent_import";
         let enabled = reuse_mode != "live_only";
-        let api_url = source.dataset_id.as_ref().map(|dataset_id| format!("https://data.go.id/api/action/package_show?id={}", dataset_id));
+        let api_url = source.endpoint.clone().or_else(|| source.dataset_id.as_ref().map(|dataset_id| format!("https://data.go.id/api/action/package_show?id={}", dataset_id)));
         let notes = match (source.dataset_id, source.notes) {
             (Some(dataset_id), Some(notes)) => Some(format!("{} dataset_id={}", notes, dataset_id)),
             (Some(dataset_id), None) => Some(format!("dataset_id={}", dataset_id)),
