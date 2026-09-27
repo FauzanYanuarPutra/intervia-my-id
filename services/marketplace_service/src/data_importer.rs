@@ -303,43 +303,47 @@ async fn run_osm_reference_import(
         .as_deref()
         .ok_or_else(|| anyhow!("OSM source has no Overpass endpoint"))?;
 
-    let bboxes: &[(&str, &str, f64, f64, f64, f64)] = &[
-        ("Jakarta", "DKI Jakarta", -6.40, -6.05, 106.65, 107.05),
-        ("Bandung", "Jawa Barat", -7.10, -6.75, 107.45, 107.80),
-        ("Surabaya", "Jawa Timur", -7.40, -7.10, 112.55, 112.90),
-        ("Yogyakarta", "DI Yogyakarta", -7.95, -7.65, 110.25, 110.50),
-        ("Semarang", "Jawa Tengah", -7.20, -6.85, 110.25, 110.55),
-        ("Denpasar", "Bali", -8.80, -8.55, 115.10, 115.30),
-        ("Medan", "Sumatera Utara", 3.45, 3.75, 98.50, 98.80),
-        ("Makassar", "Sulawesi Selatan", -5.30, -5.00, 119.25, 119.55),
-        (
-            "Palembang",
-            "Sumatera Selatan",
-            -3.15,
-            -2.80,
-            104.55,
-            104.90,
-        ),
-        (
-            "Balikpapan",
-            "Kalimantan Timur",
-            -1.40,
-            -1.10,
-            116.65,
-            117.00,
-        ),
-        ("Tangerang Selatan", "Banten", -6.40, -6.20, 106.60, 106.85),
-        ("Bogor", "Jawa Barat", -6.75, -6.45, 106.65, 106.90),
+    let cities: &[(&str, &str, f64, f64, f64)] = &[
+        ("Jakarta", "DKI Jakarta", -6.2088, 106.8456, 20_000.0),
+        ("Bogor", "Jawa Barat", -6.5950, 106.8166, 15_000.0),
+        ("Tangerang", "Banten", -6.1783, 106.6319, 15_000.0),
+        ("Bekasi", "Jawa Barat", -6.2383, 106.9756, 15_000.0),
+        ("Bandung", "Jawa Barat", -6.9175, 107.6191, 18_000.0),
+        ("Surabaya", "Jawa Timur", -7.2575, 112.7521, 18_000.0),
+        ("Medan", "Sumatera Utara", 3.5952, 98.6722, 18_000.0),
+        ("Semarang", "Jawa Tengah", -6.9667, 110.4167, 16_000.0),
+        ("Makassar", "Sulawesi Selatan", -5.1477, 119.4327, 16_000.0),
+        ("Yogyakarta", "DI Yogyakarta", -7.7956, 110.3695, 15_000.0),
+        ("Denpasar", "Bali", -8.6500, 115.2167, 15_000.0),
+        ("Palembang", "Sumatera Selatan", -2.9761, 104.7754, 16_000.0),
+        ("Bandar Lampung", "Lampung", -5.3971, 105.2668, 15_000.0),
+        ("Pekanbaru", "Riau", 0.5071, 101.4478, 16_000.0),
+        ("Padang", "Sumatera Barat", -0.9471, 100.4172, 15_000.0),
+        ("Batam", "Kepulauan Riau", 1.0456, 104.0305, 16_000.0),
+        ("Banda Aceh", "Aceh", 5.5483, 95.3238, 13_000.0),
+        ("Jambi", "Jambi", -1.6101, 103.6131, 14_000.0),
+        ("Pontianak", "Kalimantan Barat", -0.0263, 109.3425, 15_000.0),
+        ("Banjarmasin", "Kalimantan Selatan", -3.3186, 114.5944, 15_000.0),
+        ("Samarinda", "Kalimantan Timur", -0.5022, 117.1536, 15_000.0),
+        ("Balikpapan", "Kalimantan Timur", -1.2379, 116.8529, 15_000.0),
+        ("Manado", "Sulawesi Utara", 1.4748, 124.8421, 14_000.0),
+        ("Malang", "Jawa Timur", -7.9666, 112.6326, 15_000.0),
+        ("Surakarta", "Jawa Tengah", -7.5755, 110.8243, 14_000.0),
+        ("Cirebon", "Jawa Barat", -6.7320, 108.5523, 12_000.0),
+        ("Tasikmalaya", "Jawa Barat", -7.3274, 108.2207, 12_000.0),
+        ("Mataram", "Nusa Tenggara Barat", -8.5833, 116.1167, 13_000.0),
+        ("Kupang", "Nusa Tenggara Timur", -10.1772, 123.6070, 13_000.0),
+        ("Jayapura", "Papua", -2.5337, 140.7181, 12_000.0)
     ];
 
     let query = r#"
-[out:json][timeout:120];
+[out:json][timeout:110];
 (
-  nwr["name"]["shop"]({south},{west},{north},{east});
-  nwr["name"]["craft"]({south},{west},{north},{east});
-  nwr["name"]["office"]({south},{west},{north},{east});
-  nwr["name"]["amenity"~"^(marketplace|restaurant|cafe|fast_food|pharmacy|bank)$"]({south},{west},{north},{east});
-  nwr["name"]["tourism"~"^(hotel|guest_house|hostel)$"]({south},{west},{north},{east});
+  nwr(around:{radius},{lat},{lng})["name"]["shop"];
+  nwr(around:{radius},{lat},{lng})["name"]["craft"];
+  nwr(around:{radius},{lat},{lng})["name"]["office"];
+  nwr(around:{radius},{lat},{lng})["name"]["industrial"];
+  nwr(around:{radius},{lat},{lng})["name"]["amenity"="marketplace"];
 );
 out center tags;
 "#;
@@ -350,19 +354,18 @@ out center tags;
     let mut errors = 0i32;
     let mut seen = std::collections::HashSet::new();
 
-    for (bbox_index, (city, province, south, west, north, east)) in bboxes.iter().enumerate() {
+    for (city_index, (city, province, lat, lng, radius)) in cities.iter().enumerate() {
         if discovered >= 50_000 {
             tracing::warn!("OSM reference import reached the per-job safety cap of 50,000 records");
             break;
         }
-        if bbox_index > 0 {
+        if city_index > 0 {
             tokio::time::sleep(std::time::Duration::from_millis(1200)).await;
         }
         let body = query
-            .replace("{south}", &south.to_string())
-            .replace("{west}", &west.to_string())
-            .replace("{north}", &north.to_string())
-            .replace("{east}", &east.to_string());
+            .replace("{radius}", &radius.to_string())
+            .replace("{lat}", &lat.to_string())
+            .replace("{lng}", &lng.to_string());
 
         let mut payload_result: Option<Value> = None;
         let endpoints = if endpoint == "https://overpass-api.de/api/interpreter" {
