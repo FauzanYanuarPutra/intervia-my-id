@@ -673,7 +673,23 @@ out center tags;
 
 pub async fn run(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
     match run_inner(state.clone(), job_id).await {
-        Ok(()) => Ok(()),
+        Ok(()) => {
+            if let Err(error) = sqlx::query(
+                r#"UPDATE data_source_registry s
+                   SET last_success_at=NOW(), updated_at=NOW()
+                   FROM data_import_jobs j
+                   WHERE j.id=$1
+                     AND s.id=j.source_id
+                     AND j.status IN ('succeeded','partial')"#,
+            )
+            .bind(job_id)
+            .execute(&state.db)
+            .await
+            {
+                tracing::warn!(job_id=%job_id, "failed to record source success timestamp: {:?}", error);
+            }
+            Ok(())
+        }
         Err(error) => {
             let summary = error.to_string().chars().take(2000).collect::<String>();
             if let Err(db_error) = sqlx::query(
@@ -691,6 +707,19 @@ pub async fn run(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
                     "failed to persist importer recovery state for job {}: {:?}; original error: {}",
                     job_id, db_error, summary
                 );
+            }
+            if let Err(db_error) = sqlx::query(
+                r#"UPDATE data_source_registry s
+                   SET last_error_at=NOW(), updated_at=NOW()
+                   FROM data_import_jobs j
+                   WHERE j.id=$1
+                     AND s.id=j.source_id"#,
+            )
+            .bind(job_id)
+            .execute(&state.db)
+            .await
+            {
+                tracing::warn!(job_id=%job_id, "failed to record source error timestamp: {:?}", db_error);
             }
             Err(error)
         }
