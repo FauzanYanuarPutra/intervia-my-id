@@ -2817,7 +2817,7 @@ export function CommunityPostCard({
               {item.author.name}
             </button>
 
-            <div className="mt-0.5  my-[-15px] flex min-w-0 w-full items-center gap-x-1.5 gap-y-0.5 text-[11px] leading-4 text-[color:var(--app-text-soft)] sm:text-xs">
+            <div className="!mt-[-15px] flex min-w-0 w-full items-center gap-x-1.5 gap-y-0.5 text-[11px] leading-4 text-[color:var(--app-text-soft)] sm:text-xs">
               {item.group ? (
                 <Link
                   href={communityGroupHref(item.group)}
@@ -2832,7 +2832,7 @@ export function CommunityPostCard({
                 </span>
               )}
             </div>
-            <div className='mt-0.5  my-[-15px] flex min-w-0 w-full items-center text-[11px] leading-4 text-[color:var(--app-text-soft)] sm:text-xs'>
+            <div className='!mt-[-15px] flex min-w-0 w-full items-center text-[11px] leading-4 text-[color:var(--app-text-soft)] sm:text-xs'>
               <span aria-hidden="true" className="shrink-0">·</span>
 
               <span className="shrink-0 whitespace-nowrap">
