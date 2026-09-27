@@ -167,7 +167,7 @@ pub async fn run(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
             let summary = error.to_string().chars().take(2000).collect::<String>();
             if let Err(db_error) = sqlx::query(
                 "UPDATE data_import_jobs
-                 SET status='failed', finished_at=NOW(), error_count=GREATEST(error_count, 1),
+                 SET status='failed', finished_at=NOW(), error_count=GREATEST(COALESCE(error_count, 0), 1),
                      error_summary=$2
                  WHERE id=$1 AND status='running'"
             )
