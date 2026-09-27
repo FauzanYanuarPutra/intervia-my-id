@@ -1780,14 +1780,19 @@ pub async fn bootstrap_persistent_imports(state: Arc<AppState>) -> Result<u64, s
           AND reuse_mode = 'persistent_import'
           AND api_url IS NOT NULL
           AND source_kind IN ('government_open_data','osm_overpass')
-        ORDER BY source_key
+        ORDER BY CASE WHEN source_key = 'osm' THEN 0 ELSE 1 END, source_key
         "#,
     )
     .fetch_all(db)
     .await?;
 
     let mut queued = 0u64;
+    const MAX_NEW_BOOTSTRAP_JOBS: u64 = 4;
+
     for (source_id, source_key, api_url, refresh_hours) in sources {
+        if queued >= MAX_NEW_BOOTSTRAP_JOBS {
+            break;
+        }
         let active_job = sqlx::query_as::<_, (Uuid, String)>(
             r#"
             SELECT id, status
