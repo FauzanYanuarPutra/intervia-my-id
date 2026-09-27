@@ -12,9 +12,6 @@ on:
       - 'services/marketplace_service/**'
       - 'config/lajukan_data_source_registry.json'
       - '.github/workflows/marketplace-service-check.yml'
-    paths:
-      - 'services/marketplace_service/**'
-      - '.github/workflows/marketplace-service-check.yml'
 
 permissions:
   contents: read
