@@ -1755,7 +1755,7 @@ pub async fn sync_static_source_registry(db: &PgPool) -> Result<(), sqlx::Error>
         let api_url = source.endpoint.clone().or_else(|| {
             source.dataset_id.as_ref().map(|dataset_id| {
                 format!(
-                    "https://data.go.id/api/3/action/package_show?id={}",
+                    "https://data.go.id/api/action/package_show?id={}",
                     dataset_id
                 )
             })
