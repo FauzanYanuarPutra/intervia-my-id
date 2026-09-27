@@ -3126,7 +3126,150 @@ export function UmkmStorefrontClient({
     };
   }, [authFetch, store]);
 
-  const uploadGalleryMedia = useCallback(async (files: File[]) => {,    if (!store || !isStoreOwner || files.length === 0) return;,    setGalleryUploading(true);,    try {,      const form = new FormData();,      files.slice(0, 12).forEach(file => form.append('files', file));,      const response = await authFetch(`/api/super-app/umkm/stores/${encodeURIComponent(store.id)}/media`, {,        method: 'POST',,        body: form,,        cache: 'no-store',,      });,      const payload = (await response.json().catch(() => ({}))) as { error?: string; gallery_media?: string[] };,      if (!response.ok) throw new Error(payload.error || (isId ? 'Upload media gagal.' : 'Media upload failed.'));,      if (Array.isArray(payload.gallery_media)) {,        setStore(current => current ? { ...current, metadata: { ...current.metadata, gallery_media: payload.gallery_media } } : current);,      },      setGalleryUploadOpen(false);,      showStorefrontToast('success', isId ? 'Media tersimpan' : 'Media saved', isId ? 'Foto/video baru sudah masuk ke galeri usaha.' : 'The new media is now in the business gallery.');,    } catch (error) {,      showStorefrontToast('error', isId ? 'Media belum tersimpan' : 'Media not saved', resolveActionErrorMessage(error, isId ? 'Upload media gagal.' : 'Media upload failed.'));,    } finally {,      setGalleryUploading(false);,    },  }, [authFetch, isId, isStoreOwner, resolveActionErrorMessage, showStorefrontToast, store]);,,  const removeGalleryMedia = useCallback(async (url: string) => {,    if (!store || !isStoreOwner || !url) return;,    try {,      const response = await authFetch(`/api/super-app/umkm/stores/${encodeURIComponent(store.id)}/media`, {,        method: 'DELETE',,        headers: { 'Content-Type': 'application/json' },,        body: JSON.stringify({ url }),,        cache: 'no-store',,      });,      const payload = (await response.json().catch(() => ({}))) as { error?: string; gallery_media?: string[] };,      if (!response.ok) throw new Error(payload.error || (isId ? 'Media gagal dihapus.' : 'Media removal failed.'));,      setStore(current => current ? { ...current, metadata: { ...current.metadata, gallery_media: payload.gallery_media || [] } } : current);,      if (activeGalleryItem?.src === url) setActiveGalleryIndex(null);,      showStorefrontToast('success', isId ? 'Media dihapus' : 'Media removed');,    } catch (error) {,      showStorefrontToast('error', isId ? 'Media belum dihapus' : 'Media not removed', resolveActionErrorMessage(error, isId ? 'Gagal menghapus media.' : 'Failed to remove media.'));,    },  }, [activeGalleryItem?.src, authFetch, isId, isStoreOwner, resolveActionErrorMessage, showStorefrontToast, store]);,  const toggleGalleryLike = useCallback(
+  const uploadGalleryMedia = useCallback(
+    async (files: File[]) => {
+      if (!store || !isStoreOwner || files.length === 0) return;
+
+      setGalleryUploading(true);
+      try {
+        const form = new FormData();
+        files.slice(0, 12).forEach(file => form.append('files', file));
+
+        const response = await authFetch(
+          `/api/super-app/umkm/stores/${encodeURIComponent(store.id)}/media`,
+          {
+            method: 'POST',
+            body: form,
+            cache: 'no-store',
+          },
+        );
+
+        const payload = (await response.json().catch(() => ({}))) as {
+          error?: string;
+          gallery_media?: string[];
+        };
+
+        if (!response.ok) {
+          throw new Error(
+            payload.error ||
+              (isId ? 'Upload media gagal.' : 'Media upload failed.'),
+          );
+        }
+
+        if (Array.isArray(payload.gallery_media)) {
+          setStore(current =>
+            current
+              ? {
+                  ...current,
+                  metadata: {
+                    ...current.metadata,
+                    gallery_media: payload.gallery_media,
+                  },
+                }
+              : current,
+          );
+        }
+
+        setGalleryUploadOpen(false);
+        showStorefrontToast(
+          'success',
+          isId ? 'Media tersimpan' : 'Media saved',
+          isId
+            ? 'Foto/video baru sudah masuk ke galeri usaha.'
+            : 'The new media is now in the business gallery.',
+        );
+      } catch (error) {
+        showStorefrontToast(
+          'error',
+          isId ? 'Media belum tersimpan' : 'Media not saved',
+          resolveActionErrorMessage(
+            error,
+            isId ? 'Upload media gagal.' : 'Media upload failed.',
+          ),
+        );
+      } finally {
+        setGalleryUploading(false);
+      }
+    },
+    [
+      authFetch,
+      isId,
+      isStoreOwner,
+      resolveActionErrorMessage,
+      showStorefrontToast,
+      store,
+    ],
+  );
+
+  const removeGalleryMedia = useCallback(
+    async (url: string) => {
+      if (!store || !isStoreOwner || !url) return;
+
+      try {
+        const response = await authFetch(
+          `/api/super-app/umkm/stores/${encodeURIComponent(store.id)}/media`,
+          {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url }),
+            cache: 'no-store',
+          },
+        );
+
+        const payload = (await response.json().catch(() => ({}))) as {
+          error?: string;
+          gallery_media?: string[];
+        };
+
+        if (!response.ok) {
+          throw new Error(
+            payload.error ||
+              (isId ? 'Media gagal dihapus.' : 'Media removal failed.'),
+          );
+        }
+
+        setStore(current =>
+          current
+            ? {
+                ...current,
+                metadata: {
+                  ...current.metadata,
+                  gallery_media: payload.gallery_media || [],
+                },
+              }
+            : current,
+        );
+
+        if (activeGalleryItem?.src === url) {
+          setActiveGalleryIndex(null);
+        }
+
+        showStorefrontToast(
+          'success',
+          isId ? 'Media dihapus' : 'Media removed',
+        );
+      } catch (error) {
+        showStorefrontToast(
+          'error',
+          isId ? 'Media belum dihapus' : 'Media not removed',
+          resolveActionErrorMessage(
+            error,
+            isId ? 'Gagal menghapus media.' : 'Failed to remove media.',
+          ),
+        );
+      }
+    },
+    [
+      activeGalleryItem?.src,
+      authFetch,
+      isId,
+      isStoreOwner,
+      resolveActionErrorMessage,
+      showStorefrontToast,
+      store,
+    ],
+  );
+  const toggleGalleryLike = useCallback(
     async (item: StoreGalleryItem) => {
       if (!store) return;
 
