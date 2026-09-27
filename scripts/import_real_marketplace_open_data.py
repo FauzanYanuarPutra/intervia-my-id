@@ -1427,6 +1427,9 @@ def community_bucket_for(category_slug: str) -> dict[str, Any]:
 
 
 def write_community_sql(out_path: str, media_items: list[CommonsMediaSeed]) -> None:
+    if not media_items:
+        return
+
     path = Path(out_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     now = dt.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
