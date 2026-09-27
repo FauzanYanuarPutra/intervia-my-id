@@ -42,6 +42,7 @@ export type LajukanNewsArticle = {
   retractionNote: string | null;
   sourceUrls: string[];
   byline: string;
+  contributorUserId: string | null;
   language: 'id' | 'en';
   publishedAt: string;
   updatedAt: string;
@@ -146,6 +147,8 @@ export function normalizeNewsArticle(row: RawNewsRow): LajukanNewsArticle | null
     retractionNote: readString(news.retraction_note) || null,
     sourceUrls,
     byline: readString(news.byline) || 'Lajukan News',
+    contributorUserId:
+      readString(news.contributor_id) || readString(metadata.contributor_id) || null,
     language,
     publishedAt: readIsoDate(row.published_at, news.published_at, row.created_at),
     updatedAt: readIsoDate(row.updated_at, row.published_at, row.created_at),
