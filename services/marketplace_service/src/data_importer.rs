@@ -335,16 +335,14 @@ async fn run_inner(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
             .and_then(Value::as_str)
             .unwrap_or("");
         let resource_license_present = !resource_license.trim().is_empty();
-        let resource_license_allowed = !resource_license_present
-            || license_allows_persistent_import(resource_license);
+        let resource_license_allowed =
+            !resource_license_present || license_allows_persistent_import(resource_license);
         let source_license_present = source
             .5
             .as_deref()
             .is_some_and(|value| !value.trim().is_empty());
         let license_ok = resource_license_present || source_license_present;
-        if !license_ok
-            || !resource_license_allowed
-            || (!active && !json_resource) {
+        if !license_ok || !resource_license_allowed || (!active && !json_resource) {
             rejected += 1;
             continue;
         }
