@@ -10459,8 +10459,11 @@ async fn list_map_references(
             'external_content_reference',
             'real_openstreetmap_reference'
           )
-          AND NULLIF(btrim(COALESCE(metadata->>'source_license', '')), '') IS NOT NULL
           AND NULLIF(btrim(COALESCE(metadata->>'source_url', '')), '') IS NOT NULL
+          AND (
+            metadata->>'reference_subtype' = 'place_reference'
+            OR NULLIF(btrim(COALESCE(metadata->>'source_license', '')), '') IS NOT NULL
+          )
           AND public.lajukan_safe_map_coordinate(metadata->>'latitude') BETWEEN -90.0 AND 90.0
           AND public.lajukan_safe_map_coordinate(metadata->>'longitude') BETWEEN -180.0 AND 180.0
         "#,
