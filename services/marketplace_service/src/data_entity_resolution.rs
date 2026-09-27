@@ -36,8 +36,11 @@ fn normalize_text(value: Option<String>) -> Option<String> {
     (!value.is_empty()).then_some(value)
 }
 
-fn coordinate(value: &Value, aliases: &[&str]) -> Option<f64> {
-    text_field(value, aliases)?.parse::<f64>().ok().filter(|v| v.is_finite() && v.abs() <= 180.0)
+fn coordinate(value: &Value, aliases: &[&str], max_abs: f64) -> Option<f64> {
+    text_field(value, aliases)?
+        .parse::<f64>()
+        .ok()
+        .filter(|v| v.is_finite() && v.abs() <= max_abs)
 }
 
 fn similarity(a: Option<&str>, b: Option<&str>) -> f64 {
@@ -69,8 +72,8 @@ pub async fn index_record(db: &PgPool, source_id: Uuid, record_id: Uuid, raw: &V
     let province = normalize_text(text_field(raw, &["province","provinsi"]));
     let postal = text_field(raw, &["postal_code","kode_pos","zip","zipcode"]);
     let category = normalize_text(text_field(raw, &["category","kategori","jenis_usaha","sector","sektor"]));
-    let lat = coordinate(raw, &["latitude","lat","lintang"]);
-    let lon = coordinate(raw, &["longitude","lon","lng","bujur"]);
+    let lat = coordinate(raw, &["latitude","lat","lintang"], 90.0);
+    let lon = coordinate(raw, &["longitude","lon","lng","bujur"], 180.0);
 
     let canonical_key = {
         let mut value = String::new();
@@ -143,4 +146,32 @@ pub async fn index_record(db: &PgPool, source_id: Uuid, record_id: Uuid, raw: &V
         .execute(db).await?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn latitude_rejects_out_of_range_values() {
+        let raw = serde_json::json!({"latitude": "91.0"});
+        assert_eq!(coordinate(&raw, &["latitude"], 90.0), None);
+    }
+    #[test]
+    fn longitude_accepts_boundary_and_rejects_invalid() {
+        let valid = serde_json::json!({"longitude": "-180"});
+        let invalid = serde_json::json!({"longitude": "180.1"});
+        assert_eq!(coordinate(&valid, &["longitude"], 180.0), Some(-180.0));
+        assert_eq!(coordinate(&invalid, &["longitude"], 180.0), None);
+    }
+    #[test]
+    fn similarity_is_deterministic() {
+        assert_eq!(similarity(Some("toko maju"), Some("toko maju")), 1.0);
+        assert_eq!(similarity(Some("toko maju"), Some("toko")), 0.5);
+        assert_eq!(similarity(None, Some("toko")), 0.0);
+    }
+    #[test]
+    fn normalization_collapses_whitespace_and_punctuation() {
+        assert_eq!(normalize_text(Some("  Toko-Maju   Bandung ".to_string())), Some("toko maju bandung".to_string()));
+        assert_eq!(normalize_text(Some("!!!".to_string())), None);
+    }
 }
