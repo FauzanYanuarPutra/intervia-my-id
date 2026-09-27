@@ -132,7 +132,12 @@ export default async function UmkmPage({ params, searchParams }: PageProps) {
     listUmkmStores({ query: resolvedSearchParams.q?.trim() || undefined, city: resolvedSearchParams.city?.trim() || undefined, activeOnly: true, limit: 10 }),
     getDeepLinkedStore(deepLinkedSlug, deepLinkedStoreId),
   ]);
-  const listedStores = listedStoresResult.status === 'fulfilled' ? listedStoresResult.value.filter(isPublicUmkmStoreVisible).map(toDiscoveryStore) : undefined;
+  const listedStores =
+    listedStoresResult.status === 'fulfilled'
+      ? listedStoresResult.value
+          .filter(isPublicUmkmStoreVisible)
+          .map((store) => toDiscoveryStore(store))
+      : undefined;
   const deepLinkedStoreRaw =
     deepLinkedStoreResult.status === 'fulfilled' &&
     deepLinkedStoreResult.value &&
