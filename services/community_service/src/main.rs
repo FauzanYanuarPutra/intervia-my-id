@@ -7642,16 +7642,24 @@ async fn get_community_feed(
             )
             AND (
                 (
-                    $4::text IS NULL
-                    AND t.group_id IS NULL
+                    $8::text IS NOT NULL
+                    AND t.group_id IS NOT NULL
+                    AND (t.group_id::text = $8 OR g.id::text = $8 OR g.slug = $8)
                 )
                 OR (
-                    $4::text = 'community'
-                    AND t.group_id IS NOT NULL
+                    $8::text IS NULL
+                    AND (
+                        (
+                            $4::text IS NULL
+                            AND t.group_id IS NULL
+                        )
+                        OR (
+                            $4::text = 'community'
+                            AND t.group_id IS NOT NULL
+                        )
+                    )
                 )
             )
-
-            AND ($8::text IS NULL OR t.group_id::text = $8 OR g.id::text = $8 OR g.slug = $8)
 
             AND (
                 t.group_id IS NULL OR
