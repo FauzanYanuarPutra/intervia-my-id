@@ -2098,6 +2098,7 @@ pub async fn bootstrap_reference_publication(state: Arc<AppState>) -> Result<u64
           AND s.reuse_mode = 'persistent_import'
           AND s.storage_allowed = TRUE
           AND s.enabled = TRUE
+          AND s.last_checked_at > NOW() - INTERVAL '7 days'
         ORDER BY c.created_at ASC
         LIMIT 500
         "#,
