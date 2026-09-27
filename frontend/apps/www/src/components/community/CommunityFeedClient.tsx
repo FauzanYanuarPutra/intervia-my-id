@@ -2956,6 +2956,475 @@ export function CommunityPostCard({
           </div>
         </div>
       </div>
+export function CommunityDetailModal({
+  isId,
+  threadId,
+  onClose,
+  onChanged,
+}: {
+  isId: boolean;
+  threadId: string | null;
+  onClose: () => void;
+  onChanged: () => void;
+}) {
+  const { isAuthenticated, authFetch, user } = useAuth();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const { notify } = useToast();
+  const [thread, setThread] = useState<ForumThreadDetail | null>(null);
+  const [posts, setPosts] = useState<ForumPostDetail[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [comment, setComment] = useState('');
+  const [replyTarget, setReplyTarget] = useState<ForumPostDetail | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [voteSaving, setVoteSaving] = useState(false);
+  const [bookmarkSaving, setBookmarkSaving] = useState(false);
+  const [solutionSavingId, setSolutionSavingId] = useState<string | null>(null);
+  const trackedThreadViewRef = useRef<string | null>(null);
+  const commentInputRef = useRef<HTMLInputElement>(null);
+  const loginHref = buildLoginHref(pathname, searchParams.toString());
+  useBodyScrollLock(Boolean(threadId));
+
+  useEffect(() => {
+    if (!threadId) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [onClose, threadId]);
+
+  useEffect(() => {
+    if (!threadId) return;
+    let alive = true;
+    queueMicrotask(() => {
+      if (!alive) return;
+      setLoading(true);
+      setComment('');
+      setReplyTarget(null);
+    });
+
+    Promise.all([
+      fetch(`/api/forum/threads/${encodeURIComponent(threadId)}`, {
+        cache: 'no-store',
+        credentials: 'include',
+      }).then(response => response.json()),
+      fetch(
+        `/api/forum/threads/${encodeURIComponent(threadId)}/posts?page_size=80`,
+        {
+          cache: 'no-store',
+          credentials: 'include',
+        },
+      ).then(response => response.json()),
+    ])
+      .then(
+        ([threadPayload, postsPayload]: [
+          ForumThreadDetail,
+          ForumPostsResponse,
+        ]) => {
+          if (!alive) return;
+          setThread(threadPayload?.id ? threadPayload : null);
+          setPosts(postsPayload.data || []);
+        },
+      )
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, [threadId]);
+
+  const {
+    bookmarked: threadSaved,
+    bookmarkCount: threadSaveCount,
+    setBookmarked: setThreadSaved,
+    setBookmarkCount: setThreadSaveCount,
+  } = useCommunityBookmark(
+    authFetch,
+    thread?.id,
+    Boolean(thread?.id),
+  );
+
+  useEffect(() => {
+    if (!thread?.id || !thread.author?.id || !isAuthenticated) return;
+
+    const actorId = String(user?.id || '').trim();
+    const targetUserId = String(thread.author.id || '').trim();
+    if (!actorId || !targetUserId || actorId === targetUserId) return;
+
+    const trackingKey = `${thread.id}:${actorId}`;
+    if (trackedThreadViewRef.current === trackingKey) return;
+    trackedThreadViewRef.current = trackingKey;
+
+    void trackLajukanEvent('content.viewed', {
+      entityType: 'content',
+      entityId: thread.id,
+      page: `/community?thread=${encodeURIComponent(thread.id)}`,
+      properties: {
+        entity_label: thread.title,
+        target_user_id: targetUserId,
+        target_username: thread.author?.name || '',
+        target_name: thread.author?.name || '',
+        target_href: `/community?thread=${encodeURIComponent(thread.id)}`,
+        actor_user_id: actorId,
+        actor_username: String(user?.username || '').trim(),
+        actor_name:
+          user?.fullName ||
+          user?.full_name ||
+          user?.username ||
+          user?.email ||
+          '',
+        actor_avatar_url: user?.avatarUrl || user?.avatar_url || '',
+        source: 'community',
+        surface: 'community',
+        action: 'view',
+      },
+    });
+  }, [isAuthenticated, thread, user]);
+
+  if (!threadId) return null;
+
+  const rootPost = posts.find(post => !post.replyToPostId) || posts[0] || null;
+  const comments = posts.filter(post => post.id !== rootPost?.id);
+  const repliesByParent = comments.reduce<Record<string, ForumPostDetail[]>>(
+    (acc, post) => {
+      if (post.replyToPostId && post.replyToPostId !== rootPost?.id) {
+        acc[post.replyToPostId] = [...(acc[post.replyToPostId] || []), post];
+      }
+      return acc;
+    },
+    {},
+  );
+  const topLevelComments = comments
+    .filter(post => !post.replyToPostId || post.replyToPostId === rootPost?.id)
+    .sort((a, b) => {
+      if (Boolean(a.isAnswer) !== Boolean(b.isAnswer)) return a.isAnswer ? -1 : 1;
+      const scoreA = Math.max(Number(a.voteScore ?? a.likeCount ?? 0), 0);
+      const scoreB = Math.max(Number(b.voteScore ?? b.likeCount ?? 0), 0);
+      if (scoreA !== scoreB) return scoreB - scoreA;
+      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    });
+  const detailPoll =
+    thread && rootPost
+      ? parseCommunityPoll(thread.title, rootPost.content, thread.tags)
+      : null;
+  const rootPostBody = detailPoll ? detailPoll.body : rootPost?.content || '';
+  const threadLikeCount = Math.max(
+    thread?.voteScore ??
+      thread?.likeCount ??
+      rootPost?.voteScore ??
+      rootPost?.likeCount ??
+      0,
+    0,
+  );
+  const rootMediaUrls = normalizeCommunityMediaItems(
+    [
+      ...(rootPost?.imageUrls || []),
+      ...(thread?.imageUrls || []),
+    ],
+    thread?.title || '',
+  )
+    .map(item => item.src)
+    .slice(0, 12);
+
+  const submitComment = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const clean = comment.trim();
+    if (!clean) return;
+    if (!isAuthenticated) {
+      router.push(loginHref);
+      return;
+    }
+
+    setSaving(true);
+    const response = await authFetch(
+      `/api/forum/threads/${encodeURIComponent(threadId)}/posts`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: clean,
+          replyToPostId: replyTarget?.id || undefined,
+        }),
+      },
+    );
+    const payload = (await response
+      .json()
+      .catch(() => ({}))) as CreatedPostPayload;
+    setSaving(false);
+
+    if (!response.ok) {
+      notify({
+        title: isId ? 'Komentar gagal' : 'Comment failed',
+        description: payload.error || '',
+        variant: 'error',
+      });
+      return;
+    }
+
+    setComment('');
+    setReplyTarget(null);
+    if (payload.post) {
+      setPosts(current => [
+        ...current.filter(post => post.id !== payload.post?.id),
+        payload.post as ForumPostDetail,
+      ]);
+    }
+    const actorId = String(user?.id || '').trim();
+    const targetUserId = String(
+      replyTarget?.author?.id || thread?.author?.id || '',
+    ).trim();
+    if (payload.post && actorId && targetUserId && actorId !== targetUserId) {
+      void trackLajukanEvent(
+        replyTarget ? 'content.replied' : 'content.commented',
+        {
+          entityType: 'content',
+          entityId: threadId,
+          page: `/community?thread=${encodeURIComponent(threadId)}`,
+          properties: {
+            entity_label: thread?.title || '',
+            target_user_id: targetUserId,
+            target_username:
+              replyTarget?.author?.name || thread?.author?.name || '',
+            target_name:
+              replyTarget?.author?.name || thread?.author?.name || '',
+            target_href: `/community?thread=${encodeURIComponent(threadId)}`,
+            actor_user_id: actorId,
+            actor_username: String(user?.username || '').trim(),
+            actor_name:
+              user?.fullName ||
+              user?.full_name ||
+              user?.username ||
+              user?.email ||
+              '',
+            actor_avatar_url: user?.avatarUrl || user?.avatar_url || '',
+            source: 'community',
+            surface: 'community',
+            action: replyTarget ? 'reply' : 'comment',
+            reply_id: replyTarget?.id || '',
+          },
+        },
+      );
+    }
+    onChanged();
+    const postsResponse = await fetch(
+      `/api/forum/threads/${encodeURIComponent(threadId)}/posts?page_size=80`,
+      { cache: 'no-store', credentials: 'include' },
+    );
+    const postsPayload = (await postsResponse
+      .json()
+      .catch(() => ({}))) as ForumPostsResponse;
+    setPosts(postsPayload.data || []);
+  };
+
+  const voteThread = async () => {
+    if (!isAuthenticated || !thread || voteSaving) {
+      if (!isAuthenticated) router.push(loginHref);
+      return;
+    }
+
+    const nextVote = thread.viewerVote === 1 ? 0 : 1;
+    setVoteSaving(true);
+    try {
+      const response = await authFetch(
+        `/api/forum/threads/${encodeURIComponent(threadId)}/vote`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ value: nextVote }),
+        },
+      );
+      const payload = (await response.json().catch(() => ({}))) as {
+        thread?: ForumThreadDetail;
+        error?: string;
+      };
+
+      if (!response.ok || !payload.thread) {
+        throw new Error(payload.error || 'Gagal mengubah suka');
+      }
+
+      setThread(payload.thread);
+
+      const actorId = String(user?.id || '').trim();
+      const targetUserId = String(payload.thread.author?.id || '').trim();
+      if (nextVote === 1 && actorId && targetUserId && actorId !== targetUserId) {
+        void trackLajukanEvent('content.liked', {
+          entityType: 'content',
+          entityId: threadId,
+          page: `/community?thread=${encodeURIComponent(threadId)}`,
+          properties: {
+            entity_label: payload.thread.title || '',
+            target_user_id: targetUserId,
+            target_username: payload.thread.author?.name || '',
+            target_name: payload.thread.author?.name || '',
+            target_href: `/community?thread=${encodeURIComponent(threadId)}`,
+            actor_user_id: actorId,
+            actor_username: String(user?.username || '').trim(),
+            actor_name:
+              user?.fullName ||
+              user?.full_name ||
+              user?.username ||
+              user?.email ||
+              '',
+            actor_avatar_url: user?.avatarUrl || user?.avatar_url || '',
+            source: 'community',
+            surface: 'community',
+            action: 'like',
+          },
+        });
+      }
+      onChanged();
+    } catch (error) {
+      notify({
+        title: isId ? 'Suka gagal' : 'Like failed',
+        description: error instanceof Error ? error.message : undefined,
+        variant: 'error',
+      });
+    } finally {
+      setVoteSaving(false);
+    }
+  };
+
+  const toggleThreadBookmark = async () => {
+    if (!isAuthenticated || !thread || bookmarkSaving) {
+      if (!isAuthenticated) router.push(loginHref);
+      return;
+    }
+
+    const previousSaved = threadSaved;
+    const previousCount = threadSaveCount;
+    const nextSaved = !previousSaved;
+    setBookmarkSaving(true);
+    setThreadSaved(nextSaved);
+    setThreadSaveCount(Math.max(0, previousCount + (nextSaved ? 1 : -1)));
+
+    try {
+      const response = await authFetch(
+        `/api/forum/threads/${encodeURIComponent(threadId)}/bookmark`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ active: nextSaved }),
+        },
+      );
+      const payload = (await response.json().catch(() => ({}))) as {
+        bookmarked?: unknown;
+        bookmarkCount?: unknown;
+        error?: string;
+      };
+      if (!response.ok) {
+        throw new Error(payload.error || 'Gagal menyimpan postingan');
+      }
+
+      setThreadSaved(Boolean(payload.bookmarked));
+      const count = Number(payload.bookmarkCount);
+      setThreadSaveCount(Number.isFinite(count) ? Math.max(0, count) : 0);
+      onChanged();
+    } catch (error) {
+      setThreadSaved(previousSaved);
+      setThreadSaveCount(previousCount);
+      notify({
+        title: isId ? 'Simpan gagal' : 'Save failed',
+        description: error instanceof Error ? error.message : undefined,
+        variant: 'error',
+      });
+    } finally {
+      setBookmarkSaving(false);
+    }
+  };
+
+  const viewerOwnsThread = Boolean(
+    thread?.author?.id && isSameCommunityUser(String(user?.id || ''), thread.author.id),
+  );
+
+  const setSolution = async (postId: string | null) => {
+    if (!thread || !isAuthenticated || solutionSavingId) {
+      if (!isAuthenticated) router.push(loginHref);
+      return;
+    }
+
+    setSolutionSavingId(postId || 'clear');
+    try {
+      const response = await authFetch(
+        `/api/forum/threads/${encodeURIComponent(threadId)}/solution`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ postId: postId || undefined }),
+        },
+      );
+      const payload = (await response.json().catch(() => ({}))) as {
+        thread?: ForumThreadDetail;
+        solutionPost?: ForumPostDetail | null;
+        error?: string;
+      };
+
+      if (!response.ok || !payload.thread) {
+        notify({
+          title: isId ? 'Status jawaban belum berubah' : 'Answer status unchanged',
+          description: payload.error || '',
+          variant: 'error',
+        });
+        return;
+      }
+
+      setThread(payload.thread);
+      setPosts(current =>
+        current.map(item => ({ ...item, isAnswer: Boolean(postId && item.id === postId) })),
+      );
+      notify({
+        title: postId
+          ? isId
+            ? 'Jawaban ditandai sebagai solusi'
+            : 'Answer marked as solution'
+          : isId
+            ? 'Status solusi dibatalkan'
+            : 'Solution cleared',
+        variant: 'success',
+      });
+      onChanged();
+    } finally {
+      setSolutionSavingId(null);
+    }
+  };
+
+  const renderComment = (post: ForumPostDetail, nested = false) => (
+    <article
+      key={post.id}
+      className={cn(
+        'rounded-[16px] border border-transparent bg-slate-50 p-3',
+        post.isAnswer && 'border-emerald-200 bg-emerald-50/70',
+        nested && 'ml-8 border-[color:var(--app-border)] bg-white',
+      )}
+    >
+      <div className="flex items-center gap-2.5">
+        <Image
+          alt={post.author?.name || 'Author'}
+          src={profileAvatarSrc(
+            post.author?.avatarUrl,
+            readProfileAvatarStyle(post.author),
+            post.author?.name,
+          )}
+          width={32}
+          height={32}
+          className="h-8 w-8 rounded-full object-cover"
+        />
+        <div className="min-w-0">
+          <p className="truncate text-xs font-bold text-[color:var(--app-text)]">
+            {post.author?.name || 'Community Member'}
+          </p>
+          <p className="text-[10px] text-[color:var(--app-text-soft)]">
+            {timeAgo(post.createdAt, isId)}
+          </p>
+        </div>
+      </div>
       {post.isAnswer ? (
         <div className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-700">
           <CheckCircle2 className="h-4 w-4" />
