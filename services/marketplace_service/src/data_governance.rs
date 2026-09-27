@@ -1515,6 +1515,7 @@ pub async fn bootstrap_persistent_imports(state: Arc<AppState>) -> Result<u64, s
           AND storage_allowed = TRUE
           AND reuse_mode = 'persistent_import'
           AND api_url IS NOT NULL
+          AND source_kind IN ('government_open_data','osm_overpass')
         ORDER BY source_key
         "#,
     )
@@ -1754,6 +1755,18 @@ pub async fn sync_static_source_registry(db: &PgPool) -> Result<(), sqlx::Error>
         .bind(source.auto_publish_reference).bind(notes)
         .execute(db).await?;
     }
+
+    sqlx::query(
+        r#"UPDATE data_source_registry
+           SET enabled=FALSE,
+               auto_publish_reference=FALSE,
+               notes=COALESCE(notes || '; ', '') || 'disabled: consolidated into source_key=\'osm\'',
+               updated_at=NOW()
+           WHERE source_key='osm-indonesia-public-references'"#
+    )
+    .execute(db)
+    .await?;
+
     Ok(())
 }
 pub fn router() -> Router<Arc<AppState>> {
