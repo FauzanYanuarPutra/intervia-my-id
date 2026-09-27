@@ -1003,7 +1003,18 @@ async fn create_import_job(
     .fetch_one(&state.db)
     .await
     {
-        Ok(job) => (StatusCode::ACCEPTED, Json(json!({"job":job,"note":"Job queued. The importer must still validate resource-level license and schema before publishing records."}))).into_response(),
+        Ok(job) => {
+            let state_for_job = state.clone();
+            tokio::spawn(async move {
+                if let Err(error) = crate::data_importer::run(state_for_job, job.id).await {
+                    tracing::error!("data importer job {} failed: {:?}", job.id, error);
+                }
+            });
+            (StatusCode::ACCEPTED, Json(json!({
+                "job": job,
+                "note": "Job queued and staged only. No public business is created automatically."
+            }))).into_response()
+        },
         Err(error) => {
             tracing::error!("create_import_job insert failed: {:?}", error);
             (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"failed to create import job"}))).into_response()
