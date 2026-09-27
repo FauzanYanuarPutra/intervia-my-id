@@ -30,7 +30,7 @@
       "selectors": [
         {
           "key": "shop",
-            "values": [
+          "values": [
             "bakery",
             "butcher",
             "greengrocer",
@@ -87,38 +87,326 @@
         }
       ],
       "bboxes": [
-        { "name": "Jakarta Pusat", "city": "Jakarta", "bbox": [-6.22, 106.8, -6.15, 106.87] },
-        { "name": "Bandung Tengah", "city": "Bandung", "bbox": [-6.94, 107.57, -6.88, 107.65] },
-        { "name": "Surabaya Tengah", "city": "Surabaya", "bbox": [-7.3, 112.7, -7.23, 112.78] },
-        { "name": "Yogyakarta Kota", "city": "Yogyakarta", "bbox": [-7.82, 110.34, -7.77, 110.39] },
-        { "name": "Semarang Tengah", "city": "Semarang", "bbox": [-7.02, 110.39, -6.96, 110.45] },
-        { "name": "Denpasar Tengah", "city": "Denpasar", "bbox": [-8.69, 115.2, -8.63, 115.25] },
-        { "name": "Medan Kota", "city": "Medan", "bbox": [3.55, 98.64, 3.62, 98.7] },
-        { "name": "Makassar Tengah", "city": "Makassar", "bbox": [-5.18, 119.39, -5.12, 119.46] },
-        { "name": "Palembang Tengah", "city": "Palembang", "bbox": [-3.02, 104.72, -2.95, 104.8] },
-        { "name": "Balikpapan Kota", "city": "Balikpapan", "bbox": [-1.28, 116.82, -1.21, 116.88] },
-        { "name": "Banda Aceh Kota", "city": "Banda Aceh", "bbox": [5.51, 95.28, 5.59, 95.36] },
-        { "name": "Banjarmasin Kota", "city": "Banjarmasin", "bbox": [-3.36, 114.55, -3.27, 114.65] },
-        { "name": "Batam Kota", "city": "Batam", "bbox": [0.98, 103.98, 1.10, 104.10] },
-        { "name": "Bekasi Kota", "city": "Bekasi", "bbox": [-6.30, 106.92, -6.17, 107.03] },
-        { "name": "Bogor Kota", "city": "Bogor", "bbox": [-6.65, 106.75, -6.55, 106.85] },
-        { "name": "Cirebon Kota", "city": "Cirebon", "bbox": [-6.78, 108.50, -6.68, 108.59] },
-        { "name": "Jambi Kota", "city": "Jambi", "bbox": [-1.68, 103.56, -1.55, 103.67] },
-        { "name": "Jayapura Kota", "city": "Jayapura", "bbox": [-2.60, 140.66, -2.48, 140.77] },
-        { "name": "Kupang Kota", "city": "Kupang", "bbox": [-10.23, 123.55, -10.13, 123.67] },
-        { "name": "Malang Kota", "city": "Malang", "bbox": [-8.03, 112.60, -7.91, 112.69] },
-        { "name": "Manado Kota", "city": "Manado", "bbox": [1.43, 124.78, 1.53, 124.90] },
-        { "name": "Mataram Kota", "city": "Mataram", "bbox": [-8.64, 116.08, -8.53, 116.18] },
-        { "name": "Padang Kota", "city": "Padang", "bbox": [-1.05, 100.34, -0.87, 100.47] },
-        { "name": "Pekanbaru Kota", "city": "Pekanbaru", "bbox": [0.45, 101.39, 0.57, 101.50] },
-        { "name": "Pontianak Kota", "city": "Pontianak", "bbox": [-0.09, 109.28, 0.04, 109.40] },
-        { "name": "Samarinda Kota", "city": "Samarinda", "bbox": [-0.56, 117.08, -0.45, 117.22] },
-        { "name": "Semarang Selatan", "city": "Semarang", "bbox": [-7.08, 110.36, -6.91, 110.48] },
-        { "name": "Surakarta Kota", "city": "Surakarta", "bbox": [-7.63, 110.78, -7.53, 110.87] },
-        { "name": "Bandar Lampung Kota", "city": "Bandar Lampung", "bbox": [-5.47, 105.20, -5.33, 105.34] },
-        { "name": "Palembang Kota", "city": "Palembang", "bbox": [-3.06, 104.69, -2.89, 104.84] },
-        { "name": "Tangerang Kota", "city": "Tangerang", "bbox": [-6.25, 106.56, -6.14, 106.69] },
-        { "name": "Tangerang Selatan", "city": "Tangerang Selatan", "bbox": [-6.37, 106.66, -6.26, 106.79] }
+        {
+          "name": "Jakarta Pusat",
+          "city": "Jakarta",
+          "bbox": [
+            -6.22,
+            106.8,
+            -6.15,
+            106.87
+          ]
+        },
+        {
+          "name": "Bandung Tengah",
+          "city": "Bandung",
+          "bbox": [
+            -6.94,
+            107.57,
+            -6.88,
+            107.65
+          ]
+        },
+        {
+          "name": "Surabaya Tengah",
+          "city": "Surabaya",
+          "bbox": [
+            -7.3,
+            112.7,
+            -7.23,
+            112.78
+          ]
+        },
+        {
+          "name": "Yogyakarta Kota",
+          "city": "Yogyakarta",
+          "bbox": [
+            -7.82,
+            110.34,
+            -7.77,
+            110.39
+          ]
+        },
+        {
+          "name": "Semarang Tengah",
+          "city": "Semarang",
+          "bbox": [
+            -7.02,
+            110.39,
+            -6.96,
+            110.45
+          ]
+        },
+        {
+          "name": "Denpasar Tengah",
+          "city": "Denpasar",
+          "bbox": [
+            -8.69,
+            115.2,
+            -8.63,
+            115.25
+          ]
+        },
+        {
+          "name": "Medan Kota",
+          "city": "Medan",
+          "bbox": [
+            3.55,
+            98.64,
+            3.62,
+            98.7
+          ]
+        },
+        {
+          "name": "Makassar Tengah",
+          "city": "Makassar",
+          "bbox": [
+            -5.18,
+            119.39,
+            -5.12,
+            119.46
+          ]
+        },
+        {
+          "name": "Palembang Tengah",
+          "city": "Palembang",
+          "bbox": [
+            -3.02,
+            104.72,
+            -2.95,
+            104.8
+          ]
+        },
+        {
+          "name": "Balikpapan Kota",
+          "city": "Balikpapan",
+          "bbox": [
+            -1.28,
+            116.82,
+            -1.21,
+            116.88
+          ]
+        },
+        {
+          "name": "Banda Aceh Kota",
+          "city": "Banda Aceh",
+          "bbox": [
+            5.51,
+            95.28,
+            5.59,
+            95.36
+          ]
+        },
+        {
+          "name": "Banjarmasin Kota",
+          "city": "Banjarmasin",
+          "bbox": [
+            -3.36,
+            114.55,
+            -3.27,
+            114.65
+          ]
+        },
+        {
+          "name": "Batam Kota",
+          "city": "Batam",
+          "bbox": [
+            0.98,
+            103.98,
+            1.1,
+            104.1
+          ]
+        },
+        {
+          "name": "Bekasi Kota",
+          "city": "Bekasi",
+          "bbox": [
+            -6.3,
+            106.92,
+            -6.17,
+            107.03
+          ]
+        },
+        {
+          "name": "Bogor Kota",
+          "city": "Bogor",
+          "bbox": [
+            -6.65,
+            106.75,
+            -6.55,
+            106.85
+          ]
+        },
+        {
+          "name": "Cirebon Kota",
+          "city": "Cirebon",
+          "bbox": [
+            -6.78,
+            108.5,
+            -6.68,
+            108.59
+          ]
+        },
+        {
+          "name": "Jambi Kota",
+          "city": "Jambi",
+          "bbox": [
+            -1.68,
+            103.56,
+            -1.55,
+            103.67
+          ]
+        },
+        {
+          "name": "Jayapura Kota",
+          "city": "Jayapura",
+          "bbox": [
+            -2.6,
+            140.66,
+            -2.48,
+            140.77
+          ]
+        },
+        {
+          "name": "Kupang Kota",
+          "city": "Kupang",
+          "bbox": [
+            -10.23,
+            123.55,
+            -10.13,
+            123.67
+          ]
+        },
+        {
+          "name": "Malang Kota",
+          "city": "Malang",
+          "bbox": [
+            -8.03,
+            112.6,
+            -7.91,
+            112.69
+          ]
+        },
+        {
+          "name": "Manado Kota",
+          "city": "Manado",
+          "bbox": [
+            1.43,
+            124.78,
+            1.53,
+            124.9
+          ]
+        },
+        {
+          "name": "Mataram Kota",
+          "city": "Mataram",
+          "bbox": [
+            -8.64,
+            116.08,
+            -8.53,
+            116.18
+          ]
+        },
+        {
+          "name": "Padang Kota",
+          "city": "Padang",
+          "bbox": [
+            -1.05,
+            100.34,
+            -0.87,
+            100.47
+          ]
+        },
+        {
+          "name": "Pekanbaru Kota",
+          "city": "Pekanbaru",
+          "bbox": [
+            0.45,
+            101.39,
+            0.57,
+            101.5
+          ]
+        },
+        {
+          "name": "Pontianak Kota",
+          "city": "Pontianak",
+          "bbox": [
+            -0.09,
+            109.28,
+            0.04,
+            109.4
+          ]
+        },
+        {
+          "name": "Samarinda Kota",
+          "city": "Samarinda",
+          "bbox": [
+            -0.56,
+            117.08,
+            -0.45,
+            117.22
+          ]
+        },
+        {
+          "name": "Semarang Selatan",
+          "city": "Semarang",
+          "bbox": [
+            -7.08,
+            110.36,
+            -6.91,
+            110.48
+          ]
+        },
+        {
+          "name": "Surakarta Kota",
+          "city": "Surakarta",
+          "bbox": [
+            -7.63,
+            110.78,
+            -7.53,
+            110.87
+          ]
+        },
+        {
+          "name": "Bandar Lampung Kota",
+          "city": "Bandar Lampung",
+          "bbox": [
+            -5.47,
+            105.2,
+            -5.33,
+            105.34
+          ]
+        },
+        {
+          "name": "Palembang Kota",
+          "city": "Palembang",
+          "bbox": [
+            -3.06,
+            104.69,
+            -2.89,
+            104.84
+          ]
+        },
+        {
+          "name": "Tangerang Kota",
+          "city": "Tangerang",
+          "bbox": [
+            -6.25,
+            106.56,
+            -6.14,
+            106.69
+          ]
+        },
+        {
+          "name": "Tangerang Selatan",
+          "city": "Tangerang Selatan",
+          "bbox": [
+            -6.37,
+            106.66,
+            -6.26,
+            106.79
+          ]
+        }
       ]
     },
     {
@@ -348,6 +636,54 @@
       "license": "Open Database License 1.0",
       "license_url": "https://opendatacommons.org/licenses/odbl/1-0/",
       "note": "Use this for 100k+ provider imports with osmium/pyosmium outside the stdlib importer."
+    },
+    {
+      "id": "denpasar-umkm-csv-2020",
+      "kind": "csv_aggregate",
+      "role": "insight",
+      "enabled_by_default": true,
+      "name": "Data UMKM Kota Denpasar 2020",
+      "provider": "Dinas UMKM Kota Denpasar",
+      "url": "https://satudata.denpasarkota.go.id/dataset/4a6e5e83-237a-49f9-b7a1-97fadd82f6c3/resource/6d0eb903-731b-412d-8257-a361ee6c5392/download/umkm.csv",
+      "source_url": "https://satudata.denpasarkota.go.id/dataset/umkm/resource/6d0eb903-731b-412d-8257-a361ee6c5392",
+      "license": "Creative Commons Attribution",
+      "attribution": "Dinas UMKM Kota Denpasar",
+      "title": "Data UMKM Kota Denpasar",
+      "location": "Denpasar",
+      "dimension_fields": [
+        "Umkm_Bidang",
+        "Tahun",
+        "Kecamatan"
+      ],
+      "measure_fields": [
+        "Usaha_Mikro",
+        "Usaha_Kecil",
+        "Usaha_Menengah"
+      ],
+      "max_bytes": 2000000,
+      "timeout_seconds": 45
+    },
+    {
+      "id": "tangsel-umkm-csv-2022",
+      "kind": "csv_aggregate",
+      "role": "insight",
+      "enabled_by_default": true,
+      "name": "Jumlah UMKM Menurut Kecamatan di Kota Tangerang Selatan Tahun 2022",
+      "provider": "Dinas Koperasi, Usaha Kecil dan Menengah Kota Tangerang Selatan",
+      "url": "https://data.tangerangselatankota.go.id/dataset/17809e7c-aa43-4bbf-8a54-4dc937467d52/resource/68ce50ad-5e19-4898-9c4b-8abebaf37fcb/download/0e-jumlah-umkm-menurut-kecamatan-di-kota-tangerang-selatan-tahun-2022.csv",
+      "source_url": "https://data.tangerangselatankota.go.id/dataset/jumlah-umkm-menurut-kecamatan-di-kota-tangerang-selatan-tahun-2022/resource/68ce50ad-5e19-4898-9c4b-8abebaf37fcb",
+      "license": "Creative Commons Attribution",
+      "attribution": "Diskominfo Kota Tangerang Selatan",
+      "title": "Jumlah UMKM Kecamatan Tangerang Selatan 2022",
+      "location": "Tangerang Selatan",
+      "dimension_fields": [
+        "Kecamatan"
+      ],
+      "measure_fields": [
+        "UMKM"
+      ],
+      "max_bytes": 2000000,
+      "timeout_seconds": 45
     }
   ]
 }
