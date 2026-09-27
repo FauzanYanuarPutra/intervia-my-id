@@ -183,11 +183,17 @@ async fn review_candidate(
         _ => return (StatusCode::BAD_REQUEST, Json(json!({"error":"decision must be approved, rejected, or blocked"}))).into_response(),
     };
     if decision == "approved" {
-        let blocked = sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(*) FROM reference_promotion_candidates WHERE id=$1 AND jsonb_array_length(blocking_reasons) > 0"
-        ).bind(candidate_id).fetch_optional(&state.db).await.ok().flatten().unwrap_or(0);
+        let blocked = match sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM reference_promotion_candidates WHERE id=$1 AND (jsonb_array_length(blocking_reasons) > 0 OR readiness_score < 0.70)"
+        ).bind(candidate_id).fetch_one(&state.db).await {
+            Ok(value) => value,
+            Err(error) => {
+                tracing::error!("promotion candidate validation failed: {:?}", error);
+                return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"failed to validate promotion candidate"}))).into_response();
+            }
+        };
         if blocked > 0 {
-            return (StatusCode::CONFLICT, Json(json!({"error":"candidate has unresolved blocking reasons","code":"candidate_blocked"}))).into_response();
+            return (StatusCode::CONFLICT, Json(json!({"error":"candidate has unresolved blocking reasons or insufficient readiness","code":"candidate_blocked"}))).into_response();
         }
     }
     match sqlx::query(
