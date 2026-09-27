@@ -21,8 +21,8 @@ RUN apt-get update \
 
 WORKDIR /app
 
-COPY Cargo.toml ./
-COPY Cargo.lock* ./
+COPY services/marketplace_service/Cargo.toml ./
+COPY services/marketplace_service/Cargo.lock* ./
 
 RUN mkdir -p src && \
     printf "fn main() {}\n" > src/main.rs
@@ -34,7 +34,8 @@ RUN for i in 1 2 3 4 5; do \
 
 RUN cargo build --release --locked || true
 
-COPY . .
+COPY services/marketplace_service/ ./
+COPY config/lajukan_data_source_registry.json /config/lajukan_data_source_registry.json
 
 RUN if [ ! -d migrations ]; then \
     mkdir -p migrations && touch migrations/.keep; \
