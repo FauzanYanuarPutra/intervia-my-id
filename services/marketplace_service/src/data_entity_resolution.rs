@@ -115,7 +115,10 @@ pub async fn index_record(db: &PgPool, source_id: Uuid, record_id: Uuid, raw: &V
         r#"SELECT id, normalized_name, normalized_address, latitude, longitude
            FROM data_import_entities
            WHERE id <> $1
-             AND (normalized_name = $2 OR (city IS NOT NULL AND city = $3))
+             AND (
+               ($2 IS NOT NULL AND normalized_name = $2)
+               OR ($3 IS NOT NULL AND city = $3)
+             )
            ORDER BY updated_at DESC LIMIT 20"#,
     )
     .bind(entity_id).bind(&name).bind(&city).fetch_all(db).await?;
