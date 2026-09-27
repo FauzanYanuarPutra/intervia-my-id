@@ -2305,17 +2305,14 @@ async fn ensure_platform_group_admin_memberships(
         SELECT
           g.id,
           $1,
-          'moderator',
+          'owner',
           'active',
           now(),
           now()
         FROM lajukan_groups g
         WHERE g.status = 'active'
         ON CONFLICT (group_id, user_id) DO UPDATE
-        SET role = CASE
-              WHEN lajukan_group_members.role = 'owner' THEN 'owner'
-              ELSE 'moderator'
-            END,
+        SET role = 'owner',
             status = 'active',
             updated_at = now()
         "#,
