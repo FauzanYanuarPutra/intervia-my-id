@@ -148,21 +148,44 @@ pub(crate) fn require_actor(headers: &HeaderMap, state: &AppState) -> ApiResult<
         .ok_or_else(|| ApiError::new(StatusCode::UNAUTHORIZED, "Unauthorized"))
 }
 
-pub(crate) fn is_platform_group_admin(actor: &AuthActor) -> bool {
-    let configured = env::var("COMMUNITY_PLATFORM_ADMIN_EMAILS")
+fn configured_platform_admin_matches(
+    email: Option<&str>,
+    username: Option<&str>,
+) -> bool {
+    let configured_emails = env::var("COMMUNITY_PLATFORM_ADMIN_EMAILS")
         .unwrap_or_else(|_| "lajukan001@gmail.com".to_string());
-    let candidate = actor
-        .email
-        .as_deref()
-        .or_else(|| actor.username.as_deref().filter(|value| value.contains('@')))
+    let configured_usernames = env::var("COMMUNITY_PLATFORM_ADMIN_USERNAMES")
+        .unwrap_or_else(|_| "lajukan001".to_string());
+
+    let normalized_email = email.map(str::trim).filter(|value| !value.is_empty());
+    let normalized_username = username.map(str::trim).filter(|value| !value.is_empty());
+
+    configured_emails
+        .split(',')
         .map(str::trim)
-        .unwrap_or_default();
-    !candidate.is_empty()
-        && configured
+        .filter(|value| !value.is_empty())
+        .any(|value| {
+            normalized_email.is_some_and(|candidate| value.eq_ignore_ascii_case(candidate))
+                || normalized_username.is_some_and(|candidate| {
+                    value
+                        .split_once('@')
+                        .map(|(local, _)| local)
+                        .is_some_and(|local| local.eq_ignore_ascii_case(candidate))
+                })
+        })
+        || configured_usernames
             .split(',')
             .map(str::trim)
             .filter(|value| !value.is_empty())
-            .any(|value| value.eq_ignore_ascii_case(candidate))
+            .any(|value| {
+                normalized_username.is_some_and(|candidate| {
+                    value.eq_ignore_ascii_case(candidate)
+                })
+            })
+}
+
+pub(crate) fn is_platform_group_admin(actor: &AuthActor) -> bool {
+    configured_platform_admin_matches(actor.email.as_deref(), actor.username.as_deref())
 }
 
 pub(crate) fn is_moderator(actor: &AuthActor) -> bool {
@@ -189,6 +212,23 @@ pub(crate) fn request_ip(headers: &HeaderMap) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn platform_admin_matches_email_or_username() {
+        assert!(configured_platform_admin_matches(
+            Some("lajukan001@gmail.com"),
+            None,
+        ));
+        assert!(configured_platform_admin_matches(None, Some("lajukan001")));
+        assert!(configured_platform_admin_matches(
+            Some("LAJUKAN001@GMAIL.COM"),
+            Some("other"),
+        ));
+        assert!(!configured_platform_admin_matches(
+            Some("other@example.com"),
+            Some("other"),
+        ));
+    }
 
     #[test]
     fn moderator_roles_are_explicit() {
