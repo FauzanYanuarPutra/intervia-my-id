@@ -2081,6 +2081,11 @@ async fn main() -> anyhow::Result<()> {
     if let Err(error) = data_governance::sync_static_source_registry(&state.db).await {
         tracing::warn!("Governed data source registry sync failed: {:?}", error);
     }
+    match data_governance::bootstrap_persistent_imports(state.clone()).await {
+        Ok(count) if count > 0 => tracing::info!("queued {} validated persistent data bootstrap imports", count),
+        Ok(_) => tracing::debug!("no persistent data bootstrap imports needed"),
+        Err(error) => tracing::warn!("persistent data bootstrap failed: {:?}", error),
+    }
 
     let identity_projection_config = IdentityProjectionConfig::from_env();
     if identity_projection_config.enabled {
