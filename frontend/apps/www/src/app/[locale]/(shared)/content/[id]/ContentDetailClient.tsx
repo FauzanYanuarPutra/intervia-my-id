@@ -840,11 +840,13 @@ function resolveListingLikeCount(item: ContentItem | null): number {
 type ContentDetailClientProps = {
   contentId: string;
   initialItem: ContentItem;
+  ownerEditHref?: string;
 };
 
 export default function ContentDetailClient({
   contentId,
   initialItem,
+  ownerEditHref,
 }: ContentDetailClientProps) {
   const router = useRouter();
   const handleBack = useAppBack(router, '/explore');
@@ -4047,7 +4049,7 @@ export default function ContentDetailClient({
     <div className="grid w-full grid-cols-2 gap-2 lg:grid-cols-1 [&>*:only-child]:col-span-2 lg:[&>*:only-child]:col-span-1">
       {isOwner && (
         <Link
-          href={`/create?draft=${item.id}`}
+          href={ownerEditHref || `/create?draft=${encodeURIComponent(item.id)}`}
           className={detailPrimaryButtonClass}
         >
           <Pencil className="h-4 w-4" />
@@ -4696,7 +4698,7 @@ export default function ContentDetailClient({
               </div>
               {isOwner && !publicReference ? (
                 <Link
-                  href={`/create?draft=${encodeURIComponent(item.id)}`}
+                  href={ownerEditHref || `/create?draft=${encodeURIComponent(item.id)}`}
                   className="inline-flex items-center gap-1.5 rounded-full bg-emerald-700 px-3 py-2 font-bold text-white shadow-sm transition hover:bg-emerald-800"
                 >
                   <Pencil className="h-3.5 w-3.5" />
@@ -4766,7 +4768,7 @@ export default function ContentDetailClient({
                         </div>
                       </div>
                       <Link
-                        href={`/create?draft=${encodeURIComponent(item.id)}`}
+                        href={ownerEditHref || `/create?draft=${encodeURIComponent(item.id)}`}
                         className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-full bg-emerald-700 px-3.5 text-xs font-black text-white transition hover:bg-emerald-800"
                       >
                         <Pencil className="h-3.5 w-3.5" />
