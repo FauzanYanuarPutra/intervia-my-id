@@ -1893,8 +1893,8 @@ export function UmkmDiscoveryPanel({
           ? 'usaha'
           : 'businesses'
         : isId
-          ? 'titik'
-          : 'locations';
+          ? 'usaha'
+          : 'businesses';
   const resultHasMore =
     discoveryScope === 'references' ? canLoadMoreReferences : hasMore;
   const totalLabel =
