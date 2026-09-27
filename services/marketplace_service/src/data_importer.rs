@@ -49,6 +49,11 @@ fn base_url(api_url: &str) -> Option<&str> {
     api_url.split("/api/").next().filter(|v| !v.is_empty())
 }
 
+fn ckan_action_url(api_url: &str, action: &str) -> Option<String> {
+    let base = base_url(api_url)?;
+    Some(format!("{base}/api/3/action/{action}"))
+}
+
 async fn run_inner(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
     let job = sqlx::query_as::<_, (Uuid, Uuid, String, String)>(
         "UPDATE data_import_jobs SET status='running', started_at=NOW(), error_summary=NULL WHERE id=$1 AND status='queued' RETURNING id, source_id, mode, status"
@@ -73,16 +78,22 @@ async fn run_inner(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
     }
 
     let api_url = source.4.ok_or_else(|| anyhow!("source has no CKAN API"))?;
-    let base = base_url(&api_url).ok_or_else(|| anyhow!("invalid CKAN API URL"))?;
+    let package_url = ckan_action_url(&api_url, "package_show")
+        .ok_or_else(|| anyhow!("invalid CKAN API URL"))?;
 
-    let package: Value = state
-        .http_client
-        .get(&api_url)
-        .send()
-        .await?
-        .error_for_status()?
-        .json()
-        .await?;
+    let package_response = state.http_client.get(&package_url).send().await?;
+    let package_status = package_response.status();
+    let package_text = package_response.text().await?;
+    if !package_status.is_success() {
+        return Err(anyhow!(
+            "CKAN package_show failed status={} url={} body={}",
+            package_status,
+            package_url,
+            package_text.chars().take(1000).collect::<String>()
+        ));
+    }
+    let package: Value = serde_json::from_str(&package_text)
+        .map_err(|error| anyhow!("invalid CKAN package_show JSON: {error}"))?;
     let package = package.get("result").cloned().unwrap_or(package);
     let resources = package
         .get("resources")
@@ -121,18 +132,31 @@ async fn run_inner(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
 
         let mut offset = 0usize;
         loop {
-            let url = format!(
-                "{}/api/action/datastore_search?resource_id={}&limit=500&offset={}",
-                base, resource_id, offset
-            );
-            let payload: Value = state
+            let url = ckan_action_url(&api_url, "datastore_search")
+                .ok_or_else(|| anyhow!("invalid CKAN API URL"))?;
+            let response = state
                 .http_client
                 .get(&url)
+                .query(&[
+                    ("resource_id", resource_id),
+                    ("limit", "500"),
+                    ("offset", &offset.to_string()),
+                ])
                 .send()
-                .await?
-                .error_for_status()?
-                .json()
                 .await?;
+            let status = response.status();
+            let body = response.text().await?;
+            if !status.is_success() {
+                return Err(anyhow!(
+                    "CKAN datastore_search failed status={} resource_id={} url={} body={}",
+                    status,
+                    resource_id,
+                    url,
+                    body.chars().take(1000).collect::<String>()
+                ));
+            }
+            let payload: Value = serde_json::from_str(&body)
+                .map_err(|error| anyhow!("invalid CKAN datastore_search JSON: {error}"))?;
             let records = payload
                 .get("result")
                 .and_then(|v| v.get("records"))
