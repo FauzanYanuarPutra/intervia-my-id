@@ -177,7 +177,7 @@ jobs:
               },
           )
           out = Path("/tmp/generated-reference.sql")
-          module.write_sql(str(out), [sample], [])
+          module.write_sql(str(out), [sample], [], [])
           sql = out.read_text(encoding="utf-8")
           assert "INSERT INTO content_items" in sql
           assert "'osm_provider_reference'" in sql
