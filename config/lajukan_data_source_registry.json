@@ -213,6 +213,45 @@
       "license": "Creative Commons Attribution",
       "attribution": "Portal Satu Data Indonesia / Kabupaten Sleman",
       "notes": "CSV resource DataStore aktif; data agregat UMKM per sektor/kapanewon. Diimpor untuk Data Reference/Insight, bukan profil usaha individual."
+    },
+    {
+      "id": "data-tangsel-umkm-2022",
+      "provider": "Kota Tangerang Selatan",
+      "kind": "government_open_data",
+      "url": "https://data.tangerangselatankota.go.id/dataset/jumlah-umkm-menurut-kecamatan-di-kota-tangerang-selatan-tahun-2022",
+      "dataset_id": "17809e7c-aa43-4bbf-8a54-4dc937467d52",
+      "endpoint": "https://data.tangerangselatankota.go.id/api/action/package_show?id=17809e7c-aa43-4bbf-8a54-4dc937467d52",
+      "reuse_mode": "persistent_import",
+      "auto_publish_reference": false,
+      "license": "Creative Commons Attribution",
+      "attribution": "Diskominfo Kota Tangerang Selatan",
+      "notes": "Dataset agregat jumlah UMKM per kecamatan. Resource CSV/DataStore aktif; dipublikasikan sebagai Data Reference/Insight, bukan profil usaha individual."
+    },
+    {
+      "id": "data-sumbawa-umkm-2024-2025",
+      "provider": "Kabupaten Sumbawa",
+      "kind": "government_open_data",
+      "url": "https://satudata.sumbawakab.go.id/en/dataset/jumlah-umkm-berdasarkan-sektor-usaha-dan-skala-usaha",
+      "dataset_id": "fdb17473-4d84-4751-976f-a98b59f05d71",
+      "endpoint": "https://satudata.sumbawakab.go.id/api/action/package_show?id=fdb17473-4d84-4751-976f-a98b59f05d71",
+      "reuse_mode": "persistent_import",
+      "auto_publish_reference": false,
+      "license": "Creative Commons Attribution",
+      "attribution": "Diskominfotik Kabupaten Sumbawa",
+      "notes": "Dataset agregat UMKM berdasarkan sektor/skala usaha, data diperbarui 8 Juni 2026; resource CSV/DataStore aktif. Dipublikasikan sebagai Data Reference/Insight."
+    },
+    {
+      "id": "data-aceh-barat-umkm-johan-pahlawan-2025",
+      "provider": "Kabupaten Aceh Barat",
+      "kind": "government_open_data",
+      "url": "https://www.data.acehprov.go.id/dataset/jumlah-umkm-di-kecamatan-johan-pahlawan",
+      "dataset_id": "8da95dc6-2f48-4747-9a0f-e91007cd5753",
+      "endpoint": "https://www.data.acehprov.go.id/api/action/package_show?id=8da95dc6-2f48-4747-9a0f-e91007cd5753",
+      "reuse_mode": "persistent_import",
+      "auto_publish_reference": false,
+      "license": "Creative Commons Attribution",
+      "attribution": "Diskominsa Kabupaten Aceh Barat",
+      "notes": "Data jumlah UMKM Kecamatan Johan Pahlawan semester I 2025; resource CSV/DataStore aktif. Dipublikasikan sebagai Data Reference/Insight."
     }
   ]
 }
