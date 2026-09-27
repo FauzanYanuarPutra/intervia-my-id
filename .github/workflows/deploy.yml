@@ -492,7 +492,7 @@ jobs:
           for attempt in \$(seq 1 60); do
             bootstrap_status="\$(docker compose "\${compose[@]}" exec -T marketplace_service \
               curl --fail --silent --show-error --max-time 10 \
-              http://127.0.0.1:8080/v1/data/bootstrap-status || true)"
+              http://127.0.0.1:8081/v1/data/bootstrap-status || true)"
             printf 'bootstrap attempt=%s/60 %s\n' "\$attempt" "\$bootstrap_status"
             if printf '%s' "\$bootstrap_status" | grep -q '"status":"ready"'; then
               bootstrap_ready=1
