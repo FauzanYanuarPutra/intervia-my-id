@@ -123,6 +123,71 @@ jobs:
           }
           Write-Host "All PowerShell syntax and launcher contract checks passed."
 
+  real-data-bootstrap:
+    name: Real-data bootstrap validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: repository-hygiene
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Validate bootstrap scripts and generated SQL contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile scripts/import_real_marketplace_open_data.py
+          bash -n scripts/run_real_data_bootstrap.sh
+          python scripts/import_real_marketplace_open_data.py --summary-only >/tmp/real-data-plan.json
+          python - <<'PY'
+          import json
+          plan = json.load(open("/tmp/real-data-plan.json", encoding="utf-8"))
+          ids = set(plan["sources"])
+          assert "osm-overpass-indonesia-providers" in ids, plan
+          print("real-data source plan:", sorted(ids))
+          PY
+          python - <<'PY'
+          import importlib.util
+          from pathlib import Path
+          spec = importlib.util.spec_from_file_location(
+              "real_data_importer",
+              Path("scripts/import_real_marketplace_open_data.py"),
+          )
+          module = importlib.util.module_from_spec(spec)
+          assert spec.loader is not None
+          spec.loader.exec_module(module)
+          sample = module.ProviderStore(
+              source_id="osm-overpass-indonesia-providers",
+              source_record_id="osm:node:123",
+              name="Toko Maju",
+              slug="toko-maju-osm-node-123",
+              description="Referensi penyedia nyata.",
+              city="Bandung",
+              address="Jl. Contoh 1",
+              lat=-6.9175,
+              lng=107.6191,
+              segment="supplies",
+              search_text="toko maju bandung supplier bahan",
+              source_url="https://www.openstreetmap.org/node/123",
+              source_license="Open Database License 1.0",
+              metadata={
+                  "image_url": "https://upload.wikimedia.org/example.jpg",
+                  "marketplace_category_slug": "materials-suppliers",
+              },
+          )
+          out = Path("/tmp/generated-reference.sql")
+          module.write_sql(str(out), [sample], [])
+          sql = out.read_text(encoding="utf-8")
+          assert "INSERT INTO content_items" in sql
+          assert "'osm_provider_reference'" in sql
+          assert "'claimable', true" in sql
+          assert "'market_side', 'reference'" in sql
+          assert "owner_id = NULL" in sql
+          assert "INSERT INTO users_read_model" not in sql
+          print("real-data SQL generation contract passed")
+          PY
+
   frontend:
     name: Frontend
     runs-on: ubuntu-latest
