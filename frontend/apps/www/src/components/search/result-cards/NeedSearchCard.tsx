@@ -161,7 +161,6 @@ export function NeedSearchCard({
   const visibleFactItems = factItems.slice(0, 3);
   const statusLabel = requestStatusLabel(item, locale);
   const sideStatusLabel = `${getListingSideVerbLabel('demand', locale)} - ${statusLabel}`;
-  const actorLabel = getListingSideActorLabel('demand', locale).toLowerCase();
   const action = getExploreResultAction('needs', locale);
 
   const imageCandidates = [
@@ -223,8 +222,7 @@ export function NeedSearchCard({
           <SearchCardEyebrow
             icon={Clock3}
             label={
-              item.label ||
-              (locale === 'id' ? `Kebutuhan ${actorLabel}` : 'Buyer need')
+              getListingSideVerbLabel('demand', locale)
             }
             tone="blue"
             sideLabel={sideStatusLabel}
