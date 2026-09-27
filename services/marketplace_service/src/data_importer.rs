@@ -974,7 +974,7 @@ pub async fn run(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
                    FROM data_import_jobs j
                    WHERE j.id=$1
                      AND s.id=j.source_id
-                     AND j.status IN ('succeeded','partial')"#,
+                     AND j.status = 'succeeded'"#,
             )
             .bind(job_id)
             .execute(&state.db)
