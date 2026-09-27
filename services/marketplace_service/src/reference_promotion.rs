@@ -485,9 +485,17 @@ async fn promote_candidate(db: &PgPool, candidate_id: Uuid) -> AnyhowResult<Valu
     let cuisine = raw_string(&raw_metadata, &["cuisine", "kuliner"]);
     let brand = raw_string(&raw_metadata, &["brand", "merek"]);
     let operator = raw_string(&raw_metadata, &["operator", "pengelola"]);
-    let osm_primary_key = ["shop", "amenity", "craft", "tourism", "healthcare", "leisure", "office"]
-        .iter()
-        .find_map(|key| raw_string(&raw_metadata, &[*key]).map(|value| ((*key).to_string(), value)));
+    let osm_primary_key = [
+        "shop",
+        "amenity",
+        "craft",
+        "tourism",
+        "healthcare",
+        "leisure",
+        "office",
+    ]
+    .iter()
+    .find_map(|key| raw_string(&raw_metadata, &[*key]).map(|value| ((*key).to_string(), value)));
     let (osm_type, osm_id) = osm_identity(&source_key, &source_record_id);
     let wikidata = raw_string(&raw_metadata, &["wikidata"]);
     let wikimedia_commons = raw_string(&raw_metadata, &["wikimedia_commons"]);
