@@ -179,7 +179,7 @@ async fn promote_candidate(
           r.source_record_id, r.source_url, r.license_snapshot, r.attribution_snapshot,
           r.record_kind,
           s.source_key, s.provider_name, s.source_url, s.license_name, s.license_url,
-          s.attribution_text, s.reuse_mode, s.storage_allowed
+          s.attribution_text, s.reuse_mode, s.storage_allowed, s.enabled
         FROM reference_promotion_candidates c
         JOIN data_import_entities e ON e.id = c.entity_id
         LEFT JOIN data_import_records r
@@ -232,11 +232,12 @@ async fn promote_candidate(
     if canonical_record_id.is_none() || source_record_id.is_none() {
         return Err(anyhow!("canonical imported record is required"));
     }
-    if reuse_mode != "persistent_import" || !storage_allowed {
-        return Err(anyhow!("source is not currently approved for persistent promotion"));
+    if reuse_mode != "persistent_import" || !storage_allowed || !source_enabled {
+        return Err(anyhow!("source is not currently enabled/approved for persistent promotion"));
     }
 
-    let source_record_id = source_record_id.expect("checked above");
+    let source_record_id = source_record_id.ok_or_else(|| anyhow!("canonical imported record is required"))?;
+    let canonical_record_id = canonical_record_id.ok_or_else(|| anyhow!("canonical imported record is required"))?;
     let effective_license = record_license.or(source_license.clone());
     if effective_license.as_deref().is_none_or(|v| v.trim().is_empty()) {
         return Err(anyhow!("source license is missing"));
@@ -355,7 +356,7 @@ async fn promote_candidate(
         WHERE id=$1
         "#
     )
-    .bind(canonical_record_id.expect("checked above"))
+    .bind(canonical_record_id)
     .bind(content_id)
     .execute(&mut *tx)
     .await?;
@@ -511,7 +512,7 @@ async fn promote(
             } else if message.contains("must be approved")
                 || message.contains("below promotion")
                 || message.contains("requires review")
-                || message.contains("not currently approved")
+                || message.contains("not currently enabled/approved")
                 || message.contains("license is missing")
                 || message.contains("canonical imported record")
             {
