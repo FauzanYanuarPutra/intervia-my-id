@@ -409,6 +409,23 @@ function isArchivedManagementStatus(value: string): boolean {
   return ['archived', 'deleted'].includes(normalizeManagementStatus(value));
 }
 
+function isEditorialNewsItem(item: ListingItem): boolean {
+  const metadata = readRecord(item.metadata) || {};
+  const newsMetadata = readRecord(metadata.news);
+  if (newsMetadata && Object.keys(newsMetadata).length > 0) return true;
+
+  const rawType = [item.type, item.content_type]
+    .map(value => readString(value))
+    .join(' ')
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
+
+  return rawType.split(/[^a-z0-9_]+/).some(token =>
+    ['news', 'article', 'guide'].includes(token),
+  );
+}
+
+
 function listingStatusLabel(value: string, locale: string): string {
   const normalized = normalizeManagementStatus(value);
   if (['active', 'published', 'live'].includes(normalized)) {
@@ -1073,10 +1090,9 @@ export default function MyListingsPage() {
                           ? 'archived'
                           : 'draft';
                     const itemStatus = listingStatusLabel(rawStatus, locale);
-                    const editHref =
-                      String(rawType).toLowerCase() === 'news'
-                        ? `/news/submissions?edit=${encodeURIComponent(id)}`
-                        : `/create?draft=${encodeURIComponent(id)}`;
+                    const editHref = isEditorialNewsItem(item)
+                      ? `/news/submissions?edit=${encodeURIComponent(id)}`
+                      : `/create?draft=${encodeURIComponent(id)}`;
                     const progress = readProgress(item);
                     const imageUrl = resolveListingImage(item);
                     const imageStyle = imageUrl
