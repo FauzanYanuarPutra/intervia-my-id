@@ -10489,10 +10489,77 @@ async fn list_map_references(
             'gallery_images', metadata->'gallery_images'
           )) AS metadata,
           updated_at
-        FROM content_items
-        WHERE content_status = 'active'
-          AND content_status = 'active'
-          AND metadata->>'reference_publication_status' = 'published'
+        FROM (
+          SELECT
+            id,
+            slug,
+            title,
+            summary,
+            cover_image,
+            metadata,
+            updated_at
+          FROM content_items
+          WHERE content_status = 'active'
+            AND metadata->>'reference_publication_status' = 'published'
+
+          UNION ALL
+
+          SELECT
+            s.id,
+            s.slug,
+            s.name AS title,
+            s.description AS summary,
+            COALESCE(
+              s.metadata->>'cover_image',
+              s.metadata->>'cover_image_url',
+              s.metadata->>'image_url'
+            ) AS cover_image,
+            jsonb_strip_nulls(jsonb_build_object(
+              'record_kind', s.metadata->'record_kind',
+              'marketplace_category_slug', s.metadata->'marketplace_category_slug',
+              'marketplace_subcategory_slug', s.metadata->'marketplace_subcategory_slug',
+              'category', s.metadata->'category',
+              'category_label', s.metadata->'category_label',
+              'city', s.city,
+              'location', s.address,
+              'address', s.address,
+              'latitude', public.lajukan_safe_map_coordinate(s.lat::text),
+              'longitude', public.lajukan_safe_map_coordinate(s.lng::text),
+              'external_id', s.metadata->'source_record_id',
+              'source_dataset', s.metadata->'source_id',
+              'source_url', s.metadata->'source_url',
+              'source_title', s.name,
+              'source_license', s.metadata->'source_license',
+              'source_license_url', s.metadata->'source_license_url',
+              'source_attribution', s.metadata->'attribution',
+              'image_attribution', s.metadata->'attribution',
+              'image_source_provider', s.metadata->'source_id',
+              'image_url', s.metadata->'image_url',
+              'gallery_images', s.metadata->'gallery_images',
+              'search_text', s.metadata->'search_text',
+              'brand', s.metadata->'brand',
+              'operator', s.metadata->'operator',
+              'osm_tags', s.metadata->'osm_tags',
+              'claimable', true,
+              'reference_subtype', 'place_reference',
+              'market_side', 'reference',
+              'is_transactional', false,
+              'trust_note', 'Referensi tempat/usaha dari sumber publik; belum diklaim dan bukan verifikasi kepemilikan.'
+            )) AS metadata,
+            s.updated_at
+          FROM umkm_stores s
+          WHERE s.is_active = TRUE
+            AND lower(COALESCE(s.metadata->>'is_transactional', 'true')) = 'false'
+            AND lower(COALESCE(s.metadata->>'record_kind', '')) LIKE '%reference%'
+            AND NULLIF(btrim(COALESCE(s.metadata->>'source_url', '')), '') IS NOT NULL
+            AND NULLIF(btrim(COALESCE(s.metadata->>'source_license', '')), '') IS NOT NULL
+            AND s.lat BETWEEN -90.0 AND 90.0
+            AND s.lng BETWEEN -180.0 AND 180.0
+        ) reference_rows
+        WHERE (
+            metadata->>'reference_publication_status' = 'published'
+            OR metadata->>'reference_subtype' = 'place_reference'
+          )
           AND (
             metadata->>'claimable' = 'true'
             OR metadata->>'reference_subtype' = 'place_reference'
