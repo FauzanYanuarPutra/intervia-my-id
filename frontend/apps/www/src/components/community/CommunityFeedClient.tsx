@@ -2817,28 +2817,20 @@ export function CommunityPostCard({
               {item.author.name}
             </button>
 
-            <div className="!mt-1 !flex !min-w-0 !w-full !items-center !gap-x-1.5 !gap-y-0.5 text-[11px] leading-4 text-[color:var(--app-text-soft)] sm:!mt-1 sm:text-xs">
-              {item.group ? (
-                <Link
-                  href={communityGroupHref(item.group)}
-                  className="min-w-0 flex-1 truncate font-semibold hover:text-[color:var(--app-accent)]"
-                  onClick={event => event.stopPropagation()}
-                >
-                  {item.group.name}
-                </Link>
-              ) : (
-                <span className="min-w-0 flex-1 truncate font-semibold">
-                  {item.communityName}
-                </span>
-              )}
+            <div className="!mt-0.5 !flex !min-w-0 !w-full !items-center !gap-x-1.5 text-[11px] !leading-[14px] text-[color:var(--app-text-soft)] sm:text-xs sm:!leading-4">
+              <Link
+                href={item.group ? communityGroupHref(item.group) : '/community'}
+                className="!m-0 !min-w-0 !flex-1 !truncate !p-0 font-semibold !leading-[14px] hover:text-[color:var(--app-accent)] sm:!leading-4"
+                onClick={event => event.stopPropagation()}
+              >
+                {item.group?.name || item.communityName}
+              </Link>
             </div>
-            <div className='!mt-0.5 !flex !min-w-0 !w-full !items-center !gap-x-1.5 text-[11px] leading-4 text-[color:var(--app-text-soft)] sm:!mt-0.5 sm:text-xs'>
+            <div className="!mt-0 !flex !min-w-0 !w-full !items-center !gap-x-1.5 text-[11px] !leading-[14px] text-[color:var(--app-text-soft)] sm:text-xs sm:!leading-4">
               <span aria-hidden="true" className="shrink-0">·</span>
-
-              <span className="shrink-0 whitespace-nowrap">
+              <span className="!m-0 shrink-0 whitespace-nowrap !p-0 !leading-[14px] sm:!leading-4">
                 {timeAgo(item.createdAt, isId)}
               </span>
-
               <Earth
                 className="h-3.5 w-3.5 shrink-0"
                 aria-hidden="true"
