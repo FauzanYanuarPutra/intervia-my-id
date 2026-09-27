@@ -506,11 +506,6 @@ async fn run_inner(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
         }
     }
 
-        if discovered >= 100_000 {
-            break;
-        }
-    }
-
     let status = if errors > 0 && accepted > 0 {
         "partial"
     } else if errors > 0 {
