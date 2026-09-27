@@ -1092,6 +1092,22 @@ async fn create_import_job(
 
 
 
+pub async fn recover_stale_import_jobs(db: &PgPool) -> Result<u64, sqlx::Error> {
+    let result = sqlx::query(
+        r#"UPDATE data_import_jobs
+            SET status='failed',
+                finished_at=NOW(),
+                error_count=error_count+1,
+                error_summary=COALESCE(error_summary || '; ', '') || 'recovered stale running job after service restart'
+            WHERE status='running'
+              AND started_at IS NOT NULL
+              AND started_at < NOW() - INTERVAL '2 hours'"#
+    )
+    .execute(db)
+    .await?;
+    Ok(result.rows_affected())
+}
+
 pub async fn bootstrap_persistent_imports(state: Arc<AppState>) -> Result<u64, sqlx::Error> {
     let db = &state.db;
     let sources = sqlx::query_as::<_, (Uuid, String, Option<String>, i32)>(
