@@ -1608,12 +1608,30 @@ async fn create_import_job(
     }
 }
 
-fn license_allows_persistent_import(license: &str) -> bool {
-    let normalized = license.trim().to_ascii_lowercase();
+pub(crate) fn license_allows_persistent_import(license: &str) -> bool {
+    let normalized = license
+        .trim()
+        .to_ascii_lowercase()
+        .replace('_', "-")
+        .replace(' ', " ");
+
+    if normalized.contains("noncommercial")
+        || normalized.contains("non-commercial")
+        || normalized.contains("cc by-nc")
+        || normalized.contains("cc-by-nc")
+        || normalized.contains("no derivatives")
+        || normalized.contains("no-derivatives")
+        || normalized.contains("cc by-nd")
+        || normalized.contains("cc-by-nd")
+    {
+        return false;
+    }
+
     [
         "creative commons attribution",
         "creative commons by",
         "cc by",
+        "cc-by",
         "cc0",
         "public domain",
         "open data commons attribution",
@@ -2232,7 +2250,11 @@ mod tests {
             "Creative Commons Attribution 4.0 International"
         ));
         assert!(license_allows_persistent_import("CC BY 4.0"));
+        assert!(license_allows_persistent_import("CC BY-SA 4.0"));
         assert!(license_allows_persistent_import("CC0 1.0"));
+        assert!(!license_allows_persistent_import("CC BY-NC 4.0"));
+        assert!(!license_allows_persistent_import("CC BY-NC-SA 4.0"));
+        assert!(!license_allows_persistent_import("CC BY-ND 4.0"));
         assert!(!license_allows_persistent_import("All rights reserved"));
         assert!(!license_allows_persistent_import("License not specified"));
     }
