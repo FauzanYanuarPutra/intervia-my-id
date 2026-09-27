@@ -32,7 +32,7 @@ MARKETPLACE_SQL="$TMP_DIR/marketplace.sql"
 COMMUNITY_SQL="$TMP_DIR/community.sql"
 
 echo "[real-data] crawling approved public/open sources..."
-python /workspace/scripts/import_real_marketplace_open_data.py --out "$MARKETPLACE_SQL" --community-out "$COMMUNITY_SQL" --max-providers "$MAX_PROVIDERS" --max-buyers "$MAX_BUYERS" --max-community-media "$MAX_MEDIA" --sleep "$SLEEP_SECONDS" --allow-image-less-records
+python /workspace/scripts/import_real_marketplace_open_data.py --out "$MARKETPLACE_SQL" --community-out "$COMMUNITY_SQL" --max-providers "$MAX_PROVIDERS" --max-buyers "$MAX_BUYERS" --max-community-media "$MAX_MEDIA" --sleep "$SLEEP_SECONDS" --allow-image-less-records --strict
 
 echo "[real-data] applying marketplace data..."
 if [ -s "$MARKETPLACE_SQL" ]; then psql "$MARKETPLACE_DATABASE_URL" -v ON_ERROR_STOP=1 -f "$MARKETPLACE_SQL"; fi
