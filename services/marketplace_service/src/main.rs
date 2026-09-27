@@ -23146,6 +23146,476 @@ async fn find_transaction_for_user(
     .await
 }
 
+
+          AND length(btrim(COALESCE(metadata->>'source_license', ''))) BETWEEN 2 AND 500
+          AND public.lajukan_safe_map_coordinate(metadata->>'latitude') BETWEEN -90.0 AND 90.0
+          AND public.lajukan_safe_map_coordinate(metadata->>'longitude') BETWEEN -180.0 AND 180.0
+        "#,
+    );
+
+    if let Some(value) = text_query.as_deref() {
+        statement
+            .push(
+                r#"
+                AND lower(
+                  COALESCE(title, '') || ' ' ||
+                  COALESCE(summary, '') || ' ' ||
+                  COALESCE(slug, '') || ' ' ||
+                  COALESCE(metadata->>'search_text', '') || ' ' ||
+                  COALESCE(metadata->>'city', '') || ' ' ||
+                  COALESCE(metadata->>'location', '') || ' ' ||
+                  COALESCE(metadata->>'address', '') || ' ' ||
+                  COALESCE(metadata->>'brand', '') || ' ' ||
+                  COALESCE(metadata->>'operator', '') || ' ' ||
+                  COALESCE(metadata->>'source_description', '') || ' ' ||
+                  COALESCE(metadata->>'marketplace_category_slug', '') || ' ' ||
+                  COALESCE(metadata->>'marketplace_subcategory_slug', '') || ' ' ||
+                  COALESCE(metadata->>'osm_primary_key', '') || ' ' ||
+                  COALESCE(metadata->>'osm_primary_value', '')
+                ) LIKE
+                "#,
+            )
+            .push_bind(format!("%{}%", escape_like_literal(&value.to_lowercase())))
+            .push(" ESCAPE '\\'");
+    }
+
+    if let Some(value) = city.as_deref() {
+        statement
+            .push(" AND lower(COALESCE(metadata->>'city', '')) LIKE ")
+            .push_bind(format!("%{}%", escape_like_literal(&value.to_lowercase())))
+            .push(" ESCAPE '\\'");
+    }
+
+    if let Some((min_lat, max_lat, min_lng, max_lng)) = bounds {
+        statement
+            .push(
+                r#"
+                AND point(
+                  public.lajukan_safe_map_coordinate(metadata->>'longitude'),
+                  public.lajukan_safe_map_coordinate(metadata->>'latitude')
+                ) <@ box(point(
+                "#,
+            )
+            .push_bind(min_lng)
+            .push(", ")
+            .push_bind(min_lat)
+            .push("), point(")
+            .push_bind(max_lng)
+            .push(", ")
+            .push_bind(max_lat)
+            .push("))");
+    }
+
+    if let Some((cursor_updated_at, cursor_id)) = cursor {
+        statement
+            .push(" AND (updated_at < ")
+            .push_bind(cursor_updated_at)
+            .push(" OR (updated_at = ")
+            .push_bind(cursor_updated_at)
+            .push(" AND id > ")
+            .push_bind(cursor_id)
+            .push("))");
+    }
+
+    statement.push(" ORDER BY ");
+    if let Some((viewer_lat, viewer_lng)) = ranking_origin {
+        statement
+            .push(
+                r#"
+                point(
+                  public.lajukan_safe_map_coordinate(metadata->>'longitude'),
+                  public.lajukan_safe_map_coordinate(metadata->>'latitude')
+                ) <-> point(
+                "#,
+            )
+            .push_bind(viewer_lng)
+            .push(", ")
+            .push_bind(viewer_lat)
+            .push(") ASC");
+    } else {
+        if let Some(value) = text_query.as_deref() {
+            statement
+                .push("CASE WHEN lower(title) LIKE ")
+                .push_bind(format!("{}%", escape_like_literal(&value.to_lowercase())))
+                .push(" ESCAPE '\\' THEN 0 ELSE 1 END ASC, ");
+        }
+        statement.push("updated_at DESC, id ASC");
+    }
+    statement.push(" LIMIT ").push_bind(limit + 1);
+
+    let rows = statement
+        .build_query_as::<MapReferenceRow>()
+        .fetch_all(&state.db)
+        .await;
+
+    match rows {
+        Ok(mut items) => {
+            let has_more = items.len() as i64 > limit;
+            if has_more {
+                items.truncate(limit as usize);
+            }
+            let next_cursor = if has_more && ranking_origin.is_none() && text_query.is_none() {
+                items
+                    .last()
+                    .map(|item| encode_map_reference_cursor(item.updated_at, item.id))
+            } else {
+                None
+            };
+            (
+                StatusCode::OK,
+                Json(ListMapReferencesResponse {
+                    items,
+                    limit,
+                    has_more,
+                    next_cursor,
+                }),
+            )
+                .into_response()
+        }
+        Err(error) => {
+            tracing::error!("list_map_references error: {:?}", error);
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load map references",
+            )
+            .into_response()
+        }
+    }
+}
+
+async fn list_content(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<ListContentQuery>,
+) -> impl IntoResponse {
+    let limit = query.limit.unwrap_or(20).clamp(1, 100);
+    let offset = match resolve_public_content_offset(query.offset) {
+        Ok(offset) => offset,
+        Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
+    };
+    let typ = normalize_content_type(query.r#type);
+    let marketplace_category = clean_text(query.category).map(|s| make_slug(&s));
+    let marketplace_subcategory = clean_text(query.subcategory).map(|s| make_slug(&s));
+    let industry_filter = clean_text(query.industries).and_then(|raw| {
+        let values: Vec<String> = raw
+            .split(',')
+            .map(make_slug)
+            .filter(|value| !value.is_empty())
+            .collect();
+        if values.is_empty() {
+            None
+        } else {
+            Some(values)
+        }
+    });
+    let min_price = query.min_price.filter(|value| *value >= 0);
+    let max_price = query.max_price.filter(|value| *value >= 0);
+    let side = match normalize_listing_side_filter(query.side) {
+        Ok(side) => side,
+        Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
+    };
+    let q = clean_text(query.q);
+    let location = clean_text(query.location);
+    let level = clean_text(query.level);
+    let sector = clean_text(query.sector).map(|s| s.to_lowercase());
+    let sub_sector = clean_text(query.sub_sector).map(|s| s.to_lowercase());
+    let status = match resolve_content_list_status(query.status) {
+        Ok(status) => status,
+        Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
+    };
+    let owner_id = query.owner_id;
+    let claims = auth_claims_from_headers(&headers, &state.jwt_secret);
+    let actor_user_id = claims
+        .as_ref()
+        .and_then(|claims| Uuid::parse_str(&claims.sub).ok());
+    let privileged = claims
+        .as_ref()
+        .is_some_and(|claims| has_cms_access(claims) || has_agent_access(claims));
+    if !can_list_content_status(&status, owner_id, actor_user_id, privileged) {
+        return err(
+            StatusCode::FORBIDDEN,
+            "content status is not publicly accessible",
+        )
+        .into_response();
+    }
+
+    let rows = sqlx::query_as::<_, ContentRow>(
+        r###"
+        SELECT
+            id, owner_id, content_type, slug, title, summary, body, price_cents, price_unit,
+            currency, tags, cover_image, category, content_status, pricing_mode, original_price_cents,
+            seller_type, minimum_order, promo_label, promo_start_at, promo_end_at, rating, review_count,
+            COALESCE((
+                SELECT COUNT(*)::bigint
+                FROM content_item_likes cil
+                WHERE cil.content_id = content_items.id
+            ), 0) AS like_count,
+            metadata, created_at, updated_at
+        FROM content_items
+        WHERE content_status <> 'deleted'
+          AND ($1::text IS NULL OR content_type = $1)
+          AND (
+              $2::text IS NULL
+              OR (
+                $14::text = 'reference'
+                AND lower(
+                  coalesce(title, '') || ' ' ||
+                  coalesce(summary, '') || ' ' ||
+                  coalesce(body, '') || ' ' ||
+                  coalesce(slug, '') || ' ' ||
+                  coalesce(metadata->>'search_text', '') || ' ' ||
+                  coalesce(metadata->>'location', '') || ' ' ||
+                  coalesce(metadata->>'city', '') || ' ' ||
+                  coalesce(metadata->>'address', '') || ' ' ||
+                  coalesce(metadata->>'brand', '') || ' ' ||
+                  coalesce(metadata->>'operator', '') || ' ' ||
+                  coalesce(metadata->>'source_description', '') || ' ' ||
+                  coalesce(metadata->>'marketplace_category_slug', '') || ' ' ||
+                  coalesce(metadata->>'marketplace_subcategory_slug', '')
+                ) LIKE ('%' || lower($2) || '%')
+              )
+              OR (
+                $14::text IS DISTINCT FROM 'reference'
+                AND (
+                  title ILIKE ('%' || $2 || '%') OR
+                  coalesce(summary, '') ILIKE ('%' || $2 || '%') OR
+                  body ILIKE ('%' || $2 || '%') OR
+                  coalesce(slug, '') ILIKE ('%' || $2 || '%') OR
+                  coalesce(array_to_string(tags, ' '), '') ILIKE ('%' || $2 || '%') OR
+                  coalesce(metadata->>'search_text', '') ILIKE ('%' || $2 || '%') OR
+                  coalesce(metadata->>'location', '') ILIKE ('%' || $2 || '%') OR
+                  coalesce(metadata->>'city', '') ILIKE ('%' || $2 || '%') OR
+                  coalesce(metadata->>'address', '') ILIKE ('%' || $2 || '%') OR
+                  coalesce(metadata->>'sector', '') ILIKE ('%' || $2 || '%') OR
+                  coalesce(metadata->>'sub_sector', '') ILIKE ('%' || $2 || '%') OR
+                  coalesce(metadata->>'brand', '') ILIKE ('%' || $2 || '%') OR
+                  coalesce(metadata->>'company', '') ILIKE ('%' || $2 || '%') OR
+                  coalesce(metadata->>'company_name', '') ILIKE ('%' || $2 || '%') OR
+                  coalesce(content_items.seller_type, '') ILIKE ('%' || $2 || '%') OR
+                  coalesce(metadata->>'seller_type', '') ILIKE ('%' || $2 || '%') OR
+                  coalesce(content_items.minimum_order, '') ILIKE ('%' || $2 || '%') OR
+                  coalesce(metadata->>'minimum_order', '') ILIKE ('%' || $2 || '%') OR
+                  coalesce(metadata->>'service_scope', '') ILIKE ('%' || $2 || '%') OR
+                  coalesce(metadata->>'skills', '') ILIKE ('%' || $2 || '%') OR
+                  coalesce(metadata->>'profession', '') ILIKE ('%' || $2 || '%') OR
+                  coalesce(metadata->>'property_type', '') ILIKE ('%' || $2 || '%') OR
+                  coalesce(metadata->>'work_mode', '') ILIKE ('%' || $2 || '%')
+                )
+              )
+          )
+          AND (
+              $3::text IS NULL OR
+              coalesce(metadata->>'location', '') ILIKE ('%' || $3 || '%') OR
+              coalesce(metadata->>'city', '') ILIKE ('%' || $3 || '%')
+          )
+          AND (
+              $4::text IS NULL OR
+              coalesce(metadata->>'level', '') ILIKE ('%' || $4 || '%') OR
+              coalesce(metadata->>'seniority', '') ILIKE ('%' || $4 || '%')
+          )
+          AND (
+              $5::text IS NULL OR
+              regexp_replace(lower(coalesce(metadata->>'sector', '')), '[^a-z0-9]+', '', 'g') =
+                regexp_replace(lower($5), '[^a-z0-9]+', '', 'g') OR
+              coalesce(metadata->>'sector', '') ILIKE ('%' || $5 || '%')
+          )
+          AND (
+              $6::text IS NULL OR
+              regexp_replace(lower(coalesce(metadata->>'sub_sector', '')), '[^a-z0-9]+', '', 'g') =
+                regexp_replace(lower($6), '[^a-z0-9]+', '', 'g') OR
+              coalesce(metadata->>'sub_sector', '') ILIKE ('%' || $6 || '%')
+          )
+          AND lower(content_status) = $7
+          AND (
+              $8::uuid IS NULL OR owner_id = $8
+          )
+          AND (
+              $9::text IS NULL OR
+              EXISTS (
+                SELECT 1
+                FROM marketplace_categories mc
+                WHERE mc.id = content_items.marketplace_category_id
+                  AND (mc.slug = $9 OR mc.legacy_key = $9 OR mc.metadata->'aliases' ? $9)
+              ) OR
+              coalesce(metadata->>'marketplace_category_slug', '') = $9 OR
+              coalesce(metadata->>'create_category', '') = $9
+          )
+          AND (
+              $10::text IS NULL OR
+              EXISTS (
+                SELECT 1
+                FROM marketplace_subcategories ms
+                WHERE ms.id = content_items.marketplace_subcategory_id
+                  AND ms.slug = $10
+              ) OR
+              coalesce(metadata->>'marketplace_subcategory_slug', '') = $10 OR
+              coalesce(metadata->>'sub_category', '') = $10 OR
+              coalesce(metadata->>'subcategory', '') = $10
+          )
+          AND (
+              $11::text[] IS NULL OR
+              EXISTS (
+                SELECT 1
+                FROM listing_industries li
+                JOIN industries i ON i.id = li.industry_id
+                WHERE li.content_id = content_items.id
+                  AND i.slug = ANY($11)
+              ) OR
+              coalesce(metadata->>'industry_slug', '') = ANY($11) OR
+              coalesce(metadata->>'sector', '') = ANY($11)
+          )
+          AND ($12::bigint IS NULL OR price_cents >= $12)
+          AND ($13::bigint IS NULL OR price_cents <= $13)
+          AND (
+              NOT COALESCE($15::bool, FALSE)
+              OR content_type IN (
+                  'product', 'service', 'job', 'property', 'auction', 'tender',
+                  'material', 'tool_rental', 'business_transfer', 'request'
+              )
+          )
+          AND (
+              $14::text IS NULL OR
+              (
+                CASE
+                  WHEN lower(btrim(coalesce(metadata->>'market_side', ''))) = 'reference'
+                    AND coalesce(metadata->>'is_transactional', 'true') = 'false'
+                    AND lower(coalesce(metadata->>'record_kind', '')) LIKE '%reference%'
+                    THEN 'reference'
+                  WHEN regexp_replace(lower(btrim(coalesce(metadata->>'market_side', ''))), '[_-]+', ' ', 'g')
+                    IN ('demand', 'need', 'needs', 'needed', 'request', 'requested', 'wanted', 'looking', 'seeker', 'buyer request', 'buy request', 'pencari', 'mencari', 'dibutuhkan', 'butuh', 'minta')
+                    THEN 'demand'
+                  WHEN regexp_replace(lower(btrim(coalesce(metadata->>'market_side', ''))), '[_-]+', ' ', 'g')
+                    IN ('supply', 'offer', 'offering', 'available', 'provider', 'seller', 'sell', 'penyedia', 'menawarkan', 'menyediakan', 'tersedia')
+                    THEN 'supply'
+                  WHEN regexp_replace(lower(btrim(coalesce(metadata->>'listing_side', ''))), '[_-]+', ' ', 'g')
+                    IN ('demand', 'need', 'needs', 'needed', 'request', 'requested', 'wanted', 'looking', 'seeker', 'buyer request', 'buy request', 'pencari', 'mencari', 'dibutuhkan', 'butuh', 'minta')
+                    THEN 'demand'
+                  WHEN regexp_replace(lower(btrim(coalesce(metadata->>'listing_side', ''))), '[_-]+', ' ', 'g')
+                    IN ('supply', 'offer', 'offering', 'available', 'provider', 'seller', 'sell', 'penyedia', 'menawarkan', 'menyediakan', 'tersedia')
+                    THEN 'supply'
+                  WHEN btrim(coalesce(metadata->>'market_side', '')) = ''
+                    AND btrim(coalesce(metadata->>'listing_side', '')) = ''
+                    THEN 'supply'
+                  ELSE NULL
+                END
+              ) = $14
+          )
+        ORDER BY
+          CASE
+            WHEN $14::text IS NULL
+              AND coalesce(metadata->>'is_transactional', 'true') = 'false'
+              AND lower(coalesce(metadata->>'record_kind', '')) LIKE '%reference%'
+              THEN 1
+            ELSE 0
+          END ASC,
+          CASE
+            WHEN $14::text = 'reference'
+              AND $2::text IS NULL
+              AND coalesce(metadata->>'media_storage', '') = 'minio'
+              THEN 0
+            WHEN $14::text = 'reference' AND $2::text IS NULL
+              THEN 1
+            ELSE 0
+          END ASC,
+          CASE WHEN $2::text IS NULL THEN 0 ELSE
+            (CASE WHEN title ILIKE ($2 || '%') THEN 80 ELSE 0 END) +
+            (CASE WHEN title ILIKE ('%' || $2 || '%') THEN 48 ELSE 0 END) +
+            (CASE WHEN coalesce(array_to_string(tags, ' '), '') ILIKE ('%' || $2 || '%') THEN 26 ELSE 0 END) +
+            (CASE WHEN coalesce(summary, '') ILIKE ('%' || $2 || '%') THEN 18 ELSE 0 END) +
+            (CASE WHEN coalesce(metadata->>'city', '') ILIKE ('%' || $2 || '%') THEN 14 ELSE 0 END) +
+            (CASE WHEN coalesce(metadata->>'sector', '') ILIKE ('%' || $2 || '%') THEN 12 ELSE 0 END) +
+            (CASE WHEN coalesce(metadata->>'sub_sector', '') ILIKE ('%' || $2 || '%') THEN 12 ELSE 0 END) +
+            (CASE WHEN coalesce(metadata->>'search_text', '') ILIKE ('%' || $2 || '%') THEN 10 ELSE 0 END)
+          END DESC,
+          updated_at DESC,
+          created_at DESC,
+          id ASC
+        LIMIT $16 OFFSET $17
+        "###,
+    )
+    .bind(typ)
+    .bind(q)
+    .bind(location)
+    .bind(level)
+    .bind(sector)
+    .bind(sub_sector)
+    .bind(status)
+    .bind(owner_id)
+    .bind(marketplace_category)
+    .bind(marketplace_subcategory)
+    .bind(industry_filter)
+    .bind(min_price)
+    .bind(max_price)
+    .bind(side)
+    .bind(query.marketplace_only)
+    .bind(limit + 1)
+    .bind(offset)
+    .fetch_all(&state.db)
+    .await;
+
+    match rows {
+        Ok(mut rows) => {
+            let has_more = rows.len() as i64 > limit;
+            if has_more {
+                rows.truncate(limit as usize);
+            }
+
+            let owner_ids: Vec<Uuid> = {
+                let mut seen = HashSet::new();
+                rows.iter()
+                    .filter_map(|row| {
+                        if is_public_reference_response_metadata(&row.metadata) {
+                            return None;
+                        }
+                        if seen.insert(row.owner_id) {
+                            Some(row.owner_id)
+                        } else {
+                            None
+                        }
+                    })
+                    .collect()
+            };
+
+            let stats_map = match fetch_seller_stats(&state.db, &owner_ids).await {
+                Ok(map) => map,
+                Err(e) => {
+                    tracing::error!("list_content seller_stats error: {:?}", e);
+                    HashMap::new()
+                }
+            };
+            let liked_ids = match fetch_liked_content_ids(&state.db, actor_user_id, &rows).await {
+                Ok(ids) => ids,
+                Err(e) => {
+                    tracing::error!("list_content liked state error: {:?}", e);
+                    HashSet::new()
+                }
+            };
+
+            (
+                StatusCode::OK,
+                Json(ListContentResponse {
+                    items: rows
+                        .into_iter()
+                        .map(|row| {
+                            let liked = liked_ids.contains(&row.id);
+                            let seller_stats = stats_map.get(&row.owner_id).cloned();
+                            ContentResponse::from_row_with_liked(row, seller_stats, liked)
+                        })
+                        .collect(),
+                    limit,
+                    offset,
+                    has_more,
+                }),
+            )
+                .into_response()
+        }
+        Err(e) => {
+            tracing::error!("list_content error: {:?}", e);
+            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load content").into_response()
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -24093,474 +24563,6 @@ mod tests {
     }
 }
 
-          AND length(btrim(COALESCE(metadata->>'source_license', ''))) BETWEEN 2 AND 500
-          AND public.lajukan_safe_map_coordinate(metadata->>'latitude') BETWEEN -90.0 AND 90.0
-          AND public.lajukan_safe_map_coordinate(metadata->>'longitude') BETWEEN -180.0 AND 180.0
-        "#,
-    );
-
-    if let Some(value) = text_query.as_deref() {
-        statement
-            .push(
-                r#"
-                AND lower(
-                  COALESCE(title, '') || ' ' ||
-                  COALESCE(summary, '') || ' ' ||
-                  COALESCE(slug, '') || ' ' ||
-                  COALESCE(metadata->>'search_text', '') || ' ' ||
-                  COALESCE(metadata->>'city', '') || ' ' ||
-                  COALESCE(metadata->>'location', '') || ' ' ||
-                  COALESCE(metadata->>'address', '') || ' ' ||
-                  COALESCE(metadata->>'brand', '') || ' ' ||
-                  COALESCE(metadata->>'operator', '') || ' ' ||
-                  COALESCE(metadata->>'source_description', '') || ' ' ||
-                  COALESCE(metadata->>'marketplace_category_slug', '') || ' ' ||
-                  COALESCE(metadata->>'marketplace_subcategory_slug', '') || ' ' ||
-                  COALESCE(metadata->>'osm_primary_key', '') || ' ' ||
-                  COALESCE(metadata->>'osm_primary_value', '')
-                ) LIKE
-                "#,
-            )
-            .push_bind(format!("%{}%", escape_like_literal(&value.to_lowercase())))
-            .push(" ESCAPE '\\'");
-    }
-
-    if let Some(value) = city.as_deref() {
-        statement
-            .push(" AND lower(COALESCE(metadata->>'city', '')) LIKE ")
-            .push_bind(format!("%{}%", escape_like_literal(&value.to_lowercase())))
-            .push(" ESCAPE '\\'");
-    }
-
-    if let Some((min_lat, max_lat, min_lng, max_lng)) = bounds {
-        statement
-            .push(
-                r#"
-                AND point(
-                  public.lajukan_safe_map_coordinate(metadata->>'longitude'),
-                  public.lajukan_safe_map_coordinate(metadata->>'latitude')
-                ) <@ box(point(
-                "#,
-            )
-            .push_bind(min_lng)
-            .push(", ")
-            .push_bind(min_lat)
-            .push("), point(")
-            .push_bind(max_lng)
-            .push(", ")
-            .push_bind(max_lat)
-            .push("))");
-    }
-
-    if let Some((cursor_updated_at, cursor_id)) = cursor {
-        statement
-            .push(" AND (updated_at < ")
-            .push_bind(cursor_updated_at)
-            .push(" OR (updated_at = ")
-            .push_bind(cursor_updated_at)
-            .push(" AND id > ")
-            .push_bind(cursor_id)
-            .push("))");
-    }
-
-    statement.push(" ORDER BY ");
-    if let Some((viewer_lat, viewer_lng)) = ranking_origin {
-        statement
-            .push(
-                r#"
-                point(
-                  public.lajukan_safe_map_coordinate(metadata->>'longitude'),
-                  public.lajukan_safe_map_coordinate(metadata->>'latitude')
-                ) <-> point(
-                "#,
-            )
-            .push_bind(viewer_lng)
-            .push(", ")
-            .push_bind(viewer_lat)
-            .push(") ASC");
-    } else {
-        if let Some(value) = text_query.as_deref() {
-            statement
-                .push("CASE WHEN lower(title) LIKE ")
-                .push_bind(format!("{}%", escape_like_literal(&value.to_lowercase())))
-                .push(" ESCAPE '\\' THEN 0 ELSE 1 END ASC, ");
-        }
-        statement.push("updated_at DESC, id ASC");
-    }
-    statement.push(" LIMIT ").push_bind(limit + 1);
-
-    let rows = statement
-        .build_query_as::<MapReferenceRow>()
-        .fetch_all(&state.db)
-        .await;
-
-    match rows {
-        Ok(mut items) => {
-            let has_more = items.len() as i64 > limit;
-            if has_more {
-                items.truncate(limit as usize);
-            }
-            let next_cursor = if has_more && ranking_origin.is_none() && text_query.is_none() {
-                items
-                    .last()
-                    .map(|item| encode_map_reference_cursor(item.updated_at, item.id))
-            } else {
-                None
-            };
-            (
-                StatusCode::OK,
-                Json(ListMapReferencesResponse {
-                    items,
-                    limit,
-                    has_more,
-                    next_cursor,
-                }),
-            )
-                .into_response()
-        }
-        Err(error) => {
-            tracing::error!("list_map_references error: {:?}", error);
-            err(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "failed to load map references",
-            )
-            .into_response()
-        }
-    }
-}
-
-async fn list_content(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-    Query(query): Query<ListContentQuery>,
-) -> impl IntoResponse {
-    let limit = query.limit.unwrap_or(20).clamp(1, 100);
-    let offset = match resolve_public_content_offset(query.offset) {
-        Ok(offset) => offset,
-        Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
-    };
-    let typ = normalize_content_type(query.r#type);
-    let marketplace_category = clean_text(query.category).map(|s| make_slug(&s));
-    let marketplace_subcategory = clean_text(query.subcategory).map(|s| make_slug(&s));
-    let industry_filter = clean_text(query.industries).and_then(|raw| {
-        let values: Vec<String> = raw
-            .split(',')
-            .map(make_slug)
-            .filter(|value| !value.is_empty())
-            .collect();
-        if values.is_empty() {
-            None
-        } else {
-            Some(values)
-        }
-    });
-    let min_price = query.min_price.filter(|value| *value >= 0);
-    let max_price = query.max_price.filter(|value| *value >= 0);
-    let side = match normalize_listing_side_filter(query.side) {
-        Ok(side) => side,
-        Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
-    };
-    let q = clean_text(query.q);
-    let location = clean_text(query.location);
-    let level = clean_text(query.level);
-    let sector = clean_text(query.sector).map(|s| s.to_lowercase());
-    let sub_sector = clean_text(query.sub_sector).map(|s| s.to_lowercase());
-    let status = match resolve_content_list_status(query.status) {
-        Ok(status) => status,
-        Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
-    };
-    let owner_id = query.owner_id;
-    let claims = auth_claims_from_headers(&headers, &state.jwt_secret);
-    let actor_user_id = claims
-        .as_ref()
-        .and_then(|claims| Uuid::parse_str(&claims.sub).ok());
-    let privileged = claims
-        .as_ref()
-        .is_some_and(|claims| has_cms_access(claims) || has_agent_access(claims));
-    if !can_list_content_status(&status, owner_id, actor_user_id, privileged) {
-        return err(
-            StatusCode::FORBIDDEN,
-            "content status is not publicly accessible",
-        )
-        .into_response();
-    }
-
-    let rows = sqlx::query_as::<_, ContentRow>(
-        r###"
-        SELECT
-            id, owner_id, content_type, slug, title, summary, body, price_cents, price_unit,
-            currency, tags, cover_image, category, content_status, pricing_mode, original_price_cents,
-            seller_type, minimum_order, promo_label, promo_start_at, promo_end_at, rating, review_count,
-            COALESCE((
-                SELECT COUNT(*)::bigint
-                FROM content_item_likes cil
-                WHERE cil.content_id = content_items.id
-            ), 0) AS like_count,
-            metadata, created_at, updated_at
-        FROM content_items
-        WHERE content_status <> 'deleted'
-          AND ($1::text IS NULL OR content_type = $1)
-          AND (
-              $2::text IS NULL
-              OR (
-                $14::text = 'reference'
-                AND lower(
-                  coalesce(title, '') || ' ' ||
-                  coalesce(summary, '') || ' ' ||
-                  coalesce(body, '') || ' ' ||
-                  coalesce(slug, '') || ' ' ||
-                  coalesce(metadata->>'search_text', '') || ' ' ||
-                  coalesce(metadata->>'location', '') || ' ' ||
-                  coalesce(metadata->>'city', '') || ' ' ||
-                  coalesce(metadata->>'address', '') || ' ' ||
-                  coalesce(metadata->>'brand', '') || ' ' ||
-                  coalesce(metadata->>'operator', '') || ' ' ||
-                  coalesce(metadata->>'source_description', '') || ' ' ||
-                  coalesce(metadata->>'marketplace_category_slug', '') || ' ' ||
-                  coalesce(metadata->>'marketplace_subcategory_slug', '')
-                ) LIKE ('%' || lower($2) || '%')
-              )
-              OR (
-                $14::text IS DISTINCT FROM 'reference'
-                AND (
-                  title ILIKE ('%' || $2 || '%') OR
-                  coalesce(summary, '') ILIKE ('%' || $2 || '%') OR
-                  body ILIKE ('%' || $2 || '%') OR
-                  coalesce(slug, '') ILIKE ('%' || $2 || '%') OR
-                  coalesce(array_to_string(tags, ' '), '') ILIKE ('%' || $2 || '%') OR
-                  coalesce(metadata->>'search_text', '') ILIKE ('%' || $2 || '%') OR
-                  coalesce(metadata->>'location', '') ILIKE ('%' || $2 || '%') OR
-                  coalesce(metadata->>'city', '') ILIKE ('%' || $2 || '%') OR
-                  coalesce(metadata->>'address', '') ILIKE ('%' || $2 || '%') OR
-                  coalesce(metadata->>'sector', '') ILIKE ('%' || $2 || '%') OR
-                  coalesce(metadata->>'sub_sector', '') ILIKE ('%' || $2 || '%') OR
-                  coalesce(metadata->>'brand', '') ILIKE ('%' || $2 || '%') OR
-                  coalesce(metadata->>'company', '') ILIKE ('%' || $2 || '%') OR
-                  coalesce(metadata->>'company_name', '') ILIKE ('%' || $2 || '%') OR
-                  coalesce(content_items.seller_type, '') ILIKE ('%' || $2 || '%') OR
-                  coalesce(metadata->>'seller_type', '') ILIKE ('%' || $2 || '%') OR
-                  coalesce(content_items.minimum_order, '') ILIKE ('%' || $2 || '%') OR
-                  coalesce(metadata->>'minimum_order', '') ILIKE ('%' || $2 || '%') OR
-                  coalesce(metadata->>'service_scope', '') ILIKE ('%' || $2 || '%') OR
-                  coalesce(metadata->>'skills', '') ILIKE ('%' || $2 || '%') OR
-                  coalesce(metadata->>'profession', '') ILIKE ('%' || $2 || '%') OR
-                  coalesce(metadata->>'property_type', '') ILIKE ('%' || $2 || '%') OR
-                  coalesce(metadata->>'work_mode', '') ILIKE ('%' || $2 || '%')
-                )
-              )
-          )
-          AND (
-              $3::text IS NULL OR
-              coalesce(metadata->>'location', '') ILIKE ('%' || $3 || '%') OR
-              coalesce(metadata->>'city', '') ILIKE ('%' || $3 || '%')
-          )
-          AND (
-              $4::text IS NULL OR
-              coalesce(metadata->>'level', '') ILIKE ('%' || $4 || '%') OR
-              coalesce(metadata->>'seniority', '') ILIKE ('%' || $4 || '%')
-          )
-          AND (
-              $5::text IS NULL OR
-              regexp_replace(lower(coalesce(metadata->>'sector', '')), '[^a-z0-9]+', '', 'g') =
-                regexp_replace(lower($5), '[^a-z0-9]+', '', 'g') OR
-              coalesce(metadata->>'sector', '') ILIKE ('%' || $5 || '%')
-          )
-          AND (
-              $6::text IS NULL OR
-              regexp_replace(lower(coalesce(metadata->>'sub_sector', '')), '[^a-z0-9]+', '', 'g') =
-                regexp_replace(lower($6), '[^a-z0-9]+', '', 'g') OR
-              coalesce(metadata->>'sub_sector', '') ILIKE ('%' || $6 || '%')
-          )
-          AND lower(content_status) = $7
-          AND (
-              $8::uuid IS NULL OR owner_id = $8
-          )
-          AND (
-              $9::text IS NULL OR
-              EXISTS (
-                SELECT 1
-                FROM marketplace_categories mc
-                WHERE mc.id = content_items.marketplace_category_id
-                  AND (mc.slug = $9 OR mc.legacy_key = $9 OR mc.metadata->'aliases' ? $9)
-              ) OR
-              coalesce(metadata->>'marketplace_category_slug', '') = $9 OR
-              coalesce(metadata->>'create_category', '') = $9
-          )
-          AND (
-              $10::text IS NULL OR
-              EXISTS (
-                SELECT 1
-                FROM marketplace_subcategories ms
-                WHERE ms.id = content_items.marketplace_subcategory_id
-                  AND ms.slug = $10
-              ) OR
-              coalesce(metadata->>'marketplace_subcategory_slug', '') = $10 OR
-              coalesce(metadata->>'sub_category', '') = $10 OR
-              coalesce(metadata->>'subcategory', '') = $10
-          )
-          AND (
-              $11::text[] IS NULL OR
-              EXISTS (
-                SELECT 1
-                FROM listing_industries li
-                JOIN industries i ON i.id = li.industry_id
-                WHERE li.content_id = content_items.id
-                  AND i.slug = ANY($11)
-              ) OR
-              coalesce(metadata->>'industry_slug', '') = ANY($11) OR
-              coalesce(metadata->>'sector', '') = ANY($11)
-          )
-          AND ($12::bigint IS NULL OR price_cents >= $12)
-          AND ($13::bigint IS NULL OR price_cents <= $13)
-          AND (
-              NOT COALESCE($15::bool, FALSE)
-              OR content_type IN (
-                  'product', 'service', 'job', 'property', 'auction', 'tender',
-                  'material', 'tool_rental', 'business_transfer', 'request'
-              )
-          )
-          AND (
-              $14::text IS NULL OR
-              (
-                CASE
-                  WHEN lower(btrim(coalesce(metadata->>'market_side', ''))) = 'reference'
-                    AND coalesce(metadata->>'is_transactional', 'true') = 'false'
-                    AND lower(coalesce(metadata->>'record_kind', '')) LIKE '%reference%'
-                    THEN 'reference'
-                  WHEN regexp_replace(lower(btrim(coalesce(metadata->>'market_side', ''))), '[_-]+', ' ', 'g')
-                    IN ('demand', 'need', 'needs', 'needed', 'request', 'requested', 'wanted', 'looking', 'seeker', 'buyer request', 'buy request', 'pencari', 'mencari', 'dibutuhkan', 'butuh', 'minta')
-                    THEN 'demand'
-                  WHEN regexp_replace(lower(btrim(coalesce(metadata->>'market_side', ''))), '[_-]+', ' ', 'g')
-                    IN ('supply', 'offer', 'offering', 'available', 'provider', 'seller', 'sell', 'penyedia', 'menawarkan', 'menyediakan', 'tersedia')
-                    THEN 'supply'
-                  WHEN regexp_replace(lower(btrim(coalesce(metadata->>'listing_side', ''))), '[_-]+', ' ', 'g')
-                    IN ('demand', 'need', 'needs', 'needed', 'request', 'requested', 'wanted', 'looking', 'seeker', 'buyer request', 'buy request', 'pencari', 'mencari', 'dibutuhkan', 'butuh', 'minta')
-                    THEN 'demand'
-                  WHEN regexp_replace(lower(btrim(coalesce(metadata->>'listing_side', ''))), '[_-]+', ' ', 'g')
-                    IN ('supply', 'offer', 'offering', 'available', 'provider', 'seller', 'sell', 'penyedia', 'menawarkan', 'menyediakan', 'tersedia')
-                    THEN 'supply'
-                  WHEN btrim(coalesce(metadata->>'market_side', '')) = ''
-                    AND btrim(coalesce(metadata->>'listing_side', '')) = ''
-                    THEN 'supply'
-                  ELSE NULL
-                END
-              ) = $14
-          )
-        ORDER BY
-          CASE
-            WHEN $14::text IS NULL
-              AND coalesce(metadata->>'is_transactional', 'true') = 'false'
-              AND lower(coalesce(metadata->>'record_kind', '')) LIKE '%reference%'
-              THEN 1
-            ELSE 0
-          END ASC,
-          CASE
-            WHEN $14::text = 'reference'
-              AND $2::text IS NULL
-              AND coalesce(metadata->>'media_storage', '') = 'minio'
-              THEN 0
-            WHEN $14::text = 'reference' AND $2::text IS NULL
-              THEN 1
-            ELSE 0
-          END ASC,
-          CASE WHEN $2::text IS NULL THEN 0 ELSE
-            (CASE WHEN title ILIKE ($2 || '%') THEN 80 ELSE 0 END) +
-            (CASE WHEN title ILIKE ('%' || $2 || '%') THEN 48 ELSE 0 END) +
-            (CASE WHEN coalesce(array_to_string(tags, ' '), '') ILIKE ('%' || $2 || '%') THEN 26 ELSE 0 END) +
-            (CASE WHEN coalesce(summary, '') ILIKE ('%' || $2 || '%') THEN 18 ELSE 0 END) +
-            (CASE WHEN coalesce(metadata->>'city', '') ILIKE ('%' || $2 || '%') THEN 14 ELSE 0 END) +
-            (CASE WHEN coalesce(metadata->>'sector', '') ILIKE ('%' || $2 || '%') THEN 12 ELSE 0 END) +
-            (CASE WHEN coalesce(metadata->>'sub_sector', '') ILIKE ('%' || $2 || '%') THEN 12 ELSE 0 END) +
-            (CASE WHEN coalesce(metadata->>'search_text', '') ILIKE ('%' || $2 || '%') THEN 10 ELSE 0 END)
-          END DESC,
-          updated_at DESC,
-          created_at DESC,
-          id ASC
-        LIMIT $16 OFFSET $17
-        "###,
-    )
-    .bind(typ)
-    .bind(q)
-    .bind(location)
-    .bind(level)
-    .bind(sector)
-    .bind(sub_sector)
-    .bind(status)
-    .bind(owner_id)
-    .bind(marketplace_category)
-    .bind(marketplace_subcategory)
-    .bind(industry_filter)
-    .bind(min_price)
-    .bind(max_price)
-    .bind(side)
-    .bind(query.marketplace_only)
-    .bind(limit + 1)
-    .bind(offset)
-    .fetch_all(&state.db)
-    .await;
-
-    match rows {
-        Ok(mut rows) => {
-            let has_more = rows.len() as i64 > limit;
-            if has_more {
-                rows.truncate(limit as usize);
-            }
-
-            let owner_ids: Vec<Uuid> = {
-                let mut seen = HashSet::new();
-                rows.iter()
-                    .filter_map(|row| {
-                        if is_public_reference_response_metadata(&row.metadata) {
-                            return None;
-                        }
-                        if seen.insert(row.owner_id) {
-                            Some(row.owner_id)
-                        } else {
-                            None
-                        }
-                    })
-                    .collect()
-            };
-
-            let stats_map = match fetch_seller_stats(&state.db, &owner_ids).await {
-                Ok(map) => map,
-                Err(e) => {
-                    tracing::error!("list_content seller_stats error: {:?}", e);
-                    HashMap::new()
-                }
-            };
-            let liked_ids = match fetch_liked_content_ids(&state.db, actor_user_id, &rows).await {
-                Ok(ids) => ids,
-                Err(e) => {
-                    tracing::error!("list_content liked state error: {:?}", e);
-                    HashSet::new()
-                }
-            };
-
-            (
-                StatusCode::OK,
-                Json(ListContentResponse {
-                    items: rows
-                        .into_iter()
-                        .map(|row| {
-                            let liked = liked_ids.contains(&row.id);
-                            let seller_stats = stats_map.get(&row.owner_id).cloned();
-                            ContentResponse::from_row_with_liked(row, seller_stats, liked)
-                        })
-                        .collect(),
-                    limit,
-                    offset,
-                    has_more,
-                }),
-            )
-                .into_response()
-        }
-        Err(e) => {
-            tracing::error!("list_content error: {:?}", e);
-            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load content").into_response()
-        }
-    }
-}
 
 async fn fetch_liked_content_ids(
     db: &PgPool,
