@@ -1176,6 +1176,7 @@ pub async fn sync_static_source_registry(db: &PgPool) -> Result<(), sqlx::Error>
         #[serde(default)] license: Option<String>,
         #[serde(default)] attribution: Option<String>,
         #[serde(default)] notes: Option<String>,
+        #[serde(default)] auto_publish_reference: bool,
     }
 
     let registry: Registry = serde_json::from_str(
@@ -1202,17 +1203,18 @@ pub async fn sync_static_source_registry(db: &PgPool) -> Result<(), sqlx::Error>
         sqlx::query(
             r#"INSERT INTO data_source_registry (
                 source_key, provider_name, source_kind, source_url, api_url, license_name, attribution_text,
-                reuse_mode, storage_allowed, media_storage_allowed, pii_import_allowed, enabled, notes, updated_at
-            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,FALSE,FALSE,$10,$11,NOW())
+                reuse_mode, storage_allowed, media_storage_allowed, pii_import_allowed, enabled, auto_publish_reference, notes, updated_at
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,FALSE,FALSE,$10,$11,$12,NOW())
             ON CONFLICT (source_key) DO UPDATE SET
                 provider_name=EXCLUDED.provider_name, source_kind=EXCLUDED.source_kind, source_url=EXCLUDED.source_url,
                 api_url=EXCLUDED.api_url, license_name=EXCLUDED.license_name, attribution_text=EXCLUDED.attribution_text,
                 reuse_mode=CASE WHEN data_source_registry.reuse_mode='persistent_import' AND EXCLUDED.reuse_mode <> 'persistent_import' THEN data_source_registry.reuse_mode ELSE EXCLUDED.reuse_mode END, storage_allowed=CASE WHEN data_source_registry.reuse_mode='persistent_import' AND EXCLUDED.reuse_mode <> 'persistent_import' THEN data_source_registry.storage_allowed ELSE EXCLUDED.storage_allowed END,
                 media_storage_allowed=EXCLUDED.media_storage_allowed, pii_import_allowed=EXCLUDED.pii_import_allowed,
-                enabled=EXCLUDED.enabled, notes=EXCLUDED.notes, updated_at=NOW()"#
+                enabled=EXCLUDED.enabled, auto_publish_reference=EXCLUDED.auto_publish_reference, notes=EXCLUDED.notes, updated_at=NOW()"#
         )
         .bind(source.id).bind(source.provider).bind(source.kind).bind(source.url).bind(api_url)
-        .bind(source.license).bind(source.attribution).bind(reuse_mode).bind(storage_allowed).bind(enabled).bind(notes)
+        .bind(source.license).bind(source.attribution).bind(reuse_mode).bind(storage_allowed).bind(enabled)
+        .bind(source.auto_publish_reference).bind(notes)
         .execute(db).await?;
     }
     Ok(())
