@@ -80,7 +80,7 @@ async fn run_inner(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
         let active = resource.get("datastore_active").and_then(Value::as_bool).unwrap_or(false);
         let resource_license = resource.get("license").or_else(|| resource.get("license_title"))
             .and_then(Value::as_str).unwrap_or("");
-        let license_ok = !resource_license.trim().is_empty() || source.4.as_deref().is_some_and(|v| !v.trim().is_empty());
+        let license_ok = !resource_license.trim().is_empty() || source.5.as_deref().is_some_and(|v| !v.trim().is_empty());
         if !active || !license_ok {
             rejected += 1;
             continue;
