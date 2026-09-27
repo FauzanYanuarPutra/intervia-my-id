@@ -1760,7 +1760,7 @@ pub async fn sync_static_source_registry(db: &PgPool) -> Result<(), sqlx::Error>
         r#"UPDATE data_source_registry
            SET enabled=FALSE,
                auto_publish_reference=FALSE,
-               notes=COALESCE(notes || '; ', '') || 'disabled: consolidated into source_key=\'osm\'',
+               notes=COALESCE(notes || '; ', '') || 'disabled: consolidated into source_key=''osm''',
                updated_at=NOW()
            WHERE source_key='osm-indonesia-public-references'"#
     )
