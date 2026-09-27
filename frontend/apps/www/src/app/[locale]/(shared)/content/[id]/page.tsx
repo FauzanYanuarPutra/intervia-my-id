@@ -72,8 +72,8 @@ export default async function ContentDetailPage({ params }: PageProps) {
   }
 
   const ownerEditHref = isPublicEditorialContent(result.content)
-    ? `/${locale}/news/submissions?edit=${encodeURIComponent(String(result.content.id || id))}`
-    : `/${locale}/create?draft=${encodeURIComponent(String(result.content.id || id))}`;
+    ? `/news/submissions?edit=${encodeURIComponent(String(result.content.id || id))}`
+    : `/create?draft=${encodeURIComponent(String(result.content.id || id))}`;
 
   return (
     <ContentDetailClient
