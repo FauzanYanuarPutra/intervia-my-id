@@ -4,7 +4,7 @@ use sha2::{Digest, Sha256};
 use std::sync::Arc;
 use uuid::Uuid;
 
-use crate::AppState;
+use crate::{data_governance::license_allows_persistent_import, AppState};
 
 fn redact(value: &Value) -> Value {
     const BLOCKED: &[&str] = &[
@@ -334,12 +334,17 @@ async fn run_inner(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
             .or_else(|| resource.get("license_title"))
             .and_then(Value::as_str)
             .unwrap_or("");
-        let license_ok = !resource_license.trim().is_empty()
-            || source
-                .5
-                .as_deref()
-                .is_some_and(|value| !value.trim().is_empty());
-        if !license_ok || (!active && !json_resource) {
+        let resource_license_present = !resource_license.trim().is_empty();
+        let resource_license_allowed = !resource_license_present
+            || license_allows_persistent_import(resource_license);
+        let source_license_present = source
+            .5
+            .as_deref()
+            .is_some_and(|value| !value.trim().is_empty());
+        let license_ok = resource_license_present || source_license_present;
+        if !license_ok
+            || !resource_license_allowed
+            || (!active && !json_resource) {
             rejected += 1;
             continue;
         }
@@ -1062,6 +1067,13 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn rejects_restricted_resource_licenses() {
+        assert!(!license_allows_persistent_import("CC BY-NC 4.0"));
+        assert!(!license_allows_persistent_import("CC BY-ND 4.0"));
+        assert!(license_allows_persistent_import("CC BY 4.0"));
+    }
+
     fn recognizes_json_and_geojson_resources() {
         assert!(resource_is_json(&serde_json::json!({
             "format": "JSON",
