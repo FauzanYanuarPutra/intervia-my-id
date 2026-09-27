@@ -984,7 +984,7 @@ export function UmkmDiscoveryPanel({
     initialCount ?? (hasInitialStores ? initialStores.length : null),
   );
   const [listPage, setListPage] = useState(1);
-  const [discoveryScope, setDiscoveryScope] = useState<DiscoveryScope>('all');
+  const [discoveryScope, setDiscoveryScope] = useState<DiscoveryScope>('registered');
   const [hasMore, setHasMore] = useState(
     () => (initialStores?.length || 0) >= Math.max(1, Math.min(limit, 50)),
   );
@@ -1083,31 +1083,17 @@ export function UmkmDiscoveryPanel({
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const syncScopeFromUrl = () => {
+    const clearPublicScopeParam = () => {
       const url = new URL(window.location.href);
-      setDiscoveryScope(readDiscoveryScope(url.searchParams.get('scope')));
+      if (url.searchParams.has('scope')) {
+        url.searchParams.delete('scope');
+        window.history.replaceState(window.history.state, '', url.pathname + url.search);
+      }
+      setDiscoveryScope('registered');
     };
-    syncScopeFromUrl();
-    window.addEventListener('popstate', syncScopeFromUrl);
-    return () => window.removeEventListener('popstate', syncScopeFromUrl);
-  }, []);
-
-  const handleDiscoveryScopeChange = useCallback((scope: DiscoveryScope) => {
-    setDiscoveryScope(scope);
-    setListPage(1);
-    setSelectedStoreId(null);
-    setShowRoute(false);
-    setRouteSummary(null);
-    setMapFocusMode('stores');
-    setMapFocusNonce(current => current + 1);
-
-    if (typeof window === 'undefined') return;
-    const url = new URL(window.location.href);
-    url.searchParams.set('scope', scope);
-    url.searchParams.delete('store');
-    url.searchParams.delete('storeId');
-    url.searchParams.delete('business');
-    window.history.replaceState(window.history.state, '', url.pathname + url.search);
+    clearPublicScopeParam();
+    window.addEventListener('popstate', clearPublicScopeParam);
+    return () => window.removeEventListener('popstate', clearPublicScopeParam);
   }, []);
   const deepLinkedInitialStore = useMemo(() => {
     const targetSlug = selectedSlug?.trim();
@@ -1423,9 +1409,7 @@ export function UmkmDiscoveryPanel({
   const visibleStores = useMemo(
     () =>
       preparedStores.filter(place => {
-        const isReference = isUmkmMapPublicReference(place.store);
-        if (discoveryScope === 'registered' && isReference) return false;
-        if (discoveryScope === 'references' && !isReference) return false;
+        if (isUmkmMapPublicReference(place.store)) return false;
         return matchesUmkmDiscoveryCategory(
           {
             kind: place.ui.kind,
@@ -2097,15 +2081,6 @@ export function UmkmDiscoveryPanel({
               </div>
             </div>
 
-            <div className="shrink-0 px-4 pb-2">
-              <DiscoveryScopeControl
-                scope={discoveryScope}
-                isId={isId}
-                compact
-                onChange={handleDiscoveryScopeChange}
-              />
-            </div>
-
             {selectedPlace ? (
               <div
                 className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain px-3 pb-3 pt-1 [scrollbar-gutter:stable] [scrollbar-width:thin]"
@@ -2457,13 +2432,7 @@ export function UmkmDiscoveryPanel({
           </span>
         </div>
 
-        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <DiscoveryScopeControl
-            scope={discoveryScope}
-            isId={isId}
-            onChange={handleDiscoveryScopeChange}
-          />
-          <button
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">          <button
             type="button"
             onClick={handleOpenMapPreview}
             className="inline-flex min-h-[36px] w-full items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-[12px] font-semibold text-[color:var(--app-accent)] shadow-[0_14px_28px_-24px_rgba(15,23,42,0.12)] transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_10%,white)] sm:w-fit dark:border-slate-800 dark:bg-slate-950"
