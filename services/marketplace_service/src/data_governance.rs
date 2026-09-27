@@ -1608,18 +1608,36 @@ pub async fn bootstrap_persistent_imports(state: Arc<AppState>) -> Result<u64, s
 
     let mut queued = 0u64;
     for (source_id, source_key, api_url, refresh_hours) in sources {
-        let latest_job = sqlx::query_as::<_, (Uuid, String)>(
+        let active_job = sqlx::query_as::<_, (Uuid, String)>(
             r#"
             SELECT id, status
             FROM data_import_jobs
             WHERE source_id = $1
-            ORDER BY created_at DESC
+              AND status IN ('queued','running')
+            ORDER BY created_at ASC
             LIMIT 1
-            "#,
+            "#
         )
         .bind(source_id)
         .fetch_optional(db)
         .await?;
+
+        let latest_job = if active_job.is_some() {
+            None
+        } else {
+            sqlx::query_as::<_, (Uuid, String)>(
+                r#"
+                SELECT id, status
+                FROM data_import_jobs
+                WHERE source_id = $1
+                ORDER BY created_at DESC
+                LIMIT 1
+                "#
+            )
+            .bind(source_id)
+            .fetch_optional(db)
+            .await?
+        };
 
         let job = if let Some((job_id, status)) = latest_job {
             match status.as_str() {
