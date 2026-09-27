@@ -10,7 +10,14 @@ MAX_BUYERS="${REAL_DATA_MAX_BUYERS:-1000}"
 MAX_INSIGHTS="${REAL_DATA_MAX_INSIGHTS:-2000}"
 MAX_MEDIA="${REAL_DATA_MAX_COMMUNITY_MEDIA:-80}"
 SLEEP_SECONDS="${REAL_DATA_REQUEST_SLEEP_SECONDS:-1}"
-BOOTSTRAP_VERSION="${REAL_DATA_BOOTSTRAP_VERSION:-2026-09-28-v5}"
+SOURCE_FINGERPRINT="$(
+  (
+    sha256sum /workspace/config/real_marketplace_open_data.sources.json
+    sha256sum /workspace/scripts/import_real_marketplace_open_data.py
+    sha256sum /workspace/scripts/run_real_data_bootstrap.sh
+) | sha256sum | awk '{print $1}'
+)"
+BOOTSTRAP_VERSION="${REAL_DATA_BOOTSTRAP_VERSION:-config-${SOURCE_FINGERPRINT}}"
 LOCK_KEY="real_marketplace_open_data"
 
 run_sql() {
