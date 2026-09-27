@@ -1036,10 +1036,10 @@ export function HeaderInboxDropdown({
           if (!open) refresh();
         }}
         className={cn(
-          'ui-pressable relative inline-flex h-10 min-h-10 w-10 min-w-10 items-center justify-center rounded-full transition sm:h-11 sm:min-h-11 sm:w-11 sm:min-w-11',
+          'ui-pressable relative inline-flex h-10 w-10 min-h-10 min-w-10 shrink-0 items-center justify-center overflow-visible rounded-full bg-transparent p-0 text-[color:var(--app-text)] transition sm:h-11 sm:w-11 sm:min-h-11 sm:min-w-11',
           active || open
-            ? 'bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)]'
-            : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)]',
+            ? 'text-[color:var(--app-accent)]'
+            : 'hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)]',
           className,
         )}
         aria-label={label}
@@ -1054,7 +1054,10 @@ export function HeaderInboxDropdown({
 
         {badge ? (
           <span
-            className="absolute -right-1 -top-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full border-2 border-[color:var(--app-surface-strong)] bg-red-500 px-1 text-[10px] font-black leading-none text-white shadow-sm"
+            className={cn(
+              'pointer-events-none absolute right-0 top-1 inline-flex h-[18px] min-h-[18px] items-center justify-center rounded-full border-2 border-[color:var(--app-surface-strong)] bg-red-500 px-[5px] text-[10px] font-black leading-[14px] text-white shadow-sm',
+              badge.length > 2 && 'min-w-[28px]',
+            )}
             aria-label={unreadCopy}
           >
             {badge}
