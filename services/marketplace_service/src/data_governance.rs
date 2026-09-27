@@ -1491,7 +1491,7 @@ pub async fn bootstrap_persistent_imports(state: Arc<AppState>) -> Result<u64, s
                     SELECT 1
                     FROM data_import_jobs
                     WHERE source_id = $1
-                      AND status IN ('succeeded','partial')
+                      AND status = 'succeeded'
                       AND finished_at > NOW() - ($2::text || ' hours')::interval
                 )
                 "#,
