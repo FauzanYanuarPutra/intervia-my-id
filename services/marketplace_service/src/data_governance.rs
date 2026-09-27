@@ -1118,7 +1118,7 @@ pub async fn sync_static_source_registry(db: &PgPool) -> Result<(), sqlx::Error>
             ON CONFLICT (source_key) DO UPDATE SET
                 provider_name=EXCLUDED.provider_name, source_kind=EXCLUDED.source_kind, source_url=EXCLUDED.source_url,
                 api_url=EXCLUDED.api_url, license_name=EXCLUDED.license_name, attribution_text=EXCLUDED.attribution_text,
-                reuse_mode=EXCLUDED.reuse_mode, storage_allowed=EXCLUDED.storage_allowed,
+                reuse_mode=CASE WHEN data_source_registry.reuse_mode='persistent_import' AND EXCLUDED.reuse_mode <> 'persistent_import' THEN data_source_registry.reuse_mode ELSE EXCLUDED.reuse_mode END, storage_allowed=CASE WHEN data_source_registry.reuse_mode='persistent_import' AND EXCLUDED.reuse_mode <> 'persistent_import' THEN data_source_registry.storage_allowed ELSE EXCLUDED.storage_allowed END,
                 media_storage_allowed=EXCLUDED.media_storage_allowed, pii_import_allowed=EXCLUDED.pii_import_allowed,
                 enabled=EXCLUDED.enabled, notes=EXCLUDED.notes, updated_at=NOW()"#
         )
