@@ -929,6 +929,61 @@ async fn inspect_source(
     ).into_response()
 }
 
+#[derive(Debug, Deserialize)]
+struct ApproveSourceRequest {
+    license_name: String,
+    license_url: Option<String>,
+    confirmation_note: String,
+}
+
+async fn approve_persistent_import(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(source_key): Path<String>,
+    Json(payload): Json<ApproveSourceRequest>,
+) -> impl IntoResponse {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+        Some(value) => value,
+        None => return (StatusCode::UNAUTHORIZED, Json(json!({"error":"unauthorized"}))).into_response(),
+    };
+    if !has_agent_access(&claims) {
+        return (StatusCode::FORBIDDEN, Json(json!({"error":"agent role required"}))).into_response();
+    }
+
+    let license_name = clean(Some(payload.license_name), 300);
+    let note = clean(Some(payload.confirmation_note), 2_000);
+    if license_name.is_none() || note.is_none() {
+        return (StatusCode::BAD_REQUEST, Json(json!({"error":"license_name and confirmation_note are required"}))).into_response();
+    }
+
+    let result = sqlx::query(
+        r#"UPDATE data_source_registry
+           SET reuse_mode='persistent_import',
+               storage_allowed=TRUE,
+               license_name=$2,
+               license_url=$3,
+               notes=COALESCE(notes,'') || E'\\nPersistent import approved by agent: ' || $4,
+               updated_at=NOW()
+           WHERE source_key=$1 AND enabled=TRUE
+           RETURNING source_key"#,
+    )
+    .bind(source_key.trim())
+    .bind(license_name)
+    .bind(clean(payload.license_url, 2_000))
+    .bind(note)
+    .fetch_optional(&state.db)
+    .await;
+
+    match result {
+        Ok(Some(row)) => (StatusCode::OK, Json(json!({"source_key":row.get::<String,_>("source_key"),"reuse_mode":"persistent_import"}))).into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, Json(json!({"error":"enabled source not found"}))).into_response(),
+        Err(error) => {
+            tracing::error!("approve_persistent_import failed: {:?}", error);
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"failed to approve source"}))).into_response()
+        }
+    }
+}
+
 async fn create_import_job(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -1080,6 +1135,7 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/v1/data/import-jobs", get(list_import_jobs))
         .route("/v1/data/import-jobs/{source_key}", post(create_import_job))
         .route("/v1/data/sources/{source_key}/inspect", post(inspect_source))
+        .route("/v1/data/sources/{source_key}/approve-persistent", post(approve_persistent_import))
         .route("/v1/businesses/{content_ref}/claim", get(claim_status).post(create_claim))
         .route("/v1/businesses/{content_ref}/claims", get(claim_status).post(create_claim))
         .route("/v1/business-claims", get(list_my_claims))
