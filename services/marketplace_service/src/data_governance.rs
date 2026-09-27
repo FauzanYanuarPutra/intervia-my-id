@@ -1229,6 +1229,27 @@ pub async fn bootstrap_reference_publication(state: Arc<AppState>) -> Result<u64
     Ok(promoted)
 }
 
+pub async fn bootstrap_governed_data(state: Arc<AppState>) {
+    if let Err(error) = sync_static_source_registry(&state.db).await {
+        tracing::warn!("Governed data source registry sync failed: {:?}", error);
+    }
+    match recover_stale_import_jobs(&state.db).await {
+        Ok(recovered) if recovered > 0 => tracing::warn!(recovered, "recovered stale data import jobs"),
+        Ok(_) => {}
+        Err(error) => tracing::error!("failed to recover stale data import jobs: {:?}", error),
+    }
+    match bootstrap_persistent_imports(state.clone()).await {
+        Ok(count) if count > 0 => tracing::info!("queued {} validated persistent data bootstrap imports", count),
+        Ok(_) => tracing::debug!("no persistent data bootstrap imports needed"),
+        Err(error) => tracing::warn!("persistent data bootstrap failed: {:?}", error),
+    }
+    match bootstrap_reference_publication(state).await {
+        Ok(count) if count > 0 => tracing::info!("published {} eligible unowned reference records", count),
+        Ok(_) => tracing::debug!("no eligible reference publication candidates found"),
+        Err(error) => tracing::warn!("reference publication reconciliation failed: {:?}", error),
+    }
+}
+
 pub async fn sync_static_source_registry(db: &PgPool) -> Result<(), sqlx::Error> {
     #[derive(Deserialize)]
     struct Registry { sources: Vec<SourceSeed> }
