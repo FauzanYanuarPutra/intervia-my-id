@@ -929,27 +929,26 @@ export default function CommunityGroupDetailClient({
               {compactNumber(group.memberCount)} {isId ? 'anggota' : 'members'} · {compactNumber(group.postCount)} post
             </p>
           </div>
-          <button
-            type="button"
-            onClick={joinOrLeave}
-            disabled={busyJoin || pending || group.viewerRole === 'owner'}
-            className={cn(
-              'inline-flex min-h-[34px] shrink-0 items-center justify-center rounded-full px-3 text-[11px] font-extrabold transition active:scale-95 disabled:opacity-60',
-              joined
-                ? 'bg-slate-100 text-[color:var(--app-text)]'
-                : 'bg-[color:var(--app-accent)] text-white',
-            )}
-          >
-            {pending
-              ? 'Pending'
-              : joined
-                ? isId
-                  ? 'Joined'
-                  : 'Joined'
-                : isId
-                  ? 'Gabung'
-                  : 'Join'}
-          </button>
+          {joined ? (
+            <span className="inline-flex min-h-[34px] shrink-0 items-center justify-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 text-[11px] font-extrabold text-emerald-700">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              {isId ? 'Sudah bergabung' : 'Joined'}
+            </span>
+          ) : pending ? (
+            <span className="inline-flex min-h-[34px] shrink-0 items-center justify-center rounded-full border border-amber-200 bg-amber-50 px-3 text-[11px] font-extrabold text-amber-700">
+              {isId ? 'Menunggu approval' : 'Pending approval'}
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={joinOrLeave}
+              disabled={busyJoin || group.viewerRole === 'owner'}
+              className="inline-flex min-h-[34px] shrink-0 items-center justify-center rounded-full bg-[color:var(--app-accent)] px-3 text-[11px] font-extrabold text-white transition active:scale-95 disabled:opacity-60"
+            >
+              {busyJoin ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+              {isId ? 'Gabung' : 'Join'}
+            </button>
+          )}
           {group.viewerCanManage ? (
             <button
               type="button"
@@ -1010,30 +1009,26 @@ export default function CommunityGroupDetailClient({
                 </p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={joinOrLeave}
-              disabled={busyJoin || pending || group.viewerRole === 'owner'}
-              className={cn(
-                'mt-4 inline-flex min-h-[42px] w-full items-center justify-center gap-2 rounded-[15px] text-sm font-bold disabled:opacity-60',
-                joined
-                  ? 'border border-[color:var(--app-border)] bg-white text-[color:var(--app-text)]'
-                  : 'bg-[color:var(--app-accent)] text-white',
-              )}
-            >
-              {busyJoin ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              {pending
-                ? isId
-                  ? 'Menunggu approve'
-                  : 'Pending approval'
-                : joined
-                  ? isId
-                    ? 'Sudah join'
-                    : 'Joined'
-                  : isId
-                    ? 'Gabung grup'
-                    : 'Join group'}
-            </button>
+            {joined ? (
+              <div className="mt-4 inline-flex min-h-[42px] w-full items-center justify-center gap-2 rounded-[15px] border border-emerald-200 bg-emerald-50 text-sm font-bold text-emerald-700">
+                <ShieldCheck className="h-4 w-4" />
+                {isId ? 'Sudah bergabung' : 'Joined'}
+              </div>
+            ) : pending ? (
+              <div className="mt-4 inline-flex min-h-[42px] w-full items-center justify-center rounded-[15px] border border-amber-200 bg-amber-50 text-sm font-bold text-amber-700">
+                {isId ? 'Menunggu approval' : 'Pending approval'}
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={joinOrLeave}
+                disabled={busyJoin || group.viewerRole === 'owner'}
+                className="mt-4 inline-flex min-h-[42px] w-full items-center justify-center gap-2 rounded-[15px] bg-[color:var(--app-accent)] text-sm font-bold text-white disabled:opacity-60"
+              >
+                {busyJoin ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                {isId ? 'Gabung grup' : 'Join group'}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setMembersModalGroup(group)}
