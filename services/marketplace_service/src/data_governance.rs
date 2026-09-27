@@ -1090,6 +1090,74 @@ async fn create_import_job(
 }
 
 
+
+pub async fn bootstrap_persistent_imports(db: &PgPool) -> Result<u64, sqlx::Error> {
+    let sources = sqlx::query_as::<_, (Uuid, String, Option<String>, i32)>(
+        r#"
+        SELECT id, source_key, api_url, COALESCE(refresh_interval_hours, 168)
+        FROM data_source_registry
+        WHERE enabled = TRUE
+          AND storage_allowed = TRUE
+          AND reuse_mode = 'persistent_import'
+          AND api_url IS NOT NULL
+          AND source_kind = 'government_open_data'
+        ORDER BY source_key
+        "#
+    )
+    .fetch_all(db)
+    .await?;
+
+    let mut queued = 0u64;
+    for (source_id, source_key, api_url, refresh_hours) in sources {
+        let recent = sqlx::query_scalar::<_, bool>(
+            r#"
+            SELECT EXISTS (
+                SELECT 1
+                FROM data_import_jobs
+                WHERE source_id = $1
+                  AND status IN ('queued','running')
+            ) OR EXISTS (
+                SELECT 1
+                FROM data_import_jobs
+                WHERE source_id = $1
+                  AND status IN ('succeeded','partial')
+                  AND finished_at > NOW() - ($2::text || ' hours')::interval
+            )
+            "#
+        )
+        .bind(source_id)
+        .bind(refresh_hours)
+        .fetch_one(db)
+        .await?;
+
+        if recent {
+            continue;
+        }
+
+        let job = sqlx::query_scalar::<_, Uuid>(
+            r#"
+            INSERT INTO data_import_jobs (source_id, job_key, mode, status)
+            VALUES ($1, $2, 'import', 'queued')
+            RETURNING id
+            "#
+        )
+        .bind(source_id)
+        .bind(format!("bootstrap:{}:{}", source_key, Uuid::new_v4().simple()))
+        .fetch_one(db)
+        .await?;
+
+        queued += 1;
+        tracing::info!(
+            source_key = %source_key,
+            api_url = ?api_url,
+            job_id = %job,
+            "queued validated persistent source bootstrap import"
+        );
+    }
+
+    Ok(queued)
+}
+
 pub async fn sync_static_source_registry(db: &PgPool) -> Result<(), sqlx::Error> {
     #[derive(Deserialize)]
     struct Registry { sources: Vec<SourceSeed> }
