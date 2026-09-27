@@ -136,7 +136,7 @@
       "id": "wikimedia-commons-indonesia-open-media",
       "kind": "wikimedia_commons_media",
       "role": "community_reels",
-      "enabled_by_default": true,
+      "enabled_by_default": false,
       "name": "Wikimedia Commons Indonesia open media for community and reels",
       "source_url": "https://commons.wikimedia.org/",
       "endpoint": "https://commons.wikimedia.org/w/api.php",
