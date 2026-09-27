@@ -1,0 +1,103 @@
+# Repository metadata / VCS
+.git
+.git/**
+.github/**
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+!.env.development.example
+!.env.staging.example
+!.env.production.example
+!.env.ha.example
+
+# Dependencies / package caches
+**/node_modules
+**/.npm
+**/.npm-cache
+**/.pnpm-store
+**/vendor
+
+# Frontend / JS build output
+**/.next
+**/dist
+**/build
+**/out
+**/.turbo
+**/.parcel-cache
+**/.vite
+**/coverage
+**/playwright-report
+**/test-results
+**/*.tsbuildinfo
+
+# Rust / Elixir generated output
+**/target
+**/_build
+**/deps
+
+# Python caches / environments
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+**/.venv
+**/venv
+**/ENV
+
+# Local runtime state and generated data
+.runtime
+**/.runtime
+.cache
+**/.cache
+.backups
+**/.backups
+.worktrees
+**/.worktrees
+audit_output
+**/audit_output
+docker-data
+**/docker-data
+postgres_data
+**/postgres_data
+redis_data
+**/redis_data
+rabbitmq_data
+**/rabbitmq_data
+scylla_data
+**/scylla_data
+minio_data
+**/minio_data
+meili_data
+**/meili_data
+qdrant_storage
+**/qdrant_storage
+ollama_data
+**/ollama_data
+caddy_data
+**/caddy_data
+caddy_config
+**/caddy_config
+
+# User uploads / local media / scratch files
+**/uploads
+**/tmp
+**/temp
+**/*.log
+**/*.pid
+**/*.pid.lock
+**/*.screenshot.png
+**/*.screenshot.jpg
+**/*.screenshot.jpeg
+**/*.screenshot.webp
+
+# OS / editor files
+.DS_Store
+Thumbs.db
+Desktop.ini
+**/.DS_Store
+**/Thumbs.db
+**/.idea
+**/.vscode
