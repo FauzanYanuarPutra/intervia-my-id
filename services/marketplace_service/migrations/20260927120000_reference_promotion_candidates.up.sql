@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS reference_promotion_candidates (
     proposed_content_id UUID,
     promotion_status TEXT NOT NULL DEFAULT 'pending_review'
         CHECK (promotion_status IN ('pending_review','approved','rejected','promoted','blocked')),
-    readiness_score NUMERIC(5,4) NOT NULL DEFAULT 0,
+    readiness_score DOUBLE PRECISION NOT NULL DEFAULT 0,
     blocking_reasons JSONB NOT NULL DEFAULT '[]'::jsonb,
     provenance_snapshot JSONB NOT NULL DEFAULT '{}'::jsonb,
     reviewed_by UUID,
