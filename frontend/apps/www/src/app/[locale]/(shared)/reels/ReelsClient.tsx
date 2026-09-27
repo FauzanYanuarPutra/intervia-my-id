@@ -3891,7 +3891,7 @@
     if (!shouldLoad) {
       return (
         <article
-          className="relative flex h-full max-h-full min-h-full w-full min-w-0 snap-start overflow-hidden bg-black pb-[calc(env(safe-area-inset-bottom)+10px)] pl-[calc(env(safe-area-inset-left)+10px)] pr-[calc(env(safe-area-inset-right)+10px)] min-[390px]:pl-[calc(env(safe-area-inset-left)+12px)] min-[390px]:pr-[calc(env(safe-area-inset-right)+12px)] sm:pl-[calc(env(safe-area-inset-left)+16px)] sm:pr-[calc(env(safe-area-inset-right)+16px)]"
+          className="relative flex h-full max-h-full min-h-full w-full min-w-0 snap-start [scroll-snap-stop:always] overflow-hidden bg-black pb-[calc(env(safe-area-inset-bottom)+10px)] pl-[calc(env(safe-area-inset-left)+10px)] pr-[calc(env(safe-area-inset-right)+10px)] min-[390px]:pl-[calc(env(safe-area-inset-left)+12px)] min-[390px]:pr-[calc(env(safe-area-inset-right)+12px)] sm:pl-[calc(env(safe-area-inset-left)+16px)] sm:pr-[calc(env(safe-area-inset-right)+16px)]"
           style={REEL_SLIDE_PLACEHOLDER_STYLE}
           aria-hidden="true"
         >
@@ -3907,7 +3907,7 @@
 
     return (
       <article
-        className="relative flex h-full max-h-full min-h-full w-full min-w-0 snap-start overflow-hidden !bg-black !text-white pb-[calc(env(safe-area-inset-bottom)+10px)] pl-[calc(env(safe-area-inset-left)+10px)] pr-[calc(env(safe-area-inset-right)+10px)] min-[390px]:pl-[calc(env(safe-area-inset-left)+12px)] min-[390px]:pr-[calc(env(safe-area-inset-right)+12px)] sm:pl-[calc(env(safe-area-inset-left)+16px)] sm:pr-[calc(env(safe-area-inset-right)+16px)] md:aspect-[9/16]"
+        className="relative flex h-full max-h-full min-h-full w-full min-w-0 snap-start [scroll-snap-stop:always] overflow-hidden !bg-black !text-white pb-[calc(env(safe-area-inset-bottom)+10px)] pl-[calc(env(safe-area-inset-left)+10px)] pr-[calc(env(safe-area-inset-right)+10px)] min-[390px]:pl-[calc(env(safe-area-inset-left)+12px)] min-[390px]:pr-[calc(env(safe-area-inset-right)+12px)] sm:pl-[calc(env(safe-area-inset-left)+16px)] sm:pr-[calc(env(safe-area-inset-right)+16px)] md:aspect-[9/16]"
         style={REEL_SLIDE_LOADED_STYLE}
         data-reel-id={reel.id}
         data-reel-media-frame="9:16"
