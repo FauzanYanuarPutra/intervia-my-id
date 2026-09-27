@@ -2818,16 +2818,16 @@ export function CommunityPostCard({
             </button>
 
             <div className="!mt-0.5 !flex !min-w-0 !w-full !items-center !gap-x-1.5 text-[11px] !leading-[14px] text-[color:var(--app-text-soft)] sm:text-xs sm:!leading-4">
-              <Link
-                href={item.group ? communityGroupHref(item.group) : '/community'}
-                className="!m-0 !min-w-0 !flex-1 !truncate !p-0 font-semibold !leading-[14px] hover:text-[color:var(--app-accent)] sm:!leading-4"
-                onClick={event => event.stopPropagation()}
-              >
-                {item.group?.name || item.communityName}
-              </Link>
+             <Link
+              href={item.group ? communityGroupHref(item.group) : '/community'}
+              className="!m-0 !h-fit !min-h-0 !min-w-0 !flex-1 !self-start !truncate py-4 font-semibold !leading-[14px] hover:text-[color:var(--app-accent)] sm:!leading-4"
+              onClick={event => event.stopPropagation()}
+            >
+              {item.group?.name || item.communityName}
+            </Link>
             </div>
             <div className="!mt-0 !flex !min-w-0 !w-full !items-center !gap-x-1.5 text-[11px] !leading-[14px] text-[color:var(--app-text-soft)] sm:text-xs sm:!leading-4">
-              <span aria-hidden="true" className="shrink-0">·</span>
+              {/* <span aria-hidden="true" className="shrink-0">·</span> */}
               <span className="!m-0 shrink-0 whitespace-nowrap !p-0 !leading-[14px] sm:!leading-4">
                 {timeAgo(item.createdAt, isId)}
               </span>
@@ -3065,7 +3065,7 @@ export function CommunityPostCard({
 
       {/* ================= REACTION SUMMARY + ACTION BAR ================= */}
 
-      {(reactionCount > 0 || commentCount > 0 || item.stats.shares > 0) ? (
+      {/* {(reactionCount > 0 || commentCount > 0 || item.stats.shares > 0) ? (
         <div className="flex min-h-9 items-center justify-between gap-3 border-t border-[color:var(--app-border)] px-3.5 pt-2 text-[11px] font-medium text-[color:var(--app-text-soft)] sm:px-4">
           <div className="flex min-w-0 items-center gap-1.5">
             {reactionCount > 0 ? (
@@ -3091,7 +3091,7 @@ export function CommunityPostCard({
                 : 'View discussion'}
           </button>
         </div>
-      ) : null}
+      ) : null} */}
 
       <div className="grid grid-cols-4 border-y border-[color:var(--app-border)] px-1 py-1 sm:px-2">
         <button
