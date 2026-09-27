@@ -984,7 +984,7 @@ export function UmkmDiscoveryPanel({
     initialCount ?? (hasInitialStores ? initialStores.length : null),
   );
   const [listPage, setListPage] = useState(1);
-  const [discoveryScope, setDiscoveryScope] = useState<DiscoveryScope>('registered');
+  const [discoveryScope, setDiscoveryScope] = useState<DiscoveryScope>('all');
   const [hasMore, setHasMore] = useState(
     () => (initialStores?.length || 0) >= Math.max(1, Math.min(limit, 50)),
   );
@@ -1108,6 +1108,12 @@ export function UmkmDiscoveryPanel({
       ) || null
     );
   }, [initialStores, selectedSlug, selectedStoreIdInitial]);
+
+  const handleDiscoveryScopeChange = useCallback((scope: DiscoveryScope) => {
+    setDiscoveryScope(scope);
+    setListPage(1);
+    setSelectedStoreId(null);
+  }, []);
 
   const loadStoresPage = useCallback(
     async ({
@@ -1409,7 +1415,10 @@ export function UmkmDiscoveryPanel({
   const visibleStores = useMemo(
     () =>
       preparedStores.filter(place => {
-        if (isUmkmMapPublicReference(place.store)) return false;
+        const isReference = isUmkmMapPublicReference(place.store);
+        if (discoveryScope === 'registered' && isReference) return false;
+        if (discoveryScope === 'references' && !isReference) return false;
+        if (isReference) return true;
         return matchesUmkmDiscoveryCategory(
           {
             kind: place.ui.kind,
@@ -1531,7 +1540,9 @@ export function UmkmDiscoveryPanel({
     (referenceNextCursor !== null || referenceNextOffset !== null);
   const canLoadMoreList =
     hasLocallyHiddenPlaces ||
-    (discoveryScope === 'references' ? canLoadMoreReferences : hasMore);
+    (discoveryScope !== 'registered'
+      ? canLoadMoreReferences || hasMore
+      : hasMore);
   const loadingMoreForScope =
     discoveryScope === 'references' ? loadingMoreReferences : loadingMore;
   const handleLoadMore = useCallback(() => {
@@ -1539,14 +1550,12 @@ export function UmkmDiscoveryPanel({
       setListPage(current => current + 1);
       return;
     }
-    if (discoveryScope === 'references') {
-      if (
-        !canLoadMoreReferences ||
-        (referenceNextCursor === null && referenceNextOffset === null) ||
-        loadingMoreReferences
-      ) {
-        return;
-      }
+    if (
+      discoveryScope !== 'registered' &&
+      canLoadMoreReferences &&
+      (referenceNextCursor !== null || referenceNextOffset !== null) &&
+      !loadingMoreReferences
+    ) {
       void loadReferencesPage({
         cursor: referenceNextCursor,
         offset: referenceNextCursor ? 0 : referenceNextOffset,
