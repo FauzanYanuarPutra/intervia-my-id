@@ -80,11 +80,13 @@ pub async fn generate_for_entity(db: &PgPool, entity_id: Uuid) -> Result<Value, 
             String,
             bool,
             bool,
+            bool,
         ),
     >(
         r#"SELECT e.id, e.source_id, e.normalized_name, e.normalized_address, e.city, e.province,
                    e.latitude, e.longitude, e.resolution_status, e.metadata,
-                   s.auto_publish_reference, s.reuse_mode, s.storage_allowed, s.enabled
+                   s.auto_publish_reference, s.reuse_mode, s.storage_allowed, s.enabled,
+                   s.last_checked_at > NOW() - INTERVAL '7 days' AS source_fresh
             FROM data_import_entities e
             JOIN data_source_registry s ON s.id=e.source_id
             WHERE e.id=$1 LIMIT 1"#,
@@ -108,6 +110,7 @@ pub async fn generate_for_entity(db: &PgPool, entity_id: Uuid) -> Result<Value, 
         reuse_mode,
         storage_allowed,
         source_enabled,
+        source_fresh,
     )) = entity
     else {
         return Ok(json!({"found":false}));
@@ -140,6 +143,7 @@ pub async fn generate_for_entity(db: &PgPool, entity_id: Uuid) -> Result<Value, 
         && reuse_mode == "persistent_import"
         && storage_allowed
         && source_enabled
+        && source_fresh
         && score >= 0.70
         && !publication_blocked
         && name
