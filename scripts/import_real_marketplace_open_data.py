@@ -267,7 +267,7 @@ def fetch_json_request(
         **(headers or {}),
     }
     request = urllib.request.Request(url, data=data, method=method, headers=request_headers)
-    with urllib.request.urlopen(request, timeout=timeout) as response:
+    with open_url_with_retry(request, timeout=timeout) as response:
         charset = response.headers.get_content_charset() or "utf-8"
         return json.loads(response.read().decode(charset, errors="replace"))
 
@@ -1897,11 +1897,13 @@ def parse_csv_text(raw: bytes) -> list[dict[str, Any]]:
 
 
 def iter_csv_aggregate_insights(source: dict[str, Any], max_rows: int | None) -> Iterable[DataInsight]:
-    response = urllib.request.urlopen(
-        urllib.request.Request(
-            source["url"],
-            headers={"Accept": "text/csv,*/*", "User-Agent": USER_AGENT},
-        ),
+    request = urllib.request.Request(
+        source["url"],
+        headers={"Accept": "text/csv,*/*", "User-Agent": USER_AGENT},
+    )
+    response = open_url_with_retry(
+        request,
+        timeout=int(source.get("timeout_seconds") or 60),
     )
     try:
         content_length = response.headers.get("Content-Length")
