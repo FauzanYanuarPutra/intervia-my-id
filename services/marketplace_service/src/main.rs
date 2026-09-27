@@ -36,6 +36,7 @@ mod business_moderation;
 mod businesses;
 mod content_projection;
 mod crm_matching;
+mod data_governance;
 mod health;
 mod identity_projection;
 mod moderation;
@@ -2145,6 +2146,7 @@ async fn main() -> anyhow::Result<()> {
     let app = Router::new()
         .merge(blog::router())
         .merge(businesses::router())
+        .merge(data_governance::router())
         .merge(business_moderation::router())
         .merge(news::router())
         .route("/health", get(health))
