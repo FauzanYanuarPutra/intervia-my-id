@@ -151,6 +151,38 @@ struct LinkedTransactionFundingOutcome {
     currency: String,
 }
 
+fn spawn_data_ingestion_refresh_loop(state: Arc<AppState>) {
+    tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(std::time::Duration::from_secs(15 * 60));
+        ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        ticker.tick().await;
+
+        loop {
+            ticker.tick().await;
+
+            match data_governance::bootstrap_persistent_imports(state.clone()).await {
+                Ok(count) if count > 0 => {
+                    tracing::info!(count, "queued scheduled persistent data imports");
+                }
+                Ok(_) => {}
+                Err(error) => {
+                    tracing::warn!("scheduled persistent data bootstrap failed: {:?}", error);
+                }
+            }
+
+            match data_governance::bootstrap_reference_publication(state.clone()).await {
+                Ok(count) if count > 0 => {
+                    tracing::info!(count, "published scheduled eligible reference records");
+                }
+                Ok(_) => {}
+                Err(error) => {
+                    tracing::warn!("scheduled reference publication reconciliation failed: {:?}", error);
+                }
+            }
+        }
+    });
+}
+
 fn parse_cors_origins() -> Vec<HeaderValue> {
     let raw = env::var("CORS_ORIGINS")
         .ok()
@@ -2079,6 +2111,8 @@ async fn main() -> anyhow::Result<()> {
         notification_tx,
     });
     data_governance::bootstrap_governed_data(state.clone()).await;
+
+    spawn_data_ingestion_refresh_loop(state.clone());
 
     let identity_projection_config = IdentityProjectionConfig::from_env();
     if identity_projection_config.enabled {
