@@ -1646,13 +1646,13 @@ pub async fn bootstrap_persistent_imports(state: Arc<AppState>) -> Result<u64, s
                     Some(job_id)
                 }
                 "running" => None,
-                "succeeded" | "partial" => {
+                "succeeded" => {
                     let recent_success = sqlx::query_scalar::<_, bool>(
                         r#"
                         SELECT finished_at > NOW() - ($2::text || ' hours')::interval
                         FROM data_import_jobs
                         WHERE id = $1
-                        "#,
+                        "#
                     )
                     .bind(job_id)
                     .bind(refresh_hours)
@@ -1667,14 +1667,39 @@ pub async fn bootstrap_persistent_imports(state: Arc<AppState>) -> Result<u64, s
                                 INSERT INTO data_import_jobs (source_id, job_key, mode, status)
                                 VALUES ($1, $2, 'import', 'queued')
                                 RETURNING id
-                                "#,
+                                "#
                             )
                             .bind(source_id)
-                            .bind(format!(
-                                "bootstrap:{}:{}",
-                                source_key,
-                                Uuid::new_v4().simple()
-                            ))
+                            .bind(format!("bootstrap:{}:{}", source_key, Uuid::new_v4().simple()))
+                            .fetch_one(db)
+                            .await?,
+                        )
+                    }
+                }
+                "partial" => {
+                    let recent_partial = sqlx::query_scalar::<_, bool>(
+                        r#"
+                        SELECT finished_at > NOW() - INTERVAL '30 minutes'
+                        FROM data_import_jobs
+                        WHERE id = $1
+                        "#
+                    )
+                    .bind(job_id)
+                    .fetch_one(db)
+                    .await?;
+                    if recent_partial {
+                        None
+                    } else {
+                        Some(
+                            sqlx::query_scalar::<_, Uuid>(
+                                r#"
+                                INSERT INTO data_import_jobs (source_id, job_key, mode, status)
+                                VALUES ($1, $2, 'refresh', 'queued')
+                                RETURNING id
+                                "#
+                            )
+                            .bind(source_id)
+                            .bind(format!("retry-partial:{}:{}", source_key, Uuid::new_v4().simple()))
                             .fetch_one(db)
                             .await?,
                         )
