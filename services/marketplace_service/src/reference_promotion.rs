@@ -199,7 +199,7 @@ async fn promote_candidate(
         name, address, city, province, lat, lon, resolution_status, canonical_record_id,
         source_record_id, source_record_url, record_license, record_attribution,
         record_kind, source_key, provider_name, source_url, source_license, source_license_url,
-        source_attribution, reuse_mode, storage_allowed
+        source_attribution, reuse_mode, storage_allowed, source_enabled
     )) = candidate else {
         return Err(anyhow!("promotion candidate not found"));
     };
