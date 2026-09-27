@@ -1104,6 +1104,7 @@ pub async fn sync_static_source_registry(db: &PgPool) -> Result<(), sqlx::Error>
             _ => "review_required",
         };
         let storage_allowed = reuse_mode == "persistent_import";
+        let enabled = reuse_mode != "live_only";
         let api_url = source.dataset_id.as_ref().map(|dataset_id| format!("https://data.go.id/api/action/package_show?id={}", dataset_id));
         let notes = match (source.dataset_id, source.notes) {
             (Some(dataset_id), Some(notes)) => Some(format!("{} dataset_id={}", notes, dataset_id)),
