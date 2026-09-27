@@ -2912,11 +2912,6 @@ export function UmkmStorefrontClient({
       icon: Heart,
     },
   ];
-  const isStoreOwner = Boolean(
-    store &&
-      user?.id &&
-      String(resolveOwnerId(store)).trim().toLowerCase() === String(user.id).trim().toLowerCase(),
-  );
   const galleryTabEnabled = true;
   const galleryHasVideo = storeGallery.some(item => item.mediaType === 'video');
   const activeGalleryItem =
@@ -3170,7 +3165,6 @@ export function UmkmStorefrontClient({
           );
         }
 
-        setGalleryUploadOpen(false);
         showStorefrontToast(
           'success',
           isId ? 'Media tersimpan' : 'Media saved',
