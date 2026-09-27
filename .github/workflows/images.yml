@@ -67,6 +67,9 @@ jobs:
           - image: lajukan-crm
             context: ./frontend
             dockerfile: apps/crm/Dockerfile
+          - image: lajukan-real-data-bootstrap
+            context: .
+            dockerfile: services/real_data_bootstrap/Dockerfile
 
     steps:
       - uses: actions/checkout@v7
