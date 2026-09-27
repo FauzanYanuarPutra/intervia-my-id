@@ -120,7 +120,29 @@ pub async fn run(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
                 .execute(&state.db).await;
 
                 match result {
-                    Ok(_) => accepted += 1,
+                    Ok(_) => {
+                        match sqlx::query_scalar::<_, uuid::Uuid>(
+                            "SELECT id FROM data_import_records WHERE source_id=$1 AND source_record_id=$2 LIMIT 1"
+                        )
+                        .bind(source.0)
+                        .bind(&record_id)
+                        .fetch_one(&state.db)
+                        .await {
+                            Ok(import_record_id) => {
+                                if let Err(error) = crate::data_entity_resolution::index_record(
+                                    &state.db, source.0, import_record_id, &safe
+                                ).await {
+                                    errors += 1;
+                                    tracing::warn!("entity normalization failed: {:?}", error);
+                                }
+                            }
+                            Err(error) => {
+                                errors += 1;
+                                tracing::warn!("import record lookup failed: {:?}", error);
+                            }
+                        }
+                        accepted += 1;
+                    }
                     Err(error) => { errors += 1; tracing::warn!("record import failed: {:?}", error); }
                 }
             }
