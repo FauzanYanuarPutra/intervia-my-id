@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { submissionFormFromItem } from './MyNewsSubmissions';
+import { submissionFormFromItem } from './MyNewsSubmissions.helpers';
 
 describe('submissionFormFromItem', () => {
   it('hydrates editable fields while excluding internal routing tags', () => {
