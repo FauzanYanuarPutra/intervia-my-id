@@ -710,7 +710,7 @@ async fn review_claim(
         }
     } else {
         let next_status = if decision == "under_review" { "under_review" } else { "rejected" };
-        sqlx::query(
+        match sqlx::query(
             r#"
             UPDATE business_claims
             SET status = $2,
