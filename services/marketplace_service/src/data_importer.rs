@@ -55,7 +55,6 @@ type SourceRow = (
     Option<String>,
 );
 
-
 // Import adapters currently support governed CKAN/DataStore and OSM Overpass sources.
 // File-resource adapters are intentionally added separately so licensing and size limits
 // remain explicit rather than silently treating every downloadable URL as reusable.

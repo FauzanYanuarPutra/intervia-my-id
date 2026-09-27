@@ -404,8 +404,8 @@ fn score_candidate(requirement: &RequirementItem, candidate: &CandidateItem) -> 
         ((overlap as f64 / need_tokens.len() as f64) * 25.0).min(25.0)
     };
 
-    let requirement_category = category_from(&requirement.metadata)
-        .or_else(|| requirement.category.clone().map(text));
+    let requirement_category =
+        category_from(&requirement.metadata).or_else(|| requirement.category.clone().map(text));
     let candidate_category =
         category_from(&candidate.metadata).or_else(|| candidate.category.clone().map(text));
     let category_fit = match (requirement_category.clone(), candidate_category.clone()) {
