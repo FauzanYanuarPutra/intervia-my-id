@@ -575,10 +575,13 @@ export default function CommunityGroupDetailClient({
       if (alive) setLoadingFeed(true);
     });
 
-    fetch(`/api/community/feed?${params.toString()}`, {
-      cache: 'no-store',
-      credentials: 'include',
-    })
+    fetch(
+      `/api/community/groups/feed?${params.toString()}`,
+      {
+        cache: 'no-store',
+        credentials: 'include',
+      },
+    )
       .then(response => response.json())
       .then((payload: CommunityFeedResponse) => {
         if (!alive) return;
@@ -644,10 +647,13 @@ export default function CommunityGroupDetailClient({
     params.set('limit', '12');
     params.set('cursor', String(nextCursor));
     params.set('sort', feedSort);
-    const response = await fetch(`/api/community/feed?${params.toString()}`, {
-      cache: 'no-store',
-      credentials: 'include',
-    });
+    const response = await fetch(
+      `/api/community/groups/feed?${params.toString()}`,
+      {
+        cache: 'no-store',
+        credentials: 'include',
+      },
+    );
     const payload = (await response
       .json()
       .catch(() => ({}))) as Partial<CommunityFeedResponse>;
