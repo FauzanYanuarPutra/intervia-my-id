@@ -472,7 +472,6 @@ out center tags;
                 "addr:postcode",
                 "wikidata",
                 "wikimedia_commons",
-                "image",
             ];
             let mut safe_map = serde_json::Map::new();
             for key in allowed_keys {
