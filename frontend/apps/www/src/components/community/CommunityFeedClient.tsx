@@ -5667,31 +5667,43 @@ export function GroupCard({
           >
             {isId ? 'Lihat grup' : 'View group'}
           </Link>
-          <button
-            type="button"
-            onClick={joinOrLeave}
-            disabled={busy || pending}
-            className={cn(
-              'inline-flex min-h-[38px] flex-1 items-center justify-center gap-1.5 rounded-[13px] px-3 text-xs font-bold transition disabled:cursor-wait disabled:opacity-60',
-              compact && 'min-h-[34px] text-[11px]',
-              joined
-                ? 'border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] hover:bg-slate-100'
-                : 'bg-[color:var(--app-accent)] text-white hover:bg-[color:var(--app-accent-strong)]',
-            )}
-          >
-            {busy ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : joined ? (
+          {joined ? (
+            <span
+              className={cn(
+                'inline-flex min-h-[38px] flex-1 items-center justify-center gap-1.5 rounded-[13px] border border-emerald-200 bg-emerald-50 px-3 text-xs font-bold text-emerald-700',
+                compact && 'min-h-[34px] text-[11px]',
+              )}
+            >
               <ShieldCheck className="h-4 w-4" />
-            ) : (
-              <Plus className="h-4 w-4" />
-            )}
-            {pending
-              ? isId ? 'Pending' : 'Pending'
-              : joined
-                ? isId ? 'Sudah join' : 'Joined'
-                : isId ? 'Gabung' : 'Join'}
-          </button>
+              {isId ? 'Sudah bergabung' : 'Joined'}
+            </span>
+          ) : pending ? (
+            <span
+              className={cn(
+                'inline-flex min-h-[38px] flex-1 items-center justify-center gap-1.5 rounded-[13px] border border-amber-200 bg-amber-50 px-3 text-xs font-bold text-amber-700',
+                compact && 'min-h-[34px] text-[11px]',
+              )}
+            >
+              {isId ? 'Menunggu approval' : 'Pending approval'}
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={joinOrLeave}
+              disabled={busy}
+              className={cn(
+                'inline-flex min-h-[38px] flex-1 items-center justify-center gap-1.5 rounded-[13px] bg-[color:var(--app-accent)] px-3 text-xs font-bold text-white transition hover:bg-[color:var(--app-accent-strong)] disabled:cursor-wait disabled:opacity-60',
+                compact && 'min-h-[34px] text-[11px]',
+              )}
+            >
+              {busy ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Plus className="h-4 w-4" />
+              )}
+              {isId ? 'Gabung' : 'Join'}
+            </button>
+          )}
         </div>
       </div>
     </article>
@@ -5999,34 +6011,30 @@ function SearchGroupResult({
         >
           {isId ? 'Lihat grup' : 'View group'}
         </Link>
-        <button
-          type="button"
-          onClick={joinOrLeave}
-          disabled={busy || pending}
-          className={cn(
-            'inline-flex min-h-[36px] flex-1 items-center justify-center gap-2 rounded-[13px] text-xs font-bold disabled:opacity-60',
-            joined
-              ? 'border border-[color:var(--app-border)] bg-white text-[color:var(--app-text)]'
-              : 'bg-[color:var(--app-accent)] text-white',
-          )}
-        >
-          {busy ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Plus className="h-4 w-4" />
-          )}
-          {pending
-            ? isId
-              ? 'Pending'
-              : 'Pending'
-            : joined
-              ? isId
-                ? 'Sudah join'
-                : 'Joined'
-              : isId
-                ? 'Gabung'
-                : 'Join'}
-        </button>
+        {joined ? (
+          <span className="inline-flex min-h-[36px] flex-1 items-center justify-center gap-1.5 rounded-[13px] border border-emerald-200 bg-emerald-50 text-xs font-bold text-emerald-700">
+            <ShieldCheck className="h-4 w-4" />
+            {isId ? 'Sudah bergabung' : 'Joined'}
+          </span>
+        ) : pending ? (
+          <span className="inline-flex min-h-[36px] flex-1 items-center justify-center rounded-[13px] border border-amber-200 bg-amber-50 text-xs font-bold text-amber-700">
+            {isId ? 'Menunggu approval' : 'Pending approval'}
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={joinOrLeave}
+            disabled={busy}
+            className="inline-flex min-h-[36px] flex-1 items-center justify-center gap-2 rounded-[13px] bg-[color:var(--app-accent)] text-xs font-bold text-white disabled:opacity-60"
+          >
+            {busy ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Plus className="h-4 w-4" />
+            )}
+            {isId ? 'Gabung' : 'Join'}
+          </button>
+        )}
       </div>
     </article>
   );
