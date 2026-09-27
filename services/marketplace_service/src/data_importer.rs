@@ -323,10 +323,7 @@ out center tags;
     let mut errors = 0i32;
     let mut seen = std::collections::HashSet::new();
 
-    for (
-        bbox_index,
-        (city, province, south, west, north, east),
-    ) in bboxes.iter().enumerate() {
+    for (bbox_index, (city, province, south, west, north, east)) in bboxes.iter().enumerate() {
         if discovered >= 50_000 {
             tracing::warn!("OSM reference import reached the per-job safety cap of 50,000 records");
             break;
