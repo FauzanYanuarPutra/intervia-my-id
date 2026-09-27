@@ -7,6 +7,7 @@ on:
     paths: &image_paths
       - "services/**"
       - "frontend/**"
+      - "config/lajukan_data_source_registry.json"
       - ".github/workflows/images.yml"
       - ".github/workflows/deploy.yml"
       - "docker-compose*.yml"
