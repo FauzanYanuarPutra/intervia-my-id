@@ -1,0 +1,2 @@
+-- No destructive rollback: the follow-up migration only restores derived cover images
+-- that were created from metadata by the paired bootstrap migration.
