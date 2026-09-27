@@ -1,7 +1,6 @@
 use anyhow::{anyhow, Result};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use sqlx::PgPool;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -108,11 +107,11 @@ async fn run_inner(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
                 let result = sqlx::query(
                     "INSERT INTO data_import_records (job_id,source_id,source_record_id,source_url,source_hash,record_kind,license_snapshot,attribution_snapshot,raw_metadata,validation_status,validation_reason,last_seen_at,updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'accepted',$10,NOW(),NOW()) ON CONFLICT (source_id,source_record_id) DO UPDATE SET job_id=EXCLUDED.job_id,source_url=EXCLUDED.source_url,source_hash=EXCLUDED.source_hash,raw_metadata=EXCLUDED.raw_metadata,validation_status='accepted',last_seen_at=NOW(),updated_at=NOW()"
                 )
-                .bind(job_id).bind(source.0).bind(record_id)
+                .bind(job_id).bind(source.0).bind(&record_id)
                 .bind(resource.get("url").and_then(Value::as_str))
                 .bind(source_hash).bind(kind)
                 .bind(if resource_license.is_empty() { source.4.as_deref() } else { Some(resource_license) })
-                .bind(source.8.as_deref()).bind(safe)
+                .bind(source.8.as_deref()).bind(&safe)
                 .bind("validated resource; sensitive fields removed when policy disallows PII import")
                 .execute(&state.db).await;
 
