@@ -416,7 +416,7 @@
       "enabled_by_default": true,
       "name": "Satrup Tanah Laut RUP penyedia package feed 2026",
       "source_url": "https://satrup.tanahlautkab.go.id/dokumentasi/isb",
-      "license": "Public open API; response metadata references ISB/LKPP and SiRUP/Inaproc source lineage",
+      "license": "Public Open Data API reference; reuse subject to source terms",
       "endpoint": "https://satrup.tanahlautkab.go.id/api/open/v1/rup/penyedia",
       "status_endpoint": "https://satrup.tanahlautkab.go.id/api/open/status-rup/sirup",
       "year": 2026,
