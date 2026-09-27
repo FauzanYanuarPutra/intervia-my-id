@@ -338,6 +338,7 @@ struct PromotionCandidateSourceRow {
     reuse_mode: String,
     storage_allowed: bool,
     source_enabled: bool,
+    source_fresh: bool,
 }
 
 pub(crate) fn raw_string(raw: &Value, keys: &[&str]) -> Option<String> {
@@ -536,7 +537,8 @@ async fn promote_candidate(db: &PgPool, candidate_id: Uuid) -> AnyhowResult<Valu
           r.record_kind,
           s.source_key, s.provider_name, s.source_url, s.license_name AS source_license,
           s.license_url AS source_license_url, s.attribution_text AS source_attribution,
-          s.reuse_mode, s.storage_allowed, s.enabled AS source_enabled
+          s.reuse_mode, s.storage_allowed, s.enabled AS source_enabled,
+          s.last_checked_at > NOW() - INTERVAL '7 days' AS source_fresh
         FROM reference_promotion_candidates c
         JOIN data_import_entities e ON e.id = c.entity_id
         LEFT JOIN data_import_records r
@@ -584,6 +586,7 @@ async fn promote_candidate(db: &PgPool, candidate_id: Uuid) -> AnyhowResult<Valu
         reuse_mode,
         storage_allowed,
         source_enabled,
+        source_fresh,
     } = candidate;
 
     if promotion_status == "promoted" {
@@ -620,6 +623,11 @@ async fn promote_candidate(db: &PgPool, candidate_id: Uuid) -> AnyhowResult<Valu
     if reuse_mode != "persistent_import" || !storage_allowed || !source_enabled {
         return Err(anyhow!(
             "source is not currently enabled/approved for persistent promotion"
+        ));
+    }
+    if !source_fresh {
+        return Err(anyhow!(
+            "source validation is stale; refresh the source before promotion"
         ));
     }
 
