@@ -13,6 +13,37 @@ import {
   type SubmissionForm,
 } from './MyNewsSubmissions.helpers';
 
+function record(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function text(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function statusLabel(value: string, isId: boolean): string {
+  const labels: Record<string, [string, string]> = {
+    pending_review: ['Menunggu review', 'Pending review'],
+    needs_revision: ['Perlu revisi', 'Needs revision'],
+    rejected: ['Ditolak', 'Rejected'],
+    published: ['Terbit', 'Published'],
+    retracted: ['Ditarik', 'Retracted'],
+  };
+  const [idLabel, enLabel] = labels[value] || [value || '—', value || '—'];
+  return isId ? idLabel : enLabel;
+}
+
+function formatDate(value: string, locale: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat(locale, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(date);
+}
+
 type LoadResult =
   | { ok: true; items: NewsItem[] }
   | { ok: false; error: string };
