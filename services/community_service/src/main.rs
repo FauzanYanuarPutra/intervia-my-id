@@ -3237,7 +3237,10 @@ async fn list_group_members(
     Query(query): Query<ListGroupMembersQuery>,
 ) -> ApiResult<Json<GroupMembersResponse>> {
     let actor = optional_actor(&headers, &state);
-    if let Some(platform_admin) = actor.as_ref().filter(|value| is_platform_group_admin(value)) {
+    if let Some(platform_admin) = actor
+        .as_ref()
+        .filter(|value| is_platform_group_admin(value))
+    {
         let forum_user = ensure_forum_user(&state.db, platform_admin).await?;
         ensure_platform_group_admin_memberships(&state.db, platform_admin, &forum_user.id).await?;
     }
