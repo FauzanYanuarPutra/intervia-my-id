@@ -133,7 +133,7 @@ async fn run_inner(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
                                             &state.db, entity_id
                                         ).await {
                                             errors += 1;
-                                            tracing::warn!("reference promotion candidate generation failed: {:?}", error);
+                                            tracing::warn!("reference promotion candidate generation failed (import remains accepted): {:?}", error);
                                         }
                                     }
                                     Err(error) => {
