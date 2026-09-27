@@ -1058,7 +1058,7 @@ async fn inspect_source(
     let source = match sqlx::query_as::<_, DataSourceRow>(
         r#"SELECT id, source_key, provider_name, source_kind, source_url, api_url, terms_url,
             license_name, license_url, attribution_text, reuse_mode, storage_allowed,
-            media_storage_allowed, pii_import_allowed, enabled, refresh_interval_hours,
+            media_storage_allowed, pii_import_allowed, enabled, auto_publish_reference, refresh_interval_hours,
             last_checked_at, last_success_at, last_error_at, notes, created_at, updated_at
             FROM data_source_registry WHERE source_key = $1 LIMIT 1"#,
     )
