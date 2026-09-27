@@ -1850,7 +1850,7 @@ def parse_csv_text(raw: bytes) -> list[dict[str, Any]]:
             sample = text[:8192]
             delimiter = ","
             try:
-                delimiter = csv.Sniffer().sniff(sample, delimiters=",;\\t|").delimiter
+                delimiter = csv.Sniffer().sniff(sample, delimiters=",;\t|").delimiter
             except csv.Error:
                 pass
             reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
