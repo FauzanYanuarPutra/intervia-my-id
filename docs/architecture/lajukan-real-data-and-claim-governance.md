@@ -128,6 +128,10 @@ Never import:
 
 AI may normalize, categorize, summarize, translate, or detect duplicates, but it must not invent business facts.
 
+## OpenStreetMap reference ingestion
+
+Lajukan may ingest selected public OSM business/place tags through a read-only Overpass source. OSM data is published under ODbL and requires attribution; Lajukan therefore stores source URL, license and attribution and publishes these rows only as unowned references. The importer deliberately excludes phone, email, WhatsApp, financial identifiers and other contact/personal fields. Overpass calls are sequential, rate-limited and bounded by geographic/category allowlists rather than attempting an uncontrolled country-wide crawl. This follows the public-service constraints described by the Overpass documentation. citeturn0search6turn1search3
+
 ## Deterministic reference publication
 
 A source may explicitly opt into `auto_publish_reference=true` only after its persistent reuse policy is approved. This flag is a publication policy, not an ownership or verification flag.
