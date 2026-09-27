@@ -44,7 +44,9 @@ mod rate_limit;
 mod runtime_metrics;
 mod schema_contract;
 
-use auth::{is_moderator, is_platform_group_admin, optional_actor, request_ip, require_actor, AuthActor};
+use auth::{
+    is_moderator, is_platform_group_admin, optional_actor, request_ip, require_actor, AuthActor,
+};
 use health::{health, ready, root, service_metrics};
 use identity_sync::{
     ensure_forum_user, run_identity_inbox_processor, run_identity_profile_consumer,
@@ -2331,7 +2333,10 @@ async fn list_groups(
     Query(query): Query<ListGroupsQuery>,
 ) -> ApiResult<Json<GroupsResponse>> {
     let actor = optional_actor(&headers, &state);
-    if let Some(platform_admin) = actor.as_ref().filter(|value| is_platform_group_admin(value)) {
+    if let Some(platform_admin) = actor
+        .as_ref()
+        .filter(|value| is_platform_group_admin(value))
+    {
         let forum_user = ensure_forum_user(&state.db, platform_admin).await?;
         ensure_platform_group_admin_memberships(&state.db, platform_admin, &forum_user.id).await?;
     }
@@ -3237,9 +3242,9 @@ async fn list_group_members(
     let group = fetch_group(&state.db, viewer_id.as_deref(), &group_id).await?;
     let can_view_private = group.privacy == "public"
         || group.viewer_membership_status.as_deref() == Some("active")
-        || actor.as_ref().is_some_and(|value| {
-            is_moderator(value) || is_platform_group_admin(value)
-        });
+        || actor
+            .as_ref()
+            .is_some_and(|value| is_moderator(value) || is_platform_group_admin(value));
     if !can_view_private {
         return Err(ApiError::new(StatusCode::FORBIDDEN, "Forbidden"));
     }
