@@ -29,9 +29,9 @@
       "kind": "government_open_data",
       "url": "https://data.go.id/dataset/dataset/umkm",
       "dataset_id": "4a6e5e83-237a-49f9-b7a1-97fadd82f6c3",
-      "reuse_mode": "persistent_import_if_license_validated",
+      "reuse_mode": "persistent_import",
       "license": "Creative Commons Attribution (as stated in dataset metadata)",
-      "notes": "Resource-level fields and current license should be rechecked on each refresh."
+      "notes": "Lisensi Creative Commons Attribution dinyatakan pada metadata dataset. Persistent import diizinkan; data tetap dipublikasikan sebagai reference/unclaimed dan tidak menjadi bukti kepemilikan."
     },
     {
       "id": "data-go-id-sukoharjo-umkm",
