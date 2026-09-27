@@ -539,16 +539,16 @@ async fn run_osm_reference_import(
         .ok_or_else(|| anyhow!("OSM source has no Overpass endpoint"))?;
 
     let cities: &[(&str, &str, f64, f64, f64)] = &[
-        ("Jakarta", "DKI Jakarta", -6.2088, 106.8456, 20_000.0),
-        ("Bogor", "Jawa Barat", -6.5950, 106.8166, 15_000.0),
-        ("Tangerang", "Banten", -6.1783, 106.6319, 15_000.0),
-        ("Bekasi", "Jawa Barat", -6.2383, 106.9756, 15_000.0),
-        ("Bandung", "Jawa Barat", -6.9175, 107.6191, 18_000.0),
-        ("Surabaya", "Jawa Timur", -7.2575, 112.7521, 18_000.0),
-        ("Medan", "Sumatera Utara", 3.5952, 98.6722, 18_000.0),
-        ("Semarang", "Jawa Tengah", -6.9667, 110.4167, 16_000.0),
-        ("Makassar", "Sulawesi Selatan", -5.1477, 119.4327, 16_000.0),
-        ("Yogyakarta", "DI Yogyakarta", -7.7956, 110.3695, 15_000.0),
+        ("Jakarta", "DKI Jakarta", -6.2088, 106.8456, 10_000.0),
+        ("Bogor", "Jawa Barat", -6.5950, 106.8166, 10_000.0),
+        ("Tangerang", "Banten", -6.1783, 106.6319, 10_000.0),
+        ("Bekasi", "Jawa Barat", -6.2383, 106.9756, 10_000.0),
+        ("Bandung", "Jawa Barat", -6.9175, 107.6191, 10_000.0),
+        ("Surabaya", "Jawa Timur", -7.2575, 112.7521, 10_000.0),
+        ("Medan", "Sumatera Utara", 3.5952, 98.6722, 10_000.0),
+        ("Semarang", "Jawa Tengah", -6.9667, 110.4167, 10_000.0),
+        ("Makassar", "Sulawesi Selatan", -5.1477, 119.4327, 10_000.0),
+        ("Yogyakarta", "DI Yogyakarta", -7.7956, 110.3695, 10_000.0),
         ("Denpasar", "Bali", -8.6500, 115.2167, 15_000.0),
         ("Palembang", "Sumatera Selatan", -2.9761, 104.7754, 16_000.0),
         ("Bandar Lampung", "Lampung", -5.3971, 105.2668, 15_000.0),
@@ -596,13 +596,16 @@ async fn run_osm_reference_import(
     ];
 
     let query = r#"
-[out:json][timeout:110];
+[out:json][timeout:90][maxsize:536870912];
 (
   nwr(around:{radius},{lat},{lng})["name"]["shop"];
   nwr(around:{radius},{lat},{lng})["name"]["craft"];
   nwr(around:{radius},{lat},{lng})["name"]["office"];
   nwr(around:{radius},{lat},{lng})["name"]["industrial"];
-  nwr(around:{radius},{lat},{lng})["name"]["amenity"="marketplace"];
+  nwr(around:{radius},{lat},{lng})["name"]["amenity"];
+  nwr(around:{radius},{lat},{lng})["name"]["tourism"];
+  nwr(around:{radius},{lat},{lng})["name"]["healthcare"];
+  nwr(around:{radius},{lat},{lng})["name"]["leisure"];
 );
 out center tags;
 "#;
@@ -630,7 +633,8 @@ out center tags;
         let endpoints = if endpoint == "https://overpass-api.de/api/interpreter" {
             vec![
                 endpoint.to_string(),
-                "https://overpass.kumi.systems/api/interpreter".to_string(),
+                "https://overpass.private.coffee/api/interpreter".to_string(),
+                "https://maps.mail.ru/osm/tools/overpass/api/interpreter".to_string(),
             ]
         } else {
             vec![endpoint.to_string()]
