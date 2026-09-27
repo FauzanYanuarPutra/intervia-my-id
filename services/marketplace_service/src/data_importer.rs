@@ -267,13 +267,6 @@ async fn run_inner(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
         "SELECT id, source_key, source_kind, source_url, api_url, license_name, reuse_mode, storage_allowed, pii_import_allowed, attribution_text FROM data_source_registry WHERE id=$1"
     ).bind(job.1).fetch_one(&state.db).await?;
 
-    sqlx::query(
-        "UPDATE data_source_registry SET last_checked_at=NOW(), last_error_at=NULL, updated_at=NOW() WHERE id=$1",
-    )
-    .bind(source.0)
-    .execute(&state.db)
-    .await?;
-
     if job.2 != "dry_run" && !(source.6 == "persistent_import" && source.7) {
         sqlx::query("UPDATE data_import_jobs SET status='failed', finished_at=NOW(), error_count=1, error_summary=$2 WHERE id=$1")
             .bind(job_id).bind("persistent import is not permitted by source policy").execute(&state.db).await?;
@@ -310,6 +303,13 @@ async fn run_inner(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
         .and_then(Value::as_array)
         .cloned()
         .unwrap_or_default();
+
+    sqlx::query(
+        "UPDATE data_source_registry SET last_checked_at=NOW(), last_error_at=NULL, updated_at=NOW() WHERE id=$1",
+    )
+    .bind(source.0)
+    .execute(&state.db)
+    .await?;
 
     let mut discovered = 0i32;
     let mut accepted = 0i32;
@@ -771,6 +771,13 @@ out center tags;
             tracing::warn!(city=%city, "all configured OSM Overpass endpoints failed");
             continue;
         };
+
+        sqlx::query(
+            "UPDATE data_source_registry SET last_checked_at=NOW(), last_error_at=NULL, updated_at=NOW() WHERE id=$1",
+        )
+        .bind(*source_id)
+        .execute(&state.db)
+        .await?;
 
         for element in payload
             .get("elements")
