@@ -10886,12 +10886,12 @@ async fn fetch_liked_content_ids(
         return Ok(HashSet::new());
     }
     let liked_ids = sqlx::query_scalar::<_, Uuid>(
-        r#"
+        r###"
         SELECT content_id
         FROM content_item_likes
         WHERE user_id = $1
           AND content_id = ANY($2)
-        "#,
+        "###,,
     )
     .bind(user_id)
     .bind(&content_ids)
