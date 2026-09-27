@@ -38,7 +38,7 @@ fn base_url(api_url: &str) -> Option<&str> {
     api_url.split("/api/").next().filter(|v| !v.is_empty())
 }
 
-pub async fn run(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
+async fn run_inner(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
     let job = sqlx::query_as::<_, (Uuid, Uuid, String, String)>(
         "UPDATE data_import_jobs SET status='running', started_at=NOW(), error_summary=NULL WHERE id=$1 AND status='queued' RETURNING id, source_id, mode, status"
     ).bind(job_id).fetch_optional(&state.db).await?;
@@ -157,4 +157,31 @@ pub async fn run(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
         .execute(&state.db).await?;
 
     Ok(())
+}
+
+
+pub async fn run(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
+    match run_inner(state.clone(), job_id).await {
+        Ok(()) => Ok(()),
+        Err(error) => {
+            let summary = error.to_string().chars().take(2000).collect::<String>();
+            if let Err(db_error) = sqlx::query(
+                "UPDATE data_import_jobs
+                 SET status='failed', finished_at=NOW(), error_count=GREATEST(error_count, 1),
+                     error_summary=$2
+                 WHERE id=$1 AND status='running'"
+            )
+            .bind(job_id)
+            .bind(&summary)
+            .execute(&state.db)
+            .await
+            {
+                tracing::error!(
+                    "failed to persist importer recovery state for job {}: {:?}; original error: {}",
+                    job_id, db_error, summary
+                );
+            }
+            Err(error)
+        }
+    }
 }
