@@ -80,6 +80,15 @@ export type DiscoveryStore = UmkmMapStore & {
   max_table_capacity?: number;
   reservation_enabled?: boolean;
   metadata?: Record<string, unknown>;
+  products?: Array<{
+    id: string;
+    name: string;
+    description?: string | null;
+    category?: string | null;
+    price_cents: number;
+    image_url?: string | null;
+    is_available: boolean;
+  }>;
 };
 
 type StoresResponse = {
@@ -98,6 +107,14 @@ type StoresResponse = {
 const LIST_PAGE_SIZE = 10;
 const REPORT_EMAIL = 'support@lajukan.com';
 
+function formatDiscoveryPrice(valueCents: number, isId: boolean): string {
+  const value = Math.max(0, Math.round(valueCents / 100));
+  return new Intl.NumberFormat(isId ? 'id-ID' : 'en-US', {
+    style: 'currency',
+    currency: 'IDR',
+    maximumFractionDigits: 0,
+  }).format(value);
+}
 function publicBusinessMetaText(store: DiscoveryStore, ...keys: string[]): string {
   const metadata = store.metadata || {};
   for (const key of keys) {
@@ -2498,6 +2515,25 @@ export function UmkmDiscoveryPanel({
           </div>
         ) : selectedPlace ? (
           <>
+            <div className="flex min-w-0 items-center justify-between gap-2 rounded-[18px] border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-3 py-2.5 dark:border-[color:var(--app-accent-border)]">
+              <div className="min-w-0">
+                <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[color:var(--app-accent)]">
+                  {isId ? 'Detail usaha' : 'Business detail'}
+                </p>
+                <p className="mt-0.5 truncate text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+                  {selectedPlace.store.name}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleClearSelectedStore}
+                className="inline-flex min-h-9 shrink-0 items-center gap-1 rounded-full bg-white px-3 text-[10px] font-bold text-[color:var(--app-accent)] shadow-sm dark:bg-slate-950"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+                {isId ? 'Kembali ke peta' : 'Back to map'}
+              </button>
+            </div>
+
             <div className="grid min-w-0 gap-3 lg:grid-cols-1 lg:gap-4">
               <div className="min-w-0 space-y-3">
                 <article
@@ -2654,6 +2690,96 @@ export function UmkmDiscoveryPanel({
                     </div>
                   </div>
                 </article>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <section className="min-w-0 overflow-hidden rounded-[20px] border border-slate-200/80 bg-white p-3 dark:border-slate-800 dark:bg-slate-950/82">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[color:var(--app-text-soft)]">Media</p>
+                        <p className="mt-0.5 text-[11px] font-semibold text-[color:var(--app-text)]">
+                          {selectedPlace.ui.gallery.length
+                            ? selectedPlace.ui.gallery.length + ' ' + (isId ? 'media' : 'items')
+                            : isId
+                              ? 'Belum ada media'
+                              : 'No media yet'}
+                        </p>
+                      </div>
+                      <Link
+                        href={buildUmkmMapPlacePath(selectedPlace.store)}
+                        className="text-[10px] font-bold text-[color:var(--app-accent)]"
+                      >
+                        {isId ? 'Buka detail' : 'Open detail'}
+                      </Link>
+                    </div>
+                    {selectedPlace.ui.gallery.length ? (
+                      <div className="mt-2 grid grid-cols-4 gap-1.5">
+                        {selectedPlace.ui.gallery.slice(0, 4).map((src, index) => (
+                          <Link
+                            key={src + index}
+                            href={buildUmkmMapPlacePath(selectedPlace.store)}
+                            className="relative block aspect-square overflow-hidden rounded-[12px] bg-slate-100 dark:bg-slate-800"
+                            aria-label={(isId ? 'Buka media ' : 'Open media ') + String(index + 1)}
+                          >
+                            <PlaceThumb
+                              src={src}
+                              alt={selectedPlace.store.name + ' ' + String(index + 1)}
+                              className="h-full w-full rounded-[12px]"
+                            />
+                            {index === 3 && selectedPlace.ui.gallery.length > 4 ? (
+                              <span className="absolute inset-0 grid place-items-center bg-black/50 text-[11px] font-extrabold text-white">
+                                +{selectedPlace.ui.gallery.length - 4}
+                              </span>
+                            ) : null}
+                          </Link>
+                        ))}
+                      </div>
+                    ) : null}
+                  </section>
+
+                  <section className="min-w-0 overflow-hidden rounded-[20px] border border-slate-200/80 bg-white p-3 dark:border-slate-800 dark:bg-slate-950/82">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[color:var(--app-text-soft)]">
+                          {isId ? 'Produk' : 'Products'}
+                        </p>
+                        <p className="mt-0.5 text-[11px] font-semibold text-[color:var(--app-text)]">
+                          {selectedPlace.store.products?.length
+                            ? selectedPlace.store.products.length + '+ ' + (isId ? 'produk' : 'products')
+                            : isId
+                              ? 'Produk belum tersedia'
+                              : 'No products yet'}
+                        </p>
+                      </div>
+                      <Link
+                        href={buildUmkmMapPlacePath(selectedPlace.store)}
+                        className="text-[10px] font-bold text-[color:var(--app-accent)]"
+                      >
+                        {isId ? 'Lihat semua' : 'View all'}
+                      </Link>
+                    </div>
+                    {selectedPlace.store.products?.length ? (
+                      <div className="mt-2 space-y-2">
+                        {selectedPlace.store.products.slice(0, 3).map(product => (
+                          <div key={product.id} className="flex min-w-0 items-center gap-2">
+                            <PlaceThumb
+                              src={product.image_url || selectedPlace.ui.gallery[0] || selectedPlace.ui.coverImage}
+                              alt={product.name}
+                              className="h-12 w-12 shrink-0 rounded-[12px]"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-[11px] font-bold text-[color:var(--app-text)]">
+                                {product.name}
+                              </p>
+                              <p className="mt-0.5 text-[10px] font-semibold text-[color:var(--app-accent)]">
+                                {formatDiscoveryPrice(product.price_cents, isId)}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                  </section>
+                </div>
 
                 {selectedIsPublicReference ? (
                   <PublicReferenceNotice
