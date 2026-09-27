@@ -12,9 +12,12 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import {
   ArrowRight,
   BadgeCheck,
+  Camera,
   Clapperboard,
   Clock3,
   Heart,
+  Upload,
+  Trash2,
   ImageIcon,
   LayoutDashboard,
   Loader2,
@@ -994,6 +997,9 @@ export function UmkmStorefrontClient({
     null,
   );
   const [galleryLikes, setGalleryLikes] = useState<Record<string, boolean>>({});
+  const [galleryUploadOpen, setGalleryUploadOpen] = useState(false);
+  const [galleryUploading, setGalleryUploading] = useState(false);
+  const galleryUploadInputRef = useRef<HTMLInputElement | null>(null);
   const [checkoutOpen, setCheckoutOpen] = useState(checkoutRequestedFromUrl);
   const mapTheme: UmkmMapTheme = 'default';
   const [routeSummary, setRouteSummary] = useState<UmkmMapRouteSummary | null>(
@@ -2907,7 +2913,8 @@ export function UmkmStorefrontClient({
       icon: Heart,
     },
   ];
-  const galleryTabEnabled = storeGallery.length > 0;
+  const isStoreOwner = Boolean(store?.owner_user_id && user?.id && String(store.owner_user_id).trim().toLowerCase() === String(user.id).trim().toLowerCase());
+  const galleryTabEnabled = true;
   const galleryHasVideo = storeGallery.some(item => item.mediaType === 'video');
   const activeGalleryItem =
     activeGalleryIndex !== null
@@ -3116,7 +3123,7 @@ export function UmkmStorefrontClient({
     };
   }, [authFetch, store]);
 
-  const toggleGalleryLike = useCallback(
+  const uploadGalleryMedia = useCallback(async (files: File[]) => {,    if (!store || !isStoreOwner || files.length === 0) return;,    setGalleryUploading(true);,    try {,      const form = new FormData();,      files.slice(0, 12).forEach(file => form.append('files', file));,      const response = await authFetch(`/api/super-app/umkm/stores/${encodeURIComponent(store.id)}/media`, {,        method: 'POST',,        body: form,,        cache: 'no-store',,      });,      const payload = (await response.json().catch(() => ({}))) as { error?: string; gallery_media?: string[] };,      if (!response.ok) throw new Error(payload.error || (isId ? 'Upload media gagal.' : 'Media upload failed.'));,      if (Array.isArray(payload.gallery_media)) {,        setStore(current => current ? { ...current, metadata: { ...current.metadata, gallery_media: payload.gallery_media } } : current);,      },      setGalleryUploadOpen(false);,      showStorefrontToast('success', isId ? 'Media tersimpan' : 'Media saved', isId ? 'Foto/video baru sudah masuk ke galeri usaha.' : 'The new media is now in the business gallery.');,    } catch (error) {,      showStorefrontToast('error', isId ? 'Media belum tersimpan' : 'Media not saved', resolveActionErrorMessage(error, isId ? 'Upload media gagal.' : 'Media upload failed.'));,    } finally {,      setGalleryUploading(false);,    },  }, [authFetch, isId, isStoreOwner, resolveActionErrorMessage, showStorefrontToast, store]);,,  const removeGalleryMedia = useCallback(async (url: string) => {,    if (!store || !isStoreOwner || !url) return;,    try {,      const response = await authFetch(`/api/super-app/umkm/stores/${encodeURIComponent(store.id)}/media`, {,        method: 'DELETE',,        headers: { 'Content-Type': 'application/json' },,        body: JSON.stringify({ url }),,        cache: 'no-store',,      });,      const payload = (await response.json().catch(() => ({}))) as { error?: string; gallery_media?: string[] };,      if (!response.ok) throw new Error(payload.error || (isId ? 'Media gagal dihapus.' : 'Media removal failed.'));,      setStore(current => current ? { ...current, metadata: { ...current.metadata, gallery_media: payload.gallery_media || [] } } : current);,      if (activeGalleryItem?.src === url) setActiveGalleryIndex(null);,      showStorefrontToast('success', isId ? 'Media dihapus' : 'Media removed');,    } catch (error) {,      showStorefrontToast('error', isId ? 'Media belum dihapus' : 'Media not removed', resolveActionErrorMessage(error, isId ? 'Gagal menghapus media.' : 'Failed to remove media.'));,    },  }, [activeGalleryItem?.src, authFetch, isId, isStoreOwner, resolveActionErrorMessage, showStorefrontToast, store]);,  const toggleGalleryLike = useCallback(
     async (item: StoreGalleryItem) => {
       if (!store) return;
 
@@ -4143,12 +4150,36 @@ export function UmkmStorefrontClient({
                       {isId ? 'Galeri toko' : 'Business gallery'}
                     </p>
                     <h2 className="mt-1 text-base font-semibold text-[color:var(--app-text)]">
-                      {isId
-                        ? 'Lihat visual usaha sebelum order'
-                        : 'See the business visuals before ordering'}
+                      {isId ? 'Lihat visual usaha sebelum order' : 'See the business visuals before ordering'}
                     </h2>
                   </div>
-                  <div className="rounded-2xl border border-[color:var(--app-accent-border)] px-3 py-1 text-[11px] font-semibold text-[color:var(--app-text)]">
+                  <div className="flex items-center gap-2">
+                    {isStoreOwner ? (
+                      <>
+                        <input
+                          ref={galleryUploadInputRef}
+                          type="file"
+                          multiple
+                          accept="image/*,video/*"
+                          className="hidden"
+                          onChange={event => {
+                            const files = Array.from(event.target.files || []);
+                            event.currentTarget.value = '';
+                            void uploadGalleryMedia(files);
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => galleryUploadInputRef.current?.click()}
+                          disabled={galleryUploading}
+                          className="inline-flex min-h-[34px] items-center gap-1.5 rounded-full bg-[color:var(--app-accent)] px-3 text-[10px] font-bold text-white disabled:opacity-60"
+                        >
+                          {galleryUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                          {isId ? 'Tambah media' : 'Add media'}
+                        </button>
+                      </>
+                    ) : null}
+                    <div className="rounded-2xl border border-[color:var(--app-accent-border)] px-3 py-1 text-[11px] font-semibold text-[color:var(--app-text)]">
                     {storeGallery.length}{' '}
                     {galleryHasVideo
                       ? isId
@@ -4157,6 +4188,7 @@ export function UmkmStorefrontClient({
                       : isId
                         ? 'foto aktif'
                         : 'active photos'}
+                    </div>
                   </div>
                 </div>
 
@@ -4165,6 +4197,49 @@ export function UmkmStorefrontClient({
                     ? 'Cek jualan, suasana, dan visual toko.'
                     : 'This gallery helps buyers quickly understand what the business sells, what the place looks like, and how the offer is presented.'}
                 </p>
+
+                {storeGallery.length === 0 ? (
+                  <div className="mt-4 rounded-[22px] border border-dashed border-[color:var(--app-accent-border)] bg-[color:var(--app-surface-muted)] p-6 text-center">
+                    <Camera className="mx-auto h-7 w-7 text-[color:var(--app-accent)]" />
+                    <p className="mt-2 text-sm font-bold text-[color:var(--app-text)]">
+                      {isId ? 'Belum ada media usaha' : 'No business media yet'}
+                    </p>
+                    <p className="mx-auto mt-1 max-w-md text-[11px] leading-5 text-[color:var(--app-text-soft)]">
+                      {isStoreOwner
+                        ? isId
+                          ? 'Tambahkan foto produk, outlet, proses, atau video singkat agar profil usaha lebih meyakinkan.'
+                          : 'Add product photos, storefront shots, process media, or short videos to make the business profile more useful.'
+                        : isId
+                          ? 'Belum ada foto atau video yang ditambahkan usaha ini.'
+                          : 'This business has not added photos or videos yet.'}
+                    </p>
+                  </div>
+                ) : null}
+
+                {storeGallery.length > 0 ? (
+                  <div className="mt-4 flex gap-3 overflow-x-auto snap-x snap-mandatory pb-2 [scrollbar-width:thin]">
+                    {storeGallery.map((item, index) => {
+                      return (
+                        <button
+                          key={'rail-' + item.id}
+                          type="button"
+                          onClick={() => openGalleryPreview(index)}
+                          className="group relative h-[220px] w-[78vw] max-w-[330px] shrink-0 snap-start overflow-hidden rounded-[22px] border border-[color:var(--app-accent-border)] bg-slate-100 text-left shadow-[0_16px_32px_-28px_rgba(15,23,42,0.18)] sm:h-[250px] sm:w-[300px]"
+                        >
+                          {item.mediaType === 'video' ? (
+                            <video src={item.src} muted playsInline preload="metadata" className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]" />
+                          ) : (
+                            <img src={item.src} alt={item.title} className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]" loading="lazy" />
+                          )}
+                          <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent p-3 pt-10 text-white">
+                            <span className="block text-[12px] font-bold">{item.title}</span>
+                            <span className="mt-0.5 block text-[10px] text-white/75">{index + 1}/{storeGallery.length}</span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
 
                 <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                   {storeGallery.map((item, index) => {
