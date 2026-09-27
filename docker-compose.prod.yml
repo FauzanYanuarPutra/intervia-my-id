@@ -151,12 +151,6 @@ services:
 
   marketplace_service:
     build: !reset null
-  real_data_bootstrap:
-    build: !reset null
-    image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-real-data-bootstrap:${IMAGE_TAG:?IMAGE_TAG is required}
-    pull_policy: always
-    restart: "no"
-
     image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-marketplace:${IMAGE_TAG:?IMAGE_TAG is required}
     pull_policy: always
     environment:
@@ -189,6 +183,12 @@ services:
       WALLET_MIDTRANS_FINISH_REDIRECT_URL: ${WALLET_MIDTRANS_FINISH_REDIRECT_URL:-https://www.lajukan.com/id/payments}
       WALLET_MIDTRANS_UNFINISH_REDIRECT_URL: ${WALLET_MIDTRANS_UNFINISH_REDIRECT_URL:-https://www.lajukan.com/id/payments}
       WALLET_MIDTRANS_ERROR_REDIRECT_URL: ${WALLET_MIDTRANS_ERROR_REDIRECT_URL:-https://www.lajukan.com/id/payments}
+
+  real_data_bootstrap:
+    build: !reset null
+    image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-real-data-bootstrap:${IMAGE_TAG:?IMAGE_TAG is required}
+    pull_policy: always
+    restart: "no"
 
   community_service:
     build: !reset null
