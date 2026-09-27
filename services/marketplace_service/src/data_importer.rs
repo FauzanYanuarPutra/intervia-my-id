@@ -210,6 +210,51 @@ async fn persist_reference_record(
     .await
 }
 
+
+async fn publish_aggregate_if_needed(
+    state: &Arc<AppState>,
+    source: &SourceRow,
+    import_record_id: Uuid,
+    entity_id: Uuid,
+) {
+    if source.2 != "government_open_data" {
+        return;
+    }
+
+    let normalized_name = match sqlx::query_scalar::<_, Option<String>>(
+        "SELECT normalized_name FROM data_import_entities WHERE id=$1 LIMIT 1",
+    )
+    .bind(entity_id)
+    .fetch_optional(&state.db)
+    .await
+    {
+        Ok(Some(name)) => name,
+        Ok(None) => None,
+        Err(error) => {
+            tracing::warn!(
+                entity_id=%entity_id,
+                "aggregate reference name lookup failed: {:?}",
+                error
+            );
+            return;
+        }
+    };
+
+    if normalized_name.is_some_and(|value| !value.trim().is_empty()) {
+        return;
+    }
+
+    if let Err(error) =
+        crate::reference_promotion::publish_aggregate_reference(&state.db, import_record_id).await
+    {
+        tracing::warn!(
+            import_record_id=%import_record_id,
+            "aggregate reference publication failed (staging record remains accepted): {:?}",
+            error
+        );
+    }
+}
+
 async fn run_inner(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
     let job = sqlx::query_as::<_, (Uuid, Uuid, String, String)>(
         "UPDATE data_import_jobs SET status='running', started_at=NOW(), error_summary=NULL WHERE id=$1 AND status='queued' RETURNING id, source_id, mode, status"
