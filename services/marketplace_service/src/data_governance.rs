@@ -407,13 +407,25 @@ async fn create_claim(
         .bind(external_url)
         .bind(clean(item.description, 1_000))
         .bind(!matches!(evidence_type, "official_domain" | "official_social_account" | "storefront_photo"))
+        if let Err(error) = sqlx::query(
+            r#"
+            INSERT INTO business_claim_evidence (
+                claim_id, evidence_type, storage_key, external_url, description, is_sensitive
+            ) VALUES ($1, $2, $3, $4, $5, $6)
+            "#
+        )
+        .bind(claim.id)
+        .bind(evidence_type)
+        .bind(storage_key)
+        .bind(external_url)
+        .bind(clean(item.description, 1_000))
+        .bind(!matches!(evidence_type, "official_domain" | "official_social_account" | "storefront_photo"))
         .execute(&mut *tx)
-        .await
-        .map_err(|error| {
+        .await {
+            let _ = tx.rollback().await;
             tracing::error!("create_claim evidence insert failed: {:?}", error);
-            error
-        })
-        .ok();
+            return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"failed to save claim evidence"}))).into_response();
+        }
     }
 
     if let Err(error) = tx.commit().await {
