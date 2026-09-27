@@ -233,7 +233,10 @@ async fn run_inner(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
         return run_osm_reference_import(&state, job_id, &source).await;
     }
 
-    let api_url = source.4.ok_or_else(|| anyhow!("source has no CKAN API"))?;
+    let api_url = source
+        .4
+        .as_ref()
+        .ok_or_else(|| anyhow!("source has no CKAN API"))?;
     let package_url =
         ckan_action_url(&api_url, "package_show").ok_or_else(|| anyhow!("invalid CKAN API URL"))?;
 
@@ -285,7 +288,7 @@ async fn run_inner(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
                 .5
                 .as_deref()
                 .is_some_and(|value| !value.trim().is_empty());
-        if (!license_ok || (!active && !json_resource)) {
+        if !license_ok || (!active && !json_resource) {
             rejected += 1;
             continue;
         }
