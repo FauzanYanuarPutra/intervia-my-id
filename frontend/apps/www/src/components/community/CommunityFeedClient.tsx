@@ -2795,7 +2795,7 @@ export function CommunityPostCard({
       {/* ================= POST HEADER ================= */}
 
       <div className="px-3 py-3 sm:px-4 sm:py-3.5">
-        <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-2.5 sm:gap-3">
+        <div className="!flex !min-w-0 !w-full !items-start !gap-2.5 sm:!gap-3">
           <Image
             alt={item.author.name}
             width={44}
@@ -2808,16 +2808,16 @@ export function CommunityPostCard({
             )}
           />
 
-          <div className="min-w-0 self-center">
+          <div className="!min-w-0 !flex-1 !self-start !pt-0.5 sm:!pt-0">
             <button
               type="button"
               onClick={openDetail}
-              className="block w-full min-w-0 my-[-5px] truncate text-left text-[0.94rem] font-bold leading-5 tracking-[-0.02em] text-[color:var(--app-text)] sm:text-[0.96rem]"
+              className="!my-0 !block !w-full !min-w-0 !truncate !whitespace-nowrap text-left text-[0.94rem] font-bold leading-5 tracking-[-0.02em] text-[color:var(--app-text)] sm:text-[0.96rem]"
             >
               {item.author.name}
             </button>
 
-            <div className="!mt-[-15px] flex min-w-0 w-full items-center gap-x-1.5 gap-y-0.5 text-[11px] leading-4 text-[color:var(--app-text-soft)] sm:text-xs">
+            <div className="!mt-1 !flex !min-w-0 !w-full !items-center !gap-x-1.5 !gap-y-0.5 text-[11px] leading-4 text-[color:var(--app-text-soft)] sm:!mt-1 sm:text-xs">
               {item.group ? (
                 <Link
                   href={communityGroupHref(item.group)}
@@ -2832,7 +2832,7 @@ export function CommunityPostCard({
                 </span>
               )}
             </div>
-            <div className='!mt-[-15px] flex min-w-0 w-full items-center text-[11px] leading-4 text-[color:var(--app-text-soft)] sm:text-xs'>
+            <div className='!mt-0.5 !flex !min-w-0 !w-full !items-center !gap-x-1.5 text-[11px] leading-4 text-[color:var(--app-text-soft)] sm:!mt-0.5 sm:text-xs'>
               <span aria-hidden="true" className="shrink-0">·</span>
 
               <span className="shrink-0 whitespace-nowrap">
@@ -2846,14 +2846,14 @@ export function CommunityPostCard({
             </div>
           </div>
 
-          <div className="relative shrink-0 self-start">
+          <div className="!relative !shrink-0 !self-start">
             <button
               type="button"
               onClick={() => {
                 setLinkCopied(false);
                 setOptionsOpen(open => !open);
               }}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-transparent text-[color:var(--app-text-soft)] transition hover:border-[color:var(--app-border)] hover:bg-[color:var(--app-surface-muted)] hover:text-[color:var(--app-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] sm:h-9 sm:w-9"
+              className="!inline-flex !h-10 !w-10 !shrink-0 !items-center !justify-center rounded-full border border-transparent text-[color:var(--app-text-soft)] transition hover:border-[color:var(--app-border)] hover:bg-[color:var(--app-surface-muted)] hover:text-[color:var(--app-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] sm:h-9 sm:w-9"
               aria-label={isId ? 'Buka opsi posting' : 'Open post options'}
               aria-expanded={optionsOpen}
               aria-haspopup="menu"
