@@ -40,11 +40,12 @@ if [ -s "$MARKETPLACE_SQL" ]; then psql "$MARKETPLACE_DATABASE_URL" -v ON_ERROR_
 echo "[real-data] applying community data..."
 if [ -s "$COMMUNITY_SQL" ]; then psql "$COMMUNITY_DATABASE_URL" -v ON_ERROR_STOP=1 -f "$COMMUNITY_SQL"; fi
 
-PROVIDER_COUNT="$(run_sql "$MARKETPLACE_DATABASE_URL" "SELECT COUNT(*) FROM content_items WHERE content_status='active' AND COALESCE(metadata->>'seed_pack','') = 'real_indonesia_bulk_open_data' AND COALESCE(metadata->>'market_side','') = 'reference'")"
+PROVIDER_COUNT="$(run_sql "$MARKETPLACE_DATABASE_URL" "SELECT COUNT(*) FROM content_items WHERE content_status='active' AND COALESCE(metadata->>'seed_pack','') = 'real_indonesia_bulk_open_data' AND COALESCE(metadata->>'market_side','') = 'reference' AND COALESCE(metadata->>'reference_subtype','') <> 'aggregate_data'")"
+INSIGHT_COUNT="$(run_sql "$MARKETPLACE_DATABASE_URL" "SELECT COUNT(*) FROM content_items WHERE content_status='active' AND COALESCE(metadata->>'seed_pack','') = 'real_indonesia_bulk_open_data' AND COALESCE(metadata->>'reference_subtype','') = 'aggregate_data'")"
 BUYER_COUNT="$(run_sql "$MARKETPLACE_DATABASE_URL" "SELECT COUNT(*) FROM content_items WHERE content_status='active' AND COALESCE(metadata->>'seed_pack','') = 'real_indonesia_bulk_open_data' AND pricing_mode = 'request'")"
 MEDIA_COUNT="$(run_sql "$COMMUNITY_DATABASE_URL" "SELECT COUNT(*) FROM reel.lajukan_reels WHERE COALESCE(metadata->>'seed_pack','') = 'real_indonesia_bulk_open_data'")"
 
-if [ "$PROVIDER_COUNT" -gt 0 ] || [ "$BUYER_COUNT" -gt 0 ] || [ "$MEDIA_COUNT" -gt 0 ]; then
+if [ "$PROVIDER_COUNT" -gt 0 ] || [ "$BUYER_COUNT" -gt 0 ] || [ "$INSIGHT_COUNT" -gt 0 ] || [ "$MEDIA_COUNT" -gt 0 ]; then
   psql "$MARKETPLACE_DATABASE_URL" -v ON_ERROR_STOP=1 <<SQL
 INSERT INTO real_data_bootstrap_runs (bootstrap_key, last_success_at, last_provider_count, last_buyer_count, last_community_media_count, last_error, updated_at)
 VALUES ('$LOCK_KEY', NOW(), $PROVIDER_COUNT, $BUYER_COUNT, $MEDIA_COUNT, NULL, NOW())
@@ -56,7 +57,7 @@ ON CONFLICT (bootstrap_key) DO UPDATE SET
   last_error = NULL,
   updated_at = NOW();
 SQL
-  echo "[real-data] bootstrap complete"
+  echo "[real-data] bootstrap complete: providers=${PROVIDER_COUNT} buyers=${BUYER_COUNT} insights=${INSIGHT_COUNT} community_media=${MEDIA_COUNT}"
 else
   psql "$MARKETPLACE_DATABASE_URL" -v ON_ERROR_STOP=1 <<SQL
 INSERT INTO real_data_bootstrap_runs (bootstrap_key, last_success_at, last_provider_count, last_buyer_count, last_community_media_count, last_error, updated_at)
