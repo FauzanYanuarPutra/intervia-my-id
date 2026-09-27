@@ -12,6 +12,9 @@ on:
       - 'services/marketplace_service/**'
       - '.github/workflows/marketplace-service-check.yml'
 
+permissions:
+  contents: read
+
 jobs:
   cargo-check:
     runs-on: ubuntu-latest
@@ -23,3 +26,5 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Cargo check
         run: cargo check --locked
+      - name: Cargo test
+        run: cargo test --locked
