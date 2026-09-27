@@ -1745,7 +1745,11 @@ pub async fn bootstrap_persistent_imports(state: Arc<AppState>) -> Result<u64, s
                         "#,
                     )
                     .bind(source_id)
-                    .bind(format!("bootstrap:{}:{}", source_key, Uuid::new_v4().simple()))
+                    .bind(format!(
+                        "bootstrap:{}:{}",
+                        source_key,
+                        Uuid::new_v4().simple()
+                    ))
                     .fetch_one(db)
                     .await?,
                 )
