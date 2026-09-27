@@ -42,6 +42,20 @@ fn hash(value: &Value) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
 
+type SourceRow = (
+    Uuid,
+    String,
+    String,
+    String,
+    Option<String>,
+    Option<String>,
+    String,
+    bool,
+    bool,
+    Option<String>,
+);
+
+
 // Import adapters currently support governed CKAN/DataStore and OSM Overpass sources.
 // File-resource adapters are intentionally added separately so licensing and size limits
 // remain explicit rather than silently treating every downloadable URL as reusable.
@@ -63,7 +77,7 @@ async fn run_inner(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
         return Ok(());
     };
 
-    let source = sqlx::query_as::<_, (Uuid, String, String, String, Option<String>, Option<String>, String, bool, bool, Option<String>)>(
+    let source = sqlx::query_as::<_, SourceRow>(
         "SELECT id, source_key, source_kind, source_url, api_url, license_name, reuse_mode, storage_allowed, pii_import_allowed, attribution_text FROM data_source_registry WHERE id=$1"
     ).bind(job.1).fetch_one(&state.db).await?;
 
@@ -271,18 +285,7 @@ async fn run_inner(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
 async fn run_osm_reference_import(
     state: &Arc<AppState>,
     job_id: Uuid,
-    source: &(
-        Uuid,
-        String,
-        String,
-        String,
-        Option<String>,
-        Option<String>,
-        String,
-        bool,
-        bool,
-        Option<String>,
-    ),
+    source: &SourceRow,
 ) -> Result<()> {
     let (
         source_id,
