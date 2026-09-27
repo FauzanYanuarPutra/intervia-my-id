@@ -1,0 +1,199 @@
+{
+  "version": 1,
+  "generated_at": "2026-09-27",
+  "purpose": "Lajukan source registry for real-data bootstrap. No dataset is automatically persisted unless its individual reuse/storage policy passes validation.",
+  "default_policy": {
+    "require_source": true,
+    "require_license_or_explicit_reuse_basis": true,
+    "import_pii": false,
+    "import_private_contacts": false,
+    "create_fake_users": false,
+    "create_fake_reviews": false,
+    "create_fake_transactions": false,
+    "google_places": "live_only",
+    "claim_required_for_owner_management": true
+  },
+  "sources": [
+    {
+      "id": "data-go-id-makassar-umkm",
+      "provider": "Kota Makassar",
+      "kind": "government_open_data",
+      "url": "https://data.go.id/dataset/dataset/umkm1",
+      "dataset_id": "db0abdc2-df0c-4432-9e72-48b7c4ff389f",
+      "reuse_mode": "review_required",
+      "notes": "Portal marks dataset Terbuka; validate resource-level metadata before persistent import."
+    },
+    {
+      "id": "data-go-id-denpasar-umkm",
+      "provider": "Kota Denpasar",
+      "kind": "government_open_data",
+      "url": "https://data.go.id/dataset/dataset/umkm",
+      "dataset_id": "4a6e5e83-237a-49f9-b7a1-97fadd82f6c3",
+      "reuse_mode": "persistent_import_if_license_validated",
+      "license": "Creative Commons Attribution (as stated in dataset metadata)",
+      "notes": "Resource-level fields and current license should be rechecked on each refresh."
+    },
+    {
+      "id": "data-go-id-sukoharjo-umkm",
+      "provider": "Kabupaten Sukoharjo",
+      "kind": "government_open_data",
+      "url": "https://data.go.id/dataset/dataset/data-umkm1",
+      "dataset_id": "f6a21434-f410-48cb-9f27-1dabeca3d117",
+      "reuse_mode": "review_required"
+    },
+    {
+      "id": "data-go-id-gunungkidul-umkm-2021",
+      "provider": "Kabupaten Gunungkidul",
+      "kind": "government_open_data",
+      "url": "https://data.go.id/dataset/dataset/data-umkm-2021",
+      "dataset_id": "57351549-92a8-4b80-858a-5a34c988ca5d",
+      "reuse_mode": "review_required"
+    },
+    {
+      "id": "data-go-id-karanganyar-umkm",
+      "provider": "Kabupaten Karanganyar",
+      "kind": "government_open_data",
+      "url": "https://data.go.id/dataset/dataset/usaha-mikro-kecil-dan-menengah-umkm",
+      "dataset_id": "995ee038-2d13-42a1-88d4-418a5c3dd32b",
+      "reuse_mode": "review_required"
+    },
+    {
+      "id": "data-go-id-kaltim-umkm-2021-2023",
+      "provider": "Provinsi Kalimantan Timur",
+      "kind": "government_open_data",
+      "url": "https://data.go.id/dataset/dataset/data-umkm-berdasarkan-sektor-usaha-tenaga-kerja-aset-omzet-dan-skala-usaha-tahun-2021-2023",
+      "dataset_id": "c47eab8e-8517-41cf-8f49-5b2ca28c212c",
+      "reuse_mode": "review_required"
+    },
+    {
+      "id": "data-go-id-malang-umkm",
+      "provider": "Kota Malang",
+      "kind": "government_open_data",
+      "url": "https://data.go.id/dataset/dataset/umkm-di-tingkat-kabupaten-kota",
+      "dataset_id": "4cef13af-9d9d-49f7-94be-0818f408c131",
+      "reuse_mode": "review_required"
+    },
+    {
+      "id": "data-go-id-depok-umkm",
+      "provider": "Kota Depok",
+      "kind": "government_open_data",
+      "url": "https://data.go.id/dataset/dataset/umkm-di-tingkat-kabupaten-kota13",
+      "dataset_id": "06363da7-7b38-490b-92a2-291c9fbf494f",
+      "reuse_mode": "review_required"
+    },
+    {
+      "id": "data-go-id-cianjur-umkm-scale",
+      "provider": "Kabupaten Cianjur",
+      "kind": "government_open_data",
+      "url": "https://data.go.id/dataset/dataset/jumlah-usaha-mikro-kecil-dan-menengah-umkm-berdasarkan-skala-usaha-di-kabupaten-cianjur",
+      "dataset_id": "5580346c-060f-4ae9-ad60-b2e74228b160",
+      "reuse_mode": "derived_only",
+      "notes": "Aggregate dataset; useful for Lajukan Insight rather than creating individual businesses."
+    },
+    {
+      "id": "data-go-id-jakarta-digital-umkm",
+      "provider": "Provinsi DKI Jakarta",
+      "kind": "government_open_data",
+      "url": "https://data.go.id/dataset/dataset/jumlah-usaha-mikro-kecil-dan-menengah-umkm-yang-mendapat-fasilitasi-adopsi-teknologi-digital",
+      "dataset_id": "d4747c2a-9722-4e55-a9f5-86def3d50ab6",
+      "reuse_mode": "derived_only"
+    },
+    {
+      "id": "data-go-id-umkm-naik-kelas",
+      "provider": "Kementerian Komunikasi dan Digital",
+      "kind": "government_open_data",
+      "url": "https://data.go.id/dataset/dataset/jumlah-umkm-naik-kelas-per-kawasan-lokasi",
+      "dataset_id": "77d86fab-409b-439b-b4fe-2cb787ae45e5",
+      "reuse_mode": "derived_only"
+    },
+    {
+      "id": "data-go-id-lkpp-umkm-pengadaan",
+      "provider": "LKPP",
+      "kind": "government_open_data",
+      "url": "https://data.go.id/dataset/dataset/data-umkm-yang-mengikuti-kegiatan-pengadaan-barang-dan-jasa",
+      "dataset_id": "1675596a-20f0-4d55-8ea8-8caa1cc4bea5",
+      "reuse_mode": "review_required"
+    },
+    {
+      "id": "data-go-id-lkpp-katalog-umk",
+      "provider": "LKPP",
+      "kind": "government_open_data",
+      "url": "https://data.go.id/dataset/dataset/jumlah-penyedia-usaha-mikro-dan-kecil-umk-yang-produknya-ditayangkan-dalam-katalog-elektronik",
+      "dataset_id": "9f6f4eba-125f-4498-9e43-8b98e43e8bfa",
+      "reuse_mode": "review_required"
+    },
+    {
+      "id": "data-go-id-lkpp-ukm-katalog",
+      "provider": "LKPP",
+      "kind": "government_open_data",
+      "url": "https://data.go.id/dataset/dataset/data-ukm-yang-masuk-dalam-katalog-elektronik",
+      "dataset_id": "ad3ad8a8-9dbd-42e8-ad88-f74d69e5dfbc",
+      "reuse_mode": "review_required"
+    },
+    {
+      "id": "data-go-id-deli-serdang-koperasi-umkm",
+      "provider": "Kabupaten Deli Serdang",
+      "kind": "government_open_data",
+      "url": "https://data.go.id/dataset/dataset/data-koperasi-dan-umkm1",
+      "dataset_id": "ed8d7268-892d-4346-aa00-25eaa1780c21",
+      "reuse_mode": "review_required"
+    },
+    {
+      "id": "data-go-id-kalsel-umkm",
+      "provider": "Provinsi Kalimantan Selatan",
+      "kind": "government_open_data",
+      "url": "https://data.go.id/dataset/dataset/jumlah-usaha-mikro-kecil-dan-menengah-umkm",
+      "dataset_id": "3d8edc3b-da58-4451-9b5f-2a81296e7b5c",
+      "reuse_mode": "review_required"
+    },
+    {
+      "id": "data-go-id-kepri-umkm-export",
+      "provider": "Provinsi Kepulauan Riau",
+      "kind": "government_open_data",
+      "url": "https://data.go.id/dataset/dataset/jumlah-produk-umkm-provinsi-kepulauan-riau-yang-diekspor-tahun-2022",
+      "dataset_id": "22d4ff71-37c8-45ca-80c7-759e340454dd",
+      "reuse_mode": "derived_only"
+    },
+    {
+      "id": "bank-indonesia-umkm-reference",
+      "provider": "Bank Indonesia",
+      "kind": "government_reference",
+      "url": "https://www.bi.go.id/id/umkm/database/umkm-layak-dibiayai.aspx",
+      "reuse_mode": "review_required",
+      "notes": "Profile data can include business and financial attributes; do not import private/financial details without an explicit reuse basis."
+    },
+    {
+      "id": "osm-indonesia",
+      "provider": "OpenStreetMap contributors",
+      "kind": "open_geodata",
+      "url": "https://www.openstreetmap.org/",
+      "reuse_mode": "persistent_import",
+      "license": "ODbL 1.0",
+      "attribution": "© OpenStreetMap contributors"
+    },
+    {
+      "id": "wikimedia-commons",
+      "provider": "Wikimedia Commons contributors",
+      "kind": "open_media",
+      "url": "https://commons.wikimedia.org/",
+      "reuse_mode": "review_required",
+      "notes": "License is per file."
+    },
+    {
+      "id": "google-places",
+      "provider": "Google Maps Platform",
+      "kind": "commercial_api",
+      "url": "https://developers.google.com/maps/documentation/places/web-service",
+      "reuse_mode": "live_only",
+      "notes": "Do not bulk scrape/persist Places content; place_id is the storage exception."
+    },
+    {
+      "id": "smesta-umkm-events",
+      "provider": "Kementerian UMKM / SMEsta",
+      "kind": "official_events",
+      "url": "https://smesta.umkm.go.id/service/calendar-event",
+      "reuse_mode": "review_required",
+      "notes": "Use as official event discovery; confirm reuse/syndication terms per content."
+    }
+  ]
+}
