@@ -134,6 +134,9 @@ pub async fn index_record(
         value.push_str(city.as_deref().unwrap_or(""));
         value.push('|');
         value.push_str(province.as_deref().unwrap_or(""));
+        if let (Some(latitude), Some(longitude)) = (lat, lon) {
+            value.push_str(&format!("|lat:{latitude:.5}|lon:{longitude:.5}"));
+        }
         if value.trim_matches('|').is_empty() {
             format!("record:{record_id}")
         } else {
@@ -142,27 +145,77 @@ pub async fn index_record(
         }
     };
 
-    let entity_id = sqlx::query_scalar::<_, Uuid>(
-        r#"INSERT INTO data_import_entities
-           (source_id, canonical_key, normalized_name, normalized_address, city, province, postal_code, latitude, longitude, category, source_record_count, resolution_status, canonical_record_id, metadata, last_seen_at, updated_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,1,'new',$11,$12,NOW(),NOW())
-           ON CONFLICT (source_id, canonical_key) DO UPDATE SET
-             normalized_name=COALESCE(EXCLUDED.normalized_name,data_import_entities.normalized_name),
-             normalized_address=COALESCE(EXCLUDED.normalized_address,data_import_entities.normalized_address),
-             city=COALESCE(EXCLUDED.city,data_import_entities.city),
-             province=COALESCE(EXCLUDED.province,data_import_entities.province),
-             postal_code=COALESCE(EXCLUDED.postal_code,data_import_entities.postal_code),
-             latitude=COALESCE(EXCLUDED.latitude,data_import_entities.latitude),
-             longitude=COALESCE(EXCLUDED.longitude,data_import_entities.longitude),
-             category=COALESCE(EXCLUDED.category,data_import_entities.category),
-             source_record_count=data_import_entities.source_record_count+1,
-             canonical_record_id=COALESCE(data_import_entities.canonical_record_id,EXCLUDED.canonical_record_id),
-             metadata=EXCLUDED.metadata,last_seen_at=NOW(),updated_at=NOW()
-           RETURNING id"#,
+    let existing_entity_id = sqlx::query_scalar::<_, Uuid>(
+        "SELECT id FROM data_import_entities WHERE source_id=$1 AND canonical_record_id=$2 LIMIT 1",
     )
-    .bind(source_id).bind(canonical_key).bind(&name).bind(&address).bind(&city).bind(&province).bind(postal)
-    .bind(lat).bind(lon).bind(category).bind(record_id).bind(raw.clone())
-    .fetch_one(db).await?;
+    .bind(source_id)
+    .bind(record_id)
+    .fetch_optional(db)
+    .await?;
+
+    let entity_id = if let Some(existing_id) = existing_entity_id {
+        sqlx::query(
+            r#"UPDATE data_import_entities
+               SET normalized_name=$2,
+                   normalized_address=$3,
+                   city=$4,
+                   province=$5,
+                   postal_code=$6,
+                   latitude=$7,
+                   longitude=$8,
+                   category=$9,
+                   metadata=$10,
+                   last_seen_at=NOW(),
+                   updated_at=NOW()
+               WHERE id=$1"#,
+        )
+        .bind(existing_id)
+        .bind(&name)
+        .bind(&address)
+        .bind(&city)
+        .bind(&province)
+        .bind(postal)
+        .bind(lat)
+        .bind(lon)
+        .bind(category)
+        .bind(raw.clone())
+        .execute(db)
+        .await?;
+        existing_id
+    } else {
+        sqlx::query_scalar::<_, Uuid>(
+            r#"INSERT INTO data_import_entities
+               (source_id, canonical_key, normalized_name, normalized_address, city, province, postal_code, latitude, longitude, category, source_record_count, resolution_status, canonical_record_id, metadata, last_seen_at, updated_at)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,1,'new',$11,$12,NOW(),NOW())
+               ON CONFLICT (source_id, canonical_key) DO UPDATE SET
+                 normalized_name=COALESCE(EXCLUDED.normalized_name,data_import_entities.normalized_name),
+                 normalized_address=COALESCE(EXCLUDED.normalized_address,data_import_entities.normalized_address),
+                 city=COALESCE(EXCLUDED.city,data_import_entities.city),
+                 province=COALESCE(EXCLUDED.province,data_import_entities.province),
+                 postal_code=COALESCE(EXCLUDED.postal_code,data_import_entities.postal_code),
+                 latitude=COALESCE(EXCLUDED.latitude,data_import_entities.latitude),
+                 longitude=COALESCE(EXCLUDED.longitude,data_import_entities.longitude),
+                 category=COALESCE(EXCLUDED.category,data_import_entities.category),
+                 source_record_count=data_import_entities.source_record_count+1,
+                 canonical_record_id=COALESCE(data_import_entities.canonical_record_id,EXCLUDED.canonical_record_id),
+                 metadata=EXCLUDED.metadata,last_seen_at=NOW(),updated_at=NOW()
+               RETURNING id"#,
+        )
+        .bind(source_id)
+        .bind(canonical_key)
+        .bind(&name)
+        .bind(&address)
+        .bind(&city)
+        .bind(&province)
+        .bind(postal)
+        .bind(lat)
+        .bind(lon)
+        .bind(category)
+        .bind(record_id)
+        .bind(raw.clone())
+        .fetch_one(db)
+        .await?
+    };
 
     let candidates = sqlx::query_as::<
         _,
