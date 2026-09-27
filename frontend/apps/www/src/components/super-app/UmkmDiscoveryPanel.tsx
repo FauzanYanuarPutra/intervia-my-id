@@ -2690,8 +2690,8 @@ export function UmkmDiscoveryPanel({
                                 ? 'Lihat referensi'
                                 : 'View reference'
                               : isId
-                                ? 'Lihat usaha'
-                                : 'View business'}
+                                ? 'Buka detail usaha'
+                                : 'Open business detail'}
                           </span>
                         </Link>
                         {selectedIsPublicReference &&
@@ -2943,8 +2943,8 @@ export function UmkmDiscoveryPanel({
                                     ? 'Lihat referensi'
                                     : 'View reference'
                                   : isId
-                                    ? 'Lihat usaha'
-                                    : 'View business'}
+                                    ? 'Buka detail usaha'
+                                    : 'Open business detail'}
                               </span>
                             </Link>
                             {selectedIsPublicReference &&
