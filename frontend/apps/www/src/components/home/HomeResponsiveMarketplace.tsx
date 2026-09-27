@@ -2323,49 +2323,129 @@ function HomeListingCarouselSection({
 function MarketplaceIntentPanel({ isId }: { isId: boolean }) {
   return (
     <section
-      className="w-full min-w-0 py-1.5 sm:py-2"
+      className="w-full min-w-0 px-2 py-2.5 sm:px-3 md:px-6 sm:py-3"
       aria-label={isId ? 'Mulai di Lajukan' : 'Start on Lajukan'}
     >
-      <div className="grid min-w-0 gap-2 px-1 sm:grid-cols-2 sm:px-3 md:px-6">
-        <Link
-          href="/create?side=supply"
-          className="group flex min-h-[78px] min-w-0 items-center gap-3 rounded-[18px] border border-emerald-200 bg-emerald-50/70 px-3.5 py-3 transition hover:-translate-y-0.5 hover:border-emerald-300 hover:bg-emerald-50 dark:border-emerald-400/15 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/15"
-        >
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-emerald-700 text-white shadow-sm">
-            <Store className="h-5 w-5" />
-          </span>
-          <span className="min-w-0">
-            <span className="block text-xs font-black text-emerald-950 dark:text-emerald-100">
-              {isId ? 'Menawarkan' : 'Offering'}
-            </span>
-            <span className="mt-0.5 block truncate text-[10px] font-semibold text-emerald-800/75 dark:text-emerald-200/75">
-              {isId
-                ? 'Tampilkan produk, jasa, atau peluang usahamu.'
-                : 'Show your products, services, or business opportunities.'}
-            </span>
-          </span>
-          <ChevronRight className="ml-auto h-4 w-4 shrink-0 text-emerald-700 transition-transform group-hover:translate-x-0.5 dark:text-emerald-200" />
-        </Link>
+      <div className="relative overflow-hidden rounded-[24px] border border-zinc-200/80 bg-white shadow-[0_16px_40px_-30px_rgba(15,23,42,0.35)] dark:border-white/10 dark:bg-zinc-950">
+        <div className="absolute -right-16 -top-20 h-48 w-48 rounded-full bg-emerald-400/10 blur-3xl" />
+        <div className="absolute -bottom-24 -left-16 h-48 w-48 rounded-full bg-blue-400/10 blur-3xl" />
 
-        <Link
-          href="/create?side=demand"
-          className="group flex min-h-[78px] min-w-0 items-center gap-3 rounded-[18px] border border-blue-200 bg-blue-50/70 px-3.5 py-3 transition hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-50 dark:border-blue-400/15 dark:bg-blue-500/10 dark:hover:bg-blue-500/15"
-        >
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-blue-700 text-white shadow-sm">
-            <Search className="h-5 w-5" />
-          </span>
-          <span className="min-w-0">
-            <span className="block text-xs font-black text-blue-950 dark:text-blue-100">
-              {isId ? 'Membutuhkan' : 'Needs'}
+        <div className="relative px-4 pb-3 pt-4 sm:px-5 sm:pt-5">
+          <div className="max-w-2xl">
+            <span className="inline-flex items-center rounded-full bg-zinc-100 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-zinc-500 dark:bg-white/[0.06] dark:text-zinc-400">
+              {isId ? 'Mulai dari tujuanmu' : 'Start with your goal'}
             </span>
-            <span className="mt-0.5 block truncate text-[10px] font-semibold text-blue-800/75 dark:text-blue-200/75">
+            <h2 className="mt-2 text-[17px] font-black tracking-[-0.02em] text-zinc-950 dark:text-white sm:text-[19px]">
               {isId
-                ? 'Tulis kebutuhan agar penyedia yang relevan bisa menemukanmu.'
-                : 'Post a need so relevant providers can find you.'}
-            </span>
+                ? 'Kamu mau menawarkan sesuatu atau sedang mencari sesuatu?'
+                : 'Are you offering something or looking for something?'}
+            </h2>
+            <p className="mt-1 text-[11px] font-medium leading-5 text-zinc-500 dark:text-zinc-400 sm:text-xs">
+              {isId
+                ? 'Pilih satu. Lajukan akan membawa kamu langsung ke alur yang sesuai.'
+                : 'Choose one and Lajukan will take you directly to the right flow.'}
+            </p>
+          </div>
+        </div>
+
+        <div className="relative grid gap-2.5 px-3 pb-3 sm:grid-cols-2 sm:px-4 sm:pb-4">
+          <Link
+            href="/create?side=supply"
+            className="group relative overflow-hidden rounded-[20px] border border-emerald-200 bg-[linear-gradient(135deg,rgba(236,253,245,0.98),rgba(240,253,250,0.82))] p-4 transition duration-200 hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-[0_16px_30px_-24px_rgba(5,150,105,0.55)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/45 dark:border-emerald-400/15 dark:bg-[linear-gradient(135deg,rgba(6,78,59,0.28),rgba(4,120,87,0.12))]"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-700 text-white shadow-sm dark:bg-emerald-500 dark:text-emerald-950">
+                <Store className="h-5 w-5" />
+              </span>
+              <span className="rounded-full bg-white/80 px-2 py-1 text-[9px] font-black text-emerald-800 dark:bg-white/[0.08] dark:text-emerald-200">
+                {isId ? 'SAYA MENAWARKAN' : 'I OFFER'}
+              </span>
+            </div>
+
+            <div className="mt-4">
+              <h3 className="text-[16px] font-black tracking-[-0.01em] text-emerald-950 dark:text-emerald-50">
+                {isId ? 'Tampilkan yang saya punya' : 'Show what I have'}
+              </h3>
+              <p className="mt-1 text-[11px] font-semibold leading-5 text-emerald-900/70 dark:text-emerald-100/70">
+                {isId
+                  ? 'Cocok untuk produk, jasa, lokasi, sewa, atau peluang usaha.'
+                  : 'For products, services, locations, rentals, or business opportunities.'}
+              </p>
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {(isId
+                ? ['Produk', 'Jasa', 'Lokasi', 'Sewa']
+                : ['Products', 'Services', 'Locations', 'Rentals']
+              ).map(label => (
+                <span
+                  key={label}
+                  className="rounded-full border border-emerald-200/80 bg-white/70 px-2 py-1 text-[9px] font-bold text-emerald-900/75 dark:border-emerald-300/15 dark:bg-white/[0.06] dark:text-emerald-100/75"
+                >
+                  {label}
+                </span>
+              ))}
+            </div>
+
+            <div className="mt-4 inline-flex items-center gap-1.5 text-[11px] font-black text-emerald-800 dark:text-emerald-200">
+              {isId ? 'Mulai menawarkan' : 'Start offering'}
+              <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
+            </div>
+          </Link>
+
+          <Link
+            href="/create?side=demand"
+            className="group relative overflow-hidden rounded-[20px] border border-blue-200 bg-[linear-gradient(135deg,rgba(239,246,255,0.98),rgba(248,250,252,0.92))] p-4 transition duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-[0_16px_30px_-24px_rgba(37,99,235,0.55)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/45 dark:border-blue-400/15 dark:bg-[linear-gradient(135deg,rgba(30,58,138,0.28),rgba(37,99,235,0.1))]"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-700 text-white shadow-sm dark:bg-blue-500 dark:text-blue-950">
+                <Search className="h-5 w-5" />
+              </span>
+              <span className="rounded-full bg-white/80 px-2 py-1 text-[9px] font-black text-blue-800 dark:bg-white/[0.08] dark:text-blue-200">
+                {isId ? 'SAYA MEMBUTUHKAN' : 'I NEED'}
+              </span>
+            </div>
+
+            <div className="mt-4">
+              <h3 className="text-[16px] font-black tracking-[-0.01em] text-blue-950 dark:text-blue-50">
+                {isId ? 'Cari yang saya butuhkan' : 'Find what I need'}
+              </h3>
+              <p className="mt-1 text-[11px] font-semibold leading-5 text-blue-900/70 dark:text-blue-100/70">
+                {isId
+                  ? 'Tulis kebutuhanmu supaya penyedia atau partner yang relevan bisa menemukanmu.'
+                  : 'Post your need so relevant providers or partners can find you.'}
+              </p>
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {(isId
+                ? ['Supplier', 'Jasa', 'Lokasi', 'Freelancer']
+                : ['Suppliers', 'Services', 'Locations', 'Freelancers']
+              ).map(label => (
+                <span
+                  key={label}
+                  className="rounded-full border border-blue-200/80 bg-white/70 px-2 py-1 text-[9px] font-bold text-blue-900/75 dark:border-blue-300/15 dark:bg-white/[0.06] dark:text-blue-100/75"
+                >
+                  {label}
+                </span>
+              ))}
+            </div>
+
+            <div className="mt-4 inline-flex items-center gap-1.5 text-[11px] font-black text-blue-800 dark:text-blue-200">
+              {isId ? 'Mulai mencari' : 'Start looking'}
+              <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
+            </div>
+          </Link>
+        </div>
+
+        <div className="relative flex items-center gap-2 border-t border-zinc-100 px-4 py-2.5 text-[10px] font-semibold text-zinc-500 dark:border-white/[0.06] dark:text-zinc-400 sm:px-5">
+          <CircleHelp className="h-3.5 w-3.5 shrink-0" />
+          <span>
+            {isId
+              ? 'Belum yakin? Kamu bisa mulai dari satu kebutuhan sederhana, lalu cari partner yang tepat.'
+              : 'Not sure? Start with one simple need, then find the right partner.'}
           </span>
-          <ChevronRight className="ml-auto h-4 w-4 shrink-0 text-blue-700 transition-transform group-hover:translate-x-0.5 dark:text-blue-200" />
-        </Link>
+        </div>
       </div>
     </section>
   );
