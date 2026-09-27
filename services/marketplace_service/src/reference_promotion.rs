@@ -216,7 +216,7 @@ struct PromotionCandidateSourceRow {
     source_enabled: bool,
 }
 
-async fn promote_candidate(
+pub(crate) async fn promote_candidate(
     db: &PgPool,
     candidate_id: Uuid,
 ) -> AnyhowResult<Value> {
