@@ -2081,6 +2081,11 @@ async fn main() -> anyhow::Result<()> {
     if let Err(error) = data_governance::sync_static_source_registry(&state.db).await {
         tracing::warn!("Governed data source registry sync failed: {:?}", error);
     }
+    match data_governance::recover_stale_import_jobs(&state.db).await {
+        Ok(recovered) if recovered > 0 => tracing::warn!(recovered, "recovered stale data import jobs"),
+        Ok(_) => {}
+        Err(error) => tracing::error!("failed to recover stale data import jobs: {:?}", error),
+    }
     match data_governance::bootstrap_persistent_imports(state.clone()).await {
         Ok(count) if count > 0 => tracing::info!("queued {} validated persistent data bootstrap imports", count),
         Ok(_) => tracing::debug!("no persistent data bootstrap imports needed"),
