@@ -997,7 +997,6 @@ export function UmkmStorefrontClient({
     null,
   );
   const [galleryLikes, setGalleryLikes] = useState<Record<string, boolean>>({});
-  const [galleryUploadOpen, setGalleryUploadOpen] = useState(false);
   const [galleryUploading, setGalleryUploading] = useState(false);
   const galleryUploadInputRef = useRef<HTMLInputElement | null>(null);
   const [checkoutOpen, setCheckoutOpen] = useState(checkoutRequestedFromUrl);
@@ -3515,25 +3514,30 @@ export function UmkmStorefrontClient({
                             {isId ? 'Lihat semua' : 'See all'}
                           </button>
                         </div>
-                        <div className="mt-2 space-y-2">
+                        <div className="mt-2 flex gap-2 overflow-x-auto snap-x snap-mandatory pb-1 [scrollbar-width:thin]">
                           {heroFeaturedProducts.map(product => (
-                            <div
+                            <button
                               key={product.id}
-                              className="flex min-w-0 items-center gap-3 rounded-[16px] border border-[color:var(--app-border)] bg-white p-2 dark:border-[color:var(--app-border-strong)] dark:bg-slate-950"
+                              type="button"
+                              onClick={() => handleTabChange('menu')}
+                              className="flex min-w-[230px] shrink-0 snap-start items-center gap-3 rounded-[16px] border border-[color:var(--app-border)] bg-white p-2.5 text-left transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950"
                             >
                               <ProductThumbnail
                                 product={product}
-                                className="relative h-12 w-12 shrink-0 overflow-hidden rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)]"
+                                className="relative h-14 w-14 shrink-0 overflow-hidden rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)]"
                               />
                               <div className="min-w-0 flex-1">
                                 <p className="truncate text-[12px] font-bold text-[color:var(--app-text)]">
                                   {product.name}
                                 </p>
-                                <p className="mt-0.5 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+                                <p className="mt-0.5 text-[11px] font-semibold text-[color:var(--app-accent)]">
                                   {formatIdr(product.price_cents)}
                                 </p>
+                                <span className="mt-2 inline-flex text-[9px] font-bold text-[color:var(--app-text-soft)]">
+                                  {isId ? 'Geser untuk lihat lainnya' : 'Swipe for more'}
+                                </span>
                               </div>
-                            </div>
+                            </button>
                           ))}
                         </div>
                       </div>
@@ -4298,6 +4302,19 @@ export function UmkmStorefrontClient({
                             </div>
                           </div>
                         </button>
+                        {isStoreOwner ? (
+                          <button
+                            type="button"
+                            onClick={() => void removeGalleryMedia(item.src)}
+                            className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-black/65 px-2.5 py-1 text-[10px] font-semibold text-white transition hover:bg-rose-600"
+                            aria-label={isId ? 'Hapus media' : 'Remove media'}
+                            title={isId ? 'Hapus media dari galeri' : 'Remove media from gallery'}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            {isId ? 'Hapus' : 'Remove'}
+                          </button>
+                        ) : null}
+
                         <button
                           type="button"
                           onClick={() => void toggleGalleryLike(item)}
