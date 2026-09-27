@@ -977,8 +977,8 @@ async fn bootstrap_status(State(state): State<Arc<AppState>>) -> impl IntoRespon
              FROM content_items
             WHERE content_status='active'
               AND metadata->>'reference_publication_status'='published'
-              AND metadata->>'claimable'='true'
-              AND metadata->>'reference_subtype' IS DISTINCT FROM 'aggregate_data') AS published_references,
+              AND metadata->>'reference_subtype' IS DISTINCT FROM 'aggregate_data'
+              AND COALESCE(metadata->>'is_transactional','true')='false') AS published_references,
           (SELECT COUNT(*)::bigint
              FROM content_items
             WHERE content_status='active'
