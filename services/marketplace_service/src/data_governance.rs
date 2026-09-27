@@ -2001,3 +2001,72 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/v1/business-claims/{claim_id}", get(get_claim))
         .route("/v1/business-claims/{claim_id}/review", post(review_claim))
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::super::AppState;
+    use serde::Deserialize;
+
+    #[derive(Debug, Deserialize)]
+    struct Registry {
+        sources: Vec<Source>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct Source {
+        id: String,
+        kind: String,
+        reuse_mode: String,
+        #[serde(default)]
+        auto_publish_reference: bool,
+    }
+
+    #[test]
+    fn static_registry_contains_governed_bootstrap_sources() {
+        let registry: Registry = serde_json::from_str(include_str!(
+            "../../../config/lajukan_data_source_registry.json"
+        ))
+        .expect("source registry JSON must remain valid");
+
+        let persistent = registry
+            .sources
+            .iter()
+            .filter(|source| source.reuse_mode == "persistent_import")
+            .count();
+        assert!(
+            persistent >= 6,
+            "expected at least 6 governed persistent sources, got {persistent}"
+        );
+
+        let osm = registry
+            .sources
+            .iter()
+            .find(|source| source.id == "osm")
+            .expect("OSM source must remain registered");
+        assert_eq!(osm.kind, "osm_overpass");
+        assert!(
+            osm.auto_publish_reference,
+            "OSM reference publication must stay explicitly governed"
+        );
+
+        let aggregate_sources = registry
+            .sources
+            .iter()
+            .filter(|source| {
+                matches!(
+                    source.id.as_str(),
+                    "data-go-id-denpasar-umkm"
+                        | "data-go-id-sleman-umkm-sector"
+                        | "data-tangsel-umkm-2022"
+                        | "data-sumbawa-umkm-2024-2025"
+                        | "data-aceh-barat-umkm-johan-pahlawan-2025"
+                )
+            })
+            .count();
+        assert_eq!(
+            aggregate_sources, 5,
+            "all currently verified aggregate UMKM sources must remain registered"
+        );
+    }
+}
