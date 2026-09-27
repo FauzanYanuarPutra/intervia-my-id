@@ -121,12 +121,25 @@ pub async fn generate_for_entity(db: &PgPool, entity_id: Uuid) -> Result<Value, 
         lon,
         &resolution_status,
     );
+    let publication_blocked = reasons
+        .iter()
+        .any(|reason| reason != "missing_coordinates");
+    let has_publishable_location = address
+        .as_deref()
+        .is_some_and(|value| !value.trim().is_empty())
+        || city
+            .as_deref()
+            .is_some_and(|value| !value.trim().is_empty());
     let auto_publish_ready = auto_publish_reference
         && reuse_mode == "persistent_import"
         && storage_allowed
         && source_enabled
         && score >= 0.70
-        && reasons.is_empty()
+        && !publication_blocked
+        && name
+            .as_deref()
+            .is_some_and(|value| !value.trim().is_empty())
+        && has_publishable_location
         && !matches!(
             resolution_status.as_str(),
             "possible_duplicate" | "needs_review"
