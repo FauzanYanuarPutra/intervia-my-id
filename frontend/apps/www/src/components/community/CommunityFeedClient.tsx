@@ -2812,7 +2812,7 @@ export function CommunityPostCard({
             <button
               type="button"
               onClick={openDetail}
-              className="!my-0 !block !w-full !min-w-0 !truncate !whitespace-nowrap text-left text-[0.94rem] font-bold leading-5 tracking-[-0.02em] text-[color:var(--app-text)] sm:text-[0.96rem]"
+              className=" !min-w-0 !py-1 !my-0 !block !w-full !min-w-0 !truncate !whitespace-nowrap text-left text-[0.94rem] font-bold leading-5 tracking-[-0.02em] text-[color:var(--app-text)] sm:text-[0.96rem]"
             >
               {item.author.name}
             </button>
@@ -2820,7 +2820,7 @@ export function CommunityPostCard({
             <div className="!mt-0.5 !flex !min-w-0 !w-full !items-center !gap-x-1.5 text-[11px] !leading-[14px] text-[color:var(--app-text-soft)] sm:text-xs sm:!leading-4">
              <Link
               href={item.group ? communityGroupHref(item.group) : '/community'}
-              className="!m-0 !h-fit !min-h-0 !min-w-0 !flex-1 !self-start !truncate py-4 font-semibold !leading-[14px] hover:text-[color:var(--app-accent)] sm:!leading-4"
+              className="!m-0 !h-fit !min-h-0 !min-w-0 !flex-1 !self-start !truncate py-1 font-semibold !leading-[14px] hover:text-[color:var(--app-accent)] sm:!leading-4"
               onClick={event => event.stopPropagation()}
             >
               {item.group?.name || item.communityName}
