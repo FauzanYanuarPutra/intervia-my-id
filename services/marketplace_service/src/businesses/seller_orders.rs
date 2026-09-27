@@ -304,7 +304,15 @@ impl SellerOrderRepository {
         let current_state = OrderState::from_db(&current.base_status).ok_or(
             SellerOrderRepositoryError::Validation("invalid_stored_order_status"),
         )?;
-        if !allowed_seller_transitions(&current).contains(&next_status) {
+        let manual_payment_confirmation = current_state == OrderState::PendingPayment
+            && next_status == OrderState::Paid
+            && metadata
+                .get("payment_confirmation")
+                .and_then(Value::as_object)
+                .is_some();
+        if !allowed_seller_transitions(&current).contains(&next_status)
+            && !manual_payment_confirmation
+        {
             return Err(SellerOrderRepositoryError::InvalidTransition);
         }
         current_state
