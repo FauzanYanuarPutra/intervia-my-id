@@ -30,13 +30,31 @@ export default async function ContentDetailPage({ params }: PageProps) {
   // Public content does not need an auth lookup. Only unpublished content
   // requires an ownership check before we decide whether to expose the editor.
   if (!isActive) {
-    const ownerId = String(result.content.owner_id || '').trim().toLowerCase();
+    const metadata =
+      result.content.metadata &&
+      typeof result.content.metadata === 'object' &&
+      !Array.isArray(result.content.metadata)
+        ? (result.content.metadata as Record<string, unknown>)
+        : {};
+    const ownerId = String(
+      result.content.owner_id ||
+        (typeof metadata.owner_id === 'string' ? metadata.owner_id : ''),
+    )
+      .trim()
+      .toLowerCase();
     const viewerId = (await getViewerUserId()).trim().toLowerCase();
     const isOwner = Boolean(ownerId && viewerId && ownerId === viewerId);
     if (!isOwner) notFound();
 
+    const contentId = String(result.content.id || id);
+    if (isPublicEditorialContent(result.content)) {
+      redirect(
+        `/${locale}/news/submissions?edit=${encodeURIComponent(contentId)}`,
+      );
+    }
+
     redirect(
-      `/${locale}/create?draft=${encodeURIComponent(String(result.content.id || id))}`,
+      `/${locale}/create?draft=${encodeURIComponent(contentId)}`,
     );
   }
 
