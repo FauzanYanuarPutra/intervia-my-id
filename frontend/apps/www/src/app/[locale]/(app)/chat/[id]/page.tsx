@@ -565,7 +565,7 @@ function createMessageReference(
     sender_name: getSenderLabel?.(message),
     content: summarizeMessageForAction(message),
     message_type: message.message_type,
-    attachments: message.attachments?.slice(0, 4),
+    attachments: message.attachments?.slice(0, MAX_COMPOSER_ATTACHMENTS),
     created_at: message.created_at,
   };
 }
@@ -657,7 +657,7 @@ function readMessageReference(raw: Record<string, unknown>, content: string): Me
         ? String(candidate?.message_type ?? candidate?.type)
         : undefined,
     attachments: Array.isArray(candidate?.attachments)
-      ? candidate.attachments.map(String).slice(0, 4)
+      ? candidate.attachments.map(String).slice(0, MAX_COMPOSER_ATTACHMENTS)
       : undefined,
     created_at:
       candidate?.created_at != null
@@ -729,10 +729,11 @@ function ChatReferenceMediaPreview({
   locale: 'id' | 'en';
   compact?: boolean;
 }) {
-  const urls = (attachments || [])
+  const allUrls = (attachments || [])
     .map(normalizeAttachmentUrl)
-    .filter(Boolean)
-    .slice(0, 4);
+    .filter(Boolean);
+  const urls = allUrls.slice(0, 4);
+  const total = allUrls.length;
   if (!urls.length) return null;
 
   const kind = String(messageType || '').toLowerCase();
@@ -752,9 +753,9 @@ function ChatReferenceMediaPreview({
                 className="h-20 w-full object-cover sm:h-24"
                 loading="lazy"
               />
-              {index === 1 && urls.length > 2 ? (
+              {index === 1 && total > 2 ? (
                 <span className="absolute inset-0 flex items-center justify-center bg-black/45 text-xs font-bold text-white">
-                  +{urls.length - 1}
+                  +{total - 2}
                 </span>
               ) : null}
             </div>
