@@ -1913,7 +1913,7 @@ pub async fn sync_static_source_registry(db: &PgPool) -> Result<(), sqlx::Error>
             (Some(dataset_id), None) => Some(format!("dataset_id={}", dataset_id)),
             (None, notes) => notes,
         };
-        sqlx::query(
+        match sqlx::query(
             r#"INSERT INTO data_source_registry (
                 source_key, provider_name, source_kind, source_url, api_url, terms_url,
                 license_name, license_url, attribution_text,
