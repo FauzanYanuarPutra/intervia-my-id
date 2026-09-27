@@ -44,7 +44,8 @@ PROVIDER_COUNT="$(run_sql "$MARKETPLACE_DATABASE_URL" "SELECT COUNT(*) FROM cont
 BUYER_COUNT="$(run_sql "$MARKETPLACE_DATABASE_URL" "SELECT COUNT(*) FROM content_items WHERE content_status='active' AND COALESCE(metadata->>'seed_pack','') = 'real_indonesia_bulk_open_data' AND pricing_mode = 'request'")"
 MEDIA_COUNT="$(run_sql "$COMMUNITY_DATABASE_URL" "SELECT COUNT(*) FROM reel.lajukan_reels WHERE COALESCE(metadata->>'seed_pack','') = 'real_indonesia_bulk_open_data'")"
 
-psql "$MARKETPLACE_DATABASE_URL" -v ON_ERROR_STOP=1 <<SQL
+if [ "$PROVIDER_COUNT" -gt 0 ] || [ "$BUYER_COUNT" -gt 0 ] || [ "$MEDIA_COUNT" -gt 0 ]; then
+  psql "$MARKETPLACE_DATABASE_URL" -v ON_ERROR_STOP=1 <<SQL
 INSERT INTO real_data_bootstrap_runs (bootstrap_key, last_success_at, last_provider_count, last_buyer_count, last_community_media_count, last_error, updated_at)
 VALUES ('$LOCK_KEY', NOW(), $PROVIDER_COUNT, $BUYER_COUNT, $MEDIA_COUNT, NULL, NOW())
 ON CONFLICT (bootstrap_key) DO UPDATE SET
@@ -55,5 +56,19 @@ ON CONFLICT (bootstrap_key) DO UPDATE SET
   last_error = NULL,
   updated_at = NOW();
 SQL
+  echo "[real-data] bootstrap complete"
+else
+  psql "$MARKETPLACE_DATABASE_URL" -v ON_ERROR_STOP=1 <<SQL
+INSERT INTO real_data_bootstrap_runs (bootstrap_key, last_success_at, last_provider_count, last_buyer_count, last_community_media_count, last_error, updated_at)
+VALUES ('$LOCK_KEY', NULL, 0, 0, 0, 'No external rows were imported; source mirrors may be unavailable.', NOW())
+ON CONFLICT (bootstrap_key) DO UPDATE SET
+  last_provider_count = EXCLUDED.last_provider_count,
+  last_buyer_count = EXCLUDED.last_buyer_count,
+  last_community_media_count = EXCLUDED.last_community_media_count,
+  last_error = EXCLUDED.last_error,
+  updated_at = NOW();
+SQL
+  echo "[real-data] bootstrap completed without external rows; will retry on next startup."
+fi
 
 echo "[real-data] bootstrap complete: providers=${PROVIDER_COUNT} buyers=${BUYER_COUNT} community_media=${MEDIA_COUNT}"
