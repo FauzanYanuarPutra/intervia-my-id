@@ -204,14 +204,8 @@ export function UmkmDiscoveryClient(props: UmkmDiscoveryClientProps) {
     : activeLaneConfig.labelEn;
   const discoveryQuery = cleanedQuery;
   const createHref = isAuthenticated ? '/create' : '/register';
-  const visibleLanes = showAllLanes
-    ? MAP_LANES
-    : MAP_LANES.filter(
-        lane =>
-          ['all', 'food', 'retail', 'service'].includes(lane.id) ||
-          lane.id === activeLane,
-      );
-  const hiddenLaneCount = MAP_LANES.length - visibleLanes.length;
+  const defaultLaneCount = 4;
+  const hiddenLaneCount = Math.max(0, MAP_LANES.length - defaultLaneCount);
 
   useBodyScrollLock(true, { resetScroll: true });
 
