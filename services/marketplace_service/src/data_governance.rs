@@ -633,7 +633,7 @@ async fn review_claim(
                 return (StatusCode::CONFLICT, Json(json!({"error":"business already has an active owner"}))).into_response();
             }
 
-            sqlx::query(
+            match sqlx::query(
                 r#"
                 UPDATE content_items
                 SET owner_id = $2,
@@ -661,7 +661,7 @@ async fn review_claim(
             };
         }
 
-        sqlx::query(
+        match sqlx::query(
             r#"
             INSERT INTO business_ownership_grants (content_id, user_id, claim_id, role, granted_by)
             VALUES ($1, $2, $3, $4, $5)
@@ -684,7 +684,7 @@ async fn review_claim(
             }
         }
 
-        sqlx::query(
+        match sqlx::query(
             r#"
             UPDATE business_claims
             SET status = 'approved',
