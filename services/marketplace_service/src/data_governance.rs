@@ -2109,6 +2109,8 @@ pub async fn sync_static_source_registry(db: &PgPool) -> Result<(), sqlx::Error>
         terms_url: Option<String>,
         #[serde(default)]
         auto_publish_reference: bool,
+        #[serde(default)]
+        enabled: Option<bool>,
     }
 
     let registry: Registry = serde_json::from_str(include_str!(
