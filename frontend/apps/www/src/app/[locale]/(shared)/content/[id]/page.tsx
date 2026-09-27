@@ -71,10 +71,15 @@ export default async function ContentDetailPage({ params }: PageProps) {
     notFound();
   }
 
+  const ownerEditHref = isPublicEditorialContent(result.content)
+    ? `/${locale}/news/submissions?edit=${encodeURIComponent(String(result.content.id || id))}`
+    : `/${locale}/create?draft=${encodeURIComponent(String(result.content.id || id))}`;
+
   return (
     <ContentDetailClient
       contentId={id}
       initialItem={result.content as ContentItem}
+      ownerEditHref={ownerEditHref}
     />
   );
 }
