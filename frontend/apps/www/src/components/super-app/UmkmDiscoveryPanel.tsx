@@ -997,6 +997,7 @@ export function UmkmDiscoveryPanel({
   const [loading, setLoading] = useState(!hasInitialStores);
   const [error, setError] = useState<string | null>(null);
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
+  const [selectedProductsLoading, setSelectedProductsLoading] = useState(false);
   const [totalCount, setTotalCount] = useState<number | null>(
     initialCount ?? (hasInitialStores ? initialStores.length : null),
   );
@@ -1467,6 +1468,58 @@ export function UmkmDiscoveryPanel({
     () => visibleStores.find(item => item.store.id === selectedStoreId) || null,
     [selectedStoreId, visibleStores],
   );
+
+  useEffect(() => {
+    if (!selectedPlace?.store.id || selectedPlace.store.products) {
+      setSelectedProductsLoading(false);
+      return;
+    }
+
+    let active = true;
+    setSelectedProductsLoading(true);
+
+    const loadSelectedProducts = async () => {
+      try {
+        const response = await fetch(
+          `/api/super-app/umkm/stores/${encodeURIComponent(selectedPlace.store.id)}/products?limit=8`,
+          {
+            cache: 'no-store',
+            credentials: 'include',
+          },
+        );
+        const payload = (await response.json().catch(() => ({}))) as {
+          data?: { items?: Array<{
+            id: string;
+            name: string;
+            description?: string | null;
+            category?: string | null;
+            price_cents: number;
+            image_url?: string | null;
+            is_available: boolean;
+          }> };
+        };
+        if (!active || !response.ok || !payload.data?.items) return;
+
+        const productItems = payload.data.items;
+        setStores(current =>
+          current.map(store =>
+            store.id === selectedPlace.store.id
+              ? { ...store, products: productItems }
+              : store,
+          ),
+        );
+      } catch {
+        // Product preview is supplemental; keep the business detail usable.
+      } finally {
+        if (active) setSelectedProductsLoading(false);
+      }
+    };
+
+    void loadSelectedProducts();
+    return () => {
+      active = false;
+    };
+  }, [selectedPlace?.store.id, selectedPlace?.store.products]);
   const selectedIsPublicReference = selectedPlace
     ? isUmkmMapPublicReference(selectedPlace.store)
     : false;
@@ -2743,11 +2796,17 @@ export function UmkmDiscoveryPanel({
                           {isId ? 'Produk' : 'Products'}
                         </p>
                         <p className="mt-0.5 text-[11px] font-semibold text-[color:var(--app-text)]">
-                          {selectedPlace.store.products?.length
-                            ? selectedPlace.store.products.length + '+ ' + (isId ? 'produk' : 'products')
-                            : isId
-                              ? 'Produk belum tersedia'
-                              : 'No products yet'}
+                          {selectedProductsLoading
+                            ? isId
+                              ? 'Memuat produk...'
+                              : 'Loading products...'
+                            : selectedPlace.store.products?.length
+                              ? isId
+                                ? 'Produk yang tersedia'
+                                : 'Available products'
+                              : isId
+                                ? 'Produk belum tersedia'
+                                : 'No products yet'}
                         </p>
                       </div>
                       <Link
