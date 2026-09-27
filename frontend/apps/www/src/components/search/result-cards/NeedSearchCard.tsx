@@ -15,7 +15,6 @@ import {
   normalizeContentMediaUrl,
 } from '@/lib/content/catalog';
 import {
-  getListingSideActorLabel,
   getListingSideVerbLabel,
   getListingValueFallback,
 } from '@/lib/content/listingSide';
