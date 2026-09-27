@@ -227,7 +227,8 @@
       "auto_publish_reference": false,
       "license": "Creative Commons Attribution",
       "attribution": "Diskominfo Kota Tangerang Selatan",
-      "notes": "Dataset agregat jumlah UMKM per kecamatan. Resource CSV/DataStore aktif; dipublikasikan sebagai Data Reference/Insight, bukan profil usaha individual."
+      "notes": "Dataset agregat jumlah UMKM per kecamatan. Resource CSV/DataStore aktif; dipublikasikan sebagai Data Reference/Insight, bukan profil usaha individual. Native CKAN bootstrap disabled in favor of the verified direct CSV resource used by the real-data insight importer.",
+      "enabled": false
     },
     {
       "id": "data-sumbawa-umkm-2024-2025",
