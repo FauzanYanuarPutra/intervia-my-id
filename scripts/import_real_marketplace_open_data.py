@@ -98,6 +98,19 @@ class CommonsMediaSeed:
     hook: str
     metadata: dict[str, Any]
 
+@dataclass(frozen=True)
+class DataInsight:
+    source_id: str
+    source_record_id: str
+    title: str
+    summary: str
+    body: str
+    location: str
+    source_url: str
+    source_license: str
+    metadata: dict[str, Any]
+
+
 
 def clean_text(value: Any, default: str = "") -> str:
     if value is None:
@@ -1651,7 +1664,7 @@ def write_community_sql(out_path: str, media_items: list[CommonsMediaSeed]) -> N
     path.write_text("\n".join(parts), encoding="utf-8")
 
 
-def write_sql(out_path: str, stores: list[ProviderStore], requests: list[BuyerRequest]) -> None:
+def write_sql(out_path: str, stores: list[ProviderStore], requests: list[BuyerRequest], insights: list[DataInsight]) -> None:
     path = Path(out_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     now = dt.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
@@ -1664,6 +1677,8 @@ def write_sql(out_path: str, stores: list[ProviderStore], requests: list[BuyerRe
         parts.extend(provider_store_sql(stores))
     if requests:
         parts.extend(buyer_request_sql(requests))
+    if insights:
+        parts.extend(aggregate_insight_sql(insights))
     parts.extend(["COMMIT;", ""])
     path.write_text("\n".join(parts), encoding="utf-8")
 
@@ -1827,6 +1842,178 @@ def buyer_request_sql(requests: list[BuyerRequest]) -> list[str]:
     ]
 
 
+def parse_csv_text(raw: bytes) -> list[dict[str, Any]]:
+    last_error: Exception | None = None
+    for encoding in ("utf-8-sig", "utf-8", "latin-1"):
+        try:
+            text = raw.decode(encoding)
+            sample = text[:8192]
+            delimiter = ","
+            try:
+                delimiter = csv.Sniffer().sniff(sample, delimiters=",;\\t|").delimiter
+            except csv.Error:
+                pass
+            reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
+            return [
+                {clean_text(k): clean_text(v) for k, v in row.items() if clean_text(k)}
+                for row in reader
+                if isinstance(row, dict)
+            ]
+        except Exception as exc:
+            last_error = exc
+    raise RuntimeError(f"unable to decode CSV: {last_error}")
+
+
+def iter_csv_aggregate_insights(source: dict[str, Any], max_rows: int | None) -> Iterable[DataInsight]:
+    response = urllib.request.urlopen(
+        urllib.request.Request(
+            source["url"],
+            headers={"Accept": "text/csv,*/*", "User-Agent": USER_AGENT},
+        ),
+        timeout=int(source.get("timeout_seconds") or 60),
+    )
+    try:
+        content_length = response.headers.get("Content-Length")
+        max_bytes = int(source.get("max_bytes") or 10_000_000)
+        if content_length and int(content_length) > max_bytes:
+            raise RuntimeError(f"CSV resource exceeds safety limit: {content_length} bytes")
+        raw = response.read(max_bytes + 1)
+    finally:
+        response.close()
+    if len(raw) > max_bytes:
+        raise RuntimeError("CSV resource exceeds safety limit after download")
+
+    rows = parse_csv_text(raw)
+    title = clean_text(source.get("title"), source.get("name", "Public data insight"))
+    dimension_fields = [clean_text(v) for v in source.get("dimension_fields", [])]
+    measure_fields = [clean_text(v) for v in source.get("measure_fields", [])]
+    source_license = clean_text(source.get("license"), "Creative Commons Attribution")
+    source_url = clean_text(source["source_url"], source["url"])
+    emitted = 0
+
+    for index, row in enumerate(rows):
+        if max_rows is not None and emitted >= max_rows:
+            break
+        values = {k: v for k, v in row.items() if v}
+        if not values:
+            continue
+
+        dimensions = [
+            f"{field}: {row[field]}"
+            for field in dimension_fields
+            if row.get(field)
+        ]
+        measures = [
+            f"{field}: {row[field]}"
+            for field in measure_fields
+            if row.get(field)
+        ]
+        if not dimensions:
+            dimensions = [
+                f"{key}: {value}"
+                for key, value in list(values.items())[:4]
+                if key not in measure_fields
+            ]
+        if not measures:
+            measures = [
+                f"{key}: {value}"
+                for key, value in list(values.items())[:6]
+                if key not in dimension_fields
+            ]
+
+        label = " · ".join(dimensions[:3]) or f"baris {index + 1}"
+        location = row.get("Kecamatan") or row.get("Kabupaten") or row.get("Kota") or row.get("Nama Kecamatan") or row.get("location") or clean_text(source.get("location"), "Indonesia")
+        record_id = clean_text(
+            row.get("id")
+            or row.get("ID")
+            or "|".join(row.get(field, "") for field in dimension_fields)
+            or f"row-{index + 1}"
+        )
+        body = (
+            f"Data agregat {title}. {label}. "
+            + (f"Ukuran: {'; '.join(measures)}. " if measures else "")
+            + "Data ini adalah statistik/reference, bukan profil usaha individual."
+        )
+        search_text = clean_text(f"{title} {label} {location} {' '.join(measures)} UMKM data insight statistik usaha")
+        metadata = {
+            "seed_pack": "real_indonesia_bulk_open_data",
+            "record_kind": "open_data_reference",
+            "reference_subtype": "aggregate_data",
+            "reference_publication_status": "published",
+            "claimable": False,
+            "market_side": "reference",
+            "listing_side": "reference",
+            "is_transactional": False,
+            "source_dataset": source["id"],
+            "external_id": record_id,
+            "source_title": title,
+            "source_url": source_url,
+            "source_license": source_license,
+            "source_attribution": source.get("attribution"),
+            "location": location,
+            "search_text": search_text,
+            "raw_row": values,
+        }
+        emitted += 1
+        yield DataInsight(
+            source_id=source["id"],
+            source_record_id=record_id,
+            title=f"{title} — {label}",
+            summary=f"Data publik agregat dari {source.get('provider', source.get('name', 'sumber resmi'))}.",
+            body=body,
+            location=location,
+            source_url=source_url,
+            source_license=source_license,
+            metadata=metadata,
+        )
+
+
+def aggregate_insight_sql(items: list[DataInsight]) -> list[str]:
+    rows = csv_block(
+        [
+            [
+                item.source_id,
+                item.source_record_id,
+                item.title,
+                item.summary,
+                item.body,
+                item.location,
+                item.source_url,
+                item.source_license,
+                json.dumps(item.metadata, ensure_ascii=False, separators=(",", ":")),
+            ]
+            for item in items
+        ]
+    ).rstrip("\n")
+    return [
+        "CREATE TEMP TABLE stage_real_data_insights (",
+        "  source_id text, source_record_id text, title text, summary text, body text,",
+        "  location text, source_url text, source_license text, metadata jsonb",
+        ") ON COMMIT DROP;",
+        "COPY stage_real_data_insights (source_id,source_record_id,title,summary,body,location,source_url,source_license,metadata) FROM STDIN WITH (FORMAT csv, NULL '');",
+        rows,
+        "\\.",
+        "INSERT INTO content_items (",
+        "  owner_id, content_type, slug, title, summary, body, pricing_mode, currency,",
+        "  tags, category, content_status, metadata, listing_status, listing_intent,",
+        "  current_step, completion_percentage, last_saved_at, published_at",
+        ")",
+        "SELECT",
+        "  NULL, 'profile',",
+        "  slugify || '-' || substr(md5(source_id || ':' || source_record_id), 1, 8),",
+        "  title, summary, body, 'fixed', 'IDR',",
+        "  ARRAY['reference','data-insight','umkm']::text[], 'data_insight', 'active',",
+        "  metadata, 'published', 'offer', 1, 100, NOW(), NOW()",
+        "FROM (",
+        "  SELECT *, regexp_replace(lower(title), '[^a-z0-9]+', '-', 'g') AS slugify",
+        "  FROM stage_real_data_insights",
+        ") src",
+        "ON CONFLICT (slug) DO UPDATE",
+        "SET owner_id = NULL, title=EXCLUDED.title, summary=EXCLUDED.summary, body=EXCLUDED.body,",
+        "    category=EXCLUDED.category, content_status='active', metadata=EXCLUDED.metadata,",
+        "    listing_status='published', updated_at=NOW();",
+    ]
+
 def enabled_sources(config: dict[str, Any], source_ids: set[str]) -> list[dict[str, Any]]:
     selected = []
     for source in config.get("sources", []):
@@ -1867,10 +2054,12 @@ def main(argv: list[str]) -> int:
     stores: list[ProviderStore] = []
     requests: list[BuyerRequest] = []
     media_items: list[CommonsMediaSeed] = []
+    insights: list[DataInsight] = []
     image_enrichers: list[dict[str, Any]] = []
     remaining_providers = args.max_providers if args.max_providers >= 0 else None
     remaining_buyers = args.max_buyers if args.max_buyers >= 0 else None
     remaining_community_media = args.max_community_media if args.max_community_media >= 0 else None
+    remaining_insights = int(args.max_buyers) if args.max_buyers >= 0 else None
 
     for source in sources:
         kind = source.get("kind")
@@ -1903,6 +2092,12 @@ def main(argv: list[str]) -> int:
                     remaining_buyers = max(0, remaining_buyers - added)
             elif kind == "google_places_photo_enrichment" and role == "provider_image_enrichment":
                 image_enrichers.append(source)
+            elif kind == "csv_aggregate" and role == "insight":
+                before = len(insights)
+                insights.extend(iter_csv_aggregate_insights(source, remaining_insights))
+                added = len(insights) - before
+                if remaining_insights is not None:
+                    remaining_insights = max(0, remaining_insights - added)
             elif kind == "wikimedia_commons_media" and role == "community_reels":
                 before = len(media_items)
                 media_items.extend(iter_wikimedia_commons_media(source, remaining_community_media))
@@ -1940,7 +2135,7 @@ def main(argv: list[str]) -> int:
         if skipped_buyer_requests:
             print(f"skipped {skipped_buyer_requests} buyer rows without a real external image", file=sys.stderr)
 
-    write_sql(args.out, stores, requests)
+    write_sql(args.out, stores, requests, insights)
     if not args.no_community_out:
         write_community_sql(args.community_out, media_items)
     print(
@@ -1950,6 +2145,7 @@ def main(argv: list[str]) -> int:
                 "community_out": None if args.no_community_out else args.community_out,
                 "provider_stores": len(stores),
                 "buyer_requests": len(requests),
+                "data_insights": len(insights),
                 "allow_image_less_records": args.allow_image_less_records,
                 "skipped_provider_stores_without_images": skipped_provider_stores,
                 "skipped_buyer_requests_without_images": skipped_buyer_requests,
