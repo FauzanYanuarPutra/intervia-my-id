@@ -10447,6 +10447,7 @@ async fn list_map_references(
           AND metadata->>'reference_publication_status' = 'published'
           AND metadata->>'claimable' = 'true'
           AND COALESCE(metadata->>'is_transactional', 'true') = 'false'
+          AND COALESCE(metadata->>'reference_subtype', '') <> 'aggregate_data'
           AND lower(COALESCE(metadata->>'market_side', '')) = 'reference'
           AND metadata->>'record_kind' IN (
             'government_reference',
