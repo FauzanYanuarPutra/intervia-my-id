@@ -315,9 +315,14 @@ impl SellerOrderRepository {
         {
             return Err(SellerOrderRepositoryError::InvalidTransition);
         }
-        current_state
-            .transition(next_status)
-            .map_err(|_| SellerOrderRepositoryError::InvalidTransition)?;
+        // Manual payment confirmation is a controlled seller exception:
+        // PENDING_PAYMENT -> PAID is valid only with explicit payment_confirmation
+        // metadata. The normal seller transition graph intentionally excludes it.
+        if !manual_payment_confirmation {
+            current_state
+                .transition(next_status)
+                .map_err(|_| SellerOrderRepositoryError::InvalidTransition)?;
+        }
 
         let mut reservations_consumed = 0u64;
         let mut reservations_released = 0u64;
