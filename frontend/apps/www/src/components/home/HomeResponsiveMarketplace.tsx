@@ -4037,11 +4037,14 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
       }).catch(() => null);
 
       const [response, groupsResponse] = await Promise.all([
-        fetch(`/api/community/feed?${params.toString()}`, {
-          cache: 'no-store',
-          credentials: 'include',
-          signal: controller.signal,
-        }),
+        fetch(
+          `${activeTab === 'community' ? '/api/community/groups/feed' : '/api/community/feed'}?${params.toString()}`,
+          {
+            cache: 'no-store',
+            credentials: 'include',
+            signal: controller.signal,
+          },
+        ),
         groupsRequest,
       ]);
 
