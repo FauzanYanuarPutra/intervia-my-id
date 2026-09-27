@@ -1938,7 +1938,6 @@ pub async fn bootstrap_persistent_imports(state: Arc<AppState>) -> Result<u64, s
             }
         };
 
-
         let Some(job) = job else {
             continue;
         };
