@@ -2305,18 +2305,84 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/v1/business-claims/{claim_id}/review", post(review_claim))
 }
 
-use axum::{
-    extract:
+#[cfg(test)]
+mod tests {
+    use super::*;
+
     #[test]
     fn license_whitelist_accepts_explicit_reuse_licenses_only() {
-        assert!(license_allows_persistent_import("Creative Commons Attribution 4.0 International"));
+        assert!(license_allows_persistent_import(
+            "Creative Commons Attribution 4.0 International"
+        ));
         assert!(license_allows_persistent_import("CC BY 4.0"));
         assert!(license_allows_persistent_import("CC0 1.0"));
         assert!(!license_allows_persistent_import("All rights reserved"));
         assert!(!license_allows_persistent_import("License not specified"));
     }
 
-    :{Path, Query, State},
+    #[test]
+    fn static_registry_contains_governed_bootstrap_sources() {
+        let registry: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../config/lajukan_data_source_registry.json"
+        ))
+        .expect("source registry JSON must remain valid");
+
+        let sources = registry
+            .get("sources")
+            .and_then(serde_json::Value::as_array)
+            .expect("sources array");
+
+        let persistent = sources
+            .iter()
+            .filter(|source| {
+                source.get("reuse_mode").and_then(serde_json::Value::as_str)
+                    == Some("persistent_import")
+            })
+            .count();
+        assert!(
+            persistent >= 6,
+            "expected at least 6 governed persistent sources, got {persistent}"
+        );
+
+        let osm = sources
+            .iter()
+            .find(|source| {
+                source.get("id").and_then(serde_json::Value::as_str) == Some("osm")
+            })
+            .expect("OSM source must remain registered");
+        assert_eq!(
+            osm.get("kind").and_then(serde_json::Value::as_str),
+            Some("osm_overpass")
+        );
+        assert_eq!(
+            osm.get("auto_publish_reference")
+                .and_then(serde_json::Value::as_bool),
+            Some(true)
+        );
+
+        let aggregate_sources = [
+            "data-go-id-denpasar-umkm",
+            "data-go-id-sleman-umkm-sector",
+            "data-tangsel-umkm-2022",
+            "data-sumbawa-umkm-2024-2025",
+            "data-aceh-barat-umkm-johan-pahlawan-2025",
+        ]
+        .iter()
+        .filter(|id| {
+            sources.iter().any(|source| {
+                source.get("id").and_then(serde_json::Value::as_str) == Some(**id)
+            })
+        })
+        .count();
+
+        assert!(
+            aggregate_sources >= 5,
+            "all currently verified aggregate UMKM sources must remain registered"
+        );
+    }
+}
+use axum::{
+    extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::IntoResponse,
     routing::{get, post},
