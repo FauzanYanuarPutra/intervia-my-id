@@ -846,6 +846,7 @@ out center tags;
 
             match result {
                 Ok(_) => {
+                    accepted += 1;
                     let import_record_id = sqlx::query_scalar::<_, Uuid>(
                         "SELECT id FROM data_import_records WHERE source_id=$1 AND source_record_id=$2 LIMIT 1"
                     )
@@ -869,9 +870,7 @@ out center tags;
                             .await
                             {
                                 errors += 1;
-                                tracing::warn!(entity_id=%entity_id, "OSM promotion candidate generation failed: {:?}", error);
-                            } else {
-                                accepted += 1;
+                                tracing::warn!(entity_id=%entity_id, "OSM promotion candidate generation failed (record remains accepted): {:?}", error);
                             }
                         }
                         Err(error) => {
