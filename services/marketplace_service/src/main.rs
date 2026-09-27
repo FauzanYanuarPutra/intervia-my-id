@@ -2091,6 +2091,11 @@ async fn main() -> anyhow::Result<()> {
         Ok(_) => tracing::debug!("no persistent data bootstrap imports needed"),
         Err(error) => tracing::warn!("persistent data bootstrap failed: {:?}", error),
     }
+    match data_governance::bootstrap_reference_publication(state.clone()).await {
+        Ok(count) if count > 0 => tracing::info!("published {} eligible unowned reference records", count),
+        Ok(_) => tracing::debug!("no eligible reference publication candidates found"),
+        Err(error) => tracing::warn!("reference publication reconciliation failed: {:?}", error),
+    }
 
     let identity_projection_config = IdentityProjectionConfig::from_env();
     if identity_projection_config.enabled {
