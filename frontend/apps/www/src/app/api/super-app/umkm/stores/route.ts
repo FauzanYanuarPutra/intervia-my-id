@@ -254,18 +254,26 @@ function mapPublicReference(
   const sourceTitle = readText(metadata.source_title).slice(0, 160);
   const sourceLicense = readText(metadata.source_license).slice(0, 160);
   const sourceDataset = readText(metadata.source_dataset).toLowerCase();
-  const sourceUrl = safeOpenStreetMapSourceUrl(metadata.source_url);
-  const sourceLicenseUrl = safeOdblLicenseUrl(metadata.source_license_url);
+  const sourceUrl = safeHttpUrl(metadata.source_url);
+  const sourceLicenseUrl = safeHttpUrl(metadata.source_license_url);
+  const isOsmReference =
+    sourceDataset === 'openstreetmap' &&
+    sourceTitle.toLowerCase().includes('openstreetmap') &&
+    /(odbl|open database license)/i.test(sourceLicense);
+  const isGovernedReference =
+    readText(metadata.record_kind).toLowerCase().includes('reference') &&
+    readText(metadata.market_side).toLowerCase() === 'reference' &&
+    readText(metadata.is_transactional).toLowerCase() === 'false' &&
+    sourceDataset.length >= 2 &&
+    sourceLicense.length >= 2;
   if (
     !id ||
     !title ||
     !sourceTitle ||
-    !sourceTitle.toLowerCase().includes('openstreetmap') ||
-    sourceDataset !== 'openstreetmap' ||
-    !sourceLicense ||
-    !/(odbl|open database license)/i.test(sourceLicense) ||
     !sourceUrl ||
-    !sourceLicenseUrl ||
+    !sourceLicense ||
+    (!isOsmReference && !isGovernedReference) ||
+    (isOsmReference && !sourceLicenseUrl) ||
     lat === null ||
     lng === null ||
     !isCoordinateValid({ lat, lng })
