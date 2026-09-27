@@ -323,17 +323,41 @@ async fn run_osm_reference_import(
         ("Banda Aceh", "Aceh", 5.5483, 95.3238, 13_000.0),
         ("Jambi", "Jambi", -1.6101, 103.6131, 14_000.0),
         ("Pontianak", "Kalimantan Barat", -0.0263, 109.3425, 15_000.0),
-        ("Banjarmasin", "Kalimantan Selatan", -3.3186, 114.5944, 15_000.0),
+        (
+            "Banjarmasin",
+            "Kalimantan Selatan",
+            -3.3186,
+            114.5944,
+            15_000.0,
+        ),
         ("Samarinda", "Kalimantan Timur", -0.5022, 117.1536, 15_000.0),
-        ("Balikpapan", "Kalimantan Timur", -1.2379, 116.8529, 15_000.0),
+        (
+            "Balikpapan",
+            "Kalimantan Timur",
+            -1.2379,
+            116.8529,
+            15_000.0,
+        ),
         ("Manado", "Sulawesi Utara", 1.4748, 124.8421, 14_000.0),
         ("Malang", "Jawa Timur", -7.9666, 112.6326, 15_000.0),
         ("Surakarta", "Jawa Tengah", -7.5755, 110.8243, 14_000.0),
         ("Cirebon", "Jawa Barat", -6.7320, 108.5523, 12_000.0),
         ("Tasikmalaya", "Jawa Barat", -7.3274, 108.2207, 12_000.0),
-        ("Mataram", "Nusa Tenggara Barat", -8.5833, 116.1167, 13_000.0),
-        ("Kupang", "Nusa Tenggara Timur", -10.1772, 123.6070, 13_000.0),
-        ("Jayapura", "Papua", -2.5337, 140.7181, 12_000.0)
+        (
+            "Mataram",
+            "Nusa Tenggara Barat",
+            -8.5833,
+            116.1167,
+            13_000.0,
+        ),
+        (
+            "Kupang",
+            "Nusa Tenggara Timur",
+            -10.1772,
+            123.6070,
+            13_000.0,
+        ),
+        ("Jayapura", "Papua", -2.5337, 140.7181, 12_000.0),
     ];
 
     let query = r#"
