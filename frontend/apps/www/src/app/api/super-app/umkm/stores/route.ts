@@ -254,8 +254,14 @@ function mapPublicReference(
   const sourceTitle = readText(metadata.source_title).slice(0, 160);
   const sourceLicense = readText(metadata.source_license).slice(0, 160);
   const sourceDataset = readText(metadata.source_dataset).toLowerCase();
-  const sourceUrl = safeHttpUrl(metadata.source_url);
-  const sourceLicenseUrl = safeHttpUrl(metadata.source_license_url);
+  const sourceUrl =
+    sourceDataset === 'openstreetmap'
+      ? safeOpenStreetMapSourceUrl(metadata.source_url)
+      : safeHttpUrl(metadata.source_url);
+  const sourceLicenseUrl =
+    sourceDataset === 'openstreetmap'
+      ? safeOdblLicenseUrl(metadata.source_license_url)
+      : safeHttpUrl(metadata.source_license_url);
   const isOsmReference =
     sourceDataset === 'openstreetmap' &&
     sourceTitle.toLowerCase().includes('openstreetmap') &&
