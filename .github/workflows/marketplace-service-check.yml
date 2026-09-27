@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'services/marketplace_service/**'
+      - 'config/lajukan_data_source_registry.json'
       - '.github/workflows/marketplace-service-check.yml'
   pull_request:
     paths:
