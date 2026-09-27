@@ -2347,9 +2347,7 @@ mod tests {
 
         let osm = sources
             .iter()
-            .find(|source| {
-                source.get("id").and_then(serde_json::Value::as_str) == Some("osm")
-            })
+            .find(|source| source.get("id").and_then(serde_json::Value::as_str) == Some("osm"))
             .expect("OSM source must remain registered");
         assert_eq!(
             osm.get("kind").and_then(serde_json::Value::as_str),
@@ -2370,9 +2368,9 @@ mod tests {
         ]
         .iter()
         .filter(|id| {
-            sources.iter().any(|source| {
-                source.get("id").and_then(serde_json::Value::as_str) == Some(**id)
-            })
+            sources
+                .iter()
+                .any(|source| source.get("id").and_then(serde_json::Value::as_str) == Some(**id))
         })
         .count();
 
@@ -4683,4 +4681,3 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/v1/business-claims/{claim_id}", get(get_claim))
         .route("/v1/business-claims/{claim_id}/review", post(review_claim))
 }
-
