@@ -10445,7 +10445,10 @@ async fn list_map_references(
         WHERE content_status = 'active'
           AND content_status = 'active'
           AND metadata->>'reference_publication_status' = 'published'
-          AND metadata->>'claimable' = 'true'
+          AND (
+            metadata->>'claimable' = 'true'
+            OR metadata->>'reference_subtype' = 'place_reference'
+          )
           AND COALESCE(metadata->>'is_transactional', 'true') = 'false'
           AND COALESCE(metadata->>'reference_subtype', '') <> 'aggregate_data'
           AND lower(COALESCE(metadata->>'market_side', '')) = 'reference'
