@@ -141,3 +141,27 @@ The data pipeline should eventually run as:
 `discover -> validate -> normalize -> dedupe -> provenance -> moderation -> publish -> refresh/archive`
 
 Claim verification remains a human-controlled operation for ownership-sensitive transitions.
+
+
+## Implemented API surface
+
+The marketplace service now mounts the governance router with these flows:
+
+- `GET /v1/data/sources` — exposes the enabled source registry and reuse policy.
+- `GET /v1/data/import-jobs` — agent-only import job visibility.
+- `POST /v1/data/import-jobs/{source_key}` — queues a dry-run/import/refresh request only when the stored source policy permits it; live-only sources are rejected.
+- `GET /v1/businesses/{content_ref}/claim` and `POST /v1/businesses/{content_ref}/claim` — public claimability/status and authenticated claim submission.
+- `GET /v1/business-claims` — claimant's own claims.
+- `GET /v1/business-claims/{claim_id}` — claimant/agent claim detail with evidence.
+- `GET /v1/business-claims/queue` — agent review queue.
+- `POST /v1/business-claims/{claim_id}/review` — agent approval, rejection, or under-review transition.
+
+Approval is transactional: the content ownership update, access grant, and claim status change commit together. The database also enforces one active owner per business reference.
+
+The service synchronizes `config/lajukan_data_source_registry.json` into the database at startup. This keeps the catalog visible without silently upgrading a source's legal reuse permission. Sources marked `review_required` or `derived_only` remain blocked from persistent row import.
+
+## Important ingestion boundary
+
+This implementation intentionally separates **catalog/provenance registration** from **bulk row ingestion**. A source appearing in the registry does not mean its rows have already been copied into Lajukan. Resource-level license/redistribution checks must pass before persistent import is enabled.
+
+Google Places remains live-only. Current Google documentation says Places content generally cannot be pre-fetched, cached, or stored beyond stated exceptions; place IDs are the explicit storage exception, and attribution/source access requirements apply. 
