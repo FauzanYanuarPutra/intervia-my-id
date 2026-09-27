@@ -320,6 +320,7 @@ struct PromotionCandidateSourceRow {
     canonical_record_id: Option<Uuid>,
     source_record_id: Option<String>,
     source_record_url: Option<String>,
+    raw_metadata: Option<Value>,
     record_license: Option<String>,
     record_attribution: Option<String>,
     record_kind: String,
@@ -334,7 +335,34 @@ struct PromotionCandidateSourceRow {
     source_enabled: bool,
 }
 
-pub(crate) async fn promote_candidate(db: &PgPool, candidate_id: Uuid) -> AnyhowResult<Value> {
+pub(crate) fn raw_string(raw: &Value, keys: &[&str]) -> Option<String> {
+    keys.iter().find_map(|key| {
+        raw.get(*key)
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(ToOwned::to_owned)
+    })
+}
+
+fn raw_value(raw: &Value, keys: &[&str]) -> Option<Value> {
+    keys.iter().find_map(|key| raw.get(*key).cloned())
+}
+
+fn osm_identity(source_key: &str, source_record_id: &str) -> (Option<String>, Option<String>) {
+    if source_key != "osm" {
+        return (None, None);
+    }
+    let mut parts = source_record_id.split(':');
+    match (parts.next(), parts.next(), parts.next()) {
+        (Some("osm"), Some(element_type), Some(element_id)) => {
+            (Some(element_type.to_string()), Some(element_id.to_string()))
+        }
+        _ => (None, None),
+    }
+}
+
+async fn promote_candidate(db: &PgPool, candidate_id: Uuid) -> AnyhowResult<Value> {
     let mut tx = db.begin().await?;
 
     let candidate = sqlx::query_as::<_, PromotionCandidateSourceRow>(
@@ -343,7 +371,7 @@ pub(crate) async fn promote_candidate(db: &PgPool, candidate_id: Uuid) -> Anyhow
           c.id AS candidate_id, c.entity_id, c.source_id, c.promotion_status, c.readiness_score,
           e.normalized_name, e.normalized_address, e.city, e.province,
           e.latitude, e.longitude, e.resolution_status, e.canonical_record_id,
-          r.source_record_id, r.source_url AS source_record_url,
+          r.source_record_id, r.source_url AS source_record_url, r.raw_metadata,
           r.license_snapshot AS record_license, r.attribution_snapshot AS record_attribution,
           r.record_kind,
           s.source_key, s.provider_name, s.source_url, s.license_name AS source_license,
@@ -383,6 +411,7 @@ pub(crate) async fn promote_candidate(db: &PgPool, candidate_id: Uuid) -> Anyhow
         canonical_record_id,
         source_record_id,
         source_record_url,
+        raw_metadata,
         record_license,
         record_attribution,
         record_kind,
@@ -454,6 +483,34 @@ pub(crate) async fn promote_candidate(db: &PgPool, candidate_id: Uuid) -> Anyhow
         province.as_deref(),
     );
     let slug = slugify_reference(&name, city.as_deref(), entity_id);
+    let raw_metadata = raw_metadata.unwrap_or_else(|| json!({}));
+    let website = raw_string(&raw_metadata, &["website", "website_url", "url"]);
+    let opening_hours = raw_string(&raw_metadata, &["opening_hours", "jam_buka"]);
+    let cuisine = raw_string(&raw_metadata, &["cuisine", "kuliner"]);
+    let brand = raw_string(&raw_metadata, &["brand", "merek"]);
+    let operator = raw_string(&raw_metadata, &["operator", "pengelola"]);
+    let osm_primary_key = ["shop", "amenity", "craft", "tourism", "healthcare", "leisure", "office"]
+        .iter()
+        .find_map(|key| raw_string(&raw_metadata, &[*key]).map(|value| ((*key).to_string(), value)));
+    let (osm_type, osm_id) = osm_identity(&source_key, &source_record_id);
+    let wikidata = raw_string(&raw_metadata, &["wikidata"]);
+    let wikimedia_commons = raw_string(&raw_metadata, &["wikimedia_commons"]);
+    let search_text = [
+        Some(name.clone()),
+        address.clone(),
+        city.clone(),
+        province.clone(),
+        website.clone(),
+        opening_hours.clone(),
+        cuisine.clone(),
+        brand.clone(),
+        operator.clone(),
+        osm_primary_key.as_ref().map(|(_, value)| value.clone()),
+    ]
+    .into_iter()
+    .flatten()
+    .collect::<Vec<_>>()
+    .join(" ");
 
     let existing_content = sqlx::query_scalar::<_, Uuid>(
         r#"
@@ -502,6 +559,20 @@ pub(crate) async fn promote_candidate(db: &PgPool, candidate_id: Uuid) -> Anyhow
             "province": province,
             "address": address,
             "category": "umkm_reference",
+            "business_discovery_category": osm_primary_key.as_ref().map(|(_, value)| value.clone()),
+            "website": website,
+            "website_url": website,
+            "opening_hours": opening_hours,
+            "cuisine": cuisine,
+            "brand": brand,
+            "operator": operator,
+            "wikidata": wikidata,
+            "wikimedia_commons": wikimedia_commons,
+            "osm_type": osm_type,
+            "osm_id": osm_id,
+            "osm_primary_key": osm_primary_key.as_ref().map(|(key, _)| key.clone()),
+            "osm_primary_value": osm_primary_key.as_ref().map(|(_, value)| value.clone()),
+            "search_text": search_text,
             "trust_note": "Data referensi dari sumber terdaftar; bukan verifikasi kepemilikan."
         });
 
