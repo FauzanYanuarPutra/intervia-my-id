@@ -39,6 +39,7 @@ mod crm_matching;
 mod data_governance;
 mod data_importer;
 mod data_entity_resolution;
+mod reference_promotion;
 mod health;
 mod identity_projection;
 mod moderation;
@@ -2152,6 +2153,7 @@ async fn main() -> anyhow::Result<()> {
         .merge(blog::router())
         .merge(businesses::router())
         .merge(data_governance::router())
+        .merge(reference_promotion::router())
         .merge(business_moderation::router())
         .merge(news::router())
         .route("/health", get(health))
