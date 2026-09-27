@@ -17,7 +17,9 @@ fn score_entity(
     if address.is_some_and(|v| !v.trim().is_empty()) { score += 0.20; } else { reasons.push("missing_address".to_string()); }
     if city.is_some_and(|v| !v.trim().is_empty()) { score += 0.10; } else { reasons.push("missing_city".to_string()); }
     if province.is_some_and(|v| !v.trim().is_empty()) { score += 0.10; } else { reasons.push("missing_province".to_string()); }
-    if lat.is_some() && lon.is_some() { score += 0.20; } else { reasons.push("missing_coordinates".to_string()); }
+    // Coordinates improve readiness but are not mandatory for list/search publication.
+    // A reference business can be publicly discoverable without being map-ready.
+    if lat.is_some() && lon.is_some() { score += 0.20; }
     if matches!(resolution_status, "possible_duplicate" | "needs_review") {
         reasons.push("entity_resolution_requires_review".to_string());
         score *= 0.5;
