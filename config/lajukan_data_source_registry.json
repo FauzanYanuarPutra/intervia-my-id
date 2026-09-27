@@ -32,7 +32,8 @@
       "reuse_mode": "persistent_import",
       "auto_publish_reference": false,
       "license": "Creative Commons Attribution (as stated in dataset metadata)",
-      "notes": "Dataset ini merupakan data agregat UMKM menurut wilayah/kategori, bukan daftar profil usaha individual. Persistent import diizinkan untuk staging/Insight dengan provenance; tidak dipublikasikan sebagai profil usaha individual."
+      "notes": "Dataset ini merupakan data agregat UMKM menurut wilayah/kategori, bukan daftar profil usaha individual. Persistent import diizinkan untuk staging/Insight dengan provenance; tidak dipublikasikan sebagai profil usaha individual. Native CKAN bootstrap disabled temporarily because the current endpoint returned 404/403/DNS/TLS errors in the latest runtime check. Keep source metadata for future revalidation; do not treat this as deletion or a license decision.",
+      "enabled": false
     },
     {
       "id": "data-go-id-sukoharjo-umkm",
@@ -212,7 +213,8 @@
       "auto_publish_reference": false,
       "license": "Creative Commons Attribution",
       "attribution": "Portal Satu Data Indonesia / Kabupaten Sleman",
-      "notes": "CSV resource DataStore aktif; data agregat UMKM per sektor/kapanewon. Diimpor untuk Data Reference/Insight, bukan profil usaha individual."
+      "notes": "CSV resource DataStore aktif; data agregat UMKM per sektor/kapanewon. Diimpor untuk Data Reference/Insight, bukan profil usaha individual. Native CKAN bootstrap disabled temporarily because the current endpoint returned 404/403/DNS/TLS errors in the latest runtime check. Keep source metadata for future revalidation; do not treat this as deletion or a license decision.",
+      "enabled": false
     },
     {
       "id": "data-tangsel-umkm-2022",
@@ -238,7 +240,8 @@
       "auto_publish_reference": false,
       "license": "Creative Commons Attribution",
       "attribution": "Diskominfotik Kabupaten Sumbawa",
-      "notes": "Dataset agregat UMKM berdasarkan sektor/skala usaha, data diperbarui 8 Juni 2026; resource CSV/DataStore aktif. Dipublikasikan sebagai Data Reference/Insight."
+      "notes": "Dataset agregat UMKM berdasarkan sektor/skala usaha, data diperbarui 8 Juni 2026; resource CSV/DataStore aktif. Dipublikasikan sebagai Data Reference/Insight. Native CKAN bootstrap disabled temporarily because the current endpoint returned 404/403/DNS/TLS errors in the latest runtime check. Keep source metadata for future revalidation; do not treat this as deletion or a license decision.",
+      "enabled": false
     },
     {
       "id": "data-aceh-barat-umkm-johan-pahlawan-2025",
@@ -251,7 +254,8 @@
       "auto_publish_reference": false,
       "license": "Creative Commons Attribution",
       "attribution": "Diskominsa Kabupaten Aceh Barat",
-      "notes": "Data jumlah UMKM Kecamatan Johan Pahlawan semester I 2025; resource CSV/DataStore aktif. Dipublikasikan sebagai Data Reference/Insight."
+      "notes": "Data jumlah UMKM Kecamatan Johan Pahlawan semester I 2025; resource CSV/DataStore aktif. Dipublikasikan sebagai Data Reference/Insight. Native CKAN bootstrap disabled temporarily because the current endpoint returned 404/403/DNS/TLS errors in the latest runtime check. Keep source metadata for future revalidation; do not treat this as deletion or a license decision.",
+      "enabled": false
     }
   ]
 }
