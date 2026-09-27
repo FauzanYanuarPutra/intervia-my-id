@@ -3101,25 +3101,76 @@ export function CommunityPostCard({
         </div>
       ) : null}
 
-      <div className="grid grid-cols-4 border-y border-[color:var(--app-border)] px-1.5 py-1 text-xs font-semibold text-[color:var(--app-text-soft)] sm:px-2">
-        <button type="button" onClick={() => void handleLike()} aria-pressed={localVote === 1} title={isId ? 'Suka' : 'Like'} className={cn('inline-flex min-h-11 items-center justify-center gap-2 rounded-[12px] px-2 transition hover:bg-slate-50', localVote === 1 ? 'text-emerald-700' : 'hover:text-[color:var(--app-accent)]')}>
-          <ThumbsUp className={cn('h-[18px] w-[18px]', localVote === 1 && 'fill-current')} />
-          <span>{isId ? 'Suka' : 'Like'}</span>
+      <div className="grid grid-cols-4 border-y border-[color:var(--app-border)] px-1 py-1 sm:px-2">
+        <button
+          type="button"
+          onClick={() => void handleLike()}
+          aria-pressed={localVote === 1}
+          aria-label={isId ? `Suka, ${compactNumber(reactionCount)} suka` : `Like, ${compactNumber(reactionCount)} likes`}
+          title={isId ? 'Suka' : 'Like'}
+          className={cn(
+            'inline-flex min-h-11 min-w-0 items-center justify-center gap-1 rounded-[12px] px-1 text-[11px] font-semibold tabular-nums transition sm:gap-1.5 sm:px-2 sm:text-xs',
+            localVote === 1
+              ? 'text-emerald-700'
+              : 'text-[color:var(--app-text-soft)] hover:bg-slate-50 hover:text-[color:var(--app-accent)]',
+          )}
+        >
+          <ThumbsUp
+            className={cn(
+              'h-[17px] w-[17px] shrink-0 sm:h-[18px] sm:w-[18px]',
+              localVote === 1 && 'fill-current',
+            )}
+          />
+          <span className="min-w-[1ch]">{compactNumber(reactionCount)}</span>
         </button>
 
-        <button type="button" onClick={focusCommentInput} aria-label={isId ? 'Komentar' : 'Comment'} title={isId ? 'Komentar' : 'Comment'} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[12px] px-2 transition hover:bg-slate-50 hover:text-[color:var(--app-accent)]">
-          <MessageCircle className="h-[18px] w-[18px]" />
-          <span>{isId ? 'Komentar' : 'Comment'}</span>
+        <button
+          type="button"
+          onClick={focusCommentInput}
+          aria-label={isId ? `Komentar, ${compactNumber(commentCount)} komentar` : `Comment, ${compactNumber(commentCount)} comments`}
+          title={isId ? 'Komentar' : 'Comment'}
+          className="inline-flex min-h-11 min-w-0 items-center justify-center gap-1 rounded-[12px] px-1 text-[11px] font-semibold tabular-nums text-[color:var(--app-text-soft)] transition hover:bg-slate-50 hover:text-[color:var(--app-accent)] sm:gap-1.5 sm:px-2 sm:text-xs"
+        >
+          <MessageCircle className="h-[17px] w-[17px] shrink-0 sm:h-[18px] sm:w-[18px]" />
+          <span className="min-w-[1ch]">{compactNumber(commentCount)}</span>
         </button>
 
-        <button type="button" onClick={() => void handleSave()} disabled={saveLoading} aria-pressed={saved} aria-busy={saveLoading} aria-label={saved ? (isId ? 'Hapus simpanan' : 'Remove save') : (isId ? 'Simpan' : 'Save')} title={isId ? 'Simpan' : 'Save'} className={cn('inline-flex min-h-11 items-center justify-center gap-2 rounded-[12px] px-2 transition disabled:cursor-wait disabled:opacity-60', saved ? 'text-amber-700' : 'hover:bg-slate-50 hover:text-[color:var(--app-accent)]')}>
-          <Bookmark className={cn('h-[18px] w-[18px]', saved && 'fill-current')} />
-          <span>{isId ? 'Simpan' : 'Save'}</span>
+        <button
+          type="button"
+          onClick={() => void handleSave()}
+          disabled={saveLoading}
+          aria-pressed={saved}
+          aria-busy={saveLoading}
+          aria-label={
+            saved
+              ? isId
+                ? `Hapus simpanan, ${compactNumber(saveCount)} tersimpan`
+                : `Remove save, ${compactNumber(saveCount)} saves`
+              : isId
+                ? `Simpan, ${compactNumber(saveCount)} tersimpan`
+                : `Save, ${compactNumber(saveCount)} saves`
+          }
+          title={isId ? 'Simpan' : 'Save'}
+          className={cn(
+            'inline-flex min-h-11 min-w-0 items-center justify-center gap-1 rounded-[12px] px-1 text-[11px] font-semibold tabular-nums transition disabled:cursor-wait disabled:opacity-60 sm:gap-1.5 sm:px-2 sm:text-xs',
+            saved
+              ? 'text-amber-700'
+              : 'text-[color:var(--app-text-soft)] hover:bg-slate-50 hover:text-[color:var(--app-accent)]',
+          )}
+        >
+          <Bookmark className={cn('h-[17px] w-[17px] shrink-0 sm:h-[18px] sm:w-[18px]', saved && 'fill-current')} />
+          <span className="min-w-[1ch]">{compactNumber(saveCount)}</span>
         </button>
 
-        <button type="button" onClick={() => void handleShare()} aria-label={isId ? 'Bagikan' : 'Share'} title={isId ? 'Bagikan' : 'Share'} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[12px] px-2 transition hover:bg-slate-50 hover:text-[color:var(--app-accent)]">
-          <Share2 className="h-[18px] w-[18px]" />
-          <span>{isId ? 'Bagikan' : 'Share'}</span>
+        <button
+          type="button"
+          onClick={() => void handleShare()}
+          aria-label={isId ? `Bagikan, ${compactNumber(item.stats.shares)} dibagikan` : `Share, ${compactNumber(item.stats.shares)} shares`}
+          title={isId ? 'Bagikan' : 'Share'}
+          className="inline-flex min-h-11 min-w-0 items-center justify-center gap-1 rounded-[12px] px-1 text-[11px] font-semibold tabular-nums text-[color:var(--app-text-soft)] transition hover:bg-slate-50 hover:text-[color:var(--app-accent)] sm:gap-1.5 sm:px-2 sm:text-xs"
+        >
+          <Share2 className="h-[17px] w-[17px] shrink-0 sm:h-[18px] sm:w-[18px]" />
+          <span className="min-w-[1ch]">{compactNumber(item.stats.shares)}</span>
         </button>
       </div>
 
