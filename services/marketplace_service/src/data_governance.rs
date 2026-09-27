@@ -1531,7 +1531,7 @@ pub async fn bootstrap_persistent_imports(state: Arc<AppState>) -> Result<u64, s
             WHERE source_id = $1
             ORDER BY created_at DESC
             LIMIT 1
-            "#
+            "#,
         )
         .bind(source_id)
         .fetch_optional(db)
@@ -1550,7 +1550,7 @@ pub async fn bootstrap_persistent_imports(state: Arc<AppState>) -> Result<u64, s
                         SELECT finished_at > NOW() - ($2::text || ' hours')::interval
                         FROM data_import_jobs
                         WHERE id = $1
-                        "#
+                        "#,
                     )
                     .bind(job_id)
                     .bind(refresh_hours)
@@ -1565,10 +1565,14 @@ pub async fn bootstrap_persistent_imports(state: Arc<AppState>) -> Result<u64, s
                                 INSERT INTO data_import_jobs (source_id, job_key, mode, status)
                                 VALUES ($1, $2, 'import', 'queued')
                                 RETURNING id
-                                "#
+                                "#,
                             )
                             .bind(source_id)
-                            .bind(format!("bootstrap:{}:{}", source_key, Uuid::new_v4().simple()))
+                            .bind(format!(
+                                "bootstrap:{}:{}",
+                                source_key,
+                                Uuid::new_v4().simple()
+                            ))
                             .fetch_one(db)
                             .await?,
                         )
@@ -1585,7 +1589,7 @@ pub async fn bootstrap_persistent_imports(state: Arc<AppState>) -> Result<u64, s
                             error_summary=NULL
                         WHERE id=$1
                         RETURNING id
-                        "#
+                        "#,
                     )
                     .bind(job_id)
                     .fetch_one(db)
@@ -1606,10 +1610,14 @@ pub async fn bootstrap_persistent_imports(state: Arc<AppState>) -> Result<u64, s
                     INSERT INTO data_import_jobs (source_id, job_key, mode, status)
                     VALUES ($1, $2, 'import', 'queued')
                     RETURNING id
-                    "#
+                    "#,
                 )
                 .bind(source_id)
-                .bind(format!("bootstrap:{}:{}", source_key, Uuid::new_v4().simple()))
+                .bind(format!(
+                    "bootstrap:{}:{}",
+                    source_key,
+                    Uuid::new_v4().simple()
+                ))
                 .fetch_one(db)
                 .await?,
             )
