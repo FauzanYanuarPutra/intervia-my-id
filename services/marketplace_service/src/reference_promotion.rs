@@ -345,10 +345,6 @@ pub(crate) fn raw_string(raw: &Value, keys: &[&str]) -> Option<String> {
     })
 }
 
-fn raw_value(raw: &Value, keys: &[&str]) -> Option<Value> {
-    keys.iter().find_map(|key| raw.get(*key).cloned())
-}
-
 fn osm_identity(source_key: &str, source_record_id: &str) -> (Option<String>, Option<String>) {
     if source_key != "osm" {
         return (None, None);
