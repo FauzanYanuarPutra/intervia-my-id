@@ -200,6 +200,32 @@
       "url": "https://smesta.umkm.go.id/service/calendar-event",
       "reuse_mode": "review_required",
       "notes": "Use as official event discovery; confirm reuse/syndication terms per content."
+    },
+    {
+      "id": "data-go-id-klaten-jumlah-umkm",
+      "provider": "Kabupaten Klaten",
+      "kind": "government_open_data",
+      "url": "https://proxyapps.data.go.id/dataset/jumlah-umkm3",
+      "endpoint": "https://proxyapps.data.go.id/api/action/package_show?id=abd594db-8ecd-45a9-aa06-8e5f9da698d",
+      "dataset_id": "abd594db-8ecd-45a9-aa06-8e5f9da698d",
+      "reuse_mode": "persistent_import",
+      "auto_publish_reference": false,
+      "license": "Creative Commons Attribution",
+      "attribution": "Portal Satu Data Indonesia / Kabupaten Klaten",
+      "notes": "Data agregat jumlah UMKM per kecamatan. Diimpor untuk Data Reference/Insight, bukan profil usaha individual."
+    },
+    {
+      "id": "data-go-id-sleman-umkm-sector",
+      "provider": "Kabupaten Sleman",
+      "kind": "government_open_data",
+      "url": "https://proxyapps.data.go.id/dataset/rekapitulasi-data-umkm-kabupaten-sleman-berdasarkan-sektor-usaha-tiap-kapanewon",
+      "endpoint": "https://proxyapps.data.go.id/api/action/package_show?id=146edef4-11ba-41d3-ba39-761ef44285f9",
+      "dataset_id": "146edef4-11ba-41d3-ba39-761ef44285f9",
+      "reuse_mode": "persistent_import",
+      "auto_publish_reference": false,
+      "license": "Creative Commons Attribution",
+      "attribution": "Portal Satu Data Indonesia / Kabupaten Sleman",
+      "notes": "CSV resource DataStore aktif; data agregat UMKM per sektor/kapanewon. Diimpor untuk Data Reference/Insight, bukan profil usaha individual."
     }
   ]
 }
