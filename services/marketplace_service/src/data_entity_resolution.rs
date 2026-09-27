@@ -145,6 +145,43 @@ pub async fn index_record(db: &PgPool, source_id: Uuid, record_id: Uuid, raw: &V
         .bind("heuristic similarity; human review remains authoritative")
         .execute(db).await?;
     }
+    let review_match = sqlx::query_scalar::<_, bool>(
+        r#"SELECT EXISTS (
+            SELECT 1
+            FROM data_import_entity_matches
+            WHERE entity_id=$1
+              AND decision IN ('same_entity','possible_duplicate')
+        )"#
+    )
+    .bind(entity_id)
+    .fetch_one(db)
+    .await?;
+
+    if review_match {
+        sqlx::query(
+            "UPDATE data_import_entities SET resolution_status='possible_duplicate', updated_at=NOW() WHERE id=$1"
+        )
+        .bind(entity_id)
+        .execute(db)
+        .await?;
+    } else {
+        let has_candidates = sqlx::query_scalar::<_, bool>(
+            "SELECT EXISTS (SELECT 1 FROM data_import_entity_matches WHERE entity_id=$1)"
+        )
+        .bind(entity_id)
+        .fetch_one(db)
+        .await?;
+
+        let status = if has_candidates { "distinct_entity" } else { "new" };
+        sqlx::query(
+            "UPDATE data_import_entities SET resolution_status=$2, updated_at=NOW() WHERE id=$1"
+        )
+        .bind(entity_id)
+        .bind(status)
+        .execute(db)
+        .await?;
+    }
+
     Ok(entity_id)
 }
 
