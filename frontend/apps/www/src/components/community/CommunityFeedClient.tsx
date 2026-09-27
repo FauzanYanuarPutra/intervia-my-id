@@ -2794,14 +2794,14 @@ export function CommunityPostCard({
       >
       {/* ================= POST HEADER ================= */}
 
-      <div className="p-3.5 sm:p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
+      <div className="px-3 py-3 sm:p-4">
+        <div className="flex items-start justify-between gap-2.5 sm:gap-3">
+          <div className="flex min-w-0 flex-1 items-center gap-2.5 sm:gap-3">
             <Image
               alt={item.author.name}
               width={44}
               height={44}
-              className="h-10 w-10 rounded-full object-cover"
+              className="h-9 w-9 shrink-0 rounded-full object-cover sm:h-10 sm:w-10"
               src={profileAvatarSrc(
                 item.author.avatarUrl,
                 readProfileAvatarStyle(item.author),
@@ -2809,33 +2809,33 @@ export function CommunityPostCard({
               )}
             />
 
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <button
                 type="button"
                 onClick={openDetail}
-                className="block truncate text-left text-[0.95rem] font-bold leading-[1.08] tracking-[-0.02em] text-[color:var(--app-text)]"
+                className="block max-w-full truncate text-left text-[0.94rem] font-bold leading-[1.12] tracking-[-0.02em] text-[color:var(--app-text)] sm:text-[0.95rem]"
               >
                 {item.author.name}
               </button>
 
-              <p className="mt-0.5 flex min-w-0 items-center gap-1 text-xs text-[color:var(--app-text-soft)]">
+              <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs leading-4 text-[color:var(--app-text-soft)]">
                 {item.group ? (
                   <Link
                     href={communityGroupHref(item.group)}
-                    className="max-w-[70%] truncate font-semibold hover:text-[color:var(--app-accent)]"
+                    className="min-w-0 max-w-full truncate font-semibold hover:text-[color:var(--app-accent)]"
                     onClick={event => event.stopPropagation()}
                   >
                     {item.group.name}
                   </Link>
                 ) : (
-                  <span className="max-w-[70%] truncate font-semibold">
+                  <span className="min-w-0 max-w-full truncate font-semibold">
                     {item.communityName}
                   </span>
                 )}
-                <span aria-hidden="true">·</span>
+                <span aria-hidden="true" className="shrink-0">·</span>
                 <span className="shrink-0">{timeAgo(item.createdAt, isId)}</span>
-                <Earth className="h-3.5 w-3.5 shrink-0" />
-              </p>
+                <Earth className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              </div>
             </div>
           </div>
 
@@ -3074,25 +3074,70 @@ export function CommunityPostCard({
         </div>
       ) : null}
 
-      <div className="grid grid-cols-4 border-y border-[color:var(--app-border)] px-1.5 py-1 text-xs font-semibold text-[color:var(--app-text-soft)] sm:px-2">
-        <button type="button" onClick={() => void handleLike()} aria-pressed={localVote === 1} title={isId ? 'Suka' : 'Like'} className={cn('inline-flex min-h-11 items-center justify-center gap-2 rounded-[12px] px-2 transition hover:bg-slate-50', localVote === 1 ? 'text-emerald-700' : 'hover:text-[color:var(--app-accent)]')}>
-          <ThumbsUp className={cn('h-[18px] w-[18px]', localVote === 1 && 'fill-current')} />
-          <span>{isId ? 'Suka' : 'Like'}</span>
+      <div className="grid grid-cols-4 border-y border-[color:var(--app-border)] px-1 py-1 sm:px-2">
+        <button
+          type="button"
+          onClick={() => void handleLike()}
+          aria-pressed={localVote === 1}
+          title={isId ? 'Suka' : 'Like'}
+          className={cn(
+            'inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-[12px] px-1.5 text-xs font-semibold transition hover:bg-slate-50 min-[420px]:gap-2 min-[420px]:px-2',
+            localVote === 1
+              ? 'text-emerald-700'
+              : 'text-[color:var(--app-text-soft)] hover:text-[color:var(--app-accent)]',
+          )}
+        >
+          <ThumbsUp className={cn('h-5 w-5 shrink-0', localVote === 1 && 'fill-current')} />
+          <span className="hidden truncate min-[420px]:inline">{isId ? 'Suka' : 'Like'}</span>
         </button>
 
-        <button type="button" onClick={focusCommentInput} aria-label={isId ? 'Komentar' : 'Comment'} title={isId ? 'Komentar' : 'Comment'} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[12px] px-2 transition hover:bg-slate-50 hover:text-[color:var(--app-accent)]">
-          <MessageCircle className="h-[18px] w-[18px]" />
-          <span>{isId ? 'Komentar' : 'Comment'}</span>
+        <button
+          type="button"
+          onClick={focusCommentInput}
+          aria-label={isId ? 'Komentar' : 'Comment'}
+          title={isId ? 'Komentar' : 'Comment'}
+          className="inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-[12px] px-1.5 text-xs font-semibold text-[color:var(--app-text-soft)] transition hover:bg-slate-50 hover:text-[color:var(--app-accent)] min-[420px]:gap-2 min-[420px]:px-2"
+        >
+          <MessageCircle className="h-5 w-5 shrink-0" strokeWidth={2.15} />
+          <span className="hidden truncate min-[420px]:inline">{isId ? 'Komentar' : 'Comment'}</span>
         </button>
 
-        <button type="button" onClick={() => void handleSave()} disabled={saveLoading} aria-pressed={saved} aria-busy={saveLoading} aria-label={saved ? (isId ? 'Hapus simpanan' : 'Remove save') : (isId ? 'Simpan' : 'Save')} title={isId ? 'Simpan' : 'Save'} className={cn('inline-flex min-h-11 items-center justify-center gap-2 rounded-[12px] px-2 transition disabled:cursor-wait disabled:opacity-60', saved ? 'text-amber-700' : 'hover:bg-slate-50 hover:text-[color:var(--app-accent)]')}>
-          <Bookmark className={cn('h-[18px] w-[18px]', saved && 'fill-current')} />
-          <span>{isId ? 'Simpan' : 'Save'}</span>
+        <button
+          type="button"
+          onClick={() => void handleSave()}
+          disabled={saveLoading}
+          aria-pressed={saved}
+          aria-busy={saveLoading}
+          aria-label={
+            saved
+              ? isId
+                ? 'Hapus simpanan'
+                : 'Remove save'
+              : isId
+                ? 'Simpan'
+                : 'Save'
+          }
+          title={isId ? 'Simpan' : 'Save'}
+          className={cn(
+            'inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-[12px] px-1.5 text-xs font-semibold transition disabled:cursor-wait disabled:opacity-60 min-[420px]:gap-2 min-[420px]:px-2',
+            saved
+              ? 'text-amber-700'
+              : 'text-[color:var(--app-text-soft)] hover:bg-slate-50 hover:text-[color:var(--app-accent)]',
+          )}
+        >
+          <Bookmark className={cn('h-5 w-5 shrink-0', saved && 'fill-current')} />
+          <span className="hidden truncate min-[420px]:inline">{isId ? 'Simpan' : 'Save'}</span>
         </button>
 
-        <button type="button" onClick={() => void handleShare()} aria-label={isId ? 'Bagikan' : 'Share'} title={isId ? 'Bagikan' : 'Share'} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[12px] px-2 transition hover:bg-slate-50 hover:text-[color:var(--app-accent)]">
-          <Share2 className="h-[18px] w-[18px]" />
-          <span>{isId ? 'Bagikan' : 'Share'}</span>
+        <button
+          type="button"
+          onClick={() => void handleShare()}
+          aria-label={isId ? 'Bagikan' : 'Share'}
+          title={isId ? 'Bagikan' : 'Share'}
+          className="inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-[12px] px-1.5 text-xs font-semibold text-[color:var(--app-text-soft)] transition hover:bg-slate-50 hover:text-[color:var(--app-accent)] min-[420px]:gap-2 min-[420px]:px-2"
+        >
+          <Share2 className="h-5 w-5 shrink-0" />
+          <span className="hidden truncate min-[420px]:inline">{isId ? 'Bagikan' : 'Share'}</span>
         </button>
       </div>
 
