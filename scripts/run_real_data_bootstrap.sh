@@ -32,7 +32,7 @@ MARKETPLACE_SQL="$TMP_DIR/marketplace.sql"
 COMMUNITY_SQL="$TMP_DIR/community.sql"
 
 echo "[real-data] crawling approved public/open sources..."
-python /workspace/scripts/import_real_marketplace_open_data.py --out "$MARKETPLACE_SQL" --community-out "$COMMUNITY_SQL" --max-providers "$MAX_PROVIDERS" --max-buyers "$MAX_BUYERS" --max-community-media "$MAX_MEDIA" --sleep "$SLEEP_SECONDS" --allow-image-less-records --strict
+python /workspace/scripts/import_real_marketplace_open_data.py --out "$MARKETPLACE_SQL" --community-out "$COMMUNITY_SQL" --max-providers "$MAX_PROVIDERS" --max-buyers "$MAX_BUYERS" --max-community-media "$MAX_MEDIA" --sleep "$SLEEP_SECONDS" --allow-image-less-records
 
 echo "[real-data] applying marketplace data..."
 if [ -s "$MARKETPLACE_SQL" ]; then psql "$MARKETPLACE_DATABASE_URL" -v ON_ERROR_STOP=1 -f "$MARKETPLACE_SQL"; fi
@@ -40,8 +40,8 @@ if [ -s "$MARKETPLACE_SQL" ]; then psql "$MARKETPLACE_DATABASE_URL" -v ON_ERROR_
 echo "[real-data] applying community data..."
 if [ -s "$COMMUNITY_SQL" ]; then psql "$COMMUNITY_DATABASE_URL" -v ON_ERROR_STOP=1 -f "$COMMUNITY_SQL"; fi
 
-PROVIDER_COUNT="$(run_sql "$MARKETPLACE_DATABASE_URL" "SELECT COUNT(*) FROM umkm_stores WHERE COALESCE(metadata->>'seed_pack','') = 'real_indonesia_bulk_open_data'")"
-BUYER_COUNT="$(run_sql "$MARKETPLACE_DATABASE_URL" "SELECT COUNT(*) FROM content_items WHERE COALESCE(metadata->>'seed_pack','') = 'real_indonesia_bulk_open_data' AND pricing_mode = 'request'")"
+PROVIDER_COUNT="$(run_sql "$MARKETPLACE_DATABASE_URL" "SELECT COUNT(*) FROM content_items WHERE content_status='active' AND COALESCE(metadata->>'seed_pack','') = 'real_indonesia_bulk_open_data' AND COALESCE(metadata->>'market_side','') = 'reference'")"
+BUYER_COUNT="$(run_sql "$MARKETPLACE_DATABASE_URL" "SELECT COUNT(*) FROM content_items WHERE content_status='active' AND COALESCE(metadata->>'seed_pack','') = 'real_indonesia_bulk_open_data' AND pricing_mode = 'request'")"
 MEDIA_COUNT="$(run_sql "$COMMUNITY_DATABASE_URL" "SELECT COUNT(*) FROM reel.lajukan_reels WHERE COALESCE(metadata->>'seed_pack','') = 'real_indonesia_bulk_open_data'")"
 
 psql "$MARKETPLACE_DATABASE_URL" -v ON_ERROR_STOP=1 <<SQL
