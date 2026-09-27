@@ -134,13 +134,14 @@ async fn run_inner(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
         loop {
             let url = ckan_action_url(&api_url, "datastore_search")
                 .ok_or_else(|| anyhow!("invalid CKAN API URL"))?;
+            let offset_value = offset.to_string();
             let response = state
                 .http_client
                 .get(&url)
                 .query(&[
                     ("resource_id", resource_id),
                     ("limit", "500"),
-                    ("offset", &offset.to_string()),
+                    ("offset", offset_value.as_str()),
                 ])
                 .send()
                 .await?;
