@@ -9,6 +9,7 @@ MAX_PROVIDERS="${REAL_DATA_MAX_PROVIDERS:-5000}"
 MAX_BUYERS="${REAL_DATA_MAX_BUYERS:-1000}"
 MAX_MEDIA="${REAL_DATA_MAX_COMMUNITY_MEDIA:-80}"
 SLEEP_SECONDS="${REAL_DATA_REQUEST_SLEEP_SECONDS:-1}"
+BOOTSTRAP_VERSION="${REAL_DATA_BOOTSTRAP_VERSION:-2026-09-28-v4}"
 LOCK_KEY="real_marketplace_open_data"
 
 run_sql() {
@@ -16,14 +17,18 @@ run_sql() {
 }
 
 echo "[real-data] checking bootstrap state..."
-LAST_SUCCESS="$(run_sql "$MARKETPLACE_DATABASE_URL" "SELECT COALESCE(EXTRACT(EPOCH FROM (NOW() - last_success_at))/3600.0, 999999) FROM real_data_bootstrap_runs WHERE bootstrap_key = '$LOCK_KEY'")"
+STATE="$(run_sql "$MARKETPLACE_DATABASE_URL" "SELECT COALESCE(bootstrap_version,'') || '|' || COALESCE(EXTRACT(EPOCH FROM (NOW() - last_success_at))/3600.0, 999999) FROM real_data_bootstrap_runs WHERE bootstrap_key = '$LOCK_KEY'")"
+LAST_VERSION="${STATE%%|*}"
+LAST_SUCCESS="${STATE#*|}"
 
-if [ -n "$LAST_SUCCESS" ]; then
+if [ "$LAST_VERSION" = "$BOOTSTRAP_VERSION" ]; then
   SKIP="$(awk -v age="$LAST_SUCCESS" -v hours="$REFRESH_HOURS" 'BEGIN { print (age < hours) ? "yes" : "no" }')"
   if [ "$SKIP" = "yes" ]; then
-    echo "[real-data] last successful run is ${LAST_SUCCESS}h old; refresh window is ${REFRESH_HOURS}h. Nothing to do."
+    echo "[real-data] bootstrap version $BOOTSTRAP_VERSION succeeded ${LAST_SUCCESS}h ago; refresh window is ${REFRESH_HOURS}h. Nothing to do."
     exit 0
   fi
+else
+  echo "[real-data] bootstrap version changed from '$LAST_VERSION' to '$BOOTSTRAP_VERSION'; forcing a refresh."
 fi
 
 TMP_DIR="$(mktemp -d)"
@@ -47,9 +52,10 @@ MEDIA_COUNT="$(run_sql "$COMMUNITY_DATABASE_URL" "SELECT COUNT(*) FROM reel.laju
 
 if [ "$PROVIDER_COUNT" -gt 0 ] || [ "$BUYER_COUNT" -gt 0 ] || [ "$INSIGHT_COUNT" -gt 0 ] || [ "$MEDIA_COUNT" -gt 0 ]; then
   psql "$MARKETPLACE_DATABASE_URL" -v ON_ERROR_STOP=1 <<SQL
-INSERT INTO real_data_bootstrap_runs (bootstrap_key, last_success_at, last_provider_count, last_buyer_count, last_community_media_count, last_error, updated_at)
-VALUES ('$LOCK_KEY', NOW(), $PROVIDER_COUNT, $BUYER_COUNT, $MEDIA_COUNT, NULL, NOW())
+INSERT INTO real_data_bootstrap_runs (bootstrap_key, bootstrap_version, last_success_at, last_provider_count, last_buyer_count, last_community_media_count, last_error, updated_at)
+VALUES ('$LOCK_KEY', '$BOOTSTRAP_VERSION', NOW(), $PROVIDER_COUNT, $BUYER_COUNT, $MEDIA_COUNT, NULL, NOW())
 ON CONFLICT (bootstrap_key) DO UPDATE SET
+  bootstrap_version = EXCLUDED.bootstrap_version,
   last_success_at = NOW(),
   last_provider_count = EXCLUDED.last_provider_count,
   last_buyer_count = EXCLUDED.last_buyer_count,
@@ -60,9 +66,10 @@ SQL
   echo "[real-data] bootstrap complete: providers=${PROVIDER_COUNT} buyers=${BUYER_COUNT} insights=${INSIGHT_COUNT} community_media=${MEDIA_COUNT}"
 else
   psql "$MARKETPLACE_DATABASE_URL" -v ON_ERROR_STOP=1 <<SQL
-INSERT INTO real_data_bootstrap_runs (bootstrap_key, last_success_at, last_provider_count, last_buyer_count, last_community_media_count, last_error, updated_at)
-VALUES ('$LOCK_KEY', NULL, 0, 0, 0, 'No external rows were imported; source mirrors may be unavailable.', NOW())
+INSERT INTO real_data_bootstrap_runs (bootstrap_key, bootstrap_version, last_success_at, last_provider_count, last_buyer_count, last_community_media_count, last_error, updated_at)
+VALUES ('$LOCK_KEY', '$BOOTSTRAP_VERSION', NULL, 0, 0, 0, 'No external rows were imported; source mirrors may be unavailable.', NOW())
 ON CONFLICT (bootstrap_key) DO UPDATE SET
+  bootstrap_version = EXCLUDED.bootstrap_version,
   last_provider_count = EXCLUDED.last_provider_count,
   last_buyer_count = EXCLUDED.last_buyer_count,
   last_community_media_count = EXCLUDED.last_community_media_count,
