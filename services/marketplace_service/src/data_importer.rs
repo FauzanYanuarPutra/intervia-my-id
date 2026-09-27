@@ -40,12 +40,12 @@ fn base_url(api_url: &str) -> Option<&str> {
 
 pub async fn run(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
     let job = sqlx::query_as::<_, (Uuid, Uuid, String, String)>(
-        "SELECT id, source_id, mode, status FROM data_import_jobs WHERE id=$1"
-    ).bind(job_id).fetch_one(&state.db).await?;
+        "UPDATE data_import_jobs SET status='running', started_at=NOW(), error_summary=NULL WHERE id=$1 AND status='queued' RETURNING id, source_id, mode, status"
+    ).bind(job_id).fetch_optional(&state.db).await?;
 
-    if job.3 != "queued" {
+    let Some(job) = job else {
         return Ok(());
-    }
+    };
 
     let source = sqlx::query_as::<_, (Uuid, String, String, Option<String>, Option<String>, String, bool, bool, Option<String>)>(
         "SELECT id, source_key, source_kind, api_url, license_name, reuse_mode, storage_allowed, pii_import_allowed, attribution_text FROM data_source_registry WHERE id=$1"
@@ -59,9 +59,6 @@ pub async fn run(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
 
     let api_url = source.3.ok_or_else(|| anyhow!("source has no CKAN API"))?;
     let base = base_url(&api_url).ok_or_else(|| anyhow!("invalid CKAN API URL"))?;
-
-    sqlx::query("UPDATE data_import_jobs SET status='running', started_at=NOW() WHERE id=$1")
-        .bind(job_id).execute(&state.db).await?;
 
     let package: Value = state.http_client.get(&api_url).send().await?.error_for_status()?.json().await?;
     let package = package.get("result").cloned().unwrap_or(package);
