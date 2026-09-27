@@ -406,7 +406,7 @@ export function MediaPreviewCarousel({
             onTouchEnd={handleMediaTouchEnd}
             onTouchCancel={handleMediaTouchCancel}
             className={cn(
-              'relative flex h-full min-h-0 w-full snap-x snap-mandatory overflow-x-hidden scroll-smooth [scrollbar-width:none] [touch-action:none] [&::-webkit-scrollbar]:hidden',
+              'relative flex h-full min-h-0 w-full snap-x snap-mandatory overflow-x-hidden scroll-smooth [scrollbar-width:none] [touch-action:pan-y] [&::-webkit-scrollbar]:hidden',
               viewportClassName,
             )}
           >
