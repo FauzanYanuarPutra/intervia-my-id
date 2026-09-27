@@ -1625,10 +1625,14 @@ pub async fn bootstrap_persistent_imports(state: Arc<AppState>) -> Result<u64, s
         .fetch_optional(db)
         .await?;
 
-        let latest_job = if active_job.is_some() {
-            None
+        let job = if let Some((job_id, status)) = active_job {
+            match status.as_str() {
+                "queued" => Some(job_id),
+                "running" => None,
+                _ => None,
+            }
         } else {
-            sqlx::query_as::<_, (Uuid, String)>(
+            let latest_job = sqlx::query_as::<_, (Uuid, String)>(
                 r#"
                 SELECT id, status
                 FROM data_import_jobs
@@ -1639,7 +1643,113 @@ pub async fn bootstrap_persistent_imports(state: Arc<AppState>) -> Result<u64, s
             )
             .bind(source_id)
             .fetch_optional(db)
-            .await?
+            .await?;
+
+            if let Some((job_id, status)) = latest_job {
+                match status.as_str() {
+                    "succeeded" => {
+                        let recent_success = sqlx::query_scalar::<_, bool>(
+                            r#"
+                            SELECT finished_at > NOW() - ($2::text || ' hours')::interval
+                            FROM data_import_jobs
+                            WHERE id = $1
+                            "#,
+                        )
+                        .bind(job_id)
+                        .bind(refresh_hours)
+                        .fetch_one(db)
+                        .await?;
+
+                        if recent_success {
+                            None
+                        } else {
+                            Some(
+                                sqlx::query_scalar::<_, Uuid>(
+                                    r#"
+                                    INSERT INTO data_import_jobs (source_id, job_key, mode, status)
+                                    VALUES ($1, $2, 'import', 'queued')
+                                    RETURNING id
+                                    "#,
+                                )
+                                .bind(source_id)
+                                .bind(format!(
+                                    "bootstrap:{}:{}",
+                                    source_key,
+                                    Uuid::new_v4().simple()
+                                ))
+                                .fetch_one(db)
+                                .await?,
+                            )
+                        }
+                    }
+                    "partial" => {
+                        let recent_partial = sqlx::query_scalar::<_, bool>(
+                            r#"
+                            SELECT finished_at > NOW() - INTERVAL '30 minutes'
+                            FROM data_import_jobs
+                            WHERE id = $1
+                            "#,
+                        )
+                        .bind(job_id)
+                        .fetch_one(db)
+                        .await?;
+
+                        if recent_partial {
+                            None
+                        } else {
+                            Some(
+                                sqlx::query_scalar::<_, Uuid>(
+                                    r#"
+                                    INSERT INTO data_import_jobs (source_id, job_key, mode, status)
+                                    VALUES ($1, $2, 'refresh', 'queued')
+                                    RETURNING id
+                                    "#,
+                                )
+                                .bind(source_id)
+                                .bind(format!(
+                                    "retry-partial:{}:{}",
+                                    source_key,
+                                    Uuid::new_v4().simple()
+                                ))
+                                .fetch_one(db)
+                                .await?,
+                            )
+                        }
+                    }
+                    "failed" | "cancelled" => Some(
+                        sqlx::query_scalar::<_, Uuid>(
+                            r#"
+                            UPDATE data_import_jobs
+                            SET status='queued',
+                                started_at=NULL,
+                                finished_at=NULL,
+                                error_count=0,
+                                error_summary=NULL
+                            WHERE id=$1
+                            RETURNING id
+                            "#,
+                        )
+                        .bind(job_id)
+                        .fetch_one(db)
+                        .await?,
+                    ),
+                    _ => None,
+                }
+            } else {
+                Some(
+                    sqlx::query_scalar::<_, Uuid>(
+                        r#"
+                        INSERT INTO data_import_jobs (source_id, job_key, mode, status)
+                        VALUES ($1, $2, 'import', 'queued')
+                        RETURNING id
+                        "#,
+                    )
+                    .bind(source_id)
+                    .bind(format!("bootstrap:{}:{}", source_key, Uuid::new_v4().simple()))
+                    .fetch_one(db)
+                    .await?,
+                )
+            }
         };
 
         let job = if let Some((job_id, status)) = latest_job {
