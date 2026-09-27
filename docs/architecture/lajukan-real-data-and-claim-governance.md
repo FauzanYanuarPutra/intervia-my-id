@@ -170,3 +170,20 @@ Google Places remains live-only. Current Google documentation says Places conten
 ### Resource-level dataset inspection
 
 Agent-only `POST /v1/data/sources/{source_key}/inspect` fetches the machine-readable catalog metadata for sources that expose an API endpoint (currently CKAN/data.go.id entries), reports resource-level license/url/datastore metadata, and records the last check time. It is metadata-only and never copies dataset rows. Persistent ingestion should only be enabled after this inspection and any required legal/reuse review succeed.
+
+
+## Staging ingestion worker
+
+Queued CKAN import jobs now execute asynchronously through `data_importer.rs`.
+
+Safety boundaries:
+
+1. `dry_run` reads and validates DataStore resources but does not persist records.
+2. Persistent `import`/`refresh` requires `reuse_mode=persistent_import` and `storage_allowed=true`.
+3. Resource-level license metadata must be present (or an explicit source-level license basis must exist).
+4. DataStore records are written to `data_import_records`, not directly to public businesses.
+5. Sensitive fields such as phone, email, NIK/KTP, NPWP, bank-account and contact-person fields are removed when the source does not explicitly permit PII import.
+6. Source records are idempotent on `(source_id, source_record_id)` and retain source URL, license and attribution snapshots.
+7. Each job is bounded to prevent an unexpectedly huge public import; failed rows/resources are counted and the job can finish as `partial`.
+
+An agent can explicitly approve a source for persistent import through `POST /v1/data/sources/{source_key}/approve-persistent` after completing the required reuse/licensing review. That approval is preserved across source-registry synchronization.
