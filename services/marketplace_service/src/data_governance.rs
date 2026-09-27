@@ -954,6 +954,64 @@ async fn review_claim(
         .into_response()
 }
 
+async fn bootstrap_status(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    let summary = sqlx::query(
+        r#"
+        SELECT
+          (SELECT COUNT(*)::bigint FROM data_source_registry
+             WHERE enabled=TRUE AND reuse_mode='persistent_import' AND storage_allowed=TRUE) AS persistent_sources,
+          (SELECT COUNT(*)::bigint FROM data_import_jobs
+             WHERE status IN ('queued','running')) AS active_jobs,
+          (SELECT COUNT(*)::bigint FROM data_import_jobs
+             WHERE status IN ('succeeded','partial')) AS completed_jobs,
+          (SELECT COUNT(*)::bigint FROM content_items
+             WHERE content_status='active'
+               AND metadata->>'reference_publication_status'='published'
+               AND metadata->>'claimable'='true') AS published_references,
+          (SELECT COUNT(*)::bigint FROM content_items
+             WHERE content_status='active'
+               AND metadata->>'record_kind' IN (
+                 'government_reference',
+                 'open_data_reference',
+                 'licensed_reference',
+                 'external_content_reference',
+                 'real_openstreetmap_reference'
+               )) AS active_reference_content
+        "#
+    )
+    .fetch_one(&state.db)
+    .await;
+
+    match summary {
+        Ok(row) => {
+            let persistent_sources = row.try_get::<i64,_>("persistent_sources").unwrap_or(0);
+            let active_jobs = row.try_get::<i64,_>("active_jobs").unwrap_or(0);
+            let completed_jobs = row.try_get::<i64,_>("completed_jobs").unwrap_or(0);
+            let published_references = row.try_get::<i64,_>("published_references").unwrap_or(0);
+            let active_reference_content = row.try_get::<i64,_>("active_reference_content").unwrap_or(0);
+
+            (
+                StatusCode::OK,
+                Json(json!({
+                    "status": if published_references > 0 { "ready" } else if active_jobs > 0 { "warming" } else { "empty" },
+                    "persistent_sources": persistent_sources,
+                    "active_jobs": active_jobs,
+                    "completed_jobs": completed_jobs,
+                    "published_references": published_references,
+                    "active_reference_content": active_reference_content
+                })),
+            ).into_response()
+        }
+        Err(error) => {
+            tracing::error!("bootstrap_status failed: {:?}", error);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error":"failed to load bootstrap status"})),
+            ).into_response()
+        }
+    }
+}
+
 async fn list_sources(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     match sqlx::query_as::<_, DataSourceRow>(
         r#"
@@ -1697,6 +1755,7 @@ pub async fn sync_static_source_registry(db: &PgPool) -> Result<(), sqlx::Error>
 }
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
+        .route("/v1/data/bootstrap-status", get(bootstrap_status))
         .route("/v1/data/sources", get(list_sources))
         .route("/v1/data/import-jobs", get(list_import_jobs))
         .route("/v1/data/import-jobs/{source_key}", post(create_import_job))
