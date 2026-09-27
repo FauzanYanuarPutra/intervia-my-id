@@ -1574,34 +1574,37 @@ pub async fn bootstrap_persistent_imports(state: Arc<AppState>) -> Result<u64, s
                           AND status = 'failed'
                           AND finished_at > NOW() - INTERVAL '6 hours'
                     )
-                    "#
+                    "#,
                 )
                 .bind(source_id)
                 .fetch_one(db)
                 .await?;
 
                 if recent_error {
-                    tracing::warn!(source_key=%source_key, "skipping persistent source bootstrap after recent failed import");
+                    tracing::warn!(
+                        source_key=%source_key,
+                        "skipping persistent source bootstrap after recent failed import"
+                    );
                     None
                 } else {
-
-                Some(
-                    sqlx::query_scalar::<_, Uuid>(
-                        r#"
-                    INSERT INTO data_import_jobs (source_id, job_key, mode, status)
-                    VALUES ($1, $2, 'import', 'queued')
-                    RETURNING id
-                    "#,
+                    Some(
+                        sqlx::query_scalar::<_, Uuid>(
+                            r#"
+                            INSERT INTO data_import_jobs (source_id, job_key, mode, status)
+                            VALUES ($1, $2, 'import', 'queued')
+                            RETURNING id
+                            "#,
+                        )
+                        .bind(source_id)
+                        .bind(format!(
+                            "bootstrap:{}:{}",
+                            source_key,
+                            Uuid::new_v4().simple()
+                        ))
+                        .fetch_one(db)
+                        .await?,
                     )
-                    .bind(source_id)
-                    .bind(format!(
-                        "bootstrap:{}:{}",
-                        source_key,
-                        Uuid::new_v4().simple()
-                    ))
-                    .fetch_one(db)
-                    .await?,
-                )
+                }
             }
         };
 
