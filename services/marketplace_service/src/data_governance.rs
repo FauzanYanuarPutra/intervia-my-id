@@ -1454,7 +1454,6 @@ pub async fn bootstrap_persistent_imports(state: Arc<AppState>) -> Result<u64, s
           AND storage_allowed = TRUE
           AND reuse_mode = 'persistent_import'
           AND api_url IS NOT NULL
-          AND source_kind IN ('government_open_data', 'osm_overpass')
         ORDER BY source_key
         "#,
     )
