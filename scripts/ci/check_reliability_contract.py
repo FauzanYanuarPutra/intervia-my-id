@@ -1295,7 +1295,7 @@ for path, markers in {
         "status IN ('pending', 'processing')",
         "available_at = NOW() + INTERVAL '2 minutes'",
     ),
-    "services/community_service/src/main.rs": (
+    "services/community_service/src/identity_sync.rs": (
         "FOR UPDATE SKIP LOCKED",
         "status IN ('pending', 'failed', 'processing')",
         "available_at = now() + INTERVAL '2 minutes'",
