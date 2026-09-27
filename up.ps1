@@ -870,8 +870,42 @@ try {
     if ($UpExitCode -ne 0) {
         Write-Warning "Docker Compose startup gagal (exit code $UpExitCode). Menampilkan status dan log core service."
         & docker @ComposeArgs ps -a
-        & docker @ComposeArgs logs --no-color --tail 120 domain_db_bootstrap domain_db marketplace_service chat_service identity_service community_migration community_service
+        & docker @ComposeArgs logs --no-color --tail 120 domain_db_bootstrap domain_db marketplace_service real_data_bootstrap chat_service identity_service community_migration community_service
         exit $UpExitCode
+    }
+
+    # The external real-data bootstrap is a one-shot crawler/importer. A healthy
+    # marketplace container does not prove that this crawler completed successfully.
+    # Verify the one-shot service explicitly so source outages/import errors remain visible.
+    if ($Services.Count -eq 0 -or $Services -contains "real_data_bootstrap") {
+        Write-Host "Verifying external real-data bootstrap..." -ForegroundColor Cyan
+        $CrawlerReady = $false
+        for ($CrawlerAttempt = 1; $CrawlerAttempt -le 36; $CrawlerAttempt++) {
+            $CrawlerState = @(
+                & docker @ComposeArgs ps -a --format "{{.Service}}|{{.State}}|{{.ExitCode}}" real_data_bootstrap 2>&1
+            )
+            if ($LASTEXITCODE -eq 0) {
+                $CrawlerLine = ($CrawlerState | Select-Object -First 1).Trim()
+                if ($CrawlerLine) {
+                    Write-Host "  external bootstrap: $CrawlerLine" -ForegroundColor DarkGray
+                    if ($CrawlerLine -match '^real_data_bootstrap\\|exited \\|0\\$$' -or $CrawlerLine -match '^real_data_bootstrap\\|exited\\|0\\$$') {
+                        $CrawlerReady = $true
+                        break
+                    }
+                    if ($CrawlerLine -match '^real_data_bootstrap\\|exited \\|[1-9][0-9]*\\$$' -or $CrawlerLine -match '^real_data_bootstrap\\|exited\\|[1-9][0-9]*\\$$') {
+                        break
+                    }
+                }
+            }
+            Start-Sleep -Seconds 5
+        }
+
+        if (-not $CrawlerReady) {
+            & docker @ComposeArgs logs --no-color --tail 220 real_data_bootstrap
+            throw "External real-data bootstrap belum selesai sukses. Data dari source crawler tidak boleh dianggap sudah masuk."
+        }
+
+        Write-Host "External real-data bootstrap completed successfully." -ForegroundColor Green
     }
 
     # Governed real-data bootstrap runs asynchronously inside marketplace_service.
