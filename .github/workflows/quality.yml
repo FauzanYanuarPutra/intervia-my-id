@@ -177,12 +177,36 @@ jobs:
               },
           )
           out = Path("/tmp/generated-reference.sql")
-          module.write_sql(str(out), [sample], [], [])
+          insight = module.DataInsight(
+              source_id="denpasar-umkm-csv-2020",
+              source_record_id="Denpasar|2020|Kuta",
+              title="Data UMKM Kota Denpasar — Kecamatan: Kuta",
+              summary="Data publik agregat.",
+              body="Data agregat, bukan profil usaha individual.",
+              location="Kuta",
+              source_url="https://satudata.denpasarkota.go.id/",
+              source_license="Creative Commons Attribution",
+              metadata={
+                  "seed_pack": "real_indonesia_bulk_open_data",
+                  "record_kind": "open_data_reference",
+                  "reference_subtype": "aggregate_data",
+                  "reference_publication_status": "published",
+                  "claimable": False,
+                  "market_side": "reference",
+                  "is_transactional": False,
+                  "source_dataset": "denpasar-umkm-csv-2020",
+                  "external_id": "Denpasar|2020|Kuta",
+                  "source_url": "https://satudata.denpasarkota.go.id/",
+                  "source_license": "Creative Commons Attribution",
+              },
+          )
+          module.write_sql(str(out), [sample], [], [insight])
           sql = out.read_text(encoding="utf-8")
           assert "INSERT INTO content_items" in sql
           assert "'osm_provider_reference'" in sql
           assert "'claimable', true" in sql
           assert "'market_side', 'reference'" in sql
+          assert "'reference_subtype', 'aggregate_data'" in sql
           assert "owner_id = NULL" in sql
           assert "INSERT INTO users_read_model" not in sql
           print("real-data SQL generation contract passed")
