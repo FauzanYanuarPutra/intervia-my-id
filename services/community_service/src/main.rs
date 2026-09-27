@@ -3232,11 +3232,17 @@ async fn list_group_members(
     Query(query): Query<ListGroupMembersQuery>,
 ) -> ApiResult<Json<GroupMembersResponse>> {
     let actor = optional_actor(&headers, &state);
+    if let Some(platform_admin) = actor.as_ref().filter(|value| is_platform_group_admin(value)) {
+        let forum_user = ensure_forum_user(&state.db, platform_admin).await?;
+        ensure_platform_group_admin_memberships(&state.db, platform_admin, &forum_user.id).await?;
+    }
     let viewer_id = actor.as_ref().map(forum_user_id);
     let group = fetch_group(&state.db, viewer_id.as_deref(), &group_id).await?;
     let can_view_private = group.privacy == "public"
         || group.viewer_membership_status.as_deref() == Some("active")
-        || actor.as_ref().is_some_and(is_moderator);
+        || actor.as_ref().is_some_and(|value| {
+            is_moderator(value) || is_platform_group_admin(value)
+        });
     if !can_view_private {
         return Err(ApiError::new(StatusCode::FORBIDDEN, "Forbidden"));
     }
@@ -3248,7 +3254,11 @@ async fn list_group_members(
     if requested_status.as_deref() != Some("pending")
         && requested_status.as_deref() != Some("blocked")
     {
-    } else if !group.viewer_can_manage && !actor.as_ref().is_some_and(is_moderator) {
+    } else if !group.viewer_can_manage
+        && !actor
+            .as_ref()
+            .is_some_and(|value| is_moderator(value) || is_platform_group_admin(value))
+    {
         return Err(ApiError::new(StatusCode::FORBIDDEN, "Forbidden"));
     }
     let status = requested_status.unwrap_or_else(|| "active".to_string());
