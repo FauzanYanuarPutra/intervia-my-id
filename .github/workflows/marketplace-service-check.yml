@@ -10,6 +10,10 @@ on:
   pull_request:
     paths:
       - 'services/marketplace_service/**'
+      - 'config/lajukan_data_source_registry.json'
+      - '.github/workflows/marketplace-service-check.yml'
+    paths:
+      - 'services/marketplace_service/**'
       - '.github/workflows/marketplace-service-check.yml'
 
 permissions:
@@ -41,6 +45,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - name: Cargo fmt check
+        run: cargo fmt --all -- --check
       - name: Cargo check
         run: cargo check --locked
       - name: Cargo test
