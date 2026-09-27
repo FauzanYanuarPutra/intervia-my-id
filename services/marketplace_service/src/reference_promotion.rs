@@ -11,15 +11,15 @@ fn score_entity(
     name: Option<&str>, address: Option<&str>, city: Option<&str>, province: Option<&str>,
     lat: Option<f64>, lon: Option<f64>, resolution_status: &str
 ) -> (f64, Vec<String>) {
-    let mut score = 0.0;
-    let mut reasons = Vec::new();
-    if name.is_some_and(|v| !v.trim().is_empty()) { score += 0.40; } else { reasons.push("missing_name"); }
-    if address.is_some_and(|v| !v.trim().is_empty()) { score += 0.20; } else { reasons.push("missing_address"); }
-    if city.is_some_and(|v| !v.trim().is_empty()) { score += 0.10; } else { reasons.push("missing_city"); }
-    if province.is_some_and(|v| !v.trim().is_empty()) { score += 0.10; } else { reasons.push("missing_province"); }
-    if lat.is_some() && lon.is_some() { score += 0.20; } else { reasons.push("missing_coordinates"); }
+    let mut score: f64 = 0.0;
+    let mut reasons: Vec<String> = Vec::new();
+    if name.is_some_and(|v| !v.trim().is_empty()) { score += 0.40; } else { reasons.push("missing_name".to_string()); }
+    if address.is_some_and(|v| !v.trim().is_empty()) { score += 0.20; } else { reasons.push("missing_address".to_string()); }
+    if city.is_some_and(|v| !v.trim().is_empty()) { score += 0.10; } else { reasons.push("missing_city".to_string()); }
+    if province.is_some_and(|v| !v.trim().is_empty()) { score += 0.10; } else { reasons.push("missing_province".to_string()); }
+    if lat.is_some() && lon.is_some() { score += 0.20; } else { reasons.push("missing_coordinates".to_string()); }
     if matches!(resolution_status, "possible_duplicate" | "needs_review") {
-        reasons.push("entity_resolution_requires_review");
+        reasons.push("entity_resolution_requires_review".to_string());
         score *= 0.5;
     }
     (score.min(1.0), reasons)
@@ -78,7 +78,7 @@ pub async fn generate_for_entity(
              updated_at=NOW()"#
     )
     .bind(id).bind(source_id).bind(status).bind(score)
-    .bind(Value::Array(reasons.into_iter().map(Value::String).collect::<Vec<_>>()))
+    .bind(Value::Array(reasons.clone().into_iter().map(Value::String).collect::<Vec<_>>()))
     .bind(provenance)
     .execute(db)
     .await?;
@@ -157,29 +157,55 @@ fn reference_body(
     lines.join("\n")
 }
 
+#[derive(Debug, sqlx::FromRow)]
+struct PromotionCandidateSourceRow {
+    candidate_id: Uuid,
+    entity_id: Uuid,
+    source_id: Uuid,
+    promotion_status: String,
+    readiness_score: f64,
+    normalized_name: Option<String>,
+    normalized_address: Option<String>,
+    city: Option<String>,
+    province: Option<String>,
+    latitude: Option<f64>,
+    longitude: Option<f64>,
+    resolution_status: String,
+    canonical_record_id: Option<Uuid>,
+    source_record_id: Option<String>,
+    source_record_url: Option<String>,
+    record_license: Option<String>,
+    record_attribution: Option<String>,
+    record_kind: String,
+    source_key: String,
+    provider_name: String,
+    source_url: String,
+    source_license: Option<String>,
+    source_license_url: Option<String>,
+    source_attribution: Option<String>,
+    reuse_mode: String,
+    storage_allowed: bool,
+    source_enabled: bool,
+}
+
 async fn promote_candidate(
     db: &PgPool,
     candidate_id: Uuid,
 ) -> AnyhowResult<Value> {
     let mut tx = db.begin().await?;
 
-    let candidate = sqlx::query_as::<_, (
-        Uuid, Uuid, Uuid, String, f64,
-        Option<String>, Option<String>, Option<String>, Option<String>,
-        Option<f64>, Option<f64>, String, Option<Uuid>,
-        Option<String>, Option<String>, Option<String>, Option<String>,
-        String, String, Option<String>, Option<String>, Option<String>,
-        Option<String>, Option<String>, String, bool
-    )>(
+    let candidate = sqlx::query_as::<_, PromotionCandidateSourceRow>(
         r#"
         SELECT
-          c.id, c.entity_id, c.source_id, c.promotion_status, c.readiness_score,
+          c.id AS candidate_id, c.entity_id, c.source_id, c.promotion_status, c.readiness_score,
           e.normalized_name, e.normalized_address, e.city, e.province,
           e.latitude, e.longitude, e.resolution_status, e.canonical_record_id,
-          r.source_record_id, r.source_url, r.license_snapshot, r.attribution_snapshot,
+          r.source_record_id, r.source_url AS source_record_url,
+          r.license_snapshot AS record_license, r.attribution_snapshot AS record_attribution,
           r.record_kind,
-          s.source_key, s.provider_name, s.source_url, s.license_name, s.license_url,
-          s.attribution_text, s.reuse_mode, s.storage_allowed, s.enabled
+          s.source_key, s.provider_name, s.source_url, s.license_name AS source_license,
+          s.license_url AS source_license_url, s.attribution_text AS source_attribution,
+          s.reuse_mode, s.storage_allowed, s.enabled AS source_enabled
         FROM reference_promotion_candidates c
         JOIN data_import_entities e ON e.id = c.entity_id
         LEFT JOIN data_import_records r
@@ -194,18 +220,21 @@ async fn promote_candidate(
     .fetch_optional(&mut *tx)
     .await?;
 
-    let Some((
-        candidate_id, entity_id, source_id, promotion_status, readiness_score,
-        name, address, city, province, lat, lon, resolution_status, canonical_record_id,
-        source_record_id, source_record_url, record_license, record_attribution,
-        record_kind, source_key, provider_name, source_url, source_license, source_license_url,
-        source_attribution, reuse_mode, storage_allowed, source_enabled
-    )) = candidate else {
+    let Some(candidate) = candidate else {
         return Err(anyhow!("promotion candidate not found"));
     };
 
+    let PromotionCandidateSourceRow {
+        candidate_id, entity_id, source_id, promotion_status, readiness_score,
+        normalized_name: name, normalized_address: address, city, province,
+        latitude: lat, longitude: lon, resolution_status, canonical_record_id,
+        source_record_id, source_record_url, record_license, record_attribution,
+        record_kind, source_key, provider_name, source_url, source_license,
+        source_license_url, source_attribution, reuse_mode, storage_allowed, source_enabled
+    } = candidate;
+
     if promotion_status == "promoted" {
-        let existing = sqlx::query_scalar::<_, Option<Uuid>>(
+        let existing = sqlx::query_scalar::<_, Uuid>(
             "SELECT proposed_content_id FROM reference_promotion_candidates WHERE id=$1"
         )
         .bind(candidate_id)
@@ -216,7 +245,7 @@ async fn promote_candidate(
             "promoted": true,
             "idempotent": true,
             "candidate_id": candidate_id,
-            "content_id": existing.flatten()
+            "content_id": existing
         }));
     }
 
