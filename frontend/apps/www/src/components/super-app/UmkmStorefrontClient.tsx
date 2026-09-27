@@ -5042,6 +5042,15 @@ export function UmkmStorefrontClient({
                 {isId ? 'Akses cepat' : 'Quick actions'}
               </p>
               <div className="mt-3 grid gap-2">
+                {isStoreOwner && store ? (
+                  <LocalizedAnchor
+                    href={buildUsahaPath('profile', { storeId: store.id })}
+                    className={subtleActionClass}
+                  >
+                    <LayoutDashboard className="h-4 w-4" />
+                    {isId ? 'Kelola profil usaha' : 'Manage business profile'}
+                  </LocalizedAnchor>
+                ) : null}
                 <LocalizedAnchor
                   href={UMKM_DISCOVERY_PATH}
                   className={subtleActionClass}
