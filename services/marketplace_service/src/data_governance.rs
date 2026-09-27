@@ -958,53 +958,136 @@ async fn bootstrap_status(State(state): State<Arc<AppState>>) -> impl IntoRespon
     let summary = sqlx::query(
         r#"
         SELECT
-          (SELECT COUNT(*)::bigint FROM data_source_registry
-             WHERE enabled=TRUE AND reuse_mode='persistent_import' AND storage_allowed=TRUE) AS persistent_sources,
-          (SELECT COUNT(*)::bigint FROM data_import_jobs
-             WHERE status IN ('queued','running')) AS active_jobs,
-          (SELECT COUNT(*)::bigint FROM data_import_jobs
-             WHERE status IN ('succeeded','partial')) AS completed_jobs,
-          (SELECT COUNT(*)::bigint FROM content_items
-             WHERE content_status='active'
-               AND metadata->>'reference_publication_status'='published'
-               AND metadata->>'claimable'='true') AS published_references,
-          (SELECT COUNT(*)::bigint FROM content_items
-             WHERE content_status='active'
-               AND metadata->>'record_kind' IN (
-                 'government_reference',
-                 'open_data_reference',
-                 'licensed_reference',
-                 'external_content_reference',
-                 'real_openstreetmap_reference'
-               )) AS active_reference_content
+          (SELECT COUNT(*)::bigint
+             FROM data_source_registry
+            WHERE enabled=TRUE
+              AND reuse_mode='persistent_import'
+              AND storage_allowed=TRUE) AS persistent_sources,
+          (SELECT COUNT(*)::bigint
+             FROM data_import_jobs
+            WHERE status IN ('queued','running')) AS active_jobs,
+          (SELECT COUNT(*)::bigint
+             FROM data_import_jobs
+            WHERE status='failed'
+              AND created_at > NOW() - INTERVAL '24 hours') AS failed_jobs_24h,
+          (SELECT COUNT(*)::bigint
+             FROM data_import_records
+            WHERE validation_status='accepted') AS accepted_records,
+          (SELECT COUNT(*)::bigint
+             FROM content_items
+            WHERE content_status='active'
+              AND metadata->>'reference_publication_status'='published'
+              AND metadata->>'claimable'='true'
+              AND metadata->>'reference_subtype' IS DISTINCT FROM 'aggregate_data') AS published_references,
+          (SELECT COUNT(*)::bigint
+             FROM content_items
+            WHERE content_status='active'
+              AND metadata->>'reference_publication_status'='published'
+              AND metadata->>'reference_subtype'='aggregate_data') AS aggregate_references,
+          (SELECT COALESCE(MAX(error_summary), '')
+             FROM data_import_jobs
+            WHERE status='failed'
+              AND created_at > NOW() - INTERVAL '24 hours') AS last_error
         "#
     )
     .fetch_one(&state.db)
     .await;
 
-    match summary {
-        Ok(row) => {
+    let source_rows = sqlx::query(
+        r#"
+        SELECT
+          s.source_key,
+          s.source_kind,
+          s.reuse_mode,
+          s.storage_allowed,
+          s.enabled,
+          s.auto_publish_reference,
+          s.last_success_at,
+          s.last_error_at,
+          COALESCE((
+            SELECT j.status
+            FROM data_import_jobs j
+            WHERE j.source_id = s.id
+            ORDER BY j.created_at DESC
+            LIMIT 1
+          ), 'never') AS latest_job_status,
+          COALESCE((
+            SELECT j.accepted_count
+            FROM data_import_jobs j
+            WHERE j.source_id = s.id
+            ORDER BY j.created_at DESC
+            LIMIT 1
+          ), 0) AS latest_accepted_count,
+          COALESCE((
+            SELECT j.error_summary
+            FROM data_import_jobs j
+            WHERE j.source_id = s.id
+            ORDER BY j.created_at DESC
+            LIMIT 1
+          ), '') AS latest_error
+        FROM data_source_registry s
+        WHERE s.reuse_mode='persistent_import'
+        ORDER BY s.source_key
+        "#
+    )
+    .fetch_all(&state.db)
+    .await;
+
+    match (summary, source_rows) {
+        (Ok(row), Ok(rows)) => {
             let persistent_sources = row.try_get::<i64, _>("persistent_sources").unwrap_or(0);
             let active_jobs = row.try_get::<i64, _>("active_jobs").unwrap_or(0);
-            let completed_jobs = row.try_get::<i64, _>("completed_jobs").unwrap_or(0);
+            let failed_jobs_24h = row.try_get::<i64, _>("failed_jobs_24h").unwrap_or(0);
+            let accepted_records = row.try_get::<i64, _>("accepted_records").unwrap_or(0);
             let published_references = row.try_get::<i64, _>("published_references").unwrap_or(0);
-            let active_reference_content = row
-                .try_get::<i64, _>("active_reference_content")
-                .unwrap_or(0);
+            let aggregate_references = row.try_get::<i64, _>("aggregate_references").unwrap_or(0);
+            let last_error = row.try_get::<Option<String>, _>("last_error").ok().flatten();
+            let hydrated = published_references > 0 || aggregate_references > 0;
+            let status = if hydrated {
+                "ready"
+            } else if active_jobs > 0 {
+                "hydrating"
+            } else if failed_jobs_24h > 0 {
+                "error"
+            } else {
+                "empty"
+            };
+
+            let sources = rows
+                .into_iter()
+                .map(|source| {
+                    json!({
+                        "source_key": source.try_get::<String, _>("source_key").unwrap_or_default(),
+                        "source_kind": source.try_get::<String, _>("source_kind").unwrap_or_default(),
+                        "reuse_mode": source.try_get::<String, _>("reuse_mode").unwrap_or_default(),
+                        "storage_allowed": source.try_get::<bool, _>("storage_allowed").unwrap_or(false),
+                        "enabled": source.try_get::<bool, _>("enabled").unwrap_or(false),
+                        "auto_publish_reference": source.try_get::<bool, _>("auto_publish_reference").unwrap_or(false),
+                        "last_success_at": source.try_get::<Option<DateTime<Utc>>, _>("last_success_at").ok().flatten(),
+                        "last_error_at": source.try_get::<Option<DateTime<Utc>>, _>("last_error_at").ok().flatten(),
+                        "latest_job_status": source.try_get::<String, _>("latest_job_status").unwrap_or_else(|_| "never".to_string()),
+                        "latest_accepted_count": source.try_get::<i64, _>("latest_accepted_count").unwrap_or(0),
+                        "latest_error": source.try_get::<String, _>("latest_error").unwrap_or_default(),
+                    })
+                })
+                .collect::<Vec<_>>();
 
             (
                 StatusCode::OK,
                 Json(json!({
-                    "status": if published_references > 0 { "ready" } else if active_jobs > 0 { "warming" } else { "empty" },
+                    "status": status,
                     "persistent_sources": persistent_sources,
                     "active_jobs": active_jobs,
-                    "completed_jobs": completed_jobs,
+                    "failed_jobs_24h": failed_jobs_24h,
+                    "accepted_records": accepted_records,
                     "published_references": published_references,
-                    "active_reference_content": active_reference_content
+                    "aggregate_references": aggregate_references,
+                    "last_error": last_error,
+                    "sources": sources
                 })),
             ).into_response()
         }
-        Err(error) => {
+        (Err(error), _) | (_, Err(error)) => {
             tracing::error!("bootstrap_status failed: {:?}", error);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -1014,6 +1097,7 @@ async fn bootstrap_status(State(state): State<Arc<AppState>>) -> impl IntoRespon
         }
     }
 }
+
 
 async fn list_sources(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     match sqlx::query_as::<_, DataSourceRow>(
