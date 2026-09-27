@@ -121,9 +121,7 @@ pub async fn generate_for_entity(db: &PgPool, entity_id: Uuid) -> Result<Value, 
         lon,
         &resolution_status,
     );
-    let publication_blocked = reasons
-        .iter()
-        .any(|reason| reason != "missing_coordinates");
+    let publication_blocked = reasons.iter().any(|reason| reason != "missing_coordinates");
     let has_publishable_location = address
         .as_deref()
         .is_some_and(|value| !value.trim().is_empty())
