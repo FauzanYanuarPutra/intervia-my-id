@@ -128,6 +128,23 @@ Never import:
 
 AI may normalize, categorize, summarize, translate, or detect duplicates, but it must not invent business facts.
 
+## Deterministic reference publication
+
+A source may explicitly opt into `auto_publish_reference=true` only after its persistent reuse policy is approved. This flag is a publication policy, not an ownership or verification flag.
+
+For an auto-publish source, a record is published only when:
+
+1. the source is enabled and `persistent_import`;
+2. storage is allowed and the source has an accepted license/reuse basis;
+3. the normalized entity has a usable name and meets the readiness threshold;
+4. entity resolution does not mark it as `possible_duplicate` or `needs_review`;
+5. the resulting `content_items.owner_id` remains `NULL`;
+6. provenance, source URL, source record ID, license and attribution are retained.
+
+Published rows are still **reference/unclaimed** records. They cannot receive fabricated reviews, transactions, followers, or ownership. Claim approval remains a separate human-controlled operation.
+
+Sources without the explicit auto-publication flag continue through the normal promotion-review queue.
+
 ## Current source registry
 
 See `config/lajukan_data_source_registry.json`.
@@ -136,9 +153,9 @@ The registry is intentionally conservative. "Terbuka" on a government portal is 
 
 ## Operational target
 
-The data pipeline should eventually run as:
+The data pipeline runs as:
 
-`discover -> validate -> normalize -> dedupe -> provenance -> moderation -> publish -> refresh/archive`
+`discover -> validate -> normalize -> dedupe -> provenance -> deterministic reference publication OR moderation -> publish -> refresh/archive`
 
 Claim verification remains a human-controlled operation for ownership-sensitive transitions.
 
