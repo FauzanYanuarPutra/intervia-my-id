@@ -1636,7 +1636,11 @@ pub async fn bootstrap_reference_publication(state: Arc<AppState>) -> Result<u64
         JOIN data_source_registry s ON s.id=c.source_id
         WHERE c.promotion_status IN ('pending_review','approved')
           AND c.readiness_score >= 0.70
-          AND jsonb_array_length(c.blocking_reasons) = 0
+          AND NOT EXISTS (
+              SELECT 1
+              FROM jsonb_array_elements_text(c.blocking_reasons) AS reason(value)
+              WHERE reason.value <> 'missing_coordinates'
+          )
           AND e.resolution_status NOT IN ('possible_duplicate','needs_review')
           AND s.auto_publish_reference = TRUE
           AND s.reuse_mode = 'persistent_import'
