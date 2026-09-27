@@ -429,6 +429,29 @@ async fn create_claim(
         .into_response()
 }
 
+async fn get_claim(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(claim_id): Path<Uuid>,
+) -> impl IntoResponse {
+    let actor_claims = auth_claims_from_headers(&headers, &state.jwt_secret);
+    let actor_id = actor_claims.as_ref().and_then(|c| Uuid::parse_str(&c.sub).ok());
+    let is_agent = actor_claims.as_ref().is_some_and(has_agent_access);
+    let claim = match load_claim(&state.db, claim_id).await {
+        Ok(Some(row)) => row,
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(json!({"error":"claim not found"}))).into_response(),
+        Err(error) => {
+            tracing::error!("get_claim failed: {:?}", error);
+            return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"failed to load claim"}))).into_response();
+        }
+    };
+    if !is_agent && actor_id != Some(claim.claimant_user_id) {
+        return (StatusCode::FORBIDDEN, Json(json!({"error":"forbidden"}))).into_response();
+    }
+    let evidence = load_claim_evidence(&state.db, claim.id).await.unwrap_or_default();
+    (StatusCode::OK, Json(ClaimDetailResponse { claim, evidence })).into_response()
+}
+
 async fn list_my_claims(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -922,5 +945,6 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/v1/businesses/{content_ref}/claims", get(claim_status).post(create_claim))
         .route("/v1/business-claims", get(list_my_claims))
         .route("/v1/business-claims/queue", get(list_claim_queue))
+        .route("/v1/business-claims/{claim_id}", get(get_claim))
         .route("/v1/business-claims/{claim_id}/review", post(review_claim))
 }
