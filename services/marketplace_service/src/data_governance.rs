@@ -984,16 +984,10 @@ async fn bootstrap_status(State(state): State<Arc<AppState>>) -> impl IntoRespon
 
     match summary {
         Ok(row) => {
-            let persistent_sources = row
-                .try_get::<i64, _>("persistent_sources")
-                .unwrap_or(0);
+            let persistent_sources = row.try_get::<i64, _>("persistent_sources").unwrap_or(0);
             let active_jobs = row.try_get::<i64, _>("active_jobs").unwrap_or(0);
-            let completed_jobs = row
-                .try_get::<i64, _>("completed_jobs")
-                .unwrap_or(0);
-            let published_references = row
-                .try_get::<i64, _>("published_references")
-                .unwrap_or(0);
+            let completed_jobs = row.try_get::<i64, _>("completed_jobs").unwrap_or(0);
+            let published_references = row.try_get::<i64, _>("published_references").unwrap_or(0);
             let active_reference_content = row
                 .try_get::<i64, _>("active_reference_content")
                 .unwrap_or(0);
@@ -1015,7 +1009,8 @@ async fn bootstrap_status(State(state): State<Arc<AppState>>) -> impl IntoRespon
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(json!({"error":"failed to load bootstrap status"})),
-            ).into_response()
+            )
+                .into_response()
         }
     }
 }
