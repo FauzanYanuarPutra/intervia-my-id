@@ -413,7 +413,7 @@
       "id": "satrup-tanah-laut-rup-penyedia-2026",
       "kind": "satrup_rup_penyedia",
       "role": "buyer",
-      "enabled_by_default": false,
+      "enabled_by_default": true,
       "name": "Satrup Tanah Laut RUP penyedia package feed 2026",
       "source_url": "https://satrup.tanahlautkab.go.id/dokumentasi/isb",
       "license": "Public open API; response metadata references ISB/LKPP and SiRUP/Inaproc source lineage",
@@ -423,7 +423,7 @@
       "city": "Tanah Laut",
       "province": "Kalimantan Selatan",
       "request_sleep_seconds": 0.2,
-      "note": "Package-level buyer demand. Personal PPK fields are intentionally not imported. Disabled by default because these rows generally do not carry a real external image."
+      "note": "Public Open Data API documented by Satrup ISB. Package-level buyer-demand references only; no private PPK fields, no automatic transaction, and verify the official source before acting."
     },
     {
       "id": "google-places-photo-enrichment",
