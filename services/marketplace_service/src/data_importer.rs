@@ -125,11 +125,21 @@ async fn run_inner(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
                         .fetch_one(&state.db)
                         .await {
                             Ok(import_record_id) => {
-                                if let Err(error) = crate::data_entity_resolution::index_record(
+                                match crate::data_entity_resolution::index_record(
                                     &state.db, source.0, import_record_id, &safe
                                 ).await {
-                                    errors += 1;
-                                    tracing::warn!("entity normalization failed: {:?}", error);
+                                    Ok(entity_id) => {
+                                        if let Err(error) = crate::reference_promotion::generate_for_entity(
+                                            &state.db, entity_id
+                                        ).await {
+                                            errors += 1;
+                                            tracing::warn!("reference promotion candidate generation failed: {:?}", error);
+                                        }
+                                    }
+                                    Err(error) => {
+                                        errors += 1;
+                                        tracing::warn!("entity normalization failed: {:?}", error);
+                                    }
                                 }
                             }
                             Err(error) => {
