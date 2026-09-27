@@ -243,7 +243,7 @@ async fn claim_status(
     headers: HeaderMap,
     Path(content_ref): Path<String>,
 ) -> impl IntoResponse {
-    let content = match sqlx::query_as::<_, (Uuid, Uuid, Value)>(
+    let content = match sqlx::query_as::<_, (Uuid, Option<Uuid>, Value)>(
         "SELECT id, owner_id, metadata FROM content_items WHERE id::text = $1 OR slug = $1 LIMIT 1",
     )
     .bind(content_ref.trim())
@@ -304,7 +304,7 @@ async fn create_claim(
         None => return (StatusCode::UNAUTHORIZED, Json(json!({"error":"unauthorized"}))).into_response(),
     };
 
-    let (content_id, owner_id, metadata) = match sqlx::query_as::<_, (Uuid, Uuid, Value)>(
+    let (content_id, owner_id, metadata) = match sqlx::query_as::<_, (Uuid, Option<Uuid>, Value)>(
         "SELECT id, owner_id, metadata FROM content_items WHERE id::text = $1 OR slug = $1 LIMIT 1",
     )
     .bind(content_ref.trim())
