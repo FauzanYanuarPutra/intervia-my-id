@@ -323,7 +323,14 @@ out center tags;
     let mut errors = 0i32;
     let mut seen = std::collections::HashSet::new();
 
-    for (city, province, south, west, north, east) in bboxes {
+    for (bbox_index, (city, province, south, west, north, east)) in bboxes.iter().enumerate() {
+        if discovered >= 50_000 {
+            tracing::warn!("OSM reference import reached the per-job safety cap of 50,000 records");
+            break;
+        }
+        if bbox_index > 0 {
+            tokio::time::sleep(std::time::Duration::from_millis(1200)).await;
+        }
         let body = query
             .replace("{south}", &south.to_string())
             .replace("{west}", &west.to_string())
