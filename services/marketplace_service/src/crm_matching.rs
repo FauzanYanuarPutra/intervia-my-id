@@ -15,10 +15,7 @@ use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sqlx::Row;
-use std::{
-    collections::HashSet,
-    sync::Arc,
-};
+use std::{collections::HashSet, sync::Arc};
 use uuid::Uuid;
 
 use super::{auth_claims_from_headers, has_agent_access, AppState};
@@ -145,14 +142,25 @@ struct MatchingRunRow {
 }
 
 fn unauthorized() -> axum::response::Response {
-    (StatusCode::UNAUTHORIZED, Json(json!({"error": "unauthorized"}))).into_response()
+    (
+        StatusCode::UNAUTHORIZED,
+        Json(json!({"error": "unauthorized"})),
+    )
+        .into_response()
 }
 
 fn forbidden() -> axum::response::Response {
-    (StatusCode::FORBIDDEN, Json(json!({"error": "agent role required"}))).into_response()
+    (
+        StatusCode::FORBIDDEN,
+        Json(json!({"error": "agent role required"})),
+    )
+        .into_response()
 }
 
-fn require_agent(headers: &HeaderMap, state: &Arc<AppState>) -> Result<Uuid, axum::response::Response> {
+fn require_agent(
+    headers: &HeaderMap,
+    state: &Arc<AppState>,
+) -> Result<Uuid, axum::response::Response> {
     let claims = auth_claims_from_headers(headers, &state.jwt_secret).ok_or_else(unauthorized)?;
     if !has_agent_access(&claims) {
         return Err(forbidden());
@@ -220,8 +228,11 @@ fn tokens(input: &str) -> HashSet<String> {
 }
 
 fn city_from(metadata: &Value) -> Option<String> {
-    json_text(metadata, &["city", "location_text", "location", "service_area"])
-        .map(|v| text(v))
+    json_text(
+        metadata,
+        &["city", "location_text", "location", "service_area"],
+    )
+    .map(|v| text(v))
 }
 
 fn category_from(metadata: &Value) -> Option<String> {
@@ -241,7 +252,11 @@ fn category_from(metadata: &Value) -> Option<String> {
 fn coordinate_from(metadata: &Value) -> Option<(f64, f64)> {
     let lat = json_f64(metadata, &["latitude", "lat", "location_lat"])?;
     let lng = json_f64(metadata, &["longitude", "lng", "lon", "location_lng"])?;
-    if !lat.is_finite() || !lng.is_finite() || !(-90.0..=90.0).contains(&lat) || !(-180.0..=180.0).contains(&lng) {
+    if !lat.is_finite()
+        || !lng.is_finite()
+        || !(-90.0..=90.0).contains(&lat)
+        || !(-180.0..=180.0).contains(&lng)
+    {
         return None;
     }
     Some((lat, lng))
@@ -265,8 +280,11 @@ fn budget(metadata: &Value) -> (Option<i64>, Option<i64>) {
 }
 
 fn availability_score(metadata: &Value) -> f64 {
-    let status = json_text(metadata, &["availability", "stock_status", "availability_status"])
-        .map(|v| text(v));
+    let status = json_text(
+        metadata,
+        &["availability", "stock_status", "availability_status"],
+    )
+    .map(|v| text(v));
     match status.as_deref() {
         Some("available") | Some("ready") | Some("ready_stock") | Some("tersedia") => 10.0,
         Some("limited") | Some("terbatas") => 6.0,
@@ -287,7 +305,13 @@ fn trust_score(candidate: &CandidateItem) -> f64 {
     let reviews = candidate.review_count.unwrap_or(0).max(0) as f64;
     let rating_component = (rating / 5.0) * 6.0;
     let verification_component = if verified { 4.0 } else { 1.0 };
-    let volume_component = if reviews >= 50.0 { 1.0 } else if reviews >= 10.0 { 0.5 } else { 0.0 };
+    let volume_component = if reviews >= 50.0 {
+        1.0
+    } else if reviews >= 10.0 {
+        0.5
+    } else {
+        0.0
+    };
     (rating_component + verification_component + volume_component).min(10.0)
 }
 
@@ -296,16 +320,35 @@ fn listing_quality_score(candidate: &CandidateItem) -> f64 {
     if !candidate.title.trim().is_empty() {
         score += 1.0;
     }
-    if candidate.summary.as_deref().unwrap_or_default().trim().len() >= 30 {
+    if candidate
+        .summary
+        .as_deref()
+        .unwrap_or_default()
+        .trim()
+        .len()
+        >= 30
+    {
         score += 1.0;
     }
     if candidate.body.trim().len() >= 80 {
         score += 1.0;
     }
-    if candidate.cover_image.as_deref().unwrap_or_default().trim().len() > 0 {
+    if candidate
+        .cover_image
+        .as_deref()
+        .unwrap_or_default()
+        .trim()
+        .len()
+        > 0
+    {
         score += 1.0;
     }
-    if candidate.tags.as_ref().map(|v| !v.is_empty()).unwrap_or(false) {
+    if candidate
+        .tags
+        .as_ref()
+        .map(|v| !v.is_empty())
+        .unwrap_or(false)
+    {
         score += 1.0;
     }
     score
@@ -346,7 +389,11 @@ fn score_candidate(requirement: &RequirementItem, candidate: &CandidateItem) -> 
         candidate.summary.as_deref().unwrap_or_default(),
         candidate.body,
         candidate.category.as_deref().unwrap_or_default(),
-        candidate.tags.as_ref().map(|v| v.join(" ")).unwrap_or_default()
+        candidate
+            .tags
+            .as_ref()
+            .map(|v| v.join(" "))
+            .unwrap_or_default()
     );
 
     let need_tokens = tokens(&requirement_text);
@@ -360,11 +407,13 @@ fn score_candidate(requirement: &RequirementItem, candidate: &CandidateItem) -> 
 
     let requirement_category = category_from(&requirement.metadata)
         .or_else(|| requirement.category.clone().map(|v| text(v)));
-    let candidate_category = category_from(&candidate.metadata)
-        .or_else(|| candidate.category.clone().map(|v| text(v)));
+    let candidate_category =
+        category_from(&candidate.metadata).or_else(|| candidate.category.clone().map(|v| text(v)));
     let category_fit = match (requirement_category.clone(), candidate_category.clone()) {
         (Some(req), Some(candidate)) if req == candidate => 20.0,
-        (Some(req), Some(candidate)) if req.contains(&candidate) || candidate.contains(&req) => 14.0,
+        (Some(req), Some(candidate)) if req.contains(&candidate) || candidate.contains(&req) => {
+            14.0
+        }
         (Some(_), Some(_)) => 5.0,
         _ => 0.0,
     };
@@ -375,7 +424,15 @@ fn score_candidate(requirement: &RequirementItem, candidate: &CandidateItem) -> 
     let cand_coord = coordinate_from(&candidate.metadata);
     let distance_km = req_coord.zip(cand_coord).map(|(a, b)| haversine_km(a, b));
     let location_fit = if let Some(distance) = distance_km {
-        if distance <= 10.0 { 15.0 } else if distance <= 25.0 { 12.0 } else if distance <= 50.0 { 8.0 } else { 2.0 }
+        if distance <= 10.0 {
+            15.0
+        } else if distance <= 25.0 {
+            12.0
+        } else if distance <= 50.0 {
+            8.0
+        } else {
+            2.0
+        }
     } else if req_city.is_some() && req_city == cand_city {
         12.0
     } else if req_city.is_some() && cand_city.is_some() {
@@ -390,9 +447,17 @@ fn score_candidate(requirement: &RequirementItem, candidate: &CandidateItem) -> 
         (None, Some(max), Some(price)) if price <= max => 10.0,
         (Some(min), None, Some(price)) if price >= min => 10.0,
         (Some(min), Some(max), Some(price)) => {
-            let distance = if price < min { min - price } else { price - max };
+            let distance = if price < min {
+                min - price
+            } else {
+                price - max
+            };
             let bound = (max - min).max(1);
-            if distance as f64 <= bound as f64 { 5.0 } else { 0.0 }
+            if distance as f64 <= bound as f64 {
+                5.0
+            } else {
+                0.0
+            }
         }
         _ => 5.0,
     };
@@ -402,7 +467,14 @@ fn score_candidate(requirement: &RequirementItem, candidate: &CandidateItem) -> 
     let quality = listing_quality_score(candidate);
     let freshness = freshness_score(candidate.updated_at);
 
-    let total = (keyword_fit + category_fit + location_fit + price_fit + trust + availability + quality + freshness)
+    let total = (keyword_fit
+        + category_fit
+        + location_fit
+        + price_fit
+        + trust
+        + availability
+        + quality
+        + freshness)
         .clamp(0.0, 100.0);
 
     let mut matched_fields = Vec::new();
@@ -523,7 +595,10 @@ pub async fn list_requirements(
 
     let limit = query.limit.unwrap_or(50).clamp(1, MAX_REQUIREMENTS);
     let offset = query.offset.unwrap_or(0).max(0);
-    let q = query.q.map(|v| v.trim().chars().take(180).collect::<String>()).filter(|v| !v.is_empty());
+    let q = query
+        .q
+        .map(|v| v.trim().chars().take(180).collect::<String>())
+        .filter(|v| !v.is_empty());
     let status = query.status.map(|v| text(v)).filter(|v| !v.is_empty());
 
     let rows = sqlx::query_as::<_, RequirementItem>(
@@ -559,15 +634,23 @@ pub async fn list_requirements(
     .await;
 
     match rows {
-        Ok(items) => (StatusCode::OK, Json(json!({
-            "items": items,
-            "limit": limit,
-            "offset": offset,
-            "has_more": items.len() as i64 == limit
-        }))).into_response(),
+        Ok(items) => (
+            StatusCode::OK,
+            Json(json!({
+                "items": items,
+                "limit": limit,
+                "offset": offset,
+                "has_more": items.len() as i64 == limit
+            })),
+        )
+            .into_response(),
         Err(error) => {
             tracing::error!("list CRM requirements failed: {:?}", error);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "failed to load requirements"}))).into_response()
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "failed to load requirements"})),
+            )
+                .into_response()
         }
     }
 }
@@ -597,10 +680,18 @@ pub async fn get_requirement(
 
     match review {
         Ok(Some(review)) => (StatusCode::OK, Json(json!({"requirement": review}))).into_response(),
-        Ok(None) => (StatusCode::NOT_FOUND, Json(json!({"error": "requirement not found"}))).into_response(),
+        Ok(None) => (
+            StatusCode::NOT_FOUND,
+            Json(json!({"error": "requirement not found"})),
+        )
+            .into_response(),
         Err(error) => {
             tracing::error!("get CRM requirement failed: {:?}", error);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "failed to load requirement"}))).into_response()
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "failed to load requirement"})),
+            )
+                .into_response()
         }
     }
 }
@@ -644,7 +735,10 @@ async fn write_audit(
     }
 }
 
-async fn load_requirement_content(db: &sqlx::PgPool, review: &RequirementReview) -> Result<RequirementItem, sqlx::Error> {
+async fn load_requirement_content(
+    db: &sqlx::PgPool,
+    review: &RequirementReview,
+) -> Result<RequirementItem, sqlx::Error> {
     let source_id = review
         .source_id
         .as_deref()
@@ -723,26 +817,49 @@ pub async fn run_match(
         Ok(None) => match ensure_review(&state.db, review_or_source, actor).await {
             Ok(review) => review,
             Err(sqlx::Error::RowNotFound) => {
-                return (StatusCode::NOT_FOUND, Json(json!({"error": "requirement not found"}))).into_response()
+                return (
+                    StatusCode::NOT_FOUND,
+                    Json(json!({"error": "requirement not found"})),
+                )
+                    .into_response()
             }
             Err(error) => {
                 tracing::error!("ensure CRM requirement failed: {:?}", error);
-                return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "failed to prepare requirement"}))).into_response()
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({"error": "failed to prepare requirement"})),
+                )
+                    .into_response();
             }
         },
         Err(error) => {
             tracing::error!("load CRM requirement failed: {:?}", error);
-            return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "failed to load requirement"}))).into_response()
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "failed to load requirement"})),
+            )
+                .into_response();
         }
     };
 
-    if let Some(key) = payload.idempotency_key.as_deref().map(str::trim).filter(|v| !v.is_empty()) {
+    if let Some(key) = payload
+        .idempotency_key
+        .as_deref()
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+    {
         match find_existing_run(&state.db, key).await {
-            Ok(Some(run)) => return (StatusCode::OK, Json(json!({"run": run, "deduped": true}))).into_response(),
+            Ok(Some(run)) => {
+                return (StatusCode::OK, Json(json!({"run": run, "deduped": true}))).into_response()
+            }
             Ok(None) => {}
             Err(error) => {
                 tracing::error!("find existing matching run failed: {:?}", error);
-                return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "failed to check idempotency"}))).into_response()
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({"error": "failed to check idempotency"})),
+                )
+                    .into_response();
             }
         }
     }
@@ -751,7 +868,11 @@ pub async fn run_match(
         Ok(requirement) => requirement,
         Err(error) => {
             tracing::error!("load requirement content failed: {:?}", error);
-            return (StatusCode::NOT_FOUND, Json(json!({"error": "requirement source not found"}))).into_response()
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({"error": "requirement source not found"})),
+            )
+                .into_response();
         }
     };
 
@@ -763,23 +884,41 @@ pub async fn run_match(
     );
     let extraction_tokens = tokens(&extraction_text);
     let inferred_city = city_from(&requirement.metadata);
-    let inferred_category = category_from(&requirement.metadata).or_else(|| requirement.category.clone());
+    let inferred_category =
+        category_from(&requirement.metadata).or_else(|| requirement.category.clone());
     let (budget_min, budget_max) = budget(&requirement.metadata);
     let mut missing_fields = Vec::new();
-    if inferred_city.is_none() { missing_fields.push("location".to_string()); }
-    if inferred_category.is_none() { missing_fields.push("category".to_string()); }
-    if budget_min.is_none() && budget_max.is_none() { missing_fields.push("budget".to_string()); }
+    if inferred_city.is_none() {
+        missing_fields.push("location".to_string());
+    }
+    if inferred_category.is_none() {
+        missing_fields.push("category".to_string());
+    }
+    if budget_min.is_none() && budget_max.is_none() {
+        missing_fields.push("budget".to_string());
+    }
 
-    let extraction_confidence: f64 = 0.55
-        + if inferred_category.is_some() { 0.15 } else { 0.0 }
-        + if inferred_city.is_some() { 0.10 } else { 0.0 }
-        + if !extraction_tokens.is_empty() { 0.10 } else { 0.0 };
+    let extraction_confidence: f64 =
+        0.55 + if inferred_category.is_some() {
+            0.15
+        } else {
+            0.0
+        } + if inferred_city.is_some() { 0.10 } else { 0.0 }
+            + if !extraction_tokens.is_empty() {
+                0.10
+            } else {
+                0.0
+            };
 
     let mut tx = match state.db.begin().await {
         Ok(tx) => tx,
         Err(error) => {
             tracing::error!("start matching tx failed: {:?}", error);
-            return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "failed to start match"}))).into_response()
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "failed to start match"})),
+            )
+                .into_response();
         }
     };
 
@@ -844,11 +983,20 @@ pub async fn run_match(
         Err(error) => {
             let _ = tx.rollback().await;
             tracing::error!("insert matching run failed: {:?}", error);
-            return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "failed to create matching run"}))).into_response()
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "failed to create matching run"})),
+            )
+                .into_response();
         }
     };
 
-    let query_text = extraction_tokens.iter().take(12).cloned().collect::<Vec<_>>().join(" ");
+    let query_text = extraction_tokens
+        .iter()
+        .take(12)
+        .cloned()
+        .collect::<Vec<_>>()
+        .join(" ");
     let candidates = sqlx::query_as::<_, CandidateItem>(
         r#"
         SELECT
@@ -884,7 +1032,11 @@ pub async fn run_match(
         })
         .collect::<Vec<_>>();
 
-    ranked.sort_by(|a, b| b.1.total.partial_cmp(&a.1.total).unwrap_or(std::cmp::Ordering::Equal));
+    ranked.sort_by(|a, b| {
+        b.1.total
+            .partial_cmp(&a.1.total)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     let ranked = ranked.into_iter().take(TOP_RESULTS).collect::<Vec<_>>();
     let top_score = ranked.first().map(|(_, score)| score.total);
@@ -927,11 +1079,19 @@ pub async fn run_match(
         {
             let _ = tx.rollback().await;
             tracing::error!("insert matching candidate failed: {:?}", error);
-            return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "failed to save candidates"}))).into_response()
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "failed to save candidates"})),
+            )
+                .into_response();
         }
     }
 
-    let run_status = if ranked.is_empty() { "no_match" } else { "needs_admin_review" };
+    let run_status = if ranked.is_empty() {
+        "no_match"
+    } else {
+        "needs_admin_review"
+    };
     if let Err(error) = sqlx::query(
         r#"
         UPDATE crm_matching_runs
@@ -948,10 +1108,18 @@ pub async fn run_match(
     {
         let _ = tx.rollback().await;
         tracing::error!("update matching run failed: {:?}", error);
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "failed to finalize match"}))).into_response()
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": "failed to finalize match"})),
+        )
+            .into_response();
     }
 
-    let next_review_status = if ranked.is_empty() { "closed" } else { "matching" };
+    let next_review_status = if ranked.is_empty() {
+        "closed"
+    } else {
+        "matching"
+    };
     if let Err(error) = sqlx::query(
         "UPDATE crm_requirement_reviews SET status = $2, assigned_to = COALESCE(assigned_to, $3), updated_at = NOW() WHERE id = $1",
     )
@@ -968,7 +1136,11 @@ pub async fn run_match(
 
     if let Err(error) = tx.commit().await {
         tracing::error!("commit matching run failed: {:?}", error);
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "failed to commit match"}))).into_response()
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": "failed to commit match"})),
+        )
+            .into_response();
     }
 
     write_audit(
@@ -985,19 +1157,24 @@ pub async fn run_match(
             "scoring_version": MATCHING_SCORE_VERSION
         })),
         None,
-    ).await;
+    )
+    .await;
 
-    (StatusCode::CREATED, Json(json!({
-        "run": {
-            "id": run.id,
-            "requirement_review_id": run.requirement_review_id,
-            "status": run_status,
-            "scoring_version": MATCHING_SCORE_VERSION,
-            "candidate_count": ranked.len(),
-            "top_score": top_score
-        },
-        "deduped": false
-    }))).into_response()
+    (
+        StatusCode::CREATED,
+        Json(json!({
+            "run": {
+                "id": run.id,
+                "requirement_review_id": run.requirement_review_id,
+                "status": run_status,
+                "scoring_version": MATCHING_SCORE_VERSION,
+                "candidate_count": ranked.len(),
+                "top_score": top_score
+            },
+            "deduped": false
+        })),
+    )
+        .into_response()
 }
 
 pub async fn get_match_run(
@@ -1025,10 +1202,20 @@ pub async fn get_match_run(
     .await
     {
         Ok(Some(run)) => run,
-        Ok(None) => return (StatusCode::NOT_FOUND, Json(json!({"error": "matching run not found"}))).into_response(),
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({"error": "matching run not found"})),
+            )
+                .into_response()
+        }
         Err(error) => {
             tracing::error!("get match run failed: {:?}", error);
-            return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "failed to load matching run"}))).into_response()
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "failed to load matching run"})),
+            )
+                .into_response();
         }
     };
 
@@ -1050,30 +1237,36 @@ pub async fn get_match_run(
 
     let candidate_json = candidates
         .into_iter()
-        .map(|row| json!({
-            "id": row.get::<Uuid, _>("id"),
-            "candidate_type": row.get::<String, _>("candidate_type"),
-            "candidate_id": row.get::<String, _>("candidate_id"),
-            "provider_user_id": row.get::<Option<Uuid>, _>("provider_user_id"),
-            "provider_business_id": row.get::<Option<Uuid>, _>("provider_business_id"),
-            "rank": row.get::<i32, _>("rank"),
-            "score_total": row.get::<f64, _>("score_total"),
-            "score_breakdown": row.get::<Value, _>("score_breakdown"),
-            "matched_fields": row.get::<Value, _>("matched_fields"),
-            "missing_fields": row.get::<Value, _>("missing_fields"),
-            "reasons": row.get::<Value, _>("reasons"),
-            "warnings": row.get::<Value, _>("warnings"),
-            "verification_snapshot": row.get::<Value, _>("verification_snapshot"),
-            "location_snapshot": row.get::<Value, _>("location_snapshot"),
-            "admin_status": row.get::<String, _>("admin_status"),
-            "admin_reason": row.get::<Option<String>, _>("admin_reason"),
-            "reviewed_by": row.get::<Option<Uuid>, _>("reviewed_by"),
-            "reviewed_at": row.get::<Option<DateTime<Utc>>, _>("reviewed_at"),
-            "created_at": row.get::<DateTime<Utc>, _>("created_at"),
-        }))
+        .map(|row| {
+            json!({
+                "id": row.get::<Uuid, _>("id"),
+                "candidate_type": row.get::<String, _>("candidate_type"),
+                "candidate_id": row.get::<String, _>("candidate_id"),
+                "provider_user_id": row.get::<Option<Uuid>, _>("provider_user_id"),
+                "provider_business_id": row.get::<Option<Uuid>, _>("provider_business_id"),
+                "rank": row.get::<i32, _>("rank"),
+                "score_total": row.get::<f64, _>("score_total"),
+                "score_breakdown": row.get::<Value, _>("score_breakdown"),
+                "matched_fields": row.get::<Value, _>("matched_fields"),
+                "missing_fields": row.get::<Value, _>("missing_fields"),
+                "reasons": row.get::<Value, _>("reasons"),
+                "warnings": row.get::<Value, _>("warnings"),
+                "verification_snapshot": row.get::<Value, _>("verification_snapshot"),
+                "location_snapshot": row.get::<Value, _>("location_snapshot"),
+                "admin_status": row.get::<String, _>("admin_status"),
+                "admin_reason": row.get::<Option<String>, _>("admin_reason"),
+                "reviewed_by": row.get::<Option<Uuid>, _>("reviewed_by"),
+                "reviewed_at": row.get::<Option<DateTime<Utc>>, _>("reviewed_at"),
+                "created_at": row.get::<DateTime<Utc>, _>("created_at"),
+            })
+        })
         .collect::<Vec<_>>();
 
-    (StatusCode::OK, Json(json!({"run": run, "candidates": candidate_json}))).into_response()
+    (
+        StatusCode::OK,
+        Json(json!({"run": run, "candidates": candidate_json})),
+    )
+        .into_response()
 }
 
 pub async fn review_candidate(
@@ -1087,10 +1280,17 @@ pub async fn review_candidate(
         Err(response) => return response,
     };
 
-    let status = match payload.admin_status.as_deref().map(text).as_deref() {
-        Some("approved") | Some("rejected") | Some("held") | Some("pending") => payload.admin_status.clone().unwrap(),
-        _ => return (StatusCode::BAD_REQUEST, Json(json!({"error": "admin_status must be pending, approved, rejected, or held"}))).into_response(),
-    };
+    let status =
+        match payload.admin_status.as_deref().map(text).as_deref() {
+            Some("approved") | Some("rejected") | Some("held") | Some("pending") => {
+                payload.admin_status.clone().unwrap()
+            }
+            _ => return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": "admin_status must be pending, approved, rejected, or held"})),
+            )
+                .into_response(),
+        };
 
     let existing = sqlx::query(
         r#"
@@ -1106,10 +1306,20 @@ pub async fn review_candidate(
 
     let existing = match existing {
         Ok(Some(row)) => row,
-        Ok(None) => return (StatusCode::NOT_FOUND, Json(json!({"error": "candidate not found"}))).into_response(),
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({"error": "candidate not found"})),
+            )
+                .into_response()
+        }
         Err(error) => {
             tracing::error!("load candidate for review failed: {:?}", error);
-            return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "failed to load candidate"}))).into_response();
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "failed to load candidate"})),
+            )
+                .into_response();
         }
     };
 
@@ -1149,7 +1359,8 @@ pub async fn review_candidate(
                     "reviewed_at": row.get::<Option<DateTime<Utc>>, _>("reviewed_at"),
                 })),
                 payload.admin_reason.clone(),
-            ).await;
+            )
+            .await;
 
             (
                 StatusCode::OK,
@@ -1159,15 +1370,19 @@ pub async fn review_candidate(
                     "admin_status": row.get::<String, _>("admin_status"),
                     "matching_run_id": existing.get::<Uuid, _>("matching_run_id"),
                 })),
-            ).into_response()
+            )
+                .into_response()
         }
         Err(error) => {
             tracing::error!("review candidate failed: {:?}", error);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "failed to review candidate"}))).into_response()
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "failed to review candidate"})),
+            )
+                .into_response()
         }
     }
 }
-
 
 pub async fn create_connection(
     State(state): State<Arc<AppState>>,
@@ -1179,14 +1394,26 @@ pub async fn create_connection(
         Err(response) => return response,
     };
 
-    let channel = payload.channel.as_deref().map(text).unwrap_or_else(|| "manual".to_string());
+    let channel = payload
+        .channel
+        .as_deref()
+        .map(text)
+        .unwrap_or_else(|| "manual".to_string());
     if !["lajukan_chat", "whatsapp", "phone", "manual"].contains(&channel.as_str()) {
-        return (StatusCode::BAD_REQUEST, Json(json!({"error": "invalid connection channel"}))).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "invalid connection channel"})),
+        )
+            .into_response();
     }
 
     let provider_entity_type = text(&payload.provider_entity_type);
     if provider_entity_type.is_empty() || payload.provider_entity_id.trim().is_empty() {
-        return (StatusCode::BAD_REQUEST, Json(json!({"error": "provider entity is required"}))).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "provider entity is required"})),
+        )
+            .into_response();
     }
 
     let mut provider_user_id = payload.provider_user_id;
@@ -1217,47 +1444,79 @@ pub async fn create_connection(
 
         let candidate = match candidate {
             Ok(Some(row)) => row,
-            Ok(None) => return (StatusCode::NOT_FOUND, Json(json!({"error": "matching candidate not found"}))).into_response(),
+            Ok(None) => {
+                return (
+                    StatusCode::NOT_FOUND,
+                    Json(json!({"error": "matching candidate not found"})),
+                )
+                    .into_response()
+            }
             Err(error) => {
                 tracing::error!("load candidate before connection failed: {:?}", error);
-                return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "failed to validate candidate"}))).into_response();
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({"error": "failed to validate candidate"})),
+                )
+                    .into_response();
             }
         };
 
         candidate_status = Some(candidate.get::<String, _>("admin_status"));
         if candidate.get::<String, _>("admin_status") != "approved" {
-            return (StatusCode::CONFLICT, Json(json!({"error": "candidate must be approved before creating a connection"}))).into_response();
+            return (
+                StatusCode::CONFLICT,
+                Json(json!({"error": "candidate must be approved before creating a connection"})),
+            )
+                .into_response();
         }
 
         linked_review_id = candidate.get::<Uuid, _>("requirement_review_id");
         if linked_review_id != payload.requirement_review_id {
-            return (StatusCode::CONFLICT, Json(json!({"error": "candidate does not belong to this requirement"}))).into_response();
+            return (
+                StatusCode::CONFLICT,
+                Json(json!({"error": "candidate does not belong to this requirement"})),
+            )
+                .into_response();
         }
 
-        provider_user_id = provider_user_id.or_else(|| candidate.get::<Option<Uuid>, _>("provider_user_id"));
-        provider_business_id = provider_business_id.or_else(|| candidate.get::<Option<Uuid>, _>("provider_business_id"));
+        provider_user_id =
+            provider_user_id.or_else(|| candidate.get::<Option<Uuid>, _>("provider_user_id"));
+        provider_business_id = provider_business_id
+            .or_else(|| candidate.get::<Option<Uuid>, _>("provider_business_id"));
         provider_entity_id = candidate.get::<String, _>("candidate_id");
 
         if payload.provider_entity_type.trim().is_empty() {
-            return (StatusCode::BAD_REQUEST, Json(json!({"error": "provider_entity_type is required"}))).into_response();
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": "provider_entity_type is required"})),
+            )
+                .into_response();
         }
     }
 
-    if let Some(key) = payload.idempotency_key.as_deref().map(str::trim).filter(|v| !v.is_empty()) {
-        if let Ok(Some(existing)) = sqlx::query(
-            "SELECT id, status FROM crm_connections WHERE idempotency_key = $1 LIMIT 1",
-        )
-        .bind(key)
-        .fetch_optional(&state.db)
-        .await
+    if let Some(key) = payload
+        .idempotency_key
+        .as_deref()
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+    {
+        if let Ok(Some(existing)) =
+            sqlx::query("SELECT id, status FROM crm_connections WHERE idempotency_key = $1 LIMIT 1")
+                .bind(key)
+                .fetch_optional(&state.db)
+                .await
         {
-            return (StatusCode::OK, Json(json!({
-                "connection": {
-                    "id": existing.get::<Uuid, _>("id"),
-                    "status": existing.get::<String, _>("status")
-                },
-                "deduped": true
-            }))).into_response();
+            return (
+                StatusCode::OK,
+                Json(json!({
+                    "connection": {
+                        "id": existing.get::<Uuid, _>("id"),
+                        "status": existing.get::<String, _>("status")
+                    },
+                    "deduped": true
+                })),
+            )
+                .into_response();
         }
     }
 
@@ -1311,26 +1570,36 @@ pub async fn create_connection(
                     "candidate_status": candidate_status,
                 })),
                 None,
-            ).await;
+            )
+            .await;
 
-            (StatusCode::CREATED, Json(json!({
-                "connection": {
-                    "id": row.get::<Uuid, _>("id"),
-                    "status": row.get::<String, _>("status"),
-                    "created_at": row.get::<DateTime<Utc>, _>("created_at")
-                }
-            }))).into_response()
+            (
+                StatusCode::CREATED,
+                Json(json!({
+                    "connection": {
+                        "id": row.get::<Uuid, _>("id"),
+                        "status": row.get::<String, _>("status"),
+                        "created_at": row.get::<DateTime<Utc>, _>("created_at")
+                    }
+                })),
+            )
+                .into_response()
         }
-        Err(sqlx::Error::Database(db_err)) if db_err.code().as_deref() == Some("23505") => {
-            (StatusCode::CONFLICT, Json(json!({"error": "connection already exists for this idempotency key"}))).into_response()
-        }
+        Err(sqlx::Error::Database(db_err)) if db_err.code().as_deref() == Some("23505") => (
+            StatusCode::CONFLICT,
+            Json(json!({"error": "connection already exists for this idempotency key"})),
+        )
+            .into_response(),
         Err(error) => {
             tracing::error!("create connection failed: {:?}", error);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "failed to create connection"}))).into_response()
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "failed to create connection"})),
+            )
+                .into_response()
         }
     }
 }
-
 
 pub async fn patch_connection(
     State(state): State<Arc<AppState>>,
@@ -1345,9 +1614,23 @@ pub async fn patch_connection(
 
     let status = payload.status.as_deref().map(text);
     if let Some(status) = status.as_deref() {
-        const ALLOWED: &[&str] = &["draft", "sent", "opened", "contacted", "responded", "negotiating", "succeeded", "failed", "spam_or_invalid"];
+        const ALLOWED: &[&str] = &[
+            "draft",
+            "sent",
+            "opened",
+            "contacted",
+            "responded",
+            "negotiating",
+            "succeeded",
+            "failed",
+            "spam_or_invalid",
+        ];
         if !ALLOWED.contains(&status) {
-            return (StatusCode::BAD_REQUEST, Json(json!({"error": "invalid connection status"}))).into_response();
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": "invalid connection status"})),
+            )
+                .into_response();
         }
     }
 
@@ -1386,20 +1669,32 @@ pub async fn patch_connection(
                 .await;
                 let _ = outcome;
             }
-            (StatusCode::OK, Json(json!({
-                "connection": {
-                    "id": row.get::<Uuid, _>("id"),
-                    "status": row.get::<String, _>("status"),
-                    "outcome_reason": row.get::<Option<String>, _>("outcome_reason"),
-                    "notes": row.get::<Option<String>, _>("notes"),
-                    "updated_at": row.get::<DateTime<Utc>, _>("updated_at")
-                }
-            }))).into_response()
+            (
+                StatusCode::OK,
+                Json(json!({
+                    "connection": {
+                        "id": row.get::<Uuid, _>("id"),
+                        "status": row.get::<String, _>("status"),
+                        "outcome_reason": row.get::<Option<String>, _>("outcome_reason"),
+                        "notes": row.get::<Option<String>, _>("notes"),
+                        "updated_at": row.get::<DateTime<Utc>, _>("updated_at")
+                    }
+                })),
+            )
+                .into_response()
         }
-        Ok(None) => (StatusCode::NOT_FOUND, Json(json!({"error": "connection not found"}))).into_response(),
+        Ok(None) => (
+            StatusCode::NOT_FOUND,
+            Json(json!({"error": "connection not found"})),
+        )
+            .into_response(),
         Err(error) => {
             tracing::error!("patch connection failed: {:?}", error);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "failed to update connection"}))).into_response()
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "failed to update connection"})),
+            )
+                .into_response()
         }
     }
 }
@@ -1415,9 +1710,23 @@ pub async fn create_matching_feedback(
     };
 
     let allowed_sources = ["admin", "requester", "provider", "system"];
-    let allowed_types = ["approved", "rejected", "contacted", "responded", "succeeded", "failed", "corrected_extraction"];
-    if !allowed_sources.contains(&text(&payload.feedback_source).as_str()) || !allowed_types.contains(&text(&payload.feedback_type).as_str()) {
-        return (StatusCode::BAD_REQUEST, Json(json!({"error": "invalid feedback type"}))).into_response();
+    let allowed_types = [
+        "approved",
+        "rejected",
+        "contacted",
+        "responded",
+        "succeeded",
+        "failed",
+        "corrected_extraction",
+    ];
+    if !allowed_sources.contains(&text(&payload.feedback_source).as_str())
+        || !allowed_types.contains(&text(&payload.feedback_type).as_str())
+    {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "invalid feedback type"})),
+        )
+            .into_response();
     }
 
     let inserted = sqlx::query(
@@ -1460,18 +1769,27 @@ pub async fn create_matching_feedback(
                     "reason_code": payload.reason_code,
                 })),
                 payload.note.clone(),
-            ).await;
+            )
+            .await;
 
-            (StatusCode::CREATED, Json(json!({
-                "feedback": {
-                    "id": row.get::<Uuid, _>("id"),
-                    "created_at": row.get::<DateTime<Utc>, _>("created_at")
-                }
-            }))).into_response()
-        },
+            (
+                StatusCode::CREATED,
+                Json(json!({
+                    "feedback": {
+                        "id": row.get::<Uuid, _>("id"),
+                        "created_at": row.get::<DateTime<Utc>, _>("created_at")
+                    }
+                })),
+            )
+                .into_response()
+        }
         Err(error) => {
             tracing::error!("create matching feedback failed: {:?}", error);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "failed to create feedback"}))).into_response()
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "failed to create feedback"})),
+            )
+                .into_response()
         }
     }
 }

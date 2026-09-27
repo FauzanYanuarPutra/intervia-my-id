@@ -489,16 +489,15 @@ fn is_allowed_news_cover_url(raw: &str) -> bool {
         return false;
     }
 
-    for prefix in [
-        "/api/content/media/laju-chat/content/",
-        "/uploads/content/",
-    ] {
+    for prefix in ["/api/content/media/laju-chat/content/", "/uploads/content/"] {
         if let Some(rest) = raw.strip_prefix(prefix) {
             if rest.is_empty()
                 || rest.contains('/')
                 || rest.contains('\\')
                 || rest.contains("..")
-                || !rest.chars().all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '.' | '_' | '-' | '%' ))
+                || !rest
+                    .chars()
+                    .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '.' | '_' | '-' | '%'))
             {
                 return false;
             }
@@ -3976,12 +3975,13 @@ async fn list_editorial_history(
 #[cfg(test)]
 mod tests {
     use super::{
-        contributor_withdrawal_allowed, is_allowed_news_source_url, moderation_action_allowed, moderation_action_requires_note,
-        moderation_target, normalize_editorial_priority, normalize_editorial_sensitivity,
-        normalize_fact_check_status, normalize_legal_review_status, normalize_news_category_filter,
-        normalize_news_language, normalize_news_search_query, normalize_queue_status,
-        parse_news_cursor, parse_requested_publish_at, public_news_metadata,
-        removes_verified_source, source_domain, validate_submission_payload,
+        contributor_withdrawal_allowed, is_allowed_news_source_url, moderation_action_allowed,
+        moderation_action_requires_note, moderation_target, normalize_editorial_priority,
+        normalize_editorial_sensitivity, normalize_fact_check_status,
+        normalize_legal_review_status, normalize_news_category_filter, normalize_news_language,
+        normalize_news_search_query, normalize_queue_status, parse_news_cursor,
+        parse_requested_publish_at, public_news_metadata, removes_verified_source, source_domain,
+        validate_submission_payload,
     };
     use chrono::{Duration, Utc};
     use serde_json::json;

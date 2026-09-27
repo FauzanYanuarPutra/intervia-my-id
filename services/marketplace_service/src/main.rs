@@ -36,16 +36,16 @@ mod business_moderation;
 mod businesses;
 mod content_projection;
 mod crm_matching;
+mod data_entity_resolution;
 mod data_governance;
 mod data_importer;
-mod data_entity_resolution;
-mod reference_promotion;
 mod health;
 mod identity_projection;
 mod moderation;
 mod news;
 mod order_engine;
 mod outbox;
+mod reference_promotion;
 mod runtime_metrics;
 mod schema_contract;
 mod wallet_support;
@@ -2361,13 +2361,28 @@ async fn main() -> anyhow::Result<()> {
         )
         .route("/v1/crm/leads", get(list_crm_leads).post(create_crm_lead))
         .route("/v1/crm/requirements", get(crm_matching::list_requirements))
-        .route("/v1/crm/requirements/{id}", get(crm_matching::get_requirement))
-        .route("/v1/crm/requirements/{id}/match", post(crm_matching::run_match))
+        .route(
+            "/v1/crm/requirements/{id}",
+            get(crm_matching::get_requirement),
+        )
+        .route(
+            "/v1/crm/requirements/{id}/match",
+            post(crm_matching::run_match),
+        )
         .route("/v1/crm/match-runs/{id}", get(crm_matching::get_match_run))
-        .route("/v1/crm/match-candidates/{id}", axum::routing::patch(crm_matching::review_candidate))
+        .route(
+            "/v1/crm/match-candidates/{id}",
+            axum::routing::patch(crm_matching::review_candidate),
+        )
         .route("/v1/crm/connections", post(crm_matching::create_connection))
-        .route("/v1/crm/connections/{id}", axum::routing::patch(crm_matching::patch_connection))
-        .route("/v1/crm/matching-feedback", post(crm_matching::create_matching_feedback))
+        .route(
+            "/v1/crm/connections/{id}",
+            axum::routing::patch(crm_matching::patch_connection),
+        )
+        .route(
+            "/v1/crm/matching-feedback",
+            post(crm_matching::create_matching_feedback),
+        )
         .route(
             "/v1/crm/leads/{id}",
             get(get_crm_lead).patch(update_crm_lead),
@@ -12200,8 +12215,7 @@ async fn update_content(
     // A published listing must never remain live while its owner is changing
     // substantive content. Autosave may keep the live state temporarily;
     // the explicit save moves it back into the moderation queue.
-    let was_live_before_edit = existing.content_status.eq_ignore_ascii_case("active")
-        && !autosave;
+    let was_live_before_edit = existing.content_status.eq_ignore_ascii_case("active") && !autosave;
     if was_live_before_edit && content_status.eq_ignore_ascii_case("active") {
         content_status = "draft".to_string();
     }
@@ -12315,10 +12329,7 @@ async fn update_content(
         let root = metadata
             .as_object_mut()
             .expect("content metadata should remain an object");
-        root.insert(
-            "owner_revision_state".to_string(),
-            json!("pending_review"),
-        );
+        root.insert("owner_revision_state".to_string(), json!("pending_review"));
     }
     if !metadata_within_limit(&metadata) {
         return err(StatusCode::BAD_REQUEST, "metadata payload is too large").into_response();

@@ -1,5 +1,10 @@
 use anyhow::{anyhow, Result as AnyhowResult};
-use axum::{extract::{Path, State}, http::{HeaderMap, StatusCode}, response::IntoResponse, Json};
+use axum::{
+    extract::{Path, State},
+    http::{HeaderMap, StatusCode},
+    response::IntoResponse,
+    Json,
+};
 use serde_json::{json, Value};
 use sqlx::{PgPool, Row};
 use std::sync::Arc;
@@ -8,18 +13,41 @@ use uuid::Uuid;
 use crate::{auth::auth_claims_from_headers, has_agent_access, AppState};
 
 fn score_entity(
-    name: Option<&str>, address: Option<&str>, city: Option<&str>, province: Option<&str>,
-    lat: Option<f64>, lon: Option<f64>, resolution_status: &str
+    name: Option<&str>,
+    address: Option<&str>,
+    city: Option<&str>,
+    province: Option<&str>,
+    lat: Option<f64>,
+    lon: Option<f64>,
+    resolution_status: &str,
 ) -> (f64, Vec<String>) {
     let mut score: f64 = 0.0;
     let mut reasons: Vec<String> = Vec::new();
-    if name.is_some_and(|v| !v.trim().is_empty()) { score += 0.40; } else { reasons.push("missing_name".to_string()); }
-    if address.is_some_and(|v| !v.trim().is_empty()) { score += 0.20; } else { reasons.push("missing_address".to_string()); }
-    if city.is_some_and(|v| !v.trim().is_empty()) { score += 0.10; } else { reasons.push("missing_city".to_string()); }
-    if province.is_some_and(|v| !v.trim().is_empty()) { score += 0.10; } else { reasons.push("missing_province".to_string()); }
+    if name.is_some_and(|v| !v.trim().is_empty()) {
+        score += 0.40;
+    } else {
+        reasons.push("missing_name".to_string());
+    }
+    if address.is_some_and(|v| !v.trim().is_empty()) {
+        score += 0.20;
+    } else {
+        reasons.push("missing_address".to_string());
+    }
+    if city.is_some_and(|v| !v.trim().is_empty()) {
+        score += 0.10;
+    } else {
+        reasons.push("missing_city".to_string());
+    }
+    if province.is_some_and(|v| !v.trim().is_empty()) {
+        score += 0.10;
+    } else {
+        reasons.push("missing_province".to_string());
+    }
     // Coordinates improve readiness but are not mandatory for list/search publication.
     // A reference business can be publicly discoverable without being map-ready.
-    if lat.is_some() && lon.is_some() { score += 0.20; }
+    if lat.is_some() && lon.is_some() {
+        score += 0.20;
+    }
     if matches!(resolution_status, "possible_duplicate" | "needs_review") {
         reasons.push("entity_resolution_requires_review".to_string());
         score *= 0.5;
@@ -27,33 +55,65 @@ fn score_entity(
     (score.min(1.0), reasons)
 }
 
-pub async fn generate_for_entity(
-    db: &PgPool,
-    entity_id: Uuid,
-) -> Result<Value, sqlx::Error> {
-    let entity = sqlx::query_as::<_, (
-        Uuid, Uuid, Option<String>, Option<String>, Option<String>, Option<String>,
-        Option<f64>, Option<f64>, String, Value, bool, String, bool, bool
-    )>(
+pub async fn generate_for_entity(db: &PgPool, entity_id: Uuid) -> Result<Value, sqlx::Error> {
+    let entity = sqlx::query_as::<
+        _,
+        (
+            Uuid,
+            Uuid,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<f64>,
+            Option<f64>,
+            String,
+            Value,
+            bool,
+            String,
+            bool,
+            bool,
+        ),
+    >(
         r#"SELECT e.id, e.source_id, e.normalized_name, e.normalized_address, e.city, e.province,
                    e.latitude, e.longitude, e.resolution_status, e.metadata,
                    s.auto_publish_reference, s.reuse_mode, s.storage_allowed, s.enabled
             FROM data_import_entities e
             JOIN data_source_registry s ON s.id=e.source_id
-            WHERE e.id=$1 LIMIT 1"#
+            WHERE e.id=$1 LIMIT 1"#,
     )
     .bind(entity_id)
     .fetch_optional(db)
     .await?;
 
-    let Some((id, source_id, name, address, city, province, lat, lon, resolution_status, metadata,
-              auto_publish_reference, reuse_mode, storage_allowed, source_enabled)) = entity else {
+    let Some((
+        id,
+        source_id,
+        name,
+        address,
+        city,
+        province,
+        lat,
+        lon,
+        resolution_status,
+        metadata,
+        auto_publish_reference,
+        reuse_mode,
+        storage_allowed,
+        source_enabled,
+    )) = entity
+    else {
         return Ok(json!({"found":false}));
     };
 
     let (score, reasons) = score_entity(
-        name.as_deref(), address.as_deref(), city.as_deref(), province.as_deref(),
-        lat, lon, &resolution_status
+        name.as_deref(),
+        address.as_deref(),
+        city.as_deref(),
+        province.as_deref(),
+        lat,
+        lon,
+        &resolution_status,
     );
     let auto_publish_ready = auto_publish_reference
         && reuse_mode == "persistent_import"
@@ -61,9 +121,15 @@ pub async fn generate_for_entity(
         && source_enabled
         && score >= 0.70
         && reasons.is_empty()
-        && !matches!(resolution_status.as_str(), "possible_duplicate" | "needs_review");
+        && !matches!(
+            resolution_status.as_str(),
+            "possible_duplicate" | "needs_review"
+        );
 
-    let status = if reasons.iter().any(|v| *v == "entity_resolution_requires_review") {
+    let status = if reasons
+        .iter()
+        .any(|v| *v == "entity_resolution_requires_review")
+    {
         "blocked"
     } else if auto_publish_ready {
         "approved"
@@ -101,7 +167,7 @@ pub async fn generate_for_entity(
 
     if auto_publish_ready {
         let candidate_id = sqlx::query_scalar::<_, Uuid>(
-            "SELECT id FROM reference_promotion_candidates WHERE entity_id=$1 LIMIT 1"
+            "SELECT id FROM reference_promotion_candidates WHERE entity_id=$1 LIMIT 1",
         )
         .bind(id)
         .fetch_optional(db)
@@ -129,26 +195,46 @@ async fn generate(
     Path(entity_id): Path<Uuid>,
 ) -> impl IntoResponse {
     let Some(claims) = auth_claims_from_headers(&headers, &state.jwt_secret) else {
-        return (StatusCode::UNAUTHORIZED, Json(json!({"error":"unauthorized"}))).into_response();
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({"error":"unauthorized"})),
+        )
+            .into_response();
     };
     if !has_agent_access(&claims) {
-        return (StatusCode::FORBIDDEN, Json(json!({"error":"agent role required"}))).into_response();
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({"error":"agent role required"})),
+        )
+            .into_response();
     }
     match generate_for_entity(&state.db, entity_id).await {
-        Ok(value) if value.get("found").and_then(Value::as_bool) == Some(true) =>
-            (StatusCode::OK, Json(value)).into_response(),
-        Ok(_) => (StatusCode::NOT_FOUND, Json(json!({"error":"entity not found"}))).into_response(),
+        Ok(value) if value.get("found").and_then(Value::as_bool) == Some(true) => {
+            (StatusCode::OK, Json(value)).into_response()
+        }
+        Ok(_) => (
+            StatusCode::NOT_FOUND,
+            Json(json!({"error":"entity not found"})),
+        )
+            .into_response(),
         Err(error) => {
             tracing::error!("generate promotion candidate failed: {:?}", error);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"failed to generate promotion candidate"}))).into_response()
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error":"failed to generate promotion candidate"})),
+            )
+                .into_response()
         }
     }
 }
 
-
 fn slugify_reference(name: &str, city: Option<&str>, entity_id: Uuid) -> String {
     let mut slug = String::new();
-    for ch in name.chars().chain(std::iter::once(' ')).chain(city.unwrap_or("").chars()) {
+    for ch in name
+        .chars()
+        .chain(std::iter::once(' '))
+        .chain(city.unwrap_or("").chars())
+    {
         if ch.is_ascii_alphanumeric() {
             slug.push(ch.to_ascii_lowercase());
         } else if !slug.ends_with('-') {
@@ -164,7 +250,11 @@ fn slugify_reference(name: &str, city: Option<&str>, entity_id: Uuid) -> String 
     if slug.is_empty() {
         format!("reference-{entity_id}")
     } else {
-        format!("{}-{}", slug.chars().take(96).collect::<String>(), &entity_id.to_string()[..8])
+        format!(
+            "{}-{}",
+            slug.chars().take(96).collect::<String>(),
+            &entity_id.to_string()[..8]
+        )
     }
 }
 
@@ -218,10 +308,7 @@ struct PromotionCandidateSourceRow {
     source_enabled: bool,
 }
 
-pub(crate) async fn promote_candidate(
-    db: &PgPool,
-    candidate_id: Uuid,
-) -> AnyhowResult<Value> {
+pub(crate) async fn promote_candidate(db: &PgPool, candidate_id: Uuid) -> AnyhowResult<Value> {
     let mut tx = db.begin().await?;
 
     let candidate = sqlx::query_as::<_, PromotionCandidateSourceRow>(
@@ -244,7 +331,7 @@ pub(crate) async fn promote_candidate(
         JOIN data_source_registry s ON s.id = c.source_id
         WHERE c.id = $1
         FOR UPDATE OF c
-        "#
+        "#,
     )
     .bind(candidate_id)
     .fetch_optional(&mut *tx)
@@ -255,17 +342,38 @@ pub(crate) async fn promote_candidate(
     };
 
     let PromotionCandidateSourceRow {
-        candidate_id, entity_id, source_id, promotion_status, readiness_score,
-        normalized_name: name, normalized_address: address, city, province,
-        latitude: lat, longitude: lon, resolution_status, canonical_record_id,
-        source_record_id, source_record_url, record_license, record_attribution,
-        record_kind, source_key, provider_name, source_url, source_license,
-        source_license_url, source_attribution, reuse_mode, storage_allowed, source_enabled
+        candidate_id,
+        entity_id,
+        source_id,
+        promotion_status,
+        readiness_score,
+        normalized_name: name,
+        normalized_address: address,
+        city,
+        province,
+        latitude: lat,
+        longitude: lon,
+        resolution_status,
+        canonical_record_id,
+        source_record_id,
+        source_record_url,
+        record_license,
+        record_attribution,
+        record_kind,
+        source_key,
+        provider_name,
+        source_url,
+        source_license,
+        source_license_url,
+        source_attribution,
+        reuse_mode,
+        storage_allowed,
+        source_enabled,
     } = candidate;
 
     if promotion_status == "promoted" {
         let existing = sqlx::query_scalar::<_, Uuid>(
-            "SELECT proposed_content_id FROM reference_promotion_candidates WHERE id=$1"
+            "SELECT proposed_content_id FROM reference_promotion_candidates WHERE id=$1",
         )
         .bind(candidate_id)
         .fetch_optional(&mut *tx)
@@ -285,20 +393,30 @@ pub(crate) async fn promote_candidate(
     if readiness_score < 0.70 {
         return Err(anyhow!("candidate readiness is below promotion threshold"));
     }
-    if matches!(resolution_status.as_str(), "possible_duplicate" | "needs_review") {
+    if matches!(
+        resolution_status.as_str(),
+        "possible_duplicate" | "needs_review"
+    ) {
         return Err(anyhow!("entity resolution still requires review"));
     }
     if canonical_record_id.is_none() || source_record_id.is_none() {
         return Err(anyhow!("canonical imported record is required"));
     }
     if reuse_mode != "persistent_import" || !storage_allowed || !source_enabled {
-        return Err(anyhow!("source is not currently enabled/approved for persistent promotion"));
+        return Err(anyhow!(
+            "source is not currently enabled/approved for persistent promotion"
+        ));
     }
 
-    let source_record_id = source_record_id.ok_or_else(|| anyhow!("canonical imported record is required"))?;
-    let canonical_record_id = canonical_record_id.ok_or_else(|| anyhow!("canonical imported record is required"))?;
+    let source_record_id =
+        source_record_id.ok_or_else(|| anyhow!("canonical imported record is required"))?;
+    let canonical_record_id =
+        canonical_record_id.ok_or_else(|| anyhow!("canonical imported record is required"))?;
     let effective_license = record_license.or(source_license.clone());
-    if effective_license.as_deref().is_none_or(|v| v.trim().is_empty()) {
+    if effective_license
+        .as_deref()
+        .is_none_or(|v| v.trim().is_empty())
+    {
         return Err(anyhow!("source license is missing"));
     }
 
@@ -320,7 +438,7 @@ pub(crate) async fn promote_candidate(
           AND metadata->>'source_dataset' = $1
           AND metadata->>'external_id' = $2
         LIMIT 1
-        "#
+        "#,
     )
     .bind(&source_key)
     .bind(&source_record_id)
@@ -371,7 +489,7 @@ pub(crate) async fn promote_candidate(
             )
             ON CONFLICT DO NOTHING
             RETURNING id
-            "#
+            "#,
         )
         .bind(&slug)
         .bind(&name)
@@ -383,23 +501,21 @@ pub(crate) async fn promote_candidate(
 
         match inserted {
             Some(id) => id,
-            None => {
-                sqlx::query_scalar::<_, Uuid>(
-                    r#"
+            None => sqlx::query_scalar::<_, Uuid>(
+                r#"
                     SELECT id FROM content_items
                     WHERE content_status <> 'deleted'
                       AND metadata->>'reference_publication_status' = 'published'
                       AND metadata->>'source_dataset' = $1
                       AND metadata->>'external_id' = $2
                     LIMIT 1
-                    "#
-                )
-                .bind(&source_key)
-                .bind(&source_record_id)
-                .fetch_optional(&mut *tx)
-                .await?
-                .ok_or_else(|| anyhow!("reference slug collision requires a new slug"))?
-            }
+                    "#,
+            )
+            .bind(&source_key)
+            .bind(&source_record_id)
+            .fetch_optional(&mut *tx)
+            .await?
+            .ok_or_else(|| anyhow!("reference slug collision requires a new slug"))?,
         }
     };
 
@@ -408,7 +524,7 @@ pub(crate) async fn promote_candidate(
         UPDATE data_import_records
         SET target_content_id=$2, updated_at=NOW()
         WHERE id=$1
-        "#
+        "#,
     )
     .bind(canonical_record_id)
     .bind(content_id)
@@ -422,7 +538,7 @@ pub(crate) async fn promote_candidate(
             promotion_status='promoted',
             updated_at=NOW()
         WHERE id=$1 AND promotion_status='approved'
-        "#
+        "#,
     )
     .bind(candidate_id)
     .bind(content_id)
@@ -440,7 +556,6 @@ pub(crate) async fn promote_candidate(
     }))
 }
 
-
 #[derive(serde::Deserialize)]
 struct ReviewPromotionRequest {
     decision: String,
@@ -452,10 +567,18 @@ async fn list_candidates(
     headers: HeaderMap,
 ) -> impl IntoResponse {
     let Some(claims) = auth_claims_from_headers(&headers, &state.jwt_secret) else {
-        return (StatusCode::UNAUTHORIZED, Json(json!({"error":"unauthorized"}))).into_response();
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({"error":"unauthorized"})),
+        )
+            .into_response();
     };
     if !has_agent_access(&claims) {
-        return (StatusCode::FORBIDDEN, Json(json!({"error":"agent role required"}))).into_response();
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({"error":"agent role required"})),
+        )
+            .into_response();
     }
     match sqlx::query(
         r#"SELECT id, entity_id, source_id, proposed_content_id, promotion_status,
@@ -494,19 +617,37 @@ async fn review_candidate(
     Json(payload): Json<ReviewPromotionRequest>,
 ) -> impl IntoResponse {
     let Some(claims) = auth_claims_from_headers(&headers, &state.jwt_secret) else {
-        return (StatusCode::UNAUTHORIZED, Json(json!({"error":"unauthorized"}))).into_response();
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({"error":"unauthorized"})),
+        )
+            .into_response();
     };
     let Some(reviewer_id) = Uuid::parse_str(&claims.sub).ok() else {
-        return (StatusCode::UNAUTHORIZED, Json(json!({"error":"invalid reviewer identity"}))).into_response();
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({"error":"invalid reviewer identity"})),
+        )
+            .into_response();
     };
     if !has_agent_access(&claims) {
-        return (StatusCode::FORBIDDEN, Json(json!({"error":"agent role required"}))).into_response();
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({"error":"agent role required"})),
+        )
+            .into_response();
     }
     let decision = match payload.decision.trim() {
         "approved" => "approved",
         "rejected" => "rejected",
         "blocked" => "blocked",
-        _ => return (StatusCode::BAD_REQUEST, Json(json!({"error":"decision must be approved, rejected, or blocked"}))).into_response(),
+        _ => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error":"decision must be approved, rejected, or blocked"})),
+            )
+                .into_response()
+        }
     };
     if decision == "approved" {
         let blocked = match sqlx::query_scalar::<_, i64>(
@@ -527,19 +668,40 @@ async fn review_candidate(
             SET promotion_status=$2, reviewed_by=$3, reviewed_at=NOW(),
                 review_note=$4, updated_at=NOW()
             WHERE id=$1 AND promotion_status NOT IN ('promoted')
-            RETURNING id, promotion_status, reviewed_at"#
-    ).bind(candidate_id).bind(decision).bind(reviewer_id)
-     .bind(payload.review_note.map(|v| v.trim().chars().take(4000).collect::<String>()))
-     .fetch_optional(&state.db).await {
-        Ok(Some(row)) => (StatusCode::OK, Json(json!({
-            "id":row.try_get::<Uuid,_>("id").ok(),
-            "promotion_status":row.try_get::<String,_>("promotion_status").ok(),
-            "reviewed_at":row.try_get::<chrono::DateTime<chrono::Utc>,_>("reviewed_at").ok()
-        }))).into_response(),
-        Ok(None) => (StatusCode::NOT_FOUND, Json(json!({"error":"candidate not found or already promoted"}))).into_response(),
+            RETURNING id, promotion_status, reviewed_at"#,
+    )
+    .bind(candidate_id)
+    .bind(decision)
+    .bind(reviewer_id)
+    .bind(
+        payload
+            .review_note
+            .map(|v| v.trim().chars().take(4000).collect::<String>()),
+    )
+    .fetch_optional(&state.db)
+    .await
+    {
+        Ok(Some(row)) => (
+            StatusCode::OK,
+            Json(json!({
+                "id":row.try_get::<Uuid,_>("id").ok(),
+                "promotion_status":row.try_get::<String,_>("promotion_status").ok(),
+                "reviewed_at":row.try_get::<chrono::DateTime<chrono::Utc>,_>("reviewed_at").ok()
+            })),
+        )
+            .into_response(),
+        Ok(None) => (
+            StatusCode::NOT_FOUND,
+            Json(json!({"error":"candidate not found or already promoted"})),
+        )
+            .into_response(),
         Err(error) => {
             tracing::error!("review promotion candidate failed: {:?}", error);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"failed to review promotion candidate"}))).into_response()
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error":"failed to review promotion candidate"})),
+            )
+                .into_response()
         }
     }
 }
@@ -550,10 +712,18 @@ async fn promote(
     Path(candidate_id): Path<Uuid>,
 ) -> impl IntoResponse {
     let Some(claims) = auth_claims_from_headers(&headers, &state.jwt_secret) else {
-        return (StatusCode::UNAUTHORIZED, Json(json!({"error":"unauthorized"}))).into_response();
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({"error":"unauthorized"})),
+        )
+            .into_response();
     };
     if !has_agent_access(&claims) {
-        return (StatusCode::FORBIDDEN, Json(json!({"error":"agent role required"}))).into_response();
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({"error":"agent role required"})),
+        )
+            .into_response();
     }
 
     match promote_candidate(&state.db, candidate_id).await {
@@ -574,20 +744,34 @@ async fn promote(
             } else {
                 StatusCode::INTERNAL_SERVER_ERROR
             };
-            (status, Json(json!({"error":"failed to promote reference candidate","detail":message}))).into_response()
+            (
+                status,
+                Json(json!({"error":"failed to promote reference candidate","detail":message})),
+            )
+                .into_response()
         }
     }
 }
 
-
 pub fn router() -> axum::Router<Arc<AppState>> {
     axum::Router::new()
-        .route("/v1/data/entities/{entity_id}/promotion-candidate", axum::routing::post(generate))
-        .route("/v1/data/promotion-candidates", axum::routing::get(list_candidates))
-        .route("/v1/data/promotion-candidates/{candidate_id}/review", axum::routing::post(review_candidate))
-        .route("/v1/data/promotion-candidates/{candidate_id}/promote", axum::routing::post(promote))
+        .route(
+            "/v1/data/entities/{entity_id}/promotion-candidate",
+            axum::routing::post(generate),
+        )
+        .route(
+            "/v1/data/promotion-candidates",
+            axum::routing::get(list_candidates),
+        )
+        .route(
+            "/v1/data/promotion-candidates/{candidate_id}/review",
+            axum::routing::post(review_candidate),
+        )
+        .route(
+            "/v1/data/promotion-candidates/{candidate_id}/promote",
+            axum::routing::post(promote),
+        )
 }
-
 
 #[cfg(test)]
 mod tests {

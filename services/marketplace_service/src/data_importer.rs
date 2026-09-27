@@ -8,8 +8,17 @@ use crate::AppState;
 
 fn redact(value: &Value) -> Value {
     const BLOCKED: &[&str] = &[
-        "phone", "telephone", "mobile", "whatsapp", "email", "npwp",
-        "nik", "ktp", "bank_account", "account_number", "contact_person",
+        "phone",
+        "telephone",
+        "mobile",
+        "whatsapp",
+        "email",
+        "npwp",
+        "nik",
+        "ktp",
+        "bank_account",
+        "account_number",
+        "contact_person",
     ];
     match value {
         Value::Object(map) => {
@@ -63,9 +72,20 @@ async fn run_inner(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
     let api_url = source.4.ok_or_else(|| anyhow!("source has no CKAN API"))?;
     let base = base_url(&api_url).ok_or_else(|| anyhow!("invalid CKAN API URL"))?;
 
-    let package: Value = state.http_client.get(&api_url).send().await?.error_for_status()?.json().await?;
+    let package: Value = state
+        .http_client
+        .get(&api_url)
+        .send()
+        .await?
+        .error_for_status()?
+        .json()
+        .await?;
     let package = package.get("result").cloned().unwrap_or(package);
-    let resources = package.get("resources").and_then(Value::as_array).cloned().unwrap_or_default();
+    let resources = package
+        .get("resources")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
 
     let mut discovered = 0i32;
     let mut accepted = 0i32;
@@ -75,12 +95,22 @@ async fn run_inner(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
     for resource in resources.into_iter().take(100) {
         let resource_id = match resource.get("id").and_then(Value::as_str) {
             Some(value) => value,
-            None => { rejected += 1; continue; }
+            None => {
+                rejected += 1;
+                continue;
+            }
         };
-        let active = resource.get("datastore_active").and_then(Value::as_bool).unwrap_or(false);
-        let resource_license = resource.get("license").or_else(|| resource.get("license_title"))
-            .and_then(Value::as_str).unwrap_or("");
-        let license_ok = !resource_license.trim().is_empty() || source.5.as_deref().is_some_and(|v| !v.trim().is_empty());
+        let active = resource
+            .get("datastore_active")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        let resource_license = resource
+            .get("license")
+            .or_else(|| resource.get("license_title"))
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        let license_ok = !resource_license.trim().is_empty()
+            || source.5.as_deref().is_some_and(|v| !v.trim().is_empty());
         if !active || !license_ok {
             rejected += 1;
             continue;
@@ -88,25 +118,50 @@ async fn run_inner(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
 
         let mut offset = 0usize;
         loop {
-            let url = format!("{}/api/action/datastore_search?resource_id={}&limit=500&offset={}", base, resource_id, offset);
-            let payload: Value = state.http_client.get(&url).send().await?.error_for_status()?.json().await?;
-            let records = payload.get("result").and_then(|v| v.get("records")).and_then(Value::as_array).cloned().unwrap_or_default();
-            if records.is_empty() { break; }
+            let url = format!(
+                "{}/api/action/datastore_search?resource_id={}&limit=500&offset={}",
+                base, resource_id, offset
+            );
+            let payload: Value = state
+                .http_client
+                .get(&url)
+                .send()
+                .await?
+                .error_for_status()?
+                .json()
+                .await?;
+            let records = payload
+                .get("result")
+                .and_then(|v| v.get("records"))
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_default();
+            if records.is_empty() {
+                break;
+            }
 
             for raw in records.iter() {
                 discovered += 1;
-                if discovered > 100_000 { break; }
+                if discovered > 100_000 {
+                    break;
+                }
 
                 let safe = if source.7 { raw.clone() } else { redact(raw) };
                 if job.2 == "dry_run" {
                     accepted += 1;
                     continue;
                 }
-                let record_id = raw.get("_id").map(|v| v.to_string())
+                let record_id = raw
+                    .get("_id")
+                    .map(|v| v.to_string())
                     .or_else(|| raw.get("id").map(|v| v.to_string()))
                     .unwrap_or_else(|| hash(&safe));
                 let source_hash = hash(&safe);
-                let kind = if source.2 == "government_open_data" { "government_reference" } else { "open_data_reference" };
+                let kind = if source.2 == "government_open_data" {
+                    "government_reference"
+                } else {
+                    "open_data_reference"
+                };
 
                 let result = sqlx::query(
                     "INSERT INTO data_import_records (job_id,source_id,source_record_id,source_url,source_hash,record_kind,license_snapshot,attribution_snapshot,raw_metadata,validation_status,validation_reason,last_seen_at,updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'accepted',$10,NOW(),NOW()) ON CONFLICT (source_id,source_record_id) DO UPDATE SET job_id=EXCLUDED.job_id,source_url=EXCLUDED.source_url,source_hash=EXCLUDED.source_hash,raw_metadata=EXCLUDED.raw_metadata,validation_status='accepted',last_seen_at=NOW(),updated_at=NOW()"
@@ -153,17 +208,30 @@ async fn run_inner(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
                         }
                         accepted += 1;
                     }
-                    Err(error) => { errors += 1; tracing::warn!("record import failed: {:?}", error); }
+                    Err(error) => {
+                        errors += 1;
+                        tracing::warn!("record import failed: {:?}", error);
+                    }
                 }
             }
 
-            if records.len() < 500 || discovered >= 100_000 { break; }
+            if records.len() < 500 || discovered >= 100_000 {
+                break;
+            }
             offset += 500;
         }
-        if discovered >= 100_000 { break; }
+        if discovered >= 100_000 {
+            break;
+        }
     }
 
-    let status = if errors > 0 && accepted > 0 { "partial" } else if errors > 0 { "failed" } else { "succeeded" };
+    let status = if errors > 0 && accepted > 0 {
+        "partial"
+    } else if errors > 0 {
+        "failed"
+    } else {
+        "succeeded"
+    };
     sqlx::query("UPDATE data_import_jobs SET status=$2,finished_at=NOW(),discovered_count=$3,accepted_count=$4,rejected_count=$5,error_count=$6,error_summary=$7 WHERE id=$1")
         .bind(job_id).bind(status).bind(discovered).bind(accepted).bind(rejected).bind(errors)
         .bind(if errors > 0 { Some("some resources or records failed") } else { None })
@@ -172,18 +240,41 @@ async fn run_inner(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
     Ok(())
 }
 
-
 async fn run_osm_reference_import(
     state: &Arc<AppState>,
     job_id: Uuid,
-    source: &(Uuid, String, String, String, Option<String>, Option<String>, String, bool, bool, Option<String>),
+    source: &(
+        Uuid,
+        String,
+        String,
+        String,
+        Option<String>,
+        Option<String>,
+        String,
+        bool,
+        bool,
+        Option<String>,
+    ),
 ) -> Result<()> {
-    let (source_id, source_key, _source_kind, source_url, api_url, license_name, reuse_mode, storage_allowed, _pii_allowed, attribution) = source;
+    let (
+        source_id,
+        source_key,
+        _source_kind,
+        source_url,
+        api_url,
+        license_name,
+        reuse_mode,
+        storage_allowed,
+        _pii_allowed,
+        attribution,
+    ) = source;
 
     if reuse_mode != "persistent_import" || !*storage_allowed {
         return Err(anyhow!("OSM source is not approved for persistent import"));
     }
-    let endpoint = api_url.as_deref().ok_or_else(|| anyhow!("OSM source has no Overpass endpoint"))?;
+    let endpoint = api_url
+        .as_deref()
+        .ok_or_else(|| anyhow!("OSM source has no Overpass endpoint"))?;
 
     let bboxes: &[(&str, &str, f64, f64, f64, f64)] = &[
         ("Jakarta", "DKI Jakarta", -6.40, -6.05, 106.65, 107.05),
@@ -194,8 +285,22 @@ async fn run_osm_reference_import(
         ("Denpasar", "Bali", -8.80, -8.55, 115.10, 115.30),
         ("Medan", "Sumatera Utara", 3.45, 3.75, 98.50, 98.80),
         ("Makassar", "Sulawesi Selatan", -5.30, -5.00, 119.25, 119.55),
-        ("Palembang", "Sumatera Selatan", -3.15, -2.80, 104.55, 104.90),
-        ("Balikpapan", "Kalimantan Timur", -1.40, -1.10, 116.65, 117.00),
+        (
+            "Palembang",
+            "Sumatera Selatan",
+            -3.15,
+            -2.80,
+            104.55,
+            104.90,
+        ),
+        (
+            "Balikpapan",
+            "Kalimantan Timur",
+            -1.40,
+            -1.10,
+            116.65,
+            117.00,
+        ),
         ("Tangerang Selatan", "Banten", -6.40, -6.20, 106.60, 106.85),
         ("Bogor", "Jawa Barat", -6.75, -6.45, 106.65, 106.90),
     ];
@@ -225,9 +330,13 @@ out center tags;
             .replace("{north}", &north.to_string())
             .replace("{east}", &east.to_string());
 
-        let response = state.http_client
+        let response = state
+            .http_client
             .post(endpoint)
-            .header(reqwest::header::USER_AGENT, "LajukanOpenDataImporter/1.0 (+https://www.lajukan.com)")
+            .header(
+                reqwest::header::USER_AGENT,
+                "LajukanOpenDataImporter/1.0 (+https://www.lajukan.com)",
+            )
             .form(&[("data", body)])
             .send()
             .await;
@@ -248,10 +357,21 @@ out center tags;
             }
         };
 
-        for element in payload.get("elements").and_then(Value::as_array).cloned().unwrap_or_default() {
+        for element in payload
+            .get("elements")
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default()
+        {
             discovered += 1;
-            let element_type = element.get("type").and_then(Value::as_str).unwrap_or("unknown");
-            let element_id = element.get("id").and_then(Value::as_i64).unwrap_or_default();
+            let element_type = element
+                .get("type")
+                .and_then(Value::as_str)
+                .unwrap_or("unknown");
+            let element_id = element
+                .get("id")
+                .and_then(Value::as_i64)
+                .unwrap_or_default();
             if element_id <= 0 {
                 rejected += 1;
                 continue;
@@ -269,16 +389,28 @@ out center tags;
                     continue;
                 }
             };
-            let name = tags.get("name").and_then(Value::as_str).unwrap_or("").trim();
+            let name = tags
+                .get("name")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .trim();
             if name.len() < 3 {
                 rejected += 1;
                 continue;
             }
 
-            let lat = element.get("lat").and_then(Value::as_f64)
-                .or_else(|| element.get("center").and_then(|v| v.get("lat")).and_then(Value::as_f64));
-            let lon = element.get("lon").and_then(Value::as_f64)
-                .or_else(|| element.get("center").and_then(|v| v.get("lon")).and_then(Value::as_f64));
+            let lat = element.get("lat").and_then(Value::as_f64).or_else(|| {
+                element
+                    .get("center")
+                    .and_then(|v| v.get("lat"))
+                    .and_then(Value::as_f64)
+            });
+            let lon = element.get("lon").and_then(Value::as_f64).or_else(|| {
+                element
+                    .get("center")
+                    .and_then(|v| v.get("lon"))
+                    .and_then(Value::as_f64)
+            });
             let (Some(lat), Some(lon)) = (lat, lon) else {
                 rejected += 1;
                 continue;
@@ -289,10 +421,25 @@ out center tags;
             }
 
             let allowed_keys = [
-                "name", "shop", "craft", "office", "amenity", "tourism", "cuisine",
-                "brand", "operator", "website", "opening_hours", "addr:street",
-                "addr:housenumber", "addr:suburb", "addr:city", "addr:postcode",
-                "wikidata", "wikimedia_commons", "image"
+                "name",
+                "shop",
+                "craft",
+                "office",
+                "amenity",
+                "tourism",
+                "cuisine",
+                "brand",
+                "operator",
+                "website",
+                "opening_hours",
+                "addr:street",
+                "addr:housenumber",
+                "addr:suburb",
+                "addr:city",
+                "addr:postcode",
+                "wikidata",
+                "wikimedia_commons",
+                "image",
             ];
             let mut safe_map = serde_json::Map::new();
             for key in allowed_keys {
@@ -303,7 +450,10 @@ out center tags;
             safe_map.insert("latitude".to_string(), Value::from(lat));
             safe_map.insert("longitude".to_string(), Value::from(lon));
             safe_map.insert("city".to_string(), Value::String((*city).to_string()));
-            safe_map.insert("province".to_string(), Value::String((*province).to_string()));
+            safe_map.insert(
+                "province".to_string(),
+                Value::String((*province).to_string()),
+            );
             let address = [
                 tags.get("addr:street").and_then(Value::as_str),
                 tags.get("addr:housenumber").and_then(Value::as_str),
@@ -318,9 +468,13 @@ out center tags;
             if !address.is_empty() {
                 safe_map.insert("address".to_string(), Value::String(address));
             }
-            safe_map.insert("source_url".to_string(), Value::String(
-                format!("https://www.openstreetmap.org/{}/{}", element_type, element_id)
-            ));
+            safe_map.insert(
+                "source_url".to_string(),
+                Value::String(format!(
+                    "https://www.openstreetmap.org/{}/{}",
+                    element_type, element_id
+                )),
+            );
             let safe = Value::Object(safe_map);
             let source_hash = hash(&safe);
 
@@ -350,9 +504,20 @@ out center tags;
                     .fetch_one(&state.db)
                     .await?;
 
-                    match crate::data_entity_resolution::index_record(&state.db, *source_id, import_record_id, &safe).await {
+                    match crate::data_entity_resolution::index_record(
+                        &state.db,
+                        *source_id,
+                        import_record_id,
+                        &safe,
+                    )
+                    .await
+                    {
                         Ok(entity_id) => {
-                            if let Err(error) = crate::reference_promotion::generate_for_entity(&state.db, entity_id).await {
+                            if let Err(error) = crate::reference_promotion::generate_for_entity(
+                                &state.db, entity_id,
+                            )
+                            .await
+                            {
                                 errors += 1;
                                 tracing::warn!(entity_id=%entity_id, "OSM promotion candidate generation failed: {:?}", error);
                             } else {
@@ -375,7 +540,13 @@ out center tags;
         tokio::time::sleep(std::time::Duration::from_secs(2)).await;
     }
 
-    let status = if errors > 0 && accepted > 0 { "partial" } else if errors > 0 { "failed" } else { "succeeded" };
+    let status = if errors > 0 && accepted > 0 {
+        "partial"
+    } else if errors > 0 {
+        "failed"
+    } else {
+        "succeeded"
+    };
     sqlx::query(
         "UPDATE data_import_jobs SET status=$2,finished_at=NOW(),discovered_count=$3,accepted_count=$4,rejected_count=$5,error_count=$6,error_summary=$7 WHERE id=$1"
     )
@@ -387,7 +558,6 @@ out center tags;
     tracing::info!(source_key=%source_key, source_url=%source_url, discovered, accepted, rejected, errors, "OSM reference import completed");
     Ok(())
 }
-
 
 pub async fn run(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
     match run_inner(state.clone(), job_id).await {

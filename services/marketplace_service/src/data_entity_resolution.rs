@@ -1,5 +1,5 @@
-use sha2::Digest;
 use serde_json::Value;
+use sha2::Digest;
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -9,7 +9,9 @@ fn text_field(value: &Value, aliases: &[&str]) -> Option<String> {
         if let Some(value) = object.get(*alias) {
             if let Some(text) = value.as_str() {
                 let text = text.trim();
-                if !text.is_empty() { return Some(text.to_string()); }
+                if !text.is_empty() {
+                    return Some(text.to_string());
+                }
             } else if value.is_number() {
                 return Some(value.to_string());
             }
@@ -47,33 +49,81 @@ fn similarity(a: Option<&str>, b: Option<&str>) -> f64 {
     match (a, b) {
         (Some(a), Some(b)) if a == b => 1.0,
         (Some(a), Some(b)) => {
-            let sa = a.split_whitespace().collect::<std::collections::HashSet<_>>();
-            let sb = b.split_whitespace().collect::<std::collections::HashSet<_>>();
+            let sa = a
+                .split_whitespace()
+                .collect::<std::collections::HashSet<_>>();
+            let sb = b
+                .split_whitespace()
+                .collect::<std::collections::HashSet<_>>();
             let union = sa.union(&sb).count() as f64;
-            if union == 0.0 { 0.0 } else { sa.intersection(&sb).count() as f64 / union }
+            if union == 0.0 {
+                0.0
+            } else {
+                sa.intersection(&sb).count() as f64 / union
+            }
         }
         _ => 0.0,
     }
 }
 
-fn geo_similarity(a_lat: Option<f64>, a_lon: Option<f64>, b_lat: Option<f64>, b_lon: Option<f64>) -> f64 {
-    let (Some(a_lat), Some(a_lon), Some(b_lat), Some(b_lon)) = (a_lat, a_lon, b_lat, b_lon) else { return 0.0; };
+fn geo_similarity(
+    a_lat: Option<f64>,
+    a_lon: Option<f64>,
+    b_lat: Option<f64>,
+    b_lon: Option<f64>,
+) -> f64 {
+    let (Some(a_lat), Some(a_lon), Some(b_lat), Some(b_lon)) = (a_lat, a_lon, b_lat, b_lon) else {
+        return 0.0;
+    };
     let lat = (a_lat - b_lat).to_radians();
     let lon = (a_lon - b_lon).to_radians();
-    let x = lat.sin().powi(2) + a_lat.to_radians().cos() * b_lat.to_radians().cos() * lon.sin().powi(2);
+    let x =
+        lat.sin().powi(2) + a_lat.to_radians().cos() * b_lat.to_radians().cos() * lon.sin().powi(2);
     let meters = 6_371_000.0 * 2.0 * x.sqrt().asin();
-    if meters <= 30.0 { 1.0 } else if meters <= 250.0 { 0.8 } else if meters <= 1000.0 { 0.4 } else { 0.0 }
+    if meters <= 30.0 {
+        1.0
+    } else if meters <= 250.0 {
+        0.8
+    } else if meters <= 1000.0 {
+        0.4
+    } else {
+        0.0
+    }
 }
 
-pub async fn index_record(db: &PgPool, source_id: Uuid, record_id: Uuid, raw: &Value) -> Result<Uuid, sqlx::Error> {
-    let name = normalize_text(text_field(raw, &["name","nama","nama_usaha","nama_umkm","business_name","merchant_name"]));
-    let address = normalize_text(text_field(raw, &["address","alamat","alamat_usaha","street","jalan"]));
-    let city = normalize_text(text_field(raw, &["city","kota","kabupaten","kabupaten_kota"]));
-    let province = normalize_text(text_field(raw, &["province","provinsi"]));
-    let postal = text_field(raw, &["postal_code","kode_pos","zip","zipcode"]);
-    let category = normalize_text(text_field(raw, &["category","kategori","jenis_usaha","sector","sektor"]));
-    let lat = coordinate(raw, &["latitude","lat","lintang"], 90.0);
-    let lon = coordinate(raw, &["longitude","lon","lng","bujur"], 180.0);
+pub async fn index_record(
+    db: &PgPool,
+    source_id: Uuid,
+    record_id: Uuid,
+    raw: &Value,
+) -> Result<Uuid, sqlx::Error> {
+    let name = normalize_text(text_field(
+        raw,
+        &[
+            "name",
+            "nama",
+            "nama_usaha",
+            "nama_umkm",
+            "business_name",
+            "merchant_name",
+        ],
+    ));
+    let address = normalize_text(text_field(
+        raw,
+        &["address", "alamat", "alamat_usaha", "street", "jalan"],
+    ));
+    let city = normalize_text(text_field(
+        raw,
+        &["city", "kota", "kabupaten", "kabupaten_kota"],
+    ));
+    let province = normalize_text(text_field(raw, &["province", "provinsi"]));
+    let postal = text_field(raw, &["postal_code", "kode_pos", "zip", "zipcode"]);
+    let category = normalize_text(text_field(
+        raw,
+        &["category", "kategori", "jenis_usaha", "sector", "sektor"],
+    ));
+    let lat = coordinate(raw, &["latitude", "lat", "lintang"], 90.0);
+    let lon = coordinate(raw, &["longitude", "lon", "lng", "bujur"], 180.0);
 
     let canonical_key = {
         let mut value = String::new();
@@ -114,7 +164,16 @@ pub async fn index_record(db: &PgPool, source_id: Uuid, record_id: Uuid, raw: &V
     .bind(lat).bind(lon).bind(category).bind(record_id).bind(raw.clone())
     .fetch_one(db).await?;
 
-    let candidates = sqlx::query_as::<_, (Uuid, Option<String>, Option<String>, Option<f64>, Option<f64>)>(
+    let candidates = sqlx::query_as::<
+        _,
+        (
+            Uuid,
+            Option<String>,
+            Option<String>,
+            Option<f64>,
+            Option<f64>,
+        ),
+    >(
         r#"SELECT id, normalized_name, normalized_address, latitude, longitude
            FROM data_import_entities
            WHERE id <> $1
@@ -124,14 +183,26 @@ pub async fn index_record(db: &PgPool, source_id: Uuid, record_id: Uuid, raw: &V
              )
            ORDER BY updated_at DESC LIMIT 20"#,
     )
-    .bind(entity_id).bind(&name).bind(&city).fetch_all(db).await?;
+    .bind(entity_id)
+    .bind(&name)
+    .bind(&city)
+    .fetch_all(db)
+    .await?;
 
-    for (candidate_id, candidate_name, candidate_address, candidate_lat, candidate_lon) in candidates {
+    for (candidate_id, candidate_name, candidate_address, candidate_lat, candidate_lon) in
+        candidates
+    {
         let ns = similarity(name.as_deref(), candidate_name.as_deref());
         let ads = similarity(address.as_deref(), candidate_address.as_deref());
         let gs = geo_similarity(lat, lon, candidate_lat, candidate_lon);
         let score = (ns * 0.50 + ads * 0.30 + gs * 0.20).min(1.0);
-        let decision = if score >= 0.90 { "same_entity" } else if score >= 0.65 { "possible_duplicate" } else { "distinct_entity" };
+        let decision = if score >= 0.90 {
+            "same_entity"
+        } else if score >= 0.65 {
+            "possible_duplicate"
+        } else {
+            "distinct_entity"
+        };
         sqlx::query(
             r#"INSERT INTO data_import_entity_matches
                (entity_id,candidate_entity_id,name_similarity,address_similarity,geo_similarity,combined_score,decision,reason)
@@ -151,7 +222,7 @@ pub async fn index_record(db: &PgPool, source_id: Uuid, record_id: Uuid, raw: &V
             FROM data_import_entity_matches
             WHERE entity_id=$1
               AND decision IN ('same_entity','possible_duplicate')
-        )"#
+        )"#,
     )
     .bind(entity_id)
     .fetch_one(db)
@@ -166,15 +237,19 @@ pub async fn index_record(db: &PgPool, source_id: Uuid, record_id: Uuid, raw: &V
         .await?;
     } else {
         let has_candidates = sqlx::query_scalar::<_, bool>(
-            "SELECT EXISTS (SELECT 1 FROM data_import_entity_matches WHERE entity_id=$1)"
+            "SELECT EXISTS (SELECT 1 FROM data_import_entity_matches WHERE entity_id=$1)",
         )
         .bind(entity_id)
         .fetch_one(db)
         .await?;
 
-        let status = if has_candidates { "distinct_entity" } else { "new" };
+        let status = if has_candidates {
+            "distinct_entity"
+        } else {
+            "new"
+        };
         sqlx::query(
-            "UPDATE data_import_entities SET resolution_status=$2, updated_at=NOW() WHERE id=$1"
+            "UPDATE data_import_entities SET resolution_status=$2, updated_at=NOW() WHERE id=$1",
         )
         .bind(entity_id)
         .bind(status)
@@ -208,7 +283,10 @@ mod tests {
     }
     #[test]
     fn normalization_collapses_whitespace_and_punctuation() {
-        assert_eq!(normalize_text(Some("  Toko-Maju   Bandung ".to_string())), Some("toko maju bandung".to_string()));
+        assert_eq!(
+            normalize_text(Some("  Toko-Maju   Bandung ".to_string())),
+            Some("toko maju bandung".to_string())
+        );
         assert_eq!(normalize_text(Some("!!!".to_string())), None);
     }
 }

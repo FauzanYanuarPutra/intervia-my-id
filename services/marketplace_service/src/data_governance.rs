@@ -165,7 +165,12 @@ fn normalize_role(value: Option<String>) -> Option<String> {
 }
 
 fn normalize_evidence_type(value: &str) -> Option<&'static str> {
-    match value.trim().to_ascii_lowercase().replace(['-', ' '], "_").as_str() {
+    match value
+        .trim()
+        .to_ascii_lowercase()
+        .replace(['-', ' '], "_")
+        .as_str()
+    {
         "nib" => Some("nib"),
         "npwp" => Some("npwp"),
         "business_license" | "izin_usaha" => Some("business_license"),
@@ -203,10 +208,7 @@ fn claimable_reference(metadata: &Value) -> bool {
         )
 }
 
-async fn load_claim(
-    db: &PgPool,
-    claim_id: Uuid,
-) -> Result<Option<ClaimRow>, sqlx::Error> {
+async fn load_claim(db: &PgPool, claim_id: Uuid) -> Result<Option<ClaimRow>, sqlx::Error> {
     sqlx::query_as::<_, ClaimRow>(
         r#"
         SELECT id, content_id, claimant_user_id, claimant_role, status, claim_message,
@@ -252,10 +254,20 @@ async fn claim_status(
     .await
     {
         Ok(Some(row)) => row,
-        Ok(None) => return (StatusCode::NOT_FOUND, Json(json!({"error":"business reference not found"}))).into_response(),
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({"error":"business reference not found"})),
+            )
+                .into_response()
+        }
         Err(error) => {
             tracing::error!("claim_status content lookup failed: {:?}", error);
-            return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"failed to load business"}))).into_response();
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error":"failed to load business"})),
+            )
+                .into_response();
         }
     };
 
@@ -296,7 +308,11 @@ async fn claim_status(
             is_reference: claimable_reference(&content.2),
             claimable,
             claimed,
-            active_owner_user_id: if actor.is_some() || !claimed { owner } else { None },
+            active_owner_user_id: if actor.is_some() || !claimed {
+                owner
+            } else {
+                None
+            },
             pending_claim_count,
         }),
     )
@@ -311,7 +327,13 @@ async fn create_claim(
 ) -> impl IntoResponse {
     let claimant_user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
         Some(id) => id,
-        None => return (StatusCode::UNAUTHORIZED, Json(json!({"error":"unauthorized"}))).into_response(),
+        None => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(json!({"error":"unauthorized"})),
+            )
+                .into_response()
+        }
     };
 
     let (content_id, owner_id, metadata) = match sqlx::query_as::<_, (Uuid, Option<Uuid>, Value)>(
@@ -322,18 +344,32 @@ async fn create_claim(
     .await
     {
         Ok(Some(row)) => row,
-        Ok(None) => return (StatusCode::NOT_FOUND, Json(json!({"error":"business reference not found"}))).into_response(),
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({"error":"business reference not found"})),
+            )
+                .into_response()
+        }
         Err(error) => {
             tracing::error!("create_claim content lookup failed: {:?}", error);
-            return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"failed to load business"}))).into_response();
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error":"failed to load business"})),
+            )
+                .into_response();
         }
     };
 
     if !claimable_reference(&metadata) {
-        return (StatusCode::CONFLICT, Json(json!({
-            "error":"business is not an unclaimed reference",
-            "code":"not_claimable"
-        }))).into_response();
+        return (
+            StatusCode::CONFLICT,
+            Json(json!({
+                "error":"business is not an unclaimed reference",
+                "code":"not_claimable"
+            })),
+        )
+            .into_response();
     }
 
     let active_owner = match sqlx::query_scalar::<_, Uuid>(
@@ -350,7 +386,11 @@ async fn create_claim(
     };
 
     if active_owner.is_some() || owner_id == Some(claimant_user_id) {
-        return (StatusCode::CONFLICT, Json(json!({"error":"business is already claimed","code":"already_claimed"}))).into_response();
+        return (
+            StatusCode::CONFLICT,
+            Json(json!({"error":"business is already claimed","code":"already_claimed"})),
+        )
+            .into_response();
     }
 
     let role = normalize_role(payload.claimant_role).unwrap_or_else(|| "owner".to_string());
@@ -360,7 +400,11 @@ async fn create_claim(
         Ok(tx) => tx,
         Err(error) => {
             tracing::error!("create_claim begin failed: {:?}", error);
-            return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"failed to create claim"}))).into_response();
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error":"failed to create claim"})),
+            )
+                .into_response();
         }
     };
 
@@ -396,15 +440,28 @@ async fn create_claim(
     for item in evidence.into_iter().take(10) {
         let Some(evidence_type) = normalize_evidence_type(&item.evidence_type) else {
             let _ = tx.rollback().await;
-            return (StatusCode::BAD_REQUEST, Json(json!({"error":"invalid evidence_type"}))).into_response();
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error":"invalid evidence_type"})),
+            )
+                .into_response();
         };
         let storage_key = clean(item.storage_key, 700);
         let external_url = clean(item.external_url, 2_000);
         if storage_key.is_none() && external_url.is_none() {
             let _ = tx.rollback().await;
-            return (StatusCode::BAD_REQUEST, Json(json!({"error":"each evidence item needs storage_key or external_url"}))).into_response();
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error":"each evidence item needs storage_key or external_url"})),
+            )
+                .into_response();
         }
-        let dedup_key = format!("{}|{}|{}", evidence_type, storage_key.as_deref().unwrap_or(""), external_url.as_deref().unwrap_or(""));
+        let dedup_key = format!(
+            "{}|{}|{}",
+            evidence_type,
+            storage_key.as_deref().unwrap_or(""),
+            external_url.as_deref().unwrap_or("")
+        );
         if !seen.insert(dedup_key) {
             continue;
         }
@@ -413,29 +470,42 @@ async fn create_claim(
             INSERT INTO business_claim_evidence (
                 claim_id, evidence_type, storage_key, external_url, description, is_sensitive
             ) VALUES ($1, $2, $3, $4, $5, $6)
-            "#
+            "#,
         )
         .bind(claim.id)
         .bind(evidence_type)
         .bind(storage_key)
         .bind(external_url)
         .bind(clean(item.description, 1_000))
-        .bind(!matches!(evidence_type, "official_domain" | "official_social_account" | "storefront_photo"))
+        .bind(!matches!(
+            evidence_type,
+            "official_domain" | "official_social_account" | "storefront_photo"
+        ))
         .execute(&mut *tx)
         .await
         {
             let _ = tx.rollback().await;
             tracing::error!("create_claim evidence insert failed: {:?}", error);
-            return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"failed to save claim evidence"}))).into_response();
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error":"failed to save claim evidence"})),
+            )
+                .into_response();
         }
     }
 
     if let Err(error) = tx.commit().await {
         tracing::error!("create_claim commit failed: {:?}", error);
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"failed to create claim"}))).into_response();
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error":"failed to create claim"})),
+        )
+            .into_response();
     }
 
-    let evidence = load_claim_evidence(&state.db, claim.id).await.unwrap_or_default();
+    let evidence = load_claim_evidence(&state.db, claim.id)
+        .await
+        .unwrap_or_default();
     (
         StatusCode::CREATED,
         Json(ClaimDetailResponse { claim, evidence }),
@@ -449,21 +519,39 @@ async fn get_claim(
     Path(claim_id): Path<Uuid>,
 ) -> impl IntoResponse {
     let actor_claims = auth_claims_from_headers(&headers, &state.jwt_secret);
-    let actor_id = actor_claims.as_ref().and_then(|c| Uuid::parse_str(&c.sub).ok());
+    let actor_id = actor_claims
+        .as_ref()
+        .and_then(|c| Uuid::parse_str(&c.sub).ok());
     let is_agent = actor_claims.as_ref().is_some_and(has_agent_access);
     let claim = match load_claim(&state.db, claim_id).await {
         Ok(Some(row)) => row,
-        Ok(None) => return (StatusCode::NOT_FOUND, Json(json!({"error":"claim not found"}))).into_response(),
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({"error":"claim not found"})),
+            )
+                .into_response()
+        }
         Err(error) => {
             tracing::error!("get_claim failed: {:?}", error);
-            return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"failed to load claim"}))).into_response();
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error":"failed to load claim"})),
+            )
+                .into_response();
         }
     };
     if !is_agent && actor_id != Some(claim.claimant_user_id) {
         return (StatusCode::FORBIDDEN, Json(json!({"error":"forbidden"}))).into_response();
     }
-    let evidence = load_claim_evidence(&state.db, claim.id).await.unwrap_or_default();
-    (StatusCode::OK, Json(ClaimDetailResponse { claim, evidence })).into_response()
+    let evidence = load_claim_evidence(&state.db, claim.id)
+        .await
+        .unwrap_or_default();
+    (
+        StatusCode::OK,
+        Json(ClaimDetailResponse { claim, evidence }),
+    )
+        .into_response()
 }
 
 async fn list_my_claims(
@@ -473,7 +561,13 @@ async fn list_my_claims(
 ) -> impl IntoResponse {
     let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
         Some(id) => id,
-        None => return (StatusCode::UNAUTHORIZED, Json(json!({"error":"unauthorized"}))).into_response(),
+        None => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(json!({"error":"unauthorized"})),
+            )
+                .into_response()
+        }
     };
     let limit = query.limit.unwrap_or(30).clamp(1, 100);
     let offset = query.offset.unwrap_or(0).max(0);
@@ -500,12 +594,22 @@ async fn list_my_claims(
     match rows {
         Ok(mut items) => {
             let has_more = items.len() as i64 > limit;
-            if has_more { items.truncate(limit as usize); }
-            (StatusCode::OK, Json(json!({"items":items,"limit":limit,"offset":offset,"has_more":has_more}))).into_response()
+            if has_more {
+                items.truncate(limit as usize);
+            }
+            (
+                StatusCode::OK,
+                Json(json!({"items":items,"limit":limit,"offset":offset,"has_more":has_more})),
+            )
+                .into_response()
         }
         Err(error) => {
             tracing::error!("list_my_claims failed: {:?}", error);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"failed to load claims"}))).into_response()
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error":"failed to load claims"})),
+            )
+                .into_response()
         }
     }
 }
@@ -517,10 +621,20 @@ async fn list_claim_queue(
 ) -> impl IntoResponse {
     let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
         Some(value) => value,
-        None => return (StatusCode::UNAUTHORIZED, Json(json!({"error":"unauthorized"}))).into_response(),
+        None => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(json!({"error":"unauthorized"})),
+            )
+                .into_response()
+        }
     };
     if !has_agent_access(&claims) {
-        return (StatusCode::FORBIDDEN, Json(json!({"error":"agent role required"}))).into_response();
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({"error":"agent role required"})),
+        )
+            .into_response();
     }
 
     let limit = query.limit.unwrap_or(50).clamp(1, 200);
@@ -546,12 +660,22 @@ async fn list_claim_queue(
     match rows {
         Ok(mut items) => {
             let has_more = items.len() as i64 > limit;
-            if has_more { items.truncate(limit as usize); }
-            (StatusCode::OK, Json(json!({"items":items,"limit":limit,"offset":offset,"has_more":has_more}))).into_response()
+            if has_more {
+                items.truncate(limit as usize);
+            }
+            (
+                StatusCode::OK,
+                Json(json!({"items":items,"limit":limit,"offset":offset,"has_more":has_more})),
+            )
+                .into_response()
         }
         Err(error) => {
             tracing::error!("list_claim_queue failed: {:?}", error);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"failed to load claim queue"}))).into_response()
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error":"failed to load claim queue"})),
+            )
+                .into_response()
         }
     }
 }
@@ -564,28 +688,52 @@ async fn review_claim(
 ) -> impl IntoResponse {
     let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
         Some(value) => value,
-        None => return (StatusCode::UNAUTHORIZED, Json(json!({"error":"unauthorized"}))).into_response(),
+        None => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(json!({"error":"unauthorized"})),
+            )
+                .into_response()
+        }
     };
     if !has_agent_access(&claims) {
-        return (StatusCode::FORBIDDEN, Json(json!({"error":"agent role required"}))).into_response();
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({"error":"agent role required"})),
+        )
+            .into_response();
     }
     let reviewer_id = match Uuid::parse_str(&claims.sub) {
         Ok(id) => id,
-        Err(_) => return (StatusCode::UNAUTHORIZED, Json(json!({"error":"invalid reviewer"}))).into_response(),
+        Err(_) => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(json!({"error":"invalid reviewer"})),
+            )
+                .into_response()
+        }
     };
 
     let decision = clean(Some(payload.decision), 30)
         .map(|v| v.to_ascii_lowercase())
         .unwrap_or_default();
     if !matches!(decision.as_str(), "approve" | "reject" | "under_review") {
-        return (StatusCode::BAD_REQUEST, Json(json!({"error":"decision must be approve, reject, or under_review"}))).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error":"decision must be approve, reject, or under_review"})),
+        )
+            .into_response();
     }
 
     let mut tx = match state.db.begin().await {
         Ok(tx) => tx,
         Err(error) => {
             tracing::error!("review_claim begin failed: {:?}", error);
-            return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"failed to review claim"}))).into_response();
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error":"failed to review claim"})),
+            )
+                .into_response();
         }
     };
 
@@ -603,15 +751,29 @@ async fn review_claim(
     .await
     {
         Ok(Some(row)) => row,
-        Ok(None) => return (StatusCode::NOT_FOUND, Json(json!({"error":"claim not found"}))).into_response(),
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({"error":"claim not found"})),
+            )
+                .into_response()
+        }
         Err(error) => {
             tracing::error!("review_claim lookup failed: {:?}", error);
-            return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"failed to load claim"}))).into_response();
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error":"failed to load claim"})),
+            )
+                .into_response();
         }
     };
 
     if !matches!(claim.status.as_str(), "pending" | "under_review") {
-        return (StatusCode::CONFLICT, Json(json!({"error":"claim is already finalized"}))).into_response();
+        return (
+            StatusCode::CONFLICT,
+            Json(json!({"error":"claim is already finalized"})),
+        )
+            .into_response();
     }
 
     if decision == "approve" {
@@ -631,7 +793,11 @@ async fn review_claim(
                 }
             };
             if active_owner.is_some() {
-                return (StatusCode::CONFLICT, Json(json!({"error":"business already has an active owner"}))).into_response();
+                return (
+                    StatusCode::CONFLICT,
+                    Json(json!({"error":"business already has an active owner"})),
+                )
+                    .into_response();
             }
 
             match sqlx::query(
@@ -652,12 +818,17 @@ async fn review_claim(
                 "claim_source":"business_claim"
             }))
             .execute(&mut *tx)
-            .await {
+            .await
+            {
                 Ok(_) => {}
                 Err(error) => {
                     let _ = tx.rollback().await;
                     tracing::error!("review_claim content ownership update failed: {:?}", error);
-                    return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"failed to transfer business access"}))).into_response();
+                    return (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(json!({"error":"failed to transfer business access"})),
+                    )
+                        .into_response();
                 }
             };
         }
@@ -701,16 +872,25 @@ async fn review_claim(
         .bind(reviewer_id)
         .bind(clean(payload.review_note, 4_000))
         .execute(&mut *tx)
-        .await {
+        .await
+        {
             Ok(_) => {}
             Err(error) => {
                 let _ = tx.rollback().await;
                 tracing::error!("review_claim approval update failed: {:?}", error);
-                return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"failed to finalize claim"}))).into_response();
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({"error":"failed to finalize claim"})),
+                )
+                    .into_response();
             }
         }
     } else {
-        let next_status = if decision == "under_review" { "under_review" } else { "rejected" };
+        let next_status = if decision == "under_review" {
+            "under_review"
+        } else {
+            "rejected"
+        };
         match sqlx::query(
             r#"
             UPDATE business_claims
@@ -727,36 +907,54 @@ async fn review_claim(
         .bind(reviewer_id)
         .bind(clean(payload.review_note, 4_000))
         .execute(&mut *tx)
-        .await {
+        .await
+        {
             Ok(_) => {}
             Err(error) => {
                 let _ = tx.rollback().await;
                 tracing::error!("review_claim update failed: {:?}", error);
-                return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"failed to update claim"}))).into_response();
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({"error":"failed to update claim"})),
+                )
+                    .into_response();
             }
         }
     }
 
     if let Err(error) = tx.commit().await {
         tracing::error!("review_claim commit failed: {:?}", error);
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"failed to finalize claim"}))).into_response();
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error":"failed to finalize claim"})),
+        )
+            .into_response();
     }
 
     let updated = match load_claim(&state.db, claim.id).await {
         Ok(Some(row)) => row,
-        _ => return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"claim finalized but could not be reloaded"}))).into_response(),
+        _ => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error":"claim finalized but could not be reloaded"})),
+            )
+                .into_response()
+        }
     };
-    let evidence = load_claim_evidence(&state.db, claim.id).await.unwrap_or_default();
+    let evidence = load_claim_evidence(&state.db, claim.id)
+        .await
+        .unwrap_or_default();
     (
         StatusCode::OK,
-        Json(ClaimDetailResponse { claim: updated, evidence }),
+        Json(ClaimDetailResponse {
+            claim: updated,
+            evidence,
+        }),
     )
         .into_response()
 }
 
-async fn list_sources(
-    State(state): State<Arc<AppState>>,
-) -> impl IntoResponse {
+async fn list_sources(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     match sqlx::query_as::<_, DataSourceRow>(
         r#"
         SELECT id, source_key, provider_name, source_kind, source_url, api_url, terms_url,
@@ -786,10 +984,20 @@ async fn list_import_jobs(
 ) -> impl IntoResponse {
     let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
         Some(value) => value,
-        None => return (StatusCode::UNAUTHORIZED, Json(json!({"error":"unauthorized"}))).into_response(),
+        None => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(json!({"error":"unauthorized"})),
+            )
+                .into_response()
+        }
     };
     if !has_agent_access(&claims) {
-        return (StatusCode::FORBIDDEN, Json(json!({"error":"agent role required"}))).into_response();
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({"error":"agent role required"})),
+        )
+            .into_response();
     }
     let limit = query.limit.unwrap_or(50).clamp(1, 200);
     let offset = query.offset.unwrap_or(0).max(0);
@@ -808,10 +1016,18 @@ async fn list_import_jobs(
     .fetch_all(&state.db)
     .await
     {
-        Ok(items) => (StatusCode::OK, Json(json!({"items":items,"limit":limit,"offset":offset}))).into_response(),
+        Ok(items) => (
+            StatusCode::OK,
+            Json(json!({"items":items,"limit":limit,"offset":offset})),
+        )
+            .into_response(),
         Err(error) => {
             tracing::error!("list_import_jobs failed: {:?}", error);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"failed to load import jobs"}))).into_response()
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error":"failed to load import jobs"})),
+            )
+                .into_response()
         }
     }
 }
@@ -823,10 +1039,20 @@ async fn inspect_source(
 ) -> impl IntoResponse {
     let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
         Some(value) => value,
-        None => return (StatusCode::UNAUTHORIZED, Json(json!({"error":"unauthorized"}))).into_response(),
+        None => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(json!({"error":"unauthorized"})),
+            )
+                .into_response()
+        }
     };
     if !has_agent_access(&claims) {
-        return (StatusCode::FORBIDDEN, Json(json!({"error":"agent role required"}))).into_response();
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({"error":"agent role required"})),
+        )
+            .into_response();
     }
 
     let source = match sqlx::query_as::<_, DataSourceRow>(
@@ -838,59 +1064,105 @@ async fn inspect_source(
     )
     .bind(source_key.trim())
     .fetch_optional(&state.db)
-    .await {
+    .await
+    {
         Ok(Some(row)) => row,
-        Ok(None) => return (StatusCode::NOT_FOUND, Json(json!({"error":"source not found"}))).into_response(),
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({"error":"source not found"})),
+            )
+                .into_response()
+        }
         Err(error) => {
             tracing::error!("inspect_source lookup failed: {:?}", error);
-            return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"failed to load source"}))).into_response();
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error":"failed to load source"})),
+            )
+                .into_response();
         }
     };
 
     let Some(api_url) = source.api_url.clone() else {
-        return (StatusCode::CONFLICT, Json(json!({
-            "error":"source has no machine-readable catalog endpoint",
-            "source_key":source.source_key
-        }))).into_response();
+        return (
+            StatusCode::CONFLICT,
+            Json(json!({
+                "error":"source has no machine-readable catalog endpoint",
+                "source_key":source.source_key
+            })),
+        )
+            .into_response();
     };
 
     let response = match state.http_client.get(&api_url).send().await {
         Ok(response) => response,
         Err(error) => {
             tracing::error!("inspect_source request failed: {:?}", error);
-            return (StatusCode::BAD_GATEWAY, Json(json!({"error":"source catalog request failed"}))).into_response();
+            return (
+                StatusCode::BAD_GATEWAY,
+                Json(json!({"error":"source catalog request failed"})),
+            )
+                .into_response();
         }
     };
 
     let status = response.status();
     if !status.is_success() {
-        return (StatusCode::BAD_GATEWAY, Json(json!({
-            "error":"source catalog returned non-success status",
-            "upstream_status":status.as_u16()
-        }))).into_response();
+        return (
+            StatusCode::BAD_GATEWAY,
+            Json(json!({
+                "error":"source catalog returned non-success status",
+                "upstream_status":status.as_u16()
+            })),
+        )
+            .into_response();
     }
 
     let body = match response.json::<Value>().await {
         Ok(value) => value,
         Err(error) => {
             tracing::error!("inspect_source JSON decode failed: {:?}", error);
-            return (StatusCode::BAD_GATEWAY, Json(json!({"error":"source catalog returned invalid JSON"}))).into_response();
+            return (
+                StatusCode::BAD_GATEWAY,
+                Json(json!({"error":"source catalog returned invalid JSON"})),
+            )
+                .into_response();
         }
     };
 
     let package = body.get("result").cloned().unwrap_or_else(|| body.clone());
-    let resources = package.get("resources").and_then(Value::as_array).cloned().unwrap_or_default();
+    let resources = package
+        .get("resources")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
     let mut resource_report = Vec::with_capacity(resources.len());
     let mut redistributable_candidates = 0usize;
 
     for resource in resources.iter().take(500) {
-        let license = resource.get("license").or_else(|| resource.get("license_title"));
+        let license = resource
+            .get("license")
+            .or_else(|| resource.get("license_title"));
         let license_text = license.and_then(Value::as_str).unwrap_or("").trim();
-        let format = resource.get("format").and_then(Value::as_str).unwrap_or("").trim();
-        let datastore_active = resource.get("datastore_active").and_then(Value::as_bool).unwrap_or(false);
-        let has_url = resource.get("url").and_then(Value::as_str).is_some_and(|value| !value.trim().is_empty());
+        let format = resource
+            .get("format")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .trim();
+        let datastore_active = resource
+            .get("datastore_active")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        let has_url = resource
+            .get("url")
+            .and_then(Value::as_str)
+            .is_some_and(|value| !value.trim().is_empty());
         let license_known = !license_text.is_empty()
-            || source.license_name.as_deref().is_some_and(|value| !value.trim().is_empty());
+            || source
+                .license_name
+                .as_deref()
+                .is_some_and(|value| !value.trim().is_empty());
         if license_known && has_url {
             redistributable_candidates += 1;
         }
@@ -907,7 +1179,8 @@ async fn inspect_source(
         }));
     }
 
-    let dataset_license = package.get("license_title")
+    let dataset_license = package
+        .get("license_title")
         .or_else(|| package.get("license_id"))
         .or_else(|| package.get("license_url"));
 
@@ -939,8 +1212,9 @@ async fn inspect_source(
             "can_enable_persistent_import":can_enable_persistent_import,
             "resources":resource_report,
             "note":"This is a metadata inspection only. It does not copy dataset rows into Lajukan."
-        }))
-    ).into_response()
+        })),
+    )
+        .into_response()
 }
 
 #[derive(Debug, Deserialize)]
@@ -958,16 +1232,30 @@ async fn approve_persistent_import(
 ) -> impl IntoResponse {
     let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
         Some(value) => value,
-        None => return (StatusCode::UNAUTHORIZED, Json(json!({"error":"unauthorized"}))).into_response(),
+        None => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(json!({"error":"unauthorized"})),
+            )
+                .into_response()
+        }
     };
     if !has_agent_access(&claims) {
-        return (StatusCode::FORBIDDEN, Json(json!({"error":"agent role required"}))).into_response();
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({"error":"agent role required"})),
+        )
+            .into_response();
     }
 
     let license_name = clean(Some(payload.license_name), 300);
     let note = clean(Some(payload.confirmation_note), 2_000);
     if license_name.is_none() || note.is_none() {
-        return (StatusCode::BAD_REQUEST, Json(json!({"error":"license_name and confirmation_note are required"}))).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error":"license_name and confirmation_note are required"})),
+        )
+            .into_response();
     }
 
     let result = sqlx::query(
@@ -988,11 +1276,23 @@ async fn approve_persistent_import(
     .await;
 
     match result {
-        Ok(result) if result.rows_affected() == 1 => (StatusCode::OK, Json(json!({"source_key":source_key,"reuse_mode":"persistent_import"}))).into_response(),
-        Ok(_) => (StatusCode::NOT_FOUND, Json(json!({"error":"enabled source not found"}))).into_response(),
+        Ok(result) if result.rows_affected() == 1 => (
+            StatusCode::OK,
+            Json(json!({"source_key":source_key,"reuse_mode":"persistent_import"})),
+        )
+            .into_response(),
+        Ok(_) => (
+            StatusCode::NOT_FOUND,
+            Json(json!({"error":"enabled source not found"})),
+        )
+            .into_response(),
         Err(error) => {
             tracing::error!("approve_persistent_import failed: {:?}", error);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"failed to approve source"}))).into_response()
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error":"failed to approve source"})),
+            )
+                .into_response()
         }
     }
 }
@@ -1005,10 +1305,20 @@ async fn create_import_job(
 ) -> impl IntoResponse {
     let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
         Some(value) => value,
-        None => return (StatusCode::UNAUTHORIZED, Json(json!({"error":"unauthorized"}))).into_response(),
+        None => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(json!({"error":"unauthorized"})),
+            )
+                .into_response()
+        }
     };
     if !has_agent_access(&claims) {
-        return (StatusCode::FORBIDDEN, Json(json!({"error":"agent role required"}))).into_response();
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({"error":"agent role required"})),
+        )
+            .into_response();
     }
     let requester_id = Uuid::parse_str(&claims.sub).ok();
     let source = match sqlx::query_as::<_, DataSourceRow>(
@@ -1025,33 +1335,56 @@ async fn create_import_job(
     .await
     {
         Ok(Some(row)) => row,
-        Ok(None) => return (StatusCode::NOT_FOUND, Json(json!({"error":"source not found"}))).into_response(),
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({"error":"source not found"})),
+            )
+                .into_response()
+        }
         Err(error) => {
             tracing::error!("create_import_job source lookup failed: {:?}", error);
-            return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"failed to load source"}))).into_response();
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error":"failed to load source"})),
+            )
+                .into_response();
         }
     };
 
-    let requested_mode = payload.get("mode").and_then(Value::as_str).unwrap_or("dry_run");
+    let requested_mode = payload
+        .get("mode")
+        .and_then(Value::as_str)
+        .unwrap_or("dry_run");
     let mode = match requested_mode {
         "dry_run" => "dry_run",
         "import" if source.storage_allowed && source.reuse_mode == "persistent_import" => "import",
-        "refresh" if source.storage_allowed && source.reuse_mode == "persistent_import" => "refresh",
+        "refresh" if source.storage_allowed && source.reuse_mode == "persistent_import" => {
+            "refresh"
+        }
         "archive" => "archive",
         _ => {
-            return (StatusCode::CONFLICT, Json(json!({
-                "error":"source policy does not permit this import mode",
-                "reuse_mode":source.reuse_mode,
-                "storage_allowed":source.storage_allowed
-            }))).into_response();
+            return (
+                StatusCode::CONFLICT,
+                Json(json!({
+                    "error":"source policy does not permit this import mode",
+                    "reuse_mode":source.reuse_mode,
+                    "storage_allowed":source.storage_allowed
+                })),
+            )
+                .into_response();
         }
     };
 
     if source.source_kind == "commercial_api" || source.reuse_mode == "live_only" {
-        return (StatusCode::CONFLICT, Json(json!({
-            "error":"this source is live-only and cannot be bulk imported",
-            "source_key":source.source_key
-        }))).into_response();
+        return (
+            StatusCode::CONFLICT,
+            Json(json!({
+                "error":"this source is live-only and cannot be bulk imported",
+                "source_key":source.source_key
+            })),
+        )
+            .into_response();
     }
 
     let job_key = format!("{}:{}:{}", source.source_key, mode, Uuid::new_v4().simple());
@@ -1082,15 +1415,17 @@ async fn create_import_job(
                 "job": job,
                 "note": "Job queued and staged only. No public business is created automatically."
             }))).into_response()
-        },
+        }
         Err(error) => {
             tracing::error!("create_import_job insert failed: {:?}", error);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"failed to create import job"}))).into_response()
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error":"failed to create import job"})),
+            )
+                .into_response()
         }
     }
 }
-
-
 
 pub async fn recover_stale_import_jobs(db: &PgPool) -> Result<u64, sqlx::Error> {
     let result = sqlx::query(
@@ -1121,7 +1456,7 @@ pub async fn bootstrap_persistent_imports(state: Arc<AppState>) -> Result<u64, s
           AND api_url IS NOT NULL
           AND source_kind IN ('government_open_data', 'osm_overpass')
         ORDER BY source_key
-        "#
+        "#,
     )
     .fetch_all(db)
     .await?;
@@ -1136,7 +1471,7 @@ pub async fn bootstrap_persistent_imports(state: Arc<AppState>) -> Result<u64, s
               AND status IN ('queued','running')
             ORDER BY created_at ASC
             LIMIT 1
-            "#
+            "#,
         )
         .bind(source_id)
         .fetch_optional(db)
@@ -1159,7 +1494,7 @@ pub async fn bootstrap_persistent_imports(state: Arc<AppState>) -> Result<u64, s
                       AND status IN ('succeeded','partial')
                       AND finished_at > NOW() - ($2::text || ' hours')::interval
                 )
-                "#
+                "#,
             )
             .bind(source_id)
             .bind(refresh_hours)
@@ -1169,17 +1504,23 @@ pub async fn bootstrap_persistent_imports(state: Arc<AppState>) -> Result<u64, s
             if recent_success {
                 None
             } else {
-                Some(sqlx::query_scalar::<_, Uuid>(
-                    r#"
+                Some(
+                    sqlx::query_scalar::<_, Uuid>(
+                        r#"
                     INSERT INTO data_import_jobs (source_id, job_key, mode, status)
                     VALUES ($1, $2, 'import', 'queued')
                     RETURNING id
-                    "#
+                    "#,
+                    )
+                    .bind(source_id)
+                    .bind(format!(
+                        "bootstrap:{}:{}",
+                        source_key,
+                        Uuid::new_v4().simple()
+                    ))
+                    .fetch_one(db)
+                    .await?,
                 )
-                .bind(source_id)
-                .bind(format!("bootstrap:{}:{}", source_key, Uuid::new_v4().simple()))
-                .fetch_one(db)
-                .await?)
             }
         };
 
@@ -1222,7 +1563,7 @@ pub async fn bootstrap_reference_publication(state: Arc<AppState>) -> Result<u64
           AND s.enabled = TRUE
         ORDER BY c.created_at ASC
         LIMIT 500
-        "#
+        "#,
     )
     .fetch_all(&state.db)
     .await?;
@@ -1232,7 +1573,7 @@ pub async fn bootstrap_reference_publication(state: Arc<AppState>) -> Result<u64
         sqlx::query(
             r#"UPDATE reference_promotion_candidates
                SET promotion_status='approved', updated_at=NOW()
-               WHERE id=$1 AND promotion_status='pending_review'"#
+               WHERE id=$1 AND promotion_status='pending_review'"#,
         )
         .bind(candidate_id)
         .execute(&state.db)
@@ -1257,17 +1598,24 @@ pub async fn bootstrap_governed_data(state: Arc<AppState>) {
         tracing::warn!("Governed data source registry sync failed: {:?}", error);
     }
     match recover_stale_import_jobs(&state.db).await {
-        Ok(recovered) if recovered > 0 => tracing::warn!(recovered, "recovered stale data import jobs"),
+        Ok(recovered) if recovered > 0 => {
+            tracing::warn!(recovered, "recovered stale data import jobs")
+        }
         Ok(_) => {}
         Err(error) => tracing::error!("failed to recover stale data import jobs: {:?}", error),
     }
     match bootstrap_persistent_imports(state.clone()).await {
-        Ok(count) if count > 0 => tracing::info!("queued {} validated persistent data bootstrap imports", count),
+        Ok(count) if count > 0 => tracing::info!(
+            "queued {} validated persistent data bootstrap imports",
+            count
+        ),
         Ok(_) => tracing::debug!("no persistent data bootstrap imports needed"),
         Err(error) => tracing::warn!("persistent data bootstrap failed: {:?}", error),
     }
     match bootstrap_reference_publication(state).await {
-        Ok(count) if count > 0 => tracing::info!("published {} eligible unowned reference records", count),
+        Ok(count) if count > 0 => {
+            tracing::info!("published {} eligible unowned reference records", count)
+        }
         Ok(_) => tracing::debug!("no eligible reference publication candidates found"),
         Err(error) => tracing::warn!("reference publication reconciliation failed: {:?}", error),
     }
@@ -1275,22 +1623,35 @@ pub async fn bootstrap_governed_data(state: Arc<AppState>) {
 
 pub async fn sync_static_source_registry(db: &PgPool) -> Result<(), sqlx::Error> {
     #[derive(Deserialize)]
-    struct Registry { sources: Vec<SourceSeed> }
+    struct Registry {
+        sources: Vec<SourceSeed>,
+    }
     #[derive(Deserialize)]
     struct SourceSeed {
-        id: String, provider: String, kind: String, url: String,
-        #[serde(default)] dataset_id: Option<String>,
-        #[serde(default)] endpoint: Option<String>,
-        #[serde(default)] reuse_mode: Option<String>,
-        #[serde(default)] license: Option<String>,
-        #[serde(default)] attribution: Option<String>,
-        #[serde(default)] notes: Option<String>,
-        #[serde(default)] auto_publish_reference: bool,
+        id: String,
+        provider: String,
+        kind: String,
+        url: String,
+        #[serde(default)]
+        dataset_id: Option<String>,
+        #[serde(default)]
+        endpoint: Option<String>,
+        #[serde(default)]
+        reuse_mode: Option<String>,
+        #[serde(default)]
+        license: Option<String>,
+        #[serde(default)]
+        attribution: Option<String>,
+        #[serde(default)]
+        notes: Option<String>,
+        #[serde(default)]
+        auto_publish_reference: bool,
     }
 
-    let registry: Registry = serde_json::from_str(
-        include_str!("../../../config/lajukan_data_source_registry.json")
-    ).map_err(|error| sqlx::Error::Protocol(format!("invalid static source registry: {}", error)))?;
+    let registry: Registry = serde_json::from_str(include_str!(
+        "../../../config/lajukan_data_source_registry.json"
+    ))
+    .map_err(|error| sqlx::Error::Protocol(format!("invalid static source registry: {}", error)))?;
 
     for source in registry.sources {
         let requested_mode = source.reuse_mode.as_deref().unwrap_or("review_required");
@@ -1303,7 +1664,14 @@ pub async fn sync_static_source_registry(db: &PgPool) -> Result<(), sqlx::Error>
         };
         let storage_allowed = reuse_mode == "persistent_import";
         let enabled = reuse_mode != "live_only";
-        let api_url = source.endpoint.clone().or_else(|| source.dataset_id.as_ref().map(|dataset_id| format!("https://data.go.id/api/action/package_show?id={}", dataset_id)));
+        let api_url = source.endpoint.clone().or_else(|| {
+            source.dataset_id.as_ref().map(|dataset_id| {
+                format!(
+                    "https://data.go.id/api/action/package_show?id={}",
+                    dataset_id
+                )
+            })
+        });
         let notes = match (source.dataset_id, source.notes) {
             (Some(dataset_id), Some(notes)) => Some(format!("{} dataset_id={}", notes, dataset_id)),
             (Some(dataset_id), None) => Some(format!("dataset_id={}", dataset_id)),
@@ -1333,10 +1701,22 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/v1/data/sources", get(list_sources))
         .route("/v1/data/import-jobs", get(list_import_jobs))
         .route("/v1/data/import-jobs/{source_key}", post(create_import_job))
-        .route("/v1/data/sources/{source_key}/inspect", post(inspect_source))
-        .route("/v1/data/sources/{source_key}/approve-persistent", post(approve_persistent_import))
-        .route("/v1/businesses/{content_ref}/claim", get(claim_status).post(create_claim))
-        .route("/v1/businesses/{content_ref}/claims", get(claim_status).post(create_claim))
+        .route(
+            "/v1/data/sources/{source_key}/inspect",
+            post(inspect_source),
+        )
+        .route(
+            "/v1/data/sources/{source_key}/approve-persistent",
+            post(approve_persistent_import),
+        )
+        .route(
+            "/v1/businesses/{content_ref}/claim",
+            get(claim_status).post(create_claim),
+        )
+        .route(
+            "/v1/businesses/{content_ref}/claims",
+            get(claim_status).post(create_claim),
+        )
         .route("/v1/business-claims", get(list_my_claims))
         .route("/v1/business-claims/queue", get(list_claim_queue))
         .route("/v1/business-claims/{claim_id}", get(get_claim))

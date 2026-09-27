@@ -780,15 +780,9 @@ pub async fn moderate_content(
         if action == "approve" || action == "restore" {
             root.remove("owner_revision_state");
         } else if action == "needs_revision" {
-            root.insert(
-                "owner_revision_state".to_string(),
-                json!("needs_revision"),
-            );
+            root.insert("owner_revision_state".to_string(), json!("needs_revision"));
         } else if action == "reject" || action == "restrict" || action == "remove" {
-            root.insert(
-                "owner_revision_state".to_string(),
-                json!("rejected"),
-            );
+            root.insert("owner_revision_state".to_string(), json!("rejected"));
         }
     }
 
