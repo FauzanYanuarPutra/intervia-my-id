@@ -338,6 +338,7 @@ pub(crate) async fn promote_candidate(
             "claimable": true,
             "source_dataset": source_key,
             "source_provider": provider_name,
+            "source_title": provider_name,
             "source_url": source_record_url.as_deref().unwrap_or(&source_url),
             "source_license": effective_license,
             "source_license_url": source_license_url,
