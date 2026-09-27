@@ -328,23 +328,17 @@ async fn promote_candidate(
                     r#"
                     SELECT id FROM content_items
                     WHERE content_status <> 'deleted'
-                      AND (
-                        slug = $1
-                        OR (
-                          metadata->>'reference_publication_status' = 'published'
-                          AND metadata->>'source_dataset' = $2
-                          AND metadata->>'external_id' = $3
-                        )
-                      )
-                    ORDER BY CASE WHEN metadata->>'external_id' = $3 THEN 0 ELSE 1 END
+                      AND metadata->>'reference_publication_status' = 'published'
+                      AND metadata->>'source_dataset' = $1
+                      AND metadata->>'external_id' = $2
                     LIMIT 1
                     "#
                 )
-                .bind(&slug)
                 .bind(&source_key)
                 .bind(&source_record_id)
-                .fetch_one(&mut *tx)
+                .fetch_optional(&mut *tx)
                 .await?
+                .ok_or_else(|| anyhow!("reference slug collision requires a new slug"))?
             }
         }
     };
