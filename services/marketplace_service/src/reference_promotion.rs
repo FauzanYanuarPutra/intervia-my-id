@@ -31,17 +31,21 @@ pub async fn generate_for_entity(
 ) -> Result<Value, sqlx::Error> {
     let entity = sqlx::query_as::<_, (
         Uuid, Uuid, Option<String>, Option<String>, Option<String>, Option<String>,
-        Option<f64>, Option<f64>, String, Value
+        Option<f64>, Option<f64>, String, Value, bool, String, bool, bool
     )>(
-        r#"SELECT id, source_id, normalized_name, normalized_address, city, province,
-                   latitude, longitude, resolution_status, metadata
-            FROM data_import_entities WHERE id=$1 LIMIT 1"#
+        r#"SELECT e.id, e.source_id, e.normalized_name, e.normalized_address, e.city, e.province,
+                   e.latitude, e.longitude, e.resolution_status, e.metadata,
+                   s.auto_publish_reference, s.reuse_mode, s.storage_allowed, s.enabled
+            FROM data_import_entities e
+            JOIN data_source_registry s ON s.id=e.source_id
+            WHERE e.id=$1 LIMIT 1"#
     )
     .bind(entity_id)
     .fetch_optional(db)
     .await?;
 
-    let Some((id, source_id, name, address, city, province, lat, lon, resolution_status, metadata)) = entity else {
+    let Some((id, source_id, name, address, city, province, lat, lon, resolution_status, metadata,
+              auto_publish_reference, reuse_mode, storage_allowed, source_enabled)) = entity else {
         return Ok(json!({"found":false}));
     };
 
@@ -49,8 +53,18 @@ pub async fn generate_for_entity(
         name.as_deref(), address.as_deref(), city.as_deref(), province.as_deref(),
         lat, lon, &resolution_status
     );
+    let auto_publish_ready = auto_publish_reference
+        && reuse_mode == "persistent_import"
+        && storage_allowed
+        && source_enabled
+        && score >= 0.70
+        && reasons.is_empty()
+        && !matches!(resolution_status.as_str(), "possible_duplicate" | "needs_review");
+
     let status = if reasons.iter().any(|v| *v == "entity_resolution_requires_review") {
         "blocked"
+    } else if auto_publish_ready {
+        "approved"
     } else {
         "pending_review"
     };
@@ -82,6 +96,20 @@ pub async fn generate_for_entity(
     .bind(provenance)
     .execute(db)
     .await?;
+
+    if auto_publish_ready {
+        let candidate_id = sqlx::query_scalar::<_, Uuid>(
+            "SELECT id FROM reference_promotion_candidates WHERE entity_id=$1 LIMIT 1"
+        )
+        .bind(id)
+        .fetch_optional(db)
+        .await?
+        .ok_or_else(|| sqlx::Error::RowNotFound)?;
+
+        if let Err(error) = promote_candidate(db, candidate_id).await {
+            tracing::warn!(candidate_id=%candidate_id, "automatic reference promotion skipped: {:?}", error);
+        }
+    }
 
     Ok(json!({
         "found": true,
