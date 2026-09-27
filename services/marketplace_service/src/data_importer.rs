@@ -340,32 +340,54 @@ out center tags;
             .replace("{north}", &north.to_string())
             .replace("{east}", &east.to_string());
 
-        let response = state
-            .http_client
-            .post(endpoint)
-            .timeout(std::time::Duration::from_secs(150))
-            .header(
-                reqwest::header::USER_AGENT,
-                "LajukanOpenDataImporter/1.0 (+https://www.lajukan.com)",
-            )
-            .form(&[("data", body)])
-            .send()
-            .await;
+        let mut payload_result: Option<Value> = None;
+        let endpoints = if endpoint == "https://overpass-api.de/api/interpreter" {
+            vec![
+                endpoint.to_string(),
+                "https://overpass.kumi.systems/api/interpreter".to_string(),
+            ]
+        } else {
+            vec![endpoint.to_string()]
+        };
 
-        let payload: Value = match response {
-            Ok(response) => match response.error_for_status() {
-                Ok(response) => response.json().await?,
+        for endpoint_candidate in endpoints {
+            let response = state
+                .http_client
+                .post(&endpoint_candidate)
+                .timeout(std::time::Duration::from_secs(150))
+                .header(
+                    reqwest::header::USER_AGENT,
+                    "LajukanOpenDataImporter/1.0 (+https://www.lajukan.com)",
+                )
+                .form(&[("data", body.clone())])
+                .send()
+                .await;
+
+            match response {
+                Ok(response) => match response.error_for_status() {
+                    Ok(response) => match response.json::<Value>().await {
+                        Ok(payload) => {
+                            payload_result = Some(payload);
+                            break;
+                        }
+                        Err(error) => {
+                            tracing::warn!(city=%city, endpoint=%endpoint_candidate, "OSM Overpass response parse failed: {:?}", error);
+                        }
+                    },
+                    Err(error) => {
+                        tracing::warn!(city=%city, endpoint=%endpoint_candidate, "OSM Overpass request failed: {:?}", error);
+                    }
+                },
                 Err(error) => {
-                    errors += 1;
-                    tracing::warn!(city=%city, "OSM Overpass request failed: {:?}", error);
-                    continue;
+                    tracing::warn!(city=%city, endpoint=%endpoint_candidate, "OSM Overpass request failed: {:?}", error);
                 }
-            },
-            Err(error) => {
-                errors += 1;
-                tracing::warn!(city=%city, "OSM Overpass request failed: {:?}", error);
-                continue;
             }
+        }
+
+        let Some(payload) = payload_result else {
+            errors += 1;
+            tracing::warn!(city=%city, "all configured OSM Overpass endpoints failed");
+            continue;
         };
 
         for element in payload
