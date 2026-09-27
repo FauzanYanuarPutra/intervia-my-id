@@ -53,6 +53,9 @@ case "$phase" in
   start)
     "${COMPOSE[@]}" up --detach --wait --wait-timeout 420
     ;;
+  data)
+    ./scripts/ci/verify_real_data_bootstrap.sh
+    ;;
   probe)
     # Compose healthchecks cover the stateful/core backend services. These probes
     # additionally prove that the host-published application endpoints are usable.
@@ -73,6 +76,7 @@ case "$phase" in
     "$0" build
     "$0" start
     "$0" probe
+    "$0" data
     ;;
   *)
     echo "usage: $0 {validate|build|start|probe|cleanup|all}" >&2
