@@ -47,7 +47,7 @@ describe('portal navigation', () => {
     expect(mobilePrimaryNavigation(ownerPermissions).map(item => item.id)).toEqual([
       'home',
       'orders',
-      'inventory',
+      'products',
       'finance',
     ]);
     expect(portalMenuNavigation(ownerPermissions).map(item => item.id)).toContain('products');
