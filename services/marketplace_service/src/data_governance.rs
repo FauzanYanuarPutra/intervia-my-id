@@ -580,13 +580,19 @@ async fn review_claim(
     if decision == "approve" {
         let grant_role = normalize_grant_role(payload.grant_role);
         if grant_role == "owner" {
-            let active_owner = sqlx::query_scalar::<_, Uuid>(
+            let active_owner = match sqlx::query_scalar::<_, Uuid>(
                 "SELECT user_id FROM business_ownership_grants WHERE content_id = $1 AND role = 'owner' AND revoked_at IS NULL FOR UPDATE",
             )
             .bind(claim.content_id)
             .fetch_optional(&mut *tx)
-            .await
-            .unwrap_or(None);
+            .await {
+                Ok(value) => value,
+                Err(error) => {
+                    let _ = tx.rollback().await;
+                    tracing::error!("review_claim owner lookup failed: {:?}", error);
+                    return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"failed to verify current owner"}))).into_response();
+                }
+            };
             if active_owner.is_some() {
                 return (StatusCode::CONFLICT, Json(json!({"error":"business already has an active owner"}))).into_response();
             }
@@ -609,12 +615,14 @@ async fn review_claim(
                 "claim_source":"business_claim"
             }))
             .execute(&mut *tx)
-            .await
-            .map_err(|error| {
-                tracing::error!("review_claim content ownership update failed: {:?}", error);
-                error
-            })
-            .ok();
+            .await {
+                Ok(_) => {}
+                Err(error) => {
+                    let _ = tx.rollback().await;
+                    tracing::error!("review_claim content ownership update failed: {:?}", error);
+                    return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"failed to transfer business access"}))).into_response();
+                }
+            };
         }
 
         sqlx::query(
@@ -631,12 +639,14 @@ async fn review_claim(
         .bind(grant_role)
         .bind(reviewer_id)
         .execute(&mut *tx)
-        .await
-        .map_err(|error| {
-            tracing::error!("review_claim grant insert failed: {:?}", error);
-            error
-        })
-        .ok();
+        .await {
+            Ok(_) => {}
+            Err(error) => {
+                let _ = tx.rollback().await;
+                tracing::error!("review_claim grant insert failed: {:?}", error);
+                return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"failed to grant business access"}))).into_response();
+            }
+        }
 
         sqlx::query(
             r#"
@@ -654,12 +664,14 @@ async fn review_claim(
         .bind(reviewer_id)
         .bind(clean(payload.review_note, 4_000))
         .execute(&mut *tx)
-        .await
-        .map_err(|error| {
-            tracing::error!("review_claim approval update failed: {:?}", error);
-            error
-        })
-        .ok();
+        .await {
+            Ok(_) => {}
+            Err(error) => {
+                let _ = tx.rollback().await;
+                tracing::error!("review_claim approval update failed: {:?}", error);
+                return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"failed to finalize claim"}))).into_response();
+            }
+        }
     } else {
         let next_status = if decision == "under_review" { "under_review" } else { "rejected" };
         sqlx::query(
@@ -678,12 +690,14 @@ async fn review_claim(
         .bind(reviewer_id)
         .bind(clean(payload.review_note, 4_000))
         .execute(&mut *tx)
-        .await
-        .map_err(|error| {
-            tracing::error!("review_claim update failed: {:?}", error);
-            error
-        })
-        .ok();
+        .await {
+            Ok(_) => {}
+            Err(error) => {
+                let _ = tx.rollback().await;
+                tracing::error!("review_claim update failed: {:?}", error);
+                return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"failed to update claim"}))).into_response();
+            }
+        }
     }
 
     if let Err(error) = tx.commit().await {
