@@ -688,15 +688,14 @@ out center tags;
             .replace("{lng}", &lng.to_string());
 
         let mut payload_result: Option<Value> = None;
-        let endpoints = if endpoint == "https://overpass-api.de/api/interpreter" {
-            vec![
-                endpoint.to_string(),
-                "https://overpass.private.coffee/api/interpreter".to_string(),
-                "https://maps.mail.ru/osm/tools/overpass/api/interpreter".to_string(),
-            ]
-        } else {
-            vec![endpoint.to_string()]
-        };
+        let mut endpoints = vec![
+            endpoint.to_string(),
+            "https://overpass-api.de/api/interpreter".to_string(),
+            "https://overpass.kumi.systems/api/interpreter".to_string(),
+            "https://overpass.private.coffee/api/interpreter".to_string(),
+            "https://maps.mail.ru/osm/tools/overpass/api/interpreter".to_string(),
+        ];
+        endpoints.dedup();
 
         for endpoint_candidate in endpoints {
             let response = state
