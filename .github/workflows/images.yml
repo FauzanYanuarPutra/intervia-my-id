@@ -13,6 +13,9 @@ on:
       - "docker-compose*.yml"
       - "infrastructure/caddy/**"
       - "scripts/ops/**"
+      - "scripts/import_real_marketplace_open_data.py"
+      - "scripts/run_real_data_bootstrap.sh"
+      - "config/real_marketplace_open_data.sources.json"
   pull_request:
     branches: [main]
     paths: *image_paths
