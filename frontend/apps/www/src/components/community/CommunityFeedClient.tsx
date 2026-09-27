@@ -2956,6 +2956,481 @@ export function CommunityPostCard({
           </div>
         </div>
       </div>
+        {/* ================= POST CONTEXT ================= */}
+
+        {(item.isPinned || item.isSolved || poll || isQuestionPost) ? (
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-bold text-[color:var(--app-text-soft)]">
+            {item.isPinned ? (
+              <span className="inline-flex items-center gap-1">
+                <Pin className="h-3.5 w-3.5" />
+                {isId ? 'Disematkan' : 'Pinned'}
+              </span>
+            ) : null}
+            {item.isSolved ? (
+              <span className="inline-flex items-center gap-1 text-emerald-700">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                {isId ? 'Terjawab' : 'Answered'}
+              </span>
+            ) : null}
+            {poll ? (
+              <span className="inline-flex items-center gap-1">
+                <BarChart3 className="h-3.5 w-3.5" />
+                {isId ? 'Polling' : 'Poll'}
+              </span>
+            ) : null}
+            {!poll && isQuestionPost ? (
+              <span className="inline-flex items-center gap-1">
+                <MessageCircle className="h-3.5 w-3.5" />
+                {isId ? 'Pertanyaan' : 'Question'}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+
+        {/* ================= POST BODY ================= */}
+
+        <h2 className="mt-3 text-[0.98rem] font-bold leading-5 text-[color:var(--app-text)]">
+          <button
+            type="button"
+            onClick={openDetail}
+            className="text-left hover:text-[color:var(--app-accent)]"
+          >
+            {item.title}
+          </button>
+        </h2>
+
+        {displayBody ? (
+          <div className="mt-1.5 text-sm leading-6 text-[color:var(--app-text)]">
+            <p className={cn(!bodyExpanded && 'line-clamp-2')}>
+              {displayBody}
+            </p>
+
+            {canExpandBody ? (
+              <button
+                type="button"
+                onClick={() => setBodyExpanded(current => !current)}
+                aria-expanded={bodyExpanded}
+                className="mt-0.5 inline-flex font-semibold text-[color:var(--app-text-soft)] hover:text-[color:var(--app-text)]"
+              >
+                {bodyExpanded
+                  ? isId
+                    ? 'Sembunyikan'
+                    : 'See less'
+                  : isId
+                    ? 'Lihat selengkapnya'
+                    : 'See more'}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+
+        {/* TAGS */}
+
+        {item.tags.length > 0 ? (
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            {item.tags.slice(0, 2).map(tag => (
+              <button
+                key={tag.id}
+                type="button"
+                onClick={openDetail}
+                className="text-[11px] font-semibold text-[color:var(--app-text-soft)] transition hover:text-[color:var(--app-accent)]"
+              >
+                #{tag.slug || tag.name}
+              </button>
+            ))}
+
+            {item.tags.length > 2 ? (
+              <span className="text-[11px] font-semibold text-[color:var(--app-text-muted)]">
+                +{item.tags.length - 2}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+
+        {poll && item.threadId ? (
+          <CommunityPoll
+            threadId={item.threadId}
+            poll={poll}
+            isId={isId}
+            loginHref={loginHref}
+          />
+        ) : null}
+      </div>
+
+      {/* ================= MEDIA ================= */}
+
+      {feedMediaItems.length > 0 ? (
+        <CommunityMediaPreview
+          media={safeMedia}
+          mediaItems={feedMediaItems}
+          title={item.title}
+          isId={isId}
+        />
+      ) : null}
+
+      {/* ================= REACTION SUMMARY + ACTION BAR ================= */}
+
+      {(reactionCount > 0 || commentCount > 0 || item.stats.shares > 0) ? (
+        <div className="flex min-h-9 items-center justify-between gap-3 border-t border-[color:var(--app-border)] px-3.5 pt-2 text-[11px] font-medium text-[color:var(--app-text-soft)] sm:px-4">
+          <div className="flex min-w-0 items-center gap-1.5">
+            {reactionCount > 0 ? (
+              <>
+                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                  <ThumbsUp className="h-3 w-3 fill-current" />
+                </span>
+                <span className="truncate font-semibold">
+                  {compactNumber(reactionCount)} {isId ? 'suka' : 'likes'}
+                </span>
+              </>
+            ) : null}
+          </div>
+          <button
+            type="button"
+            onClick={openDetail}
+            className="shrink-0 font-semibold hover:text-[color:var(--app-text)]"
+          >
+            {commentCount > 0
+              ? `${compactNumber(commentCount)} ${isId ? 'komentar' : 'comments'}`
+              : isId
+                ? 'Lihat diskusi'
+                : 'View discussion'}
+          </button>
+        </div>
+      ) : null}
+
+      <div className="grid grid-cols-4 border-y border-[color:var(--app-border)] px-1.5 py-1 text-xs font-semibold text-[color:var(--app-text-soft)] sm:px-2">
+        <button type="button" onClick={() => void handleLike()} aria-pressed={localVote === 1} title={isId ? 'Suka' : 'Like'} className={cn('inline-flex min-h-11 items-center justify-center gap-2 rounded-[12px] px-2 transition hover:bg-slate-50', localVote === 1 ? 'text-emerald-700' : 'hover:text-[color:var(--app-accent)]')}>
+          <ThumbsUp className={cn('h-[18px] w-[18px]', localVote === 1 && 'fill-current')} />
+          <span>{isId ? 'Suka' : 'Like'}</span>
+        </button>
+
+        <button type="button" onClick={focusCommentInput} aria-label={isId ? 'Komentar' : 'Comment'} title={isId ? 'Komentar' : 'Comment'} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[12px] px-2 transition hover:bg-slate-50 hover:text-[color:var(--app-accent)]">
+          <MessageCircle className="h-[18px] w-[18px]" />
+          <span>{isId ? 'Komentar' : 'Comment'}</span>
+        </button>
+
+        <button type="button" onClick={() => void handleSave()} disabled={saveLoading} aria-pressed={saved} aria-busy={saveLoading} aria-label={saved ? (isId ? 'Hapus simpanan' : 'Remove save') : (isId ? 'Simpan' : 'Save')} title={isId ? 'Simpan' : 'Save'} className={cn('inline-flex min-h-11 items-center justify-center gap-2 rounded-[12px] px-2 transition disabled:cursor-wait disabled:opacity-60', saved ? 'text-amber-700' : 'hover:bg-slate-50 hover:text-[color:var(--app-accent)]')}>
+          <Bookmark className={cn('h-[18px] w-[18px]', saved && 'fill-current')} />
+          <span>{isId ? 'Simpan' : 'Save'}</span>
+        </button>
+
+        <button type="button" onClick={() => void handleShare()} aria-label={isId ? 'Bagikan' : 'Share'} title={isId ? 'Bagikan' : 'Share'} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[12px] px-2 transition hover:bg-slate-50 hover:text-[color:var(--app-accent)]">
+          <Share2 className="h-[18px] w-[18px]" />
+          <span>{isId ? 'Bagikan' : 'Share'}</span>
+        </button>
+      </div>
+
+      {/* ================= FACEBOOK-LIKE COMMENTS PREVIEW ================= */}
+
+      {commentCount > 0 ? (
+        <section className="border-t border-[color:var(--app-border)] px-3 pb-2.5 pt-2.5 sm:px-4">
+          {/* VIEW ALL */}
+
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={openDetail}
+              className="text-[11px] font-semibold text-[color:var(--app-text-soft)] transition hover:text-[color:var(--app-text)]"
+            >
+              {isId
+                ? `Lihat semua ${compactNumber(commentCount)} komentar`
+                : `View all ${compactNumber(commentCount)} comments`}
+            </button>
+
+            {commentsLoading ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-[color:var(--app-text-soft)]" />
+            ) : null}
+          </div>
+
+          {/* LOADING SKELETON */}
+
+          {commentsLoading && topLevelComments.length === 0 ? (
+            <div className="space-y-3">
+              {[0, 1].map(index => (
+                <div
+                  key={index}
+                  className="flex items-start gap-2"
+                >
+                  <div className="h-7 w-7 shrink-0 animate-pulse rounded-full bg-slate-100" />
+
+                  <div className="min-w-0 flex-1">
+                    <div className="h-11 w-[min(88%,360px)] animate-pulse rounded-[14px] bg-slate-100" />
+                    <div className="ml-2 mt-1 h-2.5 w-24 animate-pulse rounded-full bg-slate-100" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          {/* COMMENT THREADS */}
+
+          {topLevelComments.length > 0 ? (
+            <div className="space-y-3">
+              {topLevelComments.map(comment => {
+                const replies = [...(repliesByParent[comment.id] || [])].sort(
+                  (a, b) =>
+                    new Date(b.createdAt).getTime() -
+                    new Date(a.createdAt).getTime(),
+                );
+
+                const visibleReply = replies[0] || null;
+                const hiddenReplyCount = Math.max(0, replies.length - 1);
+
+                return (
+                  <div key={comment.id}>
+                    {/* TOP LEVEL COMMENT */}
+
+                    <div className="flex items-start gap-2">
+                      <Image
+                        src={profileAvatarSrc(
+                          comment.author?.avatarUrl,
+                          readProfileAvatarStyle(comment.author),
+                          comment.author?.name || (isId ? 'Pengguna' : 'User'),
+                        )}
+                        alt={comment.author?.name || ''}
+                        width={28}
+                        height={28}
+                        className="h-7 w-7 shrink-0 rounded-full object-cover"
+                      />
+
+                      <div className="min-w-0 flex-1">
+                        <button
+                          type="button"
+                          onClick={openDetail}
+                          className="block max-w-full text-left"
+                        >
+                          <div className="inline-block max-w-full rounded-[14px] bg-slate-100 px-2.5 py-1.5 text-left">
+                            <p className="truncate text-[10px] font-bold leading-4 text-[color:var(--app-text)]">
+                              {comment.author?.name || (isId ? 'Pengguna' : 'User')}
+                            </p>
+
+                            <p className="whitespace-pre-wrap break-words text-[11px] leading-[16px] text-[color:var(--app-text)]">
+                              {comment.content}
+                            </p>
+                          </div>
+                        </button>
+
+                        <div className="ml-2 mt-0.5 flex items-center gap-2 text-[9px] font-semibold text-[color:var(--app-text-soft)]">
+                          <span>
+                            {timeAgo(comment.createdAt, isId)}
+                          </span>
+
+                          <button
+                            type="button"
+                            onClick={() => beginReply(comment)}
+                            className="transition hover:text-[color:var(--app-accent)]"
+                          >
+                            {isId ? 'Balas' : 'Reply'}
+                          </button>
+
+                          {Math.max(
+                            Number(comment.voteScore ?? comment.likeCount ?? 0),
+                            0,
+                          ) > 0 ? (
+                            <span className="inline-flex items-center gap-1">
+                              <ThumbsUp className="h-2.5 w-2.5" />
+                              {compactNumber(
+                                Math.max(
+                                  Number(
+                                    comment.voteScore ??
+                                      comment.likeCount ??
+                                      0,
+                                  ),
+                                  0,
+                                ),
+                              )}
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* ONE SPILLED REPLY */}
+
+                    {visibleReply ? (
+                      <div className="ml-8 mt-2 flex items-start gap-2 border-l-2 border-slate-100 pl-2">
+                        <Image
+                          src={profileAvatarSrc(
+                            visibleReply.author?.avatarUrl,
+                            readProfileAvatarStyle(visibleReply.author),
+                            visibleReply.author?.name ||
+                              (isId ? 'Pengguna' : 'User'),
+                          )}
+                          alt={visibleReply.author?.name || ''}
+                          width={24}
+                          height={24}
+                          className="h-6 w-6 shrink-0 rounded-full object-cover"
+                        />
+
+                        <div className="min-w-0 flex-1">
+                          <button
+                            type="button"
+                            onClick={openDetail}
+                            className="block max-w-full text-left"
+                          >
+                            <div className="inline-block max-w-full rounded-[13px] bg-slate-50 px-2.5 py-1.5 text-left ring-1 ring-slate-100">
+                              <p className="truncate text-[9px] font-bold leading-4 text-[color:var(--app-text)]">
+                                {visibleReply.author?.name ||
+                                  (isId ? 'Pengguna' : 'User')}
+                              </p>
+
+                              <p className="whitespace-pre-wrap break-words text-[10px] leading-[15px] text-[color:var(--app-text)]">
+                                {visibleReply.content}
+                              </p>
+                            </div>
+                          </button>
+
+                          <div className="ml-2 mt-0.5 flex items-center gap-2 text-[8px] font-semibold text-[color:var(--app-text-soft)]">
+                            <span>
+                              {timeAgo(visibleReply.createdAt, isId)}
+                            </span>
+
+                            <button
+                              type="button"
+                              onClick={() => beginReply(visibleReply)}
+                              className="transition hover:text-[color:var(--app-accent)]"
+                            >
+                              {isId ? 'Balas' : 'Reply'}
+                            </button>
+                          </div>
+
+                          {hiddenReplyCount > 0 ? (
+                            <button
+                              type="button"
+                              onClick={openDetail}
+                              className="mt-1 text-[9px] font-semibold text-[color:var(--app-text-soft)] transition hover:text-[color:var(--app-text)]"
+                            >
+                              {isId
+                                ? `Lihat ${hiddenReplyCount} balasan lainnya`
+                                : `View ${hiddenReplyCount} more ${
+                                    hiddenReplyCount === 1 ? 'reply' : 'replies'
+                                  }`}
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      {/* ================= INLINE COMMENT / REPLY ================= */}
+
+      {item.kind === 'discussion' && item.threadId ? (
+        <form
+          onSubmit={submitComment}
+          className="border-t border-[color:var(--app-border)] bg-white px-3 py-2.5 sm:px-4"
+        >
+          {replyTarget ? (
+            <div className="mb-1.5 flex items-center justify-between gap-2 pl-9 text-[9px] font-medium text-[color:var(--app-text-soft)]">
+              <span className="min-w-0 truncate">
+                {isId ? 'Membalas' : 'Replying to'}{' '}
+                <strong className="font-bold text-[color:var(--app-text)]">
+                  {replyTarget.author?.name || (isId ? 'Pengguna' : 'User')}
+                </strong>
+              </span>
+
+              <button
+                type="button"
+                onClick={() => setReplyTarget(null)}
+                className="grid h-5 w-5 shrink-0 place-items-center rounded-full hover:bg-slate-100"
+                aria-label={isId ? 'Batalkan balasan' : 'Cancel reply'}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          ) : null}
+
+          <div className="flex items-center gap-2">
+            <Image
+              src={viewerAvatar}
+              alt=""
+              width={28}
+              height={28}
+              className="h-7 w-7 shrink-0 rounded-full object-cover"
+            />
+
+            <div className="flex min-w-0 flex-1 items-center rounded-full bg-slate-50 ring-1 ring-slate-100 focus-within:ring-[color:var(--app-accent-border)]">
+              <label
+                htmlFor={`community-comment-${item.id}`}
+                className="sr-only"
+              >
+                {replyTarget
+                  ? isId
+                    ? 'Tulis balasan'
+                    : 'Write a reply'
+                  : isId
+                    ? 'Tulis komentar'
+                    : 'Write a comment'}
+              </label>
+
+              <input
+                ref={commentInputRef}
+                id={`community-comment-${item.id}`}
+                value={commentDraft}
+                onChange={event => setCommentDraft(event.target.value)}
+                onFocus={() => {
+                  if (!isAuthenticated) {
+                    router.push(loginHref);
+                  }
+                }}
+                disabled={commentSaving}
+                maxLength={1000}
+                autoComplete="off"
+                placeholder={
+                  replyTarget
+                    ? isId
+                      ? `Balas ${replyTarget.author?.name || ''}...`
+                      : `Reply to ${replyTarget.author?.name || ''}...`
+                    : isId
+                      ? 'Tulis komentar...'
+                      : 'Write a comment...'
+                }
+                className="min-h-9 min-w-0 flex-1 bg-transparent px-3 text-[11px] text-[color:var(--app-text)] outline-none placeholder:text-[color:var(--app-text-soft)] disabled:opacity-60"
+              />
+
+              {commentDraft.trim() ? (
+                <button
+                  type="submit"
+                  disabled={commentSaving}
+                  className="mr-1 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[color:var(--app-accent)] transition hover:bg-emerald-50 disabled:opacity-50"
+                  aria-label={
+                    replyTarget
+                      ? isId
+                        ? 'Kirim balasan'
+                        : 'Send reply'
+                      : isId
+                        ? 'Kirim komentar'
+                        : 'Send comment'
+                  }
+                >
+                  {commentSaving ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Send className="h-3.5 w-3.5" />
+                  )}
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </form>
+      ) : null}
+      </article>
+      {reportOpen ? (
+        <CommunityReportDialog
+          item={item}
+          isId={isId}
+          onClose={() => setReportOpen(false)}
+        />
+      ) : null}
+    </>
+  );
+}
+
 export function CommunityDetailModal({
   isId,
   threadId,
