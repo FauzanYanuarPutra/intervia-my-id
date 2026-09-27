@@ -2795,7 +2795,7 @@ export function CommunityPostCard({
       {/* ================= POST HEADER ================= */}
 
       <div className="px-3 py-3 sm:px-4 sm:py-3.5">
-        <div className="grid min-w-0 grid-cols-[auto,minmax(0,1fr),auto] items-start gap-2.5 sm:gap-3">
+        <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-2.5 sm:gap-3">
           <Image
             alt={item.author.name}
             width={44}
