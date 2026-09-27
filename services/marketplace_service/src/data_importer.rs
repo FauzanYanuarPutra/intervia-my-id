@@ -343,6 +343,7 @@ out center tags;
         let response = state
             .http_client
             .post(endpoint)
+            .timeout(std::time::Duration::from_secs(150))
             .header(
                 reqwest::header::USER_AGENT,
                 "LajukanOpenDataImporter/1.0 (+https://www.lajukan.com)",
