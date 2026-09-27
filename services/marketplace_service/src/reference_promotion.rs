@@ -28,10 +28,16 @@ fn score_entity(
     } else {
         reasons.push("missing_name".to_string());
     }
+    let has_coordinates = lat.is_some() && lon.is_some();
     if address.is_some_and(|v| !v.trim().is_empty()) {
         score += 0.20;
+    } else if !has_coordinates {
+        // A map-ready reference may legitimately lack a structured street address.
+        // Do not invent one; coordinates are the authoritative location signal.
+        reasons.push("missing_address_and_coordinates".to_string());
     } else {
-        reasons.push("missing_address".to_string());
+        // Preserve the address weight when coordinates make the record map-ready.
+        score += 0.20;
     }
     if city.is_some_and(|v| !v.trim().is_empty()) {
         score += 0.10;
