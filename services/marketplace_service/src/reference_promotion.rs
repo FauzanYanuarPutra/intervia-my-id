@@ -533,3 +533,40 @@ pub fn router() -> axum::Router<Arc<AppState>> {
         .route("/v1/data/promotion-candidates/{candidate_id}/review", axum::routing::post(review_candidate))
         .route("/v1/data/promotion-candidates/{candidate_id}/promote", axum::routing::post(promote))
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn slug_is_deterministic_and_has_entity_suffix() {
+        let id = Uuid::parse_str("12345678-1234-1234-1234-123456789abc").unwrap();
+        let slug = slugify_reference("Toko Maju!", Some("Bandung"), id);
+        assert_eq!(slug, "toko-maju-bandung-12345678");
+    }
+
+    #[test]
+    fn empty_reference_name_falls_back_to_entity_slug() {
+        let id = Uuid::parse_str("abcdef12-1234-1234-1234-123456789abc").unwrap();
+        assert_eq!(
+            slugify_reference("!!!", None, id),
+            "reference-abcdef12-1234-1234-1234-123456789abc"
+        );
+    }
+
+    #[test]
+    fn reference_body_contains_only_supplied_facts() {
+        let body = reference_body(
+            "Toko Maju",
+            Some("Jl. Contoh 1"),
+            Some("Bandung"),
+            Some("Jawa Barat"),
+        );
+        assert!(body.contains("Toko Maju"));
+        assert!(body.contains("Jl. Contoh 1"));
+        assert!(body.contains("Bandung"));
+        assert!(body.contains("Jawa Barat"));
+        assert!(!body.contains("rating"));
+    }
+}
