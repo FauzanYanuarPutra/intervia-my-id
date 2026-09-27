@@ -165,3 +165,8 @@ The service synchronizes `config/lajukan_data_source_registry.json` into the dat
 This implementation intentionally separates **catalog/provenance registration** from **bulk row ingestion**. A source appearing in the registry does not mean its rows have already been copied into Lajukan. Resource-level license/redistribution checks must pass before persistent import is enabled.
 
 Google Places remains live-only. Current Google documentation says Places content generally cannot be pre-fetched, cached, or stored beyond stated exceptions; place IDs are the explicit storage exception, and attribution/source access requirements apply. 
+
+
+### Resource-level dataset inspection
+
+Agent-only `POST /v1/data/sources/{source_key}/inspect` fetches the machine-readable catalog metadata for sources that expose an API endpoint (currently CKAN/data.go.id entries), reports resource-level license/url/datastore metadata, and records the last check time. It is metadata-only and never copies dataset rows. Persistent ingestion should only be enabled after this inspection and any required legal/reuse review succeed.
