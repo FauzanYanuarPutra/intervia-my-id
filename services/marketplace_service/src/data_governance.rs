@@ -2128,7 +2128,7 @@ pub async fn sync_static_source_registry(db: &PgPool) -> Result<(), sqlx::Error>
             _ => "review_required",
         };
         let storage_allowed = reuse_mode == "persistent_import";
-        let enabled = reuse_mode != "live_only";
+        let enabled = source.enabled.unwrap_or(reuse_mode != "live_only");
         let api_url = source.endpoint.clone().or_else(|| {
             source.dataset_id.as_ref().map(|dataset_id| {
                 format!(
