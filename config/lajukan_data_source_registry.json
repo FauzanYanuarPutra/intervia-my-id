@@ -168,12 +168,14 @@
       "provider": "OpenStreetMap contributors",
       "kind": "osm_overpass",
       "url": "https://www.openstreetmap.org/",
-      "reuse_mode": "live_only",
+      "reuse_mode": "persistent_import",
       "license": "ODbL 1.0",
       "attribution": "© OpenStreetMap contributors",
       "endpoint": "https://overpass.private.coffee/api/interpreter",
-      "auto_publish_reference": false,
-      "notes": "Live-only OSM source for map/reference lookup. Persistent Overpass ingestion is intentionally disabled until the dedicated Overpass adapter is enabled; existing governed OSM reference records remain available."
+      "auto_publish_reference": true,
+      "notes": "Governed persistent OSM reference import via Overpass. Lajukan preserves provenance and attribution; ownership remains unclaimed. Publication requires compliance with ODbL obligations.",
+      "license_url": "https://opendatacommons.org/licenses/odbl/1-0/",
+      "terms_url": "https://www.openstreetmap.org/copyright"
     },
     {
       "id": "wikimedia-commons",
