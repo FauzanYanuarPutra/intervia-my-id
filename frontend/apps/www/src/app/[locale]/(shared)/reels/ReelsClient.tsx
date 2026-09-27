@@ -1814,75 +1814,6 @@
       [overlayOpen, shouldIgnoreReelsGesture, snapToAdjacent],
     );
 
-    const handleReelsTouchStart = useCallback(
-      (event: ReactTouchEvent<HTMLDivElement>) => {
-        if (overlayOpen) return;
-
-        const touch = event.touches[0];
-        if (!touch) return;
-
-        reelsTouchGestureRef.current = {
-          startX: touch.clientX,
-          startY: touch.clientY,
-          active: true,
-          claimed: false,
-          ignored: shouldIgnoreReelsGesture(event.target),
-        };
-      },
-      [overlayOpen, shouldIgnoreReelsGesture],
-    );
-
-    const handleReelsTouchMove = useCallback(
-      (event: ReactTouchEvent<HTMLDivElement>) => {
-        const gesture = reelsTouchGestureRef.current;
-        if (!gesture?.active || gesture.ignored) return;
-
-        const touch = event.touches[0];
-        if (!touch) return;
-
-        const deltaX = touch.clientX - gesture.startX;
-        const deltaY = touch.clientY - gesture.startY;
-
-        if (!gesture.claimed) {
-          if (Math.max(Math.abs(deltaX), Math.abs(deltaY)) < 10) return;
-          if (Math.abs(deltaX) > Math.abs(deltaY) * 1.2) {
-            gesture.ignored = true;
-            return;
-          }
-          gesture.claimed = true;
-        }
-
-        event.preventDefault();
-      },
-      [],
-    );
-
-    const handleReelsTouchEnd = useCallback(
-      (event: ReactTouchEvent<HTMLDivElement>) => {
-        const gesture = reelsTouchGestureRef.current;
-        reelsTouchGestureRef.current = null;
-
-        if (!gesture?.active || gesture.ignored || !gesture.claimed) return;
-
-        const touch = event.changedTouches[0];
-        if (!touch) return;
-
-        const deltaY = touch.clientY - gesture.startY;
-        const threshold = Math.max(
-          36,
-          (containerRef.current?.clientHeight || window.innerHeight) * 0.1,
-        );
-
-        if (Math.abs(deltaY) < threshold) return;
-        snapToAdjacent(deltaY < 0 ? 1 : -1);
-      },
-      [snapToAdjacent],
-    );
-
-    const handleReelsTouchCancel = useCallback(() => {
-      reelsTouchGestureRef.current = null;
-    }, []);
-
     const handleReelsKeyDown = useCallback(
       (event: ReactKeyboardEvent<HTMLDivElement>) => {
         if (overlayOpen) return;
@@ -2390,10 +2321,6 @@
                 ref={containerRef}
                 onScroll={handleScroll}
                 onWheel={handleReelsWheel}
-                onTouchStart={handleReelsTouchStart}
-                onTouchMove={handleReelsTouchMove}
-                onTouchEnd={handleReelsTouchEnd}
-                onTouchCancel={handleReelsTouchCancel}
                 onKeyDown={handleReelsKeyDown}
                 tabIndex={0}
                 aria-label={
@@ -2401,7 +2328,7 @@
                     ? 'Feed Reels Lajukan. Gunakan panah atas dan bawah untuk berpindah video.'
                     : 'Lajukan Reels feed. Use up and down arrows to move between videos.'
                 }
-                className="h-full min-h-0 max-h-full w-full min-w-0 snap-y snap-mandatory overflow-x-hidden overflow-y-hidden overscroll-y-none outline-none [scroll-behavior:auto] [scrollbar-width:none] [touch-action:none] [&::-webkit-scrollbar]:hidden"
+                className="h-full min-h-0 max-h-full w-full min-w-0 snap-y snap-mandatory overflow-x-hidden overflow-y-auto overscroll-y-contain outline-none [scroll-behavior:auto] [scrollbar-width:none] [touch-action:pan-y] [&::-webkit-scrollbar]:hidden"
               >
                 {visibleItems.length > 0 ? (
                   <>
