@@ -2436,9 +2436,17 @@ export function UmkmDiscoveryPanel({
             </p>
           </div>
 
-          <span className="inline-flex w-fit items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-[color:var(--app-text-soft)] shadow-[0_12px_26px_-22px_rgba(15,23,42,0.12)] dark:border-slate-800 dark:bg-slate-950">
-            {totalLabel}
-          </span>
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <DiscoveryScopeControl
+              scope={discoveryScope}
+              isId={isId}
+              compact
+              onChange={handleDiscoveryScopeChange}
+            />
+            <span className="inline-flex w-fit items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-[color:var(--app-text-soft)] shadow-[0_12px_26px_-22px_rgba(15,23,42,0.12)] dark:border-slate-800 dark:bg-slate-950">
+              {totalLabel}
+            </span>
+          </div>
         </div>
 
         <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">          <button
