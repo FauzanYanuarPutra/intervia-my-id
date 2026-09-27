@@ -2912,7 +2912,11 @@ export function UmkmStorefrontClient({
       icon: Heart,
     },
   ];
-  const isStoreOwner = Boolean(store?.owner_user_id && user?.id && String(store.owner_user_id).trim().toLowerCase() === String(user.id).trim().toLowerCase());
+  const isStoreOwner = Boolean(
+    store &&
+      user?.id &&
+      String(resolveOwnerId(store)).trim().toLowerCase() === String(user.id).trim().toLowerCase(),
+  );
   const galleryTabEnabled = true;
   const galleryHasVideo = storeGallery.some(item => item.mediaType === 'video');
   const activeGalleryItem =
