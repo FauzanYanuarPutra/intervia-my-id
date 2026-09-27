@@ -847,6 +847,58 @@ async fn create_import_job(
     }
 }
 
+
+pub async fn sync_static_source_registry(db: &PgPool) -> Result<(), sqlx::Error> {
+    #[derive(Deserialize)]
+    struct Registry { sources: Vec<SourceSeed> }
+    #[derive(Deserialize)]
+    struct SourceSeed {
+        id: String, provider: String, kind: String, url: String,
+        #[serde(default)] dataset_id: Option<String>,
+        #[serde(default)] reuse_mode: Option<String>,
+        #[serde(default)] license: Option<String>,
+        #[serde(default)] attribution: Option<String>,
+        #[serde(default)] notes: Option<String>,
+    }
+
+    let registry: Registry = serde_json::from_str(
+        include_str!("../../../config/lajukan_data_source_registry.json")
+    ).map_err(|error| sqlx::Error::Protocol(format!("invalid static source registry: {}", error)))?;
+
+    for source in registry.sources {
+        let requested_mode = source.reuse_mode.as_deref().unwrap_or("review_required");
+        let reuse_mode = match requested_mode {
+            "persistent_import" => "persistent_import",
+            "derived_only" => "derived_only",
+            "live_only" => "live_only",
+            "link_only" => "link_only",
+            _ => "review_required",
+        };
+        let storage_allowed = reuse_mode == "persistent_import";
+        let api_url = source.dataset_id.as_ref().map(|dataset_id| format!("https://data.go.id/api/action/package_show?id={}", dataset_id));
+        let notes = match (source.dataset_id, source.notes) {
+            (Some(dataset_id), Some(notes)) => Some(format!("{} dataset_id={}", notes, dataset_id)),
+            (Some(dataset_id), None) => Some(format!("dataset_id={}", dataset_id)),
+            (None, notes) => notes,
+        };
+        sqlx::query(
+            r#"INSERT INTO data_source_registry (
+                source_key, provider_name, source_kind, source_url, api_url, license_name, attribution_text,
+                reuse_mode, storage_allowed, media_storage_allowed, pii_import_allowed, enabled, notes, updated_at
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,FALSE,FALSE,TRUE,$10,NOW())
+            ON CONFLICT (source_key) DO UPDATE SET
+                provider_name=EXCLUDED.provider_name, source_kind=EXCLUDED.source_kind, source_url=EXCLUDED.source_url,
+                api_url=EXCLUDED.api_url, license_name=EXCLUDED.license_name, attribution_text=EXCLUDED.attribution_text,
+                reuse_mode=EXCLUDED.reuse_mode, storage_allowed=EXCLUDED.storage_allowed,
+                media_storage_allowed=EXCLUDED.media_storage_allowed, pii_import_allowed=EXCLUDED.pii_import_allowed,
+                enabled=EXCLUDED.enabled, notes=EXCLUDED.notes, updated_at=NOW()"#
+        )
+        .bind(source.id).bind(source.provider).bind(source.kind).bind(source.url).bind(api_url)
+        .bind(source.license).bind(source.attribution).bind(reuse_mode).bind(storage_allowed).bind(notes)
+        .execute(db).await?;
+    }
+    Ok(())
+}
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/v1/data/sources", get(list_sources))
