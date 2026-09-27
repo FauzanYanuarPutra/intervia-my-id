@@ -1645,7 +1645,7 @@ pub async fn discover_licensed_ckan_sources(state: &Arc<AppState>) -> Result<u64
     let response = state
         .http_client
         .get("https://data.go.id/api/action/package_search")
-        .query(&[("q", "UMKM"), ("rows", "25"), ("start", "0")])
+        .query(&[("q", "UMKM"), ("rows", "100"), ("start", "0")])
         .send()
         .await?
         .error_for_status()?;
@@ -1660,7 +1660,7 @@ pub async fn discover_licensed_ckan_sources(state: &Arc<AppState>) -> Result<u64
 
     let mut discovered = 0u64;
 
-    for dataset in datasets.into_iter().take(25) {
+    for dataset in datasets.into_iter().take(100) {
         let Some(dataset_id) = dataset.get("id").and_then(Value::as_str) else {
             continue;
         };
