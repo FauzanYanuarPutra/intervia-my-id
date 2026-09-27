@@ -1182,6 +1182,53 @@ pub async fn bootstrap_persistent_imports(state: Arc<AppState>) -> Result<u64, s
     Ok(queued)
 }
 
+pub async fn bootstrap_reference_publication(state: Arc<AppState>) -> Result<u64, sqlx::Error> {
+    let ids = sqlx::query_scalar::<_, Uuid>(
+        r#"
+        SELECT c.id
+        FROM reference_promotion_candidates c
+        JOIN data_import_entities e ON e.id=c.entity_id
+        JOIN data_source_registry s ON s.id=c.source_id
+        WHERE c.promotion_status IN ('pending_review','approved')
+          AND c.readiness_score >= 0.70
+          AND jsonb_array_length(c.blocking_reasons) = 0
+          AND e.resolution_status NOT IN ('possible_duplicate','needs_review')
+          AND s.auto_publish_reference = TRUE
+          AND s.reuse_mode = 'persistent_import'
+          AND s.storage_allowed = TRUE
+          AND s.enabled = TRUE
+        ORDER BY c.created_at ASC
+        LIMIT 500
+        "#
+    )
+    .fetch_all(&state.db)
+    .await?;
+
+    let mut promoted = 0u64;
+    for candidate_id in ids {
+        sqlx::query(
+            r#"UPDATE reference_promotion_candidates
+               SET promotion_status='approved', updated_at=NOW()
+               WHERE id=$1 AND promotion_status='pending_review'"#
+        )
+        .bind(candidate_id)
+        .execute(&state.db)
+        .await?;
+
+        match crate::reference_promotion::promote_candidate(&state.db, candidate_id).await {
+            Ok(value) if value.get("promoted").and_then(Value::as_bool) == Some(true) => {
+                promoted += 1;
+            }
+            Ok(_) => {}
+            Err(error) => {
+                tracing::warn!(candidate_id=%candidate_id, "reference publication reconciliation skipped: {:?}", error);
+            }
+        }
+    }
+
+    Ok(promoted)
+}
+
 pub async fn sync_static_source_registry(db: &PgPool) -> Result<(), sqlx::Error> {
     #[derive(Deserialize)]
     struct Registry { sources: Vec<SourceSeed> }
