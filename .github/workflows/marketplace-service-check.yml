@@ -1,0 +1,24 @@
+name: marketplace-service-check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'services/marketplace_service/**'
+      - '.github/workflows/marketplace-service-check.yml'
+  pull_request:
+    paths:
+      - 'services/marketplace_service/**'
+      - '.github/workflows/marketplace-service-check.yml'
+
+jobs:
+  cargo-check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/marketplace_service
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Cargo check
+        run: cargo check --locked
