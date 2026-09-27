@@ -164,13 +164,16 @@
       "notes": "Profile data can include business and financial attributes; do not import private/financial details without an explicit reuse basis."
     },
     {
-      "id": "osm-indonesia",
+      "id": "osm",
       "provider": "OpenStreetMap contributors",
-      "kind": "open_geodata",
+      "kind": "osm_overpass",
       "url": "https://www.openstreetmap.org/",
       "reuse_mode": "persistent_import",
       "license": "ODbL 1.0",
-      "attribution": "© OpenStreetMap contributors"
+      "attribution": "© OpenStreetMap contributors",
+      "endpoint": "https://overpass-api.de/api/interpreter",
+      "auto_publish_reference": true,
+      "notes": "Read-only public OSM reference import. Governed by ODbL attribution; reference/unclaimed only. No private contact fields."
     },
     {
       "id": "wikimedia-commons",
@@ -195,18 +198,6 @@
       "url": "https://smesta.umkm.go.id/service/calendar-event",
       "reuse_mode": "review_required",
       "notes": "Use as official event discovery; confirm reuse/syndication terms per content."
-    },
-    {
-      "id": "osm-indonesia-public-references",
-      "provider": "OpenStreetMap",
-      "kind": "osm_overpass",
-      "url": "https://www.openstreetmap.org/",
-      "endpoint": "https://overpass-api.de/api/interpreter",
-      "reuse_mode": "persistent_import",
-      "auto_publish_reference": true,
-      "license": "Open Database License (ODbL) 1.0",
-      "attribution": "© OpenStreetMap contributors",
-      "notes": "Read-only public reference import. One request at a time, cached through import records, no private contact fields. Reference/unclaimed only."
     }
   ]
 }
