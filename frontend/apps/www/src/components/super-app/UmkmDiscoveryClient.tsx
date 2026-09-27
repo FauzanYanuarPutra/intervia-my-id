@@ -6,6 +6,7 @@ import {
   BriefcaseBusiness,
   Building2,
   ChevronDown,
+  Check,
   LayoutGrid,
   MapPin,
   Plus,
@@ -341,7 +342,7 @@ export function UmkmDiscoveryClient(props: UmkmDiscoveryClientProps) {
           </form>
 
           <div
-            className="pointer-events-auto flex min-w-0 gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            className="pointer-events-auto relative flex min-w-0 items-center gap-1.5 pb-1"
             aria-label={isId ? 'Pilih jenis usaha' : 'Business category filter'}
             data-testid="umkm-category-filters"
           >
@@ -375,56 +376,80 @@ export function UmkmDiscoveryClient(props: UmkmDiscoveryClientProps) {
                 <X className="h-3 w-3" />
               </button>
             ) : null}
-            {visibleLanes.map(lane => {
-              const Icon = lane.icon;
-              const active = activeLane === lane.id;
-              return (
-                <button
-                  key={lane.id}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => handleLanePick(lane)}
-                  className={cn(
-                    'inline-flex min-h-10 sm:min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[11px] font-bold shadow-[0_12px_26px_-24px_rgba(15,23,42,0.28)] transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)]',
-                    active
-                      ? 'cursor-default border-[color:var(--app-accent)] bg-[color:var(--app-accent)] text-white shadow-[0_10px_22px_-18px_color-mix(in_srgb,var(--app-accent)_45%,transparent)]'
-                      : 'cursor-pointer border-slate-200 bg-white text-slate-700 hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100',
-                  )}
-                >
-                  <Icon className="h-3.5 w-3.5" />
-                  <span>{isId ? lane.labelId : lane.labelEn}</span>
-                </button>
-              );
-            })}
-            <button
-              type="button"
-              onClick={() => setShowAllLanes(current => !current)}
-              aria-expanded={showAllLanes}
-              className={cn(
-                'inline-flex min-h-10 sm:min-h-11 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-[11px] font-bold shadow-[0_12px_26px_-24px_rgba(15,23,42,0.28)] transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)]',
-                showAllLanes
-                  ? 'border-[color:var(--app-accent-border)] bg-white text-[color:var(--app-accent)] shadow-[0_10px_22px_-18px_rgba(15,23,42,0.24)] dark:bg-slate-900 dark:text-[color:var(--app-accent)]'
-                  : 'border-slate-200 bg-white text-slate-700 hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100',
-              )}
-            >
-              {showAllLanes
-                ? isId
-                  ? 'Ringkas'
-                  : 'Less'
-                : hiddenLaneCount > 0
-                  ? isId
-                    ? `Lainnya (${hiddenLaneCount})`
-                    : `More (${hiddenLaneCount})`
-                  : isId
-                    ? 'Lainnya'
-                    : 'More'}
-              <ChevronDown
+            <div className="flex min-w-0 max-w-full items-center gap-1.5 overflow-x-auto pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {MAP_LANES.filter(lane => ['all', 'food', 'retail', 'service'].includes(lane.id) || lane.id === activeLane).map(lane => {
+                const Icon = lane.icon;
+                const active = activeLane === lane.id;
+                return (
+                  <button
+                    key={lane.id}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => handleLanePick(lane)}
+                    className={cn(
+                      'inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[11px] font-bold shadow-[0_12px_26px_-24px_rgba(15,23,42,0.28)] transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)]',
+                      active
+                        ? 'border-[color:var(--app-accent)] bg-[color:var(--app-accent)] text-white shadow-[0_10px_22px_-18px_color-mix(in_srgb,var(--app-accent)_45%,transparent)]'
+                        : 'border-slate-200 bg-white text-slate-700 hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100',
+                    )}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                    <span>{isId ? lane.labelId : lane.labelEn}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="relative shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowAllLanes(current => !current)}
+                aria-expanded={showAllLanes}
                 className={cn(
-                  'h-3.5 w-3.5 transition-transform',
-                  showAllLanes && 'rotate-180',
+                  'inline-flex min-h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-[11px] font-bold shadow-[0_12px_26px_-24px_rgba(15,23,42,0.28)] transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)]',
+                  showAllLanes
+                    ? 'border-[color:var(--app-accent)] bg-[color:var(--app-accent)] text-white'
+                    : 'border-slate-200 bg-white text-slate-700 hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100',
                 )}
-              />
-            </button>
+              >
+                <span>{isId ? 'Lainnya' : 'More'}</span>
+                {hiddenLaneCount > 0 ? <span className="rounded-full bg-black/10 px-1.5 py-0.5 text-[9px] font-extrabold dark:bg-white/10">{hiddenLaneCount}</span> : null}
+                <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', showAllLanes && 'rotate-180')} />
+              </button>
+              {showAllLanes ? (
+                <div className="absolute right-0 top-[calc(100%+0.45rem)] z-[1700] w-[min(86vw,300px)] overflow-hidden rounded-[18px] border border-slate-200 bg-white/98 p-1.5 shadow-[0_24px_55px_-24px_rgba(15,23,42,0.42)] backdrop-blur-xl dark:border-slate-700 dark:bg-slate-950/98">
+                  <div className="px-2.5 pb-1.5 pt-2">
+                    <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-slate-400">{isId ? 'Jenis usaha' : 'Business type'}</p>
+                    <p className="mt-0.5 text-[10px] font-semibold text-slate-500">{isId ? 'Pilih kategori yang ingin tampil di peta.' : 'Choose the category you want on the map.'}</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1">
+                    {MAP_LANES.map(lane => {
+                      const Icon = lane.icon;
+                      const active = activeLane === lane.id;
+                      return (
+                        <button
+                          key={lane.id}
+                          type="button"
+                          onClick={() => handleLanePick(lane)}
+                          className={cn(
+                            'flex min-w-0 items-center gap-2 rounded-[13px] px-2.5 py-2.5 text-left transition',
+                            active
+                              ? 'bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
+                              : 'text-slate-700 hover:bg-slate-50 dark:text-slate-100 dark:hover:bg-slate-900',
+                          )}
+                        >
+                          <span className={cn('grid h-8 w-8 shrink-0 place-items-center rounded-xl', active ? 'bg-[color:var(--app-accent)] text-white' : 'bg-slate-100 text-slate-500 dark:bg-slate-900 dark:text-slate-300')}><Icon className="h-4 w-4" /></span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-[10.5px] font-extrabold">{isId ? lane.labelId : lane.labelEn}</span>
+                            <span className="mt-0.5 block truncate text-[9px] font-medium text-slate-400">{isId ? lane.helperId : lane.helperEn}</span>
+                          </span>
+                          {active ? <Check className="h-4 w-4 shrink-0" /> : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
       </div>
