@@ -32,7 +32,7 @@ type PageProps = {
 
 function toDiscoveryStore(
   store: UmkmStore,
-  products: UmkmProduct[] = [],
+  products?: UmkmProduct[],
 ): DiscoveryStore {
   const publicStore = projectPublicUmkmStore(store);
   return {
@@ -48,15 +48,19 @@ function toDiscoveryStore(
     metadata: publicStore.metadata,
     online_order_enabled: publicStore.online_order_enabled,
     offline_order_enabled: publicStore.offline_order_enabled,
-    products: products.slice(0, 8).map(product => ({
-      id: product.id,
-      name: product.name,
-      description: product.description,
-      category: product.category,
-      price_cents: product.price_cents,
-      image_url: product.image_url,
-      is_available: product.is_available,
-    })),
+    ...(products
+      ? {
+          products: products.slice(0, 8).map(product => ({
+            id: product.id,
+            name: product.name,
+            description: product.description,
+            category: product.category,
+            price_cents: product.price_cents,
+            image_url: product.image_url,
+            is_available: product.is_available,
+          })),
+        }
+      : {}),
   };
 }
 
@@ -140,10 +144,10 @@ export default async function UmkmPage({ params, searchParams }: PageProps) {
         storeId: deepLinkedStoreRaw.id,
         includeUnavailable: false,
         limit: 8,
-      }).catch(() => [])
-    : [];
+      }).catch(() => null)
+    : null;
   const deepLinkedStore = deepLinkedStoreRaw
-    ? toDiscoveryStore(deepLinkedStoreRaw, deepLinkedProducts)
+    ? toDiscoveryStore(deepLinkedStoreRaw, deepLinkedProducts ?? undefined)
     : null;
   const initialStores = listedStores === undefined && !deepLinkedStore
     ? undefined
