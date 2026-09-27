@@ -14,6 +14,7 @@
     type DragEvent as ReactDragEvent,
     type FormEvent,
     type KeyboardEvent as ReactKeyboardEvent,
+    type TouchEvent as ReactTouchEvent,
     type UIEvent,
   } from 'react';
   import { useHorizontalDragScroll } from '@/hooks/useHorizontalDragScroll';
@@ -1763,6 +1764,124 @@
       [activeIndex, overlayOpen, reelPageCount, scrollToIndex],
     );
 
+    const reelsTouchGestureRef = useRef<{
+      startX: number;
+      startY: number;
+      active: boolean;
+      claimed: boolean;
+      ignored: boolean;
+    } | null>(null);
+    const reelsWheelBurstRef = useRef(false);
+    const reelsWheelBurstTimerRef = useRef<number | null>(null);
+
+    const shouldIgnoreReelsGesture = useCallback((target: EventTarget | null) => {
+      const element = target instanceof HTMLElement ? target : null;
+      if (!element) return false;
+      return Boolean(
+        element.closest(
+          'button,a,input,textarea,select,[contenteditable="true"],[data-reels-inner-scroll],[data-reels-gesture-ignore]',
+        ),
+      );
+    }, []);
+
+    const handleReelsWheel = useCallback(
+      (event: ReactWheelEvent<HTMLDivElement>) => {
+        if (overlayOpen || event.ctrlKey) return;
+        if (shouldIgnoreReelsGesture(event.target)) return;
+
+        const delta =
+          Math.abs(event.deltaY) >= Math.abs(event.deltaX)
+            ? event.deltaY
+            : event.deltaX;
+        if (Math.abs(delta) < 4) return;
+
+        event.preventDefault();
+
+        if (reelsWheelBurstRef.current) return;
+        reelsWheelBurstRef.current = true;
+
+        if (reelsWheelBurstTimerRef.current !== null) {
+          window.clearTimeout(reelsWheelBurstTimerRef.current);
+        }
+        reelsWheelBurstTimerRef.current = window.setTimeout(() => {
+          reelsWheelBurstRef.current = false;
+          reelsWheelBurstTimerRef.current = null;
+        }, 180);
+
+        snapToAdjacent(delta > 0 ? 1 : -1);
+      },
+      [overlayOpen, shouldIgnoreReelsGesture, snapToAdjacent],
+    );
+
+    const handleReelsTouchStart = useCallback(
+      (event: ReactTouchEvent<HTMLDivElement>) => {
+        if (overlayOpen) return;
+
+        const touch = event.touches[0];
+        if (!touch) return;
+
+        reelsTouchGestureRef.current = {
+          startX: touch.clientX,
+          startY: touch.clientY,
+          active: true,
+          claimed: false,
+          ignored: shouldIgnoreReelsGesture(event.target),
+        };
+      },
+      [overlayOpen, shouldIgnoreReelsGesture],
+    );
+
+    const handleReelsTouchMove = useCallback(
+      (event: ReactTouchEvent<HTMLDivElement>) => {
+        const gesture = reelsTouchGestureRef.current;
+        if (!gesture?.active || gesture.ignored) return;
+
+        const touch = event.touches[0];
+        if (!touch) return;
+
+        const deltaX = touch.clientX - gesture.startX;
+        const deltaY = touch.clientY - gesture.startY;
+
+        if (!gesture.claimed) {
+          if (Math.max(Math.abs(deltaX), Math.abs(deltaY)) < 10) return;
+          if (Math.abs(deltaX) > Math.abs(deltaY) * 1.2) {
+            gesture.ignored = true;
+            return;
+          }
+          gesture.claimed = true;
+        }
+
+        event.preventDefault();
+      },
+      [],
+    );
+
+    const handleReelsTouchEnd = useCallback(
+      (event: ReactTouchEvent<HTMLDivElement>) => {
+        const gesture = reelsTouchGestureRef.current;
+        reelsTouchGestureRef.current = null;
+
+        if (!gesture?.active || gesture.ignored || !gesture.claimed) return;
+
+        const touch = event.changedTouches[0];
+        if (!touch) return;
+
+        const deltaY = touch.clientY - gesture.startY;
+        const threshold = Math.max(
+          36,
+          (containerRef.current?.clientHeight || window.innerHeight) * 0.1,
+        );
+
+        if (Math.abs(deltaY) < threshold) return;
+        snapToAdjacent(deltaY < 0 ? 1 : -1);
+      },
+      [snapToAdjacent],
+    );
+
+    const handleReelsTouchCancel = useCallback(() => {
+      reelsTouchGestureRef.current = null;
+    }, []);
+
     const handleReelsKeyDown = useCallback(
       (event: ReactKeyboardEvent<HTMLDivElement>) => {
         if (overlayOpen) return;
@@ -2269,6 +2388,11 @@
               <div
                 ref={containerRef}
                 onScroll={handleScroll}
+                onWheel={handleReelsWheel}
+                onTouchStart={handleReelsTouchStart}
+                onTouchMove={handleReelsTouchMove}
+                onTouchEnd={handleReelsTouchEnd}
+                onTouchCancel={handleReelsTouchCancel}
                 onKeyDown={handleReelsKeyDown}
                 tabIndex={0}
                 aria-label={
@@ -2276,7 +2400,7 @@
                     ? 'Feed Reels Lajukan. Gunakan panah atas dan bawah untuk berpindah video.'
                     : 'Lajukan Reels feed. Use up and down arrows to move between videos.'
                 }
-                className="h-full min-h-0 max-h-full w-full min-w-0 snap-y snap-mandatory overflow-x-hidden overflow-y-auto overscroll-y-none outline-none [scroll-behavior:auto] [scrollbar-width:none] [touch-action:pan-y] [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden"
+                className="h-full min-h-0 max-h-full w-full min-w-0 snap-y snap-mandatory overflow-x-hidden overflow-y-hidden overscroll-y-none outline-none [scroll-behavior:auto] [scrollbar-width:none] [touch-action:none] [&::-webkit-scrollbar]:hidden]"
               >
                 {visibleItems.length > 0 ? (
                   <>
@@ -3485,6 +3609,7 @@
 
         <div
           className="relative z-10 h-full overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)+28px)] pt-[calc(env(safe-area-inset-top)+76px)] [scrollbar-width:none] [touch-action:pan-y] [&::-webkit-scrollbar]:hidden"
+          data-reels-inner-scroll="true"
           onWheel={event => event.stopPropagation()}
           onTouchStart={event => event.stopPropagation()}
           onTouchEnd={event => event.stopPropagation()}
