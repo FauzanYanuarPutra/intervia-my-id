@@ -22,7 +22,6 @@ from pathlib import Path
 from typing import Any, Iterable
 
 
-OPEN_DATA_OWNER_ID = "00000000-0000-0000-0000-000000000801"
 DEFAULT_CONFIG = "config/real_marketplace_open_data.sources.json"
 DEFAULT_OUT = "data/generated/real_marketplace_open_data.sql"
 DEFAULT_COMMUNITY_OUT = "data/generated/real_community_reels_open_data.sql"
@@ -1443,6 +1442,14 @@ def write_community_sql(out_path: str, media_items: list[CommonsMediaSeed]) -> N
     if not media_items:
         return
 
+    publisher_id = clean_text(os.environ.get("REAL_DATA_COMMUNITY_PUBLISHER_USER_ID"))
+    if not publisher_id:
+        print(
+            "warning: community/reel open-media source skipped because REAL_DATA_COMMUNITY_PUBLISHER_USER_ID is not configured; no synthetic curator account will be created.",
+            file=sys.stderr,
+        )
+        return
+
     path = Path(out_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     now = dt.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
@@ -1461,7 +1468,7 @@ def write_community_sql(out_path: str, media_items: list[CommonsMediaSeed]) -> N
         "INSERT INTO forum.lajukan_forum_users (",
         "  id, username, name, avatar_url, title, reputation, base_reputation, badges, metadata, created_at, updated_at",
         ") VALUES (",
-        f"  {sql_literal(OPEN_DATA_OWNER_ID)}, 'lajukan_bulk_open_data', 'Lajukan Bulk Open Data', '',",
+        f"  {sql_literal(publisher_id)}, 'lajukan_bulk_open_data', 'Lajukan Bulk Open Data', '',",
         "  'Kurator data publik', 0, 0, ARRAY['open-data'],",
         "  '{\"seed_pack\":\"real_indonesia_bulk_open_data\",\"account_type\":\"system_seed_curator\",\"contact_policy\":\"no_private_contact_seeded\"}'::jsonb,",
         "  NOW(), NOW()",
