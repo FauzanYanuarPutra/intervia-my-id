@@ -1,3 +1,4 @@
+use anyhow::{anyhow, Result as AnyhowResult};
 use axum::{extract::{Path, State}, http::{HeaderMap, StatusCode}, response::IntoResponse, Json};
 use serde_json::{json, Value};
 use sqlx::{PgPool, Row};
@@ -115,6 +116,276 @@ async fn generate(
 }
 
 
+fn slugify_reference(name: &str, city: Option<&str>, entity_id: Uuid) -> String {
+    let mut slug = String::new();
+    for ch in name.chars().chain(std::iter::once(' ')).chain(city.unwrap_or("").chars()) {
+        if ch.is_ascii_alphanumeric() {
+            slug.push(ch.to_ascii_lowercase());
+        } else if !slug.ends_with('-') {
+            slug.push('-');
+        }
+    }
+    while slug.ends_with('-') {
+        slug.pop();
+    }
+    while slug.starts_with('-') {
+        slug.remove(0);
+    }
+    if slug.is_empty() {
+        format!("reference-{entity_id}")
+    } else {
+        format!("{}-{}", slug.chars().take(96).collect::<String>(), &entity_id.to_string()[..8])
+    }
+}
+
+fn reference_body(
+    name: &str,
+    address: Option<&str>,
+    city: Option<&str>,
+    province: Option<&str>,
+) -> String {
+    let mut lines = vec![name.to_string()];
+    if let Some(value) = address.filter(|v| !v.trim().is_empty()) {
+        lines.push(format!("Alamat: {value}"));
+    }
+    if let Some(value) = city.filter(|v| !v.trim().is_empty()) {
+        lines.push(format!("Kota/Kabupaten: {value}"));
+    }
+    if let Some(value) = province.filter(|v| !v.trim().is_empty()) {
+        lines.push(format!("Provinsi: {value}"));
+    }
+    lines.join("\n")
+}
+
+async fn promote_candidate(
+    db: &PgPool,
+    candidate_id: Uuid,
+) -> AnyhowResult<Value> {
+    let mut tx = db.begin().await?;
+
+    let candidate = sqlx::query_as::<_, (
+        Uuid, Uuid, Uuid, String, f64,
+        Option<String>, Option<String>, Option<String>, Option<String>,
+        Option<f64>, Option<f64>, String, Option<Uuid>,
+        Option<String>, Option<String>, Option<String>, Option<String>,
+        String, String, Option<String>, Option<String>, Option<String>,
+        Option<String>, Option<String>, String, bool
+    )>(
+        r#"
+        SELECT
+          c.id, c.entity_id, c.source_id, c.promotion_status, c.readiness_score,
+          e.normalized_name, e.normalized_address, e.city, e.province,
+          e.latitude, e.longitude, e.resolution_status, e.canonical_record_id,
+          r.source_record_id, r.source_url, r.license_snapshot, r.attribution_snapshot,
+          r.record_kind,
+          s.source_key, s.provider_name, s.source_url, s.license_name, s.license_url,
+          s.attribution_text, s.reuse_mode, s.storage_allowed
+        FROM reference_promotion_candidates c
+        JOIN data_import_entities e ON e.id = c.entity_id
+        LEFT JOIN data_import_records r
+          ON r.id = e.canonical_record_id
+         AND r.source_id = c.source_id
+        JOIN data_source_registry s ON s.id = c.source_id
+        WHERE c.id = $1
+        FOR UPDATE OF c
+        "#
+    )
+    .bind(candidate_id)
+    .fetch_optional(&mut *tx)
+    .await?;
+
+    let Some((
+        candidate_id, entity_id, source_id, promotion_status, readiness_score,
+        name, address, city, province, lat, lon, resolution_status, canonical_record_id,
+        source_record_id, source_record_url, record_license, record_attribution,
+        record_kind, source_key, provider_name, source_url, source_license, source_license_url,
+        source_attribution, reuse_mode, storage_allowed
+    )) = candidate else {
+        return Err(anyhow!("promotion candidate not found"));
+    };
+
+    if promotion_status == "promoted" {
+        let existing = sqlx::query_scalar::<_, Option<Uuid>>(
+            "SELECT proposed_content_id FROM reference_promotion_candidates WHERE id=$1"
+        )
+        .bind(candidate_id)
+        .fetch_one(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        return Ok(json!({
+            "promoted": true,
+            "idempotent": true,
+            "candidate_id": candidate_id,
+            "content_id": existing.flatten()
+        }));
+    }
+
+    if promotion_status != "approved" {
+        return Err(anyhow!("candidate must be approved before promotion"));
+    }
+    if readiness_score < 0.70 {
+        return Err(anyhow!("candidate readiness is below promotion threshold"));
+    }
+    if matches!(resolution_status.as_str(), "possible_duplicate" | "needs_review") {
+        return Err(anyhow!("entity resolution still requires review"));
+    }
+    if canonical_record_id.is_none() || source_record_id.is_none() {
+        return Err(anyhow!("canonical imported record is required"));
+    }
+    if reuse_mode != "persistent_import" || !storage_allowed {
+        return Err(anyhow!("source is not currently approved for persistent promotion"));
+    }
+
+    let source_record_id = source_record_id.expect("checked above");
+    let effective_license = record_license.or(source_license.clone());
+    if effective_license.as_deref().is_none_or(|v| v.trim().is_empty()) {
+        return Err(anyhow!("source license is missing"));
+    }
+
+    let name = name.ok_or_else(|| anyhow!("reference entity has no name"))?;
+    let body = reference_body(
+        &name,
+        address.as_deref(),
+        city.as_deref(),
+        province.as_deref(),
+    );
+    let slug = slugify_reference(&name, city.as_deref(), entity_id);
+
+    let existing_content = sqlx::query_scalar::<_, Uuid>(
+        r#"
+        SELECT id
+        FROM content_items
+        WHERE content_status <> 'deleted'
+          AND metadata->>'reference_publication_status' = 'published'
+          AND metadata->>'source_dataset' = $1
+          AND metadata->>'external_id' = $2
+        LIMIT 1
+        "#
+    )
+    .bind(&source_key)
+    .bind(&source_record_id)
+    .fetch_optional(&mut *tx)
+    .await?;
+
+    let content_id = if let Some(existing_id) = existing_content {
+        existing_id
+    } else {
+        let metadata = json!({
+            "record_kind": if record_kind == "government_reference" { "government_reference" } else { "open_data_reference" },
+            "market_side": "reference",
+            "is_transactional": false,
+            "reference_publication_status": "published",
+            "claimable": true,
+            "source_dataset": source_key,
+            "source_provider": provider_name,
+            "source_url": source_record_url.as_deref().unwrap_or(&source_url),
+            "source_license": effective_license,
+            "source_license_url": source_license_url,
+            "source_attribution": record_attribution.or(source_attribution),
+            "external_id": source_record_id,
+            "entity_id": entity_id,
+            "source_id": source_id,
+            "source_record_id": source_record_id,
+            "canonical_record_id": canonical_record_id,
+            "latitude": lat,
+            "longitude": lon,
+            "city": city,
+            "province": province,
+            "address": address,
+            "category": "umkm_reference",
+            "trust_note": "Data referensi dari sumber terdaftar; bukan verifikasi kepemilikan."
+        });
+
+        let inserted = sqlx::query_scalar::<_, Uuid>(
+            r#"
+            INSERT INTO content_items (
+              owner_id, content_type, slug, title, summary, body,
+              pricing_mode, currency, tags, category, content_status,
+              metadata, listing_status, listing_intent, current_step,
+              completion_percentage, last_saved_at, published_at
+            ) VALUES (
+              NULL, 'profile', $1, $2, $3, $4,
+              'fixed', 'IDR', ARRAY['reference','umkm']::text[], 'umkm_reference', 'active',
+              $5, 'published', 'offer', 1, 100, NOW(), NOW()
+            )
+            ON CONFLICT DO NOTHING
+            RETURNING id
+            "#
+        )
+        .bind(&slug)
+        .bind(&name)
+        .bind(format!("Referensi usaha dari {provider_name}."))
+        .bind(body)
+        .bind(metadata)
+        .fetch_optional(&mut *tx)
+        .await?;
+
+        match inserted {
+            Some(id) => id,
+            None => {
+                sqlx::query_scalar::<_, Uuid>(
+                    r#"
+                    SELECT id FROM content_items
+                    WHERE content_status <> 'deleted'
+                      AND (
+                        slug = $1
+                        OR (
+                          metadata->>'reference_publication_status' = 'published'
+                          AND metadata->>'source_dataset' = $2
+                          AND metadata->>'external_id' = $3
+                        )
+                      )
+                    ORDER BY CASE WHEN metadata->>'external_id' = $3 THEN 0 ELSE 1 END
+                    LIMIT 1
+                    "#
+                )
+                .bind(&slug)
+                .bind(&source_key)
+                .bind(&source_record_id)
+                .fetch_one(&mut *tx)
+                .await?
+            }
+        }
+    };
+
+    sqlx::query(
+        r#"
+        UPDATE data_import_records
+        SET target_content_id=$2, updated_at=NOW()
+        WHERE id=$1
+        "#
+    )
+    .bind(canonical_record_id.expect("checked above"))
+    .bind(content_id)
+    .execute(&mut *tx)
+    .await?;
+
+    sqlx::query(
+        r#"
+        UPDATE reference_promotion_candidates
+        SET proposed_content_id=$2,
+            promotion_status='promoted',
+            updated_at=NOW()
+        WHERE id=$1 AND promotion_status='approved'
+        "#
+    )
+    .bind(candidate_id)
+    .bind(content_id)
+    .execute(&mut *tx)
+    .await?;
+
+    tx.commit().await?;
+
+    Ok(json!({
+        "promoted": true,
+        "idempotent": false,
+        "candidate_id": candidate_id,
+        "entity_id": entity_id,
+        "content_id": content_id
+    }))
+}
+
+
 #[derive(serde::Deserialize)]
 struct ReviewPromotionRequest {
     decision: String,
@@ -218,9 +489,46 @@ async fn review_candidate(
     }
 }
 
+async fn promote(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(candidate_id): Path<Uuid>,
+) -> impl IntoResponse {
+    let Some(claims) = auth_claims_from_headers(&headers, &state.jwt_secret) else {
+        return (StatusCode::UNAUTHORIZED, Json(json!({"error":"unauthorized"}))).into_response();
+    };
+    if !has_agent_access(&claims) {
+        return (StatusCode::FORBIDDEN, Json(json!({"error":"agent role required"}))).into_response();
+    }
+
+    match promote_candidate(&state.db, candidate_id).await {
+        Ok(value) => (StatusCode::OK, Json(value)).into_response(),
+        Err(error) => {
+            tracing::error!("promote reference candidate failed: {:?}", error);
+            let message = error.to_string();
+            let status = if message.contains("not found") {
+                StatusCode::NOT_FOUND
+            } else if message.contains("must be approved")
+                || message.contains("below promotion")
+                || message.contains("requires review")
+                || message.contains("not currently approved")
+                || message.contains("license is missing")
+                || message.contains("canonical imported record")
+            {
+                StatusCode::CONFLICT
+            } else {
+                StatusCode::INTERNAL_SERVER_ERROR
+            };
+            (status, Json(json!({"error":"failed to promote reference candidate","detail":message}))).into_response()
+        }
+    }
+}
+
+
 pub fn router() -> axum::Router<Arc<AppState>> {
     axum::Router::new()
         .route("/v1/data/entities/{entity_id}/promotion-candidate", axum::routing::post(generate))
         .route("/v1/data/promotion-candidates", axum::routing::get(list_candidates))
         .route("/v1/data/promotion-candidates/{candidate_id}/review", axum::routing::post(review_candidate))
+        .route("/v1/data/promotion-candidates/{candidate_id}/promote", axum::routing::post(promote))
 }
