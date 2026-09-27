@@ -2956,6 +2956,8 @@ export function CommunityPostCard({
           </div>
         </div>
       </div>
+
+      <div className="px-3 pb-3 sm:px-4 sm:pb-4">
         {/* ================= POST CONTEXT ================= */}
 
         {(item.isPinned || item.isSolved || poll || isQuestionPost) ? (
