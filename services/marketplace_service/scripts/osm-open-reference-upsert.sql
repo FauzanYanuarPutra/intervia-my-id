@@ -285,7 +285,7 @@ INSERT INTO content_items (
   updated_at
 )
 SELECT
-  '00000000-0000-0000-0000-000000000801'::uuid,
+  NULL::uuid,
   p.content_type,
   p.canonical_slug,
   p.name,
