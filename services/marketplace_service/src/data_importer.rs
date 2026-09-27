@@ -474,10 +474,7 @@ async fn run_inner(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
                             }
                             Err(error) => {
                                 errors += 1;
-                                tracing::warn!(
-                                    "entity normalization failed: {:?}",
-                                    error
-                                );
+                                tracing::warn!("entity normalization failed: {:?}", error);
                             }
                         }
                     }
