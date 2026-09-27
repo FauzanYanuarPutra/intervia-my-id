@@ -1108,6 +1108,7 @@ struct ListUmkmStoresQuery {
     city: Option<String>,
     slug: Option<String>,
     id: Option<Uuid>,
+    include_references: Option<bool>,
     limit: Option<i64>,
     min_lat: Option<f64>,
     max_lat: Option<f64>,
@@ -8069,23 +8070,34 @@ async fn find_public_umkm_store_row(
         FROM umkm_stores s
         WHERE (($1::uuid IS NOT NULL AND s.id = $1) OR lower(s.slug) = $2)
           AND s.is_active = TRUE
-          AND lower(COALESCE(s.metadata->>'is_transactional', 'true')) <> 'false'
-          AND lower(COALESCE(s.metadata->>'market_side', '')) <> 'reference'
-          AND lower(COALESCE(s.metadata->>'record_kind', '')) NOT LIKE '%reference%'
           AND lower(COALESCE(s.metadata->>'outlet_active', 'true')) <> 'false'
-          AND EXISTS (
-            SELECT 1 FROM business_locations location
-            WHERE location.store_id = s.id
-              AND location.public_visibility = TRUE
-              AND location.status = 'active'
+          AND (
+            (
+              lower(COALESCE(s.metadata->>'is_transactional', 'true')) = 'false'
+              AND (
+                lower(COALESCE(s.metadata->>'market_side', '')) = 'reference'
+                OR lower(COALESCE(s.metadata->>'record_kind', '')) LIKE '%reference%'
+              )
+            )
+            OR (
+              lower(COALESCE(s.metadata->>'is_transactional', 'true')) <> 'false'
+              AND lower(COALESCE(s.metadata->>'market_side', '')) <> 'reference'
+              AND lower(COALESCE(s.metadata->>'record_kind', '')) NOT LIKE '%reference%'
+              AND EXISTS (
+                SELECT 1 FROM business_locations location
+                WHERE location.store_id = s.id
+                  AND location.public_visibility = TRUE
+                  AND location.status = 'active'
+              )
+              AND COALESCE((
+                SELECT latest.current_action
+                FROM internal_moderation.business_moderation_cases latest
+                WHERE latest.business_id = s.id
+                ORDER BY latest.updated_at DESC
+                LIMIT 1
+              ), 'approve') NOT IN ('hide', 'reject')
+            )
           )
-          AND COALESCE((
-            SELECT latest.current_action
-            FROM internal_moderation.business_moderation_cases latest
-            WHERE latest.business_id = s.id
-            ORDER BY latest.updated_at DESC
-            LIMIT 1
-          ), 'approve') NOT IN ('hide', 'reject')
         LIMIT 1
         "#,
     )
@@ -8407,7 +8419,42 @@ async fn list_umkm_stores(
         .unwrap_or((None, None));
 
     let use_nearest_index = viewer.is_some();
-    let visibility_filter = r#"
+    let include_references = query.include_references.unwrap_or(true);
+    let visibility_filter = if include_references {
+        r#"
+      AND is_active = TRUE
+      AND lower(COALESCE(metadata->>'outlet_active', 'true')) <> 'false'
+      AND (
+        (
+          lower(COALESCE(metadata->>'is_transactional', 'true')) = 'false'
+          AND (
+            lower(COALESCE(metadata->>'market_side', '')) = 'reference'
+            OR lower(COALESCE(metadata->>'record_kind', '')) LIKE '%reference%'
+          )
+        )
+        OR (
+          lower(COALESCE(metadata->>'is_transactional', 'true')) <> 'false'
+          AND lower(COALESCE(metadata->>'market_side', '')) <> 'reference'
+          AND lower(COALESCE(metadata->>'record_kind', '')) NOT LIKE '%reference%'
+          AND EXISTS (
+            SELECT 1
+            FROM business_locations location
+            WHERE location.store_id = umkm_stores.id
+              AND location.public_visibility = TRUE
+              AND location.status = 'active'
+          )
+          AND COALESCE((
+            SELECT latest.current_action
+            FROM internal_moderation.business_moderation_cases latest
+            WHERE latest.business_id = umkm_stores.id
+            ORDER BY latest.updated_at DESC
+            LIMIT 1
+          ), 'approve') NOT IN ('hide', 'reject')
+        )
+      )
+    "#
+    } else {
+        r#"
       AND is_active = TRUE
       AND lower(COALESCE(metadata->>'is_transactional', 'true')) <> 'false'
       AND lower(COALESCE(metadata->>'market_side', '')) <> 'reference'
@@ -8427,7 +8474,8 @@ async fn list_umkm_stores(
         ORDER BY latest.updated_at DESC
         LIMIT 1
       ), 'approve') NOT IN ('hide', 'reject')
-    "#;
+    "#
+    };
     let ranking_order = if use_nearest_index {
         // Keep KNN distance as the complete ORDER BY expression. Adding
         // updated_at/id tie-breakers makes PostgreSQL scan and sort every
