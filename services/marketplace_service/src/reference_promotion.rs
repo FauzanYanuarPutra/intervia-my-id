@@ -6,7 +6,7 @@ use axum::{
     Json,
 };
 use serde_json::{json, Value};
-use sha2::{Digest, Sha256};
+use sha2::Digest;
 use sqlx::{PgPool, Row};
 use std::sync::Arc;
 use uuid::Uuid;
