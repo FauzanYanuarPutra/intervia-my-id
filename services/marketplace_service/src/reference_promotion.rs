@@ -1,6 +1,6 @@
 use axum::{extract::{Path, State}, http::{HeaderMap, StatusCode}, response::IntoResponse, Json};
 use serde_json::{json, Value};
-use sqlx::PgPool;
+use sqlx::{PgPool, Row};
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -114,7 +114,107 @@ async fn generate(
     }
 }
 
+
+#[derive(serde::Deserialize)]
+struct ReviewPromotionRequest {
+    decision: String,
+    review_note: Option<String>,
+}
+
+async fn list_candidates(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    let Some(claims) = auth_claims_from_headers(&headers, &state.jwt_secret) else {
+        return (StatusCode::UNAUTHORIZED, Json(json!({"error":"unauthorized"}))).into_response();
+    };
+    if !has_agent_access(&claims) {
+        return (StatusCode::FORBIDDEN, Json(json!({"error":"agent role required"}))).into_response();
+    }
+    match sqlx::query(
+        r#"SELECT id, entity_id, source_id, proposed_content_id, promotion_status,
+                   readiness_score, blocking_reasons, provenance_snapshot,
+                   reviewed_by, reviewed_at, review_note, created_at, updated_at
+            FROM reference_promotion_candidates
+            ORDER BY CASE promotion_status WHEN 'pending_review' THEN 0 WHEN 'blocked' THEN 1 ELSE 2 END,
+                     readiness_score DESC, created_at DESC
+            LIMIT 200"#
+    ).fetch_all(&state.db).await {
+        Ok(rows) => {
+            let items = rows.into_iter().map(|row| json!({
+                "id": row.try_get::<Uuid,_>("id").ok(),
+                "entity_id": row.try_get::<Uuid,_>("entity_id").ok(),
+                "source_id": row.try_get::<Uuid,_>("source_id").ok(),
+                "proposed_content_id": row.try_get::<Option<Uuid>,_>("proposed_content_id").ok().flatten(),
+                "promotion_status": row.try_get::<String,_>("promotion_status").ok(),
+                "readiness_score": row.try_get::<f64,_>("readiness_score").ok(),
+                "blocking_reasons": row.try_get::<Value,_>("blocking_reasons").ok(),
+                "provenance_snapshot": row.try_get::<Value,_>("provenance_snapshot").ok(),
+                "review_note": row.try_get::<Option<String>,_>("review_note").ok().flatten(),
+            })).collect::<Vec<_>>();
+            (StatusCode::OK, Json(json!({"items":items}))).into_response()
+        }
+        Err(error) => {
+            tracing::error!("list promotion candidates failed: {:?}", error);
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"failed to load promotion candidates"}))).into_response()
+        }
+    }
+}
+
+async fn review_candidate(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(candidate_id): Path<Uuid>,
+    Json(payload): Json<ReviewPromotionRequest>,
+) -> impl IntoResponse {
+    let Some(claims) = auth_claims_from_headers(&headers, &state.jwt_secret) else {
+        return (StatusCode::UNAUTHORIZED, Json(json!({"error":"unauthorized"}))).into_response();
+    };
+    let Some(reviewer_id) = Uuid::parse_str(&claims.sub).ok() else {
+        return (StatusCode::UNAUTHORIZED, Json(json!({"error":"invalid reviewer identity"}))).into_response();
+    };
+    if !has_agent_access(&claims) {
+        return (StatusCode::FORBIDDEN, Json(json!({"error":"agent role required"}))).into_response();
+    }
+    let decision = match payload.decision.trim() {
+        "approved" => "approved",
+        "rejected" => "rejected",
+        "blocked" => "blocked",
+        _ => return (StatusCode::BAD_REQUEST, Json(json!({"error":"decision must be approved, rejected, or blocked"}))).into_response(),
+    };
+    if decision == "approved" {
+        let blocked = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM reference_promotion_candidates WHERE id=$1 AND jsonb_array_length(blocking_reasons) > 0"
+        ).bind(candidate_id).fetch_optional(&state.db).await.ok().flatten().unwrap_or(0);
+        if blocked > 0 {
+            return (StatusCode::CONFLICT, Json(json!({"error":"candidate has unresolved blocking reasons","code":"candidate_blocked"}))).into_response();
+        }
+    }
+    match sqlx::query(
+        r#"UPDATE reference_promotion_candidates
+            SET promotion_status=$2, reviewed_by=$3, reviewed_at=NOW(),
+                review_note=$4, updated_at=NOW()
+            WHERE id=$1 AND promotion_status NOT IN ('promoted')
+            RETURNING id, promotion_status, reviewed_at"#
+    ).bind(candidate_id).bind(decision).bind(reviewer_id)
+     .bind(payload.review_note.map(|v| v.trim().chars().take(4000).collect::<String>()))
+     .fetch_optional(&state.db).await {
+        Ok(Some(row)) => (StatusCode::OK, Json(json!({
+            "id":row.try_get::<Uuid,_>("id").ok(),
+            "promotion_status":row.try_get::<String,_>("promotion_status").ok(),
+            "reviewed_at":row.try_get::<chrono::DateTime<chrono::Utc>,_>("reviewed_at").ok()
+        }))).into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, Json(json!({"error":"candidate not found or already promoted"}))).into_response(),
+        Err(error) => {
+            tracing::error!("review promotion candidate failed: {:?}", error);
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"failed to review promotion candidate"}))).into_response()
+        }
+    }
+}
+
 pub fn router() -> axum::Router<Arc<AppState>> {
     axum::Router::new()
         .route("/v1/data/entities/{entity_id}/promotion-candidate", axum::routing::post(generate))
+        .route("/v1/data/promotion-candidates", axum::routing::get(list_candidates))
+        .route("/v1/data/promotion-candidates/{candidate_id}/review", axum::routing::post(review_candidate))
 }
