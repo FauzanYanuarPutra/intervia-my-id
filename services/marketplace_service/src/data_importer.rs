@@ -42,6 +42,9 @@ fn hash(value: &Value) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
 
+// Import adapters currently support governed CKAN/DataStore and OSM Overpass sources.
+// File-resource adapters are intentionally added separately so licensing and size limits
+// remain explicit rather than silently treating every downloadable URL as reusable.
 fn base_url(api_url: &str) -> Option<&str> {
     api_url.split("/api/").next().filter(|v| !v.is_empty())
 }
