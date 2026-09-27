@@ -10406,16 +10406,20 @@ async fn list_map_references(
           updated_at
         FROM content_items
         WHERE content_status = 'active'
-          AND metadata->>'record_kind' = 'real_openstreetmap_reference'
-          AND metadata->>'source_dataset' = 'openstreetmap'
+          AND content_status = 'active'
+          AND metadata->>'reference_publication_status' = 'published'
+          AND metadata->>'claimable' = 'true'
           AND COALESCE(metadata->>'is_transactional', 'true') = 'false'
           AND lower(COALESCE(metadata->>'market_side', '')) = 'reference'
-          AND lower(btrim(COALESCE(metadata->>'source_title', ''))) LIKE '%openstreetmap%'
-          AND lower(btrim(COALESCE(metadata->>'source_license', ''))) ~ '(odbl|open database license)'
-          AND lower(btrim(COALESCE(metadata->>'source_url', '')))
-            ~ '^https://(www[.])?openstreetmap[.]org/(node|way|relation)/[0-9]+/?([?#].*)?$'
-          AND lower(btrim(COALESCE(metadata->>'source_license_url', '')))
-            ~ '^https://(www[.])?opendatacommons[.]org/licenses/odbl/1-0(/|$|[?#])'
+          AND metadata->>'record_kind' IN (
+            'government_reference',
+            'open_data_reference',
+            'licensed_reference',
+            'external_content_reference',
+            'real_openstreetmap_reference'
+          )
+          AND NULLIF(btrim(COALESCE(metadata->>'source_license', '')), '') IS NOT NULL
+          AND NULLIF(btrim(COALESCE(metadata->>'source_url', '')), '') IS NOT NULL
           AND public.lajukan_safe_map_coordinate(metadata->>'latitude') BETWEEN -90.0 AND 90.0
           AND public.lajukan_safe_map_coordinate(metadata->>'longitude') BETWEEN -180.0 AND 180.0
         "#,
