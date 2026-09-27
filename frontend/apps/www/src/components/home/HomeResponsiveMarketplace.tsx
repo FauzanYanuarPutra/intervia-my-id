@@ -3627,7 +3627,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
   const { totalUnread } = useChatInbox();
   const [query, setQuery] = useState('');
   const [summary, setSummary] = useState<LajukanSummary | null>(null);
-  const [activeTab, setActiveTab] = useState<CommunityTab>('community');
+  const [activeTab, setActiveTab] = useState<CommunityTab>('for-you');
   const [recommendations, setRecommendations] = useState<RecommendationItem[]>(
     [],
   );
