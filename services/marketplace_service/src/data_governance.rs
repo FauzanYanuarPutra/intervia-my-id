@@ -1091,7 +1091,8 @@ async fn create_import_job(
 
 
 
-pub async fn bootstrap_persistent_imports(db: &PgPool) -> Result<u64, sqlx::Error> {
+pub async fn bootstrap_persistent_imports(state: Arc<AppState>) -> Result<u64, sqlx::Error> {
+    let db = &state.db;
     let sources = sqlx::query_as::<_, (Uuid, String, Option<String>, i32)>(
         r#"
         SELECT id, source_key, api_url, COALESCE(refresh_interval_hours, 168)
@@ -1147,6 +1148,12 @@ pub async fn bootstrap_persistent_imports(db: &PgPool) -> Result<u64, sqlx::Erro
         .await?;
 
         queued += 1;
+        let state_for_job = state.clone();
+        tokio::spawn(async move {
+            if let Err(error) = crate::data_importer::run(state_for_job, job).await {
+                tracing::error!("bootstrap importer job {} failed: {:?}", job, error);
+            }
+        });
         tracing::info!(
             source_key = %source_key,
             api_url = ?api_url,
