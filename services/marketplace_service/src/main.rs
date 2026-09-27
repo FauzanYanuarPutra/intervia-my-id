@@ -24286,7 +24286,7 @@ async fn list_content(
     }
 
     let rows = sqlx::query_as::<_, ContentRow>(
-        r#"
+        r###"
         SELECT
             id, owner_id, content_type, slug, title, summary, body, price_cents, price_unit,
             currency, tags, cover_image, category, content_status, pricing_mode, original_price_cents,
@@ -24477,7 +24477,7 @@ async fn list_content(
           created_at DESC,
           id ASC
         LIMIT $16 OFFSET $17
-        "#,
+        "###
     )
     .bind(typ)
     .bind(q)
