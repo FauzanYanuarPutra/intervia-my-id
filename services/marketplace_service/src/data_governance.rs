@@ -36,6 +36,7 @@ struct DataSourceRow {
     media_storage_allowed: bool,
     pii_import_allowed: bool,
     enabled: bool,
+    auto_publish_reference: bool,
     refresh_interval_hours: Option<i32>,
     last_checked_at: Option<DateTime<Utc>>,
     last_success_at: Option<DateTime<Utc>>,
@@ -760,7 +761,7 @@ async fn list_sources(
         r#"
         SELECT id, source_key, provider_name, source_kind, source_url, api_url, terms_url,
                license_name, license_url, attribution_text, reuse_mode, storage_allowed,
-               media_storage_allowed, pii_import_allowed, enabled, refresh_interval_hours,
+               media_storage_allowed, pii_import_allowed, enabled, auto_publish_reference, refresh_interval_hours,
                last_checked_at, last_success_at, last_error_at, notes, created_at, updated_at
         FROM data_source_registry
         WHERE enabled = TRUE
