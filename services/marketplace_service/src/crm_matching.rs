@@ -333,13 +333,12 @@ fn listing_quality_score(candidate: &CandidateItem) -> f64 {
     if candidate.body.trim().len() >= 80 {
         score += 1.0;
     }
-    if candidate
+    if !candidate
         .cover_image
         .as_deref()
         .unwrap_or_default()
         .trim()
         .is_empty()
-        == false
     {
         score += 1.0;
     }
