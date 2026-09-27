@@ -304,6 +304,20 @@ out center tags;
             safe_map.insert("longitude".to_string(), Value::from(lon));
             safe_map.insert("city".to_string(), Value::String((*city).to_string()));
             safe_map.insert("province".to_string(), Value::String((*province).to_string()));
+            let address = [
+                tags.get("addr:street").and_then(Value::as_str),
+                tags.get("addr:housenumber").and_then(Value::as_str),
+                tags.get("addr:suburb").and_then(Value::as_str),
+            ]
+            .into_iter()
+            .flatten()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .collect::<Vec<_>>()
+            .join(", ");
+            if !address.is_empty() {
+                safe_map.insert("address".to_string(), Value::String(address));
+            }
             safe_map.insert("source_url".to_string(), Value::String(
                 format!("https://www.openstreetmap.org/{}/{}", element_type, element_id)
             ));
