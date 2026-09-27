@@ -1730,7 +1730,7 @@ def provider_store_sql(stores: list[ProviderStore]) -> list[str]:
         "    'address', address,",
         "    'latitude', lat,",
         "    'longitude', lng,",
-        "    'marketplace_category_slug', metadata->>'marketplace_category_slug',
+        "    'marketplace_category_slug', metadata->>'marketplace_category_slug',",
         "    'segment', segment,",
         "    'search_text', search_text",
         "  ),",
