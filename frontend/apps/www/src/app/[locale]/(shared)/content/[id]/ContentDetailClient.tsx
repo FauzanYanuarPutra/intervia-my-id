@@ -4053,7 +4053,13 @@ export default function ContentDetailClient({
           className={detailPrimaryButtonClass}
         >
           <Pencil className="h-4 w-4" />
-          {locale === 'id' ? 'Edit listing' : 'Edit listing'}
+          {isLiveContent
+            ? locale === 'id'
+              ? 'Edit & ajukan revisi'
+              : 'Edit & request revision'
+            : locale === 'id'
+              ? 'Lanjutkan edit'
+              : 'Continue editing'}
         </Link>
       )}
       {isOwner && (
@@ -4312,6 +4318,37 @@ export default function ContentDetailClient({
           </p>
         </div>
       )}
+      {isOwner && !publicReference ? (
+        <section
+          className="mt-4 rounded-[16px] border border-emerald-100 bg-emerald-50/70 p-3 dark:border-emerald-400/15 dark:bg-emerald-500/8"
+          aria-label={locale === 'id' ? 'Status pemilik listing' : 'Listing owner status'}
+        >
+          <div className="flex items-start gap-2.5">
+            <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white text-emerald-700 ring-1 ring-emerald-100 dark:bg-slate-900 dark:text-emerald-300 dark:ring-emerald-400/15">
+              <Pencil className="h-4 w-4" />
+            </span>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-xs font-black text-emerald-900 dark:text-emerald-100">
+                  {locale === 'id' ? 'Ini listing milikmu' : 'This listing is yours'}
+                </p>
+                <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-black text-emerald-800 ring-1 ring-emerald-100 dark:bg-slate-900 dark:text-emerald-200 dark:ring-emerald-400/15">
+                  {ownerStatusLabel}
+                </span>
+              </div>
+              <p className="mt-1 text-[11px] leading-5 text-emerald-900/75 dark:text-emerald-100/75">
+                {isLiveContent
+                  ? locale === 'id'
+                    ? 'Perubahan tidak langsung mengubah versi live. Saat disimpan, listing kembali ke antrean review dan baru tayang lagi setelah lolos pemeriksaan.'
+                    : 'Edits do not silently change the live version. Saving sends the listing back through review before the revised version becomes live again.'
+                  : locale === 'id'
+                    ? 'Kamu bisa melanjutkan pengeditan dari tombol di bawah.'
+                    : 'You can continue editing from the button below.'}
+              </p>
+            </div>
+          </div>
+        </section>
+      ) : null}
       <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
         {actionButtons}
       </div>
