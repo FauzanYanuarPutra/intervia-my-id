@@ -37,8 +37,8 @@ jobs:
             context: ./services/identity_service
             dockerfile: Dockerfile
           - image: lajukan-marketplace
-            context: ./services/marketplace_service
-            dockerfile: Dockerfile
+            context: .
+            dockerfile: services/marketplace_service/Dockerfile
           - image: lajukan-community
             context: ./services/community_service
             dockerfile: Dockerfile
