@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS data_import_entities (
     longitude DOUBLE PRECISION,
     category TEXT,
     source_record_count INTEGER NOT NULL DEFAULT 0,
-    confidence NUMERIC(5,4) NOT NULL DEFAULT 0,
+    confidence DOUBLE PRECISION NOT NULL DEFAULT 0,
     resolution_status TEXT NOT NULL DEFAULT 'needs_review'
         CHECK (resolution_status IN ('new','same_entity','possible_duplicate','distinct_entity','needs_review')),
     canonical_record_id UUID REFERENCES data_import_records(id) ON DELETE SET NULL,
@@ -36,10 +36,10 @@ CREATE TABLE IF NOT EXISTS data_import_entity_matches (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     entity_id UUID NOT NULL REFERENCES data_import_entities(id) ON DELETE CASCADE,
     candidate_entity_id UUID NOT NULL REFERENCES data_import_entities(id) ON DELETE CASCADE,
-    name_similarity NUMERIC(5,4) NOT NULL DEFAULT 0,
-    address_similarity NUMERIC(5,4) NOT NULL DEFAULT 0,
-    geo_similarity NUMERIC(5,4) NOT NULL DEFAULT 0,
-    combined_score NUMERIC(5,4) NOT NULL DEFAULT 0,
+    name_similarity DOUBLE PRECISION NOT NULL DEFAULT 0,
+    address_similarity DOUBLE PRECISION NOT NULL DEFAULT 0,
+    geo_similarity DOUBLE PRECISION NOT NULL DEFAULT 0,
+    combined_score DOUBLE PRECISION NOT NULL DEFAULT 0,
     decision TEXT NOT NULL DEFAULT 'needs_review'
         CHECK (decision IN ('same_entity','possible_duplicate','distinct_entity','needs_review')),
     reason TEXT,
