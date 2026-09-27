@@ -238,7 +238,7 @@ async fn promote_candidate(
             "SELECT proposed_content_id FROM reference_promotion_candidates WHERE id=$1"
         )
         .bind(candidate_id)
-        .fetch_one(&mut *tx)
+        .fetch_optional(&mut *tx)
         .await?;
         tx.commit().await?;
         return Ok(json!({
