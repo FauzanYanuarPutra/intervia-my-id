@@ -248,7 +248,7 @@ export function UmkmDiscoveryClient(props: UmkmDiscoveryClientProps) {
         title={
           activeLane === 'all'
             ? isId
-              ? 'Peta UMKM'
+              ? 'Peta usaha'
               : 'Business map'
             : isId
               ? `Peta ${activeCategoryLabel}`
