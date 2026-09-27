@@ -7147,7 +7147,7 @@ export default function CommunityFeedClient({
                   </section>
                 ) : null}
 
-                <div className="space-y-2 sm:space-y-3">
+                <div className="space-y-3">
                   {items.map(item => (
                     <CommunityPostCard
                       key={item.id}
