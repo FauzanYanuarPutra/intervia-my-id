@@ -347,8 +347,8 @@ services:
   marketplace_service:
     <<: *service-defaults
     build:
-      context: ./services/marketplace_service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: services/marketplace_service/Dockerfile
     environment:
       ENV: ${ENV:-development}
       APP_PORT: "8081"
