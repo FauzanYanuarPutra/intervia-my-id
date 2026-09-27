@@ -2002,7 +2002,6 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/v1/business-claims/{claim_id}/review", post(review_claim))
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::super::AppState;
