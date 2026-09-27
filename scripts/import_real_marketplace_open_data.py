@@ -539,7 +539,7 @@ def iter_overpass_providers(source: dict[str, Any], max_rows: int | None) -> Ite
             )
             metadata = {
                 "seed_pack": "real_indonesia_bulk_open_data",
-                "record_kind": "osm_provider_reference",
+                "record_kind": "real_openstreetmap_reference",
                 "source_id": source["id"],
                 "source_record_id": source_record_id,
                 "source_url": source_url,
