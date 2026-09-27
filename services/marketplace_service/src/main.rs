@@ -2075,6 +2075,9 @@ async fn main() -> anyhow::Result<()> {
             .unwrap_or_else(|_| "http://identity_service:8080".to_owned()),
         notification_tx,
     });
+    if let Err(error) = data_governance::sync_static_source_registry(&state.db).await {
+        tracing::warn!("Governed data source registry sync failed: {:?}", error);
+    }
 
     let identity_projection_config = IdentityProjectionConfig::from_env();
     if identity_projection_config.enabled {
