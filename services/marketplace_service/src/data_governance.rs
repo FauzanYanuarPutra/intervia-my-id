@@ -987,7 +987,19 @@ async fn bootstrap_status(State(state): State<Arc<AppState>>) -> impl IntoRespon
           (SELECT COALESCE(MAX(error_summary), '')
              FROM data_import_jobs
             WHERE status='failed'
-              AND created_at > NOW() - INTERVAL '24 hours') AS last_error
+              AND created_at > NOW() - INTERVAL '24 hours') AS last_error,
+          (SELECT COALESCE(last_provider_count, 0)::bigint
+             FROM real_data_bootstrap_runs
+            WHERE bootstrap_key='real_marketplace_open_data') AS external_provider_count,
+          (SELECT COALESCE(last_buyer_count, 0)::bigint
+             FROM real_data_bootstrap_runs
+            WHERE bootstrap_key='real_marketplace_open_data') AS external_buyer_count,
+          (SELECT COALESCE(last_community_media_count, 0)::bigint
+             FROM real_data_bootstrap_runs
+            WHERE bootstrap_key='real_marketplace_open_data') AS external_community_media_count,
+          (SELECT last_success_at
+             FROM real_data_bootstrap_runs
+            WHERE bootstrap_key='real_marketplace_open_data') AS external_last_success_at
         "#,
     )
     .fetch_one(&state.db)
@@ -1045,7 +1057,24 @@ async fn bootstrap_status(State(state): State<Arc<AppState>>) -> impl IntoRespon
                 .try_get::<Option<String>, _>("last_error")
                 .ok()
                 .flatten();
-            let hydrated = published_references > 0 || aggregate_references > 0;
+            let external_provider_count = row
+                .try_get::<i64, _>("external_provider_count")
+                .unwrap_or(0);
+            let external_buyer_count = row
+                .try_get::<i64, _>("external_buyer_count")
+                .unwrap_or(0);
+            let external_community_media_count = row
+                .try_get::<i64, _>("external_community_media_count")
+                .unwrap_or(0);
+            let external_last_success_at = row
+                .try_get::<Option<DateTime<Utc>>, _>("external_last_success_at")
+                .ok()
+                .flatten();
+            let external_hydrated =
+                external_provider_count > 0
+                    || external_buyer_count > 0
+                    || external_community_media_count > 0;
+            let hydrated = published_references > 0 || aggregate_references > 0 || external_hydrated;
             let status = if hydrated {
                 "ready"
             } else if active_jobs > 0 {
@@ -1085,6 +1114,12 @@ async fn bootstrap_status(State(state): State<Arc<AppState>>) -> impl IntoRespon
                     "accepted_records": accepted_records,
                     "published_references": published_references,
                     "aggregate_references": aggregate_references,
+                    "external_crawler": {
+                        "provider_count": external_provider_count,
+                        "buyer_count": external_buyer_count,
+                        "community_media_count": external_community_media_count,
+                        "last_success_at": external_last_success_at
+                    },
                     "last_error": last_error,
                     "sources": sources
                 })),
