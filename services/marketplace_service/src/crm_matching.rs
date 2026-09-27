@@ -117,7 +117,6 @@ struct CandidateItem {
     category: Option<String>,
     tags: Option<Vec<String>>,
     price_cents: Option<i64>,
-    currency: Option<String>,
     rating: Option<f32>,
     review_count: Option<i32>,
     cover_image: Option<String>,
@@ -157,6 +156,7 @@ fn forbidden() -> axum::response::Response {
         .into_response()
 }
 
+#[allow(clippy::result_large_err)]
 fn require_agent(
     headers: &HeaderMap,
     state: &Arc<AppState>,
@@ -232,7 +232,7 @@ fn city_from(metadata: &Value) -> Option<String> {
         metadata,
         &["city", "location_text", "location", "service_area"],
     )
-    .map(|v| text(v))
+    .map(text)
 }
 
 fn category_from(metadata: &Value) -> Option<String> {
@@ -246,7 +246,7 @@ fn category_from(metadata: &Value) -> Option<String> {
             "discovery_category",
         ],
     )
-    .map(|v| text(v))
+    .map(text)
 }
 
 fn coordinate_from(metadata: &Value) -> Option<(f64, f64)> {
@@ -284,7 +284,7 @@ fn availability_score(metadata: &Value) -> f64 {
         metadata,
         &["availability", "stock_status", "availability_status"],
     )
-    .map(|v| text(v));
+    .map(text);
     match status.as_deref() {
         Some("available") | Some("ready") | Some("ready_stock") | Some("tersedia") => 10.0,
         Some("limited") | Some("terbatas") => 6.0,
@@ -338,8 +338,8 @@ fn listing_quality_score(candidate: &CandidateItem) -> f64 {
         .as_deref()
         .unwrap_or_default()
         .trim()
-        .len()
-        > 0
+        .is_empty()
+        == false
     {
         score += 1.0;
     }
@@ -406,9 +406,9 @@ fn score_candidate(requirement: &RequirementItem, candidate: &CandidateItem) -> 
     };
 
     let requirement_category = category_from(&requirement.metadata)
-        .or_else(|| requirement.category.clone().map(|v| text(v)));
+        .or_else(|| requirement.category.clone().map(text));
     let candidate_category =
-        category_from(&candidate.metadata).or_else(|| candidate.category.clone().map(|v| text(v)));
+        category_from(&candidate.metadata).or_else(|| candidate.category.clone().map(text));
     let category_fit = match (requirement_category.clone(), candidate_category.clone()) {
         (Some(req), Some(candidate)) if req == candidate => 20.0,
         (Some(req), Some(candidate)) if req.contains(&candidate) || candidate.contains(&req) => {
@@ -599,7 +599,7 @@ pub async fn list_requirements(
         .q
         .map(|v| v.trim().chars().take(180).collect::<String>())
         .filter(|v| !v.is_empty());
-    let status = query.status.map(|v| text(v)).filter(|v| !v.is_empty());
+    let status = query.status.map(text).filter(|v| !v.is_empty());
 
     let rows = sqlx::query_as::<_, RequirementItem>(
         r#"
@@ -696,6 +696,7 @@ pub async fn get_requirement(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn write_audit(
     db: &sqlx::PgPool,
     entity_type: &str,
@@ -1001,7 +1002,7 @@ pub async fn run_match(
         r#"
         SELECT
             id, owner_id, title, summary, body, content_type, category, tags,
-            price_cents, currency, rating, review_count, cover_image,
+            price_cents, rating, review_count, cover_image,
             COALESCE(metadata, '{}'::jsonb) AS metadata, updated_at
         FROM content_items
         WHERE content_status = 'active'
