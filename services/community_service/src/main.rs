@@ -2376,7 +2376,10 @@ async fn get_group(
     Path(group_id): Path<String>,
 ) -> ApiResult<Json<DataResponse<ForumGroup>>> {
     let actor = optional_actor(&headers, &state);
-    if let Some(platform_admin) = actor.as_ref().filter(|value| is_platform_group_admin(value)) {
+    if let Some(platform_admin) = actor
+        .as_ref()
+        .filter(|value| is_platform_group_admin(value))
+    {
         let forum_user = ensure_forum_user(&state.db, platform_admin).await?;
         ensure_platform_group_admin_memberships(&state.db, platform_admin, &forum_user.id).await?;
     }
