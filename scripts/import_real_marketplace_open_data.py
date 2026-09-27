@@ -2033,6 +2033,7 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--source", action="append", default=[], help="Source id to run. Defaults to enabled_by_default sources.")
     parser.add_argument("--max-providers", type=int, default=1000, help="Use -1 for unlimited.")
     parser.add_argument("--max-buyers", type=int, default=1000, help="Use -1 for unlimited.")
+    parser.add_argument("--max-insights", type=int, default=2000, help="Use -1 for unlimited.")
     parser.add_argument("--max-community-media", type=int, default=80, help="Use -1 for unlimited.")
     parser.add_argument("--sleep", type=float, default=1.0, help="Seconds between remote source windows.")
     parser.add_argument("--summary-only", action="store_true", help="Print selected source plan without fetching.")
@@ -2059,7 +2060,7 @@ def main(argv: list[str]) -> int:
     remaining_providers = args.max_providers if args.max_providers >= 0 else None
     remaining_buyers = args.max_buyers if args.max_buyers >= 0 else None
     remaining_community_media = args.max_community_media if args.max_community_media >= 0 else None
-    remaining_insights = int(args.max_buyers) if args.max_buyers >= 0 else None
+    remaining_insights = int(args.max_insights) if args.max_insights >= 0 else None
 
     for source in sources:
         kind = source.get("kind")
