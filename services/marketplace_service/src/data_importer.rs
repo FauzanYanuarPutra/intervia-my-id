@@ -972,3 +972,65 @@ pub async fn run(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ckan_package_show_preserves_dataset_query() {
+        let url = ckan_action_url(
+            "https://data.go.id/api/action/package_show?id=dataset-123",
+            "package_show",
+        )
+        .expect("package_show URL");
+        assert_eq!(
+            url,
+            "https://data.go.id/api/action/package_show?id=dataset-123"
+        );
+    }
+
+    #[test]
+    fn ckan_datastore_search_drops_package_query() {
+        let url = ckan_action_url(
+            "https://data.go.id/api/action/package_show?id=dataset-123",
+            "datastore_search",
+        )
+        .expect("datastore URL");
+        assert_eq!(url, "https://data.go.id/api/action/datastore_search");
+    }
+
+    #[test]
+    fn recognizes_json_and_geojson_resources() {
+        assert!(resource_is_json(&serde_json::json!({
+            "format": "JSON",
+            "url": "https://example.test/data"
+        })));
+        assert!(resource_is_json(&serde_json::json!({
+            "mimetype": "application/geo+json"
+        })));
+        assert!(!resource_is_json(&serde_json::json!({
+            "format": "XLSX",
+            "url": "https://example.test/data.xlsx"
+        })));
+    }
+
+    #[test]
+    fn extracts_geojson_point_features() {
+        let rows = json_resource_records(serde_json::json!({
+            "type": "FeatureCollection",
+            "features": [{
+                "id": "shop-1",
+                "properties": {"name": "Toko Maju", "city": "Bandung"},
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [107.6191, -6.9175]
+                }
+            }]
+        }));
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].get("name").and_then(Value::as_str), Some("Toko Maju"));
+        assert_eq!(rows[0].get("latitude").and_then(Value::as_f64), Some(-6.9175));
+        assert_eq!(rows[0].get("longitude").and_then(Value::as_f64), Some(107.6191));
+    }
+}
