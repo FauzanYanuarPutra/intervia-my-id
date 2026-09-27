@@ -1552,7 +1552,7 @@ pub async fn bootstrap_persistent_imports(state: Arc<AppState>) -> Result<u64, s
                     SELECT 1
                     FROM data_import_jobs
                     WHERE source_id = $1
-                      AND status = 'succeeded'
+                      AND status IN ('succeeded','partial')
                       AND finished_at > NOW() - ($2::text || ' hours')::interval
                 )
                 "#,
@@ -1565,6 +1565,26 @@ pub async fn bootstrap_persistent_imports(state: Arc<AppState>) -> Result<u64, s
             if recent_success {
                 None
             } else {
+                let recent_error = sqlx::query_scalar::<_, bool>(
+                    r#"
+                    SELECT EXISTS (
+                        SELECT 1
+                        FROM data_import_jobs
+                        WHERE source_id = $1
+                          AND status = 'failed'
+                          AND finished_at > NOW() - INTERVAL '6 hours'
+                    )
+                    "#
+                )
+                .bind(source_id)
+                .fetch_one(db)
+                .await?;
+
+                if recent_error {
+                    tracing::warn!(source_key=%source_key, "skipping persistent source bootstrap after recent failed import");
+                    None
+                } else {
+
                 Some(
                     sqlx::query_scalar::<_, Uuid>(
                         r#"
