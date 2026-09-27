@@ -110,7 +110,7 @@ pub async fn index_record(db: &PgPool, source_id: Uuid, record_id: Uuid, raw: &V
              metadata=EXCLUDED.metadata,last_seen_at=NOW(),updated_at=NOW()
            RETURNING id"#,
     )
-    .bind(source_id).bind(canonical_key).bind(name).bind(address).bind(city).bind(province).bind(postal)
+    .bind(source_id).bind(canonical_key).bind(&name).bind(&address).bind(&city).bind(&province).bind(postal)
     .bind(lat).bind(lon).bind(category).bind(record_id).bind(raw.clone())
     .fetch_one(db).await?;
 
