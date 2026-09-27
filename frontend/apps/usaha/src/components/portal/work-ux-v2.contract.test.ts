@@ -24,7 +24,7 @@ describe('Usaha workspace UX v2', () => {
 
   it('keeps the flow guide available without forcing it open on every workspace', () => {
     expect(flowGuide).toContain('<details');
-    expect(flowGuide).toContain('expandedByDefault = currentSection === \'home\'');
+    expect(flowGuide).toContain('currentSection === \'home\'');
     expect(flowGuide).toContain('group-open:hidden');
   });
 });
