@@ -238,7 +238,7 @@ async fn run_inner(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
         .as_ref()
         .ok_or_else(|| anyhow!("source has no CKAN API"))?;
     let package_url =
-        ckan_action_url(&api_url, "package_show").ok_or_else(|| anyhow!("invalid CKAN API URL"))?;
+        ckan_action_url(api_url, "package_show").ok_or_else(|| anyhow!("invalid CKAN API URL"))?;
 
     let package_response = state.http_client.get(&package_url).send().await?;
     let package_status = package_response.status();
@@ -393,7 +393,7 @@ async fn run_inner(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
 
         let mut offset = 0usize;
         loop {
-            let url = ckan_action_url(&api_url, "datastore_search")
+            let url = ckan_action_url(api_url, "datastore_search")
                 .ok_or_else(|| anyhow!("invalid CKAN API URL"))?;
             let offset_value = offset.to_string();
             let response = state
