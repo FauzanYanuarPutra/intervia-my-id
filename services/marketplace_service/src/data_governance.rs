@@ -335,7 +335,7 @@ async fn create_claim(
     .ok()
     .flatten();
 
-    if active_owner.is_some() || owner_id == claimant_user_id {
+    if active_owner.is_some() || owner_id == Some(claimant_user_id) {
         return (StatusCode::CONFLICT, Json(json!({"error":"business is already claimed","code":"already_claimed"}))).into_response();
     }
 
