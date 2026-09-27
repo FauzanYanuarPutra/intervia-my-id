@@ -1110,22 +1110,31 @@ export default function MyListingsPage() {
                             href: editHref,
                             tone: 'bg-amber-600 text-white hover:bg-amber-700',
                           }
-                        : cardStatus === 'archived'
-                          ? null
-                          : {
-                              label: locale === 'id' ? 'Edit' : 'Edit',
-                              href: editHref,
-                              tone: 'border border-slate-200 bg-white text-slate-800 hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 dark:text-white',
-                            };
+                        : {
+                            label: locale === 'id' ? 'Edit' : 'Edit',
+                            href: editHref,
+                            tone: 'border border-slate-200 bg-white text-slate-800 hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 dark:text-white',
+                          };
+
+                    const itemHref = isLiveManagementStatus(normalizedStatus)
+                      ? `/content/${id}`
+                      : editHref;
+                    const itemActionLabel = isLiveManagementStatus(normalizedStatus)
+                      ? locale === 'id'
+                        ? `Lihat ${item.title || typeLabel}`
+                        : `View ${item.title || typeLabel}`
+                      : locale === 'id'
+                        ? `Edit ${item.title || typeLabel}`
+                        : `Edit ${item.title || typeLabel}`;
 
                     return (
                       <article key={item.id} className="relative p-3 sm:p-4">
                         <div className="flex min-w-0 gap-3">
                           <Link
-                            href={cardStatus === 'draft' ? editHref : `/content/${id}`}
+                            href={itemHref}
                             className="relative h-[82px] w-[82px] shrink-0 overflow-hidden rounded-[14px] bg-slate-100 bg-cover bg-center ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-white/10 sm:h-[92px] sm:w-[92px]"
                             style={imageStyle}
-                            aria-label={item.title || typeLabel}
+                            aria-label={itemActionLabel}
                           >
                             {!imageUrl ? (
                               <span className="absolute inset-0 grid place-items-center text-slate-400">
@@ -1141,7 +1150,8 @@ export default function MyListingsPage() {
                             <div className="flex min-w-0 items-start justify-between gap-2">
                               <div className="min-w-0">
                                 <Link
-                                  href={cardStatus === 'draft' ? editHref : `/content/${id}`}
+                                  href={itemHref}
+                                  aria-label={itemActionLabel}
                                   className="line-clamp-2 text-[14px] font-bold leading-snug text-slate-950 hover:text-emerald-700 dark:text-white dark:hover:text-emerald-300 sm:text-[15px]"
                                 >
                                   {item.title || (locale === 'id' ? 'Tanpa judul' : 'Untitled')}
