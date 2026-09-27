@@ -383,25 +383,53 @@ out center tags;
                     reqwest::header::USER_AGENT,
                     "LajukanOpenDataImporter/1.0 (+https://www.lajukan.com)",
                 )
-                .form(&[("data", body.clone())])
+                .header(reqwest::header::CONTENT_TYPE, "text/plain; charset=utf-8")
+                .body(body.clone())
                 .send()
                 .await;
 
             match response {
-                Ok(response) => match response.error_for_status() {
-                    Ok(response) => match response.json::<Value>().await {
-                        Ok(payload) => {
-                            payload_result = Some(payload);
-                            break;
+                Ok(response) => {
+                    let status = response.status();
+                    match response.text().await {
+                        Ok(response_body) if status.is_success() => {
+                            match serde_json::from_str::<Value>(&response_body) {
+                                Ok(payload) => {
+                                    payload_result = Some(payload);
+                                    break;
+                                }
+                                Err(error) => {
+                                    tracing::warn!(
+                                        city=%city,
+                                        endpoint=%endpoint_candidate,
+                                        status=%status,
+                                        "OSM Overpass response parse failed: {:?}; body={}",
+                                        error,
+                                        response_body.chars().take(800).collect::<String>()
+                                    );
+                                }
+                            }
+                        }
+                        Ok(response_body) => {
+                            tracing::warn!(
+                                city=%city,
+                                endpoint=%endpoint_candidate,
+                                status=%status,
+                                "OSM Overpass request failed: body={}",
+                                response_body.chars().take(800).collect::<String>()
+                            );
                         }
                         Err(error) => {
-                            tracing::warn!(city=%city, endpoint=%endpoint_candidate, "OSM Overpass response parse failed: {:?}", error);
+                            tracing::warn!(
+                                city=%city,
+                                endpoint=%endpoint_candidate,
+                                status=%status,
+                                "OSM Overpass response body read failed: {:?}",
+                                error
+                            );
                         }
-                    },
-                    Err(error) => {
-                        tracing::warn!(city=%city, endpoint=%endpoint_candidate, "OSM Overpass request failed: {:?}", error);
                     }
-                },
+                }
                 Err(error) => {
                     tracing::warn!(city=%city, endpoint=%endpoint_candidate, "OSM Overpass request failed: {:?}", error);
                 }
