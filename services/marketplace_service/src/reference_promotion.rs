@@ -523,7 +523,7 @@ pub(crate) async fn publish_aggregate_reference(
     Ok(Some(content_id))
 }
 
-async fn promote_candidate(db: &PgPool, candidate_id: Uuid) -> AnyhowResult<Value> {
+pub(crate) async fn promote_candidate(db: &PgPool, candidate_id: Uuid) -> AnyhowResult<Value> {
     let mut tx = db.begin().await?;
 
     let candidate = sqlx::query_as::<_, PromotionCandidateSourceRow>(
