@@ -2254,7 +2254,7 @@ async fn fetch_group(
 }
 
 fn can_post_to_group(group: &ForumGroup, actor: &AuthActor) -> bool {
-    if is_moderator(actor) {
+    if is_moderator(actor) || is_platform_group_admin(actor) {
         return true;
     }
     if group.privacy == "public" && group.posting_permission == "public" {
@@ -2268,6 +2268,7 @@ fn can_post_to_group(group: &ForumGroup, actor: &AuthActor) -> bool {
 
 fn can_manage_group(group: &ForumGroup, actor: &AuthActor) -> bool {
     is_moderator(actor)
+        || is_platform_group_admin(actor)
         || matches!(
             group.viewer_role.as_deref(),
             Some("owner") | Some("moderator")
@@ -2278,7 +2279,7 @@ fn can_view_group_content(group: &ForumGroup, actor: Option<&AuthActor>) -> bool
     if group.privacy == "public" {
         return true;
     }
-    if actor.is_some_and(is_moderator) {
+    if actor.is_some_and(|value| is_moderator(value) || is_platform_group_admin(value)) {
         return true;
     }
     group.viewer_membership_status.as_deref() == Some("active")
@@ -2288,12 +2289,55 @@ fn can_view_group_content(group: &ForumGroup, actor: Option<&AuthActor>) -> bool
         )
 }
 
+async fn ensure_platform_group_admin_memberships(
+    db: &PgPool,
+    actor: &AuthActor,
+    forum_user_id: &str,
+) -> ApiResult<()> {
+    if !is_platform_group_admin(actor) {
+        return Ok(());
+    }
+
+    sqlx::query(
+        r#"
+        INSERT INTO lajukan_group_members
+          (group_id, user_id, role, status, joined_at, updated_at)
+        SELECT
+          g.id,
+          $1,
+          'moderator',
+          'active',
+          now(),
+          now()
+        FROM lajukan_groups g
+        WHERE g.status = 'active'
+        ON CONFLICT (group_id, user_id) DO UPDATE
+        SET role = CASE
+              WHEN lajukan_group_members.role = 'owner' THEN 'owner'
+              ELSE 'moderator'
+            END,
+            status = 'active',
+            updated_at = now()
+        "#,
+    )
+    .bind(forum_user_id)
+    .execute(db)
+    .await
+    .map_err(internal_error)?;
+
+    Ok(())
+}
+
 async fn list_groups(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Query(query): Query<ListGroupsQuery>,
 ) -> ApiResult<Json<GroupsResponse>> {
     let actor = optional_actor(&headers, &state);
+    if let Some(platform_admin) = actor.as_ref().filter(|value| is_platform_group_admin(value)) {
+        let forum_user = ensure_forum_user(&state.db, platform_admin).await?;
+        ensure_platform_group_admin_memberships(&state.db, platform_admin, &forum_user.id).await?;
+    }
     let viewer_id = actor.as_ref().map(forum_user_id);
     let q = clean_optional(query.q);
     let scope = clean_optional(query.scope);
@@ -2330,6 +2374,10 @@ async fn get_group(
     Path(group_id): Path<String>,
 ) -> ApiResult<Json<DataResponse<ForumGroup>>> {
     let actor = optional_actor(&headers, &state);
+    if let Some(platform_admin) = actor.as_ref().filter(|value| is_platform_group_admin(value)) {
+        let forum_user = ensure_forum_user(&state.db, platform_admin).await?;
+        ensure_platform_group_admin_memberships(&state.db, platform_admin, &forum_user.id).await?;
+    }
     let viewer_id = actor.as_ref().map(forum_user_id);
     let group = fetch_group(&state.db, viewer_id.as_deref(), &group_id).await?;
     if !can_view_group_content(&group, actor.as_ref()) {
@@ -3331,6 +3379,7 @@ async fn update_group_member(
     let actor = require_actor(&headers, &state)?;
     mutation_rate_limit(&state, &headers, &actor, "group:member:update", 180, 60).await?;
     let forum_user = ensure_forum_user(&state.db, &actor).await?;
+    ensure_platform_group_admin_memberships(&state.db, &actor, &forum_user.id).await?;
     let group = fetch_group(&state.db, Some(&forum_user.id), &group_id).await?;
     if !can_manage_group(&group, &actor) {
         return Err(ApiError::new(StatusCode::FORBIDDEN, "Forbidden"));
@@ -3347,7 +3396,11 @@ async fn update_group_member(
         .unwrap_or_else(|| current.status.clone());
     let reason = sanitize_body(payload.reason, 500);
 
-    if current.role == "owner" && !is_moderator(&actor) && next_role != "owner" {
+    if current.role == "owner"
+        && !is_moderator(&actor)
+        && !is_platform_group_admin(&actor)
+        && next_role != "owner"
+    {
         return Err(ApiError::new(
             StatusCode::FORBIDDEN,
             "Owner role cannot be changed by group moderators",
@@ -3356,6 +3409,7 @@ async fn update_group_member(
     if next_role == "owner"
         && group.viewer_role.as_deref() != Some("owner")
         && !is_moderator(&actor)
+        && !is_platform_group_admin(&actor)
     {
         return Err(ApiError::new(
             StatusCode::FORBIDDEN,
@@ -3616,6 +3670,7 @@ async fn update_group_permissions(
 ) -> ApiResult<Json<DataResponse<ForumGroup>>> {
     let actor = require_actor(&headers, &state)?;
     let forum_user = ensure_forum_user(&state.db, &actor).await?;
+    ensure_platform_group_admin_memberships(&state.db, &actor, &forum_user.id).await?;
     let group = fetch_group(&state.db, Some(&forum_user.id), &group_id).await?;
     if !can_manage_group(&group, &actor) {
         return Err(ApiError::new(StatusCode::FORBIDDEN, "Forbidden"));
