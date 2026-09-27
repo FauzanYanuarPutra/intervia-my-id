@@ -1844,6 +1844,8 @@ pub async fn sync_static_source_registry(db: &PgPool) -> Result<(), sqlx::Error>
     ))
     .map_err(|error| sqlx::Error::Protocol(format!("invalid static source registry: {}", error)))?;
 
+    let mut first_error: Option<sqlx::Error> = None;
+
     for source in registry.sources {
         let requested_mode = source.reuse_mode.as_deref().unwrap_or("review_required");
         let reuse_mode = match requested_mode {
@@ -1888,7 +1890,17 @@ pub async fn sync_static_source_registry(db: &PgPool) -> Result<(), sqlx::Error>
         .bind(source.terms_url).bind(source.license).bind(source.license_url).bind(source.attribution)
         .bind(reuse_mode).bind(storage_allowed).bind(enabled)
         .bind(source.auto_publish_reference).bind(notes)
-        .execute(db).await?;
+        .execute(db)
+        .await
+        {
+            Ok(_) => {}
+            Err(error) => {
+                tracing::error!(source_key=%source.id, "data source registry sync failed for source: {:?}", error);
+                if first_error.is_none() {
+                    first_error = Some(error);
+                }
+            }
+        }
     }
 
     sqlx::query(
@@ -1902,7 +1914,11 @@ pub async fn sync_static_source_registry(db: &PgPool) -> Result<(), sqlx::Error>
     .execute(db)
     .await?;
 
-    Ok(())
+    if let Some(error) = first_error {
+        Err(error)
+    } else {
+        Ok(())
+    }
 }
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
