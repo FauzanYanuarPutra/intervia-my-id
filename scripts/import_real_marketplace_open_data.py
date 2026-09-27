@@ -15,6 +15,7 @@ import os
 import re
 import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass, replace
@@ -216,6 +217,30 @@ def format_idr_cents(value: int | None, label: str = "pagu") -> str:
     return f"{label} sekitar Rp {rupiah:,}".replace(",", ".")
 
 
+def retryable_network_error(error: Exception) -> bool:
+    if isinstance(error, urllib.error.HTTPError):
+        return error.code == 429 or 500 <= error.code < 600
+    return isinstance(error, (urllib.error.URLError, TimeoutError, ConnectionError, OSError))
+
+
+def open_url_with_retry(request: urllib.request.Request, *, timeout: int, attempts: int = 3):
+    last_error: Exception | None = None
+    for attempt in range(attempts):
+        try:
+            return urllib.request.urlopen(request, timeout=timeout)
+        except Exception as exc:
+            last_error = exc
+            if not retryable_network_error(exc) or attempt == attempts - 1:
+                raise
+            delay = min(4.0, 0.75 * (2**attempt))
+            print(
+                f"warning: transient fetch failure for {request.full_url}; retrying in {delay:.2f}s: {exc}",
+                file=sys.stderr,
+            )
+            time.sleep(delay)
+    raise last_error or RuntimeError("request failed without an error")
+
+
 def fetch_json(url: str, *, method: str = "GET", data: bytes | None = None, timeout: int = 60) -> Any:
     request = urllib.request.Request(
         url,
@@ -223,7 +248,7 @@ def fetch_json(url: str, *, method: str = "GET", data: bytes | None = None, time
         method=method,
         headers={"Accept": "application/json", "User-Agent": USER_AGENT},
     )
-    with urllib.request.urlopen(request, timeout=timeout) as response:
+    with open_url_with_retry(request, timeout=timeout) as response:
         charset = response.headers.get_content_charset() or "utf-8"
         return json.loads(response.read().decode(charset, errors="replace"))
 
@@ -1877,7 +1902,6 @@ def iter_csv_aggregate_insights(source: dict[str, Any], max_rows: int | None) ->
             source["url"],
             headers={"Accept": "text/csv,*/*", "User-Agent": USER_AGENT},
         ),
-        timeout=int(source.get("timeout_seconds") or 60),
     )
     try:
         content_length = response.headers.get("Content-Length")
