@@ -907,7 +907,56 @@ try {
             Write-Host "Lajukan real-data bootstrap is active." -ForegroundColor Green
         }
         else {
-            Write-Warning "Real-data bootstrap belum menghasilkan reference content dalam bounded startup window. Stack tetap berjalan; cek marketplace_service logs."
+            $FallbackProbe = $null
+            try {
+                $FallbackProbe = @(
+                    & docker @ComposeArgs exec -T marketplace_service curl -fsS http://127.0.0.1:8081/v1/data/bootstrap-status 2>&1
+                )
+                if ($LASTEXITCODE -eq 0) {
+                    $FallbackStatus = ($FallbackProbe -join "").Trim() | ConvertFrom-Json
+                }
+            }
+            catch {
+                Write-Verbose "Tidak dapat membaca bootstrap status untuk fallback OSM: $($_.Exception.Message)"
+            }
+
+            $CanRunOsmFallback =
+                $null -ne $FallbackStatus -and
+                [int64]$FallbackStatus.active_jobs -eq 0 -and
+                [int64]$FallbackStatus.published_references -eq 0
+
+            if ($CanRunOsmFallback) {
+                $OsmFallbackScript = Join-Path $RepoRoot "servicesmarketplace_servicescriptsimport-osm-open-references.ps1"
+                $PwshCommand = Get-Command pwsh -ErrorAction SilentlyContinue
+                if ((Test-Path -LiteralPath $OsmFallbackScript) -and $null -ne $PwshCommand) {
+                    Write-Host "Rust bootstrap belum menghasilkan reference. Menjalankan governed OSM fallback importer..." -ForegroundColor Yellow
+                    & $PwshCommand.Source -NoProfile -File $OsmFallbackScript -TargetCount 10000 -MinimumCities 3 -EnvFile $EnvFile
+                    if ($LASTEXITCODE -ne 0) {
+                        & docker @ComposeArgs logs --no-color --tail 160 marketplace_service
+                        throw "OSM fallback importer gagal setelah marketplace bootstrap kosong."
+                    }
+
+                    $FallbackVerify = @(
+                        & docker @ComposeArgs exec -T marketplace_service curl -fsS http://127.0.0.1:8081/v1/data/bootstrap-status 2>&1
+                    )
+                    if ($LASTEXITCODE -eq 0) {
+                        try {
+                            $FallbackVerifyJson = ($FallbackVerify -join "").Trim() | ConvertFrom-Json
+                            Write-Host ("  fallback data status={0} published_references={1} active_reference_content={2}" -f $FallbackVerifyJson.status, $FallbackVerifyJson.published_references, $FallbackVerifyJson.active_reference_content) -ForegroundColor DarkGray
+                        }
+                        catch {
+                            Write-Verbose "Respons verifikasi fallback OSM belum dapat diparse: $($_.Exception.Message)"
+                        }
+                    }
+                }
+                else {
+                    Write-Warning "OSM fallback importer tidak tersedia. Reference data tetap kosong."
+                }
+            }
+            else {
+                Write-Warning "Real-data bootstrap belum menghasilkan reference content dalam bounded startup window. Stack tetap berjalan; cek marketplace_service logs."
+            }
+
             & docker @ComposeArgs logs --no-color --tail 160 marketplace_service
         }
     }
