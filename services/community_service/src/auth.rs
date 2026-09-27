@@ -174,7 +174,9 @@ fn configured_platform_admin_matches(email: Option<&str>, username: Option<&str>
             .split(',')
             .map(str::trim)
             .filter(|value| !value.is_empty())
-            .any(|value| normalized_username.is_some_and(|candidate| value.eq_ignore_ascii_case(candidate)))
+            .any(|value| {
+                normalized_username.is_some_and(|candidate| value.eq_ignore_ascii_case(candidate))
+            })
 }
 
 pub(crate) fn is_platform_group_admin(actor: &AuthActor) -> bool {
