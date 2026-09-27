@@ -926,7 +926,7 @@ try {
                 [int64]$FallbackStatus.published_references -eq 0
 
             if ($CanRunOsmFallback) {
-                $OsmFallbackScript = Join-Path $RepoRoot "servicesmarketplace_servicescriptsimport-osm-open-references.ps1"
+                $OsmFallbackScript = Join-Path $RepoRoot "services\marketplace_service\scripts\import-osm-open-references.ps1"
                 $PwshCommand = Get-Command pwsh -ErrorAction SilentlyContinue
                 if ((Test-Path -LiteralPath $OsmFallbackScript) -and $null -ne $PwshCommand) {
                     Write-Host "Rust bootstrap belum menghasilkan reference. Menjalankan governed OSM fallback importer..." -ForegroundColor Yellow
