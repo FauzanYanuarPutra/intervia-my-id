@@ -148,14 +148,11 @@ pub(crate) fn require_actor(headers: &HeaderMap, state: &AppState) -> ApiResult<
         .ok_or_else(|| ApiError::new(StatusCode::UNAUTHORIZED, "Unauthorized"))
 }
 
-fn configured_platform_admin_matches(
-    email: Option<&str>,
-    username: Option<&str>,
-) -> bool {
+fn configured_platform_admin_matches(email: Option<&str>, username: Option<&str>) -> bool {
     let configured_emails = env::var("COMMUNITY_PLATFORM_ADMIN_EMAILS")
         .unwrap_or_else(|_| "lajukan001@gmail.com".to_string());
-    let configured_usernames = env::var("COMMUNITY_PLATFORM_ADMIN_USERNAMES")
-        .unwrap_or_else(|_| "lajukan001".to_string());
+    let configured_usernames =
+        env::var("COMMUNITY_PLATFORM_ADMIN_USERNAMES").unwrap_or_else(|_| "lajukan001".to_string());
 
     let normalized_email = email.map(str::trim).filter(|value| !value.is_empty());
     let normalized_username = username.map(str::trim).filter(|value| !value.is_empty());
@@ -177,11 +174,7 @@ fn configured_platform_admin_matches(
             .split(',')
             .map(str::trim)
             .filter(|value| !value.is_empty())
-            .any(|value| {
-                normalized_username.is_some_and(|candidate| {
-                    value.eq_ignore_ascii_case(candidate)
-                })
-            })
+            .any(|value| normalized_username.is_some_and(|candidate| value.eq_ignore_ascii_case(candidate)))
 }
 
 pub(crate) fn is_platform_group_admin(actor: &AuthActor) -> bool {
