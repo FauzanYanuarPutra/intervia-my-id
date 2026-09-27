@@ -102,11 +102,7 @@ fn resource_is_json(resource: &Value) -> bool {
 }
 
 fn json_resource_records(payload: Value) -> Vec<Value> {
-    if let Some(features) = payload
-        .get("features")
-        .and_then(Value::as_array)
-        .cloned()
-    {
+    if let Some(features) = payload.get("features").and_then(Value::as_array).cloned() {
         return features
             .into_iter()
             .map(|feature| {
@@ -119,16 +115,17 @@ fn json_resource_records(payload: Value) -> Vec<Value> {
                 }
                 if let Some(point) = feature
                     .get("geometry")
-                    .and_then(|value| value.get("type").and_then(Value::as_str).zip(
-                        value.get("coordinates").and_then(Value::as_array),
-                    ))
+                    .and_then(|value| {
+                        value
+                            .get("type")
+                            .and_then(Value::as_str)
+                            .zip(value.get("coordinates").and_then(Value::as_array))
+                    })
                     .filter(|(geometry_type, coordinates)| {
                         *geometry_type == "Point" && coordinates.len() >= 2
                     })
                 {
-                    if let (Some(lng), Some(lat)) =
-                        (point.1[0].as_f64(), point.1[1].as_f64())
-                    {
+                    if let (Some(lng), Some(lat)) = (point.1[0].as_f64(), point.1[1].as_f64()) {
                         record.insert("longitude".to_string(), Value::from(lng));
                         record.insert("latitude".to_string(), Value::from(lat));
                     }
@@ -306,7 +303,10 @@ async fn run_inner(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
             let response = state
                 .http_client
                 .get(resource_url)
-                .header(reqwest::header::ACCEPT, "application/json, application/geo+json")
+                .header(
+                    reqwest::header::ACCEPT,
+                    "application/json, application/geo+json",
+                )
                 .send()
                 .await?;
             let status = response.status();
@@ -321,10 +321,7 @@ async fn run_inner(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
             }
             if body.len() > 8 * 1024 * 1024 {
                 rejected += 1;
-                tracing::warn!(
-                    resource_url,
-                    "JSON resource exceeds 8 MiB safety limit"
-                );
+                tracing::warn!(resource_url, "JSON resource exceeds 8 MiB safety limit");
                 continue;
             }
             let payload = serde_json::from_str::<Value>(&body)
@@ -360,11 +357,10 @@ async fn run_inner(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
                         .await
                         {
                             Ok(entity_id) => {
-                                if let Err(error) =
-                                    crate::reference_promotion::generate_for_entity(
-                                        &state.db, entity_id
-                                    )
-                                    .await
+                                if let Err(error) = crate::reference_promotion::generate_for_entity(
+                                    &state.db, entity_id,
+                                )
+                                .await
                                 {
                                     errors += 1;
                                     tracing::warn!(
@@ -376,10 +372,7 @@ async fn run_inner(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
                             }
                             Err(error) => {
                                 errors += 1;
-                                tracing::warn!(
-                                    "entity normalization failed: {:?}",
-                                    error
-                                );
+                                tracing::warn!("entity normalization failed: {:?}", error);
                             }
                         }
                     }
@@ -466,11 +459,10 @@ async fn run_inner(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
                         .await
                         {
                             Ok(entity_id) => {
-                                if let Err(error) =
-                                    crate::reference_promotion::generate_for_entity(
-                                        &state.db, entity_id
-                                    )
-                                    .await
+                                if let Err(error) = crate::reference_promotion::generate_for_entity(
+                                    &state.db, entity_id,
+                                )
+                                .await
                                 {
                                     errors += 1;
                                     tracing::warn!(
@@ -1024,8 +1016,17 @@ mod tests {
             }]
         }));
         assert_eq!(rows.len(), 1);
-        assert_eq!(rows[0].get("name").and_then(Value::as_str), Some("Toko Maju"));
-        assert_eq!(rows[0].get("latitude").and_then(Value::as_f64), Some(-6.9175));
-        assert_eq!(rows[0].get("longitude").and_then(Value::as_f64), Some(107.6191));
+        assert_eq!(
+            rows[0].get("name").and_then(Value::as_str),
+            Some("Toko Maju")
+        );
+        assert_eq!(
+            rows[0].get("latitude").and_then(Value::as_f64),
+            Some(-6.9175)
+        );
+        assert_eq!(
+            rows[0].get("longitude").and_then(Value::as_f64),
+            Some(107.6191)
+        );
     }
 }
