@@ -1,0 +1,3 @@
+-- Keep this rollback intentionally non-destructive. Reverting DOUBLE PRECISION
+-- back to NUMERIC(5,4) could silently round readiness/similarity values.
+-- The original application contract is compatible with DOUBLE PRECISION.
