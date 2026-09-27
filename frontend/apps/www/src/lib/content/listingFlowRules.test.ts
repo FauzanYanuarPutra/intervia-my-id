@@ -466,6 +466,7 @@ describe('canTransitionContentStatus', () => {
     ['published', 'published'],
     ['live', 'live'],
     ['ACTIVE', 'paused'],
+    ['active', 'draft'],
   ])('allows %s -> %s as a normalized marketplace transition', (current, next) => {
     expect(canTransitionContentStatus(current, next)).toBe(true);
   });
