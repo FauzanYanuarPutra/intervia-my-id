@@ -15,6 +15,7 @@
     type FormEvent,
     type KeyboardEvent as ReactKeyboardEvent,
     type TouchEvent as ReactTouchEvent,
+    type WheelEvent as ReactWheelEvent,
     type UIEvent,
   } from 'react';
   import { useHorizontalDragScroll } from '@/hooks/useHorizontalDragScroll';
@@ -1755,7 +1756,7 @@
         if (nextIndex === activeIndex) return;
 
         scrollLockRef.current = true;
-        scrollToIndex(nextIndex);
+        scrollToIndex(nextIndex, 'smooth');
 
         window.setTimeout(() => {
           scrollLockRef.current = false;
@@ -2400,7 +2401,7 @@
                     ? 'Feed Reels Lajukan. Gunakan panah atas dan bawah untuk berpindah video.'
                     : 'Lajukan Reels feed. Use up and down arrows to move between videos.'
                 }
-                className="h-full min-h-0 max-h-full w-full min-w-0 snap-y snap-mandatory overflow-x-hidden overflow-y-hidden overscroll-y-none outline-none [scroll-behavior:auto] [scrollbar-width:none] [touch-action:none] [&::-webkit-scrollbar]:hidden]"
+                className="h-full min-h-0 max-h-full w-full min-w-0 snap-y snap-mandatory overflow-x-hidden overflow-y-hidden overscroll-y-none outline-none [scroll-behavior:auto] [scrollbar-width:none] [touch-action:none] [&::-webkit-scrollbar]:hidden"
               >
                 {visibleItems.length > 0 ? (
                   <>
