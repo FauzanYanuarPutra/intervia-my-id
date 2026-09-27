@@ -363,7 +363,7 @@ export function UmkmDiscoveryClient(props: UmkmDiscoveryClientProps) {
                     ? `Hapus filter kota ${cleanedCity}`
                     : `Clear city filter ${cleanedCity}`
                 }
-                className="inline-flex min-h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-[color:var(--app-accent-border)] bg-white px-3 text-[11px] font-bold text-[color:var(--app-accent)] shadow-[0_12px_26px_-24px_rgba(15,23,42,0.20)] transition hover:-translate-y-0.5 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] dark:bg-slate-900 dark:text-[color:var(--app-accent)]"
+                className="inline-flex min-h-10 sm:min-h-11 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-[color:var(--app-accent-border)] bg-white px-3 text-[11px] font-bold text-[color:var(--app-accent)] shadow-[0_12px_26px_-24px_rgba(15,23,42,0.20)] transition hover:-translate-y-0.5 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] dark:bg-slate-900 dark:text-[color:var(--app-accent)]"
               >
                 <MapPin className="h-3.5 w-3.5" />
                 {cleanedCity}
