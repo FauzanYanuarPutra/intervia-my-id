@@ -176,7 +176,10 @@ fn spawn_data_ingestion_refresh_loop(state: Arc<AppState>) {
                 }
                 Ok(_) => {}
                 Err(error) => {
-                    tracing::warn!("scheduled reference publication reconciliation failed: {:?}", error);
+                    tracing::warn!(
+                        "scheduled reference publication reconciliation failed: {:?}",
+                        error
+                    );
                 }
             }
         }
