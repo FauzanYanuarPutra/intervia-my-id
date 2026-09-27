@@ -2038,7 +2038,7 @@ export function UmkmDiscoveryPanel({
               'absolute inset-x-2 bottom-2 z-[1250] mx-auto flex w-[calc(100%-1rem)] max-w-[760px] flex-col overflow-hidden rounded-[20px] border border-slate-200/90 bg-white/98 pb-[calc(env(safe-area-inset-bottom)+0.25rem)] shadow-[0_-18px_48px_-30px_rgba(15,23,42,0.42)] backdrop-blur-xl transition-all duration-300 sm:inset-x-3 sm:w-[calc(100%-1.5rem)] sm:rounded-[22px] dark:border-slate-800 dark:bg-slate-950/96',
               'lg:inset-x-auto lg:bottom-3 lg:left-3 lg:top-[calc(env(safe-area-inset-top)+6.85rem)] lg:mx-0 lg:w-[400px] lg:max-w-none lg:rounded-[16px] lg:shadow-[0_18px_42px_-24px_rgba(15,23,42,0.42)]',
               sheetExpanded
-                ? 'max-h-[min(58svh,calc(var(--app-viewport-height)-8.5rem))] lg:max-h-[calc(var(--app-viewport-height)-7.15rem)]'
+                ? 'max-h-[min(78svh,calc(var(--app-viewport-height)-5.5rem))] lg:max-h-[calc(var(--app-viewport-height)-7.15rem)]'
                 : 'max-h-[106px] min-h-[106px] lg:max-h-[calc(var(--app-viewport-height)-7.15rem)] lg:min-h-0',
             )}
             data-testid="umkm-results-sheet"
