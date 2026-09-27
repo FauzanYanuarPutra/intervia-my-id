@@ -1108,6 +1108,7 @@ pub async fn recover_stale_import_jobs(db: &PgPool) -> Result<u64, sqlx::Error> 
     Ok(result.rows_affected())
 }
 
+/// Startup bootstrap is idempotent: queued/running jobs are reused and recent successful imports are skipped.
 pub async fn bootstrap_persistent_imports(state: Arc<AppState>) -> Result<u64, sqlx::Error> {
     let db = &state.db;
     let sources = sqlx::query_as::<_, (Uuid, String, Option<String>, i32)>(
