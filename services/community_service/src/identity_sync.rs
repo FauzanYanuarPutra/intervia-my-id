@@ -1,4 +1,8 @@
-use axum::{extract::State, http::{HeaderMap, StatusCode}, Json};
+use axum::{
+    extract::State,
+    http::{HeaderMap, StatusCode},
+    Json,
+};
 use chrono::{DateTime, Utc};
 use futures_util::StreamExt;
 use lapin::{
@@ -17,10 +21,9 @@ use uuid::Uuid;
 
 use crate::{
     clean_auth_id, clean_profile_avatar, clean_profile_text, clean_public_display_name,
-    env_u32_bounded, forum_user_id,
-    forum_username, internal_error, is_platform_group_admin, looks_like_email,
-    public_identity_user_id, require_actor, ApiError, ApiResult, AppState, AuthActor,
-    ForumIdentityProfile, ForumUser, IdentityPublicProfile,
+    env_u32_bounded, forum_user_id, forum_username, internal_error, is_platform_group_admin,
+    looks_like_email, public_identity_user_id, require_actor, ApiError, ApiResult, AppState,
+    AuthActor, ForumIdentityProfile, ForumUser, IdentityPublicProfile,
 };
 async fn fetch_identity_public_profile(identity_user_id: &str) -> ForumIdentityProfile {
     let base_url = env::var("INTERNAL_API_URL")
