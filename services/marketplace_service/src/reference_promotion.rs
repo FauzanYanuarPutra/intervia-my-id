@@ -723,7 +723,7 @@ pub(crate) async fn promote_candidate(db: &PgPool, candidate_id: Uuid) -> Anyhow
             "source_url": source_record_url.as_deref().unwrap_or(&source_url),
             "source_license": effective_license,
             "source_license_url": source_license_url,
-            "source_attribution": record_attribution.or(source_attribution),
+            "source_attribution": record_attribution.clone().or(source_attribution.clone()),
             "source_accessed_at": chrono::Utc::now(),
             "external_id": source_record_id,
             "entity_id": entity_id,
