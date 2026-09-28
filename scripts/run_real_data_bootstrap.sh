@@ -121,10 +121,10 @@ ON CONFLICT (bootstrap_key) DO UPDATE SET
   last_error = EXCLUDED.last_error,
   updated_at = NOW();
 SQL
-  # Network unavailability is a deferred external-data condition, not a
-  # container/application failure. Keep the stack startable; last_success_at
-  # remains unchanged so the next startup retries automatically.
-  exit 0
+  # This is a transient external-data condition. Return EX_TEMPFAIL so the
+  # compose restart policy retries automatically; the application stack itself
+  # remains healthy while hydration is retried.
+  exit 75
 fi
 
 echo "[real-data] acquiring bootstrap advisory lock..."
@@ -235,9 +235,12 @@ ON CONFLICT (bootstrap_key) DO UPDATE SET
   last_error = EXCLUDED.last_error,
   updated_at = NOW();
 SQL
-  echo "[real-data] bootstrap completed without external rows; will retry on next startup."
-  # Keep startup resilient when public mirrors are temporarily empty/unavailable.
-  # No successful timestamp is recorded, so the next startup retries.
+  echo "[real-data] bootstrap completed without external rows; will retry automatically."
+  # A source error with zero hydrated rows is a temporary bootstrap failure.
+  # Return EX_TEMPFAIL so Docker retries without marking the app services failed.
+  if [ "$SOURCE_ERROR_COUNT" -gt 0 ]; then
+    exit 75
+  fi
   exit 0
 fi
 
