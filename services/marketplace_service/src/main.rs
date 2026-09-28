@@ -8546,10 +8546,128 @@ async fn list_umkm_stores(
 
     match rows {
         Ok(rows) => {
-            let items = rows
+            let mut items = rows
                 .into_iter()
                 .map(PublicUmkmStoreRow::into_public)
+                .map(|item| serde_json::to_value(item).unwrap_or_else(|_| json!({})))
                 .collect::<Vec<_>>();
+
+            // Real public references are intentionally stored in content_items
+            // because they have no owner account. Project them into the same
+            // discovery contract so /v1/umkm/stores and the web UMKM page can
+            // actually display the imported data without inventing an owner.
+            let reference_rows = sqlx::query(
+                r#"
+                SELECT id, slug, title, summary, cover_image, metadata, created_at, updated_at
+                FROM content_items
+                WHERE content_status = 'active'
+                  AND metadata->>'reference_publication_status' = 'published'
+                  AND metadata->>'record_kind' IN (
+                    'government_reference',
+                    'open_data_reference',
+                    'licensed_reference',
+                    'external_content_reference',
+                    'real_openstreetmap_reference',
+                    'osm_provider_reference'
+                  )
+                  AND COALESCE(metadata->>'reference_subtype', '') <> 'aggregate_data'
+                  AND COALESCE(metadata->>'is_transactional', 'true') = 'false'
+                  AND lower(COALESCE(metadata->>'market_side', '')) = 'reference'
+                  AND NULLIF(btrim(metadata->>'latitude'), '') IS NOT NULL
+                  AND NULLIF(btrim(metadata->>'longitude'), '') IS NOT NULL
+                  AND ($1::text IS NULL OR (
+                    title ILIKE ('%' || $1 || '%')
+                    OR COALESCE(summary, '') ILIKE ('%' || $1 || '%')
+                    OR COALESCE(metadata->>'city', '') ILIKE ('%' || $1 || '%')
+                    OR COALESCE(metadata->>'address', '') ILIKE ('%' || $1 || '%')
+                    OR COALESCE(metadata->>'search_text', '') ILIKE ('%' || $1 || '%')
+                  ))
+                  AND ($2::text IS NULL OR metadata->>'city' ILIKE ('%' || $2 || '%'))
+                  AND ($3::float8 IS NULL OR (metadata->>'latitude')::float8 >= $3)
+                  AND ($4::float8 IS NULL OR (metadata->>'latitude')::float8 <= $4)
+                  AND ($5::float8 IS NULL OR (metadata->>'longitude')::float8 >= $5)
+                  AND ($6::float8 IS NULL OR (metadata->>'longitude')::float8 <= $6)
+                ORDER BY updated_at DESC, id ASC
+                LIMIT $7
+                "#
+            )
+            .bind(text_query.clone())
+            .bind(city.clone())
+            .bind(min_lat)
+            .bind(max_lat)
+            .bind(min_lng)
+            .bind(max_lng)
+            .bind(limit)
+            .fetch_all(&state.db)
+            .await;
+
+            if let Ok(reference_rows) = reference_rows {
+                for row in reference_rows {
+                    let id: Uuid = row.get("id");
+                    let slug: String = row.get("slug");
+                    let title: String = row.get("title");
+                    let summary: Option<String> = row.get("summary");
+                    let cover_image: Option<String> = row.get("cover_image");
+                    let metadata: Value = row.get("metadata");
+                    let created_at: DateTime<Utc> = row.get("created_at");
+                    let updated_at: DateTime<Utc> = row.get("updated_at");
+                    let city_value = metadata
+                        .get("city")
+                        .and_then(Value::as_str)
+                        .unwrap_or("Indonesia")
+                        .to_string();
+                    let address_value = metadata
+                        .get("address")
+                        .or_else(|| metadata.get("location"))
+                        .and_then(Value::as_str)
+                        .unwrap_or(&city_value)
+                        .to_string();
+                    let lat_value = metadata.get("latitude").and_then(|v| {
+                        v.as_f64().or_else(|| v.as_str().and_then(|s| s.parse::<f64>().ok()))
+                    });
+                    let lng_value = metadata.get("longitude").and_then(|v| {
+                        v.as_f64().or_else(|| v.as_str().and_then(|s| s.parse::<f64>().ok()))
+                    });
+                    if let (Some(lat_value), Some(lng_value)) = (lat_value, lng_value) {
+                        let mut projected = metadata.clone();
+                        if let Some(object) = projected.as_object_mut() {
+                            object.insert("reference_subtype".to_string(), json!("place_reference"));
+                            object.insert("market_side".to_string(), json!("reference"));
+                            object.insert("is_transactional".to_string(), json!(false));
+                            object.insert("claimable".to_string(), json!(false));
+                            object.insert("reference_content_id".to_string(), json!(id));
+                            if let Some(image) = cover_image.as_ref() {
+                                object.entry("image_url").or_insert_with(|| json!(image));
+                            }
+                        }
+                        items.push(json!({
+                            "id": id,
+                            "owner_user_id": Value::Null,
+                            "organization_id": Value::Null,
+                            "name": title,
+                            "slug": slug,
+                            "description": summary,
+                            "city": city_value,
+                            "address": address_value,
+                            "lat": lat_value,
+                            "lng": lng_value,
+                            "phone": Value::Null,
+                            "is_active": true,
+                            "online_order_enabled": false,
+                            "offline_order_enabled": false,
+                            "metadata": projected,
+                            "created_at": created_at,
+                            "updated_at": updated_at
+                        }));
+                    }
+                }
+            }
+
+            // Keep the public contract bounded even when both projections
+            // contribute rows. The source remains authoritative; this is only
+            // a read-model projection and never creates ownership.
+            items.truncate(limit as usize);
+
             (
                 StatusCode::OK,
                 Json(json!({
