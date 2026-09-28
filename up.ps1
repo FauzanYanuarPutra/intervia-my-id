@@ -888,10 +888,13 @@ try {
                 $CrawlerLine = ($CrawlerState | Select-Object -First 1).Trim()
                 if ($CrawlerLine) {
                     Write-Host "  external bootstrap: $CrawlerLine" -ForegroundColor DarkGray
-                    if ($CrawlerLine -match '^real_data_bootstrap\|exited\|0
+                    if ($CrawlerLine -match '^real_data_bootstrap\|exited\|0$') {
+                        $CrawlerReady = $true
                         break
                     }
-                    if ($CrawlerLine -match '^real_data_bootstrap\|exited\|[1-9][0-9]*
+                    if ($CrawlerLine -match '^real_data_bootstrap\|exited\|[1-9][0-9]*$') {
+                        Write-Warning "External real-data bootstrap exited with a non-zero code: $CrawlerLine"
+                        break
                     }
                 }
             }
