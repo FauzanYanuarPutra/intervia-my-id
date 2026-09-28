@@ -3,9 +3,9 @@ import {
   desktopPrimaryNavigation,
   mobilePrimaryNavigation,
   portalMenuNavigation,
-  portalSectionUserLabel,
 } from './portal-navigation';
 import type { PermissionId } from './portal-types';
+import { portalSectionUserLabel } from './portal-navigation-labels';
 
 const ownerPermissions: PermissionId[] = [
   'viewInfo',
