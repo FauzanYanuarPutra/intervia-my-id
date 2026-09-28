@@ -999,7 +999,10 @@ async fn bootstrap_status(State(state): State<Arc<AppState>>) -> impl IntoRespon
             WHERE bootstrap_key='real_marketplace_open_data') AS external_community_media_count,
           (SELECT last_success_at
              FROM real_data_bootstrap_runs
-            WHERE bootstrap_key='real_marketplace_open_data') AS external_last_success_at
+            WHERE bootstrap_key='real_marketplace_open_data') AS external_last_success_at,
+          (SELECT COALESCE(last_error, '')
+             FROM real_data_bootstrap_runs
+            WHERE bootstrap_key='real_marketplace_open_data') AS external_last_error
         "#,
     )
     .fetch_one(&state.db)
@@ -1068,6 +1071,9 @@ async fn bootstrap_status(State(state): State<Arc<AppState>>) -> impl IntoRespon
                 .try_get::<Option<DateTime<Utc>>, _>("external_last_success_at")
                 .ok()
                 .flatten();
+            let external_last_error = row
+                .try_get::<String, _>("external_last_error")
+                .unwrap_or_default();
             let external_hydrated = external_provider_count > 0
                 || external_buyer_count > 0
                 || external_community_media_count > 0;
@@ -1079,6 +1085,8 @@ async fn bootstrap_status(State(state): State<Arc<AppState>>) -> impl IntoRespon
                 "hydrating"
             } else if failed_jobs_24h > 0 {
                 "error"
+            } else if !external_last_error.trim().is_empty() {
+                "deferred"
             } else {
                 "empty"
             };
@@ -1116,7 +1124,8 @@ async fn bootstrap_status(State(state): State<Arc<AppState>>) -> impl IntoRespon
                         "provider_count": external_provider_count,
                         "buyer_count": external_buyer_count,
                         "community_media_count": external_community_media_count,
-                        "last_success_at": external_last_success_at
+                        "last_success_at": external_last_success_at,
+                        "last_error": external_last_error
                     },
                     "last_error": last_error,
                     "sources": sources
