@@ -207,13 +207,6 @@ export default async function HomePage({
     setupIncomplete: incompleteSetup,
   });
 
-  const requiredSetupSteps = setupSteps.filter(step => !step.optional);
-  const completedSetupSteps = requiredSetupSteps.filter(step => step.done).length;
-  const readiness = requiredSetupSteps.length
-    ? Math.round((completedSetupSteps / requiredSetupSteps.length) * 100)
-    : 100;
-  const nextSetupStep = setupSteps.find(step => !step.done && !step.optional) ?? null;
-
   const recentEntries = canViewFinance
     ? financeEntries.filter(entry => entry.occurred_on === today).slice(0, 5)
     : [];
