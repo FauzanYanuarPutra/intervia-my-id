@@ -578,6 +578,7 @@ export async function GET(req: NextRequest) {
       !mine &&
       !slug &&
       (referencesOnly ||
+        mapRequest ||
         url.searchParams.get('include_references') === '1' ||
         url.searchParams.get('include_references') === 'true');
     if (referencesOnly && query.length === 1) {
