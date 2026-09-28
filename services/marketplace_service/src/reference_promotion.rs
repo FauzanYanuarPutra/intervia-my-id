@@ -724,6 +724,7 @@ pub(crate) async fn promote_candidate(db: &PgPool, candidate_id: Uuid) -> Anyhow
             "source_license": effective_license,
             "source_license_url": source_license_url,
             "source_attribution": record_attribution.or(source_attribution),
+            "source_accessed_at": chrono::Utc::now(),
             "external_id": source_record_id,
             "entity_id": entity_id,
             "source_id": source_id,
@@ -795,6 +796,54 @@ pub(crate) async fn promote_candidate(db: &PgPool, candidate_id: Uuid) -> Anyhow
             .ok_or_else(|| anyhow!("reference slug collision requires a new slug"))?,
         }
     };
+
+    sqlx::query(
+        r#"
+        UPDATE content_items
+        SET metadata = COALESCE(metadata, '{}'::jsonb)
+          || jsonb_strip_nulls(jsonb_build_object(
+               'record_kind', metadata->>'record_kind',
+               'market_side', 'reference',
+               'listing_side', 'reference',
+               'is_transactional', false,
+               'reference_publication_status', 'published',
+               'claimable', true,
+               'source_dataset', $2,
+               'source_provider', $3,
+               'source_title', COALESCE(NULLIF(metadata->>'source_title', ''), $3),
+               'source_url', COALESCE(NULLIF(metadata->>'source_url', ''), $4),
+               'source_license', COALESCE(NULLIF(metadata->>'source_license', ''), $5),
+               'source_license_url', COALESCE(NULLIF(metadata->>'source_license_url', ''), $6),
+               'source_attribution', COALESCE(NULLIF(metadata->>'source_attribution', ''), $7),
+               'source_record_id', $8,
+               'canonical_record_id', $9,
+               'latitude', COALESCE((metadata->>'latitude')::double precision, $10),
+               'longitude', COALESCE((metadata->>'longitude')::double precision, $11),
+               'city', COALESCE(NULLIF(metadata->>'city', ''), $12),
+               'province', COALESCE(NULLIF(metadata->>'province', ''), $13),
+               'address', COALESCE(NULLIF(metadata->>'address', ''), $14),
+               'trust_note', 'Data referensi dari sumber terdaftar; bukan verifikasi kepemilikan.'
+             )),
+            updated_at=NOW()
+        WHERE id=$1
+        "#
+    )
+    .bind(content_id)
+    .bind(&source_key)
+    .bind(&provider_name)
+    .bind(source_record_url.as_deref().unwrap_or(&source_url))
+    .bind(effective_license.clone())
+    .bind(source_license_url.clone())
+    .bind(record_attribution.clone().or(source_attribution.clone()))
+    .bind(&source_record_id)
+    .bind(canonical_record_id)
+    .bind(lat)
+    .bind(lon)
+    .bind(city.clone())
+    .bind(province.clone())
+    .bind(address.clone())
+    .execute(&mut *tx)
+    .await?;
 
     sqlx::query(
         r#"
