@@ -8455,6 +8455,10 @@ async fn list_umkm_stores(
         .unwrap_or((None, None));
 
     let use_nearest_index = viewer.is_some();
+    let nationwide_map = viewer.is_none()
+        && bounds.is_some_and(|(min_lat, max_lat, min_lng, max_lng)| {
+            (max_lat - min_lat) >= 8.0 || (max_lng - min_lng) >= 12.0
+        });
     let include_references = query.include_references.unwrap_or(true);
     let visibility_filter = if include_references {
         r#"
@@ -8532,56 +8536,109 @@ async fn list_umkm_stores(
     } else {
         "updated_at DESC, id ASC"
     };
-    let store_sql = format!(
-        r#"
-        SELECT
-          id, owner_user_id, organization_id, name, slug, description, city, address, lat, lng, phone,
-          is_active, online_order_enabled, offline_order_enabled, metadata, created_at, updated_at
-        FROM umkm_stores
-        WHERE ($1::uuid IS NULL OR id = $1)
-          AND ($2::text IS NULL OR lower(slug) = $2)
-          AND (
-            $3::text IS NULL OR
-            name ILIKE ('%' || $3 || '%') OR
-            COALESCE(description, '') ILIKE ('%' || $3 || '%') OR
-            city ILIKE ('%' || $3 || '%') OR
-            address ILIKE ('%' || $3 || '%') OR
-            COALESCE(metadata->>'search_text', '') ILIKE ('%' || $3 || '%') OR
-            COALESCE(metadata->>'segment', '') ILIKE ('%' || $3 || '%') OR
-            COALESCE(metadata->>'keywords', '') ILIKE ('%' || $3 || '%')
-          )
-          AND ($4::text IS NULL OR city ILIKE ('%' || $4 || '%'))
-          {visibility_filter}
-          AND ($6::float8 IS NULL OR lat >= $6)
-          AND ($7::float8 IS NULL OR lat <= $7)
-          AND ($8::float8 IS NULL OR lng >= $8)
-          AND ($9::float8 IS NULL OR lng <= $9)
-          AND (
-            ($10::float8 IS NULL AND $11::float8 IS NULL)
-            OR ($10::float8 IS NOT NULL AND $11::float8 IS NOT NULL)
-          )
-          AND (
-            $12::float8 IS NULL OR (
-              6371.0088 * 2.0 * asin(
-                LEAST(
-                  1.0,
-                  GREATEST(
-                    0.0,
-                    sqrt(
-                      power(sin(radians(lat - $10) / 2.0), 2) +
-                      cos(radians($10)) * cos(radians(lat)) *
-                      power(sin(radians(lng - $11) / 2.0), 2)
-                    )
-                  )
+
+    let store_sql = if nationwide_map {
+        format!(
+            r#"
+            WITH candidates AS (
+              SELECT
+                id, owner_user_id, organization_id, name, slug, description, city, address, lat, lng, phone,
+                is_active, online_order_enabled, offline_order_enabled, metadata, created_at, updated_at,
+                floor((lat + 90.0) / 4.0)::int AS map_lat_bucket,
+                floor((lng + 180.0) / 8.0)::int AS map_lng_bucket
+              FROM umkm_stores
+              WHERE ($1::uuid IS NULL OR id = $1)
+                AND ($2::text IS NULL OR lower(slug) = $2)
+                AND (
+                  $3::text IS NULL OR
+                  name ILIKE ('%' || $3 || '%') OR
+                  COALESCE(description, '') ILIKE ('%' || $3 || '%') OR
+                  city ILIKE ('%' || $3 || '%') OR
+                  address ILIKE ('%' || $3 || '%') OR
+                  COALESCE(metadata->>'search_text', '') ILIKE ('%' || $3 || '%') OR
+                  COALESCE(metadata->>'segment', '') ILIKE ('%' || $3 || '%') OR
+                  COALESCE(metadata->>'keywords', '') ILIKE ('%' || $3 || '%')
                 )
-              ) <= $12
+                AND ($4::text IS NULL OR city ILIKE ('%' || $4 || '%'))
+                {visibility_filter}
+                AND ($6::float8 IS NULL OR lat >= $6)
+                AND ($7::float8 IS NULL OR lat <= $7)
+                AND ($8::float8 IS NULL OR lng >= $8)
+                AND ($9::float8 IS NULL OR lng <= $9)
+                AND $10::float8 IS NULL
+                AND $11::float8 IS NULL
+                AND $12::float8 IS NULL
+            ),
+            spread AS (
+              SELECT
+                candidates.*,
+                ROW_NUMBER() OVER (
+                  PARTITION BY map_lat_bucket, map_lng_bucket
+                  ORDER BY updated_at DESC, id ASC
+                ) AS map_bucket_rank
+              FROM candidates
             )
-          )
-        ORDER BY
-          {ranking_order}
-        LIMIT $5
-        "#,
-    );
+            SELECT
+              id, owner_user_id, organization_id, name, slug, description, city, address, lat, lng, phone,
+              is_active, online_order_enabled, offline_order_enabled, metadata, created_at, updated_at
+            FROM spread
+            WHERE map_bucket_rank <= 4
+            ORDER BY map_lat_bucket, map_lng_bucket, map_bucket_rank, updated_at DESC, id ASC
+            LIMIT $5
+            "#,
+        )
+    } else {
+        format!(
+            r#"
+            SELECT
+              id, owner_user_id, organization_id, name, slug, description, city, address, lat, lng, phone,
+              is_active, online_order_enabled, offline_order_enabled, metadata, created_at, updated_at
+            FROM umkm_stores
+            WHERE ($1::uuid IS NULL OR id = $1)
+              AND ($2::text IS NULL OR lower(slug) = $2)
+              AND (
+                $3::text IS NULL OR
+                name ILIKE ('%' || $3 || '%') OR
+                COALESCE(description, '') ILIKE ('%' || $3 || '%') OR
+                city ILIKE ('%' || $3 || '%') OR
+                address ILIKE ('%' || $3 || '%') OR
+                COALESCE(metadata->>'search_text', '') ILIKE ('%' || $3 || '%') OR
+                COALESCE(metadata->>'segment', '') ILIKE ('%' || $3 || '%') OR
+                COALESCE(metadata->>'keywords', '') ILIKE ('%' || $3 || '%')
+              )
+              AND ($4::text IS NULL OR city ILIKE ('%' || $4 || '%'))
+              {visibility_filter}
+              AND ($6::float8 IS NULL OR lat >= $6)
+              AND ($7::float8 IS NULL OR lat <= $7)
+              AND ($8::float8 IS NULL OR lng >= $8)
+              AND ($9::float8 IS NULL OR lng <= $9)
+              AND (
+                ($10::float8 IS NULL AND $11::float8 IS NULL)
+                OR ($10::float8 IS NOT NULL AND $11::float8 IS NOT NULL)
+              )
+              AND (
+                $12::float8 IS NULL OR (
+                  6371.0088 * 2.0 * asin(
+                    LEAST(
+                      1.0,
+                      GREATEST(
+                        0.0,
+                        sqrt(
+                          power(sin(radians(lat - $10) / 2.0), 2) +
+                          cos(radians($10)) * cos(radians(lat)) *
+                          power(sin(radians(lng - $11) / 2.0), 2)
+                        )
+                      )
+                    )
+                  ) <= $12
+                )
+              )
+            ORDER BY
+              {ranking_order}
+            LIMIT $5
+            "#,
+        )
+    };
     let rows = sqlx::query_as::<_, PublicUmkmStoreRow>(AssertSqlSafe(store_sql))
         .bind(id)
         .bind(slug)
@@ -8610,86 +8667,156 @@ async fn list_umkm_stores(
             // because they have no owner account. Project them into the same
             // discovery contract so /v1/umkm/stores and the web UMKM page can
             // actually display the imported data without inventing an owner.
-            let reference_rows = sqlx::query(
-                r#"
-                SELECT id, slug, title, summary, cover_image, metadata, created_at, updated_at
-                FROM content_items
-                WHERE content_status = 'active'
-                  AND metadata->>'reference_publication_status' = 'published'
-                  AND metadata->>'record_kind' IN (
-                    'government_reference',
-                    'open_data_reference',
-                    'licensed_reference',
-                    'external_content_reference',
-                    'real_openstreetmap_reference',
-                    'osm_provider_reference',
-                    'wikidata_reference'
-                  )
-                  AND COALESCE(metadata->>'reference_subtype', '') <> 'aggregate_data'
-                  AND COALESCE(metadata->>'is_transactional', 'true') = 'false'
-                  AND lower(COALESCE(metadata->>'market_side', '')) = 'reference'
-                  AND NULLIF(btrim(metadata->>'latitude'), '') IS NOT NULL
-                  AND NULLIF(btrim(metadata->>'longitude'), '') IS NOT NULL
-                  AND ($1::text IS NULL OR (
-                    title ILIKE ('%' || $1 || '%')
-                    OR COALESCE(summary, '') ILIKE ('%' || $1 || '%')
-                    OR COALESCE(metadata->>'city', '') ILIKE ('%' || $1 || '%')
-                    OR COALESCE(metadata->>'address', '') ILIKE ('%' || $1 || '%')
-                    OR COALESCE(metadata->>'search_text', '') ILIKE ('%' || $1 || '%')
-                  ))
-                  AND ($2::text IS NULL OR metadata->>'city' ILIKE ('%' || $2 || '%'))
-                  AND ($3::float8 IS NULL OR public.lajukan_safe_map_coordinate(metadata->>'latitude') >= $3)
-                  AND ($4::float8 IS NULL OR public.lajukan_safe_map_coordinate(metadata->>'latitude') <= $4)
-                  AND ($5::float8 IS NULL OR public.lajukan_safe_map_coordinate(metadata->>'longitude') >= $5)
-                  AND ($6::float8 IS NULL OR public.lajukan_safe_map_coordinate(metadata->>'longitude') <= $6)
-                  AND (
-                    $9::float8 IS NULL OR (
-                      6371.0088 * 2.0 * asin(
-                        LEAST(
-                          1.0,
-                          GREATEST(
-                            0.0,
-                            sqrt(
-                              power(
-                                sin(
-                                  radians(
-                                    public.lajukan_safe_map_coordinate(metadata->>'latitude') - $7
-                                  ) / 2.0
-                                ),
-                                2
-                              ) +
-                              cos(radians($7)) *
-                              cos(radians(public.lajukan_safe_map_coordinate(metadata->>'latitude'))) *
-                              power(
-                                sin(
-                                  radians(
-                                    public.lajukan_safe_map_coordinate(metadata->>'longitude') - $8
-                                  ) / 2.0
-                                ),
-                                2
+            let reference_rows = if nationwide_map {
+                sqlx::query(
+                    r#"
+                    WITH candidates AS (
+                      SELECT
+                        id, slug, title, summary, cover_image, metadata, created_at, updated_at,
+                        floor((public.lajukan_safe_map_coordinate(metadata->>'latitude') + 90.0) / 4.0)::int AS map_lat_bucket,
+                        floor((public.lajukan_safe_map_coordinate(metadata->>'longitude') + 180.0) / 8.0)::int AS map_lng_bucket
+                      FROM content_items
+                      WHERE content_status = 'active'
+                        AND metadata->>'reference_publication_status' = 'published'
+                        AND metadata->>'record_kind' IN (
+                          'government_reference',
+                          'open_data_reference',
+                          'licensed_reference',
+                          'external_content_reference',
+                          'real_openstreetmap_reference',
+                          'osm_provider_reference',
+                          'wikidata_reference'
+                        )
+                        AND COALESCE(metadata->>'reference_subtype', '') <> 'aggregate_data'
+                        AND COALESCE(metadata->>'is_transactional', 'true') = 'false'
+                        AND lower(COALESCE(metadata->>'market_side', '')) = 'reference'
+                        AND NULLIF(btrim(metadata->>'latitude'), '') IS NOT NULL
+                        AND NULLIF(btrim(metadata->>'longitude'), '') IS NOT NULL
+                        AND ($1::text IS NULL OR (
+                          title ILIKE ('%' || $1 || '%')
+                          OR COALESCE(summary, '') ILIKE ('%' || $1 || '%')
+                          OR COALESCE(metadata->>'city', '') ILIKE ('%' || $1 || '%')
+                          OR COALESCE(metadata->>'address', '') ILIKE ('%' || $1 || '%')
+                          OR COALESCE(metadata->>'search_text', '') ILIKE ('%' || $1 || '%')
+                        ))
+                        AND ($2::text IS NULL OR metadata->>'city' ILIKE ('%' || $2 || '%'))
+                        AND ($3::float8 IS NULL OR public.lajukan_safe_map_coordinate(metadata->>'latitude') >= $3)
+                        AND ($4::float8 IS NULL OR public.lajukan_safe_map_coordinate(metadata->>'latitude') <= $4)
+                        AND ($5::float8 IS NULL OR public.lajukan_safe_map_coordinate(metadata->>'longitude') >= $5)
+                        AND ($6::float8 IS NULL OR public.lajukan_safe_map_coordinate(metadata->>'longitude') <= $6)
+                        AND $7::float8 IS NULL
+                        AND $8::float8 IS NULL
+                        AND $9::float8 IS NULL
+                    ),
+                    spread AS (
+                      SELECT
+                        candidates.*,
+                        ROW_NUMBER() OVER (
+                          PARTITION BY map_lat_bucket, map_lng_bucket
+                          ORDER BY updated_at DESC, id ASC
+                        ) AS map_bucket_rank
+                      FROM candidates
+                    )
+                    SELECT id, slug, title, summary, cover_image, metadata, created_at, updated_at
+                    FROM spread
+                    WHERE map_bucket_rank <= 3
+                    ORDER BY map_lat_bucket, map_lng_bucket, map_bucket_rank, updated_at DESC, id ASC
+                    LIMIT $10
+                    "#
+                )
+                .bind(text_query.clone())
+                .bind(city.clone())
+                .bind(min_lat)
+                .bind(max_lat)
+                .bind(min_lng)
+                .bind(max_lng)
+                .bind(viewer_lat)
+                .bind(viewer_lng)
+                .bind(radius_km)
+                .bind(limit)
+                .fetch_all(&state.db)
+                .await
+            } else {
+                sqlx::query(
+                    r#"
+                    SELECT id, slug, title, summary, cover_image, metadata, created_at, updated_at
+                    FROM content_items
+                    WHERE content_status = 'active'
+                      AND metadata->>'reference_publication_status' = 'published'
+                      AND metadata->>'record_kind' IN (
+                        'government_reference',
+                        'open_data_reference',
+                        'licensed_reference',
+                        'external_content_reference',
+                        'real_openstreetmap_reference',
+                        'osm_provider_reference',
+                        'wikidata_reference'
+                      )
+                      AND COALESCE(metadata->>'reference_subtype', '') <> 'aggregate_data'
+                      AND COALESCE(metadata->>'is_transactional', 'true') = 'false'
+                      AND lower(COALESCE(metadata->>'market_side', '')) = 'reference'
+                      AND NULLIF(btrim(metadata->>'latitude'), '') IS NOT NULL
+                      AND NULLIF(btrim(metadata->>'longitude'), '') IS NOT NULL
+                      AND ($1::text IS NULL OR (
+                        title ILIKE ('%' || $1 || '%')
+                        OR COALESCE(summary, '') ILIKE ('%' || $1 || '%')
+                        OR COALESCE(metadata->>'city', '') ILIKE ('%' || $1 || '%')
+                        OR COALESCE(metadata->>'address', '') ILIKE ('%' || $1 || '%')
+                        OR COALESCE(metadata->>'search_text', '') ILIKE ('%' || $1 || '%')
+                      ))
+                      AND ($2::text IS NULL OR metadata->>'city' ILIKE ('%' || $2 || '%'))
+                      AND ($3::float8 IS NULL OR public.lajukan_safe_map_coordinate(metadata->>'latitude') >= $3)
+                      AND ($4::float8 IS NULL OR public.lajukan_safe_map_coordinate(metadata->>'latitude') <= $4)
+                      AND ($5::float8 IS NULL OR public.lajukan_safe_map_coordinate(metadata->>'longitude') >= $5)
+                      AND ($6::float8 IS NULL OR public.lajukan_safe_map_coordinate(metadata->>'longitude') <= $6)
+                      AND (
+                        $7::float8 IS NULL OR (
+                          6371.0088 * 2.0 * asin(
+                            LEAST(
+                              1.0,
+                              GREATEST(
+                                0.0,
+                                sqrt(
+                                  power(
+                                    sin(
+                                      radians(
+                                        public.lajukan_safe_map_coordinate(metadata->>'latitude') - $10
+                                      ) / 2.0
+                                    ),
+                                    2
+                                  ) +
+                                  cos(radians($10)) *
+                                  cos(radians(public.lajukan_safe_map_coordinate(metadata->>'latitude'))) *
+                                  power(
+                                    sin(
+                                      radians(
+                                        public.lajukan_safe_map_coordinate(metadata->>'longitude') - $11
+                                      ) / 2.0
+                                    ),
+                                    2
+                                  )
+                                )
                               )
                             )
-                          )
+                          ) <= $9
                         )
-                      ) <= $9
-                    )
-                  )
-                ORDER BY updated_at DESC, id ASC
-                LIMIT $10
-                "#
-            )
-            .bind(text_query.clone())
-            .bind(city.clone())
-            .bind(min_lat)
-            .bind(max_lat)
-            .bind(min_lng)
-            .bind(max_lng)
-            .bind(viewer_lat)
-            .bind(viewer_lng)
-            .bind(radius_km)
-            .bind(limit)
-            .fetch_all(&state.db)
-            .await;
+                      )
+                    ORDER BY updated_at DESC, id ASC
+                    LIMIT $12
+                    "#
+                )
+                .bind(text_query.clone())
+                .bind(city.clone())
+                .bind(min_lat)
+                .bind(max_lat)
+                .bind(min_lng)
+                .bind(max_lng)
+                .bind(radius_km)
+                .bind(limit)
+                .fetch_all(&state.db)
+                .await
+            };
+
 
             if let Ok(reference_rows) = reference_rows {
                 for row in reference_rows {
