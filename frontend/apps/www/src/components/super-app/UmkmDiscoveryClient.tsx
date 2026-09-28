@@ -44,6 +44,8 @@ type MapLaneId =
   | 'food'
   | 'retail'
   | 'service'
+  | 'craft'
+  | 'agri'
   | 'property'
   | 'workshop';
 
@@ -93,6 +95,24 @@ const MAP_LANES: MapLane[] = [
     helperEn: 'Business services',
     keywords: 'jasa usaha operasional',
     icon: BriefcaseBusiness,
+  },
+  {
+    id: 'craft',
+    labelId: 'Kriya',
+    labelEn: 'Craft',
+    helperId: 'Kerajinan & souvenir',
+    helperEn: 'Crafts & gifts',
+    keywords: 'kriya kerajinan souvenir',
+    icon: Gift,
+  },
+  {
+    id: 'agri',
+    labelId: 'Agri',
+    labelEn: 'Agri',
+    helperId: 'Tani, ternak & hasil laut',
+    helperEn: 'Farm, livestock & fishery',
+    keywords: 'agri tani ternak perikanan',
+    icon: Leaf,
   },
   {
     id: 'property',
@@ -204,7 +224,7 @@ export function UmkmDiscoveryClient(props: UmkmDiscoveryClientProps) {
     : activeLaneConfig.labelEn;
   const discoveryQuery = cleanedQuery;
   const createHref = isAuthenticated ? '/create' : '/register';
-  const defaultLaneCount = 4;
+  const defaultLaneCount = 6;
   const hiddenLaneCount = Math.max(0, MAP_LANES.length - defaultLaneCount);
 
   useBodyScrollLock(true, { resetScroll: true });
@@ -371,7 +391,7 @@ export function UmkmDiscoveryClient(props: UmkmDiscoveryClientProps) {
               </button>
             ) : null}
             <div className="flex min-w-0 max-w-full items-center gap-1.5 overflow-x-auto pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {MAP_LANES.filter(lane => ['all', 'food', 'retail', 'service'].includes(lane.id) || lane.id === activeLane).map(lane => {
+              {MAP_LANES.filter(lane => ['all', 'food', 'retail', 'service', 'craft', 'agri'].includes(lane.id) || lane.id === activeLane).map(lane => {
                 const Icon = lane.icon;
                 const active = activeLane === lane.id;
                 return (
