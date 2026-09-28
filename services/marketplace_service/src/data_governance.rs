@@ -1746,7 +1746,7 @@ pub async fn discover_licensed_ckan_sources(state: &Arc<AppState>) -> Result<u64
             .and_then(Value::as_str)
             .filter(|value| !value.trim().is_empty());
         let note = format!(
-            "Auto-discovered from data.go.id search q=UMKM. Licensed as '{license}'. Eligible JSON/DataStore resource detected. Records remain reference/unclaimed."
+            "Auto-discovered from data.go.id search q=UMKM. Licensed as '{license}'. Eligible JSON/DataStore resource detected. Records are staged for reference/Insight processing; automatic business-profile publication remains disabled unless explicitly allowlisted."
         );
 
         sqlx::query(
@@ -1789,7 +1789,7 @@ pub async fn discover_licensed_ckan_sources(state: &Arc<AppState>) -> Result<u64
                 media_storage_allowed=FALSE,
                 pii_import_allowed=FALSE,
                 enabled=TRUE,
-                auto_publish_reference=TRUE,
+                auto_publish_reference=FALSE,
                 refresh_interval_hours=EXCLUDED.refresh_interval_hours,
                 notes=EXCLUDED.notes,
                 updated_at=NOW()
