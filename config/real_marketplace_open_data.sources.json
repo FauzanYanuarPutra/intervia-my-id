@@ -447,7 +447,7 @@
       "id": "wikimedia-commons-indonesia-open-media",
       "kind": "wikimedia_commons_media",
       "role": "community_reels",
-      "enabled_by_default": false,
+      "enabled_by_default": true,
       "name": "Wikimedia Commons Indonesia open media for community and reels",
       "source_url": "https://commons.wikimedia.org/",
       "endpoint": "https://commons.wikimedia.org/w/api.php",
@@ -586,7 +586,8 @@
           "icon_key": "service",
           "hook": "Konten ini membantu contoh layanan inklusif, bukan klaim penyedia pelatihan."
         }
-      ]
+      ],
+      "notes": "Diaktifkan sebagai open-media seed. Importer hanya menerima file yang terdeteksi berlisensi bebas/public-domain dan menyimpan atribusi per-file."
     },
     {
       "id": "satrup-tanah-laut-status-rup-2026",
