@@ -196,10 +196,22 @@ MEDIA_COUNT="$(run_sql "$COMMUNITY_DATABASE_URL" "SELECT COUNT(*) FROM reel.laju
 if [ "$PROVIDER_COUNT" -gt 0 ] || [ "$BUYER_COUNT" -gt 0 ] || [ "$INSIGHT_COUNT" -gt 0 ] || [ "$MEDIA_COUNT" -gt 0 ]; then
   psql "$MARKETPLACE_DATABASE_URL" -v ON_ERROR_STOP=1 -v "bootstrap_error=$SOURCE_ERROR_SUMMARY" <<SQL
 INSERT INTO real_data_bootstrap_runs (bootstrap_key, bootstrap_version, last_success_at, last_provider_count, last_buyer_count, last_community_media_count, last_error, updated_at)
-VALUES ('$LOCK_KEY', '$BOOTSTRAP_VERSION', NOW(), $PROVIDER_COUNT, $BUYER_COUNT, $MEDIA_COUNT, NULLIF(:'bootstrap_error', ''), NOW())
+VALUES (
+  '$LOCK_KEY',
+  '$BOOTSTRAP_VERSION',
+  CASE WHEN $SOURCE_ERROR_COUNT = 0 THEN NOW() ELSE NULL END,
+  $PROVIDER_COUNT,
+  $BUYER_COUNT,
+  $MEDIA_COUNT,
+  NULLIF(:'bootstrap_error', ''),
+  NOW()
+)
 ON CONFLICT (bootstrap_key) DO UPDATE SET
   bootstrap_version = EXCLUDED.bootstrap_version,
-  last_success_at = NOW(),
+  last_success_at = CASE
+    WHEN $SOURCE_ERROR_COUNT = 0 THEN NOW()
+    ELSE real_data_bootstrap_runs.last_success_at
+  END,
   last_provider_count = EXCLUDED.last_provider_count,
   last_buyer_count = EXCLUDED.last_buyer_count,
   last_community_media_count = EXCLUDED.last_community_media_count,
@@ -207,7 +219,7 @@ ON CONFLICT (bootstrap_key) DO UPDATE SET
   updated_at = NOW();
 SQL
   if [ "$SOURCE_ERROR_COUNT" -gt 0 ]; then
-    echo "[real-data] bootstrap partially hydrated: providers=${PROVIDER_COUNT} buyers=${BUYER_COUNT} insights=${INSIGHT_COUNT} community_media=${MEDIA_COUNT} source_errors=${SOURCE_ERROR_COUNT}"
+    echo "[real-data] bootstrap partially hydrated: providers=${PROVIDER_COUNT} buyers=${BUYER_COUNT} insights=${INSIGHT_COUNT} community_media=${MEDIA_COUNT} source_errors=${SOURCE_ERROR_COUNT}; successful timestamp retained only when every source succeeds"
   else
     echo "[real-data] bootstrap complete: providers=${PROVIDER_COUNT} buyers=${BUYER_COUNT} insights=${INSIGHT_COUNT} community_media=${MEDIA_COUNT}"
   fi
