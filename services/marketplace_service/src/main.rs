@@ -8623,15 +8623,18 @@ async fn list_umkm_stores(
                         .unwrap_or(&city_value)
                         .to_string();
                     let lat_value = metadata.get("latitude").and_then(|v| {
-                        v.as_f64().or_else(|| v.as_str().and_then(|s| s.parse::<f64>().ok()))
+                        v.as_f64()
+                            .or_else(|| v.as_str().and_then(|s| s.parse::<f64>().ok()))
                     });
                     let lng_value = metadata.get("longitude").and_then(|v| {
-                        v.as_f64().or_else(|| v.as_str().and_then(|s| s.parse::<f64>().ok()))
+                        v.as_f64()
+                            .or_else(|| v.as_str().and_then(|s| s.parse::<f64>().ok()))
                     });
                     if let (Some(lat_value), Some(lng_value)) = (lat_value, lng_value) {
                         let mut projected = metadata.clone();
                         if let Some(object) = projected.as_object_mut() {
-                            object.insert("reference_subtype".to_string(), json!("place_reference"));
+                            object
+                                .insert("reference_subtype".to_string(), json!("place_reference"));
                             object.insert("market_side".to_string(), json!("reference"));
                             object.insert("is_transactional".to_string(), json!(false));
                             object.insert("claimable".to_string(), json!(false));
