@@ -604,13 +604,59 @@ LIMIT {limit}
             metadata=metadata,
         )
 
+def build_overpass_bboxes(source: dict[str, Any]) -> list[dict[str, Any]]:
+    if source.get("coverage") != "indonesia_grid":
+        return list(source.get("bboxes") or [])
+
+    raw_bbox = source.get("grid_bbox") or [-11.5, 94.5, 7.5, 142.5]
+    if len(raw_bbox) != 4:
+        raise ValueError("grid_bbox must contain south, west, north, east")
+    south, west, north, east = (float(value) for value in raw_bbox)
+    step = float(source.get("grid_step_degrees") or 4.0)
+    if not 0 < step <= 10:
+        raise ValueError("grid_step_degrees must be > 0 and <= 10")
+    if not (south < north and west < east):
+        raise ValueError("grid_bbox must have south < north and west < east")
+
+    tiles: list[dict[str, Any]] = []
+    lat = south
+    row = 0
+    while lat < north - 1e-9:
+        next_lat = min(lat + step, north)
+        # Alternate longitude direction on every row so a provider limit
+        # distributes coverage across Indonesia rather than exhausting the
+        # western tiles first.
+        columns: list[tuple[float, float]] = []
+        lon = west
+        while lon < east - 1e-9:
+            next_lon = min(lon + step, east)
+            columns.append((lon, next_lon))
+            lon = next_lon
+        if row % 2 == 1:
+            columns.reverse()
+
+        for column, (tile_west, tile_east) in enumerate(columns):
+            tiles.append(
+                {
+                    "name": f"Indonesia grid {row + 1}-{column + 1}",
+                    "city": "Indonesia",
+                    "bbox": [lat, tile_west, next_lat, tile_east],
+                }
+            )
+        lat = next_lat
+        row += 1
+
+    return tiles
+
+
 def iter_overpass_providers(source: dict[str, Any], max_rows: int | None) -> Iterable[ProviderStore]:
     endpoints = source.get("endpoints") or [source["endpoint"]]
     timeout = int(source.get("timeout_seconds") or 90)
     per_bbox_limit = int(source.get("per_bbox_limit") or 750)
     seen: set[str] = set()
     emitted = 0
-    for bbox_entry in source.get("bboxes", []):
+    bboxes = build_overpass_bboxes(source)
+    for bbox_entry in bboxes:
         if max_rows is not None and emitted >= max_rows:
             break
         remaining = per_bbox_limit if max_rows is None else min(per_bbox_limit, max_rows - emitted)
