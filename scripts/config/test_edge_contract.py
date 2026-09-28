@@ -173,7 +173,9 @@ class CaddyEdgeContractTests(unittest.TestCase):
         self.assertIsNotNone(snippet)
         body = snippet.group("body") if snippet else ""
         self.assertIn("header_up X-Forwarded-Proto https", body)
-        self.assertIn("header_up X-Forwarded-Host {host}", body)
+        # Caddy forwards the incoming Host header by default; the contract
+        # should require the externally meaningful scheme override only.
+        self.assertNotIn("header_up X-Forwarded-Host {host}", body)
 
         for upstream in ("www:3000", "usaha:3003", "cms:3001", "crm:3002"):
             with self.subTest(upstream=upstream):
