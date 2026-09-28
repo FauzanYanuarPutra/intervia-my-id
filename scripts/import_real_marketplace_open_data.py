@@ -478,6 +478,23 @@ def osm_address(tags: dict[str, Any], fallback_city: str) -> str:
     return address or clean_text(tags.get("addr:full")) or fallback_city or "Indonesia"
 
 
+def parse_wikidata_point(value: Any) -> tuple[float, float] | None:
+    text = clean_text(value)
+    match = re.fullmatch(
+        r"Point\(([-+]?\d+(?:\.\d+)?)\s+([-+]?\d+(?:\.\d+)?)\)",
+        text,
+    )
+    if not match:
+        return None
+    longitude = as_float(match.group(1))
+    latitude = as_float(match.group(2))
+    if longitude is None or latitude is None:
+        return None
+    if not (-180 <= longitude <= 180 and -90 <= latitude <= 90):
+        return None
+    return latitude, longitude
+
+
 def iter_wikidata_businesses(source: dict[str, Any], max_rows: int | None) -> Iterable[ProviderStore]:
     endpoint = clean_text(source.get("endpoint"), "https://query.wikidata.org/sparql")
     limit = int(source.get("limit") or (max_rows if max_rows is not None else 1500))
@@ -529,14 +546,10 @@ LIMIT {limit}
         if not item_id or not label or item_id in seen:
             continue
 
-        coord = clean_text(row.get("coord", {}).get("value"))
-        match = re.search(r"Point\(([-+]?\d+(?:\.\d+)?)\s+([-+]?\d+(?:\.\d+)?)\)", coord)
-        if not match:
+        point = parse_wikidata_point(row.get("coord", {}).get("value"))
+        if point is None:
             continue
-        lng = as_float(match.group(1))
-        lat = as_float(match.group(2))
-        if lat is None or lng is None or not (-90 <= lat <= 90) or not (-180 <= lng <= 180):
-            continue
+        lat, lng = point
 
         description = clean_text(row.get("description", {}).get("value"))
         city = clean_text(row.get("cityLabel", {}).get("value"), "Indonesia")
