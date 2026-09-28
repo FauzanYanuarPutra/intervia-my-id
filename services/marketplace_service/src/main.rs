@@ -10745,14 +10745,11 @@ async fn list_map_references(
         }
         None => None,
     };
-    // When browser geolocation is unavailable, rank around the visible map
-    // center. This affects retrieval order only; it is not returned as a user
-    // location or used to claim a viewer-specific distance.
-    let ranking_origin = viewer.or_else(|| {
-        bounds.map(|(min_lat, max_lat, min_lng, max_lng)| {
-            ((min_lat + max_lat) / 2.0, (min_lng + max_lng) / 2.0)
-        })
-    });
+    // A nationwide viewport is a coverage request, not a proximity request.
+    // Only explicit viewer coordinates activate nearest-first ranking. Bounds
+    // remain a spatial filter so remote Indonesian regions are not biased out
+    // by the map center.
+    let ranking_origin = viewer;
     let cursor = match parse_map_reference_cursor(query.cursor.clone()) {
         Ok(value) => value,
         Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
