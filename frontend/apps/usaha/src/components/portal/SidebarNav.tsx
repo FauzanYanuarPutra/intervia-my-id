@@ -3,10 +3,10 @@ import { ChevronDown, Settings2 } from 'lucide-react';
 import {
   desktopPrimaryNavigation,
   portalMenuNavigation,
-  portalSectionUserLabel,
 } from '@/lib/portal-navigation';
 import { buildSectionHref } from '@/lib/portal-logic';
 import type { BusinessRecord, PortalSection } from '@/lib/portal-types';
+import { portalSectionUserLabel } from '@/lib/portal-navigation-labels';
 import { portalSectionVisual } from '@/lib/portal-visual';
 
 type SidebarNavProps = {
