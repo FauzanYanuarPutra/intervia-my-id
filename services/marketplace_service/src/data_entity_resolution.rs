@@ -355,6 +355,38 @@ pub async fn index_record(
 mod tests {
     use super::*;
     #[test]
+    fn coordinate_lookup_is_case_insensitive() {
+        let raw = serde_json::json!({
+            "Latitude": "-6.2001",
+            "LONGITUDE": "106.8167"
+        });
+        assert_eq!(coordinate(&raw, &["latitude"], 90.0), Some(-6.2001));
+        assert_eq!(coordinate(&raw, &["longitude"], 180.0), Some(106.8167));
+    }
+
+    #[test]
+    fn geojson_coordinates_fallback_to_latitude_longitude() {
+        let raw = serde_json::json!({
+            "geometry": {
+                "type": "Point",
+                "coordinates": [106.8167, -6.2001]
+            }
+        });
+        assert_eq!(coordinate_pair(&raw), Some((-6.2001, 106.8167)));
+    }
+
+    #[test]
+    fn invalid_geojson_coordinates_are_rejected() {
+        let raw = serde_json::json!({
+            "geometry": {
+                "type": "Point",
+                "coordinates": [181.0, -6.2001]
+            }
+        });
+        assert_eq!(coordinate_pair(&raw), None);
+    }
+
+    #[test]
     fn latitude_rejects_out_of_range_values() {
         let raw = serde_json::json!({"latitude": "91.0"});
         assert_eq!(coordinate(&raw, &["latitude"], 90.0), None);
