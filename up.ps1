@@ -917,6 +917,7 @@ try {
                         break
                     }
                 }
+            }
             Start-Sleep -Seconds 5
         }
 
