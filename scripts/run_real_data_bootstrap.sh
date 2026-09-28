@@ -19,8 +19,6 @@ SOURCE_FINGERPRINT="$(
 )"
 BOOTSTRAP_VERSION="${REAL_DATA_BOOTSTRAP_VERSION:-config-${SOURCE_FINGERPRINT}}"
 LOCK_KEY="real_marketplace_open_data"
-LOCK_KEY_SQL="$(printf '%s' "$LOCK_KEY" | sha256sum | cut -c1-16)"
-
 run_sql() {
   psql "$1" -v ON_ERROR_STOP=1 -Atqc "$2"
 }
@@ -129,13 +127,13 @@ SQL
 fi
 
 echo "[real-data] acquiring bootstrap advisory lock..."
-LOCK_ACQUIRED="$(run_sql "$MARKETPLACE_DATABASE_URL" "SELECT pg_try_advisory_lock(('x' || '$LOCK_KEY_SQL')::bit(64)::bigint)")"
+LOCK_ACQUIRED="$(run_sql "$MARKETPLACE_DATABASE_URL" "SELECT pg_try_advisory_lock(hashtextextended('$LOCK_KEY', 0))")"
 if [ "$LOCK_ACQUIRED" != "t" ]; then
   echo "[real-data] another bootstrap worker is already running; exiting idempotently."
   exit 0
 fi
 cleanup_lock() {
-  run_sql "$MARKETPLACE_DATABASE_URL" "SELECT pg_advisory_unlock(('x' || '$LOCK_KEY_SQL')::bit(64)::bigint)" >/dev/null 2>&1 || true
+  run_sql "$MARKETPLACE_DATABASE_URL" "SELECT pg_advisory_unlock(hashtextextended('$LOCK_KEY', 0))" >/dev/null 2>&1 || true
 }
 trap 'cleanup_lock; rm -rf "$TMP_DIR"' EXIT
 
