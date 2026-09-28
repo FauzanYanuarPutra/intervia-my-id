@@ -257,6 +257,7 @@ struct ListMapReferencesQuery {
     max_lng: Option<f64>,
     viewer_lat: Option<f64>,
     viewer_lng: Option<f64>,
+    radius_km: Option<f64>,
 }
 
 fn parse_map_reference_cursor(
@@ -1118,6 +1119,7 @@ struct ListUmkmStoresQuery {
     max_lng: Option<f64>,
     viewer_lat: Option<f64>,
     viewer_lng: Option<f64>,
+    radius_km: Option<f64>,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -8417,12 +8419,30 @@ async fn list_umkm_stores(
         .unwrap_or((None, None, None, None));
     let viewer = match (query.viewer_lat, query.viewer_lng) {
         (Some(lat), Some(lng))
-            if (-90.0..=90.0).contains(&lat) && (-180.0..=180.0).contains(&lng) =>
+            if lat.is_finite()
+                && lng.is_finite()
+                && (-90.0..=90.0).contains(&lat)
+                && (-180.0..=180.0).contains(&lng) =>
         {
             Some((lat, lng))
         }
         (None, None) => None,
         _ => return err(StatusCode::BAD_REQUEST, "invalid viewer coordinates").into_response(),
+    };
+    let radius_km = match query.radius_km {
+        Some(value)
+            if value.is_finite() && value > 0.0 && value <= 1000.0 && viewer.is_some() =>
+        {
+            Some(value)
+        }
+        Some(_) => {
+            return err(
+                StatusCode::BAD_REQUEST,
+                "radius_km requires valid viewer coordinates and must be between 0 and 1000",
+            )
+            .into_response()
+        }
+        None => None,
     };
     let (viewer_lat, viewer_lng) = viewer
         .map(|value| (Some(value.0), Some(value.1)))
@@ -8534,6 +8554,17 @@ async fn list_umkm_stores(
             ($10::float8 IS NULL AND $11::float8 IS NULL)
             OR ($10::float8 IS NOT NULL AND $11::float8 IS NOT NULL)
           )
+          AND (
+            $12::float8 IS NULL OR (
+              6371.0088 * 2.0 * asin(
+                sqrt(
+                  power(sin(radians(lat - $10) / 2.0), 2) +
+                  cos(radians($10)) * cos(radians(lat)) *
+                  power(sin(radians(lng - $11) / 2.0), 2)
+                )
+              ) <= $12
+            )
+          )
         ORDER BY
           {ranking_order}
         LIMIT $5
@@ -8551,6 +8582,7 @@ async fn list_umkm_stores(
         .bind(max_lng)
         .bind(viewer_lat)
         .bind(viewer_lng)
+        .bind(radius_km)
         .fetch_all(&state.db)
         .await;
 
@@ -8598,6 +8630,32 @@ async fn list_umkm_stores(
                   AND ($4::float8 IS NULL OR public.lajukan_safe_map_coordinate(metadata->>'latitude') <= $4)
                   AND ($5::float8 IS NULL OR public.lajukan_safe_map_coordinate(metadata->>'longitude') >= $5)
                   AND ($6::float8 IS NULL OR public.lajukan_safe_map_coordinate(metadata->>'longitude') <= $6)
+                  AND (
+                    $8::float8 IS NULL OR (
+                      6371.0088 * 2.0 * asin(
+                        sqrt(
+                          power(
+                            sin(
+                              radians(
+                                public.lajukan_safe_map_coordinate(metadata->>'latitude') - $10
+                              ) / 2.0
+                            ),
+                            2
+                          ) +
+                          cos(radians($10)) *
+                          cos(radians(public.lajukan_safe_map_coordinate(metadata->>'latitude'))) *
+                          power(
+                            sin(
+                              radians(
+                                public.lajukan_safe_map_coordinate(metadata->>'longitude') - $11
+                              ) / 2.0
+                            ),
+                            2
+                          )
+                        )
+                      ) <= $8
+                    )
+                  )
                 ORDER BY updated_at DESC, id ASC
                 LIMIT $7
                 "#
@@ -8608,6 +8666,9 @@ async fn list_umkm_stores(
             .bind(max_lat)
             .bind(min_lng)
             .bind(max_lng)
+            .bind(viewer_lat)
+            .bind(viewer_lng)
+            .bind(radius_km)
             .bind(limit)
             .fetch_all(&state.db)
             .await;
@@ -10673,6 +10734,21 @@ async fn list_map_references(
         Ok(value) => value,
         Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
     };
+    let radius_km = match query.radius_km {
+        Some(value)
+            if value.is_finite() && value > 0.0 && value <= 1000.0 && viewer.is_some() =>
+        {
+            Some(value)
+        }
+        Some(_) => {
+            return err(
+                StatusCode::BAD_REQUEST,
+                "radius_km requires valid viewer coordinates and must be between 0 and 1000",
+            )
+            .into_response()
+        }
+        None => None,
+    };
     // When browser geolocation is unavailable, rank around the visible map
     // center. This affects retrieval order only; it is not returned as a user
     // location or used to claim a viewer-specific distance.
@@ -10685,7 +10761,7 @@ async fn list_map_references(
         Ok(value) => value,
         Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
     };
-    if cursor.is_some() && (ranking_origin.is_some() || text_query.is_some()) {
+    if cursor.is_some() && (ranking_origin.is_some() || text_query.is_some() || radius_km.is_some()) {
         return err(
             StatusCode::BAD_REQUEST,
             "map reference cursor is only supported for newest-first browsing",
@@ -10891,6 +10967,47 @@ async fn list_map_references(
             .push(", ")
             .push_bind(max_lat)
             .push("))");
+    }
+
+    if let Some(radius) = radius_km {
+        if let Some((viewer_lat, viewer_lng)) = viewer {
+            statement
+                .push(
+                    r#"
+                    AND (
+                      6371.0088 * 2.0 * asin(
+                        sqrt(
+                          power(sin(radians(
+                            public.lajukan_safe_map_coordinate(metadata->>'latitude') - 
+                            "#,
+                )
+                .push_bind(viewer_lat)
+                .push(
+                    r#"
+                          ) / 2.0), 2) +
+                          cos(radians(
+                            "#,
+                )
+                .push_bind(viewer_lat)
+                .push(
+                    r#"
+                          )) * cos(radians(
+                            public.lajukan_safe_map_coordinate(metadata->>'latitude')
+                          )) *
+                          power(sin(radians(
+                            public.lajukan_safe_map_coordinate(metadata->>'longitude') -
+                            "#,
+                )
+                .push_bind(viewer_lng)
+                .push(
+                    r#"
+                          ) / 2.0), 2)
+                        )
+                      )
+                    ) <= "#,
+                )
+                .push_bind(radius);
+        }
     }
 
     if let Some((cursor_updated_at, cursor_id)) = cursor {
