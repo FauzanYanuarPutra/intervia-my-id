@@ -8,15 +8,6 @@ use axum::{
     Json, Router,
 };
 use chrono::{DateTime, Utc};
-use futures_util::StreamExt;
-use lapin::{
-    options::{
-        BasicAckOptions, BasicConsumeOptions, BasicNackOptions, BasicQosOptions,
-        ExchangeDeclareOptions, QueueBindOptions, QueueDeclareOptions,
-    },
-    types::FieldTable,
-    ExchangeKind,
-};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sqlx::{postgres::PgPoolOptions, FromRow, PgPool, Postgres, Row, Transaction};
@@ -28,7 +19,7 @@ use std::{
 use tokio::{
     io::{AsyncReadExt, AsyncSeekExt},
     net::TcpListener,
-    time::{sleep, Duration},
+    time::Duration,
 };
 use tower_http::cors::CorsLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
