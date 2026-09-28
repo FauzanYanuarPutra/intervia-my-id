@@ -2087,7 +2087,9 @@ def buyer_request_sql(requests: list[BuyerRequest]) -> list[str]:
         "    attributes = EXCLUDED.attributes,",
         "    contact_snapshot = EXCLUDED.contact_snapshot,",
         "    metadata = EXCLUDED.metadata,",
-        "    updated_at = NOW();",
+        "    updated_at = NOW()",
+        "WHERE content_items.owner_id IS NULL",
+        "  AND content_items.metadata->>'seed_pack' = 'real_indonesia_bulk_open_data';",
     ]
 
 
@@ -2384,9 +2386,11 @@ def aggregate_insight_sql(items: list[DataInsight]) -> list[str]:
         "  FROM stage_real_data_insights",
         ") src",
         "ON CONFLICT (slug) DO UPDATE",
-        "SET owner_id = NULL, title=EXCLUDED.title, summary=EXCLUDED.summary, body=EXCLUDED.body,",
+        "SET title=EXCLUDED.title, summary=EXCLUDED.summary, body=EXCLUDED.body,",
         "    category=EXCLUDED.category, content_status='active', metadata=EXCLUDED.metadata,",
-        "    listing_status='published', updated_at=NOW();",
+        "    listing_status='published', updated_at=NOW()",
+        "WHERE content_items.owner_id IS NULL",
+        "  AND content_items.metadata->>'seed_pack' = 'real_indonesia_bulk_open_data';",
     ]
 
 def enabled_sources(config: dict[str, Any], source_ids: set[str]) -> list[dict[str, Any]]:
