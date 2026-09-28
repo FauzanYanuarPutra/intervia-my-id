@@ -1842,6 +1842,12 @@ pub async fn recover_stale_import_jobs(db: &PgPool) -> Result<u64, sqlx::Error> 
 }
 
 /// Startup bootstrap is idempotent: queued/running jobs are reused and recent successful imports are skipped.
+pub fn marketplace_source_bootstrap_enabled() -> bool {
+    env::var("MARKETPLACE_SOURCE_BOOTSTRAP")
+        .map(|value| matches!(value.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+        .unwrap_or(false)
+}
+
 pub async fn bootstrap_persistent_imports(state: Arc<AppState>) -> Result<u64, sqlx::Error> {
     let db = &state.db;
     let sources = sqlx::query_as::<_, (Uuid, String, Option<String>, i32)>(
