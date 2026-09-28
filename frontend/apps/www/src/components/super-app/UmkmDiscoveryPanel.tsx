@@ -1058,8 +1058,9 @@ export function UmkmDiscoveryPanel({
     null,
   );
   const [mapFocusMode, setMapFocusMode] = useState<
-    'stores' | 'viewer' | 'route' | 'selected'
-  >('stores');
+    'stores' | 'viewer' | 'route' | 'selected' | 'indonesia'
+  >('indonesia');
+  const [mapRangeKm, setMapRangeKm] = useState<number | null>(null);
   const [mapFocusNonce, setMapFocusNonce] = useState(0);
   const [sheetExpanded, setSheetExpanded] = useState(
     () => variant === 'immersive',
@@ -1160,10 +1161,13 @@ export function UmkmDiscoveryPanel({
         if (query?.trim()) params.set('q', query.trim());
         if (city?.trim()) params.set('city', city.trim());
         if (queryViewerLocation) {
-          // ~110 m precision is sufficient for nearby ordering and avoids
-          // placing exact device coordinates in URLs and access logs.
+          // ~110 m precision is sufficient for ordering without exposing exact
+          // browser coordinates in URLs/access logs.
           params.set('viewer_lat', queryViewerLocation.lat.toFixed(3));
           params.set('viewer_lng', queryViewerLocation.lng.toFixed(3));
+        }
+        if (mapRangeKm !== null && queryViewerLocation) {
+          params.set('radius_km', String(mapRangeKm));
         }
         params.set('limit', String(requestLimit));
         params.set('offset', String(offset));
@@ -1268,6 +1272,7 @@ export function UmkmDiscoveryPanel({
       selectedSlug,
       selectedStoreIdInitial,
       queryViewerLocation,
+      mapRangeKm,
     ],
   );
 
@@ -1348,6 +1353,9 @@ export function UmkmDiscoveryPanel({
         params.set('viewer_lat', queryViewerLocation.lat.toFixed(3));
         params.set('viewer_lng', queryViewerLocation.lng.toFixed(3));
       }
+      if (mapRangeKm !== null && queryViewerLocation) {
+        params.set('radius_km', String(mapRangeKm));
+      }
       if (mapBounds) {
         params.set('min_lat', mapBounds.minLat.toFixed(6));
         params.set('max_lat', mapBounds.maxLat.toFixed(6));
@@ -1399,7 +1407,7 @@ export function UmkmDiscoveryPanel({
         }
       }
     },
-    [city, mapBounds, query, queryViewerLocation],
+    [city, mapBounds, mapRangeKm, query, queryViewerLocation],
   );
 
   useEffect(() => {
@@ -1909,18 +1917,34 @@ export function UmkmDiscoveryPanel({
     return formatUmkmPlaceDistance(routeSummary.distance_m / 1000, isId);
   }, [isId, routeSummary]);
   const bumpMapFocus = useCallback(
-    (mode: 'stores' | 'viewer' | 'route' | 'selected') => {
+    (mode: 'stores' | 'viewer' | 'route' | 'selected' | 'indonesia') => {
       setMapFocusMode(mode);
       setMapFocusNonce(current => current + 1);
     },
     [],
   );
 
-  useEffect(() => {
-    if (!viewerLocation || autoFocusedViewerRef.current) return;
-    autoFocusedViewerRef.current = true;
-    bumpMapFocus('viewer');
-  }, [bumpMapFocus, viewerLocation]);
+  // Browser location may be used for distance/range filtering, but the map
+  // stays on the Indonesia-wide view until the user explicitly focuses location.
+  const handleMapRangeChange = useCallback(
+    async (value: string) => {
+      if (value === 'all') {
+        setMapRangeKm(null);
+        bumpMapFocus('indonesia');
+        return;
+      }
+
+      const nextRangeKm = Number(value);
+      if (!Number.isFinite(nextRangeKm) || nextRangeKm <= 0) return;
+      const nextLocation = viewerLocation || (await requestViewerLocation());
+      if (!nextLocation) return;
+
+      setMapRangeKm(nextRangeKm);
+      bumpMapFocus('viewer');
+    },
+    [bumpMapFocus, requestViewerLocation, viewerLocation],
+  );
+
   const cycleMapTheme = useCallback(() => {
     setMapTheme(current => getNextUmkmMapTheme(current));
   }, []);
@@ -1986,6 +2010,26 @@ export function UmkmDiscoveryPanel({
                 : 'bottom-3 left-3 sm:bottom-4',
             )}
           >
+            <div className="pointer-events-auto mb-2 flex justify-end">
+              <label className="flex items-center gap-1.5 rounded-full border border-white/80 bg-white/94 px-2.5 py-1.5 text-[10px] font-bold text-slate-700 shadow-sm backdrop-blur dark:border-slate-700/80 dark:bg-slate-950/90 dark:text-slate-200">
+                <span>{isId ? 'Jangkauan' : 'Range'}</span>
+                <select
+                  value={mapRangeKm === null ? 'all' : String(mapRangeKm)}
+                  onChange={event => {
+                    void handleMapRangeChange(event.target.value);
+                  }}
+                  className="bg-transparent text-[10px] font-black outline-none"
+                  aria-label={isId ? 'Jangkauan peta' : 'Map range'}
+                >
+                  <option value="all">{isId ? 'Seluruh Indonesia' : 'All Indonesia'}</option>
+                  {[5, 10, 25, 50, 100, 250, 500, 1000].map(value => (
+                    <option key={value} value={value}>
+                      {value} km
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
             <MapQuickControls
               isId={isId}
               interactive={mapInteractive}
@@ -2054,6 +2098,8 @@ export function UmkmDiscoveryPanel({
       viewerLocation,
       mapStores,
       handleMapBoundsChange,
+      handleMapRangeChange,
+      mapRangeKm,
     ],
   );
 
