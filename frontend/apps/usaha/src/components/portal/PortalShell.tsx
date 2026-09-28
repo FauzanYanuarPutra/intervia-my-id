@@ -143,7 +143,7 @@ export function PortalShell({
         </main>
       </div>
 
-      {!accountPage ? <QuickCreateMenu business={activeBusiness} mobile /> : null}
+      {!accountPage && currentSection !== 'home' ? <QuickCreateMenu business={activeBusiness} mobile /> : null}
       {!accountPage ? <MobileNav business={activeBusiness} currentSection={currentSection} /> : null}
     </div>
   );
