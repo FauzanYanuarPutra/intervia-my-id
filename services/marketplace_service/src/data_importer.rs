@@ -1015,6 +1015,18 @@ pub async fn run(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
             {
                 tracing::warn!(job_id=%job_id, "failed to record source import health timestamps: {:?}", error);
             }
+
+            // The startup bootstrap queues imports asynchronously. Reconcile the
+            // promotion candidates as soon as this job commits so newly imported
+            // references do not wait for the periodic refresh loop.
+            if let Err(error) = crate::data_governance::bootstrap_reference_publication(state).await
+            {
+                tracing::warn!(
+                    job_id=%job_id,
+                    "reference publication reconciliation after import failed: {:?}",
+                    error
+                );
+            }
             Ok(())
         }
         Err(error) => {

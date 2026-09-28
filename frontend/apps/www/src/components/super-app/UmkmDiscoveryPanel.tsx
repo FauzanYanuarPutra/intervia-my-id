@@ -2144,7 +2144,7 @@ export function UmkmDiscoveryPanel({
               )}
             </button>
 
-            {selectedPlace && ( <div className="flex min-w-0 shrink-0 items-center justify-between gap-3 px-4 pb-2 pt-1 sm:px-4">
+            {!selectedPlace && ( <div className="flex min-w-0 shrink-0 items-center justify-between gap-3 px-4 pb-2 pt-1 sm:px-4">
               <div className="min-w-0">
                 <h1 className="line-clamp-1 text-sm font-bold leading-tight tracking-[-0.035em] text-[color:var(--app-text)] sm:text-lg">
                   {sheetTitle}

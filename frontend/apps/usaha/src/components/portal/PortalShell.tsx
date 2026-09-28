@@ -10,6 +10,7 @@ import { QuickCreateMenu } from '@/components/portal/QuickCreateMenu';
 import { SidebarNav } from '@/components/portal/SidebarNav';
 import { StatusBadge } from '@/components/portal/StatusBadge';
 import { UsahaFlowGuide } from '@/components/portal/UsahaFlowGuide';
+import { WorkspaceSearch } from '@/components/portal/WorkspaceSearch';
 import { portalSectionLabel } from '@/lib/portal-navigation';
 import { getStatusCopy } from '@/lib/portal-logic';
 import type { BusinessRecord, PortalSection } from '@/lib/portal-types';
@@ -111,6 +112,7 @@ export function PortalShell({
             </div>
 
             <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+              {!accountPage ? <WorkspaceSearch business={activeBusiness} /> : null}
               {!accountPage && status ? (
                 <span className="hidden sm:inline-flex">
                   <StatusBadge tone={activeBusiness?.isOpen ? 'success' : 'neutral'}>{status.label}</StatusBadge>

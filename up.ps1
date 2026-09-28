@@ -789,6 +789,18 @@ try {
         }
     }
 
+    if ($Build.IsPresent -and -not $Down.IsPresent) {
+        # Compose v5 can leave temporary, hash-prefixed containers behind when
+        # a previous recreate is interrupted. Remove runtime containers before
+        # the fresh start; never remove volumes because they hold application
+        # data and migration state.
+        Write-Host "Cleaning stale Compose containers before fresh build start (volumes preserved)..." -ForegroundColor Yellow
+        & docker @ComposeArgs down --remove-orphans
+        if ($LASTEXITCODE -ne 0) {
+            throw "Docker Compose gagal membersihkan container lama sebelum startup. Volume/database tidak dihapus."
+        }
+    }
+
     # Local AI must be provisioned before the main stack starts. Otherwise
     # ai_service/www can race Ollama startup and the first Personal AI request
     # falls into a temporary gateway fallback even though the model is about to
@@ -818,12 +830,11 @@ try {
 
     $UpArgs = @("up", "-d", "--remove-orphans", "--wait", "--wait-timeout", "420")
     if ($Build.IsPresent) {
-        # The image was already compiled above. Prevent Compose from rebuilding it
-        # a second time and, for -Buildclear, recreate containers from the fresh image.
+        # The images were compiled above. Prevent Compose from rebuilding them a
+        # second time and always recreate containers so the fresh images are
+        # actually used. Volumes, including the database volumes, are preserved.
         $UpArgs += "--no-build"
-        if ($ClearBuildCache) {
-            $UpArgs += "--force-recreate"
-        }
+        $UpArgs += "--force-recreate"
     }
     if ($ForceRecreate.IsPresent) {
         $UpArgs += "--force-recreate"
@@ -880,7 +891,10 @@ try {
     if ($Services.Count -eq 0 -or $Services -contains "real_data_bootstrap") {
         Write-Host "Verifying external real-data bootstrap..." -ForegroundColor Cyan
         $CrawlerReady = $false
-        for ($CrawlerAttempt = 1; $CrawlerAttempt -le 36; $CrawlerAttempt++) {
+        # External source imports can legitimately take several minutes on a
+        # first run. Keep waiting for the one-shot importer instead of treating
+        # a slow but healthy import as a startup failure.
+        for ($CrawlerAttempt = 1; $CrawlerAttempt -le 180; $CrawlerAttempt++) {
             $CrawlerState = @(
                 & docker @ComposeArgs ps -a --format "{{.Service}}|{{.State}}|{{.ExitCode}}" real_data_bootstrap 2>&1
             )
@@ -924,7 +938,9 @@ try {
     if ($Services.Count -eq 0 -or $Services -contains "marketplace_service") {
         Write-Host "Verifying Lajukan real-data bootstrap..." -ForegroundColor Cyan
         $DataReady = $false
-        for ($DataAttempt = 1; $DataAttempt -le 36; $DataAttempt++) {
+        # OSM/CKAN jobs run in the marketplace container after startup. Give the
+        # first governed import enough time to finish and publish its candidates.
+        for ($DataAttempt = 1; $DataAttempt -le 180; $DataAttempt++) {
             $StatusProbe = @(
                 & docker @ComposeArgs exec -T marketplace_service curl -fsS http://127.0.0.1:8081/v1/data/bootstrap-status 2>&1
             )

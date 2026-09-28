@@ -262,14 +262,21 @@ function mapPublicReference(
     sourceDataset === 'openstreetmap'
       ? safeOdblLicenseUrl(metadata.source_license_url)
       : safeHttpUrl(metadata.source_license_url);
+  const recordKind = readText(metadata.record_kind).toLowerCase();
+  const marketSide = readText(metadata.market_side).toLowerCase();
+  const referenceFlagsWereProjected =
+    !Object.prototype.hasOwnProperty.call(metadata, 'market_side') &&
+    !Object.prototype.hasOwnProperty.call(metadata, 'is_transactional');
   const isOsmReference =
     sourceDataset === 'openstreetmap' &&
     sourceTitle.toLowerCase().includes('openstreetmap') &&
     /(odbl|open database license)/i.test(sourceLicense);
   const isGovernedReference =
-    readText(metadata.record_kind).toLowerCase().includes('reference') &&
-    readText(metadata.market_side).toLowerCase() === 'reference' &&
-    readText(metadata.is_transactional).toLowerCase() === 'false' &&
+    recordKind.includes('reference') &&
+    (marketSide === 'reference' || referenceFlagsWereProjected) &&
+    (metadata.is_transactional === false ||
+      readText(metadata.is_transactional).toLowerCase() === 'false' ||
+      referenceFlagsWereProjected) &&
     sourceDataset.length >= 2 &&
     sourceLicense.length >= 2;
   if (
@@ -327,7 +334,7 @@ function mapPublicReference(
       source_license: sourceLicense,
       source_license_url: sourceLicenseUrl,
       record_kind:
-        readText(metadata.record_kind) || 'real_openstreetmap_reference',
+      readText(metadata.record_kind) || 'real_openstreetmap_reference',
       market_side: 'reference',
       is_public_reference: true,
       is_transactional: false,

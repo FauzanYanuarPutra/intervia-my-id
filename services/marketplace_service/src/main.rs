@@ -11019,7 +11019,9 @@ async fn list_content(
     let rows = sqlx::query_as::<_, ContentRow>(
         r#"
         SELECT
-            id, owner_id, content_type, slug, title, summary, body, price_cents, price_unit,
+            id,
+            COALESCE(owner_id, '00000000-0000-0000-0000-000000000000'::uuid) AS owner_id,
+            content_type, slug, title, summary, body, price_cents, price_unit,
             currency, tags, cover_image, category, content_status, pricing_mode, original_price_cents,
             seller_type, minimum_order, promo_label, promo_start_at, promo_end_at, rating, review_count,
             COALESCE((
@@ -23498,7 +23500,9 @@ async fn find_content(db: &PgPool, id_or_slug: &str) -> Result<Option<ContentRow
     sqlx::query_as::<_, ContentRow>(
         r#"
         SELECT
-            id, owner_id, content_type, slug, title, summary, body, price_cents, price_unit,
+            id,
+            COALESCE(owner_id, '00000000-0000-0000-0000-000000000000'::uuid) AS owner_id,
+            content_type, slug, title, summary, body, price_cents, price_unit,
             currency, tags, cover_image, category, content_status, pricing_mode, original_price_cents,
             seller_type, minimum_order, promo_label, promo_start_at, promo_end_at, rating, review_count,
             COALESCE((

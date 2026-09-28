@@ -419,11 +419,10 @@ services:
   real_data_bootstrap:
     <<: *service-defaults
     restart: "no"
-    # Use Docker's embedded resolver so Docker Desktop/Windows VPN DNS policy
-    # is inherited instead of forcing public resolvers that may be unreachable.
-    # Explicit proxy settings remain available below for restricted networks.
-    dns:
-      - 127.0.0.11
+    # Do not override Docker Desktop's resolver here. On Windows/VPN setups an
+    # explicit 127.0.0.11 entry can return SERVFAIL even when the normal
+    # container resolver can reach the approved public sources. Proxy settings
+    # remain available below for restricted networks.
     build:
       context: .
       dockerfile: services/real_data_bootstrap/Dockerfile
