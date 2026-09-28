@@ -1065,13 +1065,13 @@ mod tests {
     }
 
     #[test]
-    #[test]
     fn rejects_restricted_resource_licenses() {
         assert!(!license_allows_persistent_import("CC BY-NC 4.0"));
         assert!(!license_allows_persistent_import("CC BY-ND 4.0"));
         assert!(license_allows_persistent_import("CC BY 4.0"));
     }
 
+    #[test]
     fn recognizes_json_and_geojson_resources() {
         assert!(resource_is_json(&serde_json::json!({
             "format": "JSON",
