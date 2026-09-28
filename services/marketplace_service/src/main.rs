@@ -4229,7 +4229,9 @@ fn validate_radius_km(
         {
             Ok(Some(radius))
         }
-        Some(_) => Err("radius_km requires valid viewer coordinates and must be between 0 and 1000"),
+        Some(_) => {
+            Err("radius_km requires valid viewer coordinates and must be between 0 and 1000")
+        }
         None => Ok(None),
     }
 }
