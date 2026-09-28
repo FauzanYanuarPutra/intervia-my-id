@@ -111,11 +111,11 @@ export function MobileNav({ business, currentSection }: MobileNavProps) {
         <div className="flex items-start justify-between gap-4 border-b border-portal-line px-4 pb-3 pt-3">
           <div>
             <p className="text-base font-black text-portal-ink">Menu usaha</p>
-            <p className="mt-0.5 text-xs text-portal-soft">Tumbuh, pelanggan, pekerjaan, produk, laporan, kanal jual, dan pengaturan usaha.</p>
+            <p className="mt-0.5 text-xs text-portal-soft">Pelanggan, laporan, jual online, pekerjaan, uang, dan pengaturan usaha.</p>
           </div>
           <button
             type="button"
-            aria-label="Tutup menu lainnya"
+            aria-label="Tutup menu usaha"
             className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-portal-soft transition hover:bg-[#f3f5f2] hover:text-portal-ink"
             onClick={() => setMoreOpen(false)}
           >
