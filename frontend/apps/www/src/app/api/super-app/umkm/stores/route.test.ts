@@ -342,9 +342,9 @@ describe('GET /api/super-app/umkm/stores', () => {
     expect(listUmkmStoresMock).toHaveBeenCalledWith(
       expect.objectContaining({
         bounds: { minLat: -7, maxLat: -6, minLng: 106, maxLng: 108 },
-        viewer: { lat: -6.5, lng: 107 },
       }),
     );
+    expect(listUmkmStoresMock.mock.calls[0][0].viewer).toBeUndefined();
     expect(payload.data.items.map((item: { id: string }) => item.id)).toEqual([
       'store-00',
     ]);
