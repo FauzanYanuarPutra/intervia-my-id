@@ -29,7 +29,7 @@ fn coordinate_pair(value: &Value) -> Option<(f64, f64)> {
         .and_then(Value::as_array)
         .or_else(|| value.get("coordinates").and_then(Value::as_array))?;
 
-    let longitude = coordinates.get(0).and_then(|value| {
+    let longitude = coordinates.first().and_then(|value| {
         value.as_f64().or_else(|| {
             value
                 .as_str()
