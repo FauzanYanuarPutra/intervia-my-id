@@ -7,11 +7,11 @@ import { ModalSurface } from '@/components/interaction/ModalSurface';
 import {
   desktopPrimaryNavigation,
   portalMenuNavigation,
-  portalSectionUserLabel,
   type PortalNavigationItem,
 } from '@/lib/portal-navigation';
 import { buildSectionHref } from '@/lib/portal-logic';
 import type { BusinessRecord, PortalSection } from '@/lib/portal-types';
+import { portalSectionUserLabel } from '@/lib/portal-navigation-labels';
 import { portalSectionVisual } from '@/lib/portal-visual';
 
 type WorkspaceSearchProps = {
