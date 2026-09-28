@@ -8819,7 +8819,6 @@ async fn list_umkm_stores(
                 .await
             };
 
-
             if let Ok(reference_rows) = reference_rows {
                 for row in reference_rows {
                     let id: Uuid = row.get("id");
