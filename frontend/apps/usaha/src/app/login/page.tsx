@@ -54,7 +54,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
               <ShieldCheck className="h-3.5 w-3.5" /> Akun Lajukan
             </span>
             <h1 className="mt-4 text-[28px] font-black leading-tight tracking-[-0.045em]">Masuk ke Lajukan Usaha</h1>
-            <p className="mt-2 text-sm leading-6 text-portal-soft">Gunakan akun Google yang sama dengan akun Lajukan kamu.</p>
+            <p className="mt-2 text-sm leading-6 text-portal-soft">Gunakan akun Google yang sama dengan akun Lajukan kamu. Setelah masuk, Lajukan akan mengecek usaha yang sudah terhubung dulu—tidak membuat usaha baru secara otomatis.</p>
 
             {error ? (
               <div role="alert" className="mt-4 rounded-xl bg-red-50 px-3.5 py-3 text-sm font-semibold leading-5 text-red-700">
@@ -88,7 +88,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           </div>
         </section>
 
-        <p className="text-center text-[10px] leading-4 text-portal-soft">Dengan masuk, kamu melanjutkan ke workspace usaha yang terhubung dengan akun Lajukan.</p>
+        <p className="text-center text-[10px] leading-4 text-portal-soft">Dengan masuk, kamu melanjutkan ke usaha yang sudah terhubung. Kalau belum ada, barulah Lajukan menawarkan pembuatan usaha baru.</p>
       </div>
     </main>
   );
