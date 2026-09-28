@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import {
   Briefcase,
+  Gift,
   Leaf,
   Loader2,
   LocateFixed,
@@ -43,7 +44,7 @@ export function getPlaceIcon(kind: UmkmPlacePresentation['kind']): LucideIcon {
   if (kind === 'food') return UtensilsCrossed;
   if (kind === 'retail') return ShoppingBag;
   if (kind === 'service') return Briefcase;
-  if (kind === 'craft') return Wrench;
+  if (kind === 'craft') return Gift;
   if (kind === 'agri') return Leaf;
   if (kind === 'workshop') return Wrench;
   return Store;
@@ -460,7 +461,7 @@ function PlaceKindIcon({
   if (kind === 'food') return <UtensilsCrossed className={className} />;
   if (kind === 'retail') return <ShoppingBag className={className} />;
   if (kind === 'service') return <Briefcase className={className} />;
-  if (kind === 'craft') return <Wrench className={className} />;
+  if (kind === 'craft') return <Gift className={className} />;
   if (kind === 'agri') return <Leaf className={className} />;
   if (kind === 'workshop') return <Wrench className={className} />;
   return <Store className={className} />;
