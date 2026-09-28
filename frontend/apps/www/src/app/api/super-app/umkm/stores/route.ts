@@ -365,6 +365,7 @@ async function listPublicMapReferences(options: {
   city?: string;
   limit: number;
   viewer: { lat: number; lng: number } | null;
+  radiusKm?: number | null;
   bounds?: {
     minLat: number;
     maxLat: number;
@@ -384,6 +385,9 @@ async function listPublicMapReferences(options: {
   if (options.viewer) {
     params.set('viewer_lat', String(options.viewer.lat));
     params.set('viewer_lng', String(options.viewer.lng));
+  }
+  if (options.radiusKm !== undefined && options.radiusKm !== null) {
+    params.set('radius_km', String(options.radiusKm));
   }
   if (options.bounds) {
     params.set('min_lat', String(options.bounds.minLat));
@@ -664,6 +668,7 @@ export async function GET(req: NextRequest) {
           viewer: hasViewer
             ? { lat: viewerLat as number, lng: viewerLng as number }
             : null,
+          radiusKm,
           bounds: parsedPublicQuery.bounds,
           cursor: referenceCursor,
         }).catch(error => {
@@ -696,6 +701,7 @@ export async function GET(req: NextRequest) {
             ? { bounds: parsedPublicQuery.bounds }
             : {}),
           ...(rankingOrigin ? { viewer: rankingOrigin } : {}),
+          ...(radiusKm !== null && hasViewer ? { radiusKm } : {}),
         });
 
     const visibleStores = mine
