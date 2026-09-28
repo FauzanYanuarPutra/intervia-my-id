@@ -8637,7 +8637,11 @@ async fn list_umkm_stores(
                                 .insert("reference_subtype".to_string(), json!("place_reference"));
                             object.insert("market_side".to_string(), json!("reference"));
                             object.insert("is_transactional".to_string(), json!(false));
-                            object.insert("claimable".to_string(), json!(false));
+                            let claimable = metadata
+                                .get("claimable")
+                                .and_then(Value::as_bool)
+                                .unwrap_or(false);
+                            object.insert("claimable".to_string(), json!(claimable));
                             object.insert("reference_content_id".to_string(), json!(id));
                             if let Some(image) = cover_image.as_ref() {
                                 object.entry("image_url").or_insert_with(|| json!(image));
@@ -8703,7 +8707,118 @@ async fn get_umkm_store(
             Json(json!({ "data": { "store": store.into_public() } })),
         )
             .into_response(),
-        Ok(None) => err(StatusCode::NOT_FOUND, "umkm store not found").into_response(),
+        Ok(None) => {
+            let reference_row = sqlx::query(
+                r#"
+                SELECT id, slug, title, summary, cover_image, metadata, created_at, updated_at
+                FROM content_items
+                WHERE content_status = 'active'
+                  AND metadata->>'reference_publication_status' = 'published'
+                  AND metadata->>'record_kind' IN (
+                    'government_reference',
+                    'open_data_reference',
+                    'licensed_reference',
+                    'external_content_reference',
+                    'real_openstreetmap_reference',
+                    'osm_provider_reference'
+                  )
+                  AND COALESCE(metadata->>'reference_subtype', '') <> 'aggregate_data'
+                  AND COALESCE(metadata->>'is_transactional', 'true') = 'false'
+                  AND lower(COALESCE(metadata->>'market_side', '')) = 'reference'
+                  AND (slug = $1 OR id::text = $1)
+                LIMIT 1
+                "#
+            )
+            .bind(store_ref.trim())
+            .fetch_optional(&state.db)
+            .await;
+
+            match reference_row {
+                Ok(Some(row)) => {
+                    let id: Uuid = row.get("id");
+                    let slug: String = row.get("slug");
+                    let title: String = row.get("title");
+                    let summary: Option<String> = row.get("summary");
+                    let cover_image: Option<String> = row.get("cover_image");
+                    let metadata: Value = row.get("metadata");
+                    let created_at: DateTime<Utc> = row.get("created_at");
+                    let updated_at: DateTime<Utc> = row.get("updated_at");
+
+                    let city = metadata
+                        .get("city")
+                        .and_then(Value::as_str)
+                        .unwrap_or("Indonesia")
+                        .to_string();
+                    let address = metadata
+                        .get("address")
+                        .or_else(|| metadata.get("location"))
+                        .and_then(Value::as_str)
+                        .unwrap_or(&city)
+                        .to_string();
+                    let lat = metadata.get("latitude").and_then(|v| {
+                        v.as_f64().or_else(|| v.as_str().and_then(|s| s.parse::<f64>().ok()))
+                    });
+                    let lng = metadata.get("longitude").and_then(|v| {
+                        v.as_f64().or_else(|| v.as_str().and_then(|s| s.parse::<f64>().ok()))
+                    });
+
+                    let Some((lat, lng)) = lat.zip(lng) else {
+                        return err(StatusCode::NOT_FOUND, "umkm store not found").into_response();
+                    };
+
+                    let mut projected = metadata.clone();
+                    if let Some(object) = projected.as_object_mut() {
+                        object.insert("reference_content_id".to_string(), json!(id));
+                        object.insert("reference_subtype".to_string(), json!("place_reference"));
+                        object.insert("market_side".to_string(), json!("reference"));
+                        object.insert("is_transactional".to_string(), json!(false));
+                        object.insert(
+                            "claimable".to_string(),
+                            json!(metadata.get("claimable").and_then(Value::as_bool).unwrap_or(false)),
+                        );
+                        if let Some(image) = cover_image.as_ref() {
+                            object.entry("image_url").or_insert_with(|| json!(image));
+                        }
+                    }
+
+                    (
+                        StatusCode::OK,
+                        Json(json!({
+                            "data": {
+                                "store": {
+                                    "id": id,
+                                    "owner_user_id": Value::Null,
+                                    "organization_id": Value::Null,
+                                    "name": title,
+                                    "slug": slug,
+                                    "description": summary,
+                                    "city": city,
+                                    "address": address,
+                                    "lat": lat,
+                                    "lng": lng,
+                                    "phone": Value::Null,
+                                    "is_active": true,
+                                    "online_order_enabled": false,
+                                    "offline_order_enabled": false,
+                                    "metadata": projected,
+                                    "created_at": created_at,
+                                    "updated_at": updated_at
+                                }
+                            }
+                        }))
+                    ).into_response()
+                }
+                Ok(None) => err(StatusCode::NOT_FOUND, "umkm store not found").into_response(),
+                Err(error) => {
+                    tracing::error!("get_umkm_store reference lookup error: {:?}", error);
+                    err(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "failed to load umkm store",
+                    )
+                    .into_response()
+                }
+            }
+        }
         Err(error) => {
             tracing::error!("get_umkm_store error: {:?}", error);
             err(
