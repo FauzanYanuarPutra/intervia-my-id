@@ -690,6 +690,7 @@ export async function GET(req: NextRequest) {
         })
 : Promise.resolve({ items: [], hasMore: false, nextCursor: null, nextOffset: null });
 
+    let storesBackendDegraded = false;
     const stores = referencesOnly
       ? []
       : mine
@@ -713,6 +714,16 @@ export async function GET(req: NextRequest) {
             : {}),
           ...(rankingOrigin ? { viewer: rankingOrigin } : {}),
           ...(radiusKm !== null && hasViewer ? { radiusKm } : {}),
+        }).catch(error => {
+          if (!includeReferences && !mapRequest) throw error;
+          storesBackendDegraded = true;
+          console.warn('[UMKM_PUBLIC_STORE_BACKEND_DEGRADED]', {
+            message: error instanceof Error ? error.message : 'unknown error',
+            mapRequest,
+            includeReferences,
+            bounds: parsedPublicQuery.bounds ?? null,
+          });
+          return [] as UmkmStore[];
         });
 
     const visibleStores = mine
@@ -815,6 +826,7 @@ export async function GET(req: NextRequest) {
           count: sortedItems.length,
           reference_count: referenceItems.length,
           reference_has_more: referenceHasMore,
+          stores_backend_degraded: storesBackendDegraded,
           next_cursor: referencesOnly ? referenceNextCursor : null,
           loaded_count: referencesOnly
             ? offset + limitedItems.length
