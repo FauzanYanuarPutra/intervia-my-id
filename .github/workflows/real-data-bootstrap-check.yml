@@ -1,0 +1,59 @@
+name: real-data-bootstrap-check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/import_real_marketplace_open_data.py'
+      - 'scripts/run_real_data_bootstrap.sh'
+      - 'config/real_marketplace_open_data.sources.json'
+      - 'docker-compose.yml'
+      - 'up.ps1'
+      - 'services/real_data_bootstrap/**'
+      - '.github/workflows/real-data-bootstrap-check.yml'
+  pull_request:
+    paths:
+      - 'scripts/import_real_marketplace_open_data.py'
+      - 'scripts/run_real_data_bootstrap.sh'
+      - 'config/real_marketplace_open_data.sources.json'
+      - 'docker-compose.yml'
+      - 'up.ps1'
+      - 'services/real_data_bootstrap/**'
+      - '.github/workflows/real-data-bootstrap-check.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  syntax-and-config:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate source config
+        shell: bash
+        run: python3 -m json.tool config/real_marketplace_open_data.sources.json >/dev/null
+
+      - name: Validate Python importer
+        shell: bash
+        run: python3 -m py_compile scripts/import_real_marketplace_open_data.py
+
+      - name: Validate shell bootstrap
+        shell: bash
+        run: |
+          sh -n scripts/run_real_data_bootstrap.sh
+          bash -n scripts/run_real_data_bootstrap.sh
+
+      - name: Validate Dockerfile
+        shell: bash
+        run: |
+          test -f services/real_data_bootstrap/Dockerfile
+          grep -q 'py_compile /workspace/scripts/import_real_marketplace_open_data.py' services/real_data_bootstrap/Dockerfile
+
+      - name: Validate PowerShell syntax
+        shell: pwsh
+        run: |
+          $text = Get-Content -Raw ./up.ps1
+          [void][scriptblock]::Create($text)
+          Write-Host 'PowerShell syntax OK'
