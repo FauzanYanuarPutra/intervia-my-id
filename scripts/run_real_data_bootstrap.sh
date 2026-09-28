@@ -35,6 +35,177 @@ run_sql "$MARKETPLACE_DATABASE_URL" "CREATE TABLE IF NOT EXISTS real_data_bootst
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 ); ALTER TABLE real_data_bootstrap_runs ADD COLUMN IF NOT EXISTS bootstrap_version TEXT NOT NULL DEFAULT ''; CREATE INDEX IF NOT EXISTS idx_real_data_bootstrap_version ON real_data_bootstrap_runs(bootstrap_version);"
 
+PREFLIGHT_HOSTS="\${REAL_DATA_NETWORK_PREFLIGHT_HOSTS:-data.go.id,overpass-api.de,commons.wikimedia.org,satudata.denpasarkota.go.id}"
+PREFLIGHT_ATTEMPTS="\${REAL_DATA_NETWORK_PREFLIGHT_ATTEMPTS:-12}"
+PREFLIGHT_DELAY="\${REAL_DATA_NETWORK_PREFLIGHT_DELAY_SECONDS:-5}"
+
+echo "[real-data] checking external DNS/network..."
+PREFLIGHT_RESULT=""
+for attempt in $(seq 1 "$PREFLIGHT_ATTEMPTS"); do
+  PREFLIGHT_RESULT="$(PREFLIGHT_HOSTS="$PREFLIGHT_HOSTS" python - <<'PY'
+import os
+import socket
+
+hosts = [item.strip() for item in os.environ.get("PREFLIGHT_HOSTS", "").split(",") if item.strip()]
+resolved = []
+failures = []
+for host in hosts:
+    try:
+        addresses = sorted({entry[4][0] for entry in socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM)})
+        if addresses:
+            resolved.append(f"{host}={','.join(addresses[:3])}")
+        else:
+            failures.append(host)
+    except OSError as exc:
+        failures.append(f"{host} ({exc})")
+
+print("resolved=" + "; ".join(resolved))
+print("failed=" + ", ".join(failures))
+print("ok=" + ("yes" if resolved else "no"))
+PY
+)"
+  echo "[real-data] network preflight attempt ${attempt}/${PREFLIGHT_ATTEMPTS}:"
+  echo "$PREFLIGHT_RESULT"
+
+  if echo "$PREFLIGHT_RESULT" | grep -q '^ok=yesSTATE="$(run_sql "$MARKETPLACE_DATABASE_URL" "SELECT COALESCE(bootstrap_version,'') || '|' || COALESCE(EXTRACT(EPOCH FROM (NOW() - last_success_at))/3600.0, 999999) FROM real_data_bootstrap_runs WHERE bootstrap_key = '$LOCK_KEY'")"
+LAST_VERSION="${STATE%%|*}"
+LAST_SUCCESS="${STATE#*|}"
+
+if [ "$LAST_VERSION" = "$BOOTSTRAP_VERSION" ]; then
+  SKIP="$(awk -v age="$LAST_SUCCESS" -v hours="$REFRESH_HOURS" 'BEGIN { print (age < hours) ? "yes" : "no" }')"
+  if [ "$SKIP" = "yes" ]; then
+    echo "[real-data] bootstrap version $BOOTSTRAP_VERSION succeeded ${LAST_SUCCESS}h ago; refresh window is ${REFRESH_HOURS}h. Nothing to do."
+    exit 0
+  fi
+else
+  echo "[real-data] bootstrap version changed from '$LAST_VERSION' to '$BOOTSTRAP_VERSION'; forcing a refresh."
+fi
+
+TMP_DIR="$(mktemp -d)"
+trap 'rm -rf "$TMP_DIR"' EXIT
+MARKETPLACE_SQL="$TMP_DIR/marketplace.sql"
+COMMUNITY_SQL="$TMP_DIR/community.sql"
+
+echo "[real-data] crawling approved public/open sources..."
+python /workspace/scripts/import_real_marketplace_open_data.py --out "$MARKETPLACE_SQL" --community-out "$COMMUNITY_SQL" --max-providers "$MAX_PROVIDERS" --max-buyers "$MAX_BUYERS" --max-insights "$MAX_INSIGHTS" --max-community-media "$MAX_MEDIA" --sleep "$SLEEP_SECONDS" --allow-image-less-records
+
+echo "[real-data] applying marketplace data..."
+if [ -s "$MARKETPLACE_SQL" ]; then psql "$MARKETPLACE_DATABASE_URL" -v ON_ERROR_STOP=1 -f "$MARKETPLACE_SQL"; fi
+
+echo "[real-data] applying community data..."
+if [ -s "$COMMUNITY_SQL" ]; then psql "$COMMUNITY_DATABASE_URL" -v ON_ERROR_STOP=1 -f "$COMMUNITY_SQL"; fi
+
+PROVIDER_COUNT="$(run_sql "$MARKETPLACE_DATABASE_URL" "SELECT COUNT(*) FROM content_items WHERE content_status='active' AND COALESCE(metadata->>'seed_pack','') = 'real_indonesia_bulk_open_data' AND COALESCE(metadata->>'market_side','') = 'reference' AND COALESCE(metadata->>'reference_subtype','') <> 'aggregate_data'")"
+INSIGHT_COUNT="$(run_sql "$MARKETPLACE_DATABASE_URL" "SELECT COUNT(*) FROM content_items WHERE content_status='active' AND COALESCE(metadata->>'seed_pack','') = 'real_indonesia_bulk_open_data' AND COALESCE(metadata->>'reference_subtype','') = 'aggregate_data'")"
+BUYER_COUNT="$(run_sql "$MARKETPLACE_DATABASE_URL" "SELECT COUNT(*) FROM content_items WHERE content_status='active' AND COALESCE(metadata->>'seed_pack','') = 'real_indonesia_bulk_open_data' AND pricing_mode = 'request'")"
+MEDIA_COUNT="$(run_sql "$COMMUNITY_DATABASE_URL" "SELECT COUNT(*) FROM reel.lajukan_reels WHERE COALESCE(metadata->>'seed_pack','') = 'real_indonesia_bulk_open_data'")"
+
+if [ "$PROVIDER_COUNT" -gt 0 ] || [ "$BUYER_COUNT" -gt 0 ] || [ "$INSIGHT_COUNT" -gt 0 ] || [ "$MEDIA_COUNT" -gt 0 ]; then
+  psql "$MARKETPLACE_DATABASE_URL" -v ON_ERROR_STOP=1 <<SQL
+INSERT INTO real_data_bootstrap_runs (bootstrap_key, bootstrap_version, last_success_at, last_provider_count, last_buyer_count, last_community_media_count, last_error, updated_at)
+VALUES ('$LOCK_KEY', '$BOOTSTRAP_VERSION', NOW(), $PROVIDER_COUNT, $BUYER_COUNT, $MEDIA_COUNT, NULL, NOW())
+ON CONFLICT (bootstrap_key) DO UPDATE SET
+  bootstrap_version = EXCLUDED.bootstrap_version,
+  last_success_at = NOW(),
+  last_provider_count = EXCLUDED.last_provider_count,
+  last_buyer_count = EXCLUDED.last_buyer_count,
+  last_community_media_count = EXCLUDED.last_community_media_count,
+  last_error = NULL,
+  updated_at = NOW();
+SQL
+  echo "[real-data] bootstrap complete: providers=${PROVIDER_COUNT} buyers=${BUYER_COUNT} insights=${INSIGHT_COUNT} community_media=${MEDIA_COUNT}"
+else
+  psql "$MARKETPLACE_DATABASE_URL" -v ON_ERROR_STOP=1 <<SQL
+INSERT INTO real_data_bootstrap_runs (bootstrap_key, bootstrap_version, last_success_at, last_provider_count, last_buyer_count, last_community_media_count, last_error, updated_at)
+VALUES ('$LOCK_KEY', '$BOOTSTRAP_VERSION', NULL, 0, 0, 0, 'No external rows were imported; source mirrors may be unavailable.', NOW())
+ON CONFLICT (bootstrap_key) DO UPDATE SET
+  bootstrap_version = EXCLUDED.bootstrap_version,
+  last_provider_count = EXCLUDED.last_provider_count,
+  last_buyer_count = EXCLUDED.last_buyer_count,
+  last_community_media_count = EXCLUDED.last_community_media_count,
+  last_error = EXCLUDED.last_error,
+  updated_at = NOW();
+SQL
+  echo "[real-data] bootstrap completed without external rows; will retry on next startup."
+fi
+
+echo "[real-data] bootstrap complete: providers=${PROVIDER_COUNT} buyers=${BUYER_COUNT} community_media=${MEDIA_COUNT}"; then
+    break
+  fi
+
+  if [ "$attempt" -lt "$PREFLIGHT_ATTEMPTS" ]; then
+    sleep "$PREFLIGHT_DELAY"
+  fi
+done
+
+if ! echo "$PREFLIGHT_RESULT" | grep -q '^ok=yesSTATE="$(run_sql "$MARKETPLACE_DATABASE_URL" "SELECT COALESCE(bootstrap_version,'') || '|' || COALESCE(EXTRACT(EPOCH FROM (NOW() - last_success_at))/3600.0, 999999) FROM real_data_bootstrap_runs WHERE bootstrap_key = '$LOCK_KEY'")"
+LAST_VERSION="${STATE%%|*}"
+LAST_SUCCESS="${STATE#*|}"
+
+if [ "$LAST_VERSION" = "$BOOTSTRAP_VERSION" ]; then
+  SKIP="$(awk -v age="$LAST_SUCCESS" -v hours="$REFRESH_HOURS" 'BEGIN { print (age < hours) ? "yes" : "no" }')"
+  if [ "$SKIP" = "yes" ]; then
+    echo "[real-data] bootstrap version $BOOTSTRAP_VERSION succeeded ${LAST_SUCCESS}h ago; refresh window is ${REFRESH_HOURS}h. Nothing to do."
+    exit 0
+  fi
+else
+  echo "[real-data] bootstrap version changed from '$LAST_VERSION' to '$BOOTSTRAP_VERSION'; forcing a refresh."
+fi
+
+TMP_DIR="$(mktemp -d)"
+trap 'rm -rf "$TMP_DIR"' EXIT
+MARKETPLACE_SQL="$TMP_DIR/marketplace.sql"
+COMMUNITY_SQL="$TMP_DIR/community.sql"
+
+echo "[real-data] crawling approved public/open sources..."
+python /workspace/scripts/import_real_marketplace_open_data.py --out "$MARKETPLACE_SQL" --community-out "$COMMUNITY_SQL" --max-providers "$MAX_PROVIDERS" --max-buyers "$MAX_BUYERS" --max-insights "$MAX_INSIGHTS" --max-community-media "$MAX_MEDIA" --sleep "$SLEEP_SECONDS" --allow-image-less-records
+
+echo "[real-data] applying marketplace data..."
+if [ -s "$MARKETPLACE_SQL" ]; then psql "$MARKETPLACE_DATABASE_URL" -v ON_ERROR_STOP=1 -f "$MARKETPLACE_SQL"; fi
+
+echo "[real-data] applying community data..."
+if [ -s "$COMMUNITY_SQL" ]; then psql "$COMMUNITY_DATABASE_URL" -v ON_ERROR_STOP=1 -f "$COMMUNITY_SQL"; fi
+
+PROVIDER_COUNT="$(run_sql "$MARKETPLACE_DATABASE_URL" "SELECT COUNT(*) FROM content_items WHERE content_status='active' AND COALESCE(metadata->>'seed_pack','') = 'real_indonesia_bulk_open_data' AND COALESCE(metadata->>'market_side','') = 'reference' AND COALESCE(metadata->>'reference_subtype','') <> 'aggregate_data'")"
+INSIGHT_COUNT="$(run_sql "$MARKETPLACE_DATABASE_URL" "SELECT COUNT(*) FROM content_items WHERE content_status='active' AND COALESCE(metadata->>'seed_pack','') = 'real_indonesia_bulk_open_data' AND COALESCE(metadata->>'reference_subtype','') = 'aggregate_data'")"
+BUYER_COUNT="$(run_sql "$MARKETPLACE_DATABASE_URL" "SELECT COUNT(*) FROM content_items WHERE content_status='active' AND COALESCE(metadata->>'seed_pack','') = 'real_indonesia_bulk_open_data' AND pricing_mode = 'request'")"
+MEDIA_COUNT="$(run_sql "$COMMUNITY_DATABASE_URL" "SELECT COUNT(*) FROM reel.lajukan_reels WHERE COALESCE(metadata->>'seed_pack','') = 'real_indonesia_bulk_open_data'")"
+
+if [ "$PROVIDER_COUNT" -gt 0 ] || [ "$BUYER_COUNT" -gt 0 ] || [ "$INSIGHT_COUNT" -gt 0 ] || [ "$MEDIA_COUNT" -gt 0 ]; then
+  psql "$MARKETPLACE_DATABASE_URL" -v ON_ERROR_STOP=1 <<SQL
+INSERT INTO real_data_bootstrap_runs (bootstrap_key, bootstrap_version, last_success_at, last_provider_count, last_buyer_count, last_community_media_count, last_error, updated_at)
+VALUES ('$LOCK_KEY', '$BOOTSTRAP_VERSION', NOW(), $PROVIDER_COUNT, $BUYER_COUNT, $MEDIA_COUNT, NULL, NOW())
+ON CONFLICT (bootstrap_key) DO UPDATE SET
+  bootstrap_version = EXCLUDED.bootstrap_version,
+  last_success_at = NOW(),
+  last_provider_count = EXCLUDED.last_provider_count,
+  last_buyer_count = EXCLUDED.last_buyer_count,
+  last_community_media_count = EXCLUDED.last_community_media_count,
+  last_error = NULL,
+  updated_at = NOW();
+SQL
+  echo "[real-data] bootstrap complete: providers=${PROVIDER_COUNT} buyers=${BUYER_COUNT} insights=${INSIGHT_COUNT} community_media=${MEDIA_COUNT}"
+else
+  psql "$MARKETPLACE_DATABASE_URL" -v ON_ERROR_STOP=1 <<SQL
+INSERT INTO real_data_bootstrap_runs (bootstrap_key, bootstrap_version, last_success_at, last_provider_count, last_buyer_count, last_community_media_count, last_error, updated_at)
+VALUES ('$LOCK_KEY', '$BOOTSTRAP_VERSION', NULL, 0, 0, 0, 'No external rows were imported; source mirrors may be unavailable.', NOW())
+ON CONFLICT (bootstrap_key) DO UPDATE SET
+  bootstrap_version = EXCLUDED.bootstrap_version,
+  last_provider_count = EXCLUDED.last_provider_count,
+  last_buyer_count = EXCLUDED.last_buyer_count,
+  last_community_media_count = EXCLUDED.last_community_media_count,
+  last_error = EXCLUDED.last_error,
+  updated_at = NOW();
+SQL
+  echo "[real-data] bootstrap completed without external rows; will retry on next startup."
+fi
+
+echo "[real-data] bootstrap complete: providers=${PROVIDER_COUNT} buyers=${BUYER_COUNT} community_media=${MEDIA_COUNT}"; then
+  echo "[real-data] external DNS resolution is unavailable inside real_data_bootstrap." >&2
+  echo "[real-data] Check Docker Desktop DNS/egress or override REAL_DATA_DNS_PRIMARY/REAL_DATA_DNS_SECONDARY." >&2
+  exit 20
+fi
+
 echo "[real-data] checking bootstrap state..."
 STATE="$(run_sql "$MARKETPLACE_DATABASE_URL" "SELECT COALESCE(bootstrap_version,'') || '|' || COALESCE(EXTRACT(EPOCH FROM (NOW() - last_success_at))/3600.0, 999999) FROM real_data_bootstrap_runs WHERE bootstrap_key = '$LOCK_KEY'")"
 LAST_VERSION="${STATE%%|*}"
