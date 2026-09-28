@@ -156,9 +156,31 @@ fi
 TMP_DIR="$(mktemp -d)"
 MARKETPLACE_SQL="$TMP_DIR/marketplace.sql"
 COMMUNITY_SQL="$TMP_DIR/community.sql"
+MANIFEST_JSON="$TMP_DIR/manifest.json"
 
 echo "[real-data] crawling approved public/open sources..."
-python /workspace/scripts/import_real_marketplace_open_data.py --out "$MARKETPLACE_SQL" --community-out "$COMMUNITY_SQL" --max-providers "$MAX_PROVIDERS" --max-buyers "$MAX_BUYERS" --max-insights "$MAX_INSIGHTS" --max-community-media "$MAX_MEDIA" --sleep "$SLEEP_SECONDS" --allow-image-less-records
+python /workspace/scripts/import_real_marketplace_open_data.py --out "$MARKETPLACE_SQL" --community-out "$COMMUNITY_SQL" --manifest "$MANIFEST_JSON" --max-providers "$MAX_PROVIDERS" --max-buyers "$MAX_BUYERS" --max-insights "$MAX_INSIGHTS" --max-community-media "$MAX_MEDIA" --sleep "$SLEEP_SECONDS" --allow-image-less-records
+
+SOURCE_ERROR_COUNT="$(python - "$MANIFEST_JSON" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as handle:
+    payload = json.load(handle)
+print(int(payload.get("source_error_count", 0)))
+PY
+)"
+SOURCE_ERROR_SUMMARY="$(python - "$MANIFEST_JSON" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as handle:
+    payload = json.load(handle)
+errors = payload.get("source_errors") or []
+summary = "; ".join(f"{item.get('id')}: {item.get('error', 'unknown error')}" for item in errors)
+print(summary[:1800])
+PY
+)"
+echo "[real-data] source diagnostics: errors=${SOURCE_ERROR_COUNT}"
+if [ "$SOURCE_ERROR_COUNT" -gt 0 ]; then
+  echo "[real-data] source diagnostic summary: ${SOURCE_ERROR_SUMMARY}"
+fi
 
 echo "[real-data] applying marketplace data..."
 if [ -s "$MARKETPLACE_SQL" ]; then psql "$MARKETPLACE_DATABASE_URL" -v ON_ERROR_STOP=1 -f "$MARKETPLACE_SQL"; fi
@@ -172,19 +194,23 @@ BUYER_COUNT="$(run_sql "$MARKETPLACE_DATABASE_URL" "SELECT COUNT(*) FROM content
 MEDIA_COUNT="$(run_sql "$COMMUNITY_DATABASE_URL" "SELECT COUNT(*) FROM reel.lajukan_reels WHERE COALESCE(metadata->>'seed_pack','') = 'real_indonesia_bulk_open_data'")"
 
 if [ "$PROVIDER_COUNT" -gt 0 ] || [ "$BUYER_COUNT" -gt 0 ] || [ "$INSIGHT_COUNT" -gt 0 ] || [ "$MEDIA_COUNT" -gt 0 ]; then
-  psql "$MARKETPLACE_DATABASE_URL" -v ON_ERROR_STOP=1 <<SQL
+  psql "$MARKETPLACE_DATABASE_URL" -v ON_ERROR_STOP=1 -v "bootstrap_error=$SOURCE_ERROR_SUMMARY" <<SQL
 INSERT INTO real_data_bootstrap_runs (bootstrap_key, bootstrap_version, last_success_at, last_provider_count, last_buyer_count, last_community_media_count, last_error, updated_at)
-VALUES ('$LOCK_KEY', '$BOOTSTRAP_VERSION', NOW(), $PROVIDER_COUNT, $BUYER_COUNT, $MEDIA_COUNT, NULL, NOW())
+VALUES ('$LOCK_KEY', '$BOOTSTRAP_VERSION', NOW(), $PROVIDER_COUNT, $BUYER_COUNT, $MEDIA_COUNT, NULLIF(:'bootstrap_error', ''), NOW())
 ON CONFLICT (bootstrap_key) DO UPDATE SET
   bootstrap_version = EXCLUDED.bootstrap_version,
   last_success_at = NOW(),
   last_provider_count = EXCLUDED.last_provider_count,
   last_buyer_count = EXCLUDED.last_buyer_count,
   last_community_media_count = EXCLUDED.last_community_media_count,
-  last_error = NULL,
+  last_error = EXCLUDED.last_error,
   updated_at = NOW();
 SQL
-  echo "[real-data] bootstrap complete: providers=${PROVIDER_COUNT} buyers=${BUYER_COUNT} insights=${INSIGHT_COUNT} community_media=${MEDIA_COUNT}"
+  if [ "$SOURCE_ERROR_COUNT" -gt 0 ]; then
+    echo "[real-data] bootstrap partially hydrated: providers=${PROVIDER_COUNT} buyers=${BUYER_COUNT} insights=${INSIGHT_COUNT} community_media=${MEDIA_COUNT} source_errors=${SOURCE_ERROR_COUNT}"
+  else
+    echo "[real-data] bootstrap complete: providers=${PROVIDER_COUNT} buyers=${BUYER_COUNT} insights=${INSIGHT_COUNT} community_media=${MEDIA_COUNT}"
+  fi
 else
   psql "$MARKETPLACE_DATABASE_URL" -v ON_ERROR_STOP=1 <<SQL
 INSERT INTO real_data_bootstrap_runs (bootstrap_key, bootstrap_version, last_success_at, last_provider_count, last_buyer_count, last_community_media_count, last_error, updated_at)
