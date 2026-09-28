@@ -160,13 +160,15 @@ fn spawn_data_ingestion_refresh_loop(state: Arc<AppState>) {
         loop {
             ticker.tick().await;
 
-            match data_governance::bootstrap_persistent_imports(state.clone()).await {
-                Ok(count) if count > 0 => {
-                    tracing::info!(count, "queued scheduled persistent data imports");
-                }
-                Ok(_) => {}
-                Err(error) => {
-                    tracing::warn!("scheduled persistent data bootstrap failed: {:?}", error);
+            if data_governance::marketplace_source_bootstrap_enabled() {
+                match data_governance::bootstrap_persistent_imports(state.clone()).await {
+                    Ok(count) if count > 0 => {
+                        tracing::info!(count, "queued scheduled persistent data imports");
+                    }
+                    Ok(_) => {}
+                    Err(error) => {
+                        tracing::warn!("scheduled persistent data bootstrap failed: {:?}", error);
+                    }
                 }
             }
 
