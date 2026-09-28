@@ -20,9 +20,10 @@
       "license": "CC0 1.0",
       "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
       "limit": 1500,
-      "timeout_seconds": 90,
+      "timeout_seconds": 25,
       "request_sleep_seconds": 0.5,
-      "note": "Public structured Wikidata references scoped to Indonesia business entities with coordinates. No ownership/contact/transaction facts are inferred; each row remains an unowned reference."
+      "note": "Public structured Wikidata references scoped to Indonesia business entities with coordinates. No ownership/contact/transaction facts are inferred; each row remains an unowned reference. SPARQL is single-attempt and bounded; a transient outage records a source error and never blocks other source imports.",
+      "network_attempts": 1
     },
     {
       "id": "osm-overpass-indonesia-providers",
@@ -31,7 +32,12 @@
       "enabled_by_default": true,
       "coverage": "indonesia_grid",
       "grid_step_degrees": 4,
-      "grid_bbox": [-11.5, 94.5, 7.5, 142.5],
+      "grid_bbox": [
+        -11.5,
+        94.5,
+        7.5,
+        142.5
+      ],
       "name": "OpenStreetMap Indonesia provider POIs via Overpass",
       "source_url": "https://www.openstreetmap.org/",
       "license": "Open Database License 1.0",
@@ -43,7 +49,7 @@
         "https://overpass.kumi.systems/api/interpreter",
         "https://overpass.private.coffee/api/interpreter"
       ],
-      "timeout_seconds": 90,
+      "timeout_seconds": 25,
       "per_bbox_limit": 350,
       "selectors": [
         {
@@ -425,7 +431,11 @@
             106.79
           ]
         }
-      ]
+      ],
+      "network_attempts": 1,
+      "max_bboxes_per_run": 12,
+      "max_consecutive_failed_bboxes": 3,
+      "note": " External Overpass mirrors are treated as optional/transient; each startup samples a bounded rotating set of tiles so one outage cannot block the whole Lajukan stack."
     },
     {
       "id": "satrup-tanah-laut-rup-penyedia-2026",
