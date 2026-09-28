@@ -257,6 +257,19 @@
       "attribution": "Diskominsa Kabupaten Aceh Barat",
       "notes": "Data jumlah UMKM Kecamatan Johan Pahlawan semester I 2025; resource CSV/DataStore aktif. Dipublikasikan sebagai Data Reference/Insight. Native CKAN bootstrap disabled temporarily because the current endpoint returned 404/403/DNS/TLS errors in the latest runtime check. Keep source metadata for future revalidation; do not treat this as deletion or a license decision.",
       "enabled": false
+    },
+    {
+      "id": "wikidata",
+      "provider": "Wikidata / Wikimedia Foundation",
+      "kind": "open_structured_data",
+      "url": "https://www.wikidata.org/",
+      "endpoint": "https://query.wikidata.org/sparql",
+      "reuse_mode": "persistent_import",
+      "license": "CC0 1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "attribution": "Wikidata contributors",
+      "auto_publish_reference": true,
+      "notes": "Structured Wikidata data is CC0. Lajukan stores only public reference facts selected by the governed importer; no ownership, private contact, financial, review, or transaction facts are inferred."
     }
   ]
 }
