@@ -2001,6 +2001,131 @@ def iter_csv_aggregate_insights(source: dict[str, Any], max_rows: int | None) ->
         )
 
 
+def iter_ckan_aggregate_insights(source: dict[str, Any], max_rows: int | None) -> Iterable[DataInsight]:
+    datastore_url = clean_text(source.get("datastore_url"))
+    resource_id = clean_text(source.get("resource_id"))
+    if not datastore_url or not resource_id:
+        raise RuntimeError(f"CKAN aggregate source is missing datastore_url/resource_id: {source.get('id')}")
+
+    title = clean_text(source.get("title"), source.get("name", "Public data insight"))
+    source_license = clean_text(source.get("license"), "Creative Commons Attribution")
+    source_url = clean_text(source.get("source_url"), datastore_url)
+    limit = min(int(source.get("page_size") or 500), 5000)
+    max_bytes = int(source.get("max_response_bytes") or 8_000_000)
+    offset = 0
+    emitted = 0
+
+    while True:
+        query = urllib.parse.urlencode({
+            "resource_id": resource_id,
+            "limit": str(limit),
+            "offset": str(offset),
+        })
+        payload = fetch_json(
+            f"{datastore_url}?{query}",
+            timeout=int(source.get("timeout_seconds") or 60),
+        )
+        rows = extract_records(payload)
+        if not rows:
+            break
+
+        for index, row in enumerate(rows):
+            if max_rows is not None and emitted >= max_rows:
+                return
+
+            values = {clean_text(k): clean_text(v) for k, v in row.items() if clean_text(k)}
+            if not values:
+                continue
+
+            dimension_fields = [clean_text(v) for v in source.get("dimension_fields", [])]
+            measure_fields = [clean_text(v) for v in source.get("measure_fields", [])]
+
+            dimensions = [
+                f"{field}: {row.get(field)}"
+                for field in dimension_fields
+                if clean_text(row.get(field))
+            ]
+            measures = [
+                f"{field}: {row.get(field)}"
+                for field in measure_fields
+                if clean_text(row.get(field))
+            ]
+
+            if not dimensions:
+                dimensions = [
+                    f"{key}: {value}"
+                    for key, value in list(values.items())[:4]
+                    if key not in measure_fields
+                ]
+            if not measures:
+                measures = [
+                    f"{key}: {value}"
+                    for key, value in list(values.items())[:6]
+                    if key not in dimension_fields
+                ]
+
+            label = " · ".join(dimensions[:3]) or f"baris {offset + index + 1}"
+            lower_keys = {key.lower(): key for key in row.keys()}
+            location = (
+                row.get(lower_keys.get("kecamatan", ""), "")
+                or row.get(lower_keys.get("kapanewon", ""), "")
+                or row.get(lower_keys.get("kabupaten", ""), "")
+                or row.get(lower_keys.get("kota", ""), "")
+                or row.get(lower_keys.get("nama kecamatan", ""), "")
+                or clean_text(source.get("location"), "Indonesia")
+            )
+            record_id = clean_text(
+                row.get("_id")
+                or row.get("id")
+                or row.get("No")
+                or "|".join(clean_text(row.get(field)) for field in dimension_fields)
+                or f"row-{offset + index + 1}"
+            )
+            body = (
+                f"Data agregat {title}. {label}. "
+                + (f"Ukuran: {'; '.join(measures)}. " if measures else "")
+                + "Data ini adalah statistik/reference, bukan profil usaha individual."
+            )
+            search_text = clean_text(
+                f"{title} {label} {location} {' '.join(measures)} UMKM data insight statistik usaha"
+            )
+            metadata = {
+                "seed_pack": "real_indonesia_bulk_open_data",
+                "record_kind": "open_data_reference",
+                "reference_subtype": "aggregate_data",
+                "reference_publication_status": "published",
+                "claimable": False,
+                "market_side": "reference",
+                "listing_side": "reference",
+                "is_transactional": False,
+                "source_dataset": source["id"],
+                "external_id": record_id,
+                "source_title": title,
+                "source_url": source_url,
+                "source_license": source_license,
+                "source_attribution": source.get("attribution"),
+                "location": location,
+                "search_text": search_text,
+                "raw_row": values,
+            }
+            emitted += 1
+            yield DataInsight(
+                source_id=source["id"],
+                source_record_id=record_id,
+                title=f"{title} — {label}",
+                summary=f"Data publik agregat dari {source.get('provider', source.get('name', 'sumber resmi'))}.",
+                body=body,
+                location=location,
+                source_url=source_url,
+                source_license=source_license,
+                metadata=metadata,
+            )
+
+        offset += len(rows)
+        if len(rows) < limit:
+            break
+
+
 def aggregate_insight_sql(items: list[DataInsight]) -> list[str]:
     rows = csv_block(
         [
@@ -2126,9 +2251,12 @@ def main(argv: list[str]) -> int:
                     remaining_buyers = max(0, remaining_buyers - added)
             elif kind == "google_places_photo_enrichment" and role == "provider_image_enrichment":
                 image_enrichers.append(source)
-            elif kind == "csv_aggregate" and role == "insight":
+            elif kind in {"csv_aggregate", "ckan_aggregate"} and role == "insight":
                 before = len(insights)
-                insights.extend(iter_csv_aggregate_insights(source, remaining_insights))
+                if kind == "csv_aggregate":
+                    insights.extend(iter_csv_aggregate_insights(source, remaining_insights))
+                else:
+                    insights.extend(iter_ckan_aggregate_insights(source, remaining_insights))
                 added = len(insights) - before
                 if remaining_insights is not None:
                     remaining_insights = max(0, remaining_insights - added)
