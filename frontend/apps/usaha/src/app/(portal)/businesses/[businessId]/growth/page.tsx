@@ -39,12 +39,12 @@ export default async function BusinessGrowthPage({ params }: PageProps) {
     business.phone.trim() &&
     business.address.trim(),
   );
-  const growthReadiness = [
+  const growthReadyCount = [
     profileReady,
     business.productsCount > 0,
     business.buyerPageReady,
     enabledChannels > 0,
-  ].filter(Boolean).length * 25;
+  ].filter(Boolean).length;
 
   return (
     <PortalShell activeBusiness={business} availableBusinesses={businesses} viewerName={account.name} currentSection="growth">
@@ -52,7 +52,7 @@ export default async function BusinessGrowthPage({ params }: PageProps) {
         eyebrow="Pertumbuhan usaha"
         title="Tumbuh"
         description="Satukan hal yang membantu pelanggan menemukan, melihat, lalu membeli dari usaha."
-        meta={<StatusBadge tone={growthReadiness === 100 ? 'success' : 'warning'}>{growthReadiness}% siap dipromosikan</StatusBadge>}
+        meta={<StatusBadge tone={growthReadyCount === 4 ? 'success' : 'warning'}>{growthReadyCount} dari 4 siap dipromosikan</StatusBadge>}
       />
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -104,7 +104,7 @@ export default async function BusinessGrowthPage({ params }: PageProps) {
           )}
 
           <section className="merchant-surface-bordered p-4 sm:p-5">
-            <div className="flex items-start justify-between gap-3"><div><h2 className="font-black text-portal-ink">Checklist siap promosi</h2><p className="mt-1 text-xs leading-5 text-portal-soft">Bukan skor bisnis; hanya pemeriksaan sederhana atas data yang sudah ada.</p></div><span className="text-lg font-black text-portal-forest">{growthReadiness}%</span></div>
+            <div className="flex items-start justify-between gap-3"><div><h2 className="font-black text-portal-ink">Yang sudah siap</h2><p className="mt-1 text-xs leading-5 text-portal-soft">Empat hal sederhana yang membantu pelanggan menemukan dan membeli dari usaha.</p></div><span className="text-sm font-black text-portal-forest">{growthReadyCount}/4</span></div>
             <div className="mt-4 grid gap-2 sm:grid-cols-2">
               {[
                 [profileReady, 'Profil + kontak lengkap', `/businesses/${business.id}/info`],
