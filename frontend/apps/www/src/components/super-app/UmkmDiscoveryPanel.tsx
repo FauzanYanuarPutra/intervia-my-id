@@ -1326,6 +1326,39 @@ export function UmkmDiscoveryPanel({
     queryViewerLocation,
   ]);
 
+  useEffect(() => {
+    const mapAutoLoadEnabled = variant === 'immersive' || mapOnly;
+    if (
+      !mapAutoLoadEnabled ||
+      !mapBounds ||
+      !hasMore ||
+      loading ||
+      loadingMore ||
+      nextOffset === null
+    ) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      void loadStoresPage({
+        offset: nextOffset,
+        append: true,
+        silent: true,
+      });
+    }, 125);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [
+    hasMore,
+    loadStoresPage,
+    loading,
+    loadingMore,
+    mapBounds,
+    mapOnly,
+    nextOffset,
+    variant,
+  ]);
+
   const loadReferencesPage = useCallback(
     async ({
       cursor,
@@ -1442,6 +1475,38 @@ export function UmkmDiscoveryPanel({
       activeReferencesRequestRef.current?.abort();
     };
   }, [loadReferencesPage, mapBounds]);
+
+  useEffect(() => {
+    const mapAutoLoadEnabled = variant === 'immersive' || mapOnly;
+    if (
+      !mapAutoLoadEnabled ||
+      !mapBounds ||
+      !referenceHasMore ||
+      loadingMoreReferences ||
+      (referenceNextCursor === null && referenceNextOffset === null)
+    ) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      void loadReferencesPage({
+        cursor: referenceNextCursor,
+        offset: referenceNextOffset,
+        append: true,
+      });
+    }, 150);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [
+    loadReferencesPage,
+    loadingMoreReferences,
+    mapBounds,
+    mapOnly,
+    referenceHasMore,
+    referenceNextCursor,
+    referenceNextOffset,
+    variant,
+  ]);
 
   const preparedStores = useMemo(
     () =>
