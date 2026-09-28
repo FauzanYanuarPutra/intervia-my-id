@@ -3,6 +3,7 @@ import 'server-only';
 import { readSingleParam } from '@/lib/portal-logic';
 import {
   getAuthenticatedActor,
+  getBusinessForCurrentActor,
   listBusinessesForCurrentActor,
 } from '@/lib/business-server';
 import type { BusinessRecord } from '@/lib/portal-types';
@@ -68,7 +69,7 @@ export async function resolvePortalHomeState(searchParams: SearchParamsLike) {
     };
   }
 
-  const activeBusiness =
+  let activeBusiness =
     (explicitBusinessId
       ? businesses.find(
           item =>
@@ -77,6 +78,34 @@ export async function resolvePortalHomeState(searchParams: SearchParamsLike) {
             item.slug === explicitBusinessId,
         )
       : null) ?? businesses[0] ?? null;
+
+  // A freshly provisioned business is redirected with its canonical ID.
+  // The collection endpoint can briefly lag behind the detail endpoint
+  // (or an older store can still be reconciling). Resolve the requested
+  // canonical business directly before showing the misleading empty state.
+  if (explicitBusinessId && !activeBusiness) {
+    try {
+      const directBusiness = await getBusinessForCurrentActor(explicitBusinessId);
+      if (directBusiness) {
+        activeBusiness = directBusiness;
+        businesses = [
+          directBusiness,
+          ...businesses.filter(item => item.id !== directBusiness.id),
+        ];
+      }
+    } catch (error) {
+      if (
+        !(
+          error &&
+          typeof error === 'object' &&
+          ((error as { status?: unknown }).status === 404 ||
+            (error as { code?: unknown }).code === 'business_not_found')
+        )
+      ) {
+        throw error;
+      }
+    }
+  }
 
   return {
     account,
