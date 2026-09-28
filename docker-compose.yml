@@ -450,7 +450,7 @@ services:
     depends_on:
       marketplace_service: { condition: service_healthy }
       community_service: { condition: service_healthy }
-    networks: [data]
+    networks: [data, external_data]
 
   # ---------------------------------------------------------------------------
   # TARGET DOMAIN SERVICES (safe, traffic-neutral until cutover)
@@ -1172,6 +1172,11 @@ networks:
   data:
     driver: bridge
     internal: true
+  # Public egress is isolated from the private database network above.
+  # Only services explicitly attached to this network can reach external
+  # open-data endpoints.
+  external_data:
+    driver: bridge
 
 volumes:
   identity_postgres_data:
