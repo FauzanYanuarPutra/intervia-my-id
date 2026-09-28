@@ -938,12 +938,17 @@ function Test-DockerResourceFailure {
             )
             $CrawlerLogText = ($CrawlerLogs -join [Environment]::NewLine)
 
-            # Docker Desktop can have a resolver that differs from the Windows
-            # host/VPN resolver. When the worker reports a pure DNS preflight
-            # failure, retry only the crawler with a host-provided IPv4 resolver.
-            if ($CrawlerLogText -match 'external DNS resolution is unavailable|network preflight.*resolved=0') {
+            $DnsFailure =
+                $CrawlerLogText.Contains("external DNS resolution is unavailable") -or
+                (
+                    $CrawlerLogText.Contains("network preflight") -and
+                    $CrawlerLogText.Contains("resolved=0")
+                )
+
+            if ($DnsFailure) {
                 $OriginalRealDataDns = $env:REAL_DATA_DNS_PRIMARY
                 $DnsFallbackSucceeded = $false
+
                 try {
                     foreach ($DnsServer in (Get-RealDataHostDnsServers | Select-Object -First 4)) {
                         Write-Host "Retrying real-data bootstrap with host DNS resolver $DnsServer..." -ForegroundColor Yellow
@@ -959,11 +964,61 @@ function Test-DockerResourceFailure {
                             $RetryState = @(
                                 & docker @ComposeArgs ps -a --format "{{.Service}}|{{.State}}|{{.ExitCode}}" real_data_bootstrap 2>&1
                             )
+
                             if ($LASTEXITCODE -eq 0) {
                                 $RetryLine = ($RetryState | Select-Object -First 1).Trim()
-                                if ($RetryLine -match '^real_data_bootstrap\|exited\|0
-    }
+                                $RetryParts = $RetryLine.Split('|')
 
+                                if (
+                                    $RetryParts.Count -ge 3 -and
+                                    $RetryParts[0] -eq "real_data_bootstrap" -and
+                                    $RetryParts[1] -eq "exited" -and
+                                    $RetryParts[2] -eq "0"
+                                ) {
+                                    $DnsFallbackSucceeded = $true
+                                    $CrawlerReady = $true
+                                    break
+                                }
+
+                                if (
+                                    $RetryParts.Count -ge 3 -and
+                                    $RetryParts[0] -eq "real_data_bootstrap" -and
+                                    $RetryParts[1] -eq "exited" -and
+                                    $RetryParts[2] -ne "0"
+                                ) {
+                                    break
+                                }
+                            }
+
+                            Start-Sleep -Seconds 5
+                        }
+
+                        if ($DnsFallbackSucceeded) {
+                            break
+                        }
+                    }
+                }
+                finally {
+                    if ($null -eq $OriginalRealDataDns) {
+                        Remove-Item Env:REAL_DATA_DNS_PRIMARY -ErrorAction SilentlyContinue
+                    }
+                    else {
+                        $env:REAL_DATA_DNS_PRIMARY = $OriginalRealDataDns
+                    }
+                }
+
+                if ($DnsFallbackSucceeded) {
+                    Write-Host "External real-data bootstrap recovered through a host DNS resolver." -ForegroundColor Green
+                }
+            }
+
+            if (-not $CrawlerReady) {
+                $CrawlerLogs | ForEach-Object { Write-Output $_ }
+                throw "External real-data bootstrap belum selesai sukses. Data dari source crawler tidak boleh dianggap sudah masuk."
+            }
+        }
+
+        Write-Host "External real-data bootstrap completed successfully." -ForegroundColor Green
     # Governed real-data bootstrap runs asynchronously inside marketplace_service.
     # Verify actual publication through the service API so a healthy container is
     # not mistaken for a populated database.
