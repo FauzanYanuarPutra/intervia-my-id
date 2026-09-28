@@ -8770,7 +8770,7 @@ async fn list_umkm_stores(
                       AND ($5::float8 IS NULL OR public.lajukan_safe_map_coordinate(metadata->>'longitude') >= $5)
                       AND ($6::float8 IS NULL OR public.lajukan_safe_map_coordinate(metadata->>'longitude') <= $6)
                       AND (
-                        $7::float8 IS NULL OR (
+                        $9::float8 IS NULL OR (
                           6371.0088 * 2.0 * asin(
                             LEAST(
                               1.0,
@@ -8780,17 +8780,17 @@ async fn list_umkm_stores(
                                   power(
                                     sin(
                                       radians(
-                                        public.lajukan_safe_map_coordinate(metadata->>'latitude') - $10
+                                        public.lajukan_safe_map_coordinate(metadata->>'latitude') - $7
                                       ) / 2.0
                                     ),
                                     2
                                   ) +
-                                  cos(radians($10)) *
+                                  cos(radians($7)) *
                                   cos(radians(public.lajukan_safe_map_coordinate(metadata->>'latitude'))) *
                                   power(
                                     sin(
                                       radians(
-                                        public.lajukan_safe_map_coordinate(metadata->>'longitude') - $11
+                                        public.lajukan_safe_map_coordinate(metadata->>'longitude') - $8
                                       ) / 2.0
                                     ),
                                     2
@@ -8802,7 +8802,7 @@ async fn list_umkm_stores(
                         )
                       )
                     ORDER BY updated_at DESC, id ASC
-                    LIMIT $12
+                    LIMIT $10
                     "#
                 )
                 .bind(text_query.clone())
@@ -8811,6 +8811,8 @@ async fn list_umkm_stores(
                 .bind(max_lat)
                 .bind(min_lng)
                 .bind(max_lng)
+                .bind(viewer_lat)
+                .bind(viewer_lng)
                 .bind(radius_km)
                 .bind(limit)
                 .fetch_all(&state.db)
