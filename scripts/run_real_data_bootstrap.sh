@@ -35,7 +35,7 @@ run_sql "$MARKETPLACE_DATABASE_URL" "CREATE TABLE IF NOT EXISTS real_data_bootst
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 ); ALTER TABLE real_data_bootstrap_runs ADD COLUMN IF NOT EXISTS bootstrap_version TEXT NOT NULL DEFAULT ''; CREATE INDEX IF NOT EXISTS idx_real_data_bootstrap_version ON real_data_bootstrap_runs(bootstrap_version);"
 
-PREFLIGHT_HOSTS="${REAL_DATA_NETWORK_PREFLIGHT_HOSTS:-data.go.id,overpass-api.de,commons.wikimedia.org,satudata.denpasarkota.go.id}"
+PREFLIGHT_HOSTS="${REAL_DATA_NETWORK_PREFLIGHT_HOSTS:-data.go.id,overpass-api.de,query.wikidata.org,commons.wikimedia.org,satudata.denpasarkota.go.id}"
 PREFLIGHT_ATTEMPTS="${REAL_DATA_NETWORK_PREFLIGHT_ATTEMPTS:-12}"
 PREFLIGHT_DELAY="${REAL_DATA_NETWORK_PREFLIGHT_DELAY_SECONDS:-5}"
 DNS_PRIMARY="${REAL_DATA_DNS_PRIMARY:-1.1.1.1}"
