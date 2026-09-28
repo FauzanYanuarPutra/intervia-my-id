@@ -42,6 +42,15 @@ export function plainTextToNewsHtml(text: string): string {
   return textToParagraphs(text);
 }
 
+const RICH_BLOCK_MARKUP = /<\s*(?:p|br|strong|b|em|i|u|s|h2|h3|blockquote|ul|ol|li|a|img|figure|figcaption|pre|code)\b/i;
+
+export function normalizeNewsRichBody(richBody: string, plainBody = ''): string {
+  const rich = String(richBody ?? '').trim();
+  if (!rich) return plainTextToNewsHtml(plainBody);
+  if (!RICH_BLOCK_MARKUP.test(rich)) return plainTextToNewsHtml(rich);
+  return sanitizeNewsRichText(rich);
+}
+
 export function sanitizeNewsRichText(value: string, maxLength = 60_000): string {
   const input = String(value ?? '')
     .replace(/\r\n?/g, '\n')
