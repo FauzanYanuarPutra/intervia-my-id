@@ -109,6 +109,7 @@ pub async fn generate_for_entity(db: &PgPool, entity_id: Uuid) -> Result<Value, 
         auto_publish_reference,
         reuse_mode,
         storage_allowed,
+        media_storage_allowed,
         source_enabled,
         source_fresh,
     )) = entity
@@ -338,8 +339,54 @@ struct PromotionCandidateSourceRow {
     source_attribution: Option<String>,
     reuse_mode: String,
     storage_allowed: bool,
+    media_storage_allowed: bool,
     source_enabled: bool,
     source_fresh: bool,
+}
+
+fn collect_authorized_media_urls(raw: &Value, allowed: bool) -> Vec<String> {
+    if !allowed {
+        return Vec::new();
+    }
+    let Some(object) = raw.as_object() else {
+        return Vec::new();
+    };
+    let keys = [
+        "image_url",
+        "image",
+        "photo_url",
+        "cover_image_url",
+        "banner_url",
+        "gallery_images",
+        "gallery",
+        "images",
+        "photos",
+    ];
+    let mut urls = Vec::new();
+    for key in keys {
+        let values: Vec<String> = match object.get(key) {
+            Some(Value::String(value)) => vec![value.clone()],
+            Some(Value::Array(values)) => values
+                .iter()
+                .filter_map(Value::as_str)
+                .map(ToOwned::to_owned)
+                .collect(),
+            _ => Vec::new(),
+        };
+        for raw_url in values {
+            let url = raw_url.trim();
+            if (url.starts_with("https://") || url.starts_with("http://"))
+                && url.len() <= 2048
+                && !urls.iter().any(|existing| existing == url)
+            {
+                urls.push(url.to_owned());
+                if urls.len() == 6 {
+                    return urls;
+                }
+            }
+        }
+    }
+    urls
 }
 
 pub(crate) fn raw_string(raw: &Value, keys: &[&str]) -> Option<String> {
@@ -538,7 +585,7 @@ pub(crate) async fn promote_candidate(db: &PgPool, candidate_id: Uuid) -> Anyhow
           r.record_kind,
           s.source_key, s.provider_name, s.source_url, s.license_name AS source_license,
           s.license_url AS source_license_url, s.attribution_text AS source_attribution,
-          s.reuse_mode, s.storage_allowed, s.enabled AS source_enabled,
+          s.reuse_mode, s.storage_allowed, s.media_storage_allowed, s.enabled AS source_enabled,
           s.last_checked_at > NOW() - INTERVAL '7 days' AS source_fresh
         FROM reference_promotion_candidates c
         JOIN data_import_entities e ON e.id = c.entity_id
@@ -674,6 +721,7 @@ pub(crate) async fn promote_candidate(db: &PgPool, candidate_id: Uuid) -> Anyhow
     let (osm_type, osm_id) = osm_identity(&source_key, &source_record_id);
     let wikidata = raw_string(&raw_metadata, &["wikidata"]);
     let wikimedia_commons = raw_string(&raw_metadata, &["wikimedia_commons"]);
+    let authorized_media_urls = collect_authorized_media_urls(&raw_metadata, media_storage_allowed);
     let search_text = [
         Some(name.clone()),
         address.clone(),
@@ -755,6 +803,8 @@ pub(crate) async fn promote_candidate(db: &PgPool, candidate_id: Uuid) -> Anyhow
             "osm_primary_key": osm_primary_key.as_ref().map(|(key, _)| key.clone()),
             "osm_primary_value": osm_primary_key.as_ref().map(|(_, value)| value.clone()),
             "search_text": search_text,
+            "image_urls": if authorized_media_urls.is_empty() { Value::Null } else { json!(authorized_media_urls) },
+            "media_storage": if media_storage_allowed { "source_authorized" } else { "category_artwork_or_owner_media" },
             "trust_note": "Data referensi dari sumber terdaftar; bukan verifikasi kepemilikan."
         });
 
