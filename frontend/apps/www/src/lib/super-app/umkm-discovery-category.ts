@@ -5,6 +5,8 @@ export type UmkmDiscoveryCategory =
   | 'food'
   | 'retail'
   | 'service'
+  | 'craft'
+  | 'agri'
   | 'property'
   | 'workshop';
 
@@ -37,6 +39,8 @@ export function matchesUmkmDiscoveryCategory(
   if (category === 'food') return candidate.kind === 'food';
   if (category === 'retail') return candidate.kind === 'retail';
   if (category === 'service') return candidate.kind === 'service';
+  if (category === 'craft') return candidate.kind === 'craft';
+  if (category === 'agri') return candidate.kind === 'agri';
   if (category === 'workshop') return candidate.kind === 'workshop';
   if (category !== 'property') return true;
 
