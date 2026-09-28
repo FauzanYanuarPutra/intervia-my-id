@@ -37,7 +37,9 @@ export function getPublicWwwBaseUrl() {
 }
 
 export function buildPublicStorefrontUrl(slug: string) {
-  return `${getPublicWwwBaseUrl()}/toko/${encodeURIComponent(slug)}`;
+  const normalizedSlug = cleanText(slug);
+  if (!normalizedSlug) return '';
+  return `${getPublicWwwBaseUrl()}/toko/${encodeURIComponent(normalizedSlug)}`;
 }
 
 export function buildBusinessLocationQuery(input: {
