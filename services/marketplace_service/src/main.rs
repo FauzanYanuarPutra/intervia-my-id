@@ -10850,10 +10850,20 @@ async fn list_map_references(
     };
     let offset = match query.offset.unwrap_or(0) {
         value if (0..=10_000).contains(&value) => value,
-        _ => return err(StatusCode::BAD_REQUEST, "offset must be between 0 and 10000").into_response(),
+        _ => {
+            return err(
+                StatusCode::BAD_REQUEST,
+                "offset must be between 0 and 10000",
+            )
+            .into_response()
+        }
     };
     if query.cursor.is_some() && offset != 0 {
-        return err(StatusCode::BAD_REQUEST, "map reference cursor cannot be combined with offset").into_response();
+        return err(
+            StatusCode::BAD_REQUEST,
+            "map reference cursor cannot be combined with offset",
+        )
+        .into_response();
     }
 
     let text_query = match clean_map_reference_filter(
@@ -11224,7 +11234,8 @@ async fn list_map_references(
                     items,
                     limit,
                     has_more,
-                    next_cursor: if offset == 0 && ranking_origin.is_none() && text_query.is_none() {
+                    next_cursor: if offset == 0 && ranking_origin.is_none() && text_query.is_none()
+                    {
                         next_cursor
                     } else {
                         None
