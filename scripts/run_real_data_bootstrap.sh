@@ -24,6 +24,9 @@ run_sql() {
   psql "$1" -v ON_ERROR_STOP=1 -Atqc "$2"
 }
 
+echo "[real-data] ensuring bootstrap state schema..."
+run_sql "$MARKETPLACE_DATABASE_URL" "ALTER TABLE real_data_bootstrap_runs ADD COLUMN IF NOT EXISTS bootstrap_version TEXT NOT NULL DEFAULT ''; CREATE INDEX IF NOT EXISTS idx_real_data_bootstrap_version ON real_data_bootstrap_runs(bootstrap_version);"
+
 echo "[real-data] checking bootstrap state..."
 STATE="$(run_sql "$MARKETPLACE_DATABASE_URL" "SELECT COALESCE(bootstrap_version,'') || '|' || COALESCE(EXTRACT(EPOCH FROM (NOW() - last_success_at))/3600.0, 999999) FROM real_data_bootstrap_runs WHERE bootstrap_key = '$LOCK_KEY'")"
 LAST_VERSION="${STATE%%|*}"
