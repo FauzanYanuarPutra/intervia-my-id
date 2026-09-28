@@ -161,7 +161,7 @@ describe('umkm place distance presentation', () => {
     );
 
     expect(ui.businessCategoryId).toBe('fashion_apparel');
-    expect(ui.coverImage).toBe('/images/business-categories/retail.svg');
+    expect(ui.coverImage).toBe('/images/business-categories/craft.svg');
   });
 
   it('presents a public map reference without store or transaction claims', () => {
