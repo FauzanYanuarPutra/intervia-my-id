@@ -944,9 +944,15 @@ try {
     if ($Services.Count -eq 0 -or $Services -contains "marketplace_service") {
         Write-Host "Verifying Lajukan real-data bootstrap..." -ForegroundColor Cyan
         $DataReady = $false
-        # OSM/CKAN jobs run in the marketplace container after startup. Give the
-        # first governed import enough time to finish and publish its candidates.
-        for ($DataAttempt = 1; $DataAttempt -le 180; $DataAttempt++) {
+        $DataMaxAttempts = 24
+        if ($env:DATA_BOOTSTRAP_ATTEMPTS) {
+            [int]::TryParse($env:DATA_BOOTSTRAP_ATTEMPTS, [ref]$DataMaxAttempts) | Out-Null
+            $DataMaxAttempts = [Math]::Max(1, [Math]::Min($DataMaxAttempts, 60))
+        }
+        # Marketplace data hydration is asynchronous. Startup only verifies the
+        # service contract for a bounded window; it does not wait indefinitely
+        # for slow external sources.
+        for ($DataAttempt = 1; $DataAttempt -le $DataMaxAttempts; $DataAttempt++) {
             $StatusProbe = @(
                 & docker @ComposeArgs exec -T marketplace_service curl -fsS http://127.0.0.1:8081/v1/data/bootstrap-status 2>&1
             )
