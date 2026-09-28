@@ -271,6 +271,9 @@ function mapPublicReference(
     sourceDataset === 'openstreetmap' &&
     sourceTitle.toLowerCase().includes('openstreetmap') &&
     /(odbl|open database license)/i.test(sourceLicense);
+  const isPlaceReference =
+    readText(metadata.reference_subtype).toLowerCase() === 'place_reference' &&
+    sourceDataset.length >= 2;
   const isGovernedReference =
     recordKind.includes('reference') &&
     (marketSide === 'reference' || referenceFlagsWereProjected) &&
@@ -278,13 +281,12 @@ function mapPublicReference(
       readText(metadata.is_transactional).toLowerCase() === 'false' ||
       referenceFlagsWereProjected) &&
     sourceDataset.length >= 2 &&
-    sourceLicense.length >= 2;
+    (sourceLicense.length >= 2 || isPlaceReference);
   if (
     !id ||
     !title ||
     !sourceTitle ||
     !sourceUrl ||
-    !sourceLicense ||
     (!isOsmReference && !isGovernedReference) ||
     (isOsmReference && !sourceLicenseUrl) ||
     lat === null ||
@@ -424,7 +426,7 @@ function parseRadiusKm(value: string | null): number | null {
   if (!value) return null;
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) return null;
-  return Math.min(parsed, 200);
+  return Math.min(parsed, 1000);
 }
 
 const PublicStoreQuerySchema = z.object({
