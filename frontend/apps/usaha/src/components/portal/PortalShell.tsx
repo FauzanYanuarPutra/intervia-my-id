@@ -11,7 +11,7 @@ import { SidebarNav } from '@/components/portal/SidebarNav';
 import { StatusBadge } from '@/components/portal/StatusBadge';
 import { UsahaFlowGuide } from '@/components/portal/UsahaFlowGuide';
 import { WorkspaceSearch } from '@/components/portal/WorkspaceSearch';
-import { portalSectionUserLabel } from '@/lib/portal-navigation';
+import { portalSectionLabel } from '@/lib/portal-navigation';
 import { getStatusCopy } from '@/lib/portal-logic';
 import type { BusinessRecord, PortalSection } from '@/lib/portal-types';
 
@@ -35,7 +35,7 @@ export function PortalShell({
   children,
 }: PortalShellProps) {
   const status = activeBusiness ? getStatusCopy(activeBusiness) : null;
-  const title = pageTitle ?? portalSectionUserLabel(currentSection);
+  const title = pageTitle ?? portalSectionLabel(currentSection);
   const businesses = activeBusiness && !availableBusinesses.some(item => item.id === activeBusiness.id)
     ? [activeBusiness, ...availableBusinesses]
     : availableBusinesses;
