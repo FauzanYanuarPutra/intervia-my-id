@@ -478,6 +478,118 @@ def osm_address(tags: dict[str, Any], fallback_city: str) -> str:
     return address or clean_text(tags.get("addr:full")) or fallback_city or "Indonesia"
 
 
+def iter_wikidata_businesses(source: dict[str, Any], max_rows: int | None) -> Iterable[ProviderStore]:
+    endpoint = clean_text(source.get("endpoint"), "https://query.wikidata.org/sparql")
+    limit = int(source.get("limit") or (max_rows if max_rows is not None else 1500))
+    if max_rows is not None:
+        limit = min(limit, max_rows)
+    limit = max(1, min(limit, 5000))
+    timeout = int(source.get("timeout_seconds") or 90)
+
+    # Wikidata structured data is CC0. We only select Indonesia business entities
+    # with public coordinates; no ownership, contact, financial, or transaction data
+    # is inferred from Wikidata.
+    query = f"""
+SELECT ?item ?itemLabel ?description ?coord ?website ?cityLabel WHERE {{
+  ?item wdt:P31/wdt:P279* wd:Q4830453;
+        wdt:P17 wd:Q252;
+        wdt:P625 ?coord.
+  OPTIONAL {{ ?item schema:description ?description. FILTER(LANG(?description) = "id" || LANG(?description) = "en") }}
+  OPTIONAL {{ ?item wdt:P856 ?website. }}
+  OPTIONAL {{ ?item wdt:P131 ?city. }}
+  SERVICE wikibase:label {{ bd:serviceParam wikibase:language "id,en". }}
+}}
+LIMIT {limit}
+""".strip()
+
+    payload = urllib.parse.urlencode({"query": query, "format": "json"}).encode("utf-8")
+    data = fetch_json_request(
+        endpoint,
+        method="POST",
+        data=payload,
+        headers={
+            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+            "Accept": "application/sparql-results+json, application/json",
+        },
+        timeout=timeout,
+    )
+
+    rows = (
+        data.get("results", {}).get("bindings", [])
+        if isinstance(data, dict)
+        else []
+    )
+    emitted = 0
+    seen: set[str] = set()
+
+    for row in rows:
+        item_uri = clean_text(row.get("item", {}).get("value"))
+        item_id = item_uri.rsplit("/", 1)[-1] if item_uri else ""
+        label = clean_text(row.get("itemLabel", {}).get("value"))
+        if not item_id or not label or item_id in seen:
+            continue
+
+        coord = clean_text(row.get("coord", {}).get("value"))
+        match = re.search(r"Point\\(([-+]?\\d+(?:\\.\\d+)?)\\s+([-+]?\\d+(?:\\.\\d+)?)\\)", coord)
+        if not match:
+            continue
+        lng = as_float(match.group(1))
+        lat = as_float(match.group(2))
+        if lat is None or lng is None or not (-90 <= lat <= 90) or not (-180 <= lng <= 180):
+            continue
+
+        description = clean_text(row.get("description", {}).get("value"))
+        city = clean_text(row.get("cityLabel", {}).get("value"), "Indonesia")
+        website = clean_text(row.get("website", {}).get("value"))
+        source_record_id = f"wikidata:{item_id}"
+        seen.add(item_id)
+
+        search_text = clean_text(
+            f"{label} {description} {city} bisnis usaha perusahaan Indonesia business reference"
+        )
+        metadata = {
+            "seed_pack": "real_indonesia_bulk_open_data",
+            "record_kind": "wikidata_reference",
+            "reference_subtype": "business_reference",
+            "source_id": source["id"],
+            "source_record_id": source_record_id,
+            "source_url": item_uri,
+            "source_license": source.get("license", "CC0 1.0"),
+            "license_url": source.get("license_url", "https://creativecommons.org/publicdomain/zero/1.0/"),
+            "is_transactional": False,
+            "verified": False,
+            "claimable": True,
+            "market_side": "reference",
+            "listing_side": "reference",
+            "marketplace_category_slug": "business-places",
+            "city": city,
+            "latitude": lat,
+            "longitude": lng,
+            "search_text": search_text,
+            "keywords": search_text,
+            "wikidata": item_id,
+        }
+        if website:
+            metadata["official_domain"] = website
+
+        emitted += 1
+        yield ProviderStore(
+            source_id=source["id"],
+            source_record_id=source_record_id,
+            name=label,
+            slug=slugify(f"wikidata-{item_id}-{label}", source_record_id),
+            description=description or "Referensi bisnis publik dari Wikidata. Verifikasi detail sebelum transaksi.",
+            city=city,
+            address=city,
+            lat=lat,
+            lng=lng,
+            segment="business-reference",
+            search_text=search_text,
+            source_url=item_uri,
+            source_license=source.get("license", "CC0 1.0"),
+            metadata=metadata,
+        )
+
 def iter_overpass_providers(source: dict[str, Any], max_rows: int | None) -> Iterable[ProviderStore]:
     endpoints = source.get("endpoints") or [source["endpoint"]]
     timeout = int(source.get("timeout_seconds") or 90)
@@ -2225,7 +2337,13 @@ def main(argv: list[str]) -> int:
         role = source.get("role")
         print(f"fetching {source.get('id')} ({kind}/{role})", file=sys.stderr)
         try:
-            if kind == "osm_overpass" and role == "provider":
+            if kind == "wikidata_sparql" and role == "provider":
+                before = len(stores)
+                stores.extend(iter_wikidata_businesses(source, remaining_providers))
+                added = len(stores) - before
+                if remaining_providers is not None:
+                    remaining_providers = max(0, remaining_providers - added)
+            elif kind == "osm_overpass" and role == "provider":
                 before = len(stores)
                 stores.extend(iter_overpass_providers(source, remaining_providers))
                 added = len(stores) - before
