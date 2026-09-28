@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { plainTextToNewsHtml, sanitizeNewsRichText } from './newsRichText';
+import { normalizeNewsRichBody, plainTextToNewsHtml, sanitizeNewsRichText } from './newsRichText';
 
 describe('news rich text hardening', () => {
   it('removes executable tags and event/style attributes', () => {
@@ -21,5 +21,19 @@ describe('news rich text hardening', () => {
 
   it('preserves paragraph and line-break structure from plain text', () => {
     expect(plainTextToNewsHtml('A\nB\n\nC')).toBe('<p>A<br />B</p><p>C</p>');
+  });
+
+  it('normalizes plain rich-body values into real paragraphs', () => {
+    expect(normalizeNewsRichBody('A\nB\n\nC', '')).toBe('<p>A<br />B</p><p>C</p>');
+  });
+
+  it('escapes HTML when normalizing plain rich-body text', () => {
+    expect(normalizeNewsRichBody('<script>alert(1)</script> & text', '')).toBe(
+      '<p>&lt;script&gt;alert(1)&lt;/script&gt; &amp; text</p>',
+    );
+  });
+
+  it('keeps real rich HTML instead of flattening its block structure', () => {
+    expect(normalizeNewsRichBody('<p>A</p><p>B</p>', 'fallback')).toBe('<p>A</p><p>B</p>');
   });
 });

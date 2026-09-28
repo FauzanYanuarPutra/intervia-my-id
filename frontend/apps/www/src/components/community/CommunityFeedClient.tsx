@@ -2996,7 +2996,7 @@ export function CommunityPostCard({
 
         {displayBody ? (
           <div className="mt-1.5 text-sm leading-6 text-[color:var(--app-text)]">
-            <p className={cn(!bodyExpanded && 'line-clamp-2')}>
+            <p className={cn('whitespace-pre-line', !bodyExpanded && 'line-clamp-2')}>
               {displayBody}
             </p>
 
@@ -5494,7 +5494,7 @@ function GroupDetailPanel({
 
       <div className="grid gap-3 p-3.5 sm:p-4 lg:grid-cols-[minmax(0,1fr)_260px]">
         <div className="space-y-3">
-          <p className="text-sm leading-6 text-[color:var(--app-text)]">
+          <p className="whitespace-pre-wrap text-sm leading-6 text-[color:var(--app-text)]">
             {group.description}
           </p>
           <GroupLeadershipPreview
@@ -5720,7 +5720,7 @@ export function GroupCard({
           </div>
 
           <p className={cn(
-            'mt-2 text-[11px] font-medium leading-4 text-[color:var(--app-text-soft)]',
+            'mt-2 whitespace-pre-line text-[11px] font-medium leading-4 text-[color:var(--app-text-soft)]',
             compact ? 'line-clamp-1' : 'line-clamp-2',
           )}>
             {group.description}
@@ -6057,7 +6057,7 @@ function SearchGroupResult({
           >
             {group.name}
           </Link>
-          <p className="mt-1 line-clamp-2 text-xs leading-5 text-[color:var(--app-text-soft)]">
+          <p className="mt-1 whitespace-pre-line line-clamp-2 text-xs leading-5 text-[color:var(--app-text-soft)]">
             {group.description}
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] font-bold text-[color:var(--app-text-soft)]">
