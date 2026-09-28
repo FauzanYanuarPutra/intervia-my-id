@@ -14,6 +14,7 @@ type HomeBusinessMapSectionProps = {
 type StoresResponse = {
   data?: {
     items?: UmkmMapStore[];
+    stores_backend_degraded?: boolean;
   };
   error?: string;
 };
@@ -64,6 +65,7 @@ export function HomeBusinessMapSection({
   const [stores, setStores] = useState<UmkmMapStore[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [backendDegraded, setBackendDegraded] = useState(false);
 
   const mapHref = `${UMKM_DISCOVERY_PATH}?view=map`;
 
@@ -93,6 +95,7 @@ export function HomeBusinessMapSection({
 
         if (!active) return;
         setStores(payload.data.items);
+        setBackendDegraded(payload.data.stores_backend_degraded === true);
       } catch (loadError) {
         if (!active || controller.signal.aborted) return;
         setError(
@@ -207,6 +210,14 @@ export function HomeBusinessMapSection({
             <ArrowUpRight className="h-3.5 w-3.5" />
           </span>
         </div>
+
+        {!error && !loading && backendDegraded ? (
+          <div className="absolute left-2 right-2 top-2 z-10 rounded-lg border border-amber-200/80 bg-amber-50/95 px-2.5 py-1.5 text-[8px] font-semibold text-amber-800 shadow-sm backdrop-blur sm:left-3 sm:right-3 sm:text-[9px]">
+            {isId
+              ? 'Sebagian data usaha sedang dipulihkan. Titik referensi publik tetap tersedia.'
+              : 'Some business data is recovering. Public reference points remain available.'}
+          </div>
+        ) : null}
 
         {error && !loading ? (
           <div className="absolute inset-x-2 bottom-2.5 z-10 rounded-lg border border-rose-200/80 bg-white/92 px-2 py-1.5 text-[8px] font-semibold text-rose-700 shadow-sm backdrop-blur sm:inset-x-3 sm:text-[9px]">
