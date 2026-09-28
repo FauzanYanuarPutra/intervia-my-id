@@ -461,6 +461,42 @@ impl BusinessRepository {
         Ok(aggregate)
     }
 
+    /// Recover owner-created canonical businesses even when the identity
+    /// organization projection temporarily does not list their organization.
+    /// This remains owner-scoped and still filters incomplete aggregates.
+    pub(crate) async fn list_created_by_actor(
+        &self,
+        actor_id: Uuid,
+    ) -> Result<Vec<BusinessAggregate>, RepositoryError> {
+        let rows = sqlx::query_as::<_, BusinessIdentityRow>(
+            r#"
+            SELECT id, organization_id
+            FROM businesses
+            WHERE created_by_user_id = $1 AND status <> 'archived'
+            ORDER BY updated_at DESC, id
+            "#,
+        )
+        .bind(actor_id)
+        .fetch_all(&self.db)
+        .await?;
+
+        let mut aggregates = Vec::with_capacity(rows.len());
+        for row in rows {
+            match optional_complete_aggregate(
+                load_aggregate(&self.db, row.id, row.organization_id).await,
+            )? {
+                Some(aggregate) => aggregates.push(aggregate),
+                None => tracing::warn!(
+                    business_id = %row.id,
+                    organization_id = %row.organization_id,
+                    actor_id = %actor_id,
+                    "skipping incomplete owner-created business aggregate"
+                ),
+            }
+        }
+        Ok(aggregates)
+    }
+
     pub(crate) async fn list_unlinked_for_actor(
         &self,
         actor_id: Uuid,
