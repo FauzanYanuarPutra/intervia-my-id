@@ -250,7 +250,6 @@ fn resolve_public_content_offset(value: Option<i64>) -> Result<i64, &'static str
 #[derive(Debug, Deserialize, Default)]
 struct ListMapReferencesQuery {
     q: Option<String>,
-    offset: Option<i64>,
     city: Option<String>,
     cursor: Option<String>,
     limit: Option<i64>,
