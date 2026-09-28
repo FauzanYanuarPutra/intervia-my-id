@@ -2812,7 +2812,7 @@ export function CommunityPostCard({
             <button
               type="button"
               onClick={openDetail}
-              className=" !min-w-0 !py-1 !my-0 !block !w-full !min-w-0 !truncate !whitespace-nowrap text-left text-[0.94rem] font-bold leading-5 tracking-[-0.02em] text-[color:var(--app-text)] sm:text-[0.96rem]"
+              className=" !min-w-0 !py-1 !my-0 !block !w-full !min-w-0 !truncate !whitespace-nowrap text-left text-[0.94rem] font-bold leading-5 tracking-[-0.02em] text-[color:var(--app-text)] sm:text-[0.96rem] !my-[-15px] !py-[-15px]"
             >
               {item.author.name}
             </button>
