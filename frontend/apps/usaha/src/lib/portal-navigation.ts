@@ -13,7 +13,7 @@ const labels: Record<PortalSection, string> = {
   inventory: 'Stok',
   finance: 'Uang',
   reports: 'Laporan',
-  channels: 'Jual Online',
+  channels: 'Kanal Jual',
   info: 'Pengaturan Usaha',
   locations: 'Lokasi & Outlet',
   operations: 'Jam & Operasional',
@@ -21,7 +21,7 @@ const labels: Record<PortalSection, string> = {
   parties: 'Pelanggan & Mitra',
   growth: 'Tumbuh',
   team: 'Tim & Akses',
-  buyerPage: 'Toko Saya',
+  buyerPage: 'Tampilan Toko',
   security: 'Keamanan akun',
 };
 
