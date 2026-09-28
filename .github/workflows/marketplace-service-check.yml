@@ -55,6 +55,26 @@ jobs:
         run: sh -n ../../scripts/run_real_data_bootstrap.sh
       - name: Validate real-data bootstrap Python
         run: python3 -m py_compile ../../scripts/import_real_marketplace_open_data.py
+      - name: Validate Wikidata reference parser
+        working-directory: .
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import importlib.util
+          from pathlib import Path
+
+          path = Path("scripts/import_real_marketplace_open_data.py")
+          spec = importlib.util.spec_from_file_location("lajukan_real_data_importer", path)
+          module = importlib.util.module_from_spec(spec)
+          assert spec.loader is not None
+          spec.loader.exec_module(module)
+
+          assert module.parse_wikidata_point("Point(106.8456 -6.2088)") == (-6.2088, 106.8456)
+          assert module.parse_wikidata_point("Point(181.0 -6.2088)") is None
+          assert module.parse_wikidata_point("invalid") is None
+          print("Wikidata coordinate parser contract: OK")
+          PY
       - name: Validate real-data bootstrap tooling
         working-directory: .
         shell: bash
