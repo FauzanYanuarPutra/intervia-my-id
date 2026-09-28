@@ -144,7 +144,7 @@ export default async function BusinessReportsPage({ params, searchParams }: Page
             </details>
           ) : null}
 
-          {canViewCosting ? <Link href={`/businesses/${business.id}/products/hpp`} className="portal-button-ghost"><Calculator className="h-4 w-4" /> Detail modal produk</Link> : null}
+          {canViewCosting ? <Link href={`/businesses/${business.id}/products/hpp`} className="portal-button-ghost"><Calculator className="h-4 w-4" /> Detail HPP produk</Link> : null}
         </div>
       ) : (
         <div className="merchant-surface-bordered p-5 text-sm text-portal-soft">Peranmu tidak memiliki akses melihat laporan usaha.</div>
