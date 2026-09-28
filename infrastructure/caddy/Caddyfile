@@ -18,7 +18,6 @@ http://{$APP_DOMAIN} {
 # and redirects https://www.* back to itself forever.
 (public_frontend_proxy) {
     header_up X-Forwarded-Proto https
-    header_up X-Forwarded-Host {host}
 }
 
 # Public WWW.
