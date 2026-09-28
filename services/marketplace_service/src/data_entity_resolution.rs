@@ -30,10 +30,18 @@ fn coordinate_pair(value: &Value) -> Option<(f64, f64)> {
         .or_else(|| value.get("coordinates").and_then(Value::as_array))?;
 
     let longitude = coordinates.get(0).and_then(|value| {
-        value.as_f64().or_else(|| value.as_str().and_then(|text| text.trim().parse::<f64>().ok()))
+        value.as_f64().or_else(|| {
+            value
+                .as_str()
+                .and_then(|text| text.trim().parse::<f64>().ok())
+        })
     })?;
     let latitude = coordinates.get(1).and_then(|value| {
-        value.as_f64().or_else(|| value.as_str().and_then(|text| text.trim().parse::<f64>().ok()))
+        value.as_f64().or_else(|| {
+            value
+                .as_str()
+                .and_then(|text| text.trim().parse::<f64>().ok())
+        })
     })?;
 
     if longitude.is_finite()
