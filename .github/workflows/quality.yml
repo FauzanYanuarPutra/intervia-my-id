@@ -144,7 +144,17 @@ jobs:
           import json
           plan = json.load(open("/tmp/real-data-plan.json", encoding="utf-8"))
           ids = set(plan["sources"])
-          assert "osm-overpass-indonesia-providers" in ids, plan
+          # OSM Overpass is intentionally opt-in because OSM is already handled by
+          # the canonical marketplace ingestion path; direct bootstrap must not
+          # silently crawl a large external surface on every CI/default run.
+          assert "osm-overpass-indonesia-providers" not in ids, plan
+          expected_default = {
+              "satrup-tanah-laut-rup-penyedia-2026",
+              "wikimedia-commons-indonesia-open-media",
+              "denpasar-umkm-csv-2020",
+              "tangsel-umkm-csv-2022",
+          }
+          assert expected_default.issubset(ids), plan
           print("real-data source plan:", sorted(ids))
           PY
           python - <<'PY'
