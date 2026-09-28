@@ -70,11 +70,22 @@ describe('umkm place distance presentation', () => {
     expect(ui.statusLabel).toBe('Senin–Jumat');
   });
 
-  it('uses a neutral placeholder instead of category imagery when media is missing', () => {
-    const ui = buildUmkmPlacePresentation(buildPlace(), true, null);
+  it('uses category-specific artwork when business media is missing', () => {
+    const food = buildUmkmPlacePresentation(
+      buildPlace({ metadata: { business_type: 'kuliner' } }),
+      true,
+      null,
+    );
+    const workshop = buildUmkmPlacePresentation(
+      buildPlace({ metadata: { business_type: 'bengkel' } }),
+      true,
+      null,
+    );
 
-    expect(ui.coverImage).toBe('/images/placeholders/business-default.svg');
-    expect(ui.gallery).toEqual(['/images/placeholders/business-default.svg']);
+    expect(food.coverImage).toBe('/images/business-categories/food.svg');
+    expect(workshop.coverImage).toBe('/images/business-categories/workshop.svg');
+    expect(food.coverImage).not.toBe(workshop.coverImage);
+    expect(food.gallery).toEqual(['/images/business-categories/food.svg']);
   });
 
   it('keeps owner-provided storefront media', () => {
@@ -134,6 +145,23 @@ describe('umkm place distance presentation', () => {
       '/api/forum/media/banner-lajukan-juice.webp',
       '/api/forum/media/logo-lajukan-juice.webp',
     ]);
+  });
+
+  it('classifies normalized source categories before falling back to generic UMKM', () => {
+    const ui = buildUmkmPlacePresentation(
+      buildPlace({
+        metadata: {
+          category: 'fashion_apparel',
+          record_kind: 'government_reference',
+          market_side: 'reference',
+        },
+      }),
+      true,
+      null,
+    );
+
+    expect(ui.businessCategoryId).toBe('fashion_apparel');
+    expect(ui.coverImage).toBe('/images/business-categories/retail.svg');
   });
 
   it('presents a public map reference without store or transaction claims', () => {
