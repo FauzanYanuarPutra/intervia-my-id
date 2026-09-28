@@ -1022,7 +1022,6 @@ export function UmkmDiscoveryPanel({
   const pendingScrollStoreIdRef = useRef<string | null>(null);
   const mobileMapRef = useRef<HTMLDivElement | null>(null);
   const desktopMapRef = useRef<HTMLDivElement | null>(null);
-  const autoFocusedViewerRef = useRef(false);
   const {
     viewerLocation,
     viewerAccuracyMeters,
@@ -1160,9 +1159,10 @@ export function UmkmDiscoveryPanel({
         const params = new URLSearchParams();
         if (query?.trim()) params.set('q', query.trim());
         if (city?.trim()) params.set('city', city.trim());
-        if (queryViewerLocation) {
-          // ~110 m precision is sufficient for ordering without exposing exact
-          // browser coordinates in URLs/access logs.
+        if (mapRangeKm !== null && queryViewerLocation) {
+          // Viewer coordinates are sent only for an explicit radius search.
+          // The default "All Indonesia" mode must not collapse into a
+          // nearest-first query around the browser location.
           params.set('viewer_lat', queryViewerLocation.lat.toFixed(3));
           params.set('viewer_lng', queryViewerLocation.lng.toFixed(3));
         }
@@ -1349,7 +1349,7 @@ export function UmkmDiscoveryPanel({
       if (safeCursor) params.set('cursor', safeCursor);
       if (query?.trim()) params.set('q', query.trim());
       if (city?.trim()) params.set('city', city.trim());
-      if (queryViewerLocation) {
+      if (mapRangeKm !== null && queryViewerLocation) {
         params.set('viewer_lat', queryViewerLocation.lat.toFixed(3));
         params.set('viewer_lng', queryViewerLocation.lng.toFixed(3));
       }
