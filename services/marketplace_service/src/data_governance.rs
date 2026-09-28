@@ -2168,6 +2168,8 @@ pub async fn sync_static_source_registry(db: &PgPool) -> Result<(), sqlx::Error>
         #[serde(default)]
         auto_publish_reference: bool,
         #[serde(default)]
+        media_storage_allowed: bool,
+        #[serde(default)]
         enabled: Option<bool>,
     }
 
@@ -2208,7 +2210,7 @@ pub async fn sync_static_source_registry(db: &PgPool) -> Result<(), sqlx::Error>
                 license_name, license_url, attribution_text,
                 reuse_mode, storage_allowed, media_storage_allowed, pii_import_allowed,
                 enabled, auto_publish_reference, notes, updated_at
-            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,FALSE,FALSE,$12,$13,$14,NOW())
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,FALSE,$13,$14,$15,NOW())
             ON CONFLICT (source_key) DO UPDATE SET
                 provider_name=EXCLUDED.provider_name, source_kind=EXCLUDED.source_kind, source_url=EXCLUDED.source_url,
                 api_url=EXCLUDED.api_url, terms_url=EXCLUDED.terms_url,
@@ -2221,8 +2223,12 @@ pub async fn sync_static_source_registry(db: &PgPool) -> Result<(), sqlx::Error>
         )
         .bind(&source.id).bind(&source.provider).bind(&source.kind).bind(&source.url).bind(api_url)
         .bind(source.terms_url).bind(source.license).bind(source.license_url).bind(source.attribution)
-        .bind(reuse_mode).bind(storage_allowed).bind(enabled)
-        .bind(source.auto_publish_reference).bind(source.media_storage_allowed).bind(notes)
+        .bind(reuse_mode)
+        .bind(storage_allowed)
+        .bind(source.media_storage_allowed)
+        .bind(enabled)
+        .bind(source.auto_publish_reference)
+        .bind(notes)
         .execute(db)
         .await
         {
