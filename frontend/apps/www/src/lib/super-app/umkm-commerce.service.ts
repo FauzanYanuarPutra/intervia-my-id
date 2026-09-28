@@ -254,6 +254,9 @@ async function fetchMarketplaceStoreList(
     params.set('viewer_lat', String(options.viewer.lat));
     params.set('viewer_lng', String(options.viewer.lng));
   }
+  if (options?.radiusKm !== undefined) {
+    params.set('radius_km', String(options.radiusKm));
+  }
 
   const suffix = params.toString() ? `?${params.toString()}` : '';
   const result = await fetchMarketplaceReadJson<MarketplaceStoreListResponse>(
