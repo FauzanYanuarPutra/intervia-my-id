@@ -43,12 +43,12 @@ describe('portal navigation', () => {
     ]);
   });
 
-  it('keeps mobile daily work focused on home, sales, goods, and money', () => {
+  it('keeps mobile daily work focused on home, sales, products, and stock', () => {
     expect(mobilePrimaryNavigation(ownerPermissions).map(item => item.id)).toEqual([
       'home',
       'orders',
       'products',
-      'finance',
+      'inventory',
     ]);
     expect(portalMenuNavigation(ownerPermissions).map(item => item.id)).toContain('products');
   });
@@ -76,13 +76,13 @@ describe('portal navigation', () => {
     expect(labels.inventory).toBe('Stok');
     expect(labels.finance).toBe('Uang');
     expect(labels.reports).toBe('Laporan');
-    expect(labels.channels).toBe('Kanal Jual');
+    expect(labels.channels).toBe('Jual Online');
     expect(labels.info).toBe('Pengaturan Usaha');
     expect(labels.work).toBe('Pekerjaan');
     expect(labels.parties).toBe('Pelanggan & Mitra');
     expect(labels.growth).toBe('Tumbuh');
     expect(labels.team).toBe('Tim & Akses');
-    expect(labels.buyerPage).toBe('Tampilan Toko');
+    expect(labels.buyerPage).toBe('Toko Saya');
     expect(portalMenuNavigation(ownerPermissions).some(item => item.id === 'operations')).toBe(true);
   });
 });
