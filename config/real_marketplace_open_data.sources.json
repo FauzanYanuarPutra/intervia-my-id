@@ -13,7 +13,7 @@
       "id": "osm-overpass-indonesia-providers",
       "kind": "osm_overpass",
       "role": "provider",
-      "enabled_by_default": true,
+      "enabled_by_default": false,
       "name": "OpenStreetMap Indonesia provider POIs via Overpass",
       "source_url": "https://www.openstreetmap.org/",
       "license": "Open Database License 1.0",
