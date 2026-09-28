@@ -144,11 +144,9 @@ jobs:
           import json
           plan = json.load(open("/tmp/real-data-plan.json", encoding="utf-8"))
           ids = set(plan["sources"])
-          # OSM Overpass is intentionally opt-in because OSM is already handled by
-          # the canonical marketplace ingestion path; direct bootstrap must not
-          # silently crawl a large external surface on every CI/default run.
-          assert "osm-overpass-indonesia-providers" not in ids, plan
           expected_default = {
+              "osm-overpass-indonesia-providers",
+              "wikidata-indonesia-business-references",
               "satrup-tanah-laut-rup-penyedia-2026",
               "wikimedia-commons-indonesia-open-media",
               "denpasar-umkm-csv-2020",
@@ -225,6 +223,7 @@ jobs:
           assert "aggregate_data" in sql
           assert "owner_id = NULL" in sql
           assert "INSERT INTO users_read_model" not in sql
+          assert "owner_id, content_type, slug, title" in sql
           print("real-data SQL generation contract passed")
           PY
 
