@@ -76,15 +76,6 @@ export function portalMenuNavigation(permissions: PermissionId[]) {
   return selectNavigation(menuOrder, permissions);
 }
 
-const userFacingLabels: Partial<Record<PortalSection, string>> = {
-  channels: 'Jual Online',
-  buyerPage: 'Toko Saya',
-};
-
 export function portalSectionLabel(section: PortalSection) {
   return labels[section];
-}
-
-export function portalSectionUserLabel(section: PortalSection) {
-  return userFacingLabels[section] ?? labels[section];
 }
