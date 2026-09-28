@@ -128,7 +128,7 @@ class UsahaBusinessOsUiContractTests(unittest.TestCase):
         finance = (
             USAHA / "app/(portal)/businesses/[businessId]/finance/page.tsx"
         ).read_text(encoding="utf-8")
-        for marker in ("WorkspaceTabs", "Aktivitas", "Rencana", "Transfer aplikasi"):
+        for marker in ("WorkspaceTabs", "Aktivitas", "Rencana", "Transfer & potongan"):
             self.assertIn(marker, finance)
 
     def test_settings_family_uses_compact_settings_center_patterns(self) -> None:
