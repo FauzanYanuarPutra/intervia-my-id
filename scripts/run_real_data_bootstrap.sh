@@ -25,7 +25,15 @@ run_sql() {
 }
 
 echo "[real-data] ensuring bootstrap state schema..."
-run_sql "$MARKETPLACE_DATABASE_URL" "ALTER TABLE real_data_bootstrap_runs ADD COLUMN IF NOT EXISTS bootstrap_version TEXT NOT NULL DEFAULT ''; CREATE INDEX IF NOT EXISTS idx_real_data_bootstrap_version ON real_data_bootstrap_runs(bootstrap_version);"
+run_sql "$MARKETPLACE_DATABASE_URL" "CREATE TABLE IF NOT EXISTS real_data_bootstrap_runs (
+  bootstrap_key TEXT PRIMARY KEY,
+  last_success_at TIMESTAMPTZ,
+  last_provider_count INTEGER NOT NULL DEFAULT 0,
+  last_buyer_count INTEGER NOT NULL DEFAULT 0,
+  last_community_media_count INTEGER NOT NULL DEFAULT 0,
+  last_error TEXT,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+); ALTER TABLE real_data_bootstrap_runs ADD COLUMN IF NOT EXISTS bootstrap_version TEXT NOT NULL DEFAULT ''; CREATE INDEX IF NOT EXISTS idx_real_data_bootstrap_version ON real_data_bootstrap_runs(bootstrap_version);"
 
 echo "[real-data] checking bootstrap state..."
 STATE="$(run_sql "$MARKETPLACE_DATABASE_URL" "SELECT COALESCE(bootstrap_version,'') || '|' || COALESCE(EXTRACT(EPOCH FROM (NOW() - last_success_at))/3600.0, 999999) FROM real_data_bootstrap_runs WHERE bootstrap_key = '$LOCK_KEY'")"
