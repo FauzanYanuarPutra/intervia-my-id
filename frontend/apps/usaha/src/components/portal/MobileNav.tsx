@@ -93,7 +93,7 @@ export function MobileNav({ business, currentSection }: MobileNavProps) {
             <span className="inline-flex h-7 w-7 items-center justify-center rounded-[10px] bg-[#f1f4f2] text-portal-soft">
               <Menu className="h-[18px] w-[18px]" />
             </span>
-            <span className="max-w-full truncate">Lainnya</span>
+            <span className="max-w-full truncate">Menu</span>
           </button>
         </div>
       </nav>
@@ -101,7 +101,7 @@ export function MobileNav({ business, currentSection }: MobileNavProps) {
       <ModalSurface
         open={moreOpen}
         onOpenChange={setMoreOpen}
-        ariaLabel="Menu lainnya"
+        ariaLabel="Menu usaha"
         presentation="sheet"
         size="sm"
         returnFocusRef={moreButtonRef}
@@ -109,7 +109,7 @@ export function MobileNav({ business, currentSection }: MobileNavProps) {
         <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-slate-200" />
         <div className="flex items-start justify-between gap-4 border-b border-portal-line px-4 pb-3 pt-3">
           <div>
-            <p className="text-base font-black text-portal-ink">Lainnya</p>
+            <p className="text-base font-black text-portal-ink">Menu usaha</p>
             <p className="mt-0.5 text-xs text-portal-soft">Tumbuh, pelanggan, pekerjaan, produk, laporan, kanal jual, dan pengaturan usaha.</p>
           </div>
           <button
