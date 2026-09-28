@@ -419,14 +419,16 @@ services:
   real_data_bootstrap:
     <<: *service-defaults
     restart: "no"
-    # Prefer Docker's embedded DNS by default. Public DNS servers are
-    # overrideable for restricted networks, but must not be the default because
-    # Docker Desktop/VPN/firewall environments commonly block direct UDP/TCP DNS.
+    # Use multiple resolvers so a Docker/VPN/host resolver SERVFAIL does not
+    # make the entire real-data bootstrap fail. Values remain overrideable for
+    # corporate networks; Docker's embedded resolver is kept as the final fallback.
     dns:
-      - ${REAL_DATA_DNS_PRIMARY:-127.0.0.11}
+      - ${REAL_DATA_DNS_PRIMARY:-1.1.1.1}
+      - ${REAL_DATA_DNS_SECONDARY:-8.8.8.8}
+      - 127.0.0.11
     dns_opt:
-      - timeout:3
-      - attempts:5
+      - timeout:${REAL_DATA_DNS_TIMEOUT_SECONDS:-3}
+      - attempts:${REAL_DATA_DNS_ATTEMPTS:-2}
     build:
       context: .
       dockerfile: services/real_data_bootstrap/Dockerfile
