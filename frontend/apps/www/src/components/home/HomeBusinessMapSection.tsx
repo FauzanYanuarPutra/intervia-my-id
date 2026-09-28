@@ -77,7 +77,7 @@ export function HomeBusinessMapSection({
       try {
         setError(null);
         const response = await fetch(
-          '/api/super-app/umkm/stores?limit=50&include_references=1',
+          '/api/super-app/umkm/stores?map=1&limit=200&include_references=1&min_lat=-11&max_lat=6&min_lng=95&max_lng=141',
           {
             cache: 'no-store',
             credentials: 'include',
