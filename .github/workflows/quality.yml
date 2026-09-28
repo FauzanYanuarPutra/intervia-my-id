@@ -205,7 +205,7 @@ jobs:
           module.write_sql(str(out), [sample], [], [insight])
           sql = out.read_text(encoding="utf-8")
           assert "INSERT INTO content_items" in sql
-          assert "'osm_provider_reference'" in sql
+          assert "'real_openstreetmap_reference'" in sql
           assert "'claimable', true" in sql
           assert "'market_side', 'reference'" in sql
           assert "'reference_subtype', 'aggregate_data'" in sql
