@@ -252,9 +252,13 @@ function mapPublicReference(
   const metadata = asRecord(item.metadata);
   const lat = readNumber(metadata.latitude ?? metadata.lat);
   const lng = readNumber(metadata.longitude ?? metadata.lng ?? metadata.lon);
-  const sourceTitle = readText(metadata.source_title).slice(0, 160);
-  const sourceLicense = readText(metadata.source_license).slice(0, 160);
   const sourceDataset = readText(metadata.source_dataset).toLowerCase();
+  const sourceTitle = (
+    readText(metadata.source_title) ||
+    readText(metadata.source_provider) ||
+    sourceDataset
+  ).slice(0, 160);
+  const sourceLicense = readText(metadata.source_license).slice(0, 160);
   const sourceUrl =
     sourceDataset === 'openstreetmap'
       ? safeOpenStreetMapSourceUrl(metadata.source_url)
