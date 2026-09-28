@@ -102,8 +102,8 @@ export function WorkspaceSearch({ business }: WorkspaceSearchProps) {
         type="button"
         aria-haspopup="dialog"
         aria-expanded={open}
-        aria-label="Cari di usaha"
-        title="Cari di usaha (Ctrl K)"
+        aria-label="Pindah halaman usaha"
+        title="Pindah halaman (Ctrl K)"
         onClick={() => {
           setQuery('');
           setOpen(true);
@@ -111,14 +111,14 @@ export function WorkspaceSearch({ business }: WorkspaceSearchProps) {
         className="portal-button-ghost min-h-11 px-2.5 sm:px-3"
       >
         <Search className="h-4 w-4" />
-        <span className="hidden sm:inline">Cari</span>
+        <span className="hidden sm:inline">Pindah</span>
         <kbd className="hidden rounded-md border border-portal-line bg-[#f7f9f7] px-1.5 py-0.5 text-[10px] font-bold text-portal-soft lg:inline">Ctrl K</kbd>
       </button>
 
       <ModalSurface
         open={open}
         onOpenChange={setOpen}
-        ariaLabel="Cari di usaha"
+        ariaLabel="Pindah halaman usaha"
         presentation="adaptive"
         size="lg"
         returnFocusRef={triggerRef}
@@ -128,7 +128,7 @@ export function WorkspaceSearch({ business }: WorkspaceSearchProps) {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="portal-kicker">Pindah halaman</p>
-                <h2 className="mt-1 text-xl font-black tracking-[-.035em] text-portal-ink">Cari area usaha</h2>
+                <h2 className="mt-1 text-xl font-black tracking-[-.035em] text-portal-ink">Pindah ke halaman</h2>
               </div>
               <button
                 type="button"
@@ -146,7 +146,7 @@ export function WorkspaceSearch({ business }: WorkspaceSearchProps) {
                 ref={inputRef}
                 value={query}
                 onChange={event => setQuery(event.target.value)}
-                placeholder="Ketik produk, stok, uang, pelanggan..."
+                placeholder="Cari halaman: produk, stok, uang, pelanggan..."
                 className="portal-input w-full pl-10 pr-3"
               />
             </label>
@@ -183,7 +183,7 @@ export function WorkspaceSearch({ business }: WorkspaceSearchProps) {
                     <Search className="h-5 w-5" />
                   </span>
                   <p className="mt-3 text-sm font-black text-portal-ink">Belum ada halaman yang cocok</p>
-                  <p className="mt-1 text-xs leading-5 text-portal-soft">Coba kata yang lebih umum seperti produk, jual, stok, atau uang.</p>
+                  <p className="mt-1 text-xs leading-5 text-portal-soft">Coba kata seperti produk, jual, stok, uang, atau laporan.</p>
                 </div>
               </div>
             )}
