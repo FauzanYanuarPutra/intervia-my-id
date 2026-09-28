@@ -241,14 +241,21 @@ def open_url_with_retry(request: urllib.request.Request, *, timeout: int, attemp
     raise last_error or RuntimeError("request failed without an error")
 
 
-def fetch_json(url: str, *, method: str = "GET", data: bytes | None = None, timeout: int = 60) -> Any:
+def fetch_json(
+    url: str,
+    *,
+    method: str = "GET",
+    data: bytes | None = None,
+    timeout: int = 60,
+    attempts: int = 3,
+) -> Any:
     request = urllib.request.Request(
         url,
         data=data,
         method=method,
         headers={"Accept": "application/json", "User-Agent": USER_AGENT},
     )
-    with open_url_with_retry(request, timeout=timeout) as response:
+    with open_url_with_retry(request, timeout=timeout, attempts=max(1, attempts)) as response:
         charset = response.headers.get_content_charset() or "utf-8"
         return json.loads(response.read().decode(charset, errors="replace"))
 
@@ -260,6 +267,7 @@ def fetch_json_request(
     data: bytes | None = None,
     headers: dict[str, str] | None = None,
     timeout: int = 60,
+    attempts: int = 3,
 ) -> Any:
     request_headers = {
         "Accept": "application/json",
@@ -267,7 +275,7 @@ def fetch_json_request(
         **(headers or {}),
     }
     request = urllib.request.Request(url, data=data, method=method, headers=request_headers)
-    with open_url_with_retry(request, timeout=timeout) as response:
+    with open_url_with_retry(request, timeout=timeout, attempts=max(1, attempts)) as response:
         charset = response.headers.get_content_charset() or "utf-8"
         return json.loads(response.read().decode(charset, errors="replace"))
 
@@ -529,6 +537,7 @@ LIMIT {limit}
             "Accept": "application/sparql-results+json, application/json",
         },
         timeout=timeout,
+        attempts=max(1, int(source.get("network_attempts") or 2)),
     )
 
     rows = (
@@ -605,8 +614,9 @@ LIMIT {limit}
         )
 
 def build_overpass_bboxes(source: dict[str, Any]) -> list[dict[str, Any]]:
+    priority_bboxes = list(source.get("bboxes") or [])
     if source.get("coverage") != "indonesia_grid":
-        return list(source.get("bboxes") or [])
+        return priority_bboxes
 
     raw_bbox = source.get("grid_bbox") or [-11.5, 94.5, 7.5, 142.5]
     if len(raw_bbox) != 4:
@@ -646,16 +656,37 @@ def build_overpass_bboxes(source: dict[str, Any]) -> list[dict[str, Any]]:
         lat = next_lat
         row += 1
 
-    return tiles
+    seen_bbox_keys: set[str] = set()
+    merged: list[dict[str, Any]] = []
+    for bbox in priority_bboxes + tiles:
+        bbox_key = json.dumps(bbox.get("bbox"), separators=(",", ":"))
+        if bbox_key in seen_bbox_keys:
+            continue
+        seen_bbox_keys.add(bbox_key)
+        merged.append(bbox)
+    return merged
 
 
 def iter_overpass_providers(source: dict[str, Any], max_rows: int | None) -> Iterable[ProviderStore]:
     endpoints = source.get("endpoints") or [source["endpoint"]]
-    timeout = int(source.get("timeout_seconds") or 90)
+    timeout = int(source.get("timeout_seconds") or 45)
+    attempts = max(1, int(source.get("network_attempts") or 2))
     per_bbox_limit = int(source.get("per_bbox_limit") or 750)
+    max_bboxes_per_run = max(1, int(source.get("max_bboxes_per_run") or 12))
+    max_consecutive_failed_bboxes = max(1, int(source.get("max_consecutive_failed_bboxes") or 3))
     seen: set[str] = set()
     emitted = 0
-    bboxes = build_overpass_bboxes(source)
+    all_bboxes = build_overpass_bboxes(source)
+    if all_bboxes and len(all_bboxes) > max_bboxes_per_run:
+        start_index = (int(time.time() // 86400) % len(all_bboxes))
+        bboxes = [
+            all_bboxes[(start_index + offset) % len(all_bboxes)]
+            for offset in range(max_bboxes_per_run)
+        ]
+    else:
+        bboxes = all_bboxes
+
+    consecutive_failures = 0
     for bbox_entry in bboxes:
         if max_rows is not None and emitted >= max_rows:
             break
@@ -668,7 +699,13 @@ def iter_overpass_providers(source: dict[str, Any], max_rows: int | None) -> Ite
         last_error: Exception | None = None
         for endpoint in endpoints:
             try:
-                data = fetch_json(endpoint, method="POST", data=payload, timeout=timeout)
+                data = fetch_json(
+                    endpoint,
+                    method="POST",
+                    data=payload,
+                    timeout=timeout,
+                    attempts=attempts,
+                )
                 break
             except Exception as exc:  # Public Overpass mirrors can rate-limit or timeout.
                 last_error = exc
@@ -677,12 +714,19 @@ def iter_overpass_providers(source: dict[str, Any], max_rows: int | None) -> Ite
                     file=sys.stderr,
                 )
         if data is None:
+            consecutive_failures += 1
             if last_error is not None:
                 print(
                     f"warning: all overpass endpoints failed for {bbox_entry.get('name')}: {last_error}",
                     file=sys.stderr,
                 )
+            if consecutive_failures >= max_consecutive_failed_bboxes:
+                raise RuntimeError(
+                    f"Overpass temporarily unavailable after {consecutive_failures} consecutive failed tiles"
+                )
             continue
+
+        consecutive_failures = 0
         for element in data.get("elements", []):
             tags = element.get("tags") or {}
             name = clean_text(tags.get("name"))
