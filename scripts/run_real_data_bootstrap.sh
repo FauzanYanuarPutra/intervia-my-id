@@ -19,6 +19,7 @@ SOURCE_FINGERPRINT="$(
 )"
 BOOTSTRAP_VERSION="${REAL_DATA_BOOTSTRAP_VERSION:-config-${SOURCE_FINGERPRINT}}"
 LOCK_KEY="real_marketplace_open_data"
+TMP_DIR=""
 run_sql() {
   psql "$1" -v ON_ERROR_STOP=1 -Atqc "$2"
 }
@@ -135,7 +136,7 @@ fi
 cleanup_lock() {
   run_sql "$MARKETPLACE_DATABASE_URL" "SELECT pg_advisory_unlock(hashtextextended('$LOCK_KEY', 0))" >/dev/null 2>&1 || true
 }
-trap 'cleanup_lock; rm -rf "$TMP_DIR"' EXIT
+trap 'cleanup_lock; if [ -n "$TMP_DIR" ]; then rm -rf "$TMP_DIR"; fi' EXIT
 
 echo "[real-data] checking bootstrap state..."
 STATE="$(run_sql "$MARKETPLACE_DATABASE_URL" "SELECT COALESCE(bootstrap_version,'') || '|' || COALESCE(EXTRACT(EPOCH FROM (NOW() - last_success_at))/3600.0, 999999) FROM real_data_bootstrap_runs WHERE bootstrap_key = '$LOCK_KEY'")"
