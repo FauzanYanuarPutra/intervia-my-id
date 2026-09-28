@@ -2301,6 +2301,7 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--config", default=DEFAULT_CONFIG)
     parser.add_argument("--out", default=DEFAULT_OUT)
     parser.add_argument("--community-out", default=DEFAULT_COMMUNITY_OUT)
+    parser.add_argument("--manifest", default="", help="Optional JSON manifest path for per-source results.")
     parser.add_argument("--source", action="append", default=[], help="Source id to run. Defaults to enabled_by_default sources.")
     parser.add_argument("--max-providers", type=int, default=1000, help="Use -1 for unlimited.")
     parser.add_argument("--max-buyers", type=int, default=1000, help="Use -1 for unlimited.")
@@ -2332,6 +2333,7 @@ def main(argv: list[str]) -> int:
     remaining_buyers = args.max_buyers if args.max_buyers >= 0 else None
     remaining_community_media = args.max_community_media if args.max_community_media >= 0 else None
     remaining_insights = int(args.max_insights) if args.max_insights >= 0 else None
+    source_results: list[dict[str, Any]] = []
 
     for source in sources:
         kind = source.get("kind")
@@ -2344,32 +2346,38 @@ def main(argv: list[str]) -> int:
                 added = len(stores) - before
                 if remaining_providers is not None:
                     remaining_providers = max(0, remaining_providers - added)
+                source_results.append({"id": source.get("id"), "status": "ok", "records_added": added})
             elif kind == "osm_overpass" and role == "provider":
                 before = len(stores)
                 stores.extend(iter_overpass_providers(source, remaining_providers))
                 added = len(stores) - before
                 if remaining_providers is not None:
                     remaining_providers = max(0, remaining_providers - added)
+                source_results.append({"id": source.get("id"), "status": "ok", "records_added": added})
             elif kind == "lpse_sirup_api" and role == "buyer":
                 before = len(requests)
                 requests.extend(iter_lpse_buyer_requests(source, remaining_buyers))
                 added = len(requests) - before
                 if remaining_buyers is not None:
                     remaining_buyers = max(0, remaining_buyers - added)
+                source_results.append({"id": source.get("id"), "status": "ok", "records_added": added})
             elif kind == "satrup_status_rup" and role == "buyer":
                 before = len(requests)
                 requests.extend(iter_satrup_status_rup_requests(source, remaining_buyers))
                 added = len(requests) - before
                 if remaining_buyers is not None:
                     remaining_buyers = max(0, remaining_buyers - added)
+                source_results.append({"id": source.get("id"), "status": "ok", "records_added": added})
             elif kind == "satrup_rup_penyedia" and role == "buyer":
                 before = len(requests)
                 requests.extend(iter_satrup_rup_penyedia_requests(source, remaining_buyers))
                 added = len(requests) - before
                 if remaining_buyers is not None:
                     remaining_buyers = max(0, remaining_buyers - added)
+                source_results.append({"id": source.get("id"), "status": "ok", "records_added": added})
             elif kind == "google_places_photo_enrichment" and role == "provider_image_enrichment":
                 image_enrichers.append(source)
+                source_results.append({"id": source.get("id"), "status": "deferred", "records_added": 0})
             elif kind in {"csv_aggregate", "ckan_aggregate"} and role == "insight":
                 before = len(insights)
                 if kind == "csv_aggregate":
@@ -2379,27 +2387,44 @@ def main(argv: list[str]) -> int:
                 added = len(insights) - before
                 if remaining_insights is not None:
                     remaining_insights = max(0, remaining_insights - added)
+                source_results.append({"id": source.get("id"), "status": "ok", "records_added": added})
             elif kind == "wikimedia_commons_media" and role == "community_reels":
                 before = len(media_items)
                 media_items.extend(iter_wikimedia_commons_media(source, remaining_community_media))
                 added = len(media_items) - before
                 if remaining_community_media is not None:
                     remaining_community_media = max(0, remaining_community_media - added)
+                source_results.append({"id": source.get("id"), "status": "ok", "records_added": added})
             else:
+                source_results.append({"id": source.get("id"), "status": "skipped", "records_added": 0})
                 print(f"skipping unsupported/default-disabled source {source.get('id')}", file=sys.stderr)
         except Exception as exc:
             if args.strict:
                 raise
+            source_results.append({
+                "id": source.get("id"),
+                "status": "error",
+                "records_added": 0,
+                "error": str(exc)[:1200],
+            })
             print(f"warning: source {source.get('id')} skipped after error: {exc}", file=sys.stderr)
         if args.sleep > 0:
             time.sleep(args.sleep)
 
     for source in image_enrichers:
         try:
+            before = len(stores)
             stores = apply_google_places_photo_enrichment(source, stores)
+            source_results.append({"id": source.get("id"), "status": "ok", "records_added": len(stores) - before})
         except Exception as exc:
             if args.strict:
                 raise
+            source_results.append({
+                "id": source.get("id"),
+                "status": "error",
+                "records_added": 0,
+                "error": str(exc)[:1200],
+            })
             print(f"warning: source {source.get('id')} skipped after error: {exc}", file=sys.stderr)
 
     skipped_provider_stores = 0
@@ -2419,6 +2444,22 @@ def main(argv: list[str]) -> int:
     write_sql(args.out, stores, requests, insights)
     if not args.no_community_out:
         write_community_sql(args.community_out, media_items)
+    manifest = {
+        "generated_at": dt.datetime.now(dt.timezone.utc).isoformat(),
+        "selected_sources": [source.get("id") for source in sources],
+        "source_results": source_results,
+        "source_errors": [item for item in source_results if item.get("status") == "error"],
+        "source_error_count": sum(1 for item in source_results if item.get("status") == "error"),
+        "provider_stores": len(stores),
+        "buyer_requests": len(requests),
+        "data_insights": len(insights),
+        "community_media": len(media_items),
+    }
+    if args.manifest:
+        manifest_path = Path(args.manifest)
+        manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+
     print(
         json.dumps(
             {
@@ -2431,6 +2472,7 @@ def main(argv: list[str]) -> int:
                 "skipped_provider_stores_without_images": skipped_provider_stores,
                 "skipped_buyer_requests_without_images": skipped_buyer_requests,
                 "community_media": len(media_items),
+                "source_error_count": manifest["source_error_count"],
             },
             indent=2,
         )
