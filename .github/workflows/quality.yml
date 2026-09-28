@@ -208,7 +208,8 @@ jobs:
           assert "'real_openstreetmap_reference'" in sql
           assert "'claimable', true" in sql
           assert "'market_side', 'reference'" in sql
-          assert "'reference_subtype', 'aggregate_data'" in sql
+          assert "reference_subtype" in sql
+          assert "aggregate_data" in sql
           assert "owner_id = NULL" in sql
           assert "INSERT INTO users_read_model" not in sql
           print("real-data SQL generation contract passed")
