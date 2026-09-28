@@ -126,14 +126,39 @@ export async function resolvePortalBusinessPageState(businessId: string) {
       isAuthenticated: false as const,
     };
   }
-  const businesses = await listPortalBusinesses();
-  const activeBusiness =
+  let businesses = await listPortalBusinesses();
+  let activeBusiness =
     businesses.find(
       item =>
         item.id === businessId ||
         item.storeId === businessId ||
         item.slug === businessId,
     ) ?? null;
+
+  if (!activeBusiness) {
+    try {
+      const directBusiness = await getBusinessForCurrentActor(businessId);
+      if (directBusiness) {
+        activeBusiness = directBusiness;
+        businesses = [
+          directBusiness,
+          ...businesses.filter(item => item.id !== directBusiness.id),
+        ];
+      }
+    } catch (error) {
+      if (
+        !(
+          error &&
+          typeof error === 'object' &&
+          ((error as { status?: unknown }).status === 404 ||
+            (error as { code?: unknown }).code === 'business_not_found')
+        )
+      ) {
+        throw error;
+      }
+    }
+  }
+
   return {
     account,
     businesses,
