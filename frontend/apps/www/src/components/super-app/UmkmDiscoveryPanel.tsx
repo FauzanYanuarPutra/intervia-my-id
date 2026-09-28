@@ -1097,21 +1097,28 @@ export function UmkmDiscoveryPanel({
     },
     [],
   );
-  const requestLimit = Math.max(1, Math.min(limit, 50));
+  const requestLimit = Math.max(50, Math.min(200, limit));
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const clearPublicScopeParam = () => {
+
+    const syncPublicScopeParam = () => {
       const url = new URL(window.location.href);
+      const requestedScope = readDiscoveryScope(url.searchParams.get('scope'));
+      setDiscoveryScope(requestedScope);
       if (url.searchParams.has('scope')) {
         url.searchParams.delete('scope');
-        window.history.replaceState(window.history.state, '', url.pathname + url.search);
+        window.history.replaceState(
+          window.history.state,
+          '',
+          url.pathname + url.search,
+        );
       }
-      setDiscoveryScope('registered');
     };
-    clearPublicScopeParam();
-    window.addEventListener('popstate', clearPublicScopeParam);
-    return () => window.removeEventListener('popstate', clearPublicScopeParam);
+
+    syncPublicScopeParam();
+    window.addEventListener('popstate', syncPublicScopeParam);
+    return () => window.removeEventListener('popstate', syncPublicScopeParam);
   }, []);
   const deepLinkedInitialStore = useMemo(() => {
     const targetSlug = selectedSlug?.trim();
@@ -1171,6 +1178,7 @@ export function UmkmDiscoveryPanel({
         }
         params.set('limit', String(requestLimit));
         params.set('offset', String(offset));
+        params.set('map', '1');
         if (mapBounds) {
           params.set('min_lat', mapBounds.minLat.toFixed(6));
           params.set('max_lat', mapBounds.maxLat.toFixed(6));
@@ -1343,9 +1351,10 @@ export function UmkmDiscoveryPanel({
 
       const params = new URLSearchParams({
         references_only: '1',
-        limit: String(LIST_PAGE_SIZE),
+        limit: String(requestLimit),
         offset: String(safeCursor ? 0 : safeOffset || 0),
       });
+      params.set('map', '1');
       if (safeCursor) params.set('cursor', safeCursor);
       if (query?.trim()) params.set('q', query.trim());
       if (city?.trim()) params.set('city', city.trim());
@@ -1407,7 +1416,7 @@ export function UmkmDiscoveryPanel({
         }
       }
     },
-    [city, mapBounds, mapRangeKm, query, queryViewerLocation],
+    [city, mapBounds, mapRangeKm, query, queryViewerLocation, requestLimit],
   );
 
   useEffect(() => {
