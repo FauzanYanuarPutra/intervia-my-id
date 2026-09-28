@@ -95,11 +95,11 @@ pub(crate) fn router() -> Router<Arc<AppState>> {
 }
 
 async fn list_mine(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
-    let (_, authorization) = match actor_and_authorization(&state, &headers) {
+    let (actor_id, authorization) = match actor_and_authorization(&state, &headers) {
         Ok(actor) => actor,
         Err(error) => return actor_auth_error_response(error),
     };
-    match service(&state).list_mine(&authorization).await {
+    match service(&state).list_mine(actor_id, &authorization).await {
         Ok(items) => (
             StatusCode::OK,
             Json(json!({ "data": { "count": items.len(), "items": items } })),
