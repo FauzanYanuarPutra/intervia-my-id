@@ -129,7 +129,13 @@ export default async function UmkmPage({ params, searchParams }: PageProps) {
   const deepLinkedSlug = resolvedSearchParams.store?.trim() || resolvedSearchParams.business?.trim() || '';
   const deepLinkedStoreId = resolvedSearchParams.storeId?.trim() || '';
   const [listedStoresResult, deepLinkedStoreResult] = await Promise.allSettled([
-    listUmkmStores({ query: resolvedSearchParams.q?.trim() || undefined, city: resolvedSearchParams.city?.trim() || undefined, activeOnly: true, limit: 10 }),
+    listUmkmStores({
+      query: resolvedSearchParams.q?.trim() || undefined,
+      city: resolvedSearchParams.city?.trim() || undefined,
+      activeOnly: true,
+      includeReferences: false,
+      limit: 10,
+    }),
     getDeepLinkedStore(deepLinkedSlug, deepLinkedStoreId),
   ]);
   const listedStores =

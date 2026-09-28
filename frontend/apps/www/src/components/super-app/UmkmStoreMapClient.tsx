@@ -783,35 +783,75 @@ function buildStoreMarkerLayer(
       (a, b) => a.projected.y - b.projected.y || a.projected.x - b.projected.x,
     );
 
-  const clustered: Array<{
+  const radius = MARKER_CLUSTER_DISTANCE_PX;
+  const cellSize = radius;
+  type ClusterBuild = {
     center: ProjectedPoint;
     items: typeof sorted;
-  }> = [];
+  };
+
+  const clustered: ClusterBuild[] = [];
+  const grid = new Map<string, Set<number>>();
+
+  const cellKey = (x: number, y: number) =>
+    `${Math.floor(x / cellSize)}:${Math.floor(y / cellSize)}`;
+
+  const addToGrid = (key: string, clusterIndex: number) => {
+    const bucket = grid.get(key);
+    if (bucket) {
+      bucket.add(clusterIndex);
+      return;
+    }
+    grid.set(key, new Set([clusterIndex]));
+  };
 
   for (const item of sorted) {
-    const target = clustered.find(
-      cluster =>
-        distanceSquared(cluster.center, item.projected) <=
-        MARKER_CLUSTER_DISTANCE_PX ** 2,
-    );
+    const baseCellX = Math.floor(item.projected.x / cellSize);
+    const baseCellY = Math.floor(item.projected.y / cellSize);
+    let bestClusterIndex: number | null = null;
+    let bestDistance = Number.POSITIVE_INFINITY;
 
-    if (!target) {
-      clustered.push({
+    for (let dy = -1; dy <= 1; dy += 1) {
+      for (let dx = -1; dx <= 1; dx += 1) {
+        const bucket = grid.get(cellKey(
+          (baseCellX + dx) * cellSize,
+          (baseCellY + dy) * cellSize,
+        ));
+        if (!bucket) continue;
+
+        for (const clusterIndex of bucket) {
+          const cluster = clustered[clusterIndex];
+          if (!cluster) continue;
+          const distance = distanceSquared(cluster.center, item.projected);
+          if (distance <= radius ** 2 && distance < bestDistance) {
+            bestClusterIndex = clusterIndex;
+            bestDistance = distance;
+          }
+        }
+      }
+    }
+
+    if (bestClusterIndex === null) {
+      const clusterIndex = clustered.push({
         center: item.projected,
         items: [item],
-      });
+      }) - 1;
+      addToGrid(cellKey(item.projected.x, item.projected.y), clusterIndex);
       continue;
     }
 
+    const target = clustered[bestClusterIndex]!;
     target.items.push(item);
+
+    const count = target.items.length;
     target.center = {
       x:
-        target.items.reduce((sum, entry) => sum + entry.projected.x, 0) /
-        target.items.length,
+        target.center.x + (item.projected.x - target.center.x) / count,
       y:
-        target.items.reduce((sum, entry) => sum + entry.projected.y, 0) /
-        target.items.length,
+        target.center.y + (item.projected.y - target.center.y) / count,
     };
+
+    addToGrid(cellKey(target.center.x, target.center.y), bestClusterIndex);
   }
 
   return clustered.map(cluster => {

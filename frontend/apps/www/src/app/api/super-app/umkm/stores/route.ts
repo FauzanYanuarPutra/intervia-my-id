@@ -24,7 +24,6 @@ import { sanitizeOwnerWritableUmkmMetadata } from '@/lib/super-app/umkm-owner-me
 import {
   createDurableMarketplaceStore,
 } from '@/lib/super-app/business-workspace';
-import { listUsahaPortalUmkmStores } from '@/lib/server/usahaPortalSync';
 
 const MARKETPLACE_URL =
   process.env.INTERNAL_MARKETPLACE_URL ||
@@ -672,24 +671,6 @@ export async function GET(req: NextRequest) {
       ? { lat: viewerLat as number, lng: viewerLng as number }
       : null;
     const candidateLimit = limit;
-    const portalStoresPromise =
-      !mine &&
-      !backendOnly &&
-      !referencesOnly &&
-      offset === 0
-        ? listUsahaPortalUmkmStores({
-            query: query || undefined,
-            city: city || undefined,
-            slug: slug || undefined,
-            limit: 200,
-          }).catch(error => {
-            console.warn('[UMKM_USAHA_PORTAL_UNAVAILABLE]', {
-              message: error instanceof Error ? error.message : 'unknown error',
-            });
-            return [] as UmkmStore[];
-          })
-        : Promise.resolve([] as UmkmStore[]);
-
     const referencesPromise = includeReferences
       ? listPublicMapReferences({
           query: query || undefined,
@@ -753,38 +734,7 @@ export async function GET(req: NextRequest) {
           return [] as UmkmStore[];
         });
 
-    const portalStores = await portalStoresPromise;
-    const existingStoreKeys = new Set(
-      stores.flatMap(store => [store.id, store.slug]),
-    );
-    const portalUniqueStores = portalStores.filter(store => {
-      if (existingStoreKeys.has(store.id) || existingStoreKeys.has(store.slug)) {
-        return false;
-      }
-      if (!isPublicUmkmStoreVisible(store)) return false;
-      if (parsedPublicQuery.bounds) {
-        const bounds = parsedPublicQuery.bounds;
-        if (
-          store.lat < bounds.minLat ||
-          store.lat > bounds.maxLat ||
-          store.lng < bounds.minLng ||
-          store.lng > bounds.maxLng
-        ) {
-          return false;
-        }
-      }
-      if (hasViewer && radiusKm !== null) {
-        const distance = haversineKm(
-          { lat: viewerLat as number, lng: viewerLng as number },
-          { lat: store.lat, lng: store.lng },
-        );
-        if (!Number.isFinite(distance) || distance > radiusKm) return false;
-      }
-      return true;
-    });
-    const visibleStoreSource = mine
-      ? stores
-      : [...stores, ...portalUniqueStores];
+    const visibleStoreSource = stores;
 
     const visibleStores = mine
       ? visibleStoreSource
@@ -864,8 +814,7 @@ export async function GET(req: NextRequest) {
           })()
         : sortedItems;
     const limitedItems = rankedItems.slice(0, limit);
-    const backendRowsConsumed =
-      Math.max(0, stores.length - portalUniqueStores.length);
+    const backendRowsConsumed = stores.length;
     const storesCanContinue =
       !mine &&
       !referencesOnly &&

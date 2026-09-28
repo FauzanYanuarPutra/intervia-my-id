@@ -74,40 +74,56 @@ export function HomeBusinessMapSection({
     let active = true;
 
     async function load() {
-      try {
-        setError(null);
-        const response = await fetch(
-          '/api/super-app/umkm/stores?map=1&limit=200&include_references=1&min_lat=-11&max_lat=6&min_lng=95&max_lng=141',
-          {
-            cache: 'no-store',
-            credentials: 'include',
-            signal: controller.signal,
-          },
-        );
-        const payload = (await response.json().catch(() => ({}))) as StoresResponse;
+      const maxAttempts = 3;
 
-        if (!response.ok || !payload.data?.items) {
-          throw new Error(
-            payload.error ||
-              (isId ? 'Peta usaha belum siap.' : 'Business map unavailable.'),
+      for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+        if (!active || controller.signal.aborted) return;
+
+        try {
+          setError(null);
+          const response = await fetch(
+            '/api/super-app/umkm/stores?map=1&limit=200&include_references=1&min_lat=-11&max_lat=6&min_lng=95&max_lng=141',
+            {
+              cache: 'no-store',
+              credentials: 'include',
+              signal: controller.signal,
+            },
+          );
+          const payload = (await response.json().catch(() => ({}))) as StoresResponse;
+
+          if (!response.ok || !payload.data?.items) {
+            throw new Error(
+              payload.error ||
+                (isId ? 'Peta usaha belum siap.' : 'Business map unavailable.'),
+            );
+          }
+
+          if (!active) return;
+          setStores(payload.data.items);
+          setBackendDegraded(payload.data.stores_backend_degraded === true);
+          setError(null);
+          setLoading(false);
+          return;
+        } catch (loadError) {
+          if (!active || controller.signal.aborted) return;
+          if (attempt < maxAttempts - 1) {
+            await new Promise(resolve =>
+              window.setTimeout(resolve, 350 * (attempt + 1)),
+            );
+            continue;
+          }
+
+          setError(
+            loadError instanceof Error
+              ? loadError.message
+              : isId
+                ? 'Peta usaha belum siap.'
+                : 'Business map unavailable.',
           );
         }
-
-        if (!active) return;
-        setStores(payload.data.items);
-        setBackendDegraded(payload.data.stores_backend_degraded === true);
-      } catch (loadError) {
-        if (!active || controller.signal.aborted) return;
-        setError(
-          loadError instanceof Error
-            ? loadError.message
-            : isId
-              ? 'Peta usaha belum siap.'
-              : 'Business map unavailable.',
-        );
-      } finally {
-        if (active) setLoading(false);
       }
+
+      if (active) setLoading(false);
     }
 
     void load();
