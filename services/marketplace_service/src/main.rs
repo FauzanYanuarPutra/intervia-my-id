@@ -127,7 +127,7 @@ const WALLET_MAX_FETCH_LIMIT: i64 = 200;
 const NOTIFICATION_WS_CHANNEL_CAP: usize = 2048;
 const NOTIFICATION_MAX_FETCH_LIMIT: i64 = 200;
 const MAP_REFERENCE_DEFAULT_LIMIT: i64 = 10;
-const MAP_REFERENCE_MAX_LIMIT: i64 = 50;
+const MAP_REFERENCE_MAX_LIMIT: i64 = 200;
 const MAP_REFERENCE_MAX_QUERY_LEN: usize = 120;
 const MAP_REFERENCE_MAX_CITY_LEN: usize = 80;
 const PUBLIC_CONTENT_MAX_OFFSET: i64 = 10_000;
@@ -10627,7 +10627,7 @@ async fn list_map_references(
     let limit = match query.limit {
         Some(value) if (1..=MAP_REFERENCE_MAX_LIMIT).contains(&value) => value,
         Some(_) => {
-            return err(StatusCode::BAD_REQUEST, "limit must be between 1 and 50").into_response()
+            return err(StatusCode::BAD_REQUEST, "limit must be between 1 and 200").into_response()
         }
         None => MAP_REFERENCE_DEFAULT_LIMIT,
     };
