@@ -1,3 +1,4 @@
+import { portalSectionLabel } from './portal-navigation';
 import type { PortalSection } from './portal-types';
 
 const userFacingLabels: Partial<Record<PortalSection, string>> = {
@@ -6,5 +7,5 @@ const userFacingLabels: Partial<Record<PortalSection, string>> = {
 };
 
 export function portalSectionUserLabel(section: PortalSection) {
-  return userFacingLabels[section] ?? section;
+  return userFacingLabels[section] ?? portalSectionLabel(section);
 }
