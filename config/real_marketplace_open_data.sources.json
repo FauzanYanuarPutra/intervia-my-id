@@ -10,6 +10,21 @@
   },
   "sources": [
     {
+      "id": "wikidata-indonesia-business-references",
+      "kind": "wikidata_sparql",
+      "role": "provider",
+      "enabled_by_default": true,
+      "name": "Wikidata Indonesia public business references",
+      "source_url": "https://www.wikidata.org/wiki/Wikidata:Licensing",
+      "endpoint": "https://query.wikidata.org/sparql",
+      "license": "CC0 1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "limit": 1500,
+      "timeout_seconds": 90,
+      "request_sleep_seconds": 0.5,
+      "note": "Public structured Wikidata references scoped to Indonesia business entities with coordinates. No ownership/contact/transaction facts are inferred; each row remains an unowned reference."
+    },
+    {
       "id": "osm-overpass-indonesia-providers",
       "kind": "osm_overpass",
       "role": "provider",
