@@ -232,8 +232,12 @@ export function getUmkmPlaceBusinessCategory(place: UmkmPlaceLike) {
   return (
     normalizeUmkmBusinessCategory(metadata.umkm_category) ||
     normalizeUmkmBusinessCategory(metadata.business_type) ||
+    normalizeUmkmBusinessCategory(metadata.category) ||
+    normalizeUmkmBusinessCategory(metadata.category_label) ||
     inferUmkmBusinessCategory(metadata.umkm_category) ||
     inferUmkmBusinessCategory(metadata.business_type) ||
+    inferUmkmBusinessCategory(metadata.category) ||
+    inferUmkmBusinessCategory(metadata.category_label) ||
     inferUmkmBusinessCategory(metadata.store_type) ||
     inferUmkmBusinessCategory(metadata.segment) ||
     inferUmkmBusinessCategory(getBusinessHint(place))
