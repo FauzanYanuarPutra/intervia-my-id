@@ -1622,7 +1622,9 @@ pub(crate) fn license_allows_persistent_import(license: &str) -> bool {
         .trim()
         .to_ascii_lowercase()
         .replace('_', "-")
-        .replace(' ', " ");
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
 
     if normalized.contains("noncommercial")
         || normalized.contains("non-commercial")
