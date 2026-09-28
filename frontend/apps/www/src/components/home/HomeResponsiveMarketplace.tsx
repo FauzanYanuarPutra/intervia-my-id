@@ -1886,16 +1886,16 @@ function HeroVisualStage({
   return (
     <section
       className={cn(
-        'mx-auto w-full max-w-7xl px-0 pb-4 pt-2 sm:pb-5 sm:pt-3',
+        'mx-auto w-full max-w-7xl px-2 pb-3 pt-2 sm:px-3 sm:pb-5 sm:pt-3 lg:px-0',
         className,
       )}
       aria-labelledby="home-main-heading"
     >
       <div
         className={cn(
-          'relative isolate overflow-hidden rounded-[28px] border border-emerald-100',
+          'relative isolate min-w-0 overflow-hidden rounded-[22px] border border-emerald-100 sm:rounded-[28px]',
           'bg-[linear-gradient(135deg,#f0fdf4_0%,#ecfdf5_54%,#ffffff_100%)]',
-          'px-3.5 py-4 sm:px-6 sm:py-5 lg:px-8 lg:py-6',
+          'px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-7',
           'dark:border-emerald-900/60',
           'dark:bg-[linear-gradient(135deg,#09090b_0%,#071510_58%,#09090b_100%)]',
         )}
@@ -1903,9 +1903,9 @@ function HeroVisualStage({
         {!isAuthenticated ? (
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute inset-y-0 right-0 z-0 hidden w-[58%] sm:block"
+            className="pointer-events-none absolute inset-y-0 right-0 z-0 hidden w-[54%] xl:block"
           >
-            <div className="absolute inset-0 bg-gradient-to-r from-[#f0fdf4] via-[#f0fdf4]/88 to-transparent dark:from-[#09090b] dark:via-[#09090b]/90" />
+            <div className="absolute inset-0 bg-gradient-to-r from-[#f0fdf4] via-[#f0fdf4]/92 via-52% to-transparent dark:from-[#09090b] dark:via-[#09090b]/92 dark:to-transparent" />
             <div className="absolute inset-y-3 right-3 grid w-[44%] grid-cols-2 gap-2 opacity-[0.16] blur-[0.2px] grayscale-[0.15] sm:inset-y-4 sm:right-4">
               {heroCategories.slice(0, 4).map(category => (
                 <div
@@ -1926,9 +1926,12 @@ function HeroVisualStage({
           </div>
         ) : null}
 
-        <div className="relative z-10">
+        <div className={cn(
+          "relative z-10 min-w-0",
+          !isAuthenticated && "xl:max-w-[57%]",
+        )}>
           {isAuthenticated ? (
-            <div className="max-w-3xl">
+            <div className="min-w-0 max-w-full">
               <p className="mb-1 text-[10px] font-extrabold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-400 sm:text-xs">
                 {isId ? 'Selamat datang kembali' : 'Welcome back'}
               </p>
@@ -1942,14 +1945,14 @@ function HeroVisualStage({
                 </span>
                 <span aria-hidden="true"> 👋</span>
               </h1>
-              <p className="mt-2 max-w-2xl text-xs font-semibold leading-5 text-zinc-700 dark:text-zinc-300 sm:text-sm sm:leading-6">
+              <p className="mt-2 max-w-[42rem] text-xs font-semibold leading-5 text-zinc-700 dark:text-zinc-300 sm:text-sm sm:leading-6">
                 {isId
                   ? 'Cari produk, supplier, jasa, bahan usaha, mesin, tempat usaha, dan peluang yang cocok untuk kebutuhan bisnismu.'
                   : 'Find products, suppliers, services, business supplies, equipment, places, and opportunities that fit your business.'}
               </p>
             </div>
           ) : (
-            <div className="max-w-3xl">
+            <div className="min-w-0 max-w-full">
               <p className="mb-1.5 text-[10px] font-extrabold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-400 sm:text-xs">
                 {isId
                   ? 'Tempat cari kebutuhan usaha'
@@ -1957,7 +1960,7 @@ function HeroVisualStage({
               </p>
               <h1
                 id="home-main-heading"
-                className="max-w-[760px] text-[clamp(1.45rem,4vw,2.55rem)] font-black leading-[1.02] tracking-[-0.055em] text-zinc-950 dark:text-white"
+                className="max-w-[44rem] text-[clamp(1.5rem,5.5vw,2.55rem)] font-black leading-[1.02] tracking-[-0.055em] text-zinc-950 dark:text-white"
               >
                 {isId ? (
                   <>
@@ -1975,7 +1978,7 @@ function HeroVisualStage({
                   </>
                 )}
               </h1>
-              <p className="mt-2 max-w-2xl text-[11px] font-medium leading-5 text-zinc-700 dark:text-zinc-300 sm:text-[13px] sm:leading-5">
+              <p className="mt-2 max-w-[42rem] text-[11px] font-medium leading-5 text-zinc-700 dark:text-zinc-300 sm:text-[13px] sm:leading-5">
                 {isId
                   ? 'Temukan bahan usaha, supplier, jasa profesional, mesin, tempat usaha, dan peluang bisnis dari berbagai daerah di Indonesia.'
                   : 'Find business supplies, suppliers, professional services, equipment, business places, and opportunities across Indonesia.'}
@@ -2008,7 +2011,7 @@ function HeroVisualStage({
               event.preventDefault();
               onSubmit(query.trim());
             }}
-            className="mt-4 flex h-12 w-full max-w-4xl items-center gap-2 rounded-2xl border border-zinc-200 bg-white/95 px-3 shadow-[0_18px_45px_-28px_rgba(15,23,42,0.45)] backdrop-blur transition focus-within:border-emerald-400 focus-within:shadow-[0_20px_50px_-28px_rgba(5,150,105,0.32)] sm:h-13 sm:px-3.5 dark:border-zinc-700 dark:bg-zinc-900/95"
+            className="mt-4 flex h-12 min-w-0 w-full max-w-[44rem] items-center gap-2 rounded-2xl border border-zinc-200 bg-white/95 px-3 shadow-[0_18px_45px_-28px_rgba(15,23,42,0.45)] backdrop-blur transition focus-within:border-emerald-400 focus-within:shadow-[0_20px_50px_-28px_rgba(5,150,105,0.32)] sm:h-13 sm:px-3.5 dark:border-zinc-700 dark:bg-zinc-900/95"
           >
             <Search className="h-4 w-4 shrink-0 text-emerald-600 sm:h-5 sm:w-5 dark:text-emerald-400" aria-hidden="true" />
             <input
@@ -2027,7 +2030,7 @@ function HeroVisualStage({
                     ? 'Cari supplier, produk, jasa, mesin...'
                     : 'Search suppliers, products, services...'
               }
-              className="min-w-0 flex-1 bg-transparent text-sm font-semibold text-zinc-900 outline-none placeholder:text-zinc-400 dark:text-white dark:placeholder:text-zinc-500"
+              className="min-w-0 flex-1 bg-transparent text-[13px] font-semibold sm:text-sm text-zinc-900 outline-none placeholder:text-zinc-400 dark:text-white dark:placeholder:text-zinc-500"
             />
             <button
               type="submit"
@@ -2062,8 +2065,8 @@ function QuickCategoriesSection({ isId }: { isId: boolean }) {
   const categories = getQuickCategories(isId);
 
   return (
-    <section className="rounded-2xl border border-zinc-100 bg-gradient-to-b from-white to-zinc-50 p-3 shadow-sm">
-      <div className="grid grid-cols-4 gap-2">
+    <section className="mx-1 min-w-0 overflow-hidden rounded-2xl border border-zinc-100 bg-gradient-to-b from-white to-zinc-50 p-2.5 shadow-sm sm:mx-0 sm:p-3">
+      <div className="grid grid-cols-2 gap-1.5 min-[360px]:grid-cols-4 sm:gap-2.5 lg:grid-cols-8">
         {categories.map(item => {
           const toneStyle = toneClassNames(item.tone);
 
@@ -2072,7 +2075,7 @@ function QuickCategoriesSection({ isId }: { isId: boolean }) {
               key={item.id}
               href={item.href}
               aria-label={item.label}
-              className="group flex flex-col items-center rounded-2xl p-2 transition-transform hover:-translate-y-0.5"
+              className="group flex min-w-0 flex-col items-center rounded-2xl p-1.5 transition-transform hover:-translate-y-0.5 sm:p-2"
             >
               <div
                 className={`
@@ -2082,52 +2085,42 @@ function QuickCategoriesSection({ isId }: { isId: boolean }) {
                   w-14
                   items-center
                   justify-center
+                  overflow-hidden
                   rounded-xl
                   border
                   shadow-sm
                   ${toneStyle.surface}
+                  sm:h-16
+                  sm:w-16
                 `}
               >
                 {/* Badge Container */}
                 {item.badge && (
-                  <div className="absolute left-0 top-0 z-20">
+                  <div className="absolute left-0 top-0 z-20 max-w-full overflow-hidden rounded-tl-xl">
                     <div className="whitespace-nowrap bg-black px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.05em] text-white">
                       {item.badge}
                     </div>
                   </div>
                 )}
 
-                <div
-                  className="absolute aspect-square flex items-center justify-center"
-                  style={{
-                    width: item.imageSize ?? 70,
-                    right: item.offsetX ?? -18,
-                    bottom: item.offsetY ?? -14,
-                    transform: `
-                      scaleX(${item.flip ? -1 : 1})
-                      scale(${item.scale ?? 1})
-                      rotate(${item.rotate ?? 0}deg)
-                    `,
-                  }}
-                >
-                  <img
-                    src={item.image}
-                    alt={item.label}
-                    className="
-                      h-full
-                      w-full
-                      object-contain
-                      transition-transform
-                      duration-300
-                      group-hover:scale-105
-                      select-none
-                      pointer-events-none
-                    "
-                  />
+                <div className="absolute inset-0 z-0 flex items-center justify-center">
+                  <div
+                    className="relative aspect-square max-h-[88%] max-w-[88%] flex-none"
+                    style={{
+                      width: Math.min(item.imageSize ?? 70, 68),
+                      transform: `translate(${Math.max(-6, Math.min(6, (item.offsetX ?? -18) / 3))}px, ${Math.max(-6, Math.min(6, (item.offsetY ?? -14) / 3))}px) scaleX(${item.flip ? -1 : 1}) scale(${item.scale ?? 1}) rotate(${item.rotate ?? 0}deg)`,
+                    }}
+                  >
+                    <img
+                      src={item.image}
+                      alt={item.label}
+                      className="h-full w-full select-none object-contain transition-transform duration-300 group-hover:scale-105"
+                    />
+                  </div>
                 </div>
               </div>
 
-              <span className="mt-2 text-center text-[11px] font-semibold leading-tight text-zinc-700">
+              <span className="mt-1.5 min-h-[28px] max-w-full px-0.5 text-center text-[10px] font-semibold leading-tight text-zinc-700 line-clamp-2 sm:text-[11px]">
                 {item.label}
               </span>
             </Link>
@@ -2294,8 +2287,8 @@ function HomeListingCarouselSection({
                   key={item.id}
                   className="
                     min-w-0 shrink-0 grow-0 select-none
-                    basis-[calc((100vw-32px)/2.08)]
-                    min-[390px]:basis-[calc((100vw-36px)/2.15)]
+                    basis-[calc((100vw-28px)/2.08)]
+                    min-[390px]:basis-[calc((100vw-34px)/2.15)]
                     sm:basis-[180px]
                     md:basis-[190px]
                     lg:basis-[200px]
@@ -2400,7 +2393,7 @@ export function PublicReferencesSection({
               key={item.id}
               className="
                 flex
-                w-[min(68vw,240px)]
+                w-[min(76vw,240px)]
                 shrink-0
                 flex-col
                 overflow-hidden
@@ -3511,8 +3504,8 @@ export function HomeLoadingState({ isId = true }: { isId?: boolean } = {}) {
         <main className="min-h-0 min-w-0 space-y-3.5 sm:space-y-4 lg:overflow-y-auto lg:pr-1 lg:pt-2 lg:overscroll-contain">
           <section className="mx-auto w-full max-w-7xl px-3 py-4">
             <div className="relative min-h-[155px] overflow-hidden rounded-3xl bg-emerald-50/70 px-4 py-5 sm:px-6 sm:py-7">
-              <div className="grid grid-cols-3 items-center gap-3">
-                <div className="col-span-2 flex min-h-[110px] flex-col justify-center sm:min-h-[140px]">
+              <div className="grid grid-cols-1 items-center gap-2 sm:grid-cols-3 sm:gap-3">
+                <div className="flex min-h-[110px] flex-col justify-center sm:col-span-2 sm:min-h-[140px]">
                   <Skeleton
                     variant="line"
                     className="h-7 w-4/5 max-w-[360px] sm:h-9"
@@ -3527,7 +3520,7 @@ export function HomeLoadingState({ isId = true }: { isId?: boolean } = {}) {
                     lineClassName="h-3"
                   />
                 </div>
-                <div className="relative col-span-1 h-[110px] sm:h-[140px]">
+                <div className="relative hidden h-[110px] sm:col-span-1 sm:block sm:h-[140px]">
                   <Skeleton className="absolute right-0 top-1/2 h-[96px] w-[96px] -translate-y-1/2 rounded-[28px] sm:h-[124px] sm:w-[124px]" />
                 </div>
               </div>
@@ -4347,7 +4340,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
 
   return (
     <MarketplacePageFrame>
-      <main className="mx-auto w-full max-w-[720px] space-y-3.5 sm:space-y-4 lg:hidden">
+      <main className="mx-auto w-full max-w-[720px] min-w-0 space-y-3.5 px-1 sm:space-y-4 sm:px-0 lg:hidden">
         <HeroVisualStage
           isId={isId}
           className="mb-3"
