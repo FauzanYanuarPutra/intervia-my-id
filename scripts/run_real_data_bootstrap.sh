@@ -35,6 +35,33 @@ run_sql "$MARKETPLACE_DATABASE_URL" "CREATE TABLE IF NOT EXISTS real_data_bootst
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 ); ALTER TABLE real_data_bootstrap_runs ADD COLUMN IF NOT EXISTS bootstrap_version TEXT NOT NULL DEFAULT ''; CREATE INDEX IF NOT EXISTS idx_real_data_bootstrap_version ON real_data_bootstrap_runs(bootstrap_version);"
 
+PREFLIGHT_HOSTS="${REAL_DATA_NETWORK_PREFLIGHT_HOSTS:-data.go.id,overpass-api.de,commons.wikimedia.org,satudata.denpasarkota.go.id}"
+PREFLIGHT_ATTEMPTS="${REAL_DATA_NETWORK_PREFLIGHT_ATTEMPTS:-12}"
+PREFLIGHT_DELAY="${REAL_DATA_NETWORK_PREFLIGHT_DELAY_SECONDS:-5}"
+
+echo "[real-data] checking external DNS/network..."
+for attempt in $(seq 1 "$PREFLIGHT_ATTEMPTS"); do
+  resolved_count=0
+  for host in $(printf "%s" "$PREFLIGHT_HOSTS" | tr "," " "); do
+    if python -c 'import socket,sys; socket.getaddrinfo(sys.argv[1],443,type=socket.SOCK_STREAM)' "$host" >/dev/null 2>&1; then
+      resolved_count=$((resolved_count + 1))
+    fi
+  done
+  echo "[real-data] network preflight attempt ${attempt}/${PREFLIGHT_ATTEMPTS}: resolved=${resolved_count}"
+  if [ "$resolved_count" -gt 0 ]; then
+    break
+  fi
+  if [ "$attempt" -lt "$PREFLIGHT_ATTEMPTS" ]; then
+    sleep "$PREFLIGHT_DELAY"
+  fi
+done
+
+if [ "$resolved_count" -eq 0 ]; then
+  echo "[real-data] external DNS resolution is unavailable inside real_data_bootstrap." >&2
+  echo "[real-data] Check Docker Desktop DNS/egress or override REAL_DATA_DNS_PRIMARY/REAL_DATA_DNS_SECONDARY." >&2
+  exit 20
+fi
+
 echo "[real-data] checking bootstrap state..."
 STATE="$(run_sql "$MARKETPLACE_DATABASE_URL" "SELECT COALESCE(bootstrap_version,'') || '|' || COALESCE(EXTRACT(EPOCH FROM (NOW() - last_success_at))/3600.0, 999999) FROM real_data_bootstrap_runs WHERE bootstrap_key = '$LOCK_KEY'")"
 LAST_VERSION="${STATE%%|*}"
