@@ -8430,9 +8430,7 @@ async fn list_umkm_stores(
         _ => return err(StatusCode::BAD_REQUEST, "invalid viewer coordinates").into_response(),
     };
     let radius_km = match query.radius_km {
-        Some(value)
-            if value.is_finite() && value > 0.0 && value <= 1000.0 && viewer.is_some() =>
-        {
+        Some(value) if value.is_finite() && value > 0.0 && value <= 1000.0 && viewer.is_some() => {
             Some(value)
         }
         Some(_) => {
@@ -10735,9 +10733,7 @@ async fn list_map_references(
         Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
     };
     let radius_km = match query.radius_km {
-        Some(value)
-            if value.is_finite() && value > 0.0 && value <= 1000.0 && viewer.is_some() =>
-        {
+        Some(value) if value.is_finite() && value > 0.0 && value <= 1000.0 && viewer.is_some() => {
             Some(value)
         }
         Some(_) => {
@@ -10761,7 +10757,8 @@ async fn list_map_references(
         Ok(value) => value,
         Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
     };
-    if cursor.is_some() && (ranking_origin.is_some() || text_query.is_some() || radius_km.is_some()) {
+    if cursor.is_some() && (ranking_origin.is_some() || text_query.is_some() || radius_km.is_some())
+    {
         return err(
             StatusCode::BAD_REQUEST,
             "map reference cursor is only supported for newest-first browsing",
