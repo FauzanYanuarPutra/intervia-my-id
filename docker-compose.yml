@@ -419,15 +419,14 @@ services:
   real_data_bootstrap:
     <<: *service-defaults
     restart: "no"
-    # Public-source crawler traffic must not inherit a broken Docker Desktop
-    # resolver. Keep DNS isolated to this worker so the rest of the stack keeps
-    # using Docker's internal service discovery normally.
+    # Prefer Docker's embedded DNS by default. Public DNS servers are
+    # overrideable for restricted networks, but must not be the default because
+    # Docker Desktop/VPN/firewall environments commonly block direct UDP/TCP DNS.
     dns:
-      - ${REAL_DATA_DNS_PRIMARY:-1.1.1.1}
-      - ${REAL_DATA_DNS_SECONDARY:-8.8.8.8}
+      - ${REAL_DATA_DNS_PRIMARY:-127.0.0.11}
     dns_opt:
-      - timeout:2
-      - attempts:3
+      - timeout:3
+      - attempts:5
     build:
       context: .
       dockerfile: services/real_data_bootstrap/Dockerfile
