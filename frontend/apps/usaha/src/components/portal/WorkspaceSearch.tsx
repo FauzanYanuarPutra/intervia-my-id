@@ -30,7 +30,7 @@ const hints: Record<PortalSection, string> = {
   inventory: 'Stok barang, bahan, dan penyesuaian persediaan',
   finance: 'Kas, pengeluaran, pemasukan, dan pencatatan uang',
   reports: 'Penjualan, laba kotor, biaya, dan ringkasan usaha',
-  channels: 'Kanal jual dan kesiapan harga per kanal',
+  channels: 'Jual online, harga, dan kanal yang dipakai usaha',
   info: 'Nama, kontak, profil, dan informasi dasar usaha',
   locations: 'Outlet, alamat, area layanan, dan lokasi utama',
   operations: 'Status buka, jam usaha, dan aturan operasional',
@@ -38,7 +38,7 @@ const hints: Record<PortalSection, string> = {
   parties: 'Pelanggan, supplier, mitra, piutang, dan utang',
   growth: 'Etalase, kanal jual, kesiapan promosi, dan saran',
   team: 'Anggota usaha, undangan, dan peran akses',
-  buyerPage: 'Tampilan toko publik yang dilihat pelanggan',
+  buyerPage: 'Toko publik yang dilihat pelanggan',
   security: 'Sesi, keamanan akun, dan aktivitas akses',
 };
 
