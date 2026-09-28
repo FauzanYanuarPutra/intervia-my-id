@@ -16,7 +16,7 @@ import { NewsArticleMedia } from '@/components/news/NewsMedia';
 import { NewsCarousel } from '@/components/news/NewsCarousel';
 import { serializeJsonLd } from '@/lib/seo/jsonLd';
 import { absoluteNewsMediaUrl } from '@/lib/newsMediaUrl';
-import { plainTextToNewsHtml, sanitizeNewsRichText } from '@/lib/newsRichText';
+import { normalizeNewsRichBody } from '@/lib/newsRichText';
 import NewsAnalytics from './NewsAnalytics';
 import NewsShareActions from './NewsShareActions';
 
@@ -131,8 +131,9 @@ export default async function NewsArticlePage({ params }: PageProps) {
       article.contributorUserId.trim().toLowerCase() === viewerId.trim().toLowerCase(),
   );
   const relatedArticles = isRetracted ? [] : await getRelatedNewsArticles(article, 4);
-  const articleRichHtml = sanitizeNewsRichText(
-    article.richBody || plainTextToNewsHtml(article.body),
+  const articleRichHtml = normalizeNewsRichBody(
+    article.richBody,
+    article.body,
   );
   const articleText = article.body || article.richBody.replace(/<[^>]+>/g, ' ');
   const estimatedMinutes = readingMinutes(articleText);
