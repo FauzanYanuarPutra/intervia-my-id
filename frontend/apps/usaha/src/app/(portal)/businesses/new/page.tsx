@@ -3,12 +3,29 @@ import { CheckCircle2, MapPinned, Store } from 'lucide-react';
 import { NewBusinessQuickForm } from '@/components/forms/NewBusinessQuickForm';
 import { PageHeader } from '@/components/portal/PageHeader';
 import { PortalShell } from '@/components/portal/PortalShell';
-import { getPortalAccount, getPortalBusinesses } from '@/lib/portal-server';
+import { resolvePortalHomeState } from '@/lib/portal-server';
 
-export default async function NewBusinessPage() {
-  const account = await getPortalAccount();
-  if (!account) redirect('/login?callbackUrl=/businesses/new');
-  const businesses = await getPortalBusinesses();
+export default async function NewBusinessPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const query = await searchParams;
+  const forceNew = query.new === '1';
+  const state = await resolvePortalHomeState({});
+  if (!state.isAuthenticated) redirect('/login?callbackUrl=/businesses/new?new=1');
+
+  if (!forceNew) {
+    if (state.businessesProvisioning) {
+      redirect('/');
+    }
+    if (state.activeBusiness) {
+      redirect(`/?business=${encodeURIComponent(state.activeBusiness.id)}`);
+    }
+  }
+
+  const account = state.account;
+  const businesses = state.businesses;
 
   return (
     <PortalShell activeBusiness={null} availableBusinesses={businesses} viewerName={account.name} currentSection="home" pageTitle="Tambah usaha">
