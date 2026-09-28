@@ -51,6 +51,7 @@ export function summarizeHomeBusinessMapStores(stores: UmkmMapStore[]) {
     validStores,
     businessCount: businesses.length,
     referenceCount: references.length,
+    mappedCount: validStores.length,
     cityCount: cities.size,
   };
 }
@@ -153,8 +154,16 @@ export function HomeBusinessMapSection({
                 ? 'Menyiapkan peta…'
                 : 'Preparing the map…'
               : isId
-                ? `${summary.businessCount} usaha terpetakan`
-                : `${summary.businessCount} businesses mapped`}
+                ? summary.businessCount > 0
+                  ? `${summary.businessCount} usaha terpetakan`
+                  : summary.referenceCount > 0
+                    ? `${summary.referenceCount} referensi lokasi publik`
+                    : 'Belum ada titik'
+                : summary.businessCount > 0
+                  ? `${summary.businessCount} businesses mapped`
+                  : summary.referenceCount > 0
+                    ? `${summary.referenceCount} public map references`
+                    : 'No mapped points'}
           </p>
         </div>
 
@@ -190,8 +199,8 @@ export function HomeBusinessMapSection({
         <div className="pointer-events-none absolute inset-x-2.5 bottom-2.5 z-10 flex items-center justify-between gap-2 sm:inset-x-3 sm:bottom-3">
           <span className="rounded-full border border-white/90 bg-white/92 px-2.5 py-1.5 text-[8px] font-black text-slate-700 shadow-sm backdrop-blur sm:text-[9px]">
             Indonesia
-            {!loading && summary.businessCount > 0
-              ? ` · ${summary.businessCount} titik`
+            {!loading && summary.mappedCount > 0
+              ? ` · ${summary.mappedCount} titik`
               : ''}
           </span>
           <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white shadow-[0_10px_24px_-12px_rgba(5,150,105,0.9)] transition-transform duration-200 group-hover/map:translate-x-0.5 group-hover/map:scale-105">
