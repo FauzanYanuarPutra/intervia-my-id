@@ -3,6 +3,7 @@ import {
   desktopPrimaryNavigation,
   mobilePrimaryNavigation,
   portalMenuNavigation,
+  portalSectionUserLabel,
 } from './portal-navigation';
 import type { PermissionId } from './portal-types';
 
@@ -52,6 +53,12 @@ describe('portal navigation', () => {
     ]);
     expect(portalMenuNavigation(ownerPermissions).map(item => item.id)).toContain('products');
     expect(portalMenuNavigation(ownerPermissions).map(item => item.id)).toContain('finance');
+  });
+
+  it('uses clearer labels for merchant-facing secondary destinations', () => {
+    expect(portalSectionUserLabel('channels')).toBe('Jual Online');
+    expect(portalSectionUserLabel('buyerPage')).toBe('Toko Saya');
+    expect(portalSectionUserLabel('products')).toBe('Produk');
   });
 
   it('preserves primary order when permissions hide destinations', () => {
