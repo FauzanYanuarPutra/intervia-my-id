@@ -38,8 +38,11 @@ run_sql "$MARKETPLACE_DATABASE_URL" "CREATE TABLE IF NOT EXISTS real_data_bootst
 PREFLIGHT_HOSTS="${REAL_DATA_NETWORK_PREFLIGHT_HOSTS:-data.go.id,overpass-api.de,commons.wikimedia.org,satudata.denpasarkota.go.id}"
 PREFLIGHT_ATTEMPTS="${REAL_DATA_NETWORK_PREFLIGHT_ATTEMPTS:-12}"
 PREFLIGHT_DELAY="${REAL_DATA_NETWORK_PREFLIGHT_DELAY_SECONDS:-5}"
+DNS_PRIMARY="${REAL_DATA_DNS_PRIMARY:-1.1.1.1}"
+DNS_SECONDARY="${REAL_DATA_DNS_SECONDARY:-8.8.8.8}"
 
 echo "[real-data] resolver configuration:"
+echo "[real-data] configured DNS failover: primary=${DNS_PRIMARY} secondary=${DNS_SECONDARY}"
 cat /etc/resolv.conf 2>/dev/null || true
 if command -v nslookup >/dev/null 2>&1; then
   nslookup data.go.id 2>&1 | sed -n '1,16p' || true
@@ -103,10 +106,25 @@ PY
 fi
 
 if [ "$resolved_count" -eq 0 ]; then
-  echo "[real-data] external DNS/network resolution is unavailable inside real_data_bootstrap." >&2
+  DEFERRED_ERROR="External DNS/network resolution is unavailable inside real_data_bootstrap; external source import is deferred and will retry on the next startup."
+  echo "[real-data] $DEFERRED_ERROR" >&2
   echo "[real-data] resolver above must reach at least one approved source host." >&2
-  echo "[real-data] On Docker Desktop/VPN/firewall setups, use the Docker embedded resolver (default) or set REAL_DATA_DNS_PRIMARY to a reachable resolver; when a proxy is required, set REAL_DATA_HTTP_PROXY/REAL_DATA_HTTPS_PROXY." >&2
-  exit 20
+  echo "[real-data] DNS failover configured as primary=${DNS_PRIMARY}, secondary=${DNS_SECONDARY}, with Docker embedded resolver as the final fallback." >&2
+  echo "[real-data] If a corporate/VPN proxy is required, set REAL_DATA_HTTP_PROXY and REAL_DATA_HTTPS_PROXY." >&2
+  psql "$MARKETPLACE_DATABASE_URL" -v ON_ERROR_STOP=1 <<SQL
+INSERT INTO real_data_bootstrap_runs (bootstrap_key, bootstrap_version, last_success_at, last_provider_count, last_buyer_count, last_community_media_count, last_error, updated_at)
+VALUES ('$LOCK_KEY', '$BOOTSTRAP_VERSION', NULL, 0, 0, 0, '$DEFERRED_ERROR', NOW())
+ON CONFLICT (bootstrap_key) DO UPDATE SET
+  last_provider_count = EXCLUDED.last_provider_count,
+  last_buyer_count = EXCLUDED.last_buyer_count,
+  last_community_media_count = EXCLUDED.last_community_media_count,
+  last_error = EXCLUDED.last_error,
+  updated_at = NOW();
+SQL
+  # Network unavailability is a deferred external-data condition, not a
+  # container/application failure. Keep the stack startable; last_success_at
+  # remains unchanged so the next startup retries automatically.
+  exit 0
 fi
 
 echo "[real-data] checking bootstrap state..."
@@ -170,7 +188,9 @@ ON CONFLICT (bootstrap_key) DO UPDATE SET
   updated_at = NOW();
 SQL
   echo "[real-data] bootstrap completed without external rows; will retry on next startup."
-  exit 21
+  # Keep startup resilient when public mirrors are temporarily empty/unavailable.
+  # No successful timestamp is recorded, so the next startup retries.
+  exit 0
 fi
 
 echo "[real-data] bootstrap complete: providers=${PROVIDER_COUNT} buyers=${BUYER_COUNT} community_media=${MEDIA_COUNT}"
