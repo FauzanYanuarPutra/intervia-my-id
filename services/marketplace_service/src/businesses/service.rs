@@ -52,6 +52,7 @@ impl BusinessService {
 
     pub(crate) async fn list_mine(
         &self,
+        actor_id: Uuid,
         authorization: &str,
     ) -> Result<Vec<BusinessAggregate>, BusinessServiceError> {
         let organizations = self
@@ -63,8 +64,21 @@ impl BusinessService {
             .into_iter()
             .map(|organization| organization.id)
             .collect::<Vec<_>>();
-        self.repository
+        let businesses = self
+            .repository
             .list_for_organizations(&organization_ids)
+            .await
+            .map_err(map_repository_error)?;
+
+        if !businesses.is_empty() {
+            return Ok(businesses);
+        }
+
+        // Owner identity is also persisted on the business row. This read-only
+        // fallback keeps a temporarily stale Identity organization projection
+        // from hiding a business the current actor created.
+        self.repository
+            .list_created_by_actor(actor_id)
             .await
             .map_err(map_repository_error)
     }
