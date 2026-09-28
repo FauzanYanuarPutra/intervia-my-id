@@ -7,6 +7,7 @@ import { ModalSurface } from '@/components/interaction/ModalSurface';
 import {
   desktopPrimaryNavigation,
   portalMenuNavigation,
+  portalSectionUserLabel,
   type PortalNavigationItem,
 } from '@/lib/portal-navigation';
 import { buildSectionHref } from '@/lib/portal-logic';
@@ -64,6 +65,7 @@ export function WorkspaceSearch({ business }: WorkspaceSearchProps) {
     ]);
     return navigation.map(item => ({
       ...item,
+      label: portalSectionUserLabel(item.id),
       href: buildSectionHref(business.id, item.id),
       hint: hints[item.id],
     }));
