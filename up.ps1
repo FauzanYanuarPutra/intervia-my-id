@@ -961,10 +961,10 @@ try {
 
             $FallbackExternalCrawler = if ($null -ne $FallbackStatus) { $FallbackStatus.external_crawler } else { $null }
             $FallbackExternalRows = if ($null -ne $FallbackExternalCrawler) {
-                [int64]$FallbackExternalCrawler.provider_count +
-                [int64]$FallbackExternalCrawler.buyer_count +
-                [int64]$FallbackExternalCrawler.community_media_count
-            } else { 0 }
+                [int64]$FallbackExternalCrawler.provider_count + [int64]$FallbackExternalCrawler.buyer_count + [int64]$FallbackExternalCrawler.community_media_count
+            } else {
+                0
+            }
 
             $CanRunOsmFallback =
                 $null -ne $FallbackStatus -and
