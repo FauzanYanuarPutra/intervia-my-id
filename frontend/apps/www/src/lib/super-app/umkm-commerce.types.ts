@@ -198,6 +198,7 @@ export type ListUmkmStoresOptions = {
     lat: number;
     lng: number;
   };
+  radiusKm?: number;
 };
 
 export type CreateUmkmStoreInput = {
