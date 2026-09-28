@@ -148,7 +148,6 @@ jobs:
           expected_default = {
               "osm-overpass-indonesia-providers",
               "wikidata-indonesia-business-references",
-              "satrup-tanah-laut-rup-penyedia-2026",
               "wikimedia-commons-indonesia-open-media",
               "denpasar-umkm-csv-2020",
               "tangsel-umkm-csv-2022",
