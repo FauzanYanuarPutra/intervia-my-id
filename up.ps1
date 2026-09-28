@@ -892,9 +892,31 @@ try {
                         $CrawlerReady = $true
                         break
                     }
-                    if ($CrawlerLine -match '^real_data_bootstrap\|exited\|([1-9][0-9]*)
+                    if ($CrawlerLine -match '^real_data_bootstrap\|exited\|([1-9][0-9]*)$') {
+                        $CrawlerExitCode = [int]$Matches[1]
+                        Write-Warning "External real-data bootstrap exited with a non-zero code: $CrawlerLine"
+
+                        # Exit 20 is reserved by run_real_data_bootstrap.sh for
+                        # unavailable external DNS. Retry the one-shot crawler
+                        # without rebuilding the whole stack; this covers transient
+                        # Docker Desktop/network startup races.
+                        if ($CrawlerExitCode -eq 20) {
+                            for ($CrawlerRetry = 1; $CrawlerRetry -le 3; $CrawlerRetry++) {
+                                Write-Warning "Retrying external real-data bootstrap ($CrawlerRetry/3) after network preflight failure..."
+                                Start-Sleep -Seconds ([Math]::Max(5, 5 * $CrawlerRetry))
+                                $RetryCrawler = @(
+                                    & docker @ComposeArgs run --rm --no-deps real_data_bootstrap 2>&1
+                                )
+                                if ($LASTEXITCODE -eq 0) {
+                                    Write-Host "External real-data bootstrap retry succeeded." -ForegroundColor Green
+                                    $CrawlerReady = $true
+                                    break
+                                }
+                            }
+                        }
+                        break
+                    }
                 }
-            }
             Start-Sleep -Seconds 5
         }
 
