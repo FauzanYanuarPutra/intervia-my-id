@@ -419,16 +419,11 @@ services:
   real_data_bootstrap:
     <<: *service-defaults
     restart: "no"
-    # Use multiple resolvers so a Docker/VPN/host resolver SERVFAIL does not
-    # make the entire real-data bootstrap fail. Values remain overrideable for
-    # corporate networks; Docker's embedded resolver is kept as the final fallback.
+    # Use Docker's embedded resolver so Docker Desktop/Windows VPN DNS policy
+    # is inherited instead of forcing public resolvers that may be unreachable.
+    # Explicit proxy settings remain available below for restricted networks.
     dns:
-      - ${REAL_DATA_DNS_PRIMARY:-1.1.1.1}
-      - ${REAL_DATA_DNS_SECONDARY:-8.8.8.8}
       - 127.0.0.11
-    dns_opt:
-      - timeout:${REAL_DATA_DNS_TIMEOUT_SECONDS:-3}
-      - attempts:${REAL_DATA_DNS_ATTEMPTS:-2}
     build:
       context: .
       dockerfile: services/real_data_bootstrap/Dockerfile
