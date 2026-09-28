@@ -906,7 +906,16 @@ try {
             throw "External real-data bootstrap belum selesai sukses. Data dari source crawler tidak boleh dianggap sudah masuk."
         }
 
-        Write-Host "External real-data bootstrap completed successfully." -ForegroundColor Green
+        $CrawlerLogs = @(
+            & docker @ComposeArgs logs --no-color --tail 80 real_data_bootstrap 2>&1
+        )
+        $CrawlerLogText = ($CrawlerLogs -join [Environment]::NewLine)
+        if ($CrawlerLogText -match "external DNS/network resolution is unavailable|bootstrap completed without external rows") {
+            Write-Warning "External real-data bootstrap ditangguhkan; stack tetap dilanjutkan dan bootstrap akan retry pada startup berikutnya."
+        }
+        else {
+            Write-Host "External real-data bootstrap completed successfully." -ForegroundColor Green
+        }
     }
 
     # Governed real-data bootstrap runs asynchronously inside marketplace_service.
@@ -966,12 +975,20 @@ try {
                 0
             }
 
+            $FallbackExternalError = if ($null -ne $FallbackExternalCrawler) {
+                [string]$FallbackExternalCrawler.last_error
+            } else {
+                ""
+            }
+            $ExternalNetworkDeferred = $FallbackExternalError -match "External DNS/network resolution is unavailable"
+
             $CanRunOsmFallback =
                 $null -ne $FallbackStatus -and
                 [int64]$FallbackStatus.active_jobs -eq 0 -and
                 [int64]$FallbackStatus.published_references -eq 0 -and
                 [int64]$FallbackStatus.aggregate_references -eq 0 -and
-                $FallbackExternalRows -eq 0
+                $FallbackExternalRows -eq 0 -and
+                -not $ExternalNetworkDeferred
 
             if ($CanRunOsmFallback) {
                 $OsmFallbackScript = Join-Path $RepoRoot "services\marketplace_service\scripts\import-osm-open-references.ps1"
@@ -980,8 +997,8 @@ try {
                     Write-Host "Rust bootstrap belum menghasilkan reference. Menjalankan governed OSM fallback importer..." -ForegroundColor Yellow
                     & $PwshCommand.Source -NoProfile -File $OsmFallbackScript -TargetCount 10000 -MinimumCities 3 -EnvFile $EnvFile
                     if ($LASTEXITCODE -ne 0) {
+                        Write-Warning "OSM fallback importer gagal; stack tetap berjalan dan akan retry pada startup berikutnya."
                         & docker @ComposeArgs logs --no-color --tail 160 marketplace_service
-                        throw "OSM fallback importer gagal setelah marketplace bootstrap kosong."
                     }
 
                     $FallbackVerify = @(
