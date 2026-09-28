@@ -3,6 +3,7 @@ import { ChevronDown, Settings2 } from 'lucide-react';
 import {
   desktopPrimaryNavigation,
   portalMenuNavigation,
+  portalSectionUserLabel,
 } from '@/lib/portal-navigation';
 import { buildSectionHref } from '@/lib/portal-logic';
 import type { BusinessRecord, PortalSection } from '@/lib/portal-types';
@@ -45,7 +46,7 @@ export function SidebarNav({ business, currentSection }: SidebarNavProps) {
         <span className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${visual.iconClass}`}>
           <Icon className="h-[17px] w-[17px]" />
         </span>
-        <span>{item.label}</span>
+        <span>{portalSectionUserLabel(item.id)}</span>
       </Link>
     );
   }
