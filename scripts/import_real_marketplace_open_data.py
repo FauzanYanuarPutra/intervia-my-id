@@ -530,7 +530,7 @@ LIMIT {limit}
             continue
 
         coord = clean_text(row.get("coord", {}).get("value"))
-        match = re.search(r"Point\\(([-+]?\\d+(?:\\.\\d+)?)\\s+([-+]?\\d+(?:\\.\\d+)?)\\)", coord)
+        match = re.search(r"Point\(([-+]?\d+(?:\.\d+)?)\s+([-+]?\d+(?:\.\d+)?)\)", coord)
         if not match:
             continue
         lng = as_float(match.group(1))
