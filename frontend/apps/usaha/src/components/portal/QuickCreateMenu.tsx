@@ -37,14 +37,6 @@ export function QuickCreateMenu({ business, mobile = false }: QuickCreateMenuPro
 
   const quickActions: QuickAction[] = [
     {
-      permission: 'createSales',
-      title: 'Catat penjualan',
-      description: 'Buka kasir dan selesaikan transaksi baru.',
-      href: `/businesses/${business.id}/orders?view=kasir`,
-      icon: ShoppingBag,
-      tone: 'bg-portal-saleTint text-portal-sale',
-    },
-    {
       permission: 'manageProducts',
       title: 'Tambah produk',
       description: 'Masukkan nama, harga, foto, dan stok awal.',
@@ -86,10 +78,10 @@ export function QuickCreateMenu({ business, mobile = false }: QuickCreateMenuPro
       <button
         ref={triggerRef}
         type="button"
-        aria-label="Tambah kegiatan usaha"
+        aria-label="Tambah data usaha"
         aria-haspopup="dialog"
         aria-expanded={open}
-        title="Tambah kegiatan"
+        title="Tambah data usaha"
         onClick={() => setOpen(true)}
         className={mobile
           ? 'portal-quick-create-fab portal-touch-target'
@@ -102,7 +94,7 @@ export function QuickCreateMenu({ business, mobile = false }: QuickCreateMenuPro
       <ModalSurface
         open={open}
         onOpenChange={setOpen}
-        ariaLabel="Tambah kegiatan usaha"
+        ariaLabel="Tambah data usaha"
         presentation="adaptive"
         size="md"
         returnFocusRef={triggerRef}
@@ -110,8 +102,8 @@ export function QuickCreateMenu({ business, mobile = false }: QuickCreateMenuPro
         <div className="flex min-h-0 flex-1 flex-col">
           <div className="flex shrink-0 items-start justify-between gap-4 border-b border-portal-line px-4 pb-3 pt-4 sm:px-5">
             <div>
-              <p className="portal-kicker">Aksi cepat</p>
-              <h2 className="mt-1 text-xl font-black tracking-[-.035em] text-portal-ink">Mau mengerjakan apa?</h2>
+              <p className="portal-kicker">Tambah data</p>
+              <h2 className="mt-1 text-xl font-black tracking-[-.035em] text-portal-ink">Mau menambahkan apa?</h2>
               <p className="mt-1 text-xs leading-5 text-portal-soft">Pilih satu tindakan. Detailnya akan mengikuti aturan dan akses usahamu.</p>
             </div>
             <button
