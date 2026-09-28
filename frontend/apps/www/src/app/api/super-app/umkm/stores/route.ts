@@ -538,9 +538,13 @@ export async function GET(req: NextRequest) {
     const mine =
       url.searchParams.get('mine') === '1' ||
       url.searchParams.get('mine') === 'true';
-    if (!mine && parsedPublicQuery.query.limit > 50) {
+    const mapRequest =
+      url.searchParams.get('map') === '1' ||
+      url.searchParams.get('map') === 'true';
+    const publicBatchLimit = mapRequest ? 200 : 50;
+    if (!mine && parsedPublicQuery.query.limit > publicBatchLimit) {
       return NextResponse.json(
-        { error: 'Public UMKM batches are limited to 50 items' },
+        { error: `Public UMKM batches are limited to ${publicBatchLimit} items` },
         { status: 400 },
       );
     }
@@ -653,7 +657,7 @@ export async function GET(req: NextRequest) {
           query: query || undefined,
           city: city || undefined,
           limit: Math.min(
-            50,
+            mapRequest ? 200 : 50,
             referencesOnly && offset === 0 ? limit : candidateLimit,
           ),
           viewer: hasViewer
