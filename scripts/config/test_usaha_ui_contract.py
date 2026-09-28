@@ -49,7 +49,7 @@ class UsahaBusinessOsUiContractTests(unittest.TestCase):
             "products: 'Produk'",
             "inventory: 'Stok'",
             "finance: 'Uang'",
-            "const mobilePrimaryOrder: PortalSection[] = ['home', 'orders', 'products', 'finance'];",
+            "const mobilePrimaryOrder: PortalSection[] = ['home', 'orders', 'products', 'inventory'];",
         ):
             self.assertIn(marker, navigation)
         self.assertNotIn("orders: 'Jualan'", navigation)
