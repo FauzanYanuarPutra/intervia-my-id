@@ -23,6 +23,13 @@ function readAttrs(raw: string): Record<string, string> {
   return attrs;
 }
 
+function escapeHtmlText(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 function textToParagraphs(text: string): string {
   const normalized = text
     .replace(/\r\n?/g, '\n')
@@ -32,7 +39,17 @@ function textToParagraphs(text: string): string {
   if (!normalized) return '';
   return normalized
     .split(/\n{2,}/)
-    .map(paragraph => paragraph.split('\n').map(line => line.replace(/ {2,}/g, spaces => '&nbsp;'.repeat(spaces.length - 1) + ' ')).join('<br />'))
+    .map(paragraph =>
+      paragraph
+        .split('\n')
+        .map(line =>
+          escapeHtmlText(line).replace(
+            / {2,}/g,
+            spaces => '&nbsp;'.repeat(spaces.length - 1) + ' ',
+          ),
+        )
+        .join('<br />'),
+    )
     .filter(Boolean)
     .map(paragraph => `<p>${paragraph}</p>`)
     .join('');
