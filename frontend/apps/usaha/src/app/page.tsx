@@ -95,11 +95,13 @@ export default async function HomePage({
             <PendingOrganizationInvitations />
             <div className="merchant-surface-bordered p-5 sm:p-8">
               <span className="portal-icon-tile h-12 w-12"><Building2 className="h-5 w-5" /></span>
-              <h1 className="mt-5 text-2xl font-black tracking-[-0.04em] text-portal-ink">Mulai dari satu usaha dulu.</h1>
-              <p className="mt-2 max-w-xl text-sm leading-6 text-portal-soft">Isi data dasar. Barang, jual, stok, dan uang bisa dilengkapi sambil usaha berjalan.</p>
+              <h1 className="mt-5 text-2xl font-black tracking-[-0.04em] text-portal-ink">Belum menemukan usaha di workspace.</h1>
+              <p className="mt-2 max-w-xl text-sm leading-6 text-portal-soft">
+                Jangan daftar ulang dulu. Lajukan bisa mencoba memulihkan usaha lama yang masih tersimpan dari workspace sebelumnya.
+              </p>
               <div className="mt-5 flex flex-wrap gap-2">
-                <Link href="/businesses/new" className="portal-button-primary"><Store className="h-4 w-4" /> Tambah usaha</Link>
                 <ReconcileBusinessButton />
+                <Link href="/businesses/new" className="portal-button-secondary"><Store className="h-4 w-4" /> Buat usaha baru</Link>
               </div>
             </div>
           </div>
