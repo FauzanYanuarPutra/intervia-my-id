@@ -2216,12 +2216,13 @@ pub async fn sync_static_source_registry(db: &PgPool) -> Result<(), sqlx::Error>
                 attribution_text=EXCLUDED.attribution_text,
                 reuse_mode=CASE WHEN data_source_registry.reuse_mode='persistent_import' AND EXCLUDED.reuse_mode <> 'persistent_import' THEN data_source_registry.reuse_mode ELSE EXCLUDED.reuse_mode END, storage_allowed=CASE WHEN data_source_registry.reuse_mode='persistent_import' AND EXCLUDED.reuse_mode <> 'persistent_import' THEN data_source_registry.storage_allowed ELSE EXCLUDED.storage_allowed END,
                 media_storage_allowed=EXCLUDED.media_storage_allowed, pii_import_allowed=EXCLUDED.pii_import_allowed,
-                enabled=EXCLUDED.enabled, auto_publish_reference=EXCLUDED.auto_publish_reference, notes=EXCLUDED.notes, updated_at=NOW()"#
+                enabled=EXCLUDED.enabled, auto_publish_reference=EXCLUDED.auto_publish_reference,
+            media_storage_allowed=EXCLUDED.media_storage_allowed, notes=EXCLUDED.notes, updated_at=NOW()"#
         )
         .bind(&source.id).bind(&source.provider).bind(&source.kind).bind(&source.url).bind(api_url)
         .bind(source.terms_url).bind(source.license).bind(source.license_url).bind(source.attribution)
         .bind(reuse_mode).bind(storage_allowed).bind(enabled)
-        .bind(source.auto_publish_reference).bind(notes)
+        .bind(source.auto_publish_reference).bind(source.media_storage_allowed).bind(notes)
         .execute(db)
         .await
         {
