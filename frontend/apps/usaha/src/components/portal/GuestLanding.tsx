@@ -48,13 +48,13 @@ export function GuestLanding() {
               Satu workspace sederhana untuk merapikan profil, katalog, jualan, stok, uang, dan pekerjaan harian usahamu.
             </p>
             <div className="mt-7 flex flex-wrap gap-2.5">
-              <Link href="/login?callbackUrl=%2Fbusinesses%2Fnew%3Fnew%3D1" className="portal-button-primary">
+              <Link href="/login?callbackUrl=%2Fbusinesses%2Fnew" className="portal-button-primary">
                 Mulai gratis <ArrowRight className="h-4 w-4" />
               </Link>
               <Link href="/login" className="portal-button-secondary">Lihat workspace</Link>
             </div>
             <div className="mt-6 flex flex-wrap gap-x-5 gap-y-2 text-xs font-semibold text-portal-soft">
-              {['Terhubung dengan akun Lajukan', 'Akses mengikuti peran tim', 'Tanpa password baru'].map(item => (
+              {['Terhubung dengan akun Lajukan', 'Usaha yang sudah ada tetap aman', 'Tanpa password baru'].map(item => (
                 <span key={item} className="inline-flex items-center gap-1.5"><Check className="h-3.5 w-3.5 text-portal-forest" />{item}</span>
               ))}
             </div>
