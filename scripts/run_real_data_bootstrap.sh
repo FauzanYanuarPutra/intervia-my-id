@@ -123,6 +123,7 @@ ON CONFLICT (bootstrap_key) DO UPDATE SET
   updated_at = NOW();
 SQL
   echo "[real-data] bootstrap completed without external rows; will retry on next startup."
+  exit 21
 fi
 
 echo "[real-data] bootstrap complete: providers=${PROVIDER_COUNT} buyers=${BUYER_COUNT} community_media=${MEDIA_COUNT}"
