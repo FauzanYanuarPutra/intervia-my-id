@@ -183,7 +183,9 @@ pub async fn generate_for_entity(db: &PgPool, entity_id: Uuid) -> Result<Value, 
            ON CONFLICT (entity_id) DO UPDATE SET
              source_id=EXCLUDED.source_id,
              promotion_status=CASE
-               WHEN reference_promotion_candidates.promotion_status IN ('approved','promoted','rejected','blocked')
+               WHEN reference_promotion_candidates.promotion_status IN ('rejected','promoted')
+                 THEN reference_promotion_candidates.promotion_status
+               WHEN reference_promotion_candidates.promotion_status IN ('approved','blocked')
                  AND EXCLUDED.promotion_status <> 'approved'
                  THEN reference_promotion_candidates.promotion_status
                ELSE EXCLUDED.promotion_status END,
