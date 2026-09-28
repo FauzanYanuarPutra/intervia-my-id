@@ -244,6 +244,12 @@ async function fetchMarketplaceStoreList(
   if (options?.ownerUserId?.trim()) params.set('owner_user_id', options.ownerUserId.trim());
   if (options?.activeOnly !== undefined) params.set('active_only', String(options.activeOnly));
   if (options?.limit) params.set('limit', String(options.limit));
+  if (options?.offset !== undefined) {
+    params.set('offset', String(Math.max(0, Math.floor(options.offset))));
+  }
+  if (options?.includeReferences !== undefined) {
+    params.set('include_references', String(options.includeReferences));
+  }
   if (options?.bounds) {
     params.set('min_lat', String(options.bounds.minLat));
     params.set('max_lat', String(options.bounds.maxLat));
