@@ -80,6 +80,7 @@ export type UmkmPlacePresentation = {
   statusLabel: string;
   statusTone: 'positive' | 'neutral' | 'muted';
   coverImage: string;
+  coverImageIsCategoryArtwork: boolean;
   gallery: string[];
   distanceLabel: string | null;
   priceLabel: string;
@@ -787,7 +788,12 @@ export function buildUmkmPlacePresentation(
     liveNow: presenceStatus.liveNow,
     statusLabel: presenceStatus.statusLabel,
     statusTone: presenceStatus.statusTone,
-undefined
+    coverImage: getCoverImage(place, kind),
+    coverImageIsCategoryArtwork: (() => {
+      const media = resolveStorefrontBrandMedia(asRecord(place.metadata));
+      return !Boolean(media.coverUrl || media.logoUrl);
+    })(),
+    gallery: getGalleryImages(place, kind)
       .map(image => image.trim())
       .filter(Boolean),
     distanceLabel,
