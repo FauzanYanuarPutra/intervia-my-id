@@ -51,6 +51,7 @@ describe('portal navigation', () => {
       'inventory',
     ]);
     expect(portalMenuNavigation(ownerPermissions).map(item => item.id)).toContain('products');
+    expect(portalMenuNavigation(ownerPermissions).map(item => item.id)).toContain('finance');
   });
 
   it('preserves primary order when permissions hide destinations', () => {
