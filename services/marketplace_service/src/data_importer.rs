@@ -19,6 +19,14 @@ fn redact(value: &Value) -> Value {
         "bank_account",
         "account_number",
         "contact_person",
+        "owner_name",
+        "nama_pemilik",
+        "nama_pemilik_usaha",
+        "penanggung_jawab",
+        "nama_pengelola",
+        "alamat_pemilik",
+        "alamat_rumah",
+        "personal_email",
     ];
     match value {
         Value::Object(map) => {
