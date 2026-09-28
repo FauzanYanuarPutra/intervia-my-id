@@ -1118,6 +1118,7 @@ struct ListUmkmStoresQuery {
     id: Option<Uuid>,
     include_references: Option<bool>,
     limit: Option<i64>,
+    offset: Option<i64>,
     min_lat: Option<f64>,
     max_lat: Option<f64>,
     min_lng: Option<f64>,
