@@ -1653,25 +1653,36 @@ pub(crate) fn license_allows_persistent_import(license: &str) -> bool {
 }
 
 pub async fn discover_licensed_ckan_sources(state: &Arc<AppState>) -> Result<u64, anyhow::Error> {
-    let response = state
-        .http_client
-        .get("https://data.go.id/api/action/package_search")
-        .query(&[("q", "UMKM"), ("rows", "100"), ("start", "0")])
-        .send()
-        .await?
-        .error_for_status()?;
+    let mut datasets_by_id = std::collections::BTreeMap::<String, Value>::new();
+    for query in ["UMKM", "usaha mikro", "koperasi UMKM"] {
+        let response = state
+            .http_client
+            .get("https://data.go.id/api/action/package_search")
+            .query(&[("q", query), ("rows", "50"), ("start", "0")])
+            .send()
+            .await?
+            .error_for_status()?;
 
-    let payload = response.json::<Value>().await?;
-    let datasets = payload
-        .get("result")
-        .and_then(|value| value.get("results"))
-        .and_then(Value::as_array)
-        .cloned()
-        .unwrap_or_default();
+        let payload = response.json::<Value>().await?;
+        let datasets = payload
+            .get("result")
+            .and_then(|value| value.get("results"))
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default();
+
+        for dataset in datasets {
+            if let Some(dataset_id) = dataset.get("id").and_then(Value::as_str) {
+                datasets_by_id
+                    .entry(dataset_id.to_string())
+                    .or_insert(dataset);
+            }
+        }
+    }
 
     let mut discovered = 0u64;
 
-    for dataset in datasets.into_iter().take(100) {
+    for dataset in datasets_by_id.into_values().take(150) {
         let Some(dataset_id) = dataset.get("id").and_then(Value::as_str) else {
             continue;
         };
@@ -1748,7 +1759,7 @@ pub async fn discover_licensed_ckan_sources(state: &Arc<AppState>) -> Result<u64
             .and_then(Value::as_str)
             .filter(|value| !value.trim().is_empty());
         let note = format!(
-            "Auto-discovered from data.go.id search q=UMKM. Licensed as '{license}'. Eligible JSON/DataStore resource detected. Records are staged for reference/Insight processing; automatic business-profile publication remains disabled unless explicitly allowlisted."
+            "Auto-discovered from data.go.id catalog search. Licensed as '{license}'. Eligible JSON/DataStore resource detected. Records are staged for reference/Insight processing; automatic business-profile publication remains disabled unless explicitly allowlisted."
         );
 
         sqlx::query(
@@ -1799,7 +1810,7 @@ pub async fn discover_licensed_ckan_sources(state: &Arc<AppState>) -> Result<u64
         )
         .bind(&source_key)
         .bind(provider)
-        .bind(&api_url)
+        .bind(&format!("https://data.go.id/dataset/dataset/{dataset_id}"))
         .bind(&api_url)
         .bind(license)
         .bind(license_url)
