@@ -922,12 +922,16 @@ try {
             if ($LASTEXITCODE -eq 0) {
                 try {
                     $StatusJson = ($StatusProbe -join "").Trim() | ConvertFrom-Json
-                    Write-Host ("  data status={0} sources={1} active_jobs={2} published_references={3} active_reference_content={4}" -f $StatusJson.status, $StatusJson.persistent_sources, $StatusJson.active_jobs, $StatusJson.published_references, $StatusJson.active_reference_content) -ForegroundColor DarkGray
-                    if ([int64]$StatusJson.published_references -gt 0) {
+                    $ExternalCrawler = $StatusJson.external_crawler
+                    $ExternalProviderCount = if ($null -ne $ExternalCrawler) { [int64]$ExternalCrawler.provider_count } else { 0 }
+                    $ExternalBuyerCount = if ($null -ne $ExternalCrawler) { [int64]$ExternalCrawler.buyer_count } else { 0 }
+                    $ExternalMediaCount = if ($null -ne $ExternalCrawler) { [int64]$ExternalCrawler.community_media_count } else { 0 }
+                    $PublishedReferences = [int64]$StatusJson.published_references
+                    $AggregateReferences = [int64]$StatusJson.aggregate_references
+                    $HydratedExternal = $ExternalProviderCount + $ExternalBuyerCount + $ExternalMediaCount
+                    Write-Host ("  data status={0} sources={1} active_jobs={2} published_references={3} aggregate_references={4} external_rows={5}" -f $StatusJson.status, $StatusJson.persistent_sources, $StatusJson.active_jobs, $PublishedReferences, $AggregateReferences, $HydratedExternal) -ForegroundColor DarkGray
+                    if ($PublishedReferences -gt 0 -or $AggregateReferences -gt 0 -or $HydratedExternal -gt 0) {
                         $DataReady = $true
-                        break
-                    }
-                    if ([int64]$StatusJson.active_jobs -eq 0 -and [int64]$StatusJson.persistent_sources -gt 0 -and [int64]$StatusJson.completed_jobs -gt 0) {
                         break
                     }
                 }
@@ -955,10 +959,19 @@ try {
                 Write-Verbose "Tidak dapat membaca bootstrap status untuk fallback OSM: $($_.Exception.Message)"
             }
 
+            $FallbackExternalCrawler = if ($null -ne $FallbackStatus) { $FallbackStatus.external_crawler } else { $null }
+            $FallbackExternalRows = if ($null -ne $FallbackExternalCrawler) {
+                [int64]$FallbackExternalCrawler.provider_count +
+                [int64]$FallbackExternalCrawler.buyer_count +
+                [int64]$FallbackExternalCrawler.community_media_count
+            } else { 0 }
+
             $CanRunOsmFallback =
                 $null -ne $FallbackStatus -and
                 [int64]$FallbackStatus.active_jobs -eq 0 -and
-                [int64]$FallbackStatus.published_references -eq 0
+                [int64]$FallbackStatus.published_references -eq 0 -and
+                [int64]$FallbackStatus.aggregate_references -eq 0 -and
+                $FallbackExternalRows -eq 0
 
             if ($CanRunOsmFallback) {
                 $OsmFallbackScript = Join-Path $RepoRoot "services\marketplace_service\scripts\import-osm-open-references.ps1"
@@ -977,7 +990,13 @@ try {
                     if ($LASTEXITCODE -eq 0) {
                         try {
                             $FallbackVerifyJson = ($FallbackVerify -join "").Trim() | ConvertFrom-Json
-                            Write-Host ("  fallback data status={0} published_references={1} active_reference_content={2}" -f $FallbackVerifyJson.status, $FallbackVerifyJson.published_references, $FallbackVerifyJson.active_reference_content) -ForegroundColor DarkGray
+                            $FallbackVerifyExternal = $FallbackVerifyJson.external_crawler
+                            $FallbackVerifyExternalRows = if ($null -ne $FallbackVerifyExternal) {
+                                [int64]$FallbackVerifyExternal.provider_count +
+                                [int64]$FallbackVerifyExternal.buyer_count +
+                                [int64]$FallbackVerifyExternal.community_media_count
+                            } else { 0 }
+                            Write-Host ("  fallback data status={0} published_references={1} aggregate_references={2} external_rows={3}" -f $FallbackVerifyJson.status, $FallbackVerifyJson.published_references, $FallbackVerifyJson.aggregate_references, $FallbackVerifyExternalRows) -ForegroundColor DarkGray
                         }
                         catch {
                             Write-Verbose "Respons verifikasi fallback OSM belum dapat diparse: $($_.Exception.Message)"
