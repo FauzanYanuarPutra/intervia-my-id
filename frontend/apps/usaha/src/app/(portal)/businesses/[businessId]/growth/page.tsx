@@ -63,7 +63,7 @@ export default async function BusinessGrowthPage({ params }: PageProps) {
         </Link>
         <Link href={`/businesses/${business.id}/channels`} className="merchant-surface-bordered p-4 transition hover:border-portal-forest/25">
           <Megaphone className="h-5 w-5 text-portal-forest" />
-          <p className="mt-3 text-sm font-black text-portal-ink">Kanal jual</p>
+          <p className="mt-3 text-sm font-black text-portal-ink">Jual online</p>
           <p className="mt-1 text-xs leading-5 text-portal-soft">{canViewChannels ? `${enabledChannels} kanal aktif.` : 'Sesuai akses peranmu.'}</p>
         </Link>
         <Link href={`/businesses/${business.id}/reports`} className="merchant-surface-bordered p-4 transition hover:border-portal-forest/25">
@@ -98,7 +98,7 @@ export default async function BusinessGrowthPage({ params }: PageProps) {
                 {!profileReady ? <Link href={`/businesses/${business.id}/info`} className="portal-button-secondary">Lengkapi profil</Link> : null}
                 {business.productsCount === 0 ? <Link href={`/businesses/${business.id}/products`} className="portal-button-secondary">Tambah produk</Link> : null}
                 {!business.buyerPageReady ? <Link href={`/businesses/${business.id}/buyer-page`} className="portal-button-secondary">Rapikan etalase</Link> : null}
-                {canViewChannels && enabledChannels === 0 ? <Link href={`/businesses/${business.id}/channels`} className="portal-button-secondary">Atur kanal jual</Link> : null}
+                {canViewChannels && enabledChannels === 0 ? <Link href={`/businesses/${business.id}/channels`} className="portal-button-secondary">Atur jual online</Link> : null}
               </div>
             </section>
           )}
