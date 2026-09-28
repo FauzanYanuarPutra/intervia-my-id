@@ -1811,7 +1811,7 @@ pub async fn discover_licensed_ckan_sources(state: &Arc<AppState>) -> Result<u64
         )
         .bind(&source_key)
         .bind(provider)
-        .bind(&format!("https://data.go.id/dataset/dataset/{dataset_id}"))
+        .bind(format!("https://data.go.id/dataset/dataset/{dataset_id}"))
         .bind(&api_url)
         .bind(license)
         .bind(license_url)
