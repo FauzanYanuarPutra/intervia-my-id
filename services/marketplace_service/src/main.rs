@@ -254,6 +254,7 @@ struct ListMapReferencesQuery {
     city: Option<String>,
     cursor: Option<String>,
     limit: Option<i64>,
+    offset: Option<i64>,
     min_lat: Option<f64>,
     max_lat: Option<f64>,
     min_lng: Option<f64>,
@@ -8418,6 +8419,7 @@ async fn list_umkm_stores(
     Query(query): Query<ListUmkmStoresQuery>,
 ) -> impl IntoResponse {
     let limit = query.limit.unwrap_or(80).clamp(1, 200);
+    let offset = query.offset.unwrap_or(0).clamp(0, 10_000);
     let text_query = clean_text(query.q);
     let city = clean_text(query.city);
     let slug = clean_text(query.slug).map(|value| value.to_lowercase());
@@ -8481,12 +8483,16 @@ async fn list_umkm_stores(
           lower(COALESCE(metadata->>'is_transactional', 'true')) <> 'false'
           AND lower(COALESCE(metadata->>'market_side', '')) <> 'reference'
           AND lower(COALESCE(metadata->>'record_kind', '')) NOT LIKE '%reference%'
-          AND EXISTS (
-            SELECT 1
-            FROM business_locations location
-            WHERE location.store_id = umkm_stores.id
-              AND location.public_visibility = TRUE
-              AND location.status = 'active'
+          AND (
+            metadata->>'source' = 'usaha_portal'
+            OR owner_user_id IS NOT NULL
+            OR EXISTS (
+              SELECT 1
+              FROM business_locations location
+              WHERE location.store_id = umkm_stores.id
+                AND location.public_visibility = TRUE
+                AND location.status = 'active'
+            )
           )
           AND COALESCE((
             SELECT latest.current_action
@@ -8505,12 +8511,16 @@ async fn list_umkm_stores(
       AND lower(COALESCE(metadata->>'market_side', '')) <> 'reference'
       AND lower(COALESCE(metadata->>'record_kind', '')) NOT LIKE '%reference%'
       AND lower(COALESCE(metadata->>'outlet_active', 'true')) <> 'false'
-      AND EXISTS (
-        SELECT 1
-        FROM business_locations location
-        WHERE location.store_id = umkm_stores.id
-          AND location.public_visibility = TRUE
-          AND location.status = 'active'
+      AND (
+        metadata->>'source' = 'usaha_portal'
+        OR owner_user_id IS NOT NULL
+        OR EXISTS (
+          SELECT 1
+          FROM business_locations location
+          WHERE location.store_id = umkm_stores.id
+            AND location.public_visibility = TRUE
+            AND location.status = 'active'
+        )
       )
       AND COALESCE((
         SELECT latest.current_action
@@ -8590,6 +8600,7 @@ async fn list_umkm_stores(
             WHERE map_bucket_rank <= 4
             ORDER BY map_lat_bucket, map_lng_bucket, map_bucket_rank, updated_at DESC, id ASC
             LIMIT $5
+            OFFSET $13
             "#,
         )
     } else {
@@ -8641,6 +8652,7 @@ async fn list_umkm_stores(
             ORDER BY
               {ranking_order}
             LIMIT $5
+            OFFSET $13
             "#,
         )
     };
@@ -8657,6 +8669,7 @@ async fn list_umkm_stores(
         .bind(viewer_lat)
         .bind(viewer_lng)
         .bind(radius_km)
+        .bind(offset)
         .fetch_all(&state.db)
         .await;
 
