@@ -4219,6 +4219,21 @@ fn validate_map_reference_bounds(
     }
 }
 
+fn validate_radius_km(
+    value: Option<f64>,
+    viewer_present: bool,
+) -> Result<Option<f64>, &'static str> {
+    match value {
+        Some(radius)
+            if radius.is_finite() && radius > 0.0 && radius <= 1000.0 && viewer_present =>
+        {
+            Ok(Some(radius))
+        }
+        Some(_) => Err("radius_km requires valid viewer coordinates and must be between 0 and 1000"),
+        None => Ok(None),
+    }
+}
+
 fn validate_map_reference_viewer(
     query: &ListMapReferencesQuery,
 ) -> Result<Option<(f64, f64)>, &'static str> {
@@ -8429,18 +8444,9 @@ async fn list_umkm_stores(
         (None, None) => None,
         _ => return err(StatusCode::BAD_REQUEST, "invalid viewer coordinates").into_response(),
     };
-    let radius_km = match query.radius_km {
-        Some(value) if value.is_finite() && value > 0.0 && value <= 1000.0 && viewer.is_some() => {
-            Some(value)
-        }
-        Some(_) => {
-            return err(
-                StatusCode::BAD_REQUEST,
-                "radius_km requires valid viewer coordinates and must be between 0 and 1000",
-            )
-            .into_response()
-        }
-        None => None,
+    let radius_km = match validate_radius_km(query.radius_km, viewer.is_some()) {
+        Ok(value) => value,
+        Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
     };
     let (viewer_lat, viewer_lng) = viewer
         .map(|value| (Some(value.0), Some(value.1)))
@@ -24576,6 +24582,21 @@ mod tests {
         );
         assert!(parse_map_reference_cursor(Some("not-a-cursor".to_string())).is_err());
         assert!(parse_map_reference_cursor(Some(format!("1:{}", Uuid::nil()))).is_ok());
+    }
+
+    #[test]
+    fn radius_filter_accepts_supported_values_with_viewer() {
+        assert_eq!(validate_radius_km(Some(5.0), true), Ok(Some(5.0)));
+        assert_eq!(validate_radius_km(Some(1000.0), true), Ok(Some(1000.0)));
+        assert_eq!(validate_radius_km(None, true), Ok(None));
+    }
+
+    #[test]
+    fn radius_filter_rejects_invalid_or_missing_viewer() {
+        assert!(validate_radius_km(Some(0.0), true).is_err());
+        assert!(validate_radius_km(Some(-1.0), true).is_err());
+        assert!(validate_radius_km(Some(1000.1), true).is_err());
+        assert!(validate_radius_km(Some(10.0), false).is_err());
     }
 
     #[test]
