@@ -10817,7 +10817,8 @@ async fn list_map_references(
             'licensed_reference',
             'external_content_reference',
             'real_openstreetmap_reference',
-            'osm_provider_reference'
+            'osm_provider_reference',
+            'wikidata_reference'
           )
           AND NULLIF(btrim(COALESCE(metadata->>'source_url', '')), '') IS NOT NULL
           AND (
