@@ -54,6 +54,7 @@ export type UmkmPlaceKind =
 
 export type UmkmPlacePresentation = {
   kind: UmkmPlaceKind;
+  businessCategoryId: string | null;
   isFood: boolean;
   locationMode: UmkmLocationMode;
   locationModeLabel: string;
@@ -94,7 +95,16 @@ export type UmkmPlacePresentation = {
 };
 
 type PublishService = 'food' | 'mart';
-const DEFAULT_UMKM_IMAGE = '/images/placeholders/business-default.svg';
+const DEFAULT_UMKM_IMAGE = '/images/business-categories/general.svg';
+const CATEGORY_FALLBACK_IMAGES: Record<UmkmPlaceKind, string> = {
+  food: '/images/business-categories/food.svg',
+  retail: '/images/business-categories/retail.svg',
+  service: '/images/business-categories/service.svg',
+  craft: '/images/business-categories/craft.svg',
+  agri: '/images/business-categories/agri.svg',
+  workshop: '/images/business-categories/workshop.svg',
+  general: DEFAULT_UMKM_IMAGE,
+};
 
 function asRecord(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
@@ -625,15 +635,16 @@ function getServiceBadges(
   return badges.slice(0, 3);
 }
 
-function getCoverImage(place: UmkmPlaceLike): string {
+function getCoverImage(place: UmkmPlaceLike, kind?: UmkmPlaceKind): string {
   const media = resolveStorefrontBrandMedia(asRecord(place.metadata));
   const explicit = media.coverUrl || media.logoUrl;
   if (explicit) return explicit;
-  return DEFAULT_UMKM_IMAGE;
+  return CATEGORY_FALLBACK_IMAGES[kind || getUmkmPlaceKind(place)];
 }
 
-function getGalleryImages(place: UmkmPlaceLike): string[] {
-  const cover = getCoverImage(place);
+function getGalleryImages(place: UmkmPlaceLike, kind?: UmkmPlaceKind): string[] {
+  const resolvedKind = kind || getUmkmPlaceKind(place);
+  const cover = getCoverImage(place, resolvedKind);
   const media = resolveStorefrontBrandMedia(asRecord(place.metadata));
   const images = [cover, media.logoUrl, ...media.galleryUrls].filter(
     (image): image is string => Boolean(image),
@@ -750,6 +761,7 @@ export function buildUmkmPlacePresentation(
 
   return {
     kind,
+    businessCategoryId: businessCategory,
     isFood: kind === 'food',
     locationMode: presenceStatus.locationMode,
     locationModeLabel: presenceStatus.locationModeLabel,
@@ -771,8 +783,7 @@ export function buildUmkmPlacePresentation(
     liveNow: presenceStatus.liveNow,
     statusLabel: presenceStatus.statusLabel,
     statusTone: presenceStatus.statusTone,
-    coverImage: getCoverImage(place),
-    gallery: getGalleryImages(place)
+undefined
       .map(image => image.trim())
       .filter(Boolean),
     distanceLabel,
