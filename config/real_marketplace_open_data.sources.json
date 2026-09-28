@@ -685,6 +685,83 @@
       ],
       "max_bytes": 2000000,
       "timeout_seconds": 45
+    },
+    {
+      "id": "sleman-umkm-sector-2022",
+      "kind": "ckan_aggregate",
+      "role": "insight",
+      "enabled_by_default": true,
+      "name": "Rekapitulasi UMKM Kabupaten Sleman berdasarkan sektor usaha tiap kapanewon 2022",
+      "provider": "Dinas Koperasi, Usaha Kecil dan Menengah Kabupaten Sleman",
+      "datastore_url": "https://proxyapps.data.go.id/api/action/datastore_search",
+      "resource_id": "9d34d5e0-0d12-4e49-a137-26cc786af905",
+      "source_url": "https://data.go.id/dataset/dataset/rekapitulasi-data-umkm-kabupaten-sleman-berdasarkan-sektor-usaha-tiap-kapanewon",
+      "license": "Creative Commons Attribution",
+      "attribution": "Kabupaten Sleman / Portal Satu Data Indonesia",
+      "title": "Rekapitulasi UMKM Kabupaten Sleman Berdasarkan Sektor Usaha Tahun 2022",
+      "location": "Sleman",
+      "dimension_fields": [
+        "kapanewon",
+        "sektorusaha",
+        "tahun"
+      ],
+      "max_records": 1000,
+      "page_size": 500,
+      "timeout_seconds": 60
+    },
+    {
+      "id": "sumbawa-umkm-sector-scale-2024-2025",
+      "kind": "ckan_aggregate",
+      "role": "insight",
+      "enabled_by_default": true,
+      "name": "Jumlah UMKM berdasarkan sektor usaha dan skala usaha Kabupaten Sumbawa 2024-2025",
+      "provider": "Pemerintah Kabupaten Sumbawa",
+      "datastore_url": "https://satudata.sumbawakab.go.id/api/action/datastore_search",
+      "resource_id": "c3c23785-44ae-4f82-aacb-6083e04d738a",
+      "source_url": "https://satudata.sumbawakab.go.id/en/dataset/jumlah-umkm-berdasarkan-sektor-usaha-dan-skala-usaha/resource/c3c23785-44ae-4f82-aacb-6083e04d738a",
+      "license": "Creative Commons Attribution",
+      "attribution": "Pemerintah Kabupaten Sumbawa / Satu Data Kabupaten Sumbawa",
+      "title": "Jumlah UMKM Kabupaten Sumbawa 2024-2025",
+      "location": "Sumbawa",
+      "dimension_fields": [
+        "Nama Kecamatan",
+        "Skala Usaha",
+        "Sektor Usaha",
+        "Tahun"
+      ],
+      "measure_fields": [
+        "Jumlah UMKM"
+      ],
+      "max_records": 2000,
+      "page_size": 500,
+      "timeout_seconds": 60
+    },
+    {
+      "id": "aceh-barat-johan-pahlawan-umkm-2025",
+      "kind": "ckan_aggregate",
+      "role": "insight",
+      "enabled_by_default": true,
+      "name": "Jumlah UMKM Kecamatan Johan Pahlawan Semester I 2025",
+      "provider": "Kecamatan Johan Pahlawan / Open Data Aceh Barat",
+      "datastore_url": "https://data.acehbaratkab.go.id/api/action/datastore_search",
+      "resource_id": "6f00254c-311d-4b3b-a5af-212fa1aeff4b",
+      "source_url": "https://data.acehbaratkab.go.id/dataset/8da95dc6-2f48-4747-9a0f-e91007cd5753/resource/6f00254c-311d-4b3b-a5af-212fa1aeff4b",
+      "license": "Creative Commons Attribution",
+      "attribution": "Open Data Aceh Barat / Kecamatan Johan Pahlawan",
+      "title": "Jumlah UMKM Kecamatan Johan Pahlawan 2025",
+      "location": "Aceh Barat",
+      "dimension_fields": [
+        "kemendagri_nama_kecamatan",
+        "kemendagri_nama_desa",
+        "semester",
+        "tahun"
+      ],
+      "measure_fields": [
+        "jumlah"
+      ],
+      "max_records": 1000,
+      "page_size": 500,
+      "timeout_seconds": 60
     }
   ]
 }
