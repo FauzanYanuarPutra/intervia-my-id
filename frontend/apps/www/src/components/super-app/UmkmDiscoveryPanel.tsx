@@ -1277,7 +1277,7 @@ export function UmkmDiscoveryPanel({
       isId,
       mapBounds,
       query,
-      requestLimit,
+      mapRequestLimit,
       selectedSlug,
       selectedStoreIdInitial,
       queryViewerLocation,
