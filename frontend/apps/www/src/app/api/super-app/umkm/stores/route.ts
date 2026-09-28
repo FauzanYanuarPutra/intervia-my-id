@@ -48,6 +48,7 @@ type PublicReferenceList = {
   items?: PublicReferenceContent[];
   has_more?: boolean;
   next_cursor?: string;
+  next_offset?: number;
 };
 
 type PublicReferenceMapItem = {
@@ -373,15 +374,20 @@ async function listPublicMapReferences(options: {
     maxLng: number;
   };
   cursor?: string;
+  offset?: number;
 }): Promise<{
   items: PublicReferenceMapItem[];
   hasMore: boolean;
   nextCursor: string | null;
+  nextOffset: number | null;
 }> {
   const params = new URLSearchParams({ limit: String(options.limit) });
   if (options.query) params.set('q', options.query);
   if (options.city) params.set('city', options.city);
   if (options.cursor) params.set('cursor', options.cursor);
+  if (typeof options.offset === 'number' && options.offset > 0) {
+    params.set('offset', String(options.offset));
+  }
   if (options.viewer) {
     params.set('viewer_lat', String(options.viewer.lat));
     params.set('viewer_lng', String(options.viewer.lng));
@@ -409,6 +415,12 @@ async function listPublicMapReferences(options: {
     .filter((item): item is PublicReferenceMapItem => Boolean(item));
   const nextCursor =
     typeof payload.next_cursor === 'string' ? payload.next_cursor.trim() : '';
+  const nextOffset =
+    typeof payload.next_offset === 'number' &&
+    Number.isSafeInteger(payload.next_offset) &&
+    payload.next_offset >= 0
+      ? payload.next_offset
+      : null;
   return {
     items: items.slice(0, options.limit),
     hasMore: payload.has_more === true,
@@ -417,6 +429,7 @@ async function listPublicMapReferences(options: {
       PUBLIC_REFERENCE_CURSOR_PATTERN.test(nextCursor)
         ? nextCursor
         : null,
+    nextOffset,
   };
 }
 
@@ -664,13 +677,14 @@ export async function GET(req: NextRequest) {
           radiusKm,
           bounds: parsedPublicQuery.bounds,
           cursor: referenceCursor,
+          offset: referencesOnly ? offset : 0,
         }).catch(error => {
           console.warn('[UMKM_PUBLIC_REFERENCES_UNAVAILABLE]', {
             message: error instanceof Error ? error.message : 'unknown error',
           });
-          return { items: [], hasMore: false, nextCursor: null };
+          return { items: [], hasMore: false, nextCursor: null, nextOffset: null };
         })
-      : Promise.resolve({ items: [], hasMore: false, nextCursor: null });
+: Promise.resolve({ items: [], hasMore: false, nextCursor: null, nextOffset: null });
 
     const stores = referencesOnly
       ? []
@@ -773,7 +787,9 @@ export async function GET(req: NextRequest) {
             return interleaved;
           })()
         : sortedItems;
-    const limitedItems = rankedItems.slice(offset, offset + limit);
+    const limitedItems = referencesOnly
+      ? rankedItems.slice(0, limit)
+      : rankedItems.slice(offset, offset + limit);
     const withinPublicWindow = mine || offset + limitedItems.length < 500;
     const hasMore =
       limitedItems.length > 0 &&
@@ -781,7 +797,11 @@ export async function GET(req: NextRequest) {
       (rankedItems.length > offset + limit ||
         (!mine && stores.length >= candidateLimit) ||
         referenceHasMore);
-    const nextOffset = hasMore ? offset + limitedItems.length : null;
+    const nextOffset = referencesOnly
+      ? (referenceHasMore ? referenceNextOffset : null)
+      : hasMore
+        ? offset + limitedItems.length
+        : null;
 
     return NextResponse.json(
       {
