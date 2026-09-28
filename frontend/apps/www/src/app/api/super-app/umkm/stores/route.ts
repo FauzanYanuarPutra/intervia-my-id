@@ -640,20 +640,13 @@ export async function GET(req: NextRequest) {
         { status: 400 },
       );
     }
+    // Without explicit browser location, a nationwide map must not be
+    // ranked by the viewport center. That would systematically favor central
+    // Indonesia and hide records from remote islands. Bounds remain a filter;
+    // only explicit viewer coordinates activate nearest-first ranking/radius.
     const rankingOrigin = hasViewer
       ? { lat: viewerLat as number, lng: viewerLng as number }
-      : parsedPublicQuery.bounds
-        ? {
-            lat:
-              (parsedPublicQuery.bounds.minLat +
-                parsedPublicQuery.bounds.maxLat) /
-              2,
-            lng:
-              (parsedPublicQuery.bounds.minLng +
-                parsedPublicQuery.bounds.maxLng) /
-              2,
-          }
-        : null;
+      : null;
     const candidateLimit = mine
       ? limit
       : Math.min(500, offset + limit + 1);
