@@ -2000,15 +2000,16 @@ def provider_store_sql(stores: list[ProviderStore]) -> list[str]:
         "  'published', 'offer', 1, 100, NOW(), NOW()",
         "FROM stage_real_provider_stores",
         "ON CONFLICT (slug) DO UPDATE",
-        "SET owner_id = NULL,",
-        "    title = EXCLUDED.title,",
+        "SET title = EXCLUDED.title,",
         "    summary = EXCLUDED.summary,",
         "    body = EXCLUDED.body,",
         "    category = EXCLUDED.category,",
         "    content_status = 'active',",
         "    metadata = EXCLUDED.metadata,",
         "    listing_status = 'published',",
-        "    updated_at = NOW();",
+        "    updated_at = NOW()",
+        "WHERE content_items.owner_id IS NULL",
+        "  AND content_items.metadata->>'reference_publication_status' = 'published';",
     ]
 
 
