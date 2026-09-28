@@ -153,6 +153,9 @@ jobs:
               "wikimedia-commons-indonesia-open-media",
               "denpasar-umkm-csv-2020",
               "tangsel-umkm-csv-2022",
+              "sleman-umkm-sector-2022",
+              "sumbawa-umkm-sector-scale-2024-2025",
+              "aceh-barat-johan-pahlawan-umkm-2025",
           }
           assert expected_default.issubset(ids), plan
           print("real-data source plan:", sorted(ids))
