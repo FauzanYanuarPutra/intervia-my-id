@@ -7,6 +7,7 @@ import { ModalSurface } from '@/components/interaction/ModalSurface';
 import {
   mobilePrimaryNavigation,
   portalMenuNavigation,
+  portalSectionUserLabel,
 } from '@/lib/portal-navigation';
 import { buildSectionHref } from '@/lib/portal-logic';
 import type { BusinessRecord, PortalSection } from '@/lib/portal-types';
@@ -46,7 +47,7 @@ export function MobileNav({ business, currentSection }: MobileNavProps) {
         <span className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${visual.iconClass}`}>
           <Icon className="h-[18px] w-[18px]" />
         </span>
-        <span className="min-w-0 flex-1 truncate">{item.label}</span>
+        <span className="min-w-0 flex-1 truncate">{portalSectionUserLabel(item.id)}</span>
       </Link>
     );
   }
