@@ -1,3 +1,5 @@
+#![recursion_limit = "512"]
+
 use axum::{
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
