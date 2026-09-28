@@ -891,10 +891,15 @@ try {
     if ($Services.Count -eq 0 -or $Services -contains "real_data_bootstrap") {
         Write-Host "Verifying external real-data bootstrap..." -ForegroundColor Cyan
         $CrawlerReady = $false
-        # External source imports can legitimately take several minutes on a
-        # first run. Keep waiting for the one-shot importer instead of treating
-        # a slow but healthy import as a startup failure.
-        for ($CrawlerAttempt = 1; $CrawlerAttempt -le 180; $CrawlerAttempt++) {
+        $CrawlerMaxAttempts = 24
+        if ($env:REAL_DATA_STARTUP_VERIFY_ATTEMPTS) {
+            [int]::TryParse($env:REAL_DATA_STARTUP_VERIFY_ATTEMPTS, [ref]$CrawlerMaxAttempts) | Out-Null
+            $CrawlerMaxAttempts = [Math]::Max(1, [Math]::Min($CrawlerMaxAttempts, 60))
+        }
+        # The crawler is deliberately best-effort. External Wikidata/Overpass
+        # mirrors can be slow or rate-limited; they must never block the local
+        # application stack from starting.
+        for ($CrawlerAttempt = 1; $CrawlerAttempt -le $CrawlerMaxAttempts; $CrawlerAttempt++) {
             $CrawlerState = @(
                 & docker @ComposeArgs ps -a --format "{{.Service}}|{{.State}}|{{.ExitCode}}" real_data_bootstrap 2>&1
             )
@@ -907,7 +912,7 @@ try {
                         break
                     }
                     if ($CrawlerLine -match '^real_data_bootstrap\|exited\|[1-9][0-9]*$') {
-                        Write-Warning "External real-data bootstrap exited with a non-zero code: $CrawlerLine"
+                        Write-Warning "External real-data bootstrap exited non-zero; source failures are recorded and will retry on the next startup."
                         break
                     }
                 }
@@ -916,19 +921,20 @@ try {
         }
 
         if (-not $CrawlerReady) {
-            & docker @ComposeArgs logs --no-color --tail 220 real_data_bootstrap
-            throw "External real-data bootstrap belum selesai sukses. Data dari source crawler tidak boleh dianggap sudah masuk."
-        }
-
-        $CrawlerLogs = @(
-            & docker @ComposeArgs logs --no-color --tail 80 real_data_bootstrap 2>&1
-        )
-        $CrawlerLogText = ($CrawlerLogs -join [Environment]::NewLine)
-        if ($CrawlerLogText -match "external DNS/network resolution is unavailable|bootstrap completed without external rows") {
-            Write-Warning "External real-data bootstrap ditangguhkan; stack tetap dilanjutkan dan bootstrap akan retry pada startup berikutnya."
+            Write-Warning "External real-data bootstrap is still running/deferred after the bounded startup window. Lajukan will continue; data hydration remains asynchronous."
+            & docker @ComposeArgs logs --no-color --tail 120 real_data_bootstrap
         }
         else {
-            Write-Host "External real-data bootstrap completed successfully." -ForegroundColor Green
+            $CrawlerLogs = @(
+                & docker @ComposeArgs logs --no-color --tail 80 real_data_bootstrap 2>&1
+            )
+            $CrawlerLogText = ($CrawlerLogs -join [Environment]::NewLine)
+            if ($CrawlerLogText -match "external DNS/network resolution is unavailable|bootstrap completed without external rows") {
+                Write-Warning "External real-data bootstrap ditangguhkan; stack tetap dilanjutkan dan bootstrap akan retry pada startup berikutnya."
+            }
+            else {
+                Write-Host "External real-data bootstrap completed successfully." -ForegroundColor Green
+            }
         }
     }
 
