@@ -8568,7 +8568,8 @@ async fn list_umkm_stores(
                     'licensed_reference',
                     'external_content_reference',
                     'real_openstreetmap_reference',
-                    'osm_provider_reference'
+                    'osm_provider_reference',
+                    'wikidata_reference'
                   )
                   AND COALESCE(metadata->>'reference_subtype', '') <> 'aggregate_data'
                   AND COALESCE(metadata->>'is_transactional', 'true') = 'false'
@@ -8720,7 +8721,8 @@ async fn get_umkm_store(
                     'licensed_reference',
                     'external_content_reference',
                     'real_openstreetmap_reference',
-                    'osm_provider_reference'
+                    'osm_provider_reference',
+                    'wikidata_reference'
                   )
                   AND COALESCE(metadata->>'reference_subtype', '') <> 'aggregate_data'
                   AND COALESCE(metadata->>'is_transactional', 'true') = 'false'
