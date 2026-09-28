@@ -1,11 +1,11 @@
 import Link from 'next/link';
 import { ArrowRight, CheckCircle2 } from 'lucide-react';
-import type { BusinessRecord } from '@/lib/portal-types';
+import type { BusinessRecord, PortalSection } from '@/lib/portal-types';
 import { getSetupSteps } from '@/lib/portal-logic';
 
 type UsahaFlowGuideProps = {
   business: BusinessRecord;
-  currentSection: Parameters<typeof getSetupSteps>[0] extends never ? never : 'home' | string;
+  currentSection: PortalSection;
 };
 
 const href = (businessId: string, path = '') => '/businesses/' + businessId + path;
