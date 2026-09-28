@@ -181,6 +181,7 @@ async function fetchMarketplaceReadJson<T>(
       headers: {
         Accept: 'application/json',
       },
+      signal: AbortSignal.timeout(5000),
     });
   } catch {
     throw new Error('marketplace_read_unavailable');
