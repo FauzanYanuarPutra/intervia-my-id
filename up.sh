@@ -233,6 +233,66 @@ else
   "${COMPOSE[@]}" up -d --remove-orphans --wait --wait-timeout 180
 fi
 
+# Verify the governed real-data plane after application startup. The crawler
+# runs as a separate idempotent service, so startup can succeed while hydration
+# is still running. Keep the check bounded and non-fatal for transient public-data
+# outages; the bootstrap container retries automatically on EX_TEMPFAIL.
+if (\${#SERVICES[@]} == 0)); then
+  DATA_BOOTSTRAP_ATTEMPTS="\${DATA_BOOTSTRAP_ATTEMPTS:-12}"
+  DATA_BOOTSTRAP_DELAY_SECONDS="\${DATA_BOOTSTRAP_DELAY_SECONDS:-5}"
+  DATA_BOOTSTRAP_READY=0
+
+  echo "Checking Lajukan real-data bootstrap status..."
+  for ((attempt=1; attempt<=DATA_BOOTSTRAP_ATTEMPTS; attempt++)); do
+    STATUS_JSON="\$("\${COMPOSE[@]}" exec -T marketplace_service curl -fsS http://127.0.0.1:8081/v1/data/bootstrap-status 2>/dev/null || true)"
+    if [[ -n "$STATUS_JSON" ]]; then
+      if "$PYTHON_BIN" - "$STATUS_JSON" <<'PY'
+import json, sys
+payload = json.loads(sys.argv[1])
+external = payload.get("external_crawler") or {}
+ready_rows = (
+    int(payload.get("published_references") or 0)
+    + int(payload.get("aggregate_references") or 0)
+    + int(external.get("provider_count") or 0)
+    + int(external.get("buyer_count") or 0)
+    + int(external.get("community_media_count") or 0)
+)
+if payload.get("status") == "ready" and ready_rows > 0:
+    print("ready")
+    raise SystemExit(0)
+print(
+    "status={status} persistent_sources={sources} active_jobs={jobs} "
+    "published_references={published} aggregate_references={aggregate} "
+    "external_rows={external_rows}".format(
+        status=payload.get("status"),
+        sources=payload.get("persistent_sources"),
+        jobs=payload.get("active_jobs"),
+        published=payload.get("published_references"),
+        aggregate=payload.get("aggregate_references"),
+        external_rows=ready_rows,
+    )
+)
+raise SystemExit(1)
+PY
+      then
+        DATA_BOOTSTRAP_READY=1
+        echo "Real-data bootstrap is hydrated."
+        break
+      fi
+    fi
+
+    if ((attempt < DATA_BOOTSTRAP_ATTEMPTS)); then
+      sleep "$DATA_BOOTSTRAP_DELAY_SECONDS"
+    fi
+  done
+
+  if ((DATA_BOOTSTRAP_READY == 0)); then
+    echo "warning: real-data bootstrap is still hydrating/deferred; the stack remains running and the bootstrap container will retry." >&2
+    "${COMPOSE[@]}" ps real_data_bootstrap marketplace_service || true
+    "${COMPOSE[@]}" logs --no-color --tail 120 real_data_bootstrap || true
+  fi
+fi
+
 # Caddyfile is bind-mounted. Compose does not reload a long-running Caddy
 # process when only that file changes, so activate the current configuration on
 # every edge/tunnel startup after validating it inside the running container.
