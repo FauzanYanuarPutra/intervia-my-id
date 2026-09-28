@@ -15,7 +15,7 @@ import { resolvePortalBusinessPageState } from '@/lib/portal-server';
 
 type PageProps = {
   params: Promise<{ businessId: string }>;
-  searchParams: Promise<{ q?: string; stock?: string; edit?: string }>;
+  searchParams: Promise<{ q?: string; stock?: string; edit?: string; create?: string }>;
 };
 
 function stockTone(stockHealth: string | undefined): 'success' | 'warning' | 'danger' | 'neutral' {
@@ -86,7 +86,7 @@ export default async function BusinessProductsPage({ params, searchParams }: Pag
         eyebrow="Produk"
         title="Produk yang dijual"
         description="Foto, nama, harga, dan stok dulu. Detail lain dibuka saat diperlukan."
-        action={canManage ? <ProductCreateModal businessId={business.id} /> : null}
+        action={canManage ? <ProductCreateModal businessId={business.id} openOnMount={query.create === '1'} /> : null}
       />
 
       <details className="merchant-surface-bordered px-4 py-3 sm:px-5">

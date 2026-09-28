@@ -22,6 +22,8 @@ export function SidebarNav({ business, currentSection }: SidebarNavProps) {
     item => !primaryIds.has(item.id) && item.id !== 'security',
   );
   const secondaryActive = secondary.some(item => item.id === currentSection);
+  const growth = secondary.filter(item => ['growth', 'buyerPage', 'channels', 'reports', 'parties'].includes(item.id));
+  const management = secondary.filter(item => !growth.some(groupItem => groupItem.id === item.id));
 
   function link(item: { id: PortalSection; label: string }, compact = false) {
     const visual = portalSectionVisual[item.id];
@@ -63,11 +65,22 @@ export function SidebarNav({ business, currentSection }: SidebarNavProps) {
             <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#f1f4f2] text-portal-soft">
               <Settings2 className="h-[17px] w-[17px]" />
             </span>
-            <span className="min-w-0 flex-1">Kelola usaha</span>
+            <span className="min-w-0 flex-1">Menu usaha</span>
             <ChevronDown className="h-4 w-4 shrink-0 transition group-open:rotate-180" />
           </summary>
-          <div className="mt-1 space-y-0.5 pl-2">
-            {secondary.map(item => link(item, true))}
+          <div className="mt-1 space-y-2 pl-2">
+            {growth.length ? (
+              <section>
+                <p className="px-2 pb-1 text-[10px] font-black uppercase tracking-[.11em] text-portal-soft/70">Tumbuh & pelanggan</p>
+                <div className="space-y-0.5">{growth.map(item => link(item, true))}</div>
+              </section>
+            ) : null}
+            {management.length ? (
+              <section className={growth.length ? 'border-t border-portal-line/70 pt-2' : ''}>
+                <p className="px-2 pb-1 text-[10px] font-black uppercase tracking-[.11em] text-portal-soft/70">Atur usaha</p>
+                <div className="space-y-0.5">{management.map(item => link(item, true))}</div>
+              </section>
+            ) : null}
           </div>
         </details>
       ) : null}

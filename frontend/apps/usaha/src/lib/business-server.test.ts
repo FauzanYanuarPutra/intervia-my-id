@@ -168,6 +168,38 @@ describe('canonical Usaha Business adapter', () => {
     );
   });
 
+  it('resolves a public store identifier without confusing it for a canonical business id', async () => {
+    const fetchMock = vi.fn<typeof fetch>((url) => {
+      const target = String(url);
+      if (target.endsWith('/auth/me')) {
+        return Promise.resolve(jsonResponse({ data: { user: { id: ACTOR_ID, name: 'Cuk' } } }));
+      }
+      if (target.endsWith('/organizations')) {
+        return Promise.resolve(jsonResponse({ data: { items: [] } }));
+      }
+      if (target.endsWith(`/v1/businesses/${STORE_ID}`)) {
+        return Promise.resolve(jsonResponse({ error: 'business_not_found' }, 404));
+      }
+      if (target.endsWith('/v1/businesses/mine')) {
+        return Promise.resolve(jsonResponse({ items: [canonicalBusiness(3).data.business] }));
+      }
+      return Promise.resolve(jsonResponse({ data: {} }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const business = await getBusinessForCurrentActor(STORE_ID);
+
+    expect(business).toMatchObject({ id: BUSINESS_ID, storeId: STORE_ID });
+    expect(fetchMock).toHaveBeenCalledWith(
+      `http://marketplace_service:8081/v1/businesses/${STORE_ID}`,
+      expect.anything(),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://marketplace_service:8081/v1/businesses/mine',
+      expect.anything(),
+    );
+  });
+
   it('provisions a business through the canonical command with an idempotency key', async () => {
     const fetchMock = vi.fn<typeof fetch>((url, init) => {
       const target = String(url);

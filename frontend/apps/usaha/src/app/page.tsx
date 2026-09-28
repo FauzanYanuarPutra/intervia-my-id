@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
 import {
   ArrowRight,
   BanknoteArrowDown,
@@ -9,6 +8,7 @@ import {
   Store,
 } from 'lucide-react';
 import { ReconcileBusinessButton } from '@/components/forms/ReconcileBusinessButton';
+import { GuestLanding } from '@/components/portal/GuestLanding';
 import { MetricStrip } from '@/components/portal/MetricStrip';
 import { PageHeader } from '@/components/portal/PageHeader';
 import { PendingOrganizationInvitations } from '@/components/portal/PendingOrganizationInvitations';
@@ -43,7 +43,7 @@ export default async function HomePage({
 }) {
   const params = await searchParams;
   const state = await resolvePortalHomeState(params);
-  if (!state.isAuthenticated) redirect('/login?callbackUrl=/');
+  if (!state.isAuthenticated) return <GuestLanding />;
   const business = state.activeBusiness;
   const viewerName = state.account.name;
 
@@ -115,7 +115,6 @@ export default async function HomePage({
   const canViewCosting = hasPermission(business, 'viewCosting');
   const canViewFinance = hasPermission(business, 'viewFinance');
   const canViewChannels = hasPermission(business, 'viewChannels');
-  const canViewOrders = hasPermission(business, 'viewOrders');
   const canViewSales = hasPermission(business, 'viewTransactions');
   const canManageInfo = hasPermission(business, 'manageInfo');
   const canManageInventory = hasPermission(business, 'manageInventory');
@@ -206,6 +205,13 @@ export default async function HomePage({
     setupIncomplete: incompleteSetup,
   });
 
+  const requiredSetupSteps = setupSteps.filter(step => !step.optional);
+  const completedSetupSteps = requiredSetupSteps.filter(step => step.done).length;
+  const readiness = requiredSetupSteps.length
+    ? Math.round((completedSetupSteps / requiredSetupSteps.length) * 100)
+    : 100;
+  const nextSetupStep = setupSteps.find(step => !step.done && !step.optional) ?? null;
+
   const recentEntries = canViewFinance
     ? financeEntries.filter(entry => entry.occurred_on === today).slice(0, 5)
     : [];
@@ -218,6 +224,27 @@ export default async function HomePage({
         description="Lihat kondisi usaha, lalu kerjakan yang paling penting."
         meta={<><StatusBadge tone={business.isOpen ? 'success' : 'neutral'}>{status.label}</StatusBadge><span className="text-xs text-portal-soft">{business.city} · {business.category}</span></>}
       />
+
+      <section className="merchant-surface-bordered overflow-hidden" aria-labelledby="workspace-readiness-title">
+        <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+          <div className="min-w-0">
+            <p className="text-[10px] font-black uppercase tracking-[.12em] text-portal-forest">Siap ditemukan pelanggan</p>
+            <h2 id="workspace-readiness-title" className="mt-1 text-lg font-black tracking-[-.03em] text-portal-ink">Usahamu {readiness}% siap dipakai.</h2>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-portal-soft">
+              {nextSetupStep
+                ? `Berikutnya: ${nextSetupStep.label}. ${nextSetupStep.hint}`
+                : 'Fondasi usaha sudah lengkap. Sekarang fokus menjaga katalog dan jualan tetap rapi.'}
+            </p>
+            <div className="mt-3 h-2 max-w-xl overflow-hidden rounded-full bg-portal-mist" role="progressbar" aria-label="Kesiapan usaha" aria-valuemin={0} aria-valuemax={100} aria-valuenow={readiness}>
+              <div className="h-full rounded-full bg-portal-forest transition-all" style={{ width: `${readiness}%` }} />
+            </div>
+          </div>
+          <div className="flex shrink-0 flex-wrap gap-2">
+            {nextSetupStep ? <Link href={dashboard.priority.href.startsWith('/') ? dashboard.priority.href : '#setup-checklist'} className="portal-button-primary">Kerjakan berikutnya <ArrowRight className="h-4 w-4" /></Link> : null}
+            <Link href="#setup-checklist" className="portal-button-secondary">Lihat checklist</Link>
+          </div>
+        </div>
+      </section>
 
       <PendingOrganizationInvitations />
 
@@ -292,7 +319,7 @@ export default async function HomePage({
       </section>
 
       {dashboard.showSetup ? (
-        <details className="merchant-surface-bordered group">
+        <details id="setup-checklist" className="merchant-surface-bordered group">
           <summary className="cursor-pointer list-none px-4 py-3.5 font-bold text-portal-ink sm:px-5">Lengkapi data usaha <span className="ml-2 text-xs font-semibold text-portal-soft">Buka</span></summary>
           <div className="border-t border-portal-line/70 p-4 sm:p-5"><ProgressTracker steps={setupSteps} /></div>
         </details>

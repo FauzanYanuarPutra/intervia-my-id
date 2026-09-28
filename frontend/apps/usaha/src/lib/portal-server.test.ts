@@ -93,4 +93,32 @@ describe('portal server state', () => {
     expect(businessServer.listBusinessesForCurrentActor).toHaveBeenCalledTimes(1);
     expect(businessServer.getBusinessForCurrentActor).not.toHaveBeenCalled();
   });
+
+  it('resolves legacy public store links to their canonical business record', async () => {
+    const business = {
+      id: 'business-1',
+      storeId: 'store-1',
+      slug: 'warung-cuk',
+      name: 'Warung Cuk',
+    };
+    businessServer.listBusinessesForCurrentActor.mockResolvedValue([business]);
+
+    const state = await resolvePortalBusinessPageState('store-1');
+
+    expect(state.activeBusiness).toBe(business);
+  });
+
+  it('keeps the home business switcher compatible with public store identifiers', async () => {
+    const business = {
+      id: 'business-1',
+      storeId: 'store-1',
+      slug: 'warung-cuk',
+      name: 'Warung Cuk',
+    };
+    businessServer.listBusinessesForCurrentActor.mockResolvedValue([business]);
+
+    const state = await resolvePortalHomeState({ business: 'store-1' });
+
+    expect(state.activeBusiness).toBe(business);
+  });
 });

@@ -4,8 +4,8 @@ import { useState } from 'react';
 import { Plus, X } from 'lucide-react';
 import { ProductQuickForm } from '@/components/forms/ProductQuickForm';
 
-export function ProductCreateModal({ businessId }: { businessId: string }) {
-  const [open, setOpen] = useState(false);
+export function ProductCreateModal({ businessId, openOnMount = false }: { businessId: string; openOnMount?: boolean }) {
+  const [open, setOpen] = useState(openOnMount);
 
   return (
     <>

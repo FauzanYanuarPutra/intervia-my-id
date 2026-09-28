@@ -17,7 +17,6 @@ import type {
   BusinessLocation,
   BusinessProfileSummary,
   BusinessRecord,
-  PortalRole,
   ProductRecord,
   ProductSourceType,
   ProductStockHealth,
@@ -615,7 +614,9 @@ export async function getBusinessForCurrentActor(
   const aggregate = await getCanonicalAggregate(token, businessId);
   if (aggregate) return mapCanonicalBusiness(aggregate, account, organizations);
   const businesses = await listBusinessesForCurrentActor();
-  return businesses.find(item => item.slug === businessId) ?? null;
+  return businesses.find(
+    item => item.id === businessId || item.storeId === businessId || item.slug === businessId,
+  ) ?? null;
 }
 
 export async function createBusiness(input: {

@@ -43,6 +43,7 @@
     color: #17211c;
     background: var(--portal-page);
     overflow-x: clip;
+    overscroll-behavior-x: none;
   }
 
   a {
@@ -64,6 +65,7 @@
   textarea,
   select {
     -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
   }
 
   select {
@@ -268,6 +270,20 @@
 
   .portal-button-ghost {
     @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-[11px] px-3 py-2 text-sm font-semibold text-portal-soft transition hover:bg-portal-mist hover:text-portal-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-forest/20;
+  }
+
+  .portal-touch-target {
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+  }
+
+  .portal-icon-button {
+    @apply inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-forest/20;
+  }
+
+  .portal-quick-create-fab {
+    @apply fixed right-4 z-[var(--portal-layer-action)] inline-flex h-14 w-14 items-center justify-center rounded-full bg-portal-forest text-white shadow-[0_16px_35px_-14px_rgba(16,76,48,.8)] transition hover:bg-portal-forestDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-forest/30 focus-visible:ring-offset-2 active:scale-95 lg:hidden;
+    bottom: calc(var(--portal-mobile-nav-height) + env(safe-area-inset-bottom) + 0.75rem);
   }
 
   .portal-skip-link {

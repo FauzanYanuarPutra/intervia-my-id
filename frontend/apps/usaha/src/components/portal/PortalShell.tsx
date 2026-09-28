@@ -1,11 +1,12 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { Bell, Building2, LockKeyhole, Store, UserRound } from 'lucide-react';
+import { Bell, Building2, ExternalLink, LockKeyhole, Store, UserRound } from 'lucide-react';
 import { BusinessSwitcher } from '@/components/portal/BusinessSwitcher';
 import { ChangeHistoryDrawer } from '@/components/portal/ChangeHistoryDrawer';
 import { InvitationIndicator } from '@/components/portal/InvitationIndicator';
 import { LogoutButton } from '@/components/portal/LogoutButton';
 import { MobileNav } from '@/components/portal/MobileNav';
+import { QuickCreateMenu } from '@/components/portal/QuickCreateMenu';
 import { SidebarNav } from '@/components/portal/SidebarNav';
 import { StatusBadge } from '@/components/portal/StatusBadge';
 import { UsahaFlowGuide } from '@/components/portal/UsahaFlowGuide';
@@ -116,6 +117,17 @@ export function PortalShell({
                 </span>
               ) : null}
               {viewerName ? <InvitationIndicator /> : null}
+              {!accountPage && activeBusiness?.publicUrl ? (
+                <a
+                  href={activeBusiness.publicUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="portal-button-ghost hidden lg:inline-flex"
+                >
+                  <ExternalLink className="h-4 w-4" /> Lihat toko
+                </a>
+              ) : null}
+              {!accountPage ? <QuickCreateMenu business={activeBusiness} /> : null}
               <Link href="/businesses/new" className="portal-button-ghost hidden sm:inline-flex">
                 <Building2 className="h-4 w-4" /> Tambah usaha
               </Link>
@@ -129,6 +141,7 @@ export function PortalShell({
         </main>
       </div>
 
+      {!accountPage ? <QuickCreateMenu business={activeBusiness} mobile /> : null}
       {!accountPage ? <MobileNav business={activeBusiness} currentSection={currentSection} /> : null}
     </div>
   );

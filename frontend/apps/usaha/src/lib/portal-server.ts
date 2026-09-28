@@ -71,7 +71,10 @@ export async function resolvePortalHomeState(searchParams: SearchParamsLike) {
   const activeBusiness =
     (explicitBusinessId
       ? businesses.find(
-          item => item.id === explicitBusinessId || item.slug === explicitBusinessId,
+          item =>
+            item.id === explicitBusinessId ||
+            item.storeId === explicitBusinessId ||
+            item.slug === explicitBusinessId,
         )
       : null) ?? businesses[0] ?? null;
 
@@ -97,7 +100,10 @@ export async function resolvePortalBusinessPageState(businessId: string) {
   const businesses = await listPortalBusinesses();
   const activeBusiness =
     businesses.find(
-      item => item.id === businessId || item.slug === businessId,
+      item =>
+        item.id === businessId ||
+        item.storeId === businessId ||
+        item.slug === businessId,
     ) ?? null;
   return {
     account,
