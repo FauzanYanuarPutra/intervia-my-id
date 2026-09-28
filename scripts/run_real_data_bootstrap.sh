@@ -39,6 +39,31 @@ PREFLIGHT_HOSTS="${REAL_DATA_NETWORK_PREFLIGHT_HOSTS:-data.go.id,overpass-api.de
 PREFLIGHT_ATTEMPTS="${REAL_DATA_NETWORK_PREFLIGHT_ATTEMPTS:-12}"
 PREFLIGHT_DELAY="${REAL_DATA_NETWORK_PREFLIGHT_DELAY_SECONDS:-5}"
 
+echo "[real-data] resolver configuration:"
+cat /etc/resolv.conf 2>/dev/null || true
+if command -v nslookup >/dev/null 2>&1; then
+  nslookup data.go.id 2>&1 | sed -n '1,16p' || true
+fi
+
+PROXY_URL="${HTTPS_PROXY:-${HTTP_PROXY:-}}"
+PROXY_HOST=""
+PROXY_REACHABLE=0
+if [ -n "$PROXY_URL" ]; then
+  PROXY_HOST="$(python - "$PROXY_URL" <<'PY'
+import sys
+from urllib.parse import urlparse
+parsed = urlparse(sys.argv[1])
+print(parsed.hostname or "")
+PY
+)"
+  if [ -n "$PROXY_HOST" ] && python -c 'import socket,sys; socket.getaddrinfo(sys.argv[1],443,type=socket.SOCK_STREAM)' "$PROXY_HOST" >/dev/null 2>&1; then
+    PROXY_REACHABLE=1
+    echo "[real-data] configured proxy host resolves: $PROXY_HOST"
+  else
+    echo "[real-data] configured proxy host does not resolve: $PROXY_HOST" >&2
+  fi
+fi
+
 echo "[real-data] checking external DNS/network..."
 for attempt in $(seq 1 "$PREFLIGHT_ATTEMPTS"); do
   resolved_count=0
@@ -56,9 +81,31 @@ for attempt in $(seq 1 "$PREFLIGHT_ATTEMPTS"); do
   fi
 done
 
+if [ "$resolved_count" -eq 0 ] && [ "$PROXY_REACHABLE" -eq 1 ]; then
+  echo "[real-data] direct DNS is unavailable; validating outbound access through configured proxy..."
+  if python - <<'PY'
+import urllib.error
+import urllib.request
+
+url = "https://data.go.id/"
+request = urllib.request.Request(url, headers={"User-Agent": "LajukanOpenDataImporter/1.0"})
+try:
+    with urllib.request.urlopen(request, timeout=20) as response:
+        print(f"[real-data] proxy network probe status={getattr(response, 'status', 'ok')}")
+    raise SystemExit(0)
+except urllib.error.HTTPError as exc:
+    print(f"[real-data] proxy network probe reached origin with HTTP {exc.code}")
+    raise SystemExit(0)
+PY
+  then
+    resolved_count=1
+  fi
+fi
+
 if [ "$resolved_count" -eq 0 ]; then
-  echo "[real-data] external DNS resolution is unavailable inside real_data_bootstrap." >&2
-  echo "[real-data] Check Docker Desktop DNS/egress or override REAL_DATA_DNS_PRIMARY/REAL_DATA_DNS_SECONDARY." >&2
+  echo "[real-data] external DNS/network resolution is unavailable inside real_data_bootstrap." >&2
+  echo "[real-data] resolver above must reach at least one approved source host." >&2
+  echo "[real-data] On Docker Desktop/VPN/firewall setups, use the Docker embedded resolver (default) or set REAL_DATA_DNS_PRIMARY to a reachable resolver; when a proxy is required, set REAL_DATA_HTTP_PROXY/REAL_DATA_HTTPS_PROXY." >&2
   exit 20
 fi
 
