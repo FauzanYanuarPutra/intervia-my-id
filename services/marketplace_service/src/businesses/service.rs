@@ -52,6 +52,7 @@ impl BusinessService {
 
     pub(crate) async fn list_mine(
         &self,
+        actor_id: Uuid,
         authorization: &str,
     ) -> Result<Vec<BusinessAggregate>, BusinessServiceError> {
         let organizations = self
@@ -63,8 +64,22 @@ impl BusinessService {
             .into_iter()
             .map(|organization| organization.id)
             .collect::<Vec<_>>();
-        self.repository
+        let businesses = self
+            .repository
             .list_for_organizations(&organization_ids)
+            .await
+            .map_err(map_repository_error)?;
+
+        if !businesses.is_empty() {
+            return Ok(businesses);
+        }
+
+        // The canonical owner identity is also persisted on the business row.
+        // Use it as a read-only recovery path when Identity's organization
+        // projection is temporarily stale; invited members continue to use the
+        // normal organization-scoped path above.
+        self.repository
+            .list_created_by_actor(actor_id)
             .await
             .map_err(map_repository_error)
     }
