@@ -17,7 +17,7 @@ Configured sources live in `config/real_marketplace_open_data.sources.json`.
 
 Default visual seed sources:
 
-- `osm-overpass-indonesia-providers`: OpenStreetMap provider POIs through Overpass. License: ODbL 1.0, attribution required.
+- `osm-overpass-indonesia-providers`: OpenStreetMap provider POIs through Overpass. License: ODbL 1.0, attribution required. The default bootstrap now uses a controlled Indonesia-wide 4° grid with rotating tile order and capped per-tile rows, rather than issuing one oversized nationwide query.
 - `wikimedia-commons-indonesia-open-media`: Wikimedia Commons image/video file metadata through the MediaWiki API. The importer reads per-file URL, MIME type, author, and license metadata, then skips files whose license does not match the free/public allow-list.
 - `wikidata-indonesia-business-references`: Wikidata structured business references for Indonesia with public coordinates. Structured Wikidata data is CC0; the importer retains the item URL/ID and treats every result as an unowned reference. It does not infer ownership, contact details, prices, stock, ratings, or transactions.
 
