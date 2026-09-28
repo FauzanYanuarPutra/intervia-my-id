@@ -737,6 +737,7 @@ export async function GET(req: NextRequest) {
     const referenceItems: PublicReferenceMapItem[] = references.items;
     const referenceHasMore = references.hasMore;
     const referenceNextCursor = references.nextCursor;
+    const referenceNextOffset = references.nextOffset;
 
     const combinedItems = [...items, ...referenceItems];
     const filteredItems = combinedItems.filter(item => {
@@ -811,7 +812,9 @@ export async function GET(req: NextRequest) {
           reference_count: referenceItems.length,
           reference_has_more: referenceHasMore,
           next_cursor: referencesOnly ? referenceNextCursor : null,
-          loaded_count: offset + limitedItems.length,
+          loaded_count: referencesOnly
+            ? offset + limitedItems.length
+            : offset + limitedItems.length,
           has_more: hasMore,
           next_offset: nextOffset,
         },
