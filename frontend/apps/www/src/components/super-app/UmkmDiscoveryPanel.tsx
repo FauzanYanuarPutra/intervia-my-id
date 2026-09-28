@@ -100,6 +100,7 @@ type StoresResponse = {
     next_offset?: number | null;
     reference_has_more?: boolean;
     next_cursor?: string | null;
+    stores_backend_degraded?: boolean;
   };
   error?: string;
 };
@@ -1069,6 +1070,7 @@ export function UmkmDiscoveryPanel({
   );
   const [canUseDesktopMapPanel, setCanUseDesktopMapPanel] = useState(false);
   const [reloadNonce, setReloadNonce] = useState(0);
+  const [storesBackendDegraded, setStoresBackendDegraded] = useState(false);
   const [mapBounds, setMapBounds] = useState<{
     minLat: number;
     maxLat: number;
@@ -1201,6 +1203,7 @@ export function UmkmDiscoveryPanel({
         }
         if (controller.signal.aborted) return;
         const pageItems = payload.data.items || [];
+        setStoresBackendDegraded(payload.data.stores_backend_degraded === true);
         const items = mergeDeepLinkedUmkmStore(
           pageItems,
           deepLinkedInitialStore,
@@ -1323,6 +1326,39 @@ export function UmkmDiscoveryPanel({
     queryViewerLocation,
   ]);
 
+  useEffect(() => {
+    const mapAutoLoadEnabled = variant === 'immersive' || mapOnly;
+    if (
+      !mapAutoLoadEnabled ||
+      !mapBounds ||
+      !hasMore ||
+      loading ||
+      loadingMore ||
+      nextOffset === null
+    ) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      void loadStoresPage({
+        offset: nextOffset,
+        append: true,
+        silent: true,
+      });
+    }, 125);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [
+    hasMore,
+    loadStoresPage,
+    loading,
+    loadingMore,
+    mapBounds,
+    mapOnly,
+    nextOffset,
+    variant,
+  ]);
+
   const loadReferencesPage = useCallback(
     async ({
       cursor,
@@ -1401,6 +1437,7 @@ export function UmkmDiscoveryPanel({
           sourceHasMore === true &&
           (nextCursor !== null || nextOffset !== null);
         const pageItems = payload.data.items || [];
+        setStoresBackendDegraded(payload.data.stores_backend_degraded === true);
         setStores(current =>
           mergeUmkmPublicReferencePage(current, pageItems, append),
         );
@@ -1438,6 +1475,38 @@ export function UmkmDiscoveryPanel({
       activeReferencesRequestRef.current?.abort();
     };
   }, [loadReferencesPage, mapBounds]);
+
+  useEffect(() => {
+    const mapAutoLoadEnabled = variant === 'immersive' || mapOnly;
+    if (
+      !mapAutoLoadEnabled ||
+      !mapBounds ||
+      !referenceHasMore ||
+      loadingMoreReferences ||
+      (referenceNextCursor === null && referenceNextOffset === null)
+    ) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      void loadReferencesPage({
+        cursor: referenceNextCursor,
+        offset: referenceNextOffset,
+        append: true,
+      });
+    }, 150);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [
+    loadReferencesPage,
+    loadingMoreReferences,
+    mapBounds,
+    mapOnly,
+    referenceHasMore,
+    referenceNextCursor,
+    referenceNextOffset,
+    variant,
+  ]);
 
   const preparedStores = useMemo(
     () =>
@@ -2137,6 +2206,18 @@ export function UmkmDiscoveryPanel({
         <div className="absolute inset-0">
           {renderDiscoveryMap('h-full w-full', true)}
         </div>
+
+        {!error && storesBackendDegraded ? (
+          <div
+            className="pointer-events-auto absolute left-3 right-3 top-[calc(env(safe-area-inset-top)+11.75rem)] z-[1150] mx-auto max-w-md rounded-full border border-amber-200 bg-amber-50/95 px-3 py-2 text-center text-[10px] font-semibold text-amber-800 shadow-[0_14px_28px_-24px_rgba(245,158,11,0.35)] backdrop-blur dark:border-amber-900/70 dark:bg-amber-950/90 dark:text-amber-200"
+            role="status"
+            data-testid="umkm-degraded-map-state"
+          >
+            {isId
+              ? 'Sebagian data usaha sedang tidak tersedia. Titik referensi publik tetap ditampilkan.'
+              : 'Some business data is temporarily unavailable. Public reference points remain visible.'}
+          </div>
+        ) : null}
 
         {error ? (
           <div

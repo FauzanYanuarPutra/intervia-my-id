@@ -110,7 +110,7 @@ pub async fn generate_for_entity(db: &PgPool, entity_id: Uuid) -> Result<Value, 
         auto_publish_reference,
         reuse_mode,
         storage_allowed,
-        media_storage_allowed,
+        _media_storage_allowed,
         source_enabled,
         source_fresh,
     )) = entity

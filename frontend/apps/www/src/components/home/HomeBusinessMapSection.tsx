@@ -14,6 +14,7 @@ type HomeBusinessMapSectionProps = {
 type StoresResponse = {
   data?: {
     items?: UmkmMapStore[];
+    stores_backend_degraded?: boolean;
   };
   error?: string;
 };
@@ -51,6 +52,7 @@ export function summarizeHomeBusinessMapStores(stores: UmkmMapStore[]) {
     validStores,
     businessCount: businesses.length,
     referenceCount: references.length,
+    mappedCount: validStores.length,
     cityCount: cities.size,
   };
 }
@@ -63,6 +65,7 @@ export function HomeBusinessMapSection({
   const [stores, setStores] = useState<UmkmMapStore[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [backendDegraded, setBackendDegraded] = useState(false);
 
   const mapHref = `${UMKM_DISCOVERY_PATH}?view=map`;
 
@@ -74,7 +77,7 @@ export function HomeBusinessMapSection({
       try {
         setError(null);
         const response = await fetch(
-          '/api/super-app/umkm/stores?limit=50&include_references=1',
+          '/api/super-app/umkm/stores?map=1&limit=200&include_references=1&min_lat=-11&max_lat=6&min_lng=95&max_lng=141',
           {
             cache: 'no-store',
             credentials: 'include',
@@ -92,6 +95,7 @@ export function HomeBusinessMapSection({
 
         if (!active) return;
         setStores(payload.data.items);
+        setBackendDegraded(payload.data.stores_backend_degraded === true);
       } catch (loadError) {
         if (!active || controller.signal.aborted) return;
         setError(
@@ -153,8 +157,16 @@ export function HomeBusinessMapSection({
                 ? 'Menyiapkan peta…'
                 : 'Preparing the map…'
               : isId
-                ? `${summary.businessCount} usaha terpetakan`
-                : `${summary.businessCount} businesses mapped`}
+                ? summary.businessCount > 0
+                  ? `${summary.businessCount} usaha terpetakan`
+                  : summary.referenceCount > 0
+                    ? `${summary.referenceCount} referensi lokasi publik`
+                    : 'Belum ada titik'
+                : summary.businessCount > 0
+                  ? `${summary.businessCount} businesses mapped`
+                  : summary.referenceCount > 0
+                    ? `${summary.referenceCount} public map references`
+                    : 'No mapped points'}
           </p>
         </div>
 
@@ -190,14 +202,22 @@ export function HomeBusinessMapSection({
         <div className="pointer-events-none absolute inset-x-2.5 bottom-2.5 z-10 flex items-center justify-between gap-2 sm:inset-x-3 sm:bottom-3">
           <span className="rounded-full border border-white/90 bg-white/92 px-2.5 py-1.5 text-[8px] font-black text-slate-700 shadow-sm backdrop-blur sm:text-[9px]">
             Indonesia
-            {!loading && summary.businessCount > 0
-              ? ` · ${summary.businessCount} titik`
+            {!loading && summary.mappedCount > 0
+              ? ` · ${summary.mappedCount} titik`
               : ''}
           </span>
           <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white shadow-[0_10px_24px_-12px_rgba(5,150,105,0.9)] transition-transform duration-200 group-hover/map:translate-x-0.5 group-hover/map:scale-105">
             <ArrowUpRight className="h-3.5 w-3.5" />
           </span>
         </div>
+
+        {!error && !loading && backendDegraded ? (
+          <div className="absolute left-2 right-2 top-2 z-10 rounded-lg border border-amber-200/80 bg-amber-50/95 px-2.5 py-1.5 text-[8px] font-semibold text-amber-800 shadow-sm backdrop-blur sm:left-3 sm:right-3 sm:text-[9px]">
+            {isId
+              ? 'Sebagian data usaha sedang dipulihkan. Titik referensi publik tetap tersedia.'
+              : 'Some business data is recovering. Public reference points remain available.'}
+          </div>
+        ) : null}
 
         {error && !loading ? (
           <div className="absolute inset-x-2 bottom-2.5 z-10 rounded-lg border border-rose-200/80 bg-white/92 px-2 py-1.5 text-[8px] font-semibold text-rose-700 shadow-sm backdrop-blur sm:inset-x-3 sm:text-[9px]">

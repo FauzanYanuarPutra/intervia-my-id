@@ -24,6 +24,7 @@ import { sanitizeOwnerWritableUmkmMetadata } from '@/lib/super-app/umkm-owner-me
 import {
   createDurableMarketplaceStore,
 } from '@/lib/super-app/business-workspace';
+import { listUsahaPortalUmkmStores } from '@/lib/server/usahaPortalSync';
 
 const MARKETPLACE_URL =
   process.env.INTERNAL_MARKETPLACE_URL ||
@@ -455,7 +456,7 @@ const PublicStoreQuerySchema = z.object({
   city: z.string().trim().max(80),
   slug: z.string().trim().max(80),
   limit: z.coerce.number().int().min(1).max(500),
-  offset: z.coerce.number().int().min(0).max(490),
+  offset: z.coerce.number().int().min(0).max(10_000),
   cursor: z
     .string()
     .trim()
@@ -562,16 +563,22 @@ export async function GET(req: NextRequest) {
     const mapRequest =
       url.searchParams.get('map') === '1' ||
       url.searchParams.get('map') === 'true';
-    const publicBatchLimit = mapRequest ? 200 : 50;
+    const publicBatchLimit = 200;
+    const maxPublicWindow = mapRequest ? 10_000 : 500;
     if (!mine && parsedPublicQuery.query.limit > publicBatchLimit) {
       return NextResponse.json(
         { error: `Public UMKM batches are limited to ${publicBatchLimit} items` },
         { status: 400 },
       );
     }
-    if (!mine && parsedPublicQuery.query.offset + parsedPublicQuery.query.limit > 500) {
+    if (
+      !mine &&
+      parsedPublicQuery.query.offset + parsedPublicQuery.query.limit > maxPublicWindow
+    ) {
       return NextResponse.json(
-        { error: 'Public UMKM pagination window cannot exceed 500 items' },
+        {
+          error: 'Public UMKM pagination window cannot exceed ' + maxPublicWindow + ' items',
+        },
         { status: 400 },
       );
     }
@@ -664,17 +671,30 @@ export async function GET(req: NextRequest) {
     const rankingOrigin = hasViewer
       ? { lat: viewerLat as number, lng: viewerLng as number }
       : null;
-    const candidateLimit = mine
-      ? limit
-      : Math.min(500, offset + limit + 1);
+    const candidateLimit = limit;
+    const portalStoresPromise =
+      !mine &&
+      !backendOnly &&
+      !referencesOnly &&
+      offset === 0
+        ? listUsahaPortalUmkmStores({
+            query: query || undefined,
+            city: city || undefined,
+            slug: slug || undefined,
+            limit: 200,
+          }).catch(error => {
+            console.warn('[UMKM_USAHA_PORTAL_UNAVAILABLE]', {
+              message: error instanceof Error ? error.message : 'unknown error',
+            });
+            return [] as UmkmStore[];
+          })
+        : Promise.resolve([] as UmkmStore[]);
+
     const referencesPromise = includeReferences
       ? listPublicMapReferences({
           query: query || undefined,
           city: city || undefined,
-          limit: Math.min(
-            mapRequest ? 200 : 50,
-            referencesOnly && offset === 0 ? limit : candidateLimit,
-          ),
+          limit: Math.min(200, limit),
           viewer: hasViewer
             ? { lat: viewerLat as number, lng: viewerLng as number }
             : null,
@@ -688,8 +708,14 @@ export async function GET(req: NextRequest) {
           });
           return { items: [], hasMore: false, nextCursor: null, nextOffset: null };
         })
-: Promise.resolve({ items: [], hasMore: false, nextCursor: null, nextOffset: null });
+      : Promise.resolve({
+          items: [],
+          hasMore: false,
+          nextCursor: null,
+          nextOffset: null,
+        });
 
+    let storesBackendDegraded = false;
     const stores = referencesOnly
       ? []
       : mine
@@ -708,16 +734,61 @@ export async function GET(req: NextRequest) {
           backendOnly,
           activeOnly: true,
           limit: candidateLimit,
+          offset,
+          includeReferences: false,
           ...(parsedPublicQuery.bounds
             ? { bounds: parsedPublicQuery.bounds }
             : {}),
           ...(rankingOrigin ? { viewer: rankingOrigin } : {}),
           ...(radiusKm !== null && hasViewer ? { radiusKm } : {}),
+        }).catch(error => {
+          if (!includeReferences && !mapRequest) throw error;
+          storesBackendDegraded = true;
+          console.warn('[UMKM_PUBLIC_STORE_BACKEND_DEGRADED]', {
+            message: error instanceof Error ? error.message : 'unknown error',
+            mapRequest,
+            includeReferences,
+            bounds: parsedPublicQuery.bounds ?? null,
+          });
+          return [] as UmkmStore[];
         });
 
-    const visibleStores = mine
+    const portalStores = await portalStoresPromise;
+    const existingStoreKeys = new Set(
+      stores.flatMap(store => [store.id, store.slug]),
+    );
+    const portalUniqueStores = portalStores.filter(store => {
+      if (existingStoreKeys.has(store.id) || existingStoreKeys.has(store.slug)) {
+        return false;
+      }
+      if (!isPublicUmkmStoreVisible(store)) return false;
+      if (parsedPublicQuery.bounds) {
+        const bounds = parsedPublicQuery.bounds;
+        if (
+          store.lat < bounds.minLat ||
+          store.lat > bounds.maxLat ||
+          store.lng < bounds.minLng ||
+          store.lng > bounds.maxLng
+        ) {
+          return false;
+        }
+      }
+      if (hasViewer && radiusKm !== null) {
+        const distance = haversineKm(
+          { lat: viewerLat as number, lng: viewerLng as number },
+          { lat: store.lat, lng: store.lng },
+        );
+        if (!Number.isFinite(distance) || distance > radiusKm) return false;
+      }
+      return true;
+    });
+    const visibleStoreSource = mine
       ? stores
-      : stores.filter(isPublicUmkmStoreVisible);
+      : [...stores, ...portalUniqueStores];
+
+    const visibleStores = mine
+      ? visibleStoreSource
+      : visibleStoreSource.filter(isPublicUmkmStoreVisible);
 
     const items = await Promise.all(
       visibleStores.map(async store => {
@@ -792,20 +863,24 @@ export async function GET(req: NextRequest) {
             return interleaved;
           })()
         : sortedItems;
-    const limitedItems = referencesOnly
-      ? rankedItems.slice(0, limit)
-      : rankedItems.slice(offset, offset + limit);
-    const withinPublicWindow = mine || offset + limitedItems.length < 500;
-    const hasMore =
-      limitedItems.length > 0 &&
-      withinPublicWindow &&
-      (rankedItems.length > offset + limit ||
-        (!mine && stores.length >= candidateLimit) ||
-        referenceHasMore);
+    const limitedItems = rankedItems.slice(0, limit);
+    const backendRowsConsumed =
+      Math.max(0, stores.length - portalUniqueStores.length);
+    const storesCanContinue =
+      !mine &&
+      !referencesOnly &&
+      stores.length >= candidateLimit &&
+      backendRowsConsumed > 0 &&
+      offset + backendRowsConsumed < maxPublicWindow;
+    const hasMore = referencesOnly
+      ? referenceHasMore
+      : mine
+        ? false
+        : storesCanContinue;
     const nextOffset = referencesOnly
       ? (referenceHasMore ? referenceNextOffset : null)
       : hasMore
-        ? offset + limitedItems.length
+        ? offset + backendRowsConsumed
         : null;
 
     return NextResponse.json(
@@ -815,10 +890,11 @@ export async function GET(req: NextRequest) {
           count: sortedItems.length,
           reference_count: referenceItems.length,
           reference_has_more: referenceHasMore,
+          stores_backend_degraded: storesBackendDegraded,
           next_cursor: referencesOnly ? referenceNextCursor : null,
           loaded_count: referencesOnly
             ? offset + limitedItems.length
-            : offset + limitedItems.length,
+            : offset + stores.length,
           has_more: hasMore,
           next_offset: nextOffset,
         },

@@ -188,6 +188,8 @@ export type ListUmkmStoresOptions = {
   activeOnly?: boolean;
   backendOnly?: boolean;
   limit?: number;
+  offset?: number;
+  includeReferences?: boolean;
   bounds?: {
     minLat: number;
     maxLat: number;
