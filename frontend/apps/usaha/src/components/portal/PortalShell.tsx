@@ -130,7 +130,7 @@ export function PortalShell({
                 </a>
               ) : null}
               {!accountPage ? <QuickCreateMenu business={activeBusiness} /> : null}
-              <Link href="/businesses/new" className="portal-button-ghost hidden sm:inline-flex">
+              <Link href="/businesses/new?new=1" className="portal-button-ghost hidden sm:inline-flex">
                 <Building2 className="h-4 w-4" /> Tambah usaha
               </Link>
               <div className="lg:hidden">{viewerName ? <LogoutButton compact /> : null}</div>

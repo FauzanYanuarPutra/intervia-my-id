@@ -54,7 +54,7 @@ export function BusinessSwitcher({
   if (!activeBusiness) {
     return (
       <Link
-        href="/businesses/new"
+        href="/businesses/new?new=1"
         className="flex min-h-11 items-center gap-3 rounded-xl border border-dashed border-portal-line bg-[#fafbfa] px-3 text-sm font-semibold text-portal-ink transition hover:bg-portal-mist"
       >
         <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-portal-mist text-portal-forest">

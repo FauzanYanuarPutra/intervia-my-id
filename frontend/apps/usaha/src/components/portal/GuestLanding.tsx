@@ -48,7 +48,7 @@ export function GuestLanding() {
               Satu workspace sederhana untuk merapikan profil, katalog, jualan, stok, uang, dan pekerjaan harian usahamu.
             </p>
             <div className="mt-7 flex flex-wrap gap-2.5">
-              <Link href="/login?callbackUrl=%2Fbusinesses%2Fnew" className="portal-button-primary">
+              <Link href="/login?callbackUrl=%2Fbusinesses%2Fnew%3Fnew%3D1" className="portal-button-primary">
                 Mulai gratis <ArrowRight className="h-4 w-4" />
               </Link>
               <Link href="/login" className="portal-button-secondary">Lihat workspace</Link>
