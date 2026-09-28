@@ -121,4 +121,38 @@ describe('portal server state', () => {
 
     expect(state.activeBusiness).toBe(business);
   });
+
+  it('resolves the canonical business directly when the list endpoint briefly misses it', async () => {
+    const business = {
+      id: 'business-1',
+      storeId: 'store-1',
+      slug: 'warung-cuk',
+      name: 'Warung Cuk',
+    };
+    businessServer.listBusinessesForCurrentActor.mockResolvedValue([]);
+    businessServer.getBusinessForCurrentActor.mockResolvedValue(business);
+
+    const state = await resolvePortalHomeState({ business: 'business-1' });
+
+    expect(state.activeBusiness).toBe(business);
+    expect(state.businesses).toEqual([business]);
+    expect(businessServer.getBusinessForCurrentActor).toHaveBeenCalledWith('business-1');
+  });
+
+  it('resolves a direct business detail when the business list temporarily misses it', async () => {
+    const business = {
+      id: 'business-1',
+      storeId: 'store-1',
+      slug: 'warung-cuk',
+      name: 'Warung Cuk',
+    };
+    businessServer.listBusinessesForCurrentActor.mockResolvedValue([]);
+    businessServer.getBusinessForCurrentActor.mockResolvedValue(business);
+
+    const state = await resolvePortalBusinessPageState('business-1');
+
+    expect(state.activeBusiness).toBe(business);
+    expect(state.businesses).toEqual([business]);
+    expect(businessServer.getBusinessForCurrentActor).toHaveBeenCalledWith('business-1');
+  });
 });
