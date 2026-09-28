@@ -987,17 +987,25 @@ pub async fn run(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
         Ok(()) => {
             if let Err(error) = sqlx::query(
                 r#"UPDATE data_source_registry s
-                   SET last_success_at=NOW(), updated_at=NOW()
+                   SET last_success_at=CASE
+                         WHEN j.status IN ('succeeded','partial') THEN NOW()
+                         ELSE s.last_success_at
+                       END,
+                       last_error_at=CASE
+                         WHEN j.status='partial' THEN NOW()
+                         ELSE s.last_error_at
+                       END,
+                       updated_at=NOW()
                    FROM data_import_jobs j
                    WHERE j.id=$1
                      AND s.id=j.source_id
-                     AND j.status = 'succeeded'"#,
+                     AND j.status IN ('succeeded','partial')"#,
             )
             .bind(job_id)
             .execute(&state.db)
             .await
             {
-                tracing::warn!(job_id=%job_id, "failed to record source success timestamp: {:?}", error);
+                tracing::warn!(job_id=%job_id, "failed to record source import health timestamps: {:?}", error);
             }
             Ok(())
         }
