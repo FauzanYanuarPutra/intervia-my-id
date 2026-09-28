@@ -920,7 +920,8 @@ try {
             Start-Sleep -Seconds 5
         }
 
-        if (-not $CrawlerReady) {
+        $CrawlerDeferred = -not $CrawlerReady
+        if ($CrawlerDeferred) {
             Write-Warning "External real-data bootstrap is still running/deferred after the bounded startup window. Lajukan will continue; data hydration remains asynchronous."
             & docker @ComposeArgs logs --no-color --tail 120 real_data_bootstrap
         }
@@ -1016,7 +1017,8 @@ try {
                 [int64]$FallbackStatus.published_references -eq 0 -and
                 [int64]$FallbackStatus.aggregate_references -eq 0 -and
                 $FallbackExternalRows -eq 0 -and
-                -not $ExternalNetworkDeferred
+                -not $ExternalNetworkDeferred -and
+                -not $CrawlerDeferred
 
             if ($CanRunOsmFallback) {
                 $OsmFallbackScript = Join-Path $RepoRoot "services\marketplace_service\scripts\import-osm-open-references.ps1"
