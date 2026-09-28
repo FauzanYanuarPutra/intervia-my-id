@@ -455,7 +455,7 @@ const PublicStoreQuerySchema = z.object({
   city: z.string().trim().max(80),
   slug: z.string().trim().max(80),
   limit: z.coerce.number().int().min(1).max(500),
-  offset: z.coerce.number().int().min(0).max(490),
+  offset: z.coerce.number().int().min(0).max(10_000),
   cursor: z
     .string()
     .trim()
@@ -562,16 +562,22 @@ export async function GET(req: NextRequest) {
     const mapRequest =
       url.searchParams.get('map') === '1' ||
       url.searchParams.get('map') === 'true';
-    const publicBatchLimit = mapRequest ? 200 : 50;
+    const publicBatchLimit = 200;
+    const maxPublicWindow = mapRequest ? 10_000 : 500;
     if (!mine && parsedPublicQuery.query.limit > publicBatchLimit) {
       return NextResponse.json(
         { error: `Public UMKM batches are limited to ${publicBatchLimit} items` },
         { status: 400 },
       );
     }
-    if (!mine && parsedPublicQuery.query.offset + parsedPublicQuery.query.limit > 500) {
+    if (
+      !mine &&
+      parsedPublicQuery.query.offset + parsedPublicQuery.query.limit > maxPublicWindow
+    ) {
       return NextResponse.json(
-        { error: 'Public UMKM pagination window cannot exceed 500 items' },
+        {
+          error: 'Public UMKM pagination window cannot exceed ' + maxPublicWindow + ' items',
+        },
         { status: 400 },
       );
     }
@@ -664,17 +670,12 @@ export async function GET(req: NextRequest) {
     const rankingOrigin = hasViewer
       ? { lat: viewerLat as number, lng: viewerLng as number }
       : null;
-    const candidateLimit = mine
-      ? limit
-      : Math.min(500, offset + limit + 1);
+    const candidateLimit = limit;
     const referencesPromise = includeReferences
       ? listPublicMapReferences({
           query: query || undefined,
           city: city || undefined,
-          limit: Math.min(
-            mapRequest ? 200 : 50,
-            referencesOnly && offset === 0 ? limit : candidateLimit,
-          ),
+          limit: Math.min(200, limit),
           viewer: hasViewer
             ? { lat: viewerLat as number, lng: viewerLng as number }
             : null,
@@ -688,7 +689,12 @@ export async function GET(req: NextRequest) {
           });
           return { items: [], hasMore: false, nextCursor: null, nextOffset: null };
         })
-: Promise.resolve({ items: [], hasMore: false, nextCursor: null, nextOffset: null });
+      : Promise.resolve({
+          items: [],
+          hasMore: false,
+          nextCursor: null,
+          nextOffset: null,
+        });
 
     let storesBackendDegraded = false;
     const stores = referencesOnly
@@ -709,6 +715,8 @@ export async function GET(req: NextRequest) {
           backendOnly,
           activeOnly: true,
           limit: candidateLimit,
+          offset,
+          includeReferences: false,
           ...(parsedPublicQuery.bounds
             ? { bounds: parsedPublicQuery.bounds }
             : {}),
@@ -803,20 +811,21 @@ export async function GET(req: NextRequest) {
             return interleaved;
           })()
         : sortedItems;
-    const limitedItems = referencesOnly
-      ? rankedItems.slice(0, limit)
-      : rankedItems.slice(offset, offset + limit);
-    const withinPublicWindow = mine || offset + limitedItems.length < 500;
-    const hasMore =
-      limitedItems.length > 0 &&
-      withinPublicWindow &&
-      (rankedItems.length > offset + limit ||
-        (!mine && stores.length >= candidateLimit) ||
-        referenceHasMore);
+    const limitedItems = rankedItems.slice(0, limit);
+    const storesCanContinue =
+      !mine &&
+      !referencesOnly &&
+      stores.length >= candidateLimit &&
+      offset + stores.length < maxPublicWindow;
+    const hasMore = referencesOnly
+      ? referenceHasMore
+      : mine
+        ? false
+        : storesCanContinue;
     const nextOffset = referencesOnly
       ? (referenceHasMore ? referenceNextOffset : null)
       : hasMore
-        ? offset + limitedItems.length
+        ? offset + stores.length
         : null;
 
     return NextResponse.json(
@@ -830,7 +839,7 @@ export async function GET(req: NextRequest) {
           next_cursor: referencesOnly ? referenceNextCursor : null,
           loaded_count: referencesOnly
             ? offset + limitedItems.length
-            : offset + limitedItems.length,
+            : offset + stores.length,
           has_more: hasMore,
           next_offset: nextOffset,
         },
