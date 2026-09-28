@@ -28,7 +28,10 @@
       "id": "osm-overpass-indonesia-providers",
       "kind": "osm_overpass",
       "role": "provider",
-      "enabled_by_default": false,
+      "enabled_by_default": true,
+      "coverage": "indonesia_grid",
+      "grid_step_degrees": 4,
+      "grid_bbox": [-11.5, 94.5, 7.5, 142.5],
       "name": "OpenStreetMap Indonesia provider POIs via Overpass",
       "source_url": "https://www.openstreetmap.org/",
       "license": "Open Database License 1.0",
@@ -41,7 +44,7 @@
         "https://overpass.private.coffee/api/interpreter"
       ],
       "timeout_seconds": 90,
-      "per_bbox_limit": 250,
+      "per_bbox_limit": 350,
       "selectors": [
         {
           "key": "shop",
