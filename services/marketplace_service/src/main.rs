@@ -8727,7 +8727,7 @@ async fn get_umkm_store(
                   AND lower(COALESCE(metadata->>'market_side', '')) = 'reference'
                   AND (slug = $1 OR id::text = $1)
                 LIMIT 1
-                "#
+                "#,
             )
             .bind(store_ref.trim())
             .fetch_optional(&state.db)
@@ -8756,10 +8756,12 @@ async fn get_umkm_store(
                         .unwrap_or(&city)
                         .to_string();
                     let lat = metadata.get("latitude").and_then(|v| {
-                        v.as_f64().or_else(|| v.as_str().and_then(|s| s.parse::<f64>().ok()))
+                        v.as_f64()
+                            .or_else(|| v.as_str().and_then(|s| s.parse::<f64>().ok()))
                     });
                     let lng = metadata.get("longitude").and_then(|v| {
-                        v.as_f64().or_else(|| v.as_str().and_then(|s| s.parse::<f64>().ok()))
+                        v.as_f64()
+                            .or_else(|| v.as_str().and_then(|s| s.parse::<f64>().ok()))
                     });
 
                     let Some((lat, lng)) = lat.zip(lng) else {
@@ -8774,7 +8776,10 @@ async fn get_umkm_store(
                         object.insert("is_transactional".to_string(), json!(false));
                         object.insert(
                             "claimable".to_string(),
-                            json!(metadata.get("claimable").and_then(Value::as_bool).unwrap_or(false)),
+                            json!(metadata
+                                .get("claimable")
+                                .and_then(Value::as_bool)
+                                .unwrap_or(false)),
                         );
                         if let Some(image) = cover_image.as_ref() {
                             object.entry("image_url").or_insert_with(|| json!(image));
@@ -8805,8 +8810,9 @@ async fn get_umkm_store(
                                     "updated_at": updated_at
                                 }
                             }
-                        }))
-                    ).into_response()
+                        })),
+                    )
+                        .into_response()
                 }
                 Ok(None) => err(StatusCode::NOT_FOUND, "umkm store not found").into_response(),
                 Err(error) => {
