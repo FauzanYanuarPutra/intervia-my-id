@@ -29,7 +29,7 @@ SET metadata = COALESCE(c.metadata, '{}'::jsonb)
     updated_at = NOW()
 FROM reference_promotion_candidates pc
 JOIN data_import_entities e ON e.id = pc.entity_id
-JOIN data_import_records r ON r.id = COALESCE(e.canonical_record_id, r.id)
+LEFT JOIN data_import_records r ON r.id = e.canonical_record_id
 JOIN data_source_registry s ON s.id = pc.source_id
 WHERE pc.proposed_content_id = c.id
   AND c.content_status <> 'deleted';
