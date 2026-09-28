@@ -1098,6 +1098,7 @@ export function UmkmDiscoveryPanel({
     [],
   );
   const requestLimit = Math.max(50, Math.min(200, limit));
+  const mapRequestLimit = 200;
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1176,7 +1177,7 @@ export function UmkmDiscoveryPanel({
         if (mapRangeKm !== null && queryViewerLocation) {
           params.set('radius_km', String(mapRangeKm));
         }
-        params.set('limit', String(requestLimit));
+        params.set('limit', String(mapRequestLimit));
         params.set('offset', String(offset));
         params.set('map', '1');
         if (mapBounds) {
@@ -1351,7 +1352,7 @@ export function UmkmDiscoveryPanel({
 
       const params = new URLSearchParams({
         references_only: '1',
-        limit: String(requestLimit),
+        limit: String(mapRequestLimit),
         offset: String(safeCursor ? 0 : safeOffset || 0),
       });
       params.set('map', '1');
@@ -1416,7 +1417,7 @@ export function UmkmDiscoveryPanel({
         }
       }
     },
-    [city, mapBounds, mapRangeKm, query, queryViewerLocation, requestLimit],
+    [city, mapBounds, mapRangeKm, query, queryViewerLocation, mapRequestLimit],
   );
 
   useEffect(() => {
@@ -2020,18 +2021,18 @@ export function UmkmDiscoveryPanel({
             )}
           >
             <div className="pointer-events-auto mb-2 flex justify-end">
-              <label className="flex items-center gap-1.5 rounded-full border border-white/80 bg-white/94 px-2.5 py-1.5 text-[10px] font-bold text-slate-700 shadow-sm backdrop-blur dark:border-slate-700/80 dark:bg-slate-950/90 dark:text-slate-200">
-                <span>{isId ? 'Jangkauan' : 'Range'}</span>
+              <label className="flex items-center gap-1 rounded-full border border-white/80 bg-white/94 px-2 py-1 text-[9px] font-bold text-slate-700 shadow-sm backdrop-blur dark:border-slate-700/80 dark:bg-slate-950/90 dark:text-slate-200">
+                <span>{isId ? 'Radius' : 'Radius'}</span>
                 <select
                   value={mapRangeKm === null ? 'all' : String(mapRangeKm)}
                   onChange={event => {
                     void handleMapRangeChange(event.target.value);
                   }}
-                  className="bg-transparent text-[10px] font-black outline-none"
+                  className="max-w-[82px] bg-transparent text-[9px] font-black outline-none"
                   aria-label={isId ? 'Jangkauan peta' : 'Map range'}
                 >
                   <option value="all">{isId ? 'Seluruh Indonesia' : 'All Indonesia'}</option>
-                  {[5, 10, 25, 50, 100, 250, 500, 1000].map(value => (
+                  {[3, 5, 10, 25, 50, 100].map(value => (
                     <option key={value} value={value}>
                       {value} km
                     </option>
