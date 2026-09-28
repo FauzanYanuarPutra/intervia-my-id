@@ -592,12 +592,13 @@ pub(crate) async fn promote_candidate(db: &PgPool, candidate_id: Uuid) -> Anyhow
     } = candidate;
 
     if promotion_status == "promoted" {
-        let existing = sqlx::query_scalar::<_, Uuid>(
+        let existing = sqlx::query_scalar::<_, Option<Uuid>>(
             "SELECT proposed_content_id FROM reference_promotion_candidates WHERE id=$1",
         )
         .bind(candidate_id)
         .fetch_optional(&mut *tx)
-        .await?;
+        .await?
+        .flatten();
         tx.commit().await?;
         return Ok(json!({
             "promoted": true,
