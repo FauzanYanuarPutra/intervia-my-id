@@ -3,6 +3,7 @@ import 'server-only';
 import { readSingleParam } from '@/lib/portal-logic';
 import {
   getAuthenticatedActor,
+  getBusinessForCurrentActor,
   listBusinessesForCurrentActor,
 } from '@/lib/business-server';
 import type { BusinessRecord } from '@/lib/portal-types';
@@ -68,7 +69,7 @@ export async function resolvePortalHomeState(searchParams: SearchParamsLike) {
     };
   }
 
-  const activeBusiness =
+  let activeBusiness =
     (explicitBusinessId
       ? businesses.find(
           item =>
@@ -77,6 +78,33 @@ export async function resolvePortalHomeState(searchParams: SearchParamsLike) {
             item.slug === explicitBusinessId,
         )
       : null) ?? businesses[0] ?? null;
+
+  // A freshly provisioned business is redirected with its canonical ID.
+  // The collection endpoint may briefly lag the detail endpoint, so resolve
+  // the requested business directly before showing a misleading empty state.
+  if (explicitBusinessId && !activeBusiness) {
+    try {
+      const directBusiness = await getBusinessForCurrentActor(explicitBusinessId);
+      if (directBusiness) {
+        activeBusiness = directBusiness;
+        businesses = [
+          directBusiness,
+          ...businesses.filter(item => item.id !== directBusiness.id),
+        ];
+      }
+    } catch (error) {
+      if (
+        !(
+          error &&
+          typeof error === 'object' &&
+          ((error as { status?: unknown }).status === 404 ||
+            (error as { code?: unknown }).code === 'business_not_found')
+        )
+      ) {
+        throw error;
+      }
+    }
+  }
 
   return {
     account,
@@ -97,14 +125,39 @@ export async function resolvePortalBusinessPageState(businessId: string) {
       isAuthenticated: false as const,
     };
   }
-  const businesses = await listPortalBusinesses();
-  const activeBusiness =
+  let businesses = await listPortalBusinesses();
+  let activeBusiness =
     businesses.find(
       item =>
         item.id === businessId ||
         item.storeId === businessId ||
         item.slug === businessId,
     ) ?? null;
+
+  if (!activeBusiness) {
+    try {
+      const directBusiness = await getBusinessForCurrentActor(businessId);
+      if (directBusiness) {
+        activeBusiness = directBusiness;
+        businesses = [
+          directBusiness,
+          ...businesses.filter(item => item.id !== directBusiness.id),
+        ];
+      }
+    } catch (error) {
+      if (
+        !(
+          error &&
+          typeof error === 'object' &&
+          ((error as { status?: unknown }).status === 404 ||
+            (error as { code?: unknown }).code === 'business_not_found')
+        )
+      ) {
+        throw error;
+      }
+    }
+  }
+
   return {
     account,
     businesses,
