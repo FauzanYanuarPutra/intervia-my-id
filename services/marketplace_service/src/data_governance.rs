@@ -1774,7 +1774,7 @@ pub async fn discover_licensed_ckan_sources(state: &Arc<AppState>) -> Result<u64
             VALUES (
                 $1, $2, 'government_open_data', $3, $4, 'https://data.go.id/',
                 $5, $6, $7, 'persistent_import',
-                TRUE, FALSE, FALSE, TRUE, TRUE, 168, $8, NOW()
+                TRUE, FALSE, FALSE, TRUE, FALSE, 168, $8, NOW()
             )
             ON CONFLICT (source_key) DO UPDATE SET
                 provider_name=EXCLUDED.provider_name,
