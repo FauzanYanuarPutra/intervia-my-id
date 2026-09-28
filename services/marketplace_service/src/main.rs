@@ -248,6 +248,7 @@ fn resolve_public_content_offset(value: Option<i64>) -> Result<i64, &'static str
 #[derive(Debug, Deserialize, Default)]
 struct ListMapReferencesQuery {
     q: Option<String>,
+    offset: Option<i64>,
     city: Option<String>,
     cursor: Option<String>,
     limit: Option<i64>,
@@ -1103,6 +1104,8 @@ struct ListMapReferencesResponse {
     has_more: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     next_cursor: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    next_offset: Option<i64>,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -10845,6 +10848,14 @@ async fn list_map_references(
         }
         None => MAP_REFERENCE_DEFAULT_LIMIT,
     };
+    let offset = match query.offset.unwrap_or(0) {
+        value if (0..=10_000).contains(&value) => value,
+        _ => return err(StatusCode::BAD_REQUEST, "offset must be between 0 and 10000").into_response(),
+    };
+    if query.cursor.is_some() && offset != 0 {
+        return err(StatusCode::BAD_REQUEST, "map reference cursor cannot be combined with offset").into_response();
+    }
+
     let text_query = match clean_map_reference_filter(
         query.q.clone(),
         MAP_REFERENCE_MAX_QUERY_LEN,
@@ -11187,6 +11198,7 @@ async fn list_map_references(
         statement.push("updated_at DESC, id ASC");
     }
     statement.push(" LIMIT ").push_bind(limit + 1);
+    statement.push(" OFFSET ").push_bind(offset);
 
     let rows = statement
         .build_query_as::<MapReferenceRow>()
@@ -11212,7 +11224,12 @@ async fn list_map_references(
                     items,
                     limit,
                     has_more,
-                    next_cursor,
+                    next_cursor: if offset == 0 && ranking_origin.is_none() && text_query.is_none() {
+                        next_cursor
+                    } else {
+                        None
+                    },
+                    next_offset: has_more.then_some(offset + limit),
                 }),
             )
                 .into_response()
