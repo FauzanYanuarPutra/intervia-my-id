@@ -6,18 +6,45 @@ use uuid::Uuid;
 fn text_field(value: &Value, aliases: &[&str]) -> Option<String> {
     let object = value.as_object()?;
     for alias in aliases {
-        if let Some(value) = object.get(*alias) {
-            if let Some(text) = value.as_str() {
-                let text = text.trim();
-                if !text.is_empty() {
-                    return Some(text.to_string());
-                }
-            } else if value.is_number() {
-                return Some(value.to_string());
+        let matched = object
+            .iter()
+            .find(|(key, _)| key.eq_ignore_ascii_case(alias))
+            .map(|(_, value)| value)?;
+        if let Some(text) = matched.as_str() {
+            let text = text.trim();
+            if !text.is_empty() {
+                return Some(text.to_string());
             }
+        } else if matched.is_number() {
+            return Some(matched.to_string());
         }
     }
     None
+}
+
+fn coordinate_pair(value: &Value) -> Option<(f64, f64)> {
+    let coordinates = value
+        .get("geometry")
+        .and_then(|geometry| geometry.get("coordinates"))
+        .and_then(Value::as_array)
+        .or_else(|| value.get("coordinates").and_then(Value::as_array))?;
+
+    let longitude = coordinates.get(0).and_then(|value| {
+        value.as_f64().or_else(|| value.as_str().and_then(|text| text.trim().parse::<f64>().ok()))
+    })?;
+    let latitude = coordinates.get(1).and_then(|value| {
+        value.as_f64().or_else(|| value.as_str().and_then(|text| text.trim().parse::<f64>().ok()))
+    })?;
+
+    if longitude.is_finite()
+        && latitude.is_finite()
+        && longitude.abs() <= 180.0
+        && latitude.abs() <= 90.0
+    {
+        Some((latitude, longitude))
+    } else {
+        None
+    }
 }
 
 fn normalize_text(value: Option<String>) -> Option<String> {
@@ -122,8 +149,11 @@ pub async fn index_record(
         raw,
         &["category", "kategori", "jenis_usaha", "sector", "sektor"],
     ));
-    let lat = coordinate(raw, &["latitude", "lat", "lintang"], 90.0);
-    let lon = coordinate(raw, &["longitude", "lon", "lng", "bujur"], 180.0);
+    let geo_pair = coordinate_pair(raw);
+    let lat = coordinate(raw, &["latitude", "lat", "lintang"], 90.0)
+        .or_else(|| geo_pair.map(|pair| pair.0));
+    let lon = coordinate(raw, &["longitude", "lon", "lng", "bujur"], 180.0)
+        .or_else(|| geo_pair.map(|pair| pair.1));
 
     let canonical_key = {
         let mut value = String::new();
