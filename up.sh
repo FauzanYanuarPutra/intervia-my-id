@@ -237,14 +237,14 @@ fi
 # runs as a separate idempotent service, so startup can succeed while hydration
 # is still running. Keep the check bounded and non-fatal for transient public-data
 # outages; the bootstrap container retries automatically on EX_TEMPFAIL.
-if (\${#SERVICES[@]} == 0)); then
-  DATA_BOOTSTRAP_ATTEMPTS="\${DATA_BOOTSTRAP_ATTEMPTS:-12}"
-  DATA_BOOTSTRAP_DELAY_SECONDS="\${DATA_BOOTSTRAP_DELAY_SECONDS:-5}"
+if ((${#SERVICES[@]} == 0)); then
+  DATA_BOOTSTRAP_ATTEMPTS="${DATA_BOOTSTRAP_ATTEMPTS:-12}"
+  DATA_BOOTSTRAP_DELAY_SECONDS="${DATA_BOOTSTRAP_DELAY_SECONDS:-5}"
   DATA_BOOTSTRAP_READY=0
 
   echo "Checking Lajukan real-data bootstrap status..."
   for ((attempt=1; attempt<=DATA_BOOTSTRAP_ATTEMPTS; attempt++)); do
-    STATUS_JSON="\$("\${COMPOSE[@]}" exec -T marketplace_service curl -fsS http://127.0.0.1:8081/v1/data/bootstrap-status 2>/dev/null || true)"
+    STATUS_JSON="$("${COMPOSE[@]}" exec -T marketplace_service curl -fsS http://127.0.0.1:8081/v1/data/bootstrap-status 2>/dev/null || true)"
     if [[ -n "$STATUS_JSON" ]]; then
       if "$PYTHON_BIN" - "$STATUS_JSON" <<'PY'
 import json, sys
