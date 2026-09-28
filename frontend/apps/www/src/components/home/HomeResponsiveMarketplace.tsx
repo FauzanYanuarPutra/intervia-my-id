@@ -1900,48 +1900,44 @@ function HeroVisualStage({
           'dark:bg-[linear-gradient(135deg,#09090b_0%,#071510_58%,#09090b_100%)]',
         )}
       >
-        {!isAuthenticated ? (
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-y-0 right-0 z-0 hidden w-[58%] sm:block"
-          >
-            <div className="absolute inset-0 bg-gradient-to-r from-[#f0fdf4] via-[#f0fdf4]/88 to-transparent dark:from-[#09090b] dark:via-[#09090b]/90" />
-            <div className="absolute inset-y-3 right-3 grid w-[44%] grid-cols-2 gap-2 opacity-[0.16] blur-[0.2px] grayscale-[0.15] sm:inset-y-4 sm:right-4">
-              {heroCategories.slice(0, 4).map(category => (
-                <div
-                  key={category.id}
-                  className="overflow-hidden rounded-2xl border border-white/70 bg-white/40 shadow-sm dark:border-white/5 dark:bg-white/5"
-                >
-                  <Image
-                    src={category.image}
-                    alt=""
-                    width={220}
-                    height={160}
-                    className="h-full w-full object-cover"
-                    sizes="180px"
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : null}
+        {/* Single hero illustration */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0 right-0 z-0 hidden w-[48%] sm:block lg:w-[46%]"
+        >
+          {/* Fade so image blends naturally into the content */}
+          <div className="absolute inset-0 z-20 bg-gradient-to-r from-[#f0fdf4] via-[#f0fdf4]/75 via-45% to-transparent dark:from-[#09090b] dark:via-[#09090b]/80 dark:to-transparent" />
 
-        <div className="relative z-10">
+          <Image
+            src="/images/hero/menu/kebutuhan-01.png"
+            alt=""
+            fill
+            priority
+            sizes="(max-width: 639px) 0px, (max-width: 1023px) 48vw, 520px"
+            className="relative z-10 object-contain object-right drop-shadow-[0_18px_30px_rgba(16,185,129,0.16)]"
+          />
+        </div>
+
+        <div className="relative z-30">
           {isAuthenticated ? (
             <div className="max-w-3xl">
               <p className="mb-1 text-[10px] font-extrabold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-400 sm:text-xs">
                 {isId ? 'Selamat datang kembali' : 'Welcome back'}
               </p>
+
               <h1
                 id="home-main-heading"
                 className="text-[clamp(1.4rem,3vw,2.4rem)] font-black leading-[1] tracking-[-0.055em] text-zinc-950 dark:text-white"
               >
                 {isId ? 'Halo, ' : 'Hi, '}
+
                 <span className="text-emerald-700 dark:text-emerald-400">
                   {displayName}
                 </span>
+
                 <span aria-hidden="true"> 👋</span>
               </h1>
+
               <p className="mt-2 max-w-2xl text-xs font-semibold leading-5 text-zinc-700 dark:text-zinc-300 sm:text-sm sm:leading-6">
                 {isId
                   ? 'Cari produk, supplier, jasa, bahan usaha, mesin, tempat usaha, dan peluang yang cocok untuk kebutuhan bisnismu.'
@@ -1955,9 +1951,10 @@ function HeroVisualStage({
                   ? 'Tempat cari kebutuhan usaha'
                   : 'Find what your business needs'}
               </p>
+
               <h1
                 id="home-main-heading"
-                className="max-w-[760px] text-[clamp(1.45rem,4vw,2.55rem)] font-black leading-[1.02] tracking-[-0.055em] text-zinc-950 dark:text-white"
+                className="max-w-[50%] text-[clamp(1.45rem,4vw,2.55rem)] font-black leading-[1.02] tracking-[-0.055em] text-zinc-950 dark:text-white"
               >
                 {isId ? (
                   <>
@@ -1975,11 +1972,13 @@ function HeroVisualStage({
                   </>
                 )}
               </h1>
-              <p className="mt-2 max-w-2xl text-[11px] font-medium leading-5 text-zinc-700 dark:text-zinc-300 sm:text-[13px] sm:leading-5">
+
+              <p className="mt-2 max-w-[50%] text-[11px] font-medium leading-5 text-zinc-700 dark:text-zinc-300 sm:text-[13px] sm:leading-5">
                 {isId
                   ? 'Temukan bahan usaha, supplier, jasa profesional, mesin, tempat usaha, dan peluang bisnis dari berbagai daerah di Indonesia.'
                   : 'Find business supplies, suppliers, professional services, equipment, business places, and opportunities across Indonesia.'}
               </p>
+
               <div className="mt-3 flex min-w-0 items-center gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {heroCategories.map(category => (
                   <Link
@@ -1990,11 +1989,15 @@ function HeroVisualStage({
                     {isId ? category.shortLabelId : category.shortLabelEn}
                   </Link>
                 ))}
+
                 <Link
                   href={UMKM_DISCOVERY_PATH + '?view=map'}
                   className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-full border border-blue-200 bg-blue-50/85 px-2.5 text-[10px] font-bold text-blue-700 shadow-sm backdrop-blur transition hover:border-blue-300 hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:border-blue-900/60 dark:bg-blue-950/50 dark:text-blue-300 dark:hover:bg-blue-950/80 sm:min-h-9 sm:px-3 sm:text-[11px]"
                 >
-                  <MapPin className="h-3 w-3" aria-hidden="true" />
+                  <MapPin
+                    className="h-3 w-3"
+                    aria-hidden="true"
+                  />
                   {isId ? 'Usaha sekitar' : 'Nearby'}
                 </Link>
               </div>
@@ -2010,7 +2013,11 @@ function HeroVisualStage({
             }}
             className="mt-4 flex h-12 w-full max-w-4xl items-center gap-2 rounded-2xl border border-zinc-200 bg-white/95 px-3 shadow-[0_18px_45px_-28px_rgba(15,23,42,0.45)] backdrop-blur transition focus-within:border-emerald-400 focus-within:shadow-[0_20px_50px_-28px_rgba(5,150,105,0.32)] sm:h-13 sm:px-3.5 dark:border-zinc-700 dark:bg-zinc-900/95"
           >
-            <Search className="h-4 w-4 shrink-0 text-emerald-600 sm:h-5 sm:w-5 dark:text-emerald-400" aria-hidden="true" />
+            <Search
+              className="h-4 w-4 shrink-0 text-emerald-600 sm:h-5 sm:w-5 dark:text-emerald-400"
+              aria-hidden="true"
+            />
+
             <input
               type="search"
               name="q"
@@ -2029,19 +2036,24 @@ function HeroVisualStage({
               }
               className="min-w-0 flex-1 bg-transparent text-sm font-semibold text-zinc-900 outline-none placeholder:text-zinc-400 dark:text-white dark:placeholder:text-zinc-500"
             />
+
             <button
               type="submit"
               className="hidden h-9 shrink-0 items-center justify-center rounded-xl bg-emerald-600 px-4 text-xs font-extrabold text-white transition hover:bg-emerald-700 active:scale-[0.98] sm:inline-flex"
             >
               {isId ? 'Cari' : 'Search'}
             </button>
+
             <button
               type="button"
               onClick={onOpenFilters}
               className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900 sm:h-9 sm:w-9 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white"
               aria-label={isId ? 'Filter pencarian' : 'Search filters'}
             >
-              <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+              <SlidersHorizontal
+                className="h-4 w-4"
+                aria-hidden="true"
+              />
             </button>
           </form>
         </div>
