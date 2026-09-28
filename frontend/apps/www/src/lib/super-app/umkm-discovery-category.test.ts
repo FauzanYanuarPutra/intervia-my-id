@@ -15,6 +15,8 @@ describe('matchesUmkmDiscoveryCategory', () => {
     ['food', 'food'],
     ['retail', 'retail'],
     ['service', 'service'],
+    ['craft', 'craft'],
+    ['agri', 'agri'],
     ['workshop', 'workshop'],
   ] as const)(
     'matches %s using the normalized business kind',
