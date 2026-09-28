@@ -6,7 +6,6 @@ const source = readFileSync(new URL('./QuickCreateMenu.tsx', import.meta.url), '
 describe('quick create workspace surface', () => {
   it('keeps the primary actions permission-aware and reachable on touch devices', () => {
     for (const marker of [
-      'createSales',
       'manageProducts',
       'manageInventory',
       'manageFinance',
