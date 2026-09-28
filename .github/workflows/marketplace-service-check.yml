@@ -9,11 +9,18 @@ on:
       - '.github/workflows/marketplace-service-check.yml'
       - 'scripts/run_real_data_bootstrap.sh'
       - 'scripts/import_real_marketplace_open_data.py'
+      - 'scripts/ci/verify_real_data_bootstrap.sh'
+      - 'config/real_marketplace_open_data.sources.json'
       - 'services/real_data_bootstrap/**'
   pull_request:
     paths:
       - 'services/marketplace_service/**'
+      - 'scripts/import_real_marketplace_open_data.py'
+      - 'scripts/run_real_data_bootstrap.sh'
+      - 'scripts/ci/verify_real_data_bootstrap.sh'
       - 'config/lajukan_data_source_registry.json'
+      - 'config/real_marketplace_open_data.sources.json'
+      - 'services/real_data_bootstrap/**'
       - '.github/workflows/marketplace-service-check.yml'
 
 permissions:
