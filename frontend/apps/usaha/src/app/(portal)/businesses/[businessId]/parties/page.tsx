@@ -35,28 +35,21 @@ export default async function BusinessPartiesPage({ params }: PageProps) {
     hasPermission(business, 'manageInventory') ||
     hasPermission(business, 'manageInfo');
 
-  let parties: CommercialParty[] = [];
-  let receivables: CommercialReceivable[] = [];
-  let payables: CommercialPayable[] = [];
-  let loadError = false;
-
-  const [partyResult, receivableResult, payableResult] = await Promise.all([
-    listCommercialParties(business.id).catch(() => {
-      loadError = true;
-      return [] as CommercialParty[];
-    }),
-    listCommercialReceivables(business.id).catch(() => {
-      loadError = true;
-      return [] as CommercialReceivable[];
-    }),
-    listCommercialPayables(business.id).catch(() => {
-      loadError = true;
-      return [] as CommercialPayable[];
-    }),
+  const [partyResult, receivableResult, payableResult] = await Promise.allSettled([
+    listCommercialParties(business.id),
+    listCommercialReceivables(business.id),
+    listCommercialPayables(business.id),
   ]);
-  parties = partyResult;
-  receivables = receivableResult;
-  payables = payableResult;
+
+  const parties = partyResult.status === 'fulfilled' ? partyResult.value : [];
+  const receivables =
+    receivableResult.status === 'fulfilled' ? receivableResult.value : [];
+  const payables =
+    payableResult.status === 'fulfilled' ? payableResult.value : [];
+  const loadError =
+    partyResult.status === 'rejected' ||
+    receivableResult.status === 'rejected' ||
+    payableResult.status === 'rejected';
 
   return (
     <PortalShell
