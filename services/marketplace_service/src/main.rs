@@ -8583,10 +8583,10 @@ async fn list_umkm_stores(
                     OR COALESCE(metadata->>'search_text', '') ILIKE ('%' || $1 || '%')
                   ))
                   AND ($2::text IS NULL OR metadata->>'city' ILIKE ('%' || $2 || '%'))
-                  AND ($3::float8 IS NULL OR (metadata->>'latitude')::float8 >= $3)
-                  AND ($4::float8 IS NULL OR (metadata->>'latitude')::float8 <= $4)
-                  AND ($5::float8 IS NULL OR (metadata->>'longitude')::float8 >= $5)
-                  AND ($6::float8 IS NULL OR (metadata->>'longitude')::float8 <= $6)
+                  AND ($3::float8 IS NULL OR public.lajukan_safe_map_coordinate(metadata->>'latitude') >= $3)
+                  AND ($4::float8 IS NULL OR public.lajukan_safe_map_coordinate(metadata->>'latitude') <= $4)
+                  AND ($5::float8 IS NULL OR public.lajukan_safe_map_coordinate(metadata->>'longitude') >= $5)
+                  AND ($6::float8 IS NULL OR public.lajukan_safe_map_coordinate(metadata->>'longitude') <= $6)
                 ORDER BY updated_at DESC, id ASC
                 LIMIT $7
                 "#
