@@ -8555,10 +8555,16 @@ async fn list_umkm_stores(
           AND (
             $12::float8 IS NULL OR (
               6371.0088 * 2.0 * asin(
-                sqrt(
-                  power(sin(radians(lat - $10) / 2.0), 2) +
-                  cos(radians($10)) * cos(radians(lat)) *
-                  power(sin(radians(lng - $11) / 2.0), 2)
+                LEAST(
+                  1.0,
+                  GREATEST(
+                    0.0,
+                    sqrt(
+                      power(sin(radians(lat - $10) / 2.0), 2) +
+                      cos(radians($10)) * cos(radians(lat)) *
+                      power(sin(radians(lng - $11) / 2.0), 2)
+                    )
+                  )
                 )
               ) <= $12
             )
@@ -8631,24 +8637,30 @@ async fn list_umkm_stores(
                   AND (
                     $9::float8 IS NULL OR (
                       6371.0088 * 2.0 * asin(
-                        sqrt(
-                          power(
-                            sin(
-                              radians(
-                                public.lajukan_safe_map_coordinate(metadata->>'latitude') - $7
-                              ) / 2.0
-                            ),
-                            2
-                          ) +
-                          cos(radians($7)) *
-                          cos(radians(public.lajukan_safe_map_coordinate(metadata->>'latitude'))) *
-                          power(
-                            sin(
-                              radians(
-                                public.lajukan_safe_map_coordinate(metadata->>'longitude') - $8
-                              ) / 2.0
-                            ),
-                            2
+                        LEAST(
+                          1.0,
+                          GREATEST(
+                            0.0,
+                            sqrt(
+                              power(
+                                sin(
+                                  radians(
+                                    public.lajukan_safe_map_coordinate(metadata->>'latitude') - $7
+                                  ) / 2.0
+                                ),
+                                2
+                              ) +
+                              cos(radians($7)) *
+                              cos(radians(public.lajukan_safe_map_coordinate(metadata->>'latitude'))) *
+                              power(
+                                sin(
+                                  radians(
+                                    public.lajukan_safe_map_coordinate(metadata->>'longitude') - $8
+                                  ) / 2.0
+                                ),
+                                2
+                              )
+                            )
                           )
                         )
                       ) <= $9
