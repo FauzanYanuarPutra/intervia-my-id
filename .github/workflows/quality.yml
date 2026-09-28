@@ -139,6 +139,7 @@ jobs:
           set -euo pipefail
           python -m py_compile scripts/import_real_marketplace_open_data.py
           bash -n scripts/run_real_data_bootstrap.sh
+          bash -n up.sh
           python scripts/import_real_marketplace_open_data.py --summary-only >/tmp/real-data-plan.json
           python - <<'PY'
           import json
