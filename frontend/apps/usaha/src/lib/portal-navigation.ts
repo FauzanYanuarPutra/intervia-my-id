@@ -13,7 +13,7 @@ const labels: Record<PortalSection, string> = {
   inventory: 'Stok',
   finance: 'Uang',
   reports: 'Laporan',
-  channels: 'Kanal Jual',
+  channels: 'Jual Online',
   info: 'Pengaturan Usaha',
   locations: 'Lokasi & Outlet',
   operations: 'Jam & Operasional',
@@ -21,7 +21,7 @@ const labels: Record<PortalSection, string> = {
   parties: 'Pelanggan & Mitra',
   growth: 'Tumbuh',
   team: 'Tim & Akses',
-  buyerPage: 'Tampilan Toko',
+  buyerPage: 'Toko Saya',
   security: 'Keamanan akun',
 };
 
@@ -33,7 +33,7 @@ const desktopPrimaryOrder: PortalSection[] = [
   'finance',
 ];
 
-const mobilePrimaryOrder: PortalSection[] = ['home', 'orders', 'products', 'finance'];
+const mobilePrimaryOrder: PortalSection[] = ['home', 'orders', 'products', 'inventory'];
 
 const menuOrder: PortalSection[] = [
   'products',
