@@ -2116,8 +2116,16 @@ async fn main() -> anyhow::Result<()> {
             .unwrap_or_else(|_| "http://identity_service:8080".to_owned()),
         notification_tx,
     });
-    data_governance::bootstrap_governed_data(state.clone()).await;
+    {
+        let bootstrap_state = state.clone();
+        tokio::spawn(async move {
+            data_governance::bootstrap_governed_data(bootstrap_state).await;
+        });
+    }
 
+    // Keep scheduled reconciliation lightweight on the API process; bulk source
+    // hydration is handled by the dedicated real_data_bootstrap service unless
+    // MARKETPLACE_SOURCE_BOOTSTRAP is explicitly enabled.
     spawn_data_ingestion_refresh_loop(state.clone());
 
     let identity_projection_config = IdentityProjectionConfig::from_env();
