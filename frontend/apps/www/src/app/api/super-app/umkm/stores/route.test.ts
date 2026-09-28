@@ -409,6 +409,40 @@ describe('GET /api/super-app/umkm/stores', () => {
     expect(payload.data.items).toEqual([]);
   });
 
+  it('keeps the public map alive when the registered-store backend fails', async () => {
+    listUmkmStoresMock.mockRejectedValue(new Error('marketplace backend 500'));
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          items: [publicReference(0)],
+          has_more: false,
+        }),
+        {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await GET(
+      publicRequest(
+        'map=1&limit=200&offset=0&min_lat=-7&max_lat=-6&min_lng=106&max_lng=108',
+      ),
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.data.items).toHaveLength(1);
+    expect(payload.data.items[0]).toMatchObject({
+      id: 'reference:reference-source-00',
+      metadata: {
+        is_public_reference: true,
+      },
+    });
+    expect(payload.data.stores_backend_degraded).toBe(true);
+  });
+
   it('loads only the bounded first reference candidate page for non-map discovery', async () => {
     listUmkmStoresMock.mockResolvedValue([]);
     const fetchMock = vi.fn().mockResolvedValue(
