@@ -48,3 +48,18 @@ jobs:
         run: cargo check --locked
       - name: Cargo test
         run: cargo test --locked
+      - name: Validate real-data bootstrap tooling
+        working-directory: .
+        shell: bash
+        run: |
+          set -euo pipefail
+          sh -n scripts/run_real_data_bootstrap.sh
+          python3 -m py_compile scripts/import_real_marketplace_open_data.py
+          duplicate_versions="$(
+            find services/marketplace_service/migrations -maxdepth 1 -type f -name '*.up.sql' -printf '%f\n'               | sed -n 's/^\([0-9]\{14\}\)_.*/\1/p'               | sort | uniq -d
+          )"
+          if [[ -n "$duplicate_versions" ]]; then
+            echo "Duplicate migration versions detected:"
+            printf '%s\n' "$duplicate_versions"
+            exit 1
+          fi
