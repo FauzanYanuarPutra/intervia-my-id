@@ -2109,13 +2109,19 @@ pub async fn bootstrap_governed_data(state: Arc<AppState>) {
         Ok(_) => {}
         Err(error) => tracing::warn!("licensed data.go.id discovery failed: {:?}", error),
     }
-    match bootstrap_persistent_imports(state.clone()).await {
-        Ok(count) if count > 0 => tracing::info!(
-            "queued {} validated persistent data bootstrap imports",
-            count
-        ),
-        Ok(_) => tracing::debug!("no persistent data bootstrap imports needed"),
-        Err(error) => tracing::warn!("persistent data bootstrap failed: {:?}", error),
+    if marketplace_source_bootstrap_enabled() {
+        match bootstrap_persistent_imports(state.clone()).await {
+            Ok(count) if count > 0 => tracing::info!(
+                "queued {} validated persistent data bootstrap imports",
+                count
+            ),
+            Ok(_) => tracing::debug!("no persistent data bootstrap imports needed"),
+            Err(error) => tracing::warn!("persistent data bootstrap failed: {:?}", error),
+        }
+    } else {
+        tracing::info!(
+            "marketplace source bootstrap disabled; bulk hydration is delegated to real_data_bootstrap"
+        );
     }
     match bootstrap_reference_publication(state).await {
         Ok(count) if count > 0 => {
