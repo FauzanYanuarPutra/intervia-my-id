@@ -1809,6 +1809,7 @@ export function ExploreCategoryClient({
                         : 'Below you will only see businesses, providers, products, and services currently offered.'}
                   </p>
                 </div>
+                </>
               ) : null}
 
               {showHelpSection ? (
