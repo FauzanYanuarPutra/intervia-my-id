@@ -40,6 +40,30 @@ describe('listing side presentation', () => {
     );
   });
 
+  it('maps canonical pricing modes when no explicit side is persisted', () => {
+    expect(
+      resolveListingSide({
+        type: 'product',
+        pricing_mode: 'request',
+      }),
+    ).toBe('demand');
+
+    expect(
+      resolveListingSide({
+        type: 'product',
+        pricing_mode: 'fixed',
+      }),
+    ).toBe('supply');
+
+    expect(
+      resolveListingSide({
+        type: 'product',
+        side: 'supply',
+        pricing_mode: 'request',
+      }),
+    ).toBe('supply');
+  });
+
   it('accepts a top-level persisted side as the source of truth', () => {
     expect(
       resolveListingSide({
