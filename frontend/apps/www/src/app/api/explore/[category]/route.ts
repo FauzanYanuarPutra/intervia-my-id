@@ -360,7 +360,7 @@ export async function GET(
     });
     const demandParams = new URLSearchParams({
       category: category.slug,
-      tab: 'needs',
+      tab: 'all',
       side: 'demand',
       sort: 'latest',
     });
