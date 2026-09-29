@@ -1270,14 +1270,14 @@ export function ExploreAllSearchClient({
     {
       value: 'supply',
       label: isId
-        ? 'Penawaran'
-        : 'Offers',
+        ? 'Saya mencari'
+        : 'I am looking for',
     },
     {
       value: 'demand',
       label: isId
-        ? 'Kebutuhan'
-        : 'Needs',
+        ? 'Saya menawarkan'
+        : 'I am offering',
     },
     {
       value: 'people',
