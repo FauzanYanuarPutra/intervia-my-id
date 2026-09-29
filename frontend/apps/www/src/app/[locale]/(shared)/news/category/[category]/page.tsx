@@ -83,6 +83,15 @@ export default async function NewsCategoryPage({ params, searchParams }: Props) 
         category={label}
         batchSize={48}
       />
+      {nextCursor ? (
+        <Link
+          href={`/news/category/${encodeURIComponent(category.toLowerCase())}?cursor=${encodeURIComponent(nextCursor)}`}
+          rel="next"
+          className="sr-only"
+        >
+          {isId ? 'Berita berikutnya' : 'Next stories'}
+        </Link>
+      ) : null}
     ) : (
       <div className="rounded-[26px] border border-dashed border-slate-300 p-8 text-center text-sm font-semibold text-slate-500 dark:border-white/15">
         {isId ? 'Belum ada berita terbit di kategori ini.' : 'No published news in this category yet.'}
