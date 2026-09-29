@@ -266,11 +266,11 @@ export function ExploreHubPage({ locale, initialIntent = 'supply' }: { locale: L
             </div>
             <div className="rounded-2xl border border-blue-200 bg-blue-50/70 p-3 dark:border-blue-900/60 dark:bg-blue-950/30">
               <p className="text-xs font-black text-blue-900 dark:text-blue-100">
-                {isId ? 'Kebutuhan' : 'Needs'}
+                {getListingSideLabel('demand', isId ? 'id' : 'en')}
               </p>
               <p className="mt-1.5 text-[11px] leading-5 text-blue-900/75 dark:text-blue-100/75">
                 {isId
-                  ? 'Untuk menemukan permintaan pembeli yang sedang mencari produk atau jasa.'
+                  ? 'Untuk menemukan kebutuhan pembeli yang sedang membutuhkan produk atau jasa.'
                   : 'Find active buyer requests for products or services.'}
               </p>
             </div>
@@ -280,7 +280,7 @@ export function ExploreHubPage({ locale, initialIntent = 'supply' }: { locale: L
               </p>
               <p className="mt-1.5 text-[11px] leading-5 text-zinc-600 dark:text-zinc-300">
                 {isId
-                  ? 'Tab seperti Produk, Jasa, Usaha, Kebutuhan, Video, Komunitas, dan Orang membantu mempersempit hasil.'
+                  ? 'Tab seperti Produk, Jasa, Usaha, Kebutuhan Pembeli, Video, Komunitas, dan Orang membantu mempersempit hasil.'
                   : 'Tabs such as Products, Services, Businesses, Needs, Videos, Communities, and Users help narrow results.'}
               </p>
             </div>
