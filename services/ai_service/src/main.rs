@@ -573,58 +573,174 @@ async fn handle_ready(State(state): State<Arc<AppState>>) -> Response {
         .send()
         .await;
 
-    match probe {
-        Ok(response) => {
-            let status = response.status();
-            let payload = response.text().await.unwrap_or_default();
-            if !status.is_success() {
-                return json_response(
-                    StatusCode::SERVICE_UNAVAILABLE,
-                    json!({
-                        "status": "not_ready",
-                        "service": SERVICE_NAME,
-                        "vllm": format!("http_{}", status.as_u16()),
-                        "latency_ms": started.elapsed().as_millis(),
-                    }),
-                );
-            }
+    let response = match probe {
+        Ok(response) => response,
+        Err(error) => {
+            return json_response(
+                StatusCode::SERVICE_UNAVAILABLE,
+                json!({
+                    "status": "not_ready",
+                    "service": SERVICE_NAME,
+                    "error": "VLLM_UNREACHABLE",
+                    "message": safe_error(&error.to_string(), 240),
+                    "latency_ms": started.elapsed().as_millis(),
+                }),
+            );
+        }
+    };
 
-            let parsed = serde_json::from_str::<Value>(&payload).unwrap_or_else(|_| json!({}));
-            let primary_ready = model_list_contains(&parsed, &state.config.vllm_model);
-            let fallback_ready = model_list_contains(&parsed, &state.config.vllm_fallback_model);
+    let status = response.status();
+    let payload = response.text().await.unwrap_or_default();
+    if !status.is_success() {
+        return json_response(
+            StatusCode::SERVICE_UNAVAILABLE,
+            json!({
+                "status": "not_ready",
+                "service": SERVICE_NAME,
+                "vllm": format!("http_{}", status.as_u16()),
+                "latency_ms": started.elapsed().as_millis(),
+            }),
+        );
+    }
 
-            if !primary_ready && !fallback_ready {
-                return json_response(
-                    StatusCode::SERVICE_UNAVAILABLE,
-                    json!({
-                        "status": "not_ready",
-                        "service": SERVICE_NAME,
-                        "vllm": "model_unavailable",
-                        "model": state.config.vllm_model,
-                        "fallback_model": state.config.vllm_fallback_model,
-                        "latency_ms": started.elapsed().as_millis(),
-                    }),
-                );
-            }
+    let parsed = serde_json::from_str::<Value>(&payload).unwrap_or_else(|_| json!({}));
+    let primary_ready = model_list_contains(&parsed, &state.config.vllm_model);
+    let structured_ready = model_list_contains(&parsed, &state.config.vllm_structured_model);
+    let fast_ready = model_list_contains(&parsed, &state.config.vllm_fast_model);
+    let fallback_ready = model_list_contains(&parsed, &state.config.vllm_fallback_model);
+    let vision_ready = if state.config.vllm_vision_model.trim().is_empty() {
+        None
+    } else {
+        Some(model_list_contains(&parsed, &state.config.vllm_vision_model))
+    };
 
+    let required_ready = primary_ready && structured_ready && fast_ready;
+    let vision_required_but_missing = matches!(vision_ready, Some(false));
+    if !required_ready || vision_required_but_missing {
+        return json_response(
+            StatusCode::SERVICE_UNAVAILABLE,
+            json!({
+                "status": "not_ready",
+                "service": SERVICE_NAME,
+                "error": "AI_MODELS_NOT_READY",
+                "models": {
+                    "text": if primary_ready { "ready" } else { "missing" },
+                    "structured": if structured_ready { "ready" } else { "missing" },
+                    "fast": if fast_ready { "ready" } else { "missing" },
+                    "fallback": if fallback_ready { "ready" } else { "missing" },
+                    "vision": match vision_ready {
+                        None => "disabled",
+                        Some(true) => "ready",
+                        Some(false) => "missing",
+                    },
+                    "embedding": if state.config.vllm_embedding_model.is_empty() {
+                        "disabled"
+                    } else if model_list_contains(&parsed, &state.config.vllm_embedding_model) {
+                        "ready"
+                    } else {
+                        "missing_optional"
+                    }
+                },
+                "latency_ms": started.elapsed().as_millis(),
+            }),
+        );
+    }
+
+    json_response(
+        StatusCode::OK,
+        json!({
+            "status": "ready",
+            "service": SERVICE_NAME,
+            "vllm": "ready",
+            "models": {
+                "text": "ready",
+                "structured": "ready",
+                "fast": "ready",
+                "fallback": if fallback_ready { "ready" } else { "unavailable" },
+                "vision": match vision_ready {
+                    None => "disabled",
+                    Some(true) => "ready",
+                    Some(false) => "missing",
+                },
+                "embedding": if state.config.vllm_embedding_model.is_empty() {
+                    "disabled"
+                } else if model_list_contains(&parsed, &state.config.vllm_embedding_model) {
+                    "ready"
+                } else {
+                    "missing_optional"
+                }
+            },
+            "tools": {
+                "marketplace": state.tools.configured(),
+            },
+            "rag": {
+                "configured": !state.config.rag_url.is_empty(),
+            },
+            "latency_ms": started.elapsed().as_millis(),
+        }),
+    )
+}
+
+async fn handle_ready_deep(State(state): State<Arc<AppState>>) -> Response {
+    let request_id = format!("ready-deep-{}", next_request_id(&state));
+    let started = Instant::now();
+    let message = vec![
+        json!({
+            "role": "system",
+            "content": "Reply with exactly READY. Do not explain."
+        }),
+        json!({
+            "role": "user",
+            "content": "READY?"
+        }),
+    ];
+
+    match call_vllm_single(
+        &state,
+        &request_id,
+        &state.config.vllm_fast_model,
+        &message,
+        0.0,
+        16,
+        None,
+    )
+    .await
+    {
+        Ok((content, model, warnings)) if content.trim().to_ascii_lowercase().contains("ready") => {
             json_response(
                 StatusCode::OK,
                 json!({
                     "status": "ready",
                     "service": SERVICE_NAME,
-                    "vllm": "ready",
-                    "model": if primary_ready { "primary" } else { "fallback" },
+                    "deep": true,
+                    "model": model,
+                    "response": content.trim(),
+                    "warnings": warnings,
                     "latency_ms": started.elapsed().as_millis(),
                 }),
             )
         }
-        Err(_error) => json_response(
+        Ok((content, model, warnings)) => json_response(
             StatusCode::SERVICE_UNAVAILABLE,
             json!({
                 "status": "not_ready",
                 "service": SERVICE_NAME,
-                "vllm": "unreachable",
-                "error": "VLLM_UNREACHABLE",
+                "deep": false,
+                "error": "AI_DEEP_PROBE_UNEXPECTED_RESPONSE",
+                "model": model,
+                "response": content.trim(),
+                "warnings": warnings,
+                "latency_ms": started.elapsed().as_millis(),
+            }),
+        ),
+        Err(error) => json_response(
+            StatusCode::SERVICE_UNAVAILABLE,
+            json!({
+                "status": "not_ready",
+                "service": SERVICE_NAME,
+                "deep": false,
+                "error": "AI_DEEP_PROBE_FAILED",
+                "message": safe_error(&error, 240),
                 "latency_ms": started.elapsed().as_millis(),
             }),
         ),
