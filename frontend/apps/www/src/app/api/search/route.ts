@@ -1617,10 +1617,21 @@ export async function GET(
     activeCategory?.searchQuery ||
     '';
 
+  const hasExplicitQuery = state.query.length >= 2;
+  const isCategoryBrowseWithoutQuery =
+    Boolean(state.category || state.subcategory) &&
+    !hasExplicitQuery;
+
+  // Category pages must use the taxonomy/category constraint as the source of
+  // truth. A semantic category seed such as "supplier bahan usaha" should not
+  // hide a valid listing whose title/body uses different wording, especially
+  // for demand/needs records.
   const effectiveQuery =
-    state.query.length >= 2
+    hasExplicitQuery
       ? state.query
-      : derivedQuery;
+      : isCategoryBrowseWithoutQuery
+        ? ''
+        : derivedQuery;
 
   const isReferenceBrowse =
     state.tab ===
