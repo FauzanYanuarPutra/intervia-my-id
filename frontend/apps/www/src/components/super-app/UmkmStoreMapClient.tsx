@@ -1234,10 +1234,10 @@ function ManualMarkerFocusController({
 }
 
 function getCompactDotRadius(zoom: number): number {
-  if (zoom <= 5) return 1.9;
-  if (zoom <= 8) return 2.2;
-  if (zoom <= 11) return 2.6;
-  return 3;
+  if (zoom <= 5) return 3;
+  if (zoom <= 8) return 3.25;
+  if (zoom <= 11) return 3.5;
+  return 3.75;
 }
 
 function StoreDotsLayer({
@@ -1277,7 +1277,7 @@ function StoreDotsLayer({
               weight: selected ? 2 : 1,
               opacity: 0.95,
               fillColor: palette.badge,
-              fillOpacity: selected ? 1 : 0.9,
+              fillOpacity: selected ? 1 : 0.94,
             }}
             eventHandlers={
               interactive
