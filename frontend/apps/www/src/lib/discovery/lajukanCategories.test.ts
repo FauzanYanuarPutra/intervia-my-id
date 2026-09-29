@@ -6,6 +6,8 @@ import {
   SOCIAL_EXPLORE_CATEGORIES,
   buildCategorySearchHref,
   getExploreCategoryBySlug,
+  getExploreSideLabel,
+  normalizeExploreSide,
 } from './lajukanCategories';
 
 describe('Lajukan explore taxonomy', () => {
@@ -47,6 +49,26 @@ describe('Lajukan explore taxonomy', () => {
     for (const category of LAJUKAN_EXPLORE_CATEGORIES) {
       expect(category.image).toMatch(/^\/images\/hero\/menu\/.+\.png$/);
     }
+  });
+
+  it('uses the same side terminology and resolver as listing cards', () => {
+    expect(getExploreSideLabel({ side: 'supply', locale: 'id' })).toBe(
+      'Menawarkan',
+    );
+    expect(getExploreSideLabel({ side: 'demand', locale: 'id' })).toBe(
+      'Membutuhkan',
+    );
+    expect(
+      normalizeExploreSide({
+        side: 'provider',
+        kind: 'need',
+      }),
+    ).toBe('supply');
+    expect(
+      normalizeExploreSide({
+        kind: 'needs',
+      }),
+    ).toBe('demand');
   });
 
   it('builds canonical explore search context', () => {
