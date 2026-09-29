@@ -2093,7 +2093,7 @@ function QuickCategoriesSection({ isId }: { isId: boolean }) {
                   w-14
                   items-center
                   justify-center
-                  overflow-hidden
+                  overflow-visible
                   rounded-xl
                   border
                   shadow-sm
@@ -2113,7 +2113,7 @@ function QuickCategoriesSection({ isId }: { isId: boolean }) {
 
                 <div className="absolute inset-0 z-0 flex items-center justify-center">
                   <div
-                    className="relative aspect-square max-h-[88%] max-w-[88%] flex-none"
+                    className="relative z-10 aspect-square flex-none"
                     style={{
                       width: Math.min(item.imageSize ?? 70, 68),
                       transform: `translate(${Math.max(-6, Math.min(6, (item.offsetX ?? -18) / 3))}px, ${Math.max(-6, Math.min(6, (item.offsetY ?? -14) / 3))}px) scaleX(${item.flip ? -1 : 1}) scale(${item.scale ?? 1}) rotate(${item.rotate ?? 0}deg)`,
