@@ -7,9 +7,9 @@ import {
   useRef,
   useState,
   type ReactNode,
-  type TouchEvent as ReactTouchEvent,
   type WheelEvent as ReactWheelEvent,
 } from 'react';
+import useEmblaCarousel from 'embla-carousel-react';
 import {
   ChevronLeft,
   ChevronRight,
@@ -149,8 +149,16 @@ export function MediaPreviewCarousel({
   const [failedSources, setFailedSources] = useState<Set<string>>(
     () => new Set(),
   );
-  const viewportRef = useRef<HTMLDivElement | null>(null);
-  const isScrolling = useRef(false);
+  const initialIndexRef = useRef(initialIndex);
+  const mediaWheelBurstRef = useRef(false);
+  const mediaWheelBurstTimerRef = useRef<number | null>(null);
+  const [viewportRef, emblaApi] = useEmblaCarousel({
+    align: 'start',
+    containScroll: 'trimSnaps',
+    dragFree: false,
+    loop: false,
+    skipSnaps: false,
+  });
 
   const visibleMediaItems = useMemo(
     () => mediaItems.filter(item => !failedSources.has(item.src)),
@@ -170,36 +178,15 @@ export function MediaPreviewCarousel({
   };
 
   const scrollToIndex = useCallback(
-    (nextIndex: number, behavior: ScrollBehavior = 'smooth') => {
-      const next = clampIndex(nextIndex, visibleMediaItems.length);
-      setActiveIndex(next);
-
-      const node = viewportRef.current;
-      if (!node) return;
-
-      isScrolling.current = true;
-      node.scrollTo({
-        left: node.clientWidth * next,
-        behavior,
-      });
-
-      // Berikan jeda sejenak agar flag onScroll tidak tabrakan dengan animasi tombol.
-      setTimeout(() => {
-        isScrolling.current = false;
-      }, 300);
+    (nextIndex: number, animated = true) => {
+      if (!emblaApi) return;
+      emblaApi.scrollTo(
+        clampIndex(nextIndex, visibleMediaItems.length),
+        animated,
+      );
     },
-    [visibleMediaItems.length],
+    [emblaApi, visibleMediaItems.length],
   );
-
-  const mediaTouchGestureRef = useRef<{
-    startX: number;
-    startY: number;
-    active: boolean;
-    claimed: boolean;
-    ignored: boolean;
-  } | null>(null);
-  const mediaWheelBurstRef = useRef(false);
-  const mediaWheelBurstTimerRef = useRef<number | null>(null);
 
   const shouldIgnoreMediaGesture = useCallback((target: EventTarget | null) => {
     const element = target instanceof HTMLElement ? target : null;
@@ -221,7 +208,12 @@ export function MediaPreviewCarousel({
           : event.shiftKey
             ? event.deltaY
             : 0;
-      if (Math.abs(delta) < 4 || !hasMany) return;
+      if (Math.abs(delta) < 4 || !hasMany || !emblaApi) return;
+
+      const direction = delta > 0 ? 1 : -1;
+      const canScroll =
+        direction > 0 ? emblaApi.canScrollNext() : emblaApi.canScrollPrev();
+      if (!canScroll) return;
 
       event.preventDefault();
 
@@ -236,78 +228,49 @@ export function MediaPreviewCarousel({
         mediaWheelBurstTimerRef.current = null;
       }, 180);
 
-      scrollToIndex(active + (delta > 0 ? 1 : -1));
+      if (direction > 0) emblaApi.scrollNext();
+      else emblaApi.scrollPrev();
     },
-    [active, hasMany, scrollToIndex, shouldIgnoreMediaGesture],
+    [emblaApi, hasMany, shouldIgnoreMediaGesture],
   );
 
-  const handleMediaTouchStart = useCallback(
-    (event: ReactTouchEvent<HTMLDivElement>) => {
-      const touch = event.touches[0];
-      if (!touch) return;
+  useEffect(() => {
+    if (!emblaApi) return;
 
-      mediaTouchGestureRef.current = {
-        startX: touch.clientX,
-        startY: touch.clientY,
-        active: true,
-        claimed: false,
-        ignored: shouldIgnoreMediaGesture(event.target),
-      };
-    },
-    [shouldIgnoreMediaGesture],
-  );
-
-  const handleMediaTouchMove = useCallback(
-    (event: ReactTouchEvent<HTMLDivElement>) => {
-      const gesture = mediaTouchGestureRef.current;
-      if (!gesture?.active || gesture.ignored) return;
-
-      const touch = event.touches[0];
-      if (!touch) return;
-
-      const deltaX = touch.clientX - gesture.startX;
-      const deltaY = touch.clientY - gesture.startY;
-
-      if (!gesture.claimed) {
-        if (Math.max(Math.abs(deltaX), Math.abs(deltaY)) < 10) return;
-        if (Math.abs(deltaY) > Math.abs(deltaX) * 1.2) {
-          gesture.ignored = true;
-          return;
-        }
-        gesture.claimed = true;
-      }
-
-      event.preventDefault();
-    },
-    [],
-  );
-
-  const handleMediaTouchEnd = useCallback(
-    (event: ReactTouchEvent<HTMLDivElement>) => {
-      const gesture = mediaTouchGestureRef.current;
-      mediaTouchGestureRef.current = null;
-
-      if (!gesture?.active || gesture.ignored || !gesture.claimed || !hasMany) {
-        return;
-      }
-
-      const touch = event.changedTouches[0];
-      if (!touch) return;
-
-      const deltaX = touch.clientX - gesture.startX;
-      const threshold = Math.max(
-        28,
-        (viewportRef.current?.clientWidth || 320) * 0.12,
+    const syncIndex = () => {
+      setActiveIndex(
+        clampIndex(emblaApi.selectedScrollSnap(), visibleMediaItems.length),
       );
+    };
 
-      if (Math.abs(deltaX) < threshold) return;
-      scrollToIndex(active + (deltaX < 0 ? 1 : -1));
-    },
-    [active, hasMany, scrollToIndex],
-  );
+    emblaApi.on('select', syncIndex);
+    emblaApi.on('reInit', syncIndex);
+    syncIndex();
 
-  const handleMediaTouchCancel = useCallback(() => {
-    mediaTouchGestureRef.current = null;
+    return () => {
+      emblaApi.off('select', syncIndex);
+      emblaApi.off('reInit', syncIndex);
+    };
+  }, [emblaApi, visibleMediaItems.length]);
+
+  useEffect(() => {
+    if (!emblaApi) return;
+
+    emblaApi.reInit();
+    const target = clampIndex(
+      initialIndexRef.current,
+      visibleMediaItems.length,
+    );
+    emblaApi.scrollTo(target, true);
+  }, [emblaApi, visibleMediaItems.length]);
+
+  useEffect(() => {
+    return () => {
+      if (mediaWheelBurstTimerRef.current !== null) {
+        window.clearTimeout(mediaWheelBurstTimerRef.current);
+        mediaWheelBurstTimerRef.current = null;
+      }
+    };
   }, []);
 
   useBodyScrollLock(lightboxOpen);
@@ -338,18 +301,6 @@ export function MediaPreviewCarousel({
   useEffect(() => {
     onIndexChange?.(active);
   }, [active, onIndexChange]);
-
-  const updateIndexFromScroll = () => {
-    if (isScrolling.current) return;
-    const node = viewportRef.current;
-    if (!node || !node.clientWidth) return;
-
-    const next = clampIndex(
-      Math.round(node.scrollLeft / node.clientWidth),
-      visibleMediaItems.length,
-    );
-    if (next !== activeIndex) setActiveIndex(next);
-  };
 
   const renderMedia = (
     item: NormalizedMedia,
@@ -399,21 +350,16 @@ export function MediaPreviewCarousel({
         {visibleMediaItems.length > 0 ? (
           <div
             ref={viewportRef}
-            onScroll={updateIndexFromScroll}
             onWheel={handleMediaWheel}
-            onTouchStart={handleMediaTouchStart}
-            onTouchMove={handleMediaTouchMove}
-            onTouchEnd={handleMediaTouchEnd}
-            onTouchCancel={handleMediaTouchCancel}
             className={cn(
-              'relative flex h-full min-h-0 w-full snap-x snap-mandatory overflow-x-hidden scroll-smooth [scrollbar-width:none] [touch-action:pan-y] [&::-webkit-scrollbar]:hidden',
+              'relative flex h-full min-h-0 w-full min-w-0 overflow-hidden [touch-action:pan-y]',
               viewportClassName,
             )}
           >
             {visibleMediaItems.map((item, index) => (
               <div
                 key={`${item.src}-${index}`}
-                className="relative h-full min-h-0 w-full min-w-full shrink-0 grow-0 basis-full snap-center [scroll-snap-stop:always] overflow-hidden bg-slate-100 dark:bg-slate-950"
+                className="relative h-full min-h-0 w-full min-w-0 shrink-0 grow-0 basis-full overflow-hidden bg-slate-100 dark:bg-slate-950"
               >
                 {renderMedia(item, index)}
                 {item.type === 'video' ? (
