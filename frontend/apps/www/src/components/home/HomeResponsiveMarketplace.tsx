@@ -2057,7 +2057,7 @@ function HeroVisualStage({
             />
             <button
               type="submit"
-              className="inline-flex !w-8 !h-8 max-!h-8 !max-w-8 shrink-0 items-center justify-center rounded-[11px] bg-emerald-600 text-white transition hover:bg-emerald-700 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 sm:h-9 sm:w-auto sm:rounded-xl sm:px-4"
+              className="inline-flex !min-h-0 !w-8 !h-8 max-!h-8 !max-w-8 shrink-0 items-center justify-center rounded-[11px] bg-emerald-600 text-white transition hover:bg-emerald-700 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 sm:h-9 sm:w-auto sm:rounded-xl sm:px-4"
               aria-label={isId ? 'Cari' : 'Search'}
             >
               <Search className="h-3.5 w-3.5 sm:hidden" aria-hidden="true" />

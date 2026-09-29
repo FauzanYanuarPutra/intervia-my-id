@@ -7462,7 +7462,7 @@ export default function ChatRoomPage() {
                               setOpenMessageActionsId(null);
                             }
                           }}
-                          className="inline-flex h-[34px] w-[34px] items-center justify-center rounded-full border border-black/[0.08] bg-white/95 text-[#54656f] shadow-[0_1px_3px_rgba(17,27,33,0.18)] backdrop-blur-sm transition-[background-color,color,box-shadow,transform] duration-150 hover:bg-[#f0f2f5] hover:text-[#008f72] active:scale-[0.96] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#25d366]/35 focus-visible:ring-offset-1 focus-visible:ring-offset-white dark:border-white/[0.10] dark:bg-[#202c33]/96 dark:text-[#aebac1] dark:shadow-[0_1px_3px_rgba(0,0,0,0.28)] dark:hover:bg-[#2a3942] dark:hover:text-[#25d366] dark:focus-visible:ring-offset-[#111b21] sm:h-9 sm:w-9"
+                          className="inline-flex !min-h-0 h-[34px] w-[34px] items-center justify-center rounded-full border border-black/[0.08] bg-white/95 text-[#54656f] shadow-[0_1px_3px_rgba(17,27,33,0.18)] backdrop-blur-sm transition-[background-color,color,box-shadow,transform] duration-150 hover:bg-[#f0f2f5] hover:text-[#008f72] active:scale-[0.96] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#25d366]/35 focus-visible:ring-offset-1 focus-visible:ring-offset-white dark:border-white/[0.10] dark:bg-[#202c33]/96 dark:text-[#aebac1] dark:shadow-[0_1px_3px_rgba(0,0,0,0.28)] dark:hover:bg-[#2a3942] dark:hover:text-[#25d366] dark:focus-visible:ring-offset-[#111b21] sm:h-9 sm:w-9"
                           title={
                             chatLocale === 'id'
                               ? 'Aksi pesan'

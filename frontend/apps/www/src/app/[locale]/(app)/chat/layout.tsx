@@ -824,7 +824,7 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
                           type="button"
                           aria-pressed={active}
                           onClick={() => setActiveFilter(option.value)}
-                          className={`inline-flex min-h-10 shrink-0 snap-start items-center justify-center gap-1.5 rounded-full border px-3 text-xs font-bold transition active:scale-[0.98] min-[420px]:min-h-11 ${
+                          className={`inline-flex min-h-6 shrink-0 snap-start items-center justify-center gap-1.5 rounded-full border px-3 text-xs font-bold transition active:scale-[0.98] min-[420px]:min-h-8 ${
                             active
                               ? option.activeClass
                               : 'border-black/5 bg-white/80 text-[#111b21] hover:border-[#25d366]/35 hover:bg-white dark:border-white/8 dark:bg-[#182229] dark:text-[#e9edef] dark:hover:border-emerald-300/25 dark:hover:bg-[#202c33]'
