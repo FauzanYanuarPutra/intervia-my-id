@@ -47,17 +47,38 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : 'Gagal memuat AI pribadi.';
+
+    if (error instanceof PersonalAiStorageUnavailableError) {
+      console.error('[PERSONAL_AI_AGENTS_STORAGE_UNAVAILABLE]', {
+        userId: auth.ctx.userId,
+        error: message,
+      });
+
+      return jsonNoStore(
+        {
+          error:
+            'Penyimpanan AI sedang tidak tersedia. Coba lagi sebentar lagi.',
+          code: error.code,
+        },
+        {
+          status: 503,
+        },
+      );
+    }
+
     console.error('[PERSONAL_AI_AGENTS_LIST_FAILED]', {
       userId: auth.ctx.userId,
-      error:
-        error instanceof Error
-          ? error.message
-          : String(error),
+      error: message,
     });
 
     return jsonNoStore(
       {
         error: 'Gagal memuat AI pribadi.',
+        code: 'personal_ai_agents_list_failed',
       },
       {
         status: 500,
