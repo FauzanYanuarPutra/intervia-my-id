@@ -982,6 +982,12 @@ function mapContentToRecommendation(
   const type = item.content_type || item.category;
   const side = resolveListingSide({
     type,
+    side: item.side,
+    listing_side: item.listing_side,
+    market_side: item.market_side,
+    listing_intent: item.listing_intent,
+    market_intent: item.market_intent,
+    intent: item.intent,
     metadata: item.metadata,
   });
   const vendor =
