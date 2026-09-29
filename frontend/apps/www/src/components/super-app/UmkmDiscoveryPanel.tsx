@@ -1037,6 +1037,7 @@ export function UmkmDiscoveryPanel({
   const activeStoresRequestRef = useRef<AbortController | null>(null);
   const activeReferencesRequestRef = useRef<AbortController | null>(null);
   const selectedPreviewRef = useRef<HTMLDivElement | null>(null);
+  const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
   const pendingScrollStoreIdRef = useRef<string | null>(null);
   const mobileMapRef = useRef<HTMLDivElement | null>(null);
   const desktopMapRef = useRef<HTMLDivElement | null>(null);
@@ -1546,25 +1547,53 @@ export function UmkmDiscoveryPanel({
     [isId, stores, viewerLocation],
   );
 
-  const visibleStores = useMemo(
-    () =>
-      preparedStores.filter(place => {
-        const isReference = isUmkmMapPublicReference(place.store);
-        if (discoveryScope === 'registered' && isReference) return false;
-        if (discoveryScope === 'references' && !isReference) return false;
-        return matchesUmkmDiscoveryCategory(
-          {
-            kind: place.ui.kind,
-            name: place.store.name,
-            description: place.store.description,
-            address: place.store.address,
-            metadata: place.store.metadata,
-          },
-          category,
-        );
-      }),
-    [category, discoveryScope, preparedStores],
-  );
+  const visibleStores = useMemo(() => {
+    const filtered = preparedStores.filter(place => {
+      const isReference = isUmkmMapPublicReference(place.store);
+      if (discoveryScope === 'registered' && isReference) return false;
+      if (discoveryScope === 'references' && !isReference) return false;
+      return matchesUmkmDiscoveryCategory(
+        {
+          kind: place.ui.kind,
+          name: place.store.name,
+          description: place.store.description,
+          address: place.store.address,
+          metadata: place.store.metadata,
+        },
+        category,
+      );
+    });
+
+    // Never derive distance from map center/bounds. Only use a real distance
+    // returned by the API/browser location, then keep the order deterministic.
+    return [...filtered].sort((left, right) => {
+      const leftDistance =
+        typeof left.store.distance_km === 'number' &&
+        Number.isFinite(left.store.distance_km)
+          ? left.store.distance_km
+          : null;
+      const rightDistance =
+        typeof right.store.distance_km === 'number' &&
+        Number.isFinite(right.store.distance_km)
+          ? right.store.distance_km
+          : null;
+
+      if (leftDistance !== null && rightDistance !== null) {
+        const delta = leftDistance - rightDistance;
+        if (Math.abs(delta) > 0.001) return delta;
+      } else if (leftDistance !== null) {
+        return -1;
+      } else if (rightDistance !== null) {
+        return 1;
+      }
+
+      const leftNative = !isUmkmMapPublicReference(left.store);
+      const rightNative = !isUmkmMapPublicReference(right.store);
+      if (leftNative !== rightNative) return leftNative ? -1 : 1;
+
+      return left.store.name.localeCompare(right.store.name, 'id');
+    });
+  }, [category, discoveryScope, preparedStores]);
 
   useEffect(() => {
     if (!visibleStores.length || !selectedStoreId) {
@@ -1815,6 +1844,27 @@ export function UmkmDiscoveryPanel({
     referenceNextCursor,
     referenceNextOffset,
   ]);
+
+  useEffect(() => {
+    const sentinel = loadMoreSentinelRef.current;
+    if (!sentinel || !canLoadMoreList) return;
+
+    const observer = new IntersectionObserver(
+      entries => {
+        if (!entries.some(entry => entry.isIntersecting)) return;
+        handleLoadMore();
+      },
+      {
+        root: null,
+        rootMargin: '0px 0px 560px 0px',
+        threshold: 0,
+      },
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [canLoadMoreList, handleLoadMore]);
+
   useEffect(() => {
     const syncSelectionFromUrl = () => {
       if (typeof window === 'undefined') return;
@@ -3361,24 +3411,20 @@ export function UmkmDiscoveryPanel({
                   </div>
                 )}
 
-                {canLoadMoreList ? (
-                  <div className="flex justify-center">
-                    <button
-                      type="button"
-                      data-testid="umkm-load-more"
-                      onClick={handleLoadMore}
-                      disabled={loadingMoreForScope}
-                      className="inline-flex min-h-[34px] items-center rounded-full border border-slate-200 bg-white px-3 text-[11px] font-bold text-slate-700 transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)]"
-                    >
-                      {loadingMoreForScope
-                        ? isId
-                          ? 'Memuat 10 berikutnya...'
-                          : 'Loading next 10...'
-                        : isId
-                          ? 'Muat 10 lagi'
-                          : 'Load 10 more'}
-                    </button>
-                  </div>
+                <div
+                  ref={loadMoreSentinelRef}
+                  data-testid="umkm-load-more-sentinel"
+                  aria-hidden="true"
+                  className="h-1 w-full"
+                />
+                {loadingMoreForScope ? (
+                  <div
+                    className="h-0 overflow-hidden"
+                    aria-live="polite"
+                    aria-label={
+                      isId ? 'Memuat hasil berikutnya' : 'Loading more results'
+                    }
+                  />
                 ) : null}
               </div>
 
