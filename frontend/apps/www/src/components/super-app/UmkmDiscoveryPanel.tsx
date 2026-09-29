@@ -1676,6 +1676,12 @@ export function UmkmDiscoveryPanel({
           description: point.description ?? null,
           phone: point.phone ?? null,
           metadata: point.metadata ?? {},
+          online_order_enabled: false,
+          offline_order_enabled: false,
+          reservation_enabled: false,
+          table_count: 0,
+          available_table_count: 0,
+          max_table_capacity: 0,
         });
       }
     }
