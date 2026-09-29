@@ -29,6 +29,7 @@ import {
 } from '@/lib/content/publicReference';
 import { getInternalWwwOrigin } from '@/lib/server/internalWwwOrigin';
 import { buildUmkmStorefrontPath } from '@/lib/umkmSurface';
+import { resolveListingSide } from '@/lib/content/listingSide';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -277,122 +278,23 @@ function formatPrice(
  * We only accept explicit values here.
  * We deliberately do NOT search arbitrary sentences/descriptions.
  */
-function normalizeSideValue(
-  value: unknown,
-): MarketplaceSide | null {
-  const normalized =
-    readString(value)
-      .toLowerCase()
-      .replace(/[\s-]+/g, '_');
-
-  switch (normalized) {
-    case 'supply':
-    case 'offer':
-    case 'offering':
-    case 'sell':
-    case 'seller':
-    case 'provider':
-    case 'penyedia':
-    case 'menawarkan':
-      return 'supply';
-
-    case 'demand':
-    case 'need':
-    case 'needs':
-    case 'request':
-    case 'looking_for':
-    case 'seeker':
-    case 'mencari':
-    case 'pencari':
-    case 'butuh':
-    case 'membutuhkan':
-      return 'demand';
-
-    default:
-      return null;
-  }
-}
-
-/**
- * Resolve supply/demand safely.
- *
- * Priority:
- * 1. item.side
- * 2. item.listing_side
- * 3. item.market_side
- * 4. item.listing_intent
- * 5. item.market_intent
- * 6. item.intent
- * 7. metadata equivalents
- * 8. explicit kind/content_type fallback
- * 9. default supply
- *
- * We intentionally avoid inspecting arbitrary fields like:
- * - description
- * - summary
- * - pricing_mode
- * - offer_type
- *
- * because words such as "buyer", "request", or "need" can occur
- * in normal product descriptions and must never change marketplace side.
- */
 function inferSide(
   item: JsonRecord,
   metadata: JsonRecord | null,
 ): MarketplaceSide {
-  const explicitCandidates: unknown[] = [
-    item.side,
-    item.listing_side,
-    item.market_side,
-    item.listing_intent,
-    item.market_intent,
-    item.intent,
-
-    metadata?.side,
-    metadata?.listing_side,
-    metadata?.market_side,
-    metadata?.listing_intent,
-    metadata?.market_intent,
-    metadata?.intent,
-  ];
-
-  for (const candidate of explicitCandidates) {
-    const resolved =
-      normalizeSideValue(
-        candidate,
-      );
-
-    if (resolved) {
-      return resolved;
-    }
-  }
-
-  /**
-   * Last fallback only:
-   * explicit content kind can imply a demand record.
-   */
-  const kindToken = [
-    item.content_type,
-    item.type,
-    metadata?.content_type,
-    metadata?.type,
-  ]
-    .map(readString)
-    .join(' ')
-    .toLowerCase();
-
-  if (
-    /\bneed\b|\bneeds\b|\bdemand\b|\brequest\b/.test(
-      kindToken,
-    )
-  ) {
-    return 'demand';
-  }
-
-  /**
-   * Normal marketplace content defaults to supply.
-   */
-  return 'supply';
+  return resolveListingSide({
+    side: item.side,
+    listing_side: item.listing_side,
+    market_side: item.market_side,
+    listing_intent: item.listing_intent,
+    market_intent: item.market_intent,
+    intent: item.intent,
+    type:
+      item.content_type ??
+      item.type ??
+      item.category,
+    metadata,
+  });
 }
 
 function contentKind(
