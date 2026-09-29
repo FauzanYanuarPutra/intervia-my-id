@@ -166,7 +166,7 @@ describe('GET /api/super-app/umkm/stores', () => {
       slug: undefined,
       backendOnly: true,
       activeOnly: true,
-      limit: 3,
+      limit: 2,
     });
     expect(listUmkmStoresForActorMock).not.toHaveBeenCalled();
 
@@ -196,7 +196,7 @@ describe('GET /api/super-app/umkm/stores', () => {
 
     expect(response.status).toBe(200);
     expect(listUmkmStoresMock).toHaveBeenCalledWith(
-      expect.objectContaining({ limit: 11 }),
+      expect.objectContaining({ limit: 10 }),
     );
     expect(payload.data.items).toHaveLength(10);
     expect(payload.data).toMatchObject({
@@ -312,7 +312,7 @@ describe('GET /api/super-app/umkm/stores', () => {
     expect(response.status).toBe(200);
     expect(listUmkmStoresMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        limit: 3,
+        limit: 2,
         viewer: { lat: -6.2, lng: 106.8 },
       }),
     );
@@ -427,7 +427,7 @@ describe('GET /api/super-app/umkm/stores', () => {
 
     const response = await GET(
       publicRequest(
-        'map=1&limit=200&offset=0&min_lat=-7&max_lat=-6&min_lng=106&max_lng=108',
+        'map=1&include_references=1&limit=200&offset=0&min_lat=-7&max_lat=-6&min_lng=106&max_lng=108',
       ),
     );
     const payload = await response.json();
@@ -516,7 +516,7 @@ describe('GET /api/super-app/umkm/stores', () => {
     const referenceUrl = new URL(String(fetchMock.mock.calls[0]?.[0]));
     expect(referenceUrl.pathname).toBe('/v1/map/references');
     expect(Object.fromEntries(referenceUrl.searchParams)).toEqual({
-      limit: '3',
+      limit: '2',
     });
     expect(payload.data).toMatchObject({
       count: 1,
@@ -672,7 +672,7 @@ describe('GET /api/super-app/umkm/stores', () => {
     const referenceUrl = new URL(String(fetchMock.mock.calls[0]?.[0]));
     expect(referenceUrl.pathname).toBe('/v1/map/references');
     expect(Object.fromEntries(referenceUrl.searchParams)).toEqual({
-      limit: '21',
+      limit: '10',
     });
     expect(
       payload.data.items.map((item: { id: string }) => item.id),
@@ -692,7 +692,7 @@ describe('GET /api/super-app/umkm/stores', () => {
 
   it('returns the requested progressive page with a sentinel-backed next offset', async () => {
     listUmkmStoresMock.mockResolvedValue(
-      Array.from({ length: 21 }, (_, index) => publicStore(index)).reverse(),
+      Array.from({ length: 10 }, (_, index) => publicStore(index + 10)).reverse(),
     );
 
     const response = await GET(
@@ -705,7 +705,7 @@ describe('GET /api/super-app/umkm/stores', () => {
     expect(response.status).toBe(200);
     expect(listUmkmStoresMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        limit: 21,
+        limit: 10,
         bounds: { minLat: -7, maxLat: -6, minLng: 106, maxLng: 108 },
         viewer: { lat: -6.2, lng: 106.8 },
       }),
@@ -723,7 +723,7 @@ describe('GET /api/super-app/umkm/stores', () => {
 
   it('ends progressive pagination when fewer than offset plus limit candidates exist', async () => {
     listUmkmStoresMock.mockResolvedValue(
-      Array.from({ length: 15 }, (_, index) => publicStore(index)),
+      Array.from({ length: 5 }, (_, index) => publicStore(index + 10)),
     );
 
     const response = await GET(publicRequest('limit=10&offset=10'));
@@ -731,7 +731,7 @@ describe('GET /api/super-app/umkm/stores', () => {
 
     expect(response.status).toBe(200);
     expect(listUmkmStoresMock).toHaveBeenCalledWith(
-      expect.objectContaining({ limit: 21 }),
+      expect.objectContaining({ limit: 10 }),
     );
     expect(
       payload.data.items.map((item: { id: string }) => item.id),
@@ -745,7 +745,7 @@ describe('GET /api/super-app/umkm/stores', () => {
 
   it('stops at the bounded public pagination cap without an unusable next offset', async () => {
     listUmkmStoresMock.mockResolvedValue(
-      Array.from({ length: 500 }, (_, index) => publicStore(index)),
+      Array.from({ length: 10 }, (_, index) => publicStore(index + 490)),
     );
 
     const response = await GET(publicRequest('limit=10&offset=490'));
@@ -753,7 +753,7 @@ describe('GET /api/super-app/umkm/stores', () => {
 
     expect(response.status).toBe(200);
     expect(listUmkmStoresMock).toHaveBeenCalledWith(
-      expect.objectContaining({ limit: 500 }),
+      expect.objectContaining({ limit: 10 }),
     );
     expect(payload.data.items).toHaveLength(10);
     expect(payload.data).toMatchObject({
@@ -794,7 +794,7 @@ describe('GET /api/super-app/umkm/stores', () => {
 
   it('rejects unsafe public batch sizes and offsets before querying storage', async () => {
     for (const query of [
-      'limit=51',
+      'limit=201',
       'limit=10&offset=-1',
       'limit=10&offset=491',
       'limit=10&offset=1.5',
