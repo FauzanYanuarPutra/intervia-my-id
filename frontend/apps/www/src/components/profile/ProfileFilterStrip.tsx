@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Check, ChevronDown, SlidersHorizontal, X } from 'lucide-react';
 
+import { EmblaInlineRail } from '@/components/common/EmblaInlineRail';
 import { cn } from '@/lib/utils';
 
 type ProfileFilterStripItem<T extends string> = {
@@ -84,9 +85,9 @@ export function ProfileFilterStrip<T extends string>({
 
         <div
           data-filter-strip-fade
-          className="relative hidden min-w-0 overflow-x-auto overscroll-x-contain pr-3 [scrollbar-width:none] sm:block [&::-webkit-scrollbar]:hidden"
+          className="relative hidden min-w-0 pr-3 sm:block"
         >
-          <div className="flex min-w-max items-center gap-1.5">
+          <EmblaInlineRail contentClassName="items-center gap-1.5" dragFree>
             {items.map(item => {
               const active = item.key === activeKey;
 
@@ -97,7 +98,7 @@ export function ProfileFilterStrip<T extends string>({
                   onClick={() => onChange(item.key)}
                   aria-pressed={active}
                   className={cn(
-                    'inline-flex min-h-8 sm:min-h-9 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-xs font-bold transition',
+                    'inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-xs font-bold transition sm:min-h-9',
                     active
                       ? 'border-emerald-600 bg-emerald-600 text-white shadow-sm shadow-emerald-600/15'
                       : 'border-transparent bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] hover:bg-emerald-50 hover:text-emerald-700 dark:bg-white/5 dark:hover:bg-emerald-500/10 dark:hover:text-emerald-300',
@@ -119,7 +120,7 @@ export function ProfileFilterStrip<T extends string>({
                 </button>
               );
             })}
-          </div>
+          </EmblaInlineRail>
         </div>
       </div>
 
