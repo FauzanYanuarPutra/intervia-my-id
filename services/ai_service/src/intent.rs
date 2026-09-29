@@ -25,6 +25,7 @@ pub struct MarketplaceIntent {
     pub category: String,
     pub location: String,
     pub normalized_query: String,
+    pub search_query: String,
 }
 
 fn has_any(text: &str, words: &[&str]) -> bool {
@@ -66,6 +67,80 @@ fn extract_location(lower: &str) -> String {
     String::new()
 }
 
+fn is_quantity_token(token: &str) -> bool {
+    let lower = token.trim().to_ascii_lowercase();
+    if lower.is_empty() {
+        return false;
+    }
+
+    let mut seen_digit = false;
+    for character in lower.chars() {
+        if character.is_ascii_digit() {
+            seen_digit = true;
+            continue;
+        }
+        if matches!(character, '.' | ',' | '/') || character.is_ascii_whitespace() {
+            continue;
+        }
+        if seen_digit {
+            return matches!(
+                lower.as_str(),
+                value if value.ends_with("kg")
+                    || value.ends_with('g')
+                    || value.ends_with("gram")
+                    || value.ends_with("liter")
+                    || value.ends_with('l')
+                    || value.ends_with("pcs")
+                    || value.ends_with("buah")
+                    || value.ends_with("unit")
+                    || value.ends_with("rb")
+                    || value.ends_with("jt")
+                    || value.ends_with("juta")
+                    || value.ends_with("ribu")
+            );
+        }
+        return false;
+    }
+
+    seen_digit
+}
+
+fn build_search_query(query: &str) -> String {
+    let lower = query.to_ascii_lowercase();
+    let location_start = [" di ", " daerah ", " area ", " sekitar ", " wilayah "]
+        .iter()
+        .filter_map(|marker| lower.find(marker))
+        .min();
+
+    let product_part = location_start
+        .map(|index| &query[..index])
+        .unwrap_or(query);
+
+    let stop_words = [
+        "cari", "carikan", "mencari", "mau cari", "aku cari", "saya cari",
+        "kami cari", "butuh", "membutuhkan", "aku butuh", "saya butuh",
+        "kami butuh", "supplier", "pemasok", "penjual", "pembeli", "buyer",
+        "seller", "menjual", "jualan", "jual", "menawarkan", "penawaran",
+        "tersedia", "ready", "stok", "ada", "yang", "saya", "aku", "kami",
+        "dong", "tolong", "untuk", "dengan", "budget", "harga", "maksimal",
+        "minimal",
+    ];
+
+    product_part
+        .split_whitespace()
+        .map(|token| token.trim_matches(|character: char| !character.is_alphanumeric() && character != '-' ))
+        .filter(|token| {
+            !token.is_empty()
+                && !stop_words.iter().any(|word| word == token.to_ascii_lowercase())
+                && !is_quantity_token(token)
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+        .trim()
+        .chars()
+        .take(240)
+        .collect::<String>()
+}
 fn infer_category(lower: &str) -> String {
     if has_any(
         lower,
@@ -242,6 +317,7 @@ pub fn infer_marketplace_intent(query: &str) -> MarketplaceIntent {
         side,
         category: infer_category(&lower),
         location: extract_location(&lower),
+        search_query: build_search_query(&normalized_query),
         normalized_query,
     }
 }
@@ -257,6 +333,7 @@ mod tests {
         assert_eq!(intent.side, MarketplaceSide::Supply);
         assert_eq!(intent.category, "materials-suppliers");
         assert!(intent.location.contains("tangerang"));
+        assert_eq!(intent.search_query, "mangga");
     }
 
     #[test]
@@ -278,5 +355,6 @@ mod tests {
         let intent = infer_marketplace_intent("Cari mesin kopi untuk kedai kecil budget 10 juta");
         assert_eq!(intent.category, "machines-tools");
         assert_eq!(intent.side, MarketplaceSide::Supply);
+        assert!(intent.search_query.contains("mesin"));
     }
 }
