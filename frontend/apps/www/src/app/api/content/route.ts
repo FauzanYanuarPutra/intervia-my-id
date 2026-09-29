@@ -1459,6 +1459,11 @@ export async function GET(req: NextRequest) {
     (isEnabledFlag(searchParams.get('nearby')) ||
       searchParams.get('sort') === 'nearby');
   const includeOwnerProfiles = shouldIncludeOwnerProfiles(searchParams);
+  const publicCacheable =
+    !getAuthToken(req) &&
+    !viewerLocation &&
+    requestedType !== 'freelancer' &&
+    !shouldFallbackTalent;
   const databaseOnly =
     isEnabledFlag(searchParams.get('database_only')) ||
     isEnabledFlag(searchParams.get('backend_only')) ||
@@ -1635,7 +1640,17 @@ export async function GET(req: NextRequest) {
       items: filterEditorialContent(resolvedPayload.items || []),
     };
 
-    return NextResponse.json(resolvedPayload, { status: 200 });
+    return NextResponse.json(resolvedPayload, {
+      status: 200,
+      headers: publicCacheable
+        ? {
+            'Cache-Control':
+              'public, s-maxage=15, stale-while-revalidate=60',
+          }
+        : {
+            'Cache-Control': 'private, no-store',
+          },
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'unknown error';
     console.error('[api/content] marketplace unreachable:', message);
