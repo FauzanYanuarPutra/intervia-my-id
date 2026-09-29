@@ -2255,7 +2255,7 @@ function HomeListingCarouselSection({
         </span>
 
         <Link
-          href={isDemand ? '/explore?side=demand' : '/explore?side=supply'}
+          href={isDemand ? '/explore?side=demand&tab=all' : '/explore?side=supply&tab=all'}
           className="ml-auto inline-flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-1 text-[9px] font-bold text-[color:var(--app-accent)] hover:bg-[color:var(--app-accent-soft)]"
         >
           {isId ? 'Lihat semua' : 'See all'}
@@ -2272,8 +2272,8 @@ function HomeListingCarouselSection({
                   ? 'Belum ada kebutuhan yang dipublikasikan saat ini.'
                   : 'No active requests have been posted yet.'
                 : isId
-                  ? 'Belum ada rekomendasi saat ini.'
-                  : 'No recommendations right now.'}
+                  ? 'Belum ada penawaran yang relevan saat ini.'
+                  : 'No relevant offers right now.'}
             </p>
           </div>
         </div>
