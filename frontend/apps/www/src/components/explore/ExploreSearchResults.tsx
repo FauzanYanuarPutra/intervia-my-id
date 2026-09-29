@@ -370,7 +370,7 @@ function SearchGroupSection({
 
   useEffect(() => {
     setVisibleCount(compact ? pageSize : group.items.length);
-  }, [compact, group.items.length, groupKey, pageSize]);
+  }, [compact, group.items, groupKey, pageSize]);
 
   const items = compact
     ? group.items.slice(0, visibleCount)
