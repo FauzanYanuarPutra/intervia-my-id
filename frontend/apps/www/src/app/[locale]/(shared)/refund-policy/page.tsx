@@ -1,3 +1,5 @@
+import { buildPublicPageMetadata } from '@/lib/seo/publicPageMetadata';
+import type { Metadata } from 'next';
 import { Link } from '@/i18n/navigation';
 import { AlertCircle, CheckCircle2, Clock3, CreditCard, MessageCircle, PackageCheck, Phone, ReceiptText, RotateCcw, ShieldCheck } from 'lucide-react';
 
@@ -5,6 +7,18 @@ type PageProps = { params: Promise<{ locale: string }> };
 const businessPhoneDisplay = '0821 1714 8623';
 const businessPhoneHref = 'tel:+6282117148623';
 const businessWhatsappHref = 'https://wa.me/6282117148623';
+
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
+  const { locale } = await params;
+  return buildPublicPageMetadata({
+    locale,
+    path: '/refund-policy',
+    titleId: 'Kebijakan Refund, Retur & Pembatalan | Lajukan',
+    titleEn: 'Refund, Return & Cancellation Policy | Lajukan',
+    descriptionId: 'Pelajari alur bantuan Lajukan untuk refund, retur produk, pembatalan, komplain layanan, dan bukti yang perlu disiapkan.',
+    descriptionEn: 'Learn Lajukan support flows for refunds, product returns, cancellations, service complaints, and required evidence.',
+  });
+}
 
 export default async function RefundPolicyPage({ params }: PageProps) {
   const { locale } = await params; const isId = locale === 'id';
