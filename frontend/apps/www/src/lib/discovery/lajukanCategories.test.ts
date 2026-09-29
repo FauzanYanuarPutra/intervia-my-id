@@ -57,7 +57,7 @@ describe('Lajukan explore taxonomy', () => {
         side: 'supply',
         subcategory: 'packaging',
       }),
-    ).toBe('/explore/materials-suppliers?side=supply&subcategory=packaging');
+    ).toBe('/explore/materials-suppliers?side=supply&tab=all&subcategory=packaging');
     expect(
       buildCategorySearchHref({
         category,
