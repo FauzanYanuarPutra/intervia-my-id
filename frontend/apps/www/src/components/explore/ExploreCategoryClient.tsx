@@ -1717,100 +1717,83 @@ export function ExploreCategoryClient({
               {!isSocialCategory ? (
                 <>
                   <div
-                  role="group"
-                  aria-label={
-                    isId
-                      ? 'Tujuan pencarian'
-                      : 'Search purpose'
-                  }
-                  className="mt-2 grid grid-cols-2 gap-1 rounded-[12px] bg-zinc-100 p-1 dark:bg-zinc-900"
-                >
-                  <button
-                    type="button"
-                    aria-pressed={
-                      searchSide ===
-                      'supply'
+                    role="group"
+                    aria-label={
+                      isId
+                        ? 'Tujuan pencarian'
+                        : 'Search purpose'
                     }
-                    onClick={() =>
-                      selectSearchSide(
-                        'supply',
-                      )
-                    }
-                    className={cn(
-                      'min-h-8 rounded-[9px] px-2 text-[10px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/25 sm:text-[11px]',
-                      searchSide ===
-                        'supply'
-                        ? 'bg-zinc-950 text-white shadow-sm dark:bg-white dark:text-zinc-950'
-                        : 'text-zinc-500 hover:bg-white hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white',
-                    )}
+                    className="mt-2 grid grid-cols-2 gap-1 rounded-[12px] bg-zinc-100 p-1 dark:bg-zinc-900"
                   >
-                    {isId
-                      ? 'Cari penawaran'
-                      : 'Find offers'}
-                  </button>
+                    <button
+                      type="button"
+                      aria-pressed={searchSide === 'supply'}
+                      onClick={() => selectSearchSide('supply')}
+                      className={cn(
+                        'min-h-8 rounded-[9px] px-2 text-[10px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/25 sm:text-[11px]',
+                        searchSide === 'supply'
+                          ? 'bg-zinc-950 text-white shadow-sm dark:bg-white dark:text-zinc-950'
+                          : 'text-zinc-500 hover:bg-white hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white',
+                      )}
+                    >
+                      {isId ? 'Cari penawaran' : 'Find offers'}
+                    </button>
 
-                  <button
-                    type="button"
-                    aria-pressed={
-                      searchSide ===
-                      'demand'
-                    }
-                    onClick={() =>
-                      selectSearchSide(
-                        'demand',
-                      )
-                    }
-                    className={cn(
-                      'min-h-8 rounded-[9px] px-2 text-[10px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/25 sm:text-[11px]',
-                      searchSide ===
-                        'demand'
-                        ? 'bg-zinc-950 text-white shadow-sm dark:bg-white dark:text-zinc-950'
-                        : 'text-zinc-500 hover:bg-white hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white',
-                    )}
-                  >
-                    {isId
-                      ? 'Cari kebutuhan pembeli'
-                      : 'Find buyer needs'}
-                  </button>
-                </div>
+                    <button
+                      type="button"
+                      aria-pressed={searchSide === 'demand'}
+                      onClick={() => selectSearchSide('demand')}
+                      className={cn(
+                        'min-h-8 rounded-[9px] px-2 text-[10px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/25 sm:text-[11px]',
+                        searchSide === 'demand'
+                          ? 'bg-zinc-950 text-white shadow-sm dark:bg-white dark:text-zinc-950'
+                          : 'text-zinc-500 hover:bg-white hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white',
+                      )}
+                    >
+                      {isId
+                        ? 'Cari kebutuhan pembeli'
+                        : 'Find buyer needs'}
+                    </button>
+                  </div>
 
-                <div
-                  className={cn(
-                    'mt-2 rounded-[11px] border px-3 py-2.5',
-                    searchSide === 'demand'
-                      ? 'border-amber-200 bg-amber-50/70 dark:border-amber-900/60 dark:bg-amber-950/20'
-                      : 'border-emerald-200 bg-emerald-50/70 dark:border-emerald-900/60 dark:bg-emerald-950/20',
-                  )}
-                  aria-live="polite"
-                >
-                  <p
+                  <div
                     className={cn(
-                      'text-[10px] font-black sm:text-[11px]',
+                      'mt-2 rounded-[11px] border px-3 py-2.5',
                       searchSide === 'demand'
-                        ? 'text-amber-900 dark:text-amber-200'
-                        : 'text-emerald-900 dark:text-emerald-200',
+                        ? 'border-amber-200 bg-amber-50/70 dark:border-amber-900/60 dark:bg-amber-950/20'
+                        : 'border-emerald-200 bg-emerald-50/70 dark:border-emerald-900/60 dark:bg-emerald-950/20',
                     )}
+                    aria-live="polite"
                   >
-                    {searchSide === 'demand'
-                      ? isId
-                        ? 'Mode cari kebutuhan pembeli'
-                        : 'Find buyer needs mode'
-                      : isId
-                        ? 'Mode cari penawaran'
-                        : 'Find-offers mode'}
-                  </p>
-                  <p className="mt-0.5 text-[9px] font-medium leading-4 text-zinc-600 dark:text-zinc-400 sm:text-[10px]">
-                    {searchSide === 'demand'
-                      ? isId
-                        ? 'Di bawah hanya tampil kebutuhan pembeli yang sedang mencari produk, jasa, atau supplier.'
-                        : 'Below you will only see buyer needs looking for products, services, or suppliers.'
-                      : isId
-                        ? 'Di bawah hanya tampil usaha, penyedia, produk, dan jasa yang sedang ditawarkan.'
-                        : 'Below you will only see businesses, providers, products, and services currently offered.'}
-                  </p>
-                </div>
+                    <p
+                      className={cn(
+                        'text-[10px] font-black sm:text-[11px]',
+                        searchSide === 'demand'
+                          ? 'text-amber-900 dark:text-amber-200'
+                          : 'text-emerald-900 dark:text-emerald-200',
+                      )}
+                    >
+                      {searchSide === 'demand'
+                        ? isId
+                          ? 'Mode cari kebutuhan pembeli'
+                          : 'Find buyer needs mode'
+                        : isId
+                          ? 'Mode cari penawaran'
+                          : 'Find-offers mode'}
+                    </p>
+                    <p className="mt-0.5 text-[9px] font-medium leading-4 text-zinc-600 dark:text-zinc-400 sm:text-[10px]">
+                      {searchSide === 'demand'
+                        ? isId
+                          ? 'Di bawah hanya tampil kebutuhan pembeli yang sedang mencari produk, jasa, atau supplier.'
+                          : 'Below you will only see buyer needs looking for products, services, or suppliers.'
+                        : isId
+                          ? 'Di bawah hanya tampil usaha, penyedia, produk, dan jasa yang sedang ditawarkan.'
+                          : 'Below you will only see businesses, providers, products, and services currently offered.'}
+                    </p>
+                  </div>
                 </>
               ) : null}
+
 
               {showHelpSection ? (
                 <button
