@@ -2116,7 +2116,7 @@ function QuickCategoriesSection({ isId }: { isId: boolean }) {
                     className="relative z-10 aspect-square flex-none"
                     style={{
                       width: Math.min(item.imageSize ?? 70, 68),
-                      transform: `translate(${Math.max(-6, Math.min(6, (item.offsetX ?? 18) / 3))}px, ${Math.max(-6, Math.min(6, (item.offsetY ?? 18) / 3))}px) scaleX(${item.flip ? -1 : 1}) scale(${item.scale ?? 1}) rotate(${item.rotate ?? 0}deg)`,
+                      transform: `translate(${Math.max(-6, Math.min(6, -((item.offsetX ?? -18) / 3)))}px, ${Math.max(-6, Math.min(6, -((item.offsetY ?? -14) / 3)))}px) scaleX(${item.flip ? -1 : 1}) scale(${item.scale ?? 1}) rotate(${item.rotate ?? 0}deg)`,
                     }}
                   >
                     <img
