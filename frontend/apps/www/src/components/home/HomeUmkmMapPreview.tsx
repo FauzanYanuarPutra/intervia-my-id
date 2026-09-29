@@ -18,7 +18,7 @@ import { useEmblaWheelGestures } from '@/components/common/useEmblaWheelGestures
 import { CompactSeeAllLink } from '@/components/common/CompactSectionAction';
 import { useViewerLocation } from '@/components/super-app/useViewerLocation';
 import { ArrowRight, BadgeCheck, Target, ChevronRight } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import useEmblaCarousel from 'embla-carousel-react';
 
 import {
