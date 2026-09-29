@@ -149,7 +149,6 @@ export function HomeBusinessMapSection({
 
     async function load() {
       setLoading(true);
-      setTotalMappedCount(0);
       try {
         if (!active || controller.signal.aborted) return;
         setError(null);
@@ -163,28 +162,26 @@ export function HomeBusinessMapSection({
         );
         const payload = (await response.json().catch(() => ({}))) as MapPointsResponse;
 
-        if (!response.ok || !payload.data?.items) {
+        if (response.status === 429) {
           throw new Error(
-            response.status === 429
-              ? isId
-                ? 'Peta sedang sibuk. Coba lagi sebentar.'
-                : 'The map is busy. Please try again shortly.'
-              : payload.error ||
-                (isId ? 'Peta usaha belum siap.' : 'Business map unavailable.'),
+            isId
+              ? 'Peta sedang sibuk. Coba lagi sebentar.'
+              : 'The map is busy. Please try again shortly.',
           );
         }
 
-        // Home map is intentionally geo-light. If the dedicated projection has
-        // no rows yet, fall back to the public store projection instead of
-        // showing an empty basemap. Both sources contain real database-backed
-        // locations; no decorative/fake points are introduced.
-        let mapItems = payload.data.items;
+        // Home map is intentionally geo-light. If the dedicated projection
+        // fails or has no rows yet, use the public store projection instead of
+        // showing an empty basemap. Both sources are database-backed.
+        let mapItems = Array.isArray(payload.data?.items)
+          ? payload.data.items
+          : [];
         let totalCount =
-          typeof payload.data.total_count === 'number'
+          typeof payload.data?.total_count === 'number'
             ? payload.data.total_count
             : mapItems.length;
 
-        if (mapItems.length === 0) {
+        if (!response.ok || mapItems.length === 0) {
           const fallbackResponse = await fetch(
             '/api/super-app/umkm/stores?limit=200&map=1&include_references=1&min_lat=-11&max_lat=6&min_lng=95&max_lng=141',
             {
@@ -253,6 +250,13 @@ export function HomeBusinessMapSection({
               typeof fallbackPayload.data?.count === 'number'
                 ? fallbackPayload.data.count
                 : mapItems.length;
+          } else if (!response.ok) {
+            throw new Error(
+              payload.error ||
+                (isId
+                  ? 'Data peta usaha belum tersedia.'
+                  : 'Business map data is unavailable.'),
+            );
           }
         }
 
