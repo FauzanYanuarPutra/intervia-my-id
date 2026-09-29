@@ -290,6 +290,7 @@ export function HomeUmkmMapPreview({
   const [stores, setStores] = useState<PreviewStore[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
   const [locationPromptOpen, setLocationPromptOpen] = useState(false);
 
   const localViewerLocationState = useViewerLocation({
@@ -372,7 +373,7 @@ export function HomeUmkmMapPreview({
       active = false;
       controller.abort();
     };
-  }, [isId, viewerLocation]);
+  }, [isId, viewerLocation, retryKey]);
 
   /* ================= PREPARE UI ================= */
 
@@ -512,7 +513,7 @@ export function HomeUmkmMapPreview({
                 <p className="min-w-0 flex-1 text-[10px] font-medium text-red-500 sm:text-[11px]">
                   {error}
                 </p>
-                <button type="button" onClick={() => window.location.reload()} className="shrink-0 rounded-full bg-white px-2.5 py-1.5 text-[9px] font-bold text-red-600 shadow-sm">
+                <button type="button" onClick={() => setRetryKey(value => value + 1)} className="shrink-0 rounded-full bg-white px-2.5 py-1.5 text-[9px] font-bold text-red-600 shadow-sm">
                   {isId ? 'Coba lagi' : 'Retry'}
                 </button>
               </div>
