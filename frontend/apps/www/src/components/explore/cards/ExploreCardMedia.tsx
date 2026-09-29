@@ -1,6 +1,6 @@
 'use client';
 
-import Image from 'next/image';
+import { LajukanImage } from '@/components/common/LajukanImage';
 import { ImageIcon } from 'lucide-react';
 import { useState } from 'react';
 
@@ -42,11 +42,10 @@ export function ExploreCardMedia({
     <div
       className={`relative overflow-hidden bg-[color:var(--app-surface-muted)] ${className}`}
     >
-      <Image
+      <LajukanImage
         src={src}
         alt={alt}
         fill
-        unoptimized
         sizes="(max-width: 640px) 45vw, 260px"
         className="object-cover"
         onError={() => setFailedSrc(src)}
