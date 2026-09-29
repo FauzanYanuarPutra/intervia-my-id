@@ -111,11 +111,77 @@ function readReferenceCursor(
     readString(value);
 
   return cursor.length <= 96 &&
-    /^\d{1,19}:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(
+    /^\\d{1,19}:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(
       cursor,
     )
     ? cursor
     : '';
+}
+
+type SearchOffsetSource = 'content' | 'business';
+
+function readOffsetCursor(
+  value: unknown,
+  source: SearchOffsetSource,
+): number | null {
+  const cursor = readString(value);
+  const prefix = `${source}:`;
+  if (!cursor.startsWith(prefix)) return null;
+
+  const rawOffset = cursor.slice(prefix.length);
+  if (!/^\\d{1,6}$/.test(rawOffset)) return null;
+
+  const offset = Number(rawOffset);
+  return Number.isSafeInteger(offset) && offset >= 0 ? offset : null;
+}
+
+function encodeOffsetCursor(
+  source: SearchOffsetSource,
+  offset: number,
+): string {
+  return `${source}:${Math.max(0, Math.min(10000, Math.trunc(offset)))}`;
+}
+
+function readNextOffsetCursor(
+  payload: JsonRecord | null,
+  source: SearchOffsetSource,
+): string | null {
+  const sourcePayload =
+    source === 'business'
+      ? asRecord(payload?.data) || payload
+      : payload;
+
+  if (
+    !sourcePayload ||
+    sourcePayload.has_more !== true
+  ) {
+    return null;
+  }
+
+  const nextOffset =
+    readNumber(sourcePayload.next_offset);
+  if (
+    nextOffset !== null &&
+    nextOffset >= 0
+  ) {
+    return encodeOffsetCursor(
+      source,
+      nextOffset,
+    );
+  }
+
+  const offset =
+    readNumber(sourcePayload.offset) ?? 0;
+  const limit =
+    readNumber(sourcePayload.limit);
+  if (limit === null || limit <= 0) {
+    return null;
+  }
+
+  return encodeOffsetCursor(
+    source,
+    offset + limit,
+  );
 }
 
 function readNumber(
@@ -1505,6 +1571,7 @@ function group(
   available: boolean,
   error: string | null = null,
   relevanceQuery = '',
+  nextCursor: string | null = null,
 ): GlobalSearchGroup {
   const unique =
     new Map<
@@ -1534,7 +1601,7 @@ function group(
   return {
     items: normalized,
     total: normalized.length,
-    nextCursor: null,
+    nextCursor,
     available,
     error,
   };
@@ -1756,6 +1823,15 @@ export async function GET(
     ),
   );
 
+  const contentOffset = readOffsetCursor(
+    state.cursor,
+    'content',
+  );
+  const businessOffset = readOffsetCursor(
+    state.cursor,
+    'business',
+  );
+
   const params =
     new URLSearchParams({
       status: 'active',
@@ -1767,6 +1843,13 @@ export async function GET(
           ? '24'
           : '48',
     });
+
+  if (contentOffset !== null) {
+    params.set(
+      'offset',
+      String(contentOffset),
+    );
+  }
 
   if (effectiveQuery) {
     params.set(
@@ -2039,7 +2122,11 @@ export async function GET(
                   }
                 : {}),
               backend_only: '1',
+              include_references: '0',
               limit: state.category || state.subcategory ? '48' : '12',
+              ...(businessOffset !== null
+                ? { offset: String(businessOffset) }
+                : {}),
             },
           ).toString()}`,
           'businesses',
@@ -2373,6 +2460,12 @@ export async function GET(
    *
    * The side was already normalized in mapContentItem().
    */
+  const contentNextCursor =
+    readNextOffsetCursor(
+      contentPayload,
+      'content',
+    );
+
   response.groups.products =
     group(
       contentItems.filter(
@@ -2390,6 +2483,9 @@ export async function GET(
         ? 'products_unavailable'
         : null,
       relevanceQuery,
+      requested.has('products')
+        ? contentNextCursor
+        : null,
     );
 
   /**
@@ -2412,6 +2508,9 @@ export async function GET(
         ? 'services_unavailable'
         : null,
       relevanceQuery,
+      requested.has('services')
+        ? contentNextCursor
+        : null,
     );
 
   /**
@@ -2434,6 +2533,9 @@ export async function GET(
         ? 'needs_unavailable'
         : null,
       relevanceQuery,
+      requested.has('needs')
+        ? contentNextCursor
+        : null,
     );
 
   response.groups.references =
@@ -2484,6 +2586,12 @@ export async function GET(
       ),
     ).toLowerCase();
 
+  const businessNextCursor =
+    readNextOffsetCursor(
+      businessPayload,
+      'business',
+    );
+
   response.groups.businesses =
     group(
       asArray(
@@ -2515,6 +2623,9 @@ export async function GET(
         ? 'businesses_unavailable'
         : null,
       relevanceQuery,
+      requested.has('businesses')
+        ? businessNextCursor
+        : null,
     );
 
   response.groups.communities =
