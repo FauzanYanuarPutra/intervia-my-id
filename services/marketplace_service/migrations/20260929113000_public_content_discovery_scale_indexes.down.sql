@@ -1,0 +1,2 @@
+DROP INDEX IF EXISTS idx_content_items_public_marketplace_category_updated;
+DROP INDEX IF EXISTS idx_content_items_public_listing_intent_updated;
