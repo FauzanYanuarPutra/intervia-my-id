@@ -130,6 +130,7 @@ import { normalizeCommunityMediaItems } from '@/components/community/community-f
 import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 import { buildUmkmMapPlacePath, UMKM_DISCOVERY_PATH } from '@/lib/umkmSurface';
 import { resolveStorefrontBrandMedia } from '@/lib/super-app/storefront-brand-media';
+import { getUmkmPlaceKind } from '@/lib/super-app/umkm-place-ui';
 import {
   LAJUKAN_EXPLORE_CATEGORIES,
   buildExploreCategoryHref,
@@ -1128,6 +1129,16 @@ function mapContentToRecommendation(
   };
 }
 
+const NATIVE_BUSINESS_CATEGORY_ARTWORK: Record<string, string> = {
+  food: '/images/business-categories/food.svg',
+  retail: '/images/business-categories/retail.svg',
+  service: '/images/business-categories/service.svg',
+  craft: '/images/business-categories/craft.svg',
+  agri: '/images/business-categories/agri.svg',
+  workshop: '/images/business-categories/workshop.svg',
+  general: '/images/business-categories/general.svg',
+};
+
 function mapNativeStoreToRecommendation(
   item: HomeNativeStoreApiItem,
   isId: boolean,
@@ -1145,13 +1156,28 @@ function mapNativeStoreToRecommendation(
       : {};
 
   const storefrontMedia = resolveStorefrontBrandMedia(metadata);
+  const placeKind = getUmkmPlaceKind({
+    id,
+    slug,
+    name: title,
+    description: readText(item.description) || null,
+    city: readText(item.city) || null,
+    address: readText(item.address) || null,
+    lat: Number(item.lat) || 0,
+    lng: Number(item.lng) || 0,
+    metadata,
+  });
+  // If the business has no approved/owner media yet, use the same category
+  // artwork used by the map/detail surfaces instead of an empty gray card.
+  const categoryArtwork = NATIVE_BUSINESS_CATEGORY_ARTWORK[placeKind];
   const coverImage =
     storefrontMedia.coverUrl ||
     storefrontMedia.logoUrl ||
     readText(metadata.cover_image) ||
     readText(metadata.coverImage) ||
     readText(metadata.logo_url) ||
-    readText(metadata.logoUrl);
+    readText(metadata.logoUrl) ||
+    categoryArtwork;
   const galleryImages = Array.from(
     new Set([
       coverImage,
