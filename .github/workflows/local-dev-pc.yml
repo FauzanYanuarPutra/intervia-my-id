@@ -101,7 +101,7 @@ jobs:
           & docker compose @compose exec -T ai_service curl -fsS http://localhost:8080/ready/deep | Write-Host
 
           Write-Host "Checking Personal AI storage..."
-          & docker compose @compose exec -T www node -e 'const {Client}=require("pg");(async()=>{const url=process.env.SUPER_APP_POSTGRES_URL;if(!url)throw new Error("SUPER_APP_POSTGRES_URL is missing");const client=new Client({connectionString:url});await client.connect();const result=await client.query("SELECT to_regclass('"'"'public.personal_ai_agents'"'"') AS agents,to_regclass('"'"'public.personal_ai_threads'"'"') AS threads,to_regclass('"'"'public.personal_ai_messages'"'"') AS messages");const row=result.rows[0]||{};if(!row.agents||!row.threads||!row.messages)throw new Error("Personal AI tables are missing");await client.end();console.log("Personal AI storage: ready");})().catch(error=>{console.error("Personal AI storage:",error.message);process.exit(1)})'
+          & docker compose @compose exec -T www node -e 'const {Client}=require("pg");(async()=>{const url=process.env.SUPER_APP_POSTGRES_URL;if(!url)throw new Error("SUPER_APP_POSTGRES_URL is missing");const client=new Client({connectionString:url});await client.connect();const result=await client.query("SELECT COUNT(*)::int AS count FROM information_schema.tables WHERE table_schema=$1 AND table_name=ANY($2::text[])",["public",["personal_ai_agents","personal_ai_threads","personal_ai_messages"]]);if(Number(result.rows[0]?.count||0)!==3)throw new Error("Personal AI tables are missing");await client.end();console.log("Personal AI storage: ready");})().catch(error=>{console.error("Personal AI storage:",error.message);process.exit(1)})'
       - name: Collect Docker diagnostics
         if: always()
         shell: pwsh
