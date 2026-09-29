@@ -10,7 +10,7 @@ import {
 describe('Explore hub routes', () => {
   it('emits canonical supply intent explicitly', () => {
     expect(buildExploreHubSearchHref('id', 'supply', ' supplier kemasan ')).toBe(
-      '/id/explore?q=supplier+kemasan&side=supply',
+      '/id/explore?q=supplier+kemasan&side=supply&tab=all',
     );
   });
 
