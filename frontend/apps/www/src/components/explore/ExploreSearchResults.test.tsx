@@ -164,6 +164,48 @@ describe('ExploreSearchResults public references', () => {
     expect(offerHtml).toContain('/create?side=supply');
   });
 
+  it('renders demand all from the needs group only', () => {
+    const payload = emptyGlobalSearchResponse('kemasan');
+    payload.groups.needs = {
+      ...payload.groups.needs,
+      items: [
+        {
+          id: 'need-1',
+          kind: 'needs',
+          title: 'Butuh kemasan makanan',
+          summary: 'Mencari pemasok kemasan makanan.',
+          href: '/content/need-1',
+          image: null,
+          label: 'Kebutuhan',
+          location: 'Bekasi',
+          priceLabel: 'Rp1.000.000',
+          ownerName: 'Pelaku Usaha',
+          verified: false,
+          side: 'demand',
+          memberCount: null,
+          viewCount: null,
+          durationLabel: '',
+          metadata: {},
+        },
+      ],
+      total: 1,
+    };
+
+    const html = renderToStaticMarkup(
+      <ExploreSearchResults
+        payload={payload}
+        loading={false}
+        error={false}
+        locale="id"
+        searchSide="demand"
+        activeTab="all"
+      />,
+    );
+
+    expect(html).toContain('Butuh kemasan makanan');
+    expect(html).not.toContain('Jenis hasil');
+  });
+
   it('uses the selected-tab empty state even when another tab has results', () => {
     const payload = emptyGlobalSearchResponse('kopi');
     payload.groups.references = {
