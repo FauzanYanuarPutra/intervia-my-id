@@ -1,0 +1,2 @@
+DROP INDEX IF EXISTS idx_content_public_reference_map_lat_lng;
+DROP INDEX IF EXISTS idx_content_public_reference_map_point_gist;
