@@ -79,6 +79,48 @@ describe('public UMKM store projection', () => {
     expect(projected.metadata).not.toHaveProperty('selected_location');
   });
 
+  it('preserves only safe reference provenance in public projection', () => {
+    const projected = projectPublicUmkmStore(
+      makeStore({
+        metadata: {
+          record_kind: 'government_reference',
+          market_side: 'reference',
+          is_transactional: false,
+          is_public_reference: true,
+          reference_publication_status: 'published',
+          claimable: true,
+          source_dataset: 'data-go-id-denpasar-umkm',
+          source_url: 'https://data.go.id/dataset/dataset/umkm',
+          source_title: 'Kota Denpasar',
+          source_license: 'Creative Commons Attribution',
+          source_license_url: 'https://creativecommons.org/licenses/by/4.0/',
+          source_attribution: 'Kota Denpasar',
+          owner_user_id: 'must-not-be-exposed',
+          owner_phone: '+628133333333',
+          api_token: 'must-not-be-exposed',
+        },
+      }),
+    );
+
+    expect(projected.metadata).toMatchObject({
+      record_kind: 'government_reference',
+      market_side: 'reference',
+      is_transactional: false,
+      is_public_reference: true,
+      reference_publication_status: 'published',
+      claimable: true,
+      source_dataset: 'data-go-id-denpasar-umkm',
+      source_url: 'https://data.go.id/dataset/dataset/umkm',
+      source_title: 'Kota Denpasar',
+      source_license: 'Creative Commons Attribution',
+      source_license_url: 'https://creativecommons.org/licenses/by/4.0/',
+      source_attribution: 'Kota Denpasar',
+    });
+    expect(projected.metadata).not.toHaveProperty('owner_user_id');
+    expect(projected.metadata).not.toHaveProperty('owner_phone');
+    expect(projected.metadata).not.toHaveProperty('api_token');
+  });
+
   it('keeps owner-uploaded brand media public for storefront rendering', () => {
     const projected = projectPublicUmkmStore(
       makeStore({
