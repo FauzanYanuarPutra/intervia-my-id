@@ -690,7 +690,7 @@ export const LAJUKAN_EXPLORE_CATEGORIES:
       sections: marketplaceSections({
         'latest-needs': {
           titleId:
-            'Pencari tempat terbaru',
+            'Kebutuhan tempat terbaru',
         },
         'featured-providers': {
           titleId:
