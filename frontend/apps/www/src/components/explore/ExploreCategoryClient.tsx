@@ -1258,15 +1258,16 @@ export function ExploreCategoryClient({
         }
 
         if (searchSide === 'demand') {
-          return (
-            section.key ===
-            'latest-needs'
-          );
+          return section.key === 'latest-needs';
         }
 
+        // Supply is the default mode, but the category landing page should
+        // still expose current demand so providers can discover who is
+        // looking for something in this category.
         return [
           'featured-providers',
           'latest-listings',
+          'latest-needs',
         ].includes(section.key);
       },
     );
