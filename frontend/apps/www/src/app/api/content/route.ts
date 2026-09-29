@@ -1459,11 +1459,6 @@ export async function GET(req: NextRequest) {
     (isEnabledFlag(searchParams.get('nearby')) ||
       searchParams.get('sort') === 'nearby');
   const includeOwnerProfiles = shouldIncludeOwnerProfiles(searchParams);
-  const publicCacheable =
-    !getAuthToken(req) &&
-    !viewerLocation &&
-    requestedType !== 'freelancer' &&
-    !shouldFallbackTalent;
   const databaseOnly =
     isEnabledFlag(searchParams.get('database_only')) ||
     isEnabledFlag(searchParams.get('backend_only')) ||
@@ -1476,6 +1471,11 @@ export async function GET(req: NextRequest) {
       requestedTypeRaw === 'user' ||
       requestedTypeRaw === 'users' ||
       requestedTypeRaw === 'profile');
+  const publicCacheable =
+    !getAuthToken(req) &&
+    !viewerLocation &&
+    requestedType !== 'freelancer' &&
+    !shouldFallbackTalent;
 
   try {
     const { response: backendRes, payload: data } =
