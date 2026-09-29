@@ -276,7 +276,9 @@ export function HomeBusinessMapSection({
         role="link"
         tabIndex={0}
         aria-label={
-          isId ? 'Buka peta UMKM Lajukan' : 'Open the Lajukan business map'
+          isId
+            ? 'Buka peta usaha & referensi Lajukan'
+            : 'Open the Lajukan business & reference map'
         }
         onClick={handleMapClick}
         onKeyDown={handleMapKeyDown}
