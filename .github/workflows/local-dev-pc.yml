@@ -72,6 +72,33 @@ jobs:
             exit $exitCode
           }
 
+      - name: Smoke test application runtime
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $compose = @()
+          if (Test-Path "$env:GITHUB_WORKSPACE\.env.development") {
+            $compose += @("--env-file", ".env.development")
+          } elseif (Test-Path "$env:GITHUB_WORKSPACE\.env") {
+            $compose += @("--env-file", ".env")
+          }
+          $compose += @("-f", "docker-compose.yml")
+          if (Test-Path "$env:GITHUB_WORKSPACE\docker-compose.dev.yml") {
+            $compose += @("-f", "docker-compose.dev.yml")
+          }
+
+          foreach ($profile in @("backoffice","edge","local-ai","kyc","devtools","tunnel")) {
+            $compose += @("--profile", $profile)
+          }
+
+          Write-Host "Checking marketplace readiness..."
+          & docker compose @compose exec -T marketplace_service curl -fsS http://localhost:8081/ready | Write-Host
+
+          Write-Host "Checking AI readiness..."
+          & docker compose @compose exec -T ai_service curl -fsS http://localhost:8080/ready | Write-Host
+
+          Write-Host "Checking AI deep inference..."
+          & docker compose @compose exec -T ai_service curl -fsS http://localhost:8080/ready/deep | Write-Host
       - name: Collect Docker diagnostics
         if: always()
         shell: pwsh

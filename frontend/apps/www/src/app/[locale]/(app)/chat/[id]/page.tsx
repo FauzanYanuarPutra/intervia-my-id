@@ -2729,6 +2729,9 @@ export default function ChatRoomPage() {
   const [openMessageActionsId, setOpenMessageActionsId] = useState<
     string | null
   >(null);
+  const [messageActionPlacement, setMessageActionPlacement] = useState<
+    'above' | 'below'
+  >('above');
   const {
     status: voiceNoteStatus,
     durationMs: voiceNoteDurationMs,
@@ -5093,6 +5096,68 @@ export default function ChatRoomPage() {
       messageInputRef.current?.focus({ preventScroll: true });
     }, 0);
   }, []);
+
+  const syncMessageActionPlacement = useCallback(
+    (messageId: string) => {
+      const menu = document.getElementById(`message-actions-${messageId}`);
+      const anchor = menu?.parentElement?.querySelector(
+        'button[aria-haspopup="menu"]',
+      ) as HTMLElement | null;
+      if (!menu || !anchor) return;
+
+      const anchorRect = anchor.getBoundingClientRect();
+      const menuRect = menu.getBoundingClientRect();
+      const chatViewportRect = messagesViewportRef.current?.getBoundingClientRect();
+      const padding = 8;
+      const gap = 8;
+      const topBoundary = Math.max(
+        padding,
+        chatViewportRect?.top ?? padding,
+      );
+      const bottomBoundary = Math.min(
+        window.innerHeight - padding,
+        chatViewportRect?.bottom ?? window.innerHeight - padding,
+      );
+      const availableAbove = Math.max(
+        0,
+        anchorRect.top - topBoundary - gap,
+      );
+      const availableBelow = Math.max(
+        0,
+        bottomBoundary - anchorRect.bottom - gap,
+      );
+
+      const fitsAbove = menuRect.height <= availableAbove;
+      const fitsBelow = menuRect.height <= availableBelow;
+
+      setMessageActionPlacement(
+        fitsAbove
+          ? 'above'
+          : fitsBelow
+            ? 'below'
+            : availableBelow > availableAbove
+              ? 'below'
+              : 'above',
+      );
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (!openMessageActionsId) return;
+
+    const sync = () => syncMessageActionPlacement(openMessageActionsId);
+    const frame = window.requestAnimationFrame(sync);
+
+    window.addEventListener('resize', sync);
+    window.addEventListener('scroll', sync, true);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener('resize', sync);
+      window.removeEventListener('scroll', sync, true);
+    };
+  }, [openMessageActionsId, syncMessageActionPlacement]);
 
   const handleReplyToMessage = useCallback(
     (message: Message) => {

@@ -20,11 +20,15 @@ use std::{
 use tokio::sync::Semaphore;
 use tower_http::cors::CorsLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use intent::infer_marketplace_intent;
+use tools::{ToolCallTrace, ToolRegistry, ToolRegistryConfig};
 
+mod intent;
 mod runtime_metrics;
+mod tools;
 
 const SERVICE_NAME: &str = "lajukan-ai-orchestrator";
-const SERVICE_VERSION: &str = "2.0.3";
+const SERVICE_VERSION: &str = "2.1.0";
 
 #[derive(Clone)]
 struct AppState {
@@ -32,6 +36,7 @@ struct AppState {
     config: Config,
     concurrency: Arc<Semaphore>,
     request_counter: Arc<AtomicU64>,
+    tools: ToolRegistry,
 }
 
 #[derive(Clone)]
@@ -48,6 +53,13 @@ struct Config {
     vllm_kyc_model: String,
     vllm_structured_outputs: bool,
     vllm_reasoning_effort: String,
+    vllm_fast_model: String,
+    vllm_embedding_model: String,
+
+    marketplace_url: String,
+    marketplace_service_token: String,
+    ai_tool_timeout_ms: u64,
+    ai_tool_limit: usize,
 
     ocr_url: String,
     liveness_url: String,
@@ -340,12 +352,19 @@ async fn main() {
         http,
         concurrency: Arc::new(Semaphore::new(config.max_concurrent_ai)),
         request_counter: Arc::new(AtomicU64::new(1)),
+        tools: ToolRegistry::new(ToolRegistryConfig {
+            marketplace_url: config.marketplace_url.clone(),
+            service_token: config.marketplace_service_token.clone(),
+            timeout_ms: config.ai_tool_timeout_ms,
+            max_results: config.ai_tool_limit,
+        }),
         config: config.clone(),
     });
 
     let app = Router::new()
         .route("/health", get(handle_health))
         .route("/ready", get(handle_ready))
+        .route("/ready/deep", get(handle_ready_deep))
         .route("/metrics", get(handle_metrics))
         .route("/v1/capabilities", get(handle_capabilities))
         .route("/v1/chat", post(handle_chat))
@@ -447,8 +466,10 @@ impl Config {
             vllm_api_key: env::var("VLLM_API_KEY").unwrap_or_default(),
             vllm_structured_model: non_empty_env("VLLM_STRUCTURED_MODEL")
                 .unwrap_or_else(|| vllm_model.clone()),
-            vllm_vision_model: non_empty_env("VLLM_VISION_MODEL")
-                .unwrap_or_else(|| vllm_model.clone()),
+            vllm_vision_model: env::var("VLLM_VISION_MODEL")
+                .unwrap_or_default()
+                .trim()
+                .to_string(),
             vllm_kyc_model: non_empty_env("VLLM_KYC_MODEL").unwrap_or_else(|| vllm_model.clone()),
             vllm_model,
             vllm_fallback_model: non_empty_env("VLLM_FALLBACK_MODEL")
@@ -459,6 +480,21 @@ impl Config {
                 .unwrap_or_else(|_| "none".to_string())
                 .trim()
                 .to_ascii_lowercase(),
+            vllm_fast_model: non_empty_env("VLLM_FAST_MODEL")
+                .or_else(|| non_empty_env("AI_FAST_MODEL"))
+                .unwrap_or_else(|| vllm_model.clone()),
+            vllm_embedding_model: env::var("VLLM_EMBEDDING_MODEL")
+                .unwrap_or_default()
+                .trim()
+                .to_string(),
+
+            marketplace_url: service_url(
+                "MARKETPLACE_URL",
+                "http://marketplace_service:8081",
+            ),
+            marketplace_service_token: env::var("MARKETPLACE_SERVICE_TOKEN").unwrap_or_default(),
+            ai_tool_timeout_ms: env_u64("AI_TOOL_TIMEOUT_MS", 5_000, 500, 20_000),
+            ai_tool_limit: env_usize("AI_TOOL_LIMIT", 12, 1, 30),
 
             ocr_url: service_url("OCR_URL", "http://ocr_service:8000/predict"),
             liveness_url: service_url("LIVENESS_URL", "http://liveness_service:8000/check"),
@@ -519,6 +555,7 @@ async fn handle_health(State(state): State<Arc<AppState>>) -> Json<Value> {
         "version": SERVICE_VERSION,
         "configured": {
             "vllm": !state.config.vllm_chat_url.is_empty(),
+            "marketplace_tools": state.tools.configured(),
             "rag": !state.config.rag_url.is_empty(),
             "ocr": !state.config.ocr_url.is_empty(),
             "liveness": !state.config.liveness_url.is_empty(),
@@ -538,58 +575,174 @@ async fn handle_ready(State(state): State<Arc<AppState>>) -> Response {
         .send()
         .await;
 
-    match probe {
-        Ok(response) => {
-            let status = response.status();
-            let payload = response.text().await.unwrap_or_default();
-            if !status.is_success() {
-                return json_response(
-                    StatusCode::SERVICE_UNAVAILABLE,
-                    json!({
-                        "status": "not_ready",
-                        "service": SERVICE_NAME,
-                        "vllm": format!("http_{}", status.as_u16()),
-                        "latency_ms": started.elapsed().as_millis(),
-                    }),
-                );
-            }
+    let response = match probe {
+        Ok(response) => response,
+        Err(error) => {
+            return json_response(
+                StatusCode::SERVICE_UNAVAILABLE,
+                json!({
+                    "status": "not_ready",
+                    "service": SERVICE_NAME,
+                    "error": "VLLM_UNREACHABLE",
+                    "message": safe_error(&error.to_string(), 240),
+                    "latency_ms": started.elapsed().as_millis(),
+                }),
+            );
+        }
+    };
 
-            let parsed = serde_json::from_str::<Value>(&payload).unwrap_or_else(|_| json!({}));
-            let primary_ready = model_list_contains(&parsed, &state.config.vllm_model);
-            let fallback_ready = model_list_contains(&parsed, &state.config.vllm_fallback_model);
+    let status = response.status();
+    let payload = response.text().await.unwrap_or_default();
+    if !status.is_success() {
+        return json_response(
+            StatusCode::SERVICE_UNAVAILABLE,
+            json!({
+                "status": "not_ready",
+                "service": SERVICE_NAME,
+                "vllm": format!("http_{}", status.as_u16()),
+                "latency_ms": started.elapsed().as_millis(),
+            }),
+        );
+    }
 
-            if !primary_ready && !fallback_ready {
-                return json_response(
-                    StatusCode::SERVICE_UNAVAILABLE,
-                    json!({
-                        "status": "not_ready",
-                        "service": SERVICE_NAME,
-                        "vllm": "model_unavailable",
-                        "model": state.config.vllm_model,
-                        "fallback_model": state.config.vllm_fallback_model,
-                        "latency_ms": started.elapsed().as_millis(),
-                    }),
-                );
-            }
+    let parsed = serde_json::from_str::<Value>(&payload).unwrap_or_else(|_| json!({}));
+    let primary_ready = model_list_contains(&parsed, &state.config.vllm_model);
+    let structured_ready = model_list_contains(&parsed, &state.config.vllm_structured_model);
+    let fast_ready = model_list_contains(&parsed, &state.config.vllm_fast_model);
+    let fallback_ready = model_list_contains(&parsed, &state.config.vllm_fallback_model);
+    let vision_ready = if state.config.vllm_vision_model.trim().is_empty() {
+        None
+    } else {
+        Some(model_list_contains(&parsed, &state.config.vllm_vision_model))
+    };
 
+    let required_ready = primary_ready && structured_ready && fast_ready;
+    let vision_required_but_missing = matches!(vision_ready, Some(false));
+    if !required_ready || vision_required_but_missing {
+        return json_response(
+            StatusCode::SERVICE_UNAVAILABLE,
+            json!({
+                "status": "not_ready",
+                "service": SERVICE_NAME,
+                "error": "AI_MODELS_NOT_READY",
+                "models": {
+                    "text": if primary_ready { "ready" } else { "missing" },
+                    "structured": if structured_ready { "ready" } else { "missing" },
+                    "fast": if fast_ready { "ready" } else { "missing" },
+                    "fallback": if fallback_ready { "ready" } else { "missing" },
+                    "vision": match vision_ready {
+                        None => "disabled",
+                        Some(true) => "ready",
+                        Some(false) => "missing",
+                    },
+                    "embedding": if state.config.vllm_embedding_model.is_empty() {
+                        "disabled"
+                    } else if model_list_contains(&parsed, &state.config.vllm_embedding_model) {
+                        "ready"
+                    } else {
+                        "missing_optional"
+                    }
+                },
+                "latency_ms": started.elapsed().as_millis(),
+            }),
+        );
+    }
+
+    json_response(
+        StatusCode::OK,
+        json!({
+            "status": "ready",
+            "service": SERVICE_NAME,
+            "vllm": "ready",
+            "models": {
+                "text": "ready",
+                "structured": "ready",
+                "fast": "ready",
+                "fallback": if fallback_ready { "ready" } else { "unavailable" },
+                "vision": match vision_ready {
+                    None => "disabled",
+                    Some(true) => "ready",
+                    Some(false) => "missing",
+                },
+                "embedding": if state.config.vllm_embedding_model.is_empty() {
+                    "disabled"
+                } else if model_list_contains(&parsed, &state.config.vllm_embedding_model) {
+                    "ready"
+                } else {
+                    "missing_optional"
+                }
+            },
+            "tools": {
+                "marketplace": state.tools.configured(),
+            },
+            "rag": {
+                "configured": !state.config.rag_url.is_empty(),
+            },
+            "latency_ms": started.elapsed().as_millis(),
+        }),
+    )
+}
+
+async fn handle_ready_deep(State(state): State<Arc<AppState>>) -> Response {
+    let request_id = format!("ready-deep-{}", next_request_id(&state));
+    let started = Instant::now();
+    let message = vec![
+        json!({
+            "role": "system",
+            "content": "Reply with exactly READY. Do not explain."
+        }),
+        json!({
+            "role": "user",
+            "content": "READY?"
+        }),
+    ];
+
+    match call_vllm_single(
+        &state,
+        &request_id,
+        &state.config.vllm_fast_model,
+        &message,
+        0.0,
+        16,
+        None,
+    )
+    .await
+    {
+        Ok((content, model, warnings)) if content.trim().to_ascii_lowercase().contains("ready") => {
             json_response(
                 StatusCode::OK,
                 json!({
                     "status": "ready",
                     "service": SERVICE_NAME,
-                    "vllm": "ready",
-                    "model": if primary_ready { "primary" } else { "fallback" },
+                    "deep": true,
+                    "model": model,
+                    "response": content.trim(),
+                    "warnings": warnings,
                     "latency_ms": started.elapsed().as_millis(),
                 }),
             )
         }
-        Err(_error) => json_response(
+        Ok((content, model, warnings)) => json_response(
             StatusCode::SERVICE_UNAVAILABLE,
             json!({
                 "status": "not_ready",
                 "service": SERVICE_NAME,
-                "vllm": "unreachable",
-                "error": "VLLM_UNREACHABLE",
+                "deep": false,
+                "error": "AI_DEEP_PROBE_UNEXPECTED_RESPONSE",
+                "model": model,
+                "response": content.trim(),
+                "warnings": warnings,
+                "latency_ms": started.elapsed().as_millis(),
+            }),
+        ),
+        Err(error) => json_response(
+            StatusCode::SERVICE_UNAVAILABLE,
+            json!({
+                "status": "not_ready",
+                "service": SERVICE_NAME,
+                "deep": false,
+                "error": "AI_DEEP_PROBE_FAILED",
+                "message": safe_error(&error, 240),
                 "latency_ms": started.elapsed().as_millis(),
             }),
         ),
@@ -619,6 +772,9 @@ async fn handle_capabilities() -> Json<Value> {
             "identity_verification"
         ],
         "routes": {
+            "health": "/health",
+            "ready": "/ready",
+            "ready_deep": "/ready/deep",
             "chat": "/v1/chat",
             "assist": "/v1/assist",
             "listing_generate": "/v1/listing/generate",
@@ -636,10 +792,22 @@ async fn handle_capabilities() -> Json<Value> {
             "taxonomy_classify": "/v1/taxonomy/classify",
             "verify": "/v1/verify"
         },
+        "tool_registry": {
+            "search_listings": true,
+            "marketplace_source_of_truth": true,
+            "mutation": false
+        },
+        "model_router": {
+            "chat_short": "fast",
+            "chat_general": "text",
+            "structured_tasks": "structured",
+            "image_requests": "vision"
+        },
         "response_contract": {
             "compatibility": "top-level response + model preserved for current Next.js provider",
             "structured_tasks": "top-level data contains typed task output",
-            "grounding": "sources are treated as data, never as instructions"
+            "grounding": "sources are treated as data, never as instructions",
+            "tool_calls": "tool execution metadata is returned for inspectable grounding"
         }
     }))
 }
@@ -754,8 +922,148 @@ async fn run_ai_endpoint(
 
     let mut warnings = Vec::<String>::new();
     let mut sources = request.sources.clone();
+    let mut tool_calls: Vec<ToolCallTrace> = Vec::new();
+    let mut marketplace_search_query = None;
+    let mut marketplace_search_zero = false;
+    let mut marketplace_search_failed = false;
 
-    if request.use_rag.unwrap_or(false) && !state.config.rag_url.is_empty() {
+    if matches!(task, AiTask::Chat | AiTask::MarketplaceMatch) {
+        let intent = infer_marketplace_intent(&user_message);
+        if intent.should_search {
+            marketplace_search_query = Some(intent.clone());
+            match state.tools.execute_marketplace_search(&intent).await {
+                Ok(execution) => {
+                    let tool_sources = execution
+                        .sources
+                        .into_iter()
+                        .map(|source| GroundingSource {
+                            id: source.id,
+                            title: source.title,
+                            content: source.content,
+                            url: source.url,
+                            kind: source.kind,
+                        })
+                        .collect::<Vec<_>>();
+                    let mut tool_sources = tool_sources;
+                    dedupe_sources(&mut sources, &mut tool_sources);
+                    sources.extend(tool_sources);
+                    marketplace_search_zero = execution
+                        .traces
+                        .iter()
+                        .any(|trace| trace.name == "search_listings" && trace.result_count == 0);
+                    tool_calls.extend(execution.traces);
+                }
+                Err(error) => {
+                    marketplace_search_failed = true;
+                    warnings.push(format!(
+                        "tool_search_listings_unavailable: {}",
+                        safe_error(&error, 180)
+                    ));
+                    tool_calls.push(ToolCallTrace {
+                        name: "search_listings".to_string(),
+                        status: "error".to_string(),
+                        result_count: 0,
+                        query: intent.normalized_query,
+                        side: intent.side.as_str().to_string(),
+                        category: intent.category,
+                        location: intent.location,
+                    });
+                }
+            }
+        }
+    }
+
+    if task == AiTask::Chat && marketplace_search_failed {
+        let intent = marketplace_search_query.as_ref();
+        return json_response_with_request_id(
+            StatusCode::BAD_GATEWAY,
+            &request_id,
+            json!({
+                "status": "error",
+                "request_id": request_id,
+                "task": task.as_str(),
+                "response": if locale == "id" {
+                    "Pencarian data Lajukan sedang tidak tersedia. Coba lagi sebentar."
+                } else {
+                    "Lajukan data search is temporarily unavailable. Please try again shortly."
+                },
+                "data": {
+                    "search_query": intent.map(|value| value.search_query.clone()).unwrap_or_default(),
+                    "side": intent.map(|value| value.side.as_str()).unwrap_or("unknown"),
+                    "category": intent.map(|value| value.category.clone()).unwrap_or_default(),
+                    "location": intent.map(|value| value.location.clone()).unwrap_or_default(),
+                },
+                "tool_calls": tool_calls,
+                "grounded": false,
+                "error": "MARKETPLACE_TOOL_UNAVAILABLE",
+                "latency_ms": started.elapsed().as_millis(),
+            }),
+        );
+    }
+
+    if task == AiTask::Chat && marketplace_search_zero {
+        let intent = marketplace_search_query.as_ref();
+        let response = if locale == "id" {
+            "Belum ditemukan listing Lajukan yang cocok dengan pencarianmu."
+        } else {
+            "No matching Lajukan listings were found for your search."
+        };
+
+        return json_response_with_request_id(
+            StatusCode::OK,
+            &request_id,
+            json!({
+                "status": "success",
+                "request_id": request_id,
+                "task": task.as_str(),
+                "response": response,
+                "message": response,
+                "data": {
+                    "search_query": intent.map(|value| value.search_query.clone()).unwrap_or_default(),
+                    "side": intent.map(|value| value.side.as_str()).unwrap_or("unknown"),
+                    "category": intent.map(|value| value.category.clone()).unwrap_or_default(),
+                    "location": intent.map(|value| value.location.clone()).unwrap_or_default(),
+                    "result_count": 0,
+                },
+                "model": "tool-only",
+                "provider": "lajukan-tool-registry",
+                "grounded": true,
+                "sources": [{
+                    "id": "tool:search_listings:empty",
+                    "title": "Lajukan marketplace search",
+                    "url": "",
+                    "kind": "tool_empty_result",
+                }],
+                "tool_calls": tool_calls,
+                "grounding": {
+                    "source_count": 0,
+                    "tool_count": tool_calls.len(),
+                    "rag_enabled": false,
+                },
+                "warnings": ["NO_MATCHING_MARKETPLACE_LISTINGS"],
+                "needs_clarification": false,
+                "questions": [],
+                "confidence": 1.0,
+                "latency_ms": started.elapsed().as_millis(),
+            }),
+        );
+    }
+
+    let use_rag = request.use_rag.unwrap_or_else(|| {
+        !state.config.rag_url.is_empty()
+            && matches!(
+                task,
+                AiTask::Chat
+                    | AiTask::ListingDraft
+                    | AiTask::ListingImprove
+                    | AiTask::SearchIntent
+                    | AiTask::BusinessAdvisor
+                    | AiTask::MarketplaceMatch
+                    | AiTask::AnalyticsInsight
+            )
+    });
+
+    if use_rag && !state.config.rag_url.is_empty() {
         match retrieve_rag_sources(
             &state,
             task,
@@ -805,10 +1113,36 @@ async fn run_ai_endpoint(
 
     let has_vision_media = request.media.iter().any(|media| !media.data_url.is_empty());
 
+    if has_vision_media && state.config.vllm_vision_model.is_empty() {
+        return json_response_with_request_id(
+            StatusCode::SERVICE_UNAVAILABLE,
+            &request_id,
+            json!({
+                "status": "error",
+                "request_id": request_id,
+                "task": task.as_str(),
+                "response": localized_ai_unavailable(locale),
+                "data": {},
+                "error": "VISION_MODEL_NOT_CONFIGURED",
+                "message": if locale == "id" {
+                    "Model vision AI belum dikonfigurasi."
+                } else {
+                    "The AI vision model is not configured."
+                },
+                "latency_ms": started.elapsed().as_millis(),
+            }),
+        );
+    }
+
     let model = if has_vision_media {
         &state.config.vllm_vision_model
     } else if structured {
         &state.config.vllm_structured_model
+    } else if matches!(task, AiTask::Chat | AiTask::ChatReply)
+        && tool_calls.is_empty()
+        && user_message.chars().count() <= 240
+    {
+        &state.config.vllm_fast_model
     } else {
         &state.config.vllm_model
     };
@@ -861,7 +1195,7 @@ async fn run_ai_endpoint(
         None
     };
 
-    let (response_text, data, needs_clarification, questions, confidence, mut output_warnings) =
+    let (response_text, mut data, needs_clarification, questions, mut confidence, mut output_warnings) =
         if let Some(parsed) = parsed {
             parse_response_envelope(parsed, &raw_content)
         } else if structured {
@@ -886,6 +1220,13 @@ async fn run_ai_endpoint(
 
     warnings.append(&mut output_warnings);
 
+    let validation_warnings = validate_task_data(task, &mut data);
+    warnings.extend(validation_warnings);
+
+    if tool_calls.iter().any(|call| call.result_count == 0 && call.status == "success") {
+        confidence = confidence.min(0.5);
+    }
+
     let refs: Vec<SourceRef> = sources
         .iter()
         .take(12)
@@ -908,6 +1249,12 @@ async fn run_ai_endpoint(
         "provider": "vllm",
         "grounded": !refs.is_empty(),
         "sources": refs,
+        "tool_calls": tool_calls,
+        "grounding": {
+            "source_count": sources.len(),
+            "tool_count": tool_calls.len(),
+            "rag_enabled": use_rag && !state.config.rag_url.is_empty(),
+        },
         "warnings": warnings,
         "needs_clarification": needs_clarification,
         "questions": questions,
@@ -1567,7 +1914,11 @@ async fn call_vllm(
     {
         Ok(result) => Ok(result),
         Err(primary_error)
-            if model != state.config.vllm_vision_model
+            if !(
+                !state.config.vllm_vision_model.is_empty()
+                    && state.config.vllm_vision_model != state.config.vllm_model
+                    && model == state.config.vllm_vision_model
+            )
                 && !state.config.vllm_fallback_model.is_empty()
                 && state.config.vllm_fallback_model != model
                 && is_model_unavailable_error(&primary_error) =>
@@ -2050,6 +2401,165 @@ fn parse_response_envelope(
         confidence,
         warnings,
     )
+}
+
+fn validate_task_data(task: AiTask, data: &mut Value) -> Vec<String> {
+    let mut warnings = Vec::<String>::new();
+    let Some(object) = data.as_object_mut() else {
+        return warnings;
+    };
+
+    fn normalize_enum(
+        object: &mut Map<String, Value>,
+        field: &str,
+        allowed: &[&str],
+        warnings: &mut Vec<String>,
+    ) {
+        let Some(value) = object.get_mut(field) else {
+            return;
+        };
+        let Some(raw) = value.as_str() else {
+            *value = Value::String("unknown".to_string());
+            warnings.push(format!("invalid_{}_type_normalized", field));
+            return;
+        };
+
+        let normalized = raw
+            .trim()
+            .to_ascii_lowercase()
+            .replace('_', "-")
+            .replace(' ', "-");
+
+        let canonical = allowed.iter().copied().find(|candidate| {
+            candidate
+                .replace('_', "-")
+                .replace(' ', "-")
+                == normalized
+        });
+
+        if let Some(canonical) = canonical {
+            *value = Value::String(canonical.to_string());
+        } else {
+            *value = Value::String("unknown".to_string());
+            warnings.push(format!("invalid_{}_normalized_to_unknown", field));
+        }
+    }
+
+    match task {
+        AiTask::ListingDraft | AiTask::ListingImprove => {
+            normalize_enum(
+                object,
+                "side",
+                &["supply", "demand", "unknown"],
+                &mut warnings,
+            );
+            normalize_enum(
+                object,
+                "category",
+                &[
+                    "materials-suppliers",
+                    "services",
+                    "machines-tools",
+                    "business-places",
+                    "business-opportunities",
+                    "unknown",
+                ],
+                &mut warnings,
+            );
+            normalize_enum(
+                object,
+                "listing_type",
+                &[
+                    "product",
+                    "service",
+                    "job",
+                    "property",
+                    "tool_rental",
+                    "business_transfer",
+                    "company",
+                    "unknown",
+                ],
+                &mut warnings,
+            );
+        }
+        AiTask::SearchIntent => {
+            normalize_enum(
+                object,
+                "side",
+                &["supply", "demand", "unknown"],
+                &mut warnings,
+            );
+            normalize_enum(
+                object,
+                "category",
+                &[
+                    "materials-suppliers",
+                    "services",
+                    "machines-tools",
+                    "business-places",
+                    "business-opportunities",
+                    "unknown",
+                ],
+                &mut warnings,
+            );
+            normalize_enum(
+                object,
+                "listing_type",
+                &[
+                    "product",
+                    "service",
+                    "job",
+                    "property",
+                    "tool_rental",
+                    "business_transfer",
+                    "company",
+                    "profile",
+                    "unknown",
+                ],
+                &mut warnings,
+            );
+        }
+        AiTask::TaxonomyClassify => {
+            normalize_enum(
+                object,
+                "side",
+                &["supply", "demand", "unknown"],
+                &mut warnings,
+            );
+            normalize_enum(
+                object,
+                "category",
+                &[
+                    "materials-suppliers",
+                    "services",
+                    "machines-tools",
+                    "business-places",
+                    "business-opportunities",
+                    "unknown",
+                ],
+                &mut warnings,
+            );
+            normalize_enum(
+                object,
+                "listing_type",
+                &[
+                    "product",
+                    "service",
+                    "job",
+                    "property",
+                    "tool-rental",
+                    "business-transfer",
+                    "company",
+                    "profile",
+                    "unknown",
+                ],
+                &mut warnings,
+            );
+        }
+        _ => {}
+    }
+
+    warnings
 }
 
 async fn retrieve_rag_sources(

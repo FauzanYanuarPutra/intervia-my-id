@@ -3,4 +3,4 @@
 export const PROMO_ONLY_MODE =
   process.env.PROMO_ONLY_MODE?.trim().toLowerCase() === 'true';
 export const AI_CHAT_ENABLED =
-  process.env.AI_CHAT_ENABLED?.trim().toLowerCase() === 'true';
+  process.env.AI_CHAT_ENABLED?.trim().toLowerCase() !== 'false';

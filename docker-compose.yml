@@ -818,25 +818,32 @@ services:
       RAG_SERVICE_TOKEN: ${RAG_SERVICE_TOKEN:-}
       VLLM_URL: ${VLLM_URL:-http://ollama:11434/v1}
       VLLM_API_KEY: ${VLLM_API_KEY:-}
-      VLLM_MODEL: ${VLLM_MODEL:-}
-      VLLM_FALLBACK_MODEL: ${VLLM_FALLBACK_MODEL:-}
+      VLLM_MODEL: ${VLLM_MODEL:-qwen3:4b}
+      VLLM_FALLBACK_MODEL: ${VLLM_FALLBACK_MODEL:-qwen3:4b}
       AI_FALLBACK_MODEL: ${AI_FALLBACK_MODEL:-}
       AI_MODEL: ${AI_MODEL:-}
-      VLLM_STRUCTURED_MODEL: ${VLLM_STRUCTURED_MODEL:-}
+      VLLM_STRUCTURED_MODEL: ${VLLM_STRUCTURED_MODEL:-qwen3:4b}
       VLLM_VISION_MODEL: ${VLLM_VISION_MODEL:-}
+      VLLM_FAST_MODEL: ${VLLM_FAST_MODEL:-qwen3:4b}
+      VLLM_EMBEDDING_MODEL: ${VLLM_EMBEDDING_MODEL:-}
       VLLM_KYC_MODEL: ${VLLM_KYC_MODEL:-}
-      VLLM_REASONING_EFFORT: ${VLLM_REASONING_EFFORT:-medium}
+      VLLM_REASONING_EFFORT: ${VLLM_REASONING_EFFORT:-none}
       OCR_URL: ${OCR_URL:-http://ocr_service:8000/predict}
       LIVENESS_URL: ${LIVENESS_URL:-http://liveness_service:8000/check}
       FACE_MATCH_URL: ${FACE_MATCH_URL:-}
       RAG_URL: ${RAG_URL:-}
+      MARKETPLACE_URL: http://marketplace_service:8081
+      MARKETPLACE_SERVICE_TOKEN: ${MARKETPLACE_SERVICE_TOKEN:-}
+      AI_TOOL_TIMEOUT_MS: ${AI_TOOL_TIMEOUT_MS:-5000}
+      AI_TOOL_LIMIT: ${AI_TOOL_LIMIT:-12}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
     expose: ["8080"]
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/ready"]
       interval: 15s
-      timeout: 5s
-      retries: 10
+      timeout: 8s
+      retries: 12
+      start_period: 20s
     networks: [app]
 
   ocr_service:
@@ -949,6 +956,7 @@ services:
       WEB_PUSH_VAPID_SUBJECT: ${WEB_PUSH_VAPID_SUBJECT:-mailto:admin@lajukan.com}
       INTERNAL_AI_URL: http://ai_service:8080
       AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN}
+      AI_CHAT_ENABLED: ${AI_CHAT_ENABLED:-true}
       AI_LEARNING_ENABLED: ${AI_LEARNING_ENABLED:-false}
       AI_LEARNING_LOG_DIR: ${AI_LEARNING_LOG_DIR:-/app/apps/www/.runtime/ai-learning}
       AI_LEARNING_MEMORY_FILE: ${AI_LEARNING_MEMORY_FILE:-/app/apps/www/.runtime/ai-learning/create-from-image-memory.json}
