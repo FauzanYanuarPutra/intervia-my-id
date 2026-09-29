@@ -3687,9 +3687,6 @@ export function UmkmStorefrontClient({
                             ))}
                           </EmblaInlineRail>
                         </div>
-                            </button>
-                          ))}
-                        </div>
                       </div>
                     ) : null}
 
