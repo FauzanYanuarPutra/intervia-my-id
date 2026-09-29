@@ -146,7 +146,7 @@ export default async function NewsArticlePage({ params }: PageProps) {
       ];
 
   return (
-    <main className="page-shell page-shell-readable page-rhythm pb-14 pt-4 sm:pt-6">
+    <main className="page-shell page-shell-readable page-rhythm min-w-0 pb-14 pt-3 sm:pt-5 lg:pt-6">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }} />
       <NewsAnalytics articleId={article.id} slug={article.slug} category={article.category} />
 
@@ -170,9 +170,9 @@ export default async function NewsArticlePage({ params }: PageProps) {
         </Link>
       </div>
 
-      <article id="news-article" className="mt-4">
+      <article id="news-article" className="mt-4 min-w-0">
         <header className="max-w-4xl">
-          <h1 className="text-[34px] font-black leading-[1.04] tracking-[-0.055em] text-slate-950 dark:text-white sm:text-[48px] lg:text-[56px]">
+          <h1 className="break-words text-[33px] font-black leading-[1.04] tracking-[-0.055em] text-slate-950 dark:text-white sm:text-[48px] lg:text-[56px]">
             {article.title}
           </h1>
 
@@ -250,7 +250,7 @@ export default async function NewsArticlePage({ params }: PageProps) {
           <NewsArticleMedia article={article} isId={isId} />
         </div>
 
-        <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_260px] lg:gap-12">
+        <div className="mt-7 grid min-w-0 gap-7 sm:mt-8 lg:grid-cols-[minmax(0,1fr)_260px] lg:gap-12">
           <div className="min-w-0">
             {isRetracted ? (
               <section className="rounded-[22px] border border-rose-200 bg-rose-50 p-4 dark:border-rose-400/20 dark:bg-rose-400/10">
@@ -294,7 +294,7 @@ export default async function NewsArticlePage({ params }: PageProps) {
                 ) : null}
 
                 {article.sourceUrls.length ? (
-                  <section className="mt-10 border-t border-slate-200 pt-7 dark:border-white/10">
+                  <section className="mt-8 border-t sm:mt-10 border-slate-200 pt-7 dark:border-white/10">
                     <div className="flex items-end justify-between gap-3">
                       <div>
                         <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-300">
@@ -306,7 +306,7 @@ export default async function NewsArticlePage({ params }: PageProps) {
                       </div>
                       <span className="text-[10px] font-bold text-slate-400">{article.sourceUrls.length}</span>
                     </div>
-                    <div className="mt-4 divide-y divide-slate-200 overflow-hidden rounded-[18px] border border-slate-200 bg-white dark:divide-white/10 dark:border-white/10 dark:bg-slate-900">
+                    <div className="mt-4 min-w-0 divide-y divide-slate-200 overflow-hidden rounded-[18px] border border-slate-200 bg-white dark:divide-white/10 dark:border-white/10 dark:bg-slate-900">
                       {article.sourceUrls.map((source, index) => (
                         <a
                           key={source}

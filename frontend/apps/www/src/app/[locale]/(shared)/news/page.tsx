@@ -70,10 +70,10 @@ export default async function NewsIndexPage({ params, searchParams }: PageProps)
   });
 
   const sliderItems = items.slice(0, 6);
-  const grid = cursor ? items.slice(6) : items.slice(sliderItems.length);
+  const grid = items.slice(sliderItems.length);
 
   return (
-    <main className="page-shell page-rhythm min-w-0 overflow-x-clip pb-12 pt-3 sm:pt-5">
+    <main className="page-shell page-shell-wide page-rhythm min-w-0 overflow-x-clip pb-12 pt-3 sm:pt-5">
       <section className="min-w-0 overflow-hidden rounded-[24px] border border-emerald-100/80 bg-[linear-gradient(135deg,#effcf5_0%,#ffffff_48%,#fffaf1_100%)] shadow-[0_28px_70px_-58px_rgba(15,23,42,0.35)] dark:border-white/10 dark:bg-[linear-gradient(135deg,#06261b_0%,#0f172a_62%,#1c1917_100%)]">
         <div className="p-3.5 sm:p-5 md:p-6 lg:p-7">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -111,7 +111,7 @@ export default async function NewsIndexPage({ params, searchParams }: PageProps)
             <h1 className="max-w-4xl text-[28px] font-black leading-[1.04] tracking-[-0.055em] text-slate-950 dark:text-white sm:text-[42px]">
               {isId ? 'Berita yang bantu kamu mengambil langkah.' : 'News that helps you decide what to do next.'}
             </h1>
-            <p className="mt-2.5 max-w-2xl text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300 sm:text-[15px]">
+            <p className="mt-2.5 max-w-2xl text-[13px] font-semibold leading-6 text-slate-600 dark:text-slate-300 sm:text-[15px]">
               {isId
                 ? 'Ringkas, jelas, dan fokus pada perubahan yang punya arti untuk usaha.'
                 : 'Clear, practical updates focused on changes that matter to businesses.'}

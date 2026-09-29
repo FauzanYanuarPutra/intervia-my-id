@@ -40,7 +40,7 @@ export function NewsCard({
     return (
       <Link
         href={href}
-        className="group grid min-w-0 grid-cols-[96px_minmax(0,1fr)] items-center gap-3 rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] p-2 text-left transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/20 sm:grid-cols-[118px_minmax(0,1fr)] sm:gap-3.5 sm:p-2.5"
+        className="group grid min-w-0 grid-cols-[84px_minmax(0,1fr)] items-center gap-3 rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] p-2 text-left transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/20 sm:grid-cols-[112px_minmax(0,1fr)] sm:gap-3.5 sm:p-2.5"
       >
         <NewsMedia
           article={article}
@@ -61,7 +61,7 @@ export function NewsCard({
           </div>
 
           <div className="mt-1 flex min-w-0 items-start gap-2">
-            <h3 className="line-clamp-2 min-w-0 flex-1 text-[13px] font-extrabold leading-[18px] tracking-[-0.02em] text-[color:var(--app-text)] transition-colors group-hover:text-[color:var(--app-accent)] sm:text-[14px] sm:leading-[19px]">
+            <h3 className="line-clamp-2 min-w-0 flex-1 text-[13px] font-extrabold leading-[18px] tracking-[-0.02em] text-[color:var(--app-text)] transition-colors group-hover:text-[color:var(--app-accent)] sm:text-[14px] sm:leading-[19px] lg:text-[13px] lg:leading-[18px]">
               {article.title}
             </h3>
             <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[color:var(--app-border)] text-[color:var(--app-text-soft)] transition group-hover:border-[color:var(--app-accent-border)] group-hover:text-[color:var(--app-accent)]">
@@ -105,7 +105,7 @@ export function NewsCard({
               {article.summary}
             </p>
           ) : null}
-          <div className="mt-3 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[9px] font-semibold text-[color:var(--app-text-soft)]">
+          <div className="mt-3 flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 text-[9px] font-semibold text-[color:var(--app-text-soft)]">
             <span className="inline-flex items-center gap-1">
               <Clock3 className="h-3 w-3" />
               {formatDate(article.publishedAt, locale) || (isId ? 'Terbaru' : 'Latest')}
