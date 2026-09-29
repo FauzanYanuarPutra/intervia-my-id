@@ -794,6 +794,7 @@ async fn handle_capabilities() -> Json<Value> {
         },
         "tool_registry": {
             "search_listings": true,
+            "search_umkm": true,
             "marketplace_source_of_truth": true,
             "mutation": false
         },
