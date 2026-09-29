@@ -150,6 +150,7 @@ export function MediaPreviewCarousel({
     () => new Set(),
   );
   const initialIndexRef = useRef(initialIndex);
+  const hasInitialisedEmblaRef = useRef(false);
   const mediaWheelBurstRef = useRef(false);
   const mediaWheelBurstTimerRef = useRef<number | null>(null);
   const [viewportRef, emblaApi] = useEmblaCarousel({
@@ -178,11 +179,11 @@ export function MediaPreviewCarousel({
   };
 
   const scrollToIndex = useCallback(
-    (nextIndex: number, animated = true) => {
+    (nextIndex: number, jump = false) => {
       if (!emblaApi) return;
       emblaApi.scrollTo(
         clampIndex(nextIndex, visibleMediaItems.length),
-        animated,
+        jump,
       );
     },
     [emblaApi, visibleMediaItems.length],
@@ -257,11 +258,14 @@ export function MediaPreviewCarousel({
     if (!emblaApi) return;
 
     emblaApi.reInit();
-    const target = clampIndex(
-      initialIndexRef.current,
-      visibleMediaItems.length,
-    );
-    emblaApi.scrollTo(target, true);
+    if (!hasInitialisedEmblaRef.current) {
+      const target = clampIndex(
+        initialIndexRef.current,
+        visibleMediaItems.length,
+      );
+      emblaApi.scrollTo(target, true);
+      hasInitialisedEmblaRef.current = true;
+    }
   }, [emblaApi, visibleMediaItems.length]);
 
   useEffect(() => {
