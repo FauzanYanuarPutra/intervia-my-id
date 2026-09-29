@@ -1101,7 +1101,7 @@ services:
       INTERNAL_MARKETPLACE_URL: http://marketplace_service:8081
       # Personal AI storage is owned by marketplace_db. Keep the connection
       # configurable for staging/production while providing a working local default.
-      SUPER_APP_POSTGRES_URL: ${SUPER_APP_POSTGRES_URL:-postgres://${DB_USER}:${DB_PASS}@marketplace_db:5432/marketplace_db}
+      SUPER_APP_POSTGRES_URL: postgres://${DB_USER}:${DB_PASS}@marketplace_db:5432/marketplace_db
       INTERNAL_COMMUNITY_URL: http://community_service:8082
       COMMUNITY_SERVICE_URL: http://community_service:8082
       EMAIL_TRANSPORT: ${EMAIL_TRANSPORT:-smtp}
