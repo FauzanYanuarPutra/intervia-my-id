@@ -83,6 +83,7 @@ export function HomeBusinessMapSection({
     let active = true;
 
     async function load() {
+      setLoading(true);
       try {
         if (!active || controller.signal.aborted) return;
         setError(null);
