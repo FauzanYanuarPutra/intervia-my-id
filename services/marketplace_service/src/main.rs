@@ -1109,6 +1109,7 @@ struct MapPlacePoint {
     lng: f64,
     category: String,
     source_kind: String,
+    metadata: Value,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -11372,6 +11373,23 @@ async fn list_map_places(
               NULLIF(lower(s.metadata->>'business_type'), ''),
               'business'
             ) AS category,
+            jsonb_strip_nulls(jsonb_build_object(
+              'marketplace_category_slug', NULLIF(lower(s.metadata->>'marketplace_category_slug'), ''),
+              'umkm_category', NULLIF(lower(s.metadata->>'umkm_category'), ''),
+              'business_type', NULLIF(lower(s.metadata->>'business_type'), ''),
+              'store_type', NULLIF(lower(s.metadata->>'store_type'), ''),
+              'segment', NULLIF(lower(s.metadata->>'segment'), ''),
+              'category', NULLIF(lower(s.metadata->>'category'), ''),
+              'category_label', NULLIF(s.metadata->>'category_label', ''),
+              'osm_primary_key', NULLIF(lower(s.metadata->>'osm_primary_key'), ''),
+              'osm_primary_value', NULLIF(lower(s.metadata->>'osm_primary_value'), ''),
+              'amenity', NULLIF(lower(s.metadata->>'amenity'), ''),
+              'shop', NULLIF(lower(s.metadata->>'shop'), ''),
+              'tourism', NULLIF(lower(s.metadata->>'tourism'), ''),
+              'office', NULLIF(lower(s.metadata->>'office'), ''),
+              'building', NULLIF(lower(s.metadata->>'building'), ''),
+              'place_type', NULLIF(lower(s.metadata->>'place_type'), '')
+            )) AS metadata,
             CASE
               WHEN lower(COALESCE(s.metadata->>'record_kind','')) LIKE '%reference%'
                 OR lower(COALESCE(s.metadata->>'market_side','')) = 'reference'
@@ -11433,6 +11451,23 @@ async fn list_map_places(
               NULLIF(lower(c.metadata->>'category'), ''),
               'business'
             ) AS category,
+            jsonb_strip_nulls(jsonb_build_object(
+              'marketplace_category_slug', NULLIF(lower(c.metadata->>'marketplace_category_slug'), ''),
+              'umkm_category', NULLIF(lower(c.metadata->>'umkm_category'), ''),
+              'business_type', NULLIF(lower(c.metadata->>'business_type'), ''),
+              'store_type', NULLIF(lower(c.metadata->>'store_type'), ''),
+              'segment', NULLIF(lower(c.metadata->>'segment'), ''),
+              'category', NULLIF(lower(c.metadata->>'category'), ''),
+              'category_label', NULLIF(c.metadata->>'category_label', ''),
+              'osm_primary_key', NULLIF(lower(c.metadata->>'osm_primary_key'), ''),
+              'osm_primary_value', NULLIF(lower(c.metadata->>'osm_primary_value'), ''),
+              'amenity', NULLIF(lower(c.metadata->>'amenity'), ''),
+              'shop', NULLIF(lower(c.metadata->>'shop'), ''),
+              'tourism', NULLIF(lower(c.metadata->>'tourism'), ''),
+              'office', NULLIF(lower(c.metadata->>'office'), ''),
+              'building', NULLIF(lower(c.metadata->>'building'), ''),
+              'place_type', NULLIF(lower(c.metadata->>'place_type'), '')
+            )) AS metadata,
             'reference_content' AS source_kind
           FROM content_items c
           WHERE c.content_status = 'active'
@@ -11504,6 +11539,7 @@ async fn list_map_places(
                         lng: row.try_get("lng").ok()?,
                         category: row.try_get("category").ok()?,
                         source_kind: row.try_get("source_kind").ok()?,
+                        metadata: row.try_get("metadata").ok()?,
                     })
                 })
                 .collect::<Vec<_>>();
