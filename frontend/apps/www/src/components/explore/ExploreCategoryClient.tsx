@@ -2519,7 +2519,7 @@ export function ExploreCategoryClient({
                               category.id !== 'community' &&
                               category.id !== 'video'
                             ) {
-                              void loadCategoryMore('listing', cursor, 'demand');
+                              void loadCategoryMore('listing', cursor, 'supply');
                             }
                           }}
                         />
