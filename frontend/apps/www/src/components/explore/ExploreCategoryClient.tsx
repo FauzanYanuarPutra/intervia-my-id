@@ -1348,7 +1348,10 @@ export function ExploreCategoryClient({
       new URLSearchParams(searchKey);
 
     if (tab === 'all') {
-      params.delete('tab');
+      params.set(
+        'tab',
+        'all',
+      );
     } else {
       params.set(
         'tab',
