@@ -1406,6 +1406,7 @@ function StoreMarkersLayer({
         if (layer.kind === 'single') {
           const { store, ui } = layer.item;
           const active = selectedStoreId === store.id;
+          const isReference = isUmkmMapPublicReference(store);
 
           return (
             <Marker
@@ -1419,7 +1420,7 @@ function StoreMarkersLayer({
                 imageUrl: ui.coverImage,
                 imageIsCategoryArtwork: ui.coverImageIsCategoryArtwork,
               })}
-              zIndexOffset={active ? 480 : 220}
+              zIndexOffset={active ? 480 : isReference ? 120 : 260}
               eventHandlers={{
                 click: () => {
                   focusMarker(store, MARKER_CLICK_FOCUS_ZOOM);
