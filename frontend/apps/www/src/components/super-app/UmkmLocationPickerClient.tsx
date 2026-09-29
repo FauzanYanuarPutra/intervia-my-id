@@ -180,10 +180,17 @@ export function UmkmLocationPickerClient({
           zoom={15}
           minZoom={4}
           zoomControl={false}
+          preferCanvas
           scrollWheelZoom
           className="leaflet-location-picker-map relative z-0 h-full min-h-[340px] w-full sm:min-h-[460px]"
         >
-          <TileLayer attribution={OPEN_MAP_TILE_ATTRIBUTION} url={OPEN_MAP_TILE_URL} />
+          <TileLayer
+            attribution={OPEN_MAP_TILE_ATTRIBUTION}
+            url={OPEN_MAP_TILE_URL}
+            keepBuffer={1}
+            updateWhenIdle
+            updateWhenZooming={false}
+          />
           <ZoomControl position="bottomright" />
           <MapCenterController point={point} />
           <MapClickController onPick={reversePoint} />
