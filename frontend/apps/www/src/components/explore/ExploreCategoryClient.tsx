@@ -2405,6 +2405,21 @@ export function ExploreCategoryClient({
                             category
                           }
                           kind="listing"
+                          nextCursor={
+                            groups?.needs.nextCursor || null
+                          }
+                          loadingCursor={categoryLoadingCursor}
+                          appendError={categoryAppendError}
+                          onNextCursor={cursor => {
+                            void loadCategoryMore('listing', cursor);
+                          }}
+                          onRetryNext={() => {
+                            const cursor =
+                              groups?.needs.nextCursor || null;
+                            if (cursor) {
+                              void loadCategoryMore('listing', cursor);
+                            }
+                          }}
                         />
                       );
                     }
@@ -2429,6 +2444,21 @@ export function ExploreCategoryClient({
                             category
                           }
                           kind="business"
+                          nextCursor={
+                            groups?.businesses.nextCursor || null
+                          }
+                          loadingCursor={categoryLoadingCursor}
+                          appendError={categoryAppendError}
+                          onNextCursor={cursor => {
+                            void loadCategoryMore('business', cursor);
+                          }}
+                          onRetryNext={() => {
+                            const cursor =
+                              groups?.businesses.nextCursor || null;
+                            if (cursor) {
+                              void loadCategoryMore('business', cursor);
+                            }
+                          }}
                         />
                       );
                     }
@@ -2470,6 +2500,37 @@ export function ExploreCategoryClient({
                                 ? 'video'
                                 : 'listing'
                           }
+                          nextCursor={
+                            category.id === 'community' ||
+                            category.id === 'video'
+                              ? null
+                              : groups?.products.nextCursor ||
+                                groups?.services.nextCursor ||
+                                null
+                          }
+                          loadingCursor={categoryLoadingCursor}
+                          appendError={categoryAppendError}
+                          onNextCursor={cursor => {
+                            if (
+                              category.id !== 'community' &&
+                              category.id !== 'video'
+                            ) {
+                              void loadCategoryMore('listing', cursor);
+                            }
+                          }}
+                          onRetryNext={() => {
+                            const cursor =
+                              groups?.products.nextCursor ||
+                              groups?.services.nextCursor ||
+                              null;
+                            if (
+                              cursor &&
+                              category.id !== 'community' &&
+                              category.id !== 'video'
+                            ) {
+                              void loadCategoryMore('listing', cursor);
+                            }
+                          }}
                         />
                       );
                     }
