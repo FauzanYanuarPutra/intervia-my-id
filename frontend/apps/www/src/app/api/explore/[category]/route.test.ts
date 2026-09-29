@@ -41,7 +41,7 @@ describe('GET /api/explore/[category]', () => {
 
     expect(response.status).toBe(200);
     expect(payload.degraded).toBe(false);
-    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(String(fetchMock.mock.calls[0][0])).toMatch(
       /^http:\/\/www-internal:3000\/api\/search\?/,
     );
