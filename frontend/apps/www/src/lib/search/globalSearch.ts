@@ -167,7 +167,7 @@ export function parseGlobalSearchState(
 export function serializeGlobalSearchState(state: GlobalSearchState): string {
   const params = new URLSearchParams();
   if (state.query) params.set('q', state.query);
-  if (state.tab !== 'all' || state.side !== 'all') params.set('tab', state.tab);
+  if (state.tab !== 'all') params.set('tab', state.tab);
   if (state.side !== 'all') params.set('side', state.side);
   if (state.category) params.set('category', state.category);
   if (state.subcategory) params.set('subcategory', state.subcategory);
