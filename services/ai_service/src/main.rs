@@ -2275,6 +2275,152 @@ fn parse_response_envelope(
     )
 }
 
+fn validate_task_data(task: AiTask, data: &mut Value) -> Vec<String> {
+    let mut warnings = Vec::<String>::new();
+    let Some(object) = data.as_object_mut() else {
+        return warnings;
+    };
+
+    fn normalize_enum(
+        object: &mut Map<String, Value>,
+        field: &str,
+        allowed: &[&str],
+        warnings: &mut Vec<String>,
+    ) {
+        let Some(value) = object.get_mut(field) else {
+            return;
+        };
+        let Some(raw) = value.as_str() else {
+            *value = Value::String("unknown".to_string());
+            warnings.push(format!("invalid_{}_type_normalized", field));
+            return;
+        };
+        let normalized = raw.trim().to_ascii_lowercase().replace(['_', ' '], "-");
+        if allowed.iter().any(|allowed| *allowed == normalized) {
+            *value = Value::String(normalized);
+        } else {
+            *value = Value::String("unknown".to_string());
+            warnings.push(format!("invalid_{}_normalized_to_unknown", field));
+        }
+    }
+
+    match task {
+        AiTask::ListingDraft | AiTask::ListingImprove => {
+            normalize_enum(
+                object,
+                "side",
+                &["supply", "demand", "unknown"],
+                &mut warnings,
+            );
+            normalize_enum(
+                object,
+                "category",
+                &[
+                    "materials-suppliers",
+                    "services",
+                    "machines-tools",
+                    "business-places",
+                    "business-opportunities",
+                    "unknown",
+                ],
+                &mut warnings,
+            );
+            normalize_enum(
+                object,
+                "listing_type",
+                &[
+                    "product",
+                    "service",
+                    "job",
+                    "property",
+                    "tool-rental",
+                    "business-transfer",
+                    "company",
+                    "unknown",
+                ],
+                &mut warnings,
+            );
+        }
+        AiTask::SearchIntent => {
+            normalize_enum(
+                object,
+                "side",
+                &["supply", "demand", "unknown"],
+                &mut warnings,
+            );
+            normalize_enum(
+                object,
+                "category",
+                &[
+                    "materials-suppliers",
+                    "services",
+                    "machines-tools",
+                    "business-places",
+                    "business-opportunities",
+                    "unknown",
+                ],
+                &mut warnings,
+            );
+            normalize_enum(
+                object,
+                "listing_type",
+                &[
+                    "product",
+                    "service",
+                    "job",
+                    "property",
+                    "tool-rental",
+                    "business-transfer",
+                    "company",
+                    "profile",
+                    "unknown",
+                ],
+                &mut warnings,
+            );
+        }
+        AiTask::TaxonomyClassify => {
+            normalize_enum(
+                object,
+                "side",
+                &["supply", "demand", "unknown"],
+                &mut warnings,
+            );
+            normalize_enum(
+                object,
+                "category",
+                &[
+                    "materials-suppliers",
+                    "services",
+                    "machines-tools",
+                    "business-places",
+                    "business-opportunities",
+                    "unknown",
+                ],
+                &mut warnings,
+            );
+            normalize_enum(
+                object,
+                "listing_type",
+                &[
+                    "product",
+                    "service",
+                    "job",
+                    "property",
+                    "tool-rental",
+                    "business-transfer",
+                    "company",
+                    "profile",
+                    "unknown",
+                ],
+                &mut warnings,
+            );
+        }
+        _ => {}
+    }
+
+    warnings
+}
+
 async fn retrieve_rag_sources(
     state: &AppState,
     task: AiTask,
