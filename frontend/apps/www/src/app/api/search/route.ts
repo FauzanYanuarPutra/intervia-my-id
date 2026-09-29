@@ -1265,6 +1265,37 @@ function mapBusiness(
           item.rating,
         ),
 
+      category:
+        firstString(
+          item.category,
+          metadata?.category,
+          metadata?.category_label,
+        ),
+
+      marketplaceCategorySlug:
+        firstString(
+          item.marketplace_category_slug,
+          item.create_category,
+          metadata?.marketplace_category_slug,
+          metadata?.marketplaceCategorySlug,
+          metadata?.create_category,
+        ),
+
+      marketplaceSubcategorySlug:
+        firstString(
+          item.marketplace_subcategory_slug,
+          metadata?.marketplace_subcategory_slug,
+          metadata?.marketplaceSubcategorySlug,
+        ),
+
+      businessCategory:
+        firstString(
+          item.business_category,
+          item.umkm_category,
+          metadata?.business_category,
+          metadata?.umkm_category,
+        ),
+
       imageAttribution:
         firstString(
           metadata?.image_attribution,
@@ -1573,6 +1604,37 @@ function requestedGroupsForState(
         'references',
     ),
   );
+}
+
+function businessMatchesRequestedTaxonomy(
+  item: GlobalSearchItem,
+  category: string,
+  subcategory: string,
+): boolean {
+  if (!category && !subcategory) return true;
+
+  const metadata = item.metadata;
+  const explicitCategory = readString(
+    metadata.marketplaceCategorySlug,
+  ).toLowerCase();
+
+  const explicitSubcategory = readString(
+    metadata.marketplaceSubcategorySlug,
+  ).toLowerCase();
+
+  if (subcategory && explicitSubcategory) {
+    return explicitSubcategory === subcategory;
+  }
+
+  if (category && explicitCategory) {
+    return (
+      explicitCategory === category ||
+      getExploreCategoryBySlug(explicitCategory)?.slug === category
+    );
+  }
+
+  // Do not guess when the business record has no explicit marketplace taxonomy.
+  return true;
 }
 
 export async function GET(
@@ -1965,7 +2027,7 @@ export async function GET(
                   }
                 : {}),
               backend_only: '1',
-              limit: '12',
+              limit: state.category || state.subcategory ? '48' : '12',
             },
           ).toString()}`,
           'businesses',
@@ -2420,6 +2482,16 @@ export async function GET(
           item =>
             !verifiedOnly ||
             item?.verified,
+        )
+        .filter(
+          item =>
+            item
+              ? businessMatchesRequestedTaxonomy(
+                  item,
+                  state.category,
+                  state.subcategory,
+                )
+              : false,
         ),
       requested.has(
         'businesses',
