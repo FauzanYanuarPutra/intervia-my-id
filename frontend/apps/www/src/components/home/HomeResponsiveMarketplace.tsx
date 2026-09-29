@@ -1893,59 +1893,55 @@ function HeroVisualStage({
     >
       <div
         className={cn(
-          'relative isolate min-w-0 overflow-hidden rounded-[22px] border border-emerald-100 sm:rounded-[28px]',
-          'bg-[linear-gradient(135deg,#f0fdf4_0%,#ecfdf5_54%,#ffffff_100%)]',
-          'px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-7',
+          'relative isolate min-w-0 overflow-hidden rounded-[20px] border border-emerald-100',
+          'bg-[linear-gradient(135deg,#f0fdf4_0%,#ecfdf5_58%,#ffffff_100%)]',
+          'px-3.5 py-4 sm:rounded-[26px] sm:px-5 sm:py-6 md:px-6 lg:px-8 lg:py-7',
           'dark:border-emerald-900/60',
-          'dark:bg-[linear-gradient(135deg,#09090b_0%,#071510_58%,#09090b_100%)]',
+          'dark:bg-[linear-gradient(135deg,#09090b_0%,#071510_60%,#09090b_100%)]',
         )}
       >
-        {!isAuthenticated ? (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0 right-0 z-0 hidden w-[44%] min-w-[15rem] max-w-[30rem] sm:block"
+        >
           <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-y-0 right-0 z-0 hidden w-[54%] xl:block"
-          >
-            <div className="absolute inset-0 bg-gradient-to-r from-[#f0fdf4] via-[#f0fdf4]/92 via-52% to-transparent dark:from-[#09090b] dark:via-[#09090b]/92 dark:to-transparent" />
-            <div className="absolute inset-y-3 right-3 grid w-[44%] grid-cols-2 gap-2 opacity-[0.16] blur-[0.2px] grayscale-[0.15] sm:inset-y-4 sm:right-4">
-              {heroCategories.slice(0, 4).map(category => (
-                <div
-                  key={category.id}
-                  className="overflow-hidden rounded-2xl border border-white/70 bg-white/40 shadow-sm dark:border-white/5 dark:bg-white/5"
-                >
-                  <Image
-                    src={category.image}
-                    alt=""
-                    width={220}
-                    height={160}
-                    className="h-full w-full object-cover"
-                    sizes="180px"
-                  />
-                </div>
-              ))}
-            </div>
+            className="absolute inset-0 bg-gradient-to-r from-[#f0fdf4] via-[#f0fdf4]/92 via-55% to-transparent dark:from-[#09090b] dark:via-[#09090b]/92 dark:to-transparent"
+          />
+          <div className="absolute -bottom-8 right-[-2%] h-[112%] w-[96%] sm:right-[-4%] md:right-[-1%]">
+            <Image
+              src="/images/hero/lajukan-id-3-removebg.png"
+              alt=""
+              width={720}
+              height={720}
+              priority
+              sizes="(min-width: 1280px) 400px, (min-width: 1024px) 320px, (min-width: 768px) 280px, 240px"
+              className="h-full w-full object-contain object-right-bottom opacity-[0.92] dark:opacity-[0.72]"
+            />
           </div>
-        ) : null}
+        </div>
 
-        <div className={cn(
-          "relative z-10 min-w-0",
-          !isAuthenticated && "xl:max-w-[57%]",
-        )}>
+        <div
+          className={cn(
+            'relative z-10 min-w-0',
+            'w-full sm:max-w-[69%] md:max-w-[66%] lg:max-w-[62%] xl:max-w-[60%]',
+          )}
+        >
           {isAuthenticated ? (
             <div className="min-w-0 max-w-full">
-              <p className="mb-1 text-[10px] font-extrabold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-400 sm:text-xs">
+              <p className="mb-1.5 text-[10px] font-extrabold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-400 sm:text-xs">
                 {isId ? 'Selamat datang kembali' : 'Welcome back'}
               </p>
               <h1
                 id="home-main-heading"
-                className="text-[clamp(1.4rem,3vw,2.4rem)] font-black leading-[1] tracking-[-0.055em] text-zinc-950 dark:text-white"
+                className="max-w-full text-[clamp(1.5rem,5vw,2.65rem)] font-black leading-[1.02] tracking-[-0.055em] text-zinc-950 dark:text-white"
               >
                 {isId ? 'Halo, ' : 'Hi, '}
-                <span className="text-emerald-700 dark:text-emerald-400">
+                <span className="break-words text-emerald-700 dark:text-emerald-400">
                   {displayName}
                 </span>
                 <span aria-hidden="true"> 👋</span>
               </h1>
-              <p className="mt-2 max-w-[42rem] text-xs font-semibold leading-5 text-zinc-700 dark:text-zinc-300 sm:text-sm sm:leading-6">
+              <p className="mt-2 max-w-[42rem] text-[11px] font-semibold leading-5 text-zinc-700 dark:text-zinc-300 sm:text-[13px] sm:leading-5 md:text-sm">
                 {isId
                   ? 'Cari produk, supplier, jasa, bahan usaha, mesin, tempat usaha, dan peluang yang cocok untuk kebutuhan bisnismu.'
                   : 'Find products, suppliers, services, business supplies, equipment, places, and opportunities that fit your business.'}
@@ -1960,7 +1956,7 @@ function HeroVisualStage({
               </p>
               <h1
                 id="home-main-heading"
-                className="max-w-[44rem] text-[clamp(1.5rem,5.5vw,2.55rem)] font-black leading-[1.02] tracking-[-0.055em] text-zinc-950 dark:text-white"
+                className="max-w-[44rem] text-[clamp(1.65rem,5.7vw,2.7rem)] font-black leading-[1.02] tracking-[-0.055em] text-zinc-950 dark:text-white"
               >
                 {isId ? (
                   <>
@@ -1983,19 +1979,20 @@ function HeroVisualStage({
                   ? 'Temukan bahan usaha, supplier, jasa profesional, mesin, tempat usaha, dan peluang bisnis dari berbagai daerah di Indonesia.'
                   : 'Find business supplies, suppliers, professional services, equipment, business places, and opportunities across Indonesia.'}
               </p>
-              <div className="mt-3 flex min-w-0 items-center gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+
+              <div className="mt-3 -mx-0.5 flex min-w-0 max-w-full items-center gap-1.5 overflow-x-auto px-0.5 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-2">
                 {heroCategories.map(category => (
                   <Link
                     key={category.id}
                     href={buildExploreCategoryHref(category)}
-                    className="inline-flex min-h-8 shrink-0 items-center rounded-full border border-white/80 bg-white/75 px-2.5 text-[10px] font-bold text-zinc-700 shadow-sm backdrop-blur transition hover:border-emerald-300 hover:bg-white hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 dark:border-white/10 dark:bg-zinc-900/70 dark:text-zinc-300 dark:hover:border-emerald-800 dark:hover:bg-zinc-900 dark:hover:text-emerald-300 sm:min-h-9 sm:px-3 sm:text-[11px]"
+                    className="inline-flex min-h-8 shrink-0 items-center rounded-full border border-white/80 bg-white/80 px-2.5 text-[10px] font-bold text-zinc-700 shadow-sm backdrop-blur transition hover:border-emerald-300 hover:bg-white hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 dark:border-white/10 dark:bg-zinc-900/70 dark:text-zinc-300 dark:hover:border-emerald-800 dark:hover:bg-zinc-900 dark:hover:text-emerald-300 sm:min-h-9 sm:px-3 sm:text-[11px]"
                   >
                     {isId ? category.shortLabelId : category.shortLabelEn}
                   </Link>
                 ))}
                 <Link
                   href={UMKM_DISCOVERY_PATH + '?view=map'}
-                  className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-full border border-blue-200 bg-blue-50/85 px-2.5 text-[10px] font-bold text-blue-700 shadow-sm backdrop-blur transition hover:border-blue-300 hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:border-blue-900/60 dark:bg-blue-950/50 dark:text-blue-300 dark:hover:bg-blue-950/80 sm:min-h-9 sm:px-3 sm:text-[11px]"
+                  className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-full border border-blue-200 bg-blue-50/90 px-2.5 text-[10px] font-bold text-blue-700 shadow-sm backdrop-blur transition hover:border-blue-300 hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:border-blue-900/60 dark:bg-blue-950/55 dark:text-blue-300 dark:hover:bg-blue-950/80 sm:min-h-9 sm:px-3 sm:text-[11px]"
                 >
                   <MapPin className="h-3 w-3" aria-hidden="true" />
                   {isId ? 'Usaha sekitar' : 'Nearby'}
@@ -2011,9 +2008,12 @@ function HeroVisualStage({
               event.preventDefault();
               onSubmit(query.trim());
             }}
-            className="mt-4 flex h-12 min-w-0 w-full max-w-[44rem] items-center gap-2 rounded-2xl border border-zinc-200 bg-white/95 px-3 shadow-[0_18px_45px_-28px_rgba(15,23,42,0.45)] backdrop-blur transition focus-within:border-emerald-400 focus-within:shadow-[0_20px_50px_-28px_rgba(5,150,105,0.32)] sm:h-13 sm:px-3.5 dark:border-zinc-700 dark:bg-zinc-900/95"
+            className="mt-3.5 flex h-11 min-w-0 w-full max-w-[48rem] items-center gap-1.5 rounded-[15px] border border-zinc-200 bg-white/95 px-2.5 shadow-[0_18px_45px_-28px_rgba(15,23,42,0.45)] backdrop-blur transition focus-within:border-emerald-400 focus-within:shadow-[0_20px_50px_-28px_rgba(5,150,105,0.32)] sm:mt-4 sm:h-12 sm:gap-2 sm:rounded-2xl sm:px-3.5 dark:border-zinc-700 dark:bg-zinc-900/95"
           >
-            <Search className="h-4 w-4 shrink-0 text-emerald-600 sm:h-5 sm:w-5 dark:text-emerald-400" aria-hidden="true" />
+            <Search
+              className="h-4 w-4 shrink-0 text-emerald-600 sm:h-5 sm:w-5 dark:text-emerald-400"
+              aria-hidden="true"
+            />
             <input
               type="search"
               name="q"
@@ -2030,18 +2030,22 @@ function HeroVisualStage({
                     ? 'Cari supplier, produk, jasa, mesin...'
                     : 'Search suppliers, products, services...'
               }
-              className="min-w-0 flex-1 bg-transparent text-[13px] font-semibold sm:text-sm text-zinc-900 outline-none placeholder:text-zinc-400 dark:text-white dark:placeholder:text-zinc-500"
+              className="min-w-0 flex-1 bg-transparent px-0.5 text-[12px] font-semibold text-zinc-900 outline-none placeholder:text-zinc-400 sm:text-sm dark:text-white dark:placeholder:text-zinc-500"
             />
             <button
               type="submit"
-              className="hidden h-9 shrink-0 items-center justify-center rounded-xl bg-emerald-600 px-4 text-xs font-extrabold text-white transition hover:bg-emerald-700 active:scale-[0.98] sm:inline-flex"
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[11px] bg-emerald-600 text-white transition hover:bg-emerald-700 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 sm:h-9 sm:w-auto sm:rounded-xl sm:px-4"
+              aria-label={isId ? 'Cari' : 'Search'}
             >
-              {isId ? 'Cari' : 'Search'}
+              <Search className="h-3.5 w-3.5 sm:hidden" aria-hidden="true" />
+              <span className="hidden text-xs font-extrabold sm:inline">
+                {isId ? 'Cari' : 'Search'}
+              </span>
             </button>
             <button
               type="button"
               onClick={onOpenFilters}
-              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900 sm:h-9 sm:w-9 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white"
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[11px] text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/30 sm:h-9 sm:w-9 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white"
               aria-label={isId ? 'Filter pencarian' : 'Search filters'}
             >
               <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
@@ -2060,7 +2064,6 @@ function HeroVisualStage({
     </section>
   );
 }
-
 function QuickCategoriesSection({ isId }: { isId: boolean }) {
   const categories = getQuickCategories(isId);
 
