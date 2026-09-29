@@ -139,7 +139,7 @@ export function normalizeExploreSide(
  * Convert the canonical marketplace side into the noun used by discovery UI.
  *
  * supply -> Penawaran
- * demand -> Kebutuhan
+ * demand -> Kebutuhan Pembeli
  *
  * Actions can still use verbs such as "Tawarkan bantuan"; this helper is
  * intentionally for labels, tabs, chips, and section context.
@@ -159,7 +159,7 @@ export function getExploreSideLabel({
 const COMMON_MARKETPLACE_SECTIONS: ExploreSectionConfig[] = [
   {
     key: 'latest-needs',
-    titleId: 'Kebutuhan terbaru',
+    titleId: 'Kebutuhan pembeli terbaru',
     titleEn: 'Latest needs',
     descriptionId:
       'Permintaan nyata yang sedang mencari penyedia.',
@@ -692,7 +692,7 @@ export const LAJUKAN_EXPLORE_CATEGORIES:
       sections: marketplaceSections({
         'latest-needs': {
           titleId:
-            'Pencari tempat terbaru',
+            'Kebutuhan tempat terbaru',
         },
         'featured-providers': {
           titleId:
