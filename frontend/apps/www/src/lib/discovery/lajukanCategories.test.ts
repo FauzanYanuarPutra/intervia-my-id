@@ -53,10 +53,10 @@ describe('Lajukan explore taxonomy', () => {
 
   it('uses the same side terminology and resolver as listing cards', () => {
     expect(getExploreSideLabel({ side: 'supply', locale: 'id' })).toBe(
-      'Menawarkan',
+      'Penawaran',
     );
     expect(getExploreSideLabel({ side: 'demand', locale: 'id' })).toBe(
-      'Membutuhkan',
+      'Kebutuhan',
     );
     expect(
       normalizeExploreSide({
