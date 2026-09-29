@@ -181,7 +181,7 @@ function normalizeType(value: unknown): string {
     return 'tool_rental';
   if (
     normalized.includes('property') ||
-    normalized.includes('real estate') ||
+    normalized.includes('real_estate') ||
     normalized.includes('realestate')
   )
     return 'property';
