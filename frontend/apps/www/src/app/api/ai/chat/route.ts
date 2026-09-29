@@ -308,13 +308,28 @@ export async function POST(req: NextRequest) {
 
     if (typeof useRag === 'boolean') {
       aiPayload.use_rag = useRag;
+    } else {
+      aiPayload.use_rag = true;
     }
 
+    const pageContext = {
+      page: {
+        pathname: req.nextUrl.pathname.slice(0, 512),
+        search: req.nextUrl.search.slice(0, 1024),
+      },
+    };
+
     if (
-      body.ai_context !== undefined &&
-      body.ai_context !== null
+      body.ai_context &&
+      typeof body.ai_context === 'object' &&
+      !Array.isArray(body.ai_context)
     ) {
-      aiPayload.context = body.ai_context;
+      aiPayload.context = {
+        ...(body.ai_context as Record<string, unknown>),
+        ...pageContext,
+      };
+    } else {
+      aiPayload.context = pageContext;
     }
 
     if (body.memory !== undefined && body.memory !== null) {
