@@ -277,9 +277,9 @@ export function getListingSideLabel(
   locale: LocaleCode,
 ): string {
   if (locale === 'id') {
-    return side === 'demand' ? 'Membutuhkan' : 'Menawarkan';
+    return side === 'demand' ? 'Kebutuhan Pembeli' : 'Penawaran';
   }
-  return side === 'demand' ? 'Needs' : 'Offering';
+  return side === 'demand' ? 'Buyer needs' : 'Offers';
 }
 
 export function getListingSideActorLabel(
