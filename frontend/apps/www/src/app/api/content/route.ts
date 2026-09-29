@@ -1575,7 +1575,10 @@ export async function GET(req: NextRequest) {
       requestedLimit,
       requestedOffset,
     );
-    let resolvedItems = filterEditorialContent(resolvedPayload.items || []);
+    let resolvedItems = filterByRequestedMarketplaceSide(
+      filterEditorialContent(resolvedPayload.items || []),
+      requestedMarketplaceSide,
+    );
     resolvedPayload = { ...resolvedPayload, items: resolvedItems };
 
     const shouldIncludeDiscoverCandidates =
@@ -1585,12 +1588,15 @@ export async function GET(req: NextRequest) {
         requestedType === 'freelancer' ||
         queryText.length >= 2);
     const discoverCandidates = shouldIncludeDiscoverCandidates
-      ? await fetchDiscoverContentCandidates(req, {
-          requestedType,
-          query: queryText,
-          locationFilter: searchParams.get('location') || '',
-          limit: requestedLimit,
-        })
+      ? filterByRequestedMarketplaceSide(
+          await fetchDiscoverContentCandidates(req, {
+            requestedType,
+            query: queryText,
+            locationFilter: searchParams.get('location') || '',
+            limit: requestedLimit,
+          }),
+          requestedMarketplaceSide,
+        )
       : [];
 
     if (shouldFallbackTalent && resolvedItems.length === 0) {
@@ -1605,7 +1611,10 @@ export async function GET(req: NextRequest) {
           requestedLimit,
           requestedOffset,
         );
-        resolvedItems = resolvedPayload.items || [];
+        resolvedItems = filterByRequestedMarketplaceSide(
+          resolvedPayload.items || [],
+          requestedMarketplaceSide,
+        );
       }
     }
 
