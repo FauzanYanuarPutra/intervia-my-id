@@ -1237,10 +1237,7 @@ export function buildCategorySearchHref({
 
   if (side) {
     params.set('side', side);
-
-    if (side === 'demand') {
-      params.set('tab', 'all');
-    }
+    params.set('tab', 'all');
   }
 
   if (normalizedSubcategory) {
