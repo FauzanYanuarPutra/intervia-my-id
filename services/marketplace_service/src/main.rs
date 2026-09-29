@@ -11657,7 +11657,13 @@ async fn list_content(
                 FROM content_item_likes cil
                 WHERE cil.content_id = content_items.id
             ), 0) AS like_count,
-            metadata, created_at, updated_at
+            jsonb_set(
+                COALESCE(metadata, '{}'::jsonb),
+                '{listing_intent}',
+                to_jsonb(content_items.listing_intent),
+                true
+            ) AS metadata,
+            created_at, updated_at
         FROM content_items
         WHERE content_status <> 'deleted'
           AND ($1::text IS NULL OR content_type = $1)
