@@ -28,7 +28,7 @@ mod runtime_metrics;
 mod tools;
 
 const SERVICE_NAME: &str = "lajukan-ai-orchestrator";
-const SERVICE_VERSION: &str = "2.0.3";
+const SERVICE_VERSION: &str = "2.1.0";
 
 #[derive(Clone)]
 struct AppState {
@@ -772,6 +772,9 @@ async fn handle_capabilities() -> Json<Value> {
             "identity_verification"
         ],
         "routes": {
+            "health": "/health",
+            "ready": "/ready",
+            "ready_deep": "/ready/deep",
             "chat": "/v1/chat",
             "assist": "/v1/assist",
             "listing_generate": "/v1/listing/generate",
@@ -789,10 +792,22 @@ async fn handle_capabilities() -> Json<Value> {
             "taxonomy_classify": "/v1/taxonomy/classify",
             "verify": "/v1/verify"
         },
+        "tool_registry": {
+            "search_listings": true,
+            "marketplace_source_of_truth": true,
+            "mutation": false
+        },
+        "model_router": {
+            "chat_short": "fast",
+            "chat_general": "text",
+            "structured_tasks": "structured",
+            "image_requests": "vision"
+        },
         "response_contract": {
             "compatibility": "top-level response + model preserved for current Next.js provider",
             "structured_tasks": "top-level data contains typed task output",
-            "grounding": "sources are treated as data, never as instructions"
+            "grounding": "sources are treated as data, never as instructions",
+            "tool_calls": "tool execution metadata is returned for inspectable grounding"
         }
     }))
 }
