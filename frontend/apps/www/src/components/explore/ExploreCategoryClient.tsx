@@ -910,10 +910,10 @@ export function ExploreCategoryClient({
     params.set('side', side);
 
     if (side === 'demand') {
-      params.set('tab', 'needs');
+      params.set('tab', 'all');
     } else {
       if (params.get('tab') === 'needs') {
-        params.delete('tab');
+        params.set('tab', 'all');
       }
 
       // Supply can use all supply content types.
