@@ -76,6 +76,7 @@ type UmkmStoreMapProps = {
   showPopups?: boolean;
   focusOffset?: UmkmMapFocusOffset;
   onBoundsChange?: (bounds: UmkmMapBounds) => void;
+  markerStyle?: 'default' | 'dots';
 };
 
 const UmkmStoreMapClient = dynamic(
