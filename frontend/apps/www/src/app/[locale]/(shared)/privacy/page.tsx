@@ -1,3 +1,5 @@
+import { buildPublicPageMetadata } from '@/lib/seo/publicPageMetadata';
+import type { Metadata } from 'next';
 import { Database, Eye, Lock, ShieldCheck } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import {
@@ -16,6 +18,18 @@ import { PrivacyActions } from '@/components/trust/PrivacyActions';
 type PageProps = {
   params: Promise<{ locale: string }>;
 };
+
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
+  const { locale } = await params;
+  return buildPublicPageMetadata({
+    locale,
+    path: '/privacy',
+    titleId: 'Kebijakan Privasi | Lajukan',
+    titleEn: 'Privacy Policy | Lajukan',
+    descriptionId: 'Pelajari data yang digunakan Lajukan, tujuan pemrosesan, perlindungan data, serta hak pengguna.',
+    descriptionEn: 'Learn what data Lajukan uses, why it is processed, how it is protected, and the rights of users.',
+  });
+}
 
 export default async function PrivacyPage({ params }: PageProps) {
   const { locale } = await params;
