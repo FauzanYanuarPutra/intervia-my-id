@@ -194,9 +194,12 @@ export async function getPublishedNews(options: {
   try {
     const response = await fetch(
       `${MARKETPLACE_URL}/v1/news?${params.toString()}`,
-      highCardinalityRequest
-        ? { cache: 'no-store' }
-        : { next: { revalidate: 30 } },
+      {
+        ...(highCardinalityRequest
+          ? { cache: 'no-store' as const }
+          : { next: { revalidate: 30 } }),
+        signal: AbortSignal.timeout(5_000),
+      },
     );
     if (!response.ok) return { items: [], hasMore: false, nextCursor: null };
     const payload = (await response.json()) as NewsListPayload;
