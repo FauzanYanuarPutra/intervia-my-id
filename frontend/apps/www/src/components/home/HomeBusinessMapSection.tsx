@@ -135,7 +135,10 @@ function normalizeMapPointItem(item: {
     source_kind:
       metadata.is_public_reference === true
         ? 'reference_store'
-        : source === 'usaha_portal' || source === 'lajukan_store'
+        : source === 'usaha_portal' ||
+            source === 'lajukan_store' ||
+            source === 'lajukan_content' ||
+            source === 'lajukan_listing'
           ? 'lajukan_store'
           : recordKind.includes('reference')
             ? 'reference_store'
