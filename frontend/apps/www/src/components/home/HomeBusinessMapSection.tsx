@@ -73,7 +73,6 @@ export function HomeBusinessMapSection({
   const [stores, setStores] = useState<UmkmMapStore[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [backendDegraded, setBackendDegraded] = useState(false);
 
   const mapHref = `${UMKM_DISCOVERY_PATH}?view=map`;
 
@@ -84,65 +83,61 @@ export function HomeBusinessMapSection({
     async function load() {
       try {
         if (!active || controller.signal.aborted) return;
-          setError(null);
-          const response = await fetch(
-            '/api/super-app/umkm/map-points?limit=80&min_lat=-11&max_lat=6&min_lng=95&max_lng=141',
-            {
-              cache: 'default',
-              credentials: 'include',
-              signal: controller.signal,
-            },
-          );
-          const payload = (await response.json().catch(() => ({}))) as MapPointsResponse;
+        setError(null);
+        const response = await fetch(
+          '/api/super-app/umkm/map-points?limit=80&min_lat=-11&max_lat=6&min_lng=95&max_lng=141',
+          {
+            cache: 'default',
+            credentials: 'include',
+            signal: controller.signal,
+          },
+        );
+        const payload = (await response.json().catch(() => ({}))) as MapPointsResponse;
 
-          if (!response.ok || !payload.data?.items) {
-            throw new Error(
-              response.status === 429
-                ? isId
-                  ? 'Peta sedang sibuk. Coba lagi sebentar.'
-                  : 'The map is busy. Please try again shortly.'
-                : payload.error ||
-                  (isId ? 'Peta usaha belum siap.' : 'Business map unavailable.'),
-            );
-          }
-
-          if (!active) return;
-          setStores(
-            payload.data.items.map(item => ({
-              id: item.id,
-              slug: item.slug,
-              name: item.name,
-              city: item.city,
-              address: item.city,
-              lat: item.lat,
-              lng: item.lng,
-              metadata: {
-                marketplace_category_slug: item.category,
-                record_kind:
-                  item.source_kind.includes('reference')
-                    ? item.source_kind
-                    : undefined,
-                is_public_reference: item.source_kind.includes('reference'),
-              },
-            })),
-          );
-          setBackendDegraded(false);
-          setError(null);
-          setLoading(false);
-          return;
-        } catch (loadError) {
-          if (!active || controller.signal.aborted) return;
-          setError(
-            loadError instanceof Error
-              ? loadError.message
-              : isId
-                ? 'Peta usaha belum siap.'
-                : 'Business map unavailable.',
+        if (!response.ok || !payload.data?.items) {
+          throw new Error(
+            response.status === 429
+              ? isId
+                ? 'Peta sedang sibuk. Coba lagi sebentar.'
+                : 'The map is busy. Please try again shortly.'
+              : payload.error ||
+                (isId ? 'Peta usaha belum siap.' : 'Business map unavailable.'),
           );
         }
-      }
 
-      if (active) setLoading(false);
+        if (!active) return;
+        setStores(
+          payload.data.items.map(item => ({
+            id: item.id,
+            slug: item.slug,
+            name: item.name,
+            city: item.city,
+            address: item.city,
+            lat: item.lat,
+            lng: item.lng,
+            metadata: {
+              marketplace_category_slug: item.category,
+              record_kind: item.source_kind.includes('reference')
+                ? item.source_kind
+                : undefined,
+              is_public_reference: item.source_kind.includes('reference'),
+            },
+          })),
+        );
+        setError(null);
+        setLoading(false);
+      } catch (loadError) {
+        if (!active || controller.signal.aborted) return;
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : isId
+              ? 'Peta usaha belum siap.'
+              : 'Business map unavailable.',
+        );
+      } finally {
+        if (active && !controller.signal.aborted) setLoading(false);
+      }
     }
 
     void load();
@@ -247,13 +242,6 @@ export function HomeBusinessMapSection({
           </span>
         </div>
 
-        {!error && !loading && backendDegraded ? (
-          <div className="absolute left-2 right-2 top-2 z-10 rounded-lg border border-amber-200/80 bg-amber-50/95 px-2.5 py-1.5 text-[8px] font-semibold text-amber-800 shadow-sm backdrop-blur sm:left-3 sm:right-3 sm:text-[9px]">
-            {isId
-              ? 'Sebagian data usaha sedang dipulihkan. Titik referensi publik tetap tersedia.'
-              : 'Some business data is recovering. Public reference points remain available.'}
-          </div>
-        ) : null}
 
         {error && !loading ? (
           <div className="absolute inset-x-2 bottom-2.5 z-10 flex items-center gap-2 rounded-lg border border-rose-200/80 bg-white/95 px-2 py-1.5 shadow-sm backdrop-blur sm:inset-x-3">
