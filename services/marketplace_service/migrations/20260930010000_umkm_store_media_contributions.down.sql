@@ -1,0 +1,8 @@
+DROP TRIGGER IF EXISTS umkm_store_media_contribution_updated_at
+  ON umkm_store_media_contributions;
+DROP FUNCTION IF EXISTS public.touch_umkm_store_media_contribution_updated_at();
+DROP INDEX IF EXISTS idx_umkm_store_media_contributions_uploader;
+DROP INDEX IF EXISTS idx_umkm_store_media_contributions_queue;
+DROP INDEX IF EXISTS idx_umkm_store_media_contributions_public;
+DROP INDEX IF EXISTS uq_umkm_store_media_contribution_store_url;
+DROP TABLE IF EXISTS umkm_store_media_contributions;
