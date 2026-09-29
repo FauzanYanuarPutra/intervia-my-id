@@ -4141,7 +4141,9 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
         map: '1',
         include_references: '0',
       });
-      addViewerLocation(params);
+      // Home recommendations are not a nearby-only surface. Keep the
+      // first-party Lajukan pool global so registered businesses are not
+      // accidentally hidden just because the viewer is in another city.
 
       const response = await fetch(
         `/api/super-app/umkm/stores?${params.toString()}`,
