@@ -1064,6 +1064,7 @@ function mapContentToRecommendation(
     listing_intent: item.listing_intent,
     market_intent: item.market_intent,
     intent: item.intent,
+    pricing_mode: item.pricing_mode,
     metadata: item.metadata,
   });
   const vendor =
@@ -2463,11 +2464,11 @@ function HomeListingCarouselSection({
             <p className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400 sm:text-[11px]">
               {isDemand
                 ? isId
-                  ? 'Belum ada kebutuhan aktif yang bisa ditampilkan.'
-                  : 'No active requests to show right now.'
+                  ? 'Belum ada kebutuhan aktif saat ini.'
+                  : 'No active requests right now.'
                 : isId
-                  ? 'Belum ada penawaran aktif di Lajukan saat ini.'
-                  : 'No active Lajukan offers right now.'}
+                  ? 'Belum ada penawaran aktif saat ini.'
+                  : 'No active offers right now.'}
             </p>
           </div>
         </div>
