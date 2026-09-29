@@ -1523,6 +1523,18 @@ export function ExploreCategoryClient({
       searchSide,
     );
 
+  const exploreBackParams =
+    new URLSearchParams(searchKey);
+  exploreBackParams.delete('category');
+  exploreBackParams.delete('type');
+
+  // Returning from a category should restore the exact Explore state that
+  // opened it, especially explicit supply/demand + tab selection.
+  const exploreBackHref = appendSearchParams(
+    '/explore',
+    exploreBackParams,
+  );
+
   const categoryTitle =
     categoryCopy.title;
 
@@ -1541,7 +1553,7 @@ export function ExploreCategoryClient({
 
       <main className="mx-auto w-full min-w-0 max-w-[1080px] px-3 py-2.5 sm:px-5 sm:py-4 lg:px-6 lg:py-5">
         <Link
-          href="/explore"
+          href={exploreBackHref}
           aria-label={
             isId
               ? 'Kembali ke Jelajahi'
