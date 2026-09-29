@@ -1261,7 +1261,10 @@ function StoreDotsLayer({
   return (
     <>
       {storePresentations.map(({ store, ui }) => {
-        const palette = getMarkerPalette(ui.markerTone);
+        const isReference = isUmkmMapPublicReference(store);
+        const palette = isReference
+          ? { badge: '#94a3b8', border: '#cbd5e1', text: '#64748b' }
+          : getMarkerPalette(ui.markerTone);
         const selected = store.id === selectedStoreId;
         return (
           <CircleMarker
