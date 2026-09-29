@@ -568,7 +568,10 @@ function DataSection({
       return;
     }
 
-    if (!nextCursor || (kind !== 'listing' && kind !== 'video')) {
+    if (
+      !nextCursor ||
+      !['listing', 'business', 'video'].includes(kind)
+    ) {
       return;
     }
 
@@ -613,10 +616,11 @@ function DataSection({
         return;
       }
 
+      const searchTab = kind === 'business' ? 'businesses' : 'all';
       const params = new URLSearchParams({
         category: category.slug,
         side: forcedSide || 'supply',
-        tab: forcedSide === 'demand' ? 'all' : 'all',
+        tab: searchTab,
         sort: 'latest',
         limit: '48',
         offset: nextCursor,
@@ -628,20 +632,23 @@ function DataSection({
       if (!response.ok) throw new Error('explore_pagination_failed');
 
       const payload = (await response.json()) as GlobalSearchResponse;
-      const incoming = [
-        ...(payload.groups.products?.items || []),
-        ...(payload.groups.services?.items || []),
-      ];
-
       const nextItems =
-        forcedSide === 'demand'
-          ? payload.groups.needs?.items || []
-          : incoming;
+        kind === 'business'
+          ? payload.groups.businesses?.items || []
+          : forcedSide === 'demand'
+            ? payload.groups.needs?.items || []
+            : [
+                ...(payload.groups.products?.items || []),
+                ...(payload.groups.services?.items || []),
+              ];
 
       const returnedCursor =
-        (forcedSide === 'demand'
-          ? payload.groups.needs?.nextCursor
-          : payload.groups.products?.nextCursor || payload.groups.services?.nextCursor) || null;
+        kind === 'business'
+          ? payload.groups.businesses?.nextCursor || null
+          : (forcedSide === 'demand'
+              ? payload.groups.needs?.nextCursor
+              : payload.groups.products?.nextCursor ||
+                payload.groups.services?.nextCursor) || null;
       setExtraItems(current => [...current, ...nextItems]);
       setNextCursor(
         nextItems.length === 0 || returnedCursor === nextCursor
@@ -2360,6 +2367,7 @@ export function ExploreCategoryClient({
                             category
                           }
                           kind="business"
+                          initialNextCursor={groups?.businesses.nextCursor}
                         />
                       );
                     }
