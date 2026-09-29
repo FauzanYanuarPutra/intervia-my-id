@@ -91,6 +91,22 @@ export type DiscoveryStore = UmkmMapStore & {
   }>;
 };
 
+type MapPointResponse = {
+  data?: {
+    items?: Array<{
+      id: string;
+      slug: string;
+      name: string;
+      city: string;
+      lat: number;
+      lng: number;
+      category: string;
+      source_kind: string;
+    }>;
+  };
+  error?: string;
+};
+
 type StoresResponse = {
   data?: {
     items: DiscoveryStore[];
@@ -1077,6 +1093,8 @@ export function UmkmDiscoveryPanel({
     minLng: number;
     maxLng: number;
   } | null>(null);
+  const [mapPoints, setMapPoints] = useState<UmkmMapStore[]>([]);
+  const activeMapPointsRequestRef = useRef<AbortController | null>(null);
   const handleMapBoundsChange = useCallback(
     (nextBounds: {
       minLat: number;
@@ -1101,6 +1119,7 @@ export function UmkmDiscoveryPanel({
   );
   const requestLimit = Math.max(50, Math.min(200, limit));
   const mapRequestLimit = 200;
+  const mapPointLimit = 2000;
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1508,6 +1527,88 @@ export function UmkmDiscoveryPanel({
     variant,
   ]);
 
+  useEffect(() => {
+    if (!mapBounds) return;
+
+    activeMapPointsRequestRef.current?.abort();
+    const controller = new AbortController();
+    activeMapPointsRequestRef.current = controller;
+
+    const params = new URLSearchParams({
+      limit: String(mapPointLimit),
+      min_lat: mapBounds.minLat.toFixed(6),
+      max_lat: mapBounds.maxLat.toFixed(6),
+      min_lng: mapBounds.minLng.toFixed(6),
+      max_lng: mapBounds.maxLng.toFixed(6),
+    });
+    if (query?.trim()) params.set('q', query.trim());
+    if (city?.trim()) params.set('city', city.trim());
+    if (queryViewerLocation) {
+      params.set('viewer_lat', queryViewerLocation.lat.toFixed(3));
+      params.set('viewer_lng', queryViewerLocation.lng.toFixed(3));
+    }
+
+    void fetch(`/api/super-app/umkm/map-points?${params.toString()}`, {
+      cache: 'no-store',
+      signal: controller.signal,
+    })
+      .then(async response => {
+        const payload = (await response.json().catch(() => ({}))) as MapPointResponse;
+        if (!response.ok || controller.signal.aborted) return;
+        const points = payload.data?.items || [];
+        setMapPoints(
+          points
+            .filter(point => isCoordinateValid({ lat: point.lat, lng: point.lng }))
+            .map(point => ({
+              id: point.id,
+              slug: point.slug,
+              name: point.name,
+              city: point.city || 'Indonesia',
+              address: point.city || 'Indonesia',
+              lat: point.lat,
+              lng: point.lng,
+              description: null,
+              phone: null,
+              metadata: {
+                marketplace_category_slug: point.category,
+                umkm_category: point.category,
+                record_kind:
+                  point.source_kind.includes('reference')
+                    ? 'open_data_reference'
+                    : 'registered_store',
+                market_side: point.source_kind.includes('reference')
+                  ? 'reference'
+                  : 'supply',
+                is_transactional: !point.source_kind.includes('reference'),
+                reference_publication_status: point.source_kind.includes('reference')
+                  ? 'published'
+                  : undefined,
+                claimable: point.source_kind.includes('reference'),
+                source_dataset: point.source_kind,
+              },
+              online_order_enabled: false,
+              offline_order_enabled: false,
+              reservation_enabled: false,
+              table_count: 0,
+              available_table_count: 0,
+              max_table_capacity: 0,
+            })),
+        );
+      })
+      .catch(error => {
+        if (!controller.signal.aborted) {
+          console.warn('[UMKM_MAP_POINTS_CLIENT_ERROR]', error);
+        }
+      });
+
+    return () => {
+      controller.abort();
+      if (activeMapPointsRequestRef.current === controller) {
+        activeMapPointsRequestRef.current = null;
+      }
+    };
+  }, [city, mapBounds, mapPointLimit, query, queryViewerLocation]);
+
   const preparedStores = useMemo(
     () =>
       stores.map(store => ({
@@ -1547,10 +1648,13 @@ export function UmkmDiscoveryPanel({
     setSelectedStoreId(null);
   }, [selectedStoreId, visibleStores]);
 
-  const mapStores = useMemo(
-    () => visibleStores.map(item => item.store),
-    [visibleStores],
-  );
+  const mapStores = useMemo(() => {
+    const merged = new Map(visibleStores.map(item => [item.store.id, item.store]));
+    for (const point of mapPoints) {
+      if (!merged.has(point.id)) merged.set(point.id, point);
+    }
+    return Array.from(merged.values());
+  }, [mapPoints, visibleStores]);
   const selectedPlace = useMemo(
     () => visibleStores.find(item => item.store.id === selectedStoreId) || null,
     [selectedStoreId, visibleStores],
@@ -1905,15 +2009,29 @@ export function UmkmDiscoveryPanel({
   }, []);
   const handleMapSelectStore = useCallback(
     (storeId: string) => {
+      const point = mapPoints.find(item => item.id === storeId);
+      if (point && !visibleStores.some(item => item.store.id === storeId)) {
+        setStores(current => {
+          if (current.some(item => item.id === storeId)) return current;
+          return [...current, point as DiscoveryStore];
+        });
+      }
       handleSelectStore(storeId, { scrollToPreview: true });
     },
-    [handleSelectStore],
+    [handleSelectStore, mapPoints, visibleStores],
   );
   const handleEdgeMapSelectStore = useCallback(
     (storeId: string) => {
+      const point = mapPoints.find(item => item.id === storeId);
+      if (point && !visibleStores.some(item => item.store.id === storeId)) {
+        setStores(current => {
+          if (current.some(item => item.id === storeId)) return current;
+          return [...current, point as DiscoveryStore];
+        });
+      }
       handleSelectStore(storeId, { scrollToPreview: false });
     },
-    [handleSelectStore],
+    [handleSelectStore, mapPoints, visibleStores],
   );
 
   useEffect(() => {
