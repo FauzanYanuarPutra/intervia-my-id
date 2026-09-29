@@ -2416,9 +2416,6 @@ export function ExploreCategoryClient({
                     if (
                       section.key ===
                       'communities'
-                    if (
-                      section.key ===
-                      'communities')
                     ) {
                       return (
                         <DataSection
