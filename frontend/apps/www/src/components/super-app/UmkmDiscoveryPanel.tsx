@@ -52,6 +52,7 @@ import {
 import { useViewerLocation } from './useViewerLocation';
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 import { Skeleton, SkeletonStack } from '@/components/ui/Skeleton';
+import { EmblaInlineRail } from '@/components/common/EmblaInlineRail';
 
 type UmkmDiscoveryPanelProps = {
   isId: boolean;
