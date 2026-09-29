@@ -2186,7 +2186,6 @@ export function UmkmDiscoveryPanel({
             focusMode={mapFocusMode}
             focusNonce={mapFocusNonce}
             focusOffset={viewerFocusOffset}
-            onBoundsChange={handleMapBoundsChange}
             onSelectStore={
               edgeToEdge ? handleEdgeMapSelectStore : handleMapSelectStore
             }
@@ -2288,7 +2287,6 @@ export function UmkmDiscoveryPanel({
       viewerAccuracyMeters,
       viewerLocation,
       mapStores,
-      handleMapBoundsChange,
       handleMapRangeChange,
       mapRangeKm,
     ],
