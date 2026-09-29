@@ -822,21 +822,28 @@ services:
       VLLM_FALLBACK_MODEL: ${VLLM_FALLBACK_MODEL:-}
       AI_FALLBACK_MODEL: ${AI_FALLBACK_MODEL:-}
       AI_MODEL: ${AI_MODEL:-}
-      VLLM_STRUCTURED_MODEL: ${VLLM_STRUCTURED_MODEL:-}
+      VLLM_STRUCTURED_MODEL: ${VLLM_STRUCTURED_MODEL:-qwen3:4b}
       VLLM_VISION_MODEL: ${VLLM_VISION_MODEL:-}
+      VLLM_FAST_MODEL: ${VLLM_FAST_MODEL:-qwen3:4b}
+      VLLM_EMBEDDING_MODEL: ${VLLM_EMBEDDING_MODEL:-}
       VLLM_KYC_MODEL: ${VLLM_KYC_MODEL:-}
-      VLLM_REASONING_EFFORT: ${VLLM_REASONING_EFFORT:-medium}
+      VLLM_REASONING_EFFORT: ${VLLM_REASONING_EFFORT:-none}
       OCR_URL: ${OCR_URL:-http://ocr_service:8000/predict}
       LIVENESS_URL: ${LIVENESS_URL:-http://liveness_service:8000/check}
       FACE_MATCH_URL: ${FACE_MATCH_URL:-}
       RAG_URL: ${RAG_URL:-}
+      MARKETPLACE_URL: http://marketplace_service:8081
+      MARKETPLACE_SERVICE_TOKEN: ${MARKETPLACE_SERVICE_TOKEN:-}
+      AI_TOOL_TIMEOUT_MS: ${AI_TOOL_TIMEOUT_MS:-5000}
+      AI_TOOL_LIMIT: ${AI_TOOL_LIMIT:-12}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
     expose: ["8080"]
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/ready"]
       interval: 15s
-      timeout: 5s
-      retries: 10
+      timeout: 8s
+      retries: 12
+      start_period: 20s
     networks: [app]
 
   ocr_service:
