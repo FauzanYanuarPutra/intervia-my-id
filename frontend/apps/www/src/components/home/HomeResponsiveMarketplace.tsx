@@ -1890,6 +1890,17 @@ function HeroVisualStage({
     'Sobat Bisnis';
 
   const heroCategories = LAJUKAN_EXPLORE_CATEGORIES.slice(0, 5);
+  const [heroCategoryEmblaRef, heroCategoryEmblaApi] = useEmblaCarousel({
+    align: 'start',
+    containScroll: 'trimSnaps',
+    dragFree: true,
+    loop: false,
+  });
+  useEmblaWheelGestures(heroCategoryEmblaApi, {
+    enabled: heroCategories.length > 1,
+    desktopOnly: true,
+    threshold: 42,
+  });
 
   return (
     <section
@@ -1988,23 +1999,25 @@ function HeroVisualStage({
                   : 'Find business supplies, suppliers, professional services, equipment, business places, and opportunities across Indonesia.'}
               </p>
 
-              <div className="mt-3 -mx-0.5 flex min-w-0 max-w-full items-center gap-1.5 overflow-x-auto px-0.5 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-2">
-                {heroCategories.map(category => (
+              <div ref={heroCategoryEmblaRef} className="mt-3 -mx-0.5 min-w-0 max-w-full overflow-hidden px-0.5">
+                <div className="flex w-max min-w-full touch-pan-y items-center gap-1.5 pb-0.5 sm:gap-2">
+                  {heroCategories.map(category => (
+                    <Link
+                      key={category.id}
+                      href={buildExploreCategoryHref(category)}
+                      className="inline-flex min-h-8 shrink-0 items-center rounded-full border border-white/80 bg-white/80 px-2.5 text-[10px] font-bold text-zinc-700 shadow-sm backdrop-blur transition hover:border-emerald-300 hover:bg-white hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 dark:border-white/10 dark:bg-zinc-900/70 dark:text-zinc-300 dark:hover:border-emerald-800 dark:hover:bg-zinc-900 dark:hover:text-emerald-300 sm:min-h-9 sm:px-3 sm:text-[11px]"
+                    >
+                      {isId ? category.shortLabelId : category.shortLabelEn}
+                    </Link>
+                  ))}
                   <Link
-                    key={category.id}
-                    href={buildExploreCategoryHref(category)}
-                    className="inline-flex min-h-8 shrink-0 items-center rounded-full border border-white/80 bg-white/80 px-2.5 text-[10px] font-bold text-zinc-700 shadow-sm backdrop-blur transition hover:border-emerald-300 hover:bg-white hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 dark:border-white/10 dark:bg-zinc-900/70 dark:text-zinc-300 dark:hover:border-emerald-800 dark:hover:bg-zinc-900 dark:hover:text-emerald-300 sm:min-h-9 sm:px-3 sm:text-[11px]"
+                    href={UMKM_DISCOVERY_PATH + '?view=map'}
+                    className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-full border border-blue-200 bg-blue-50/90 px-2.5 text-[10px] font-bold text-blue-700 shadow-sm backdrop-blur transition hover:border-blue-300 hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 dark:border-blue-900/60 dark:bg-blue-950/55 dark:text-blue-300 dark:hover:bg-blue-950/80 sm:min-h-9 sm:px-3 sm:text-[11px]"
                   >
-                    {isId ? category.shortLabelId : category.shortLabelEn}
+                    <MapPin className="h-3 w-3" aria-hidden="true" />
+                    {isId ? 'Usaha sekitar' : 'Nearby'}
                   </Link>
-                ))}
-                <Link
-                  href={UMKM_DISCOVERY_PATH + '?view=map'}
-                  className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-full border border-blue-200 bg-blue-50/90 px-2.5 text-[10px] font-bold text-blue-700 shadow-sm backdrop-blur transition hover:border-blue-300 hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:border-blue-900/60 dark:bg-blue-950/55 dark:text-blue-300 dark:hover:bg-blue-950/80 sm:min-h-9 sm:px-3 sm:text-[11px]"
-                >
-                  <MapPin className="h-3 w-3" aria-hidden="true" />
-                  {isId ? 'Usaha sekitar' : 'Nearby'}
-                </Link>
+                </div>
               </div>
             </div>
           )}
@@ -3109,6 +3122,22 @@ function CommunityPanel({
 }) {
   const router = useRouter();
   const tabs = getCommunityTabs(isId);
+  const activeTabIndex = tabs.findIndex(tab => tab.id === activeTab);
+  const [communityTabEmblaRef, communityTabEmblaApi] = useEmblaCarousel({
+    align: 'start',
+    containScroll: 'trimSnaps',
+    dragFree: false,
+    loop: false,
+  });
+  useEmblaWheelGestures(communityTabEmblaApi, {
+    enabled: tabs.length > 1,
+    desktopOnly: true,
+    threshold: 42,
+  });
+  useEffect(() => {
+    if (!communityTabEmblaApi || activeTabIndex < 0) return;
+    communityTabEmblaApi.scrollTo(activeTabIndex);
+  }, [activeTabIndex, communityTabEmblaApi]);
   const cards = posts
     .filter(post => post.tab === activeTab)
     .slice(0, 3)
@@ -3132,20 +3161,22 @@ function CommunityPanel({
         </Link>
       </div>
 
-      <div className="mt-2 flex items-center gap-4 overflow-x-auto border-b border-[color:var(--app-border)] px-1 sm:px-3 md:px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {tabs.map(tab => {
-          const Icon = tab.icon;
-          const active = tab.id === activeTab;
-          return (
-            <button key={tab.id} type="button" onClick={() => onTabChange(tab.id)} className={cn(
-              'inline-flex min-h-10 shrink-0 items-center gap-1.5 border-b-2 px-0.5 text-[10px] font-bold transition',
-              active ? 'border-[color:var(--app-accent)] text-[color:var(--app-accent)]' : 'border-transparent text-[color:var(--app-text-soft)] hover:text-[color:var(--app-text)]',
-            )}>
-              <Icon className="h-3.5 w-3.5" />
-              {tab.label}
-            </button>
-          );
-        })}
+      <div ref={communityTabEmblaRef} className="mt-2 min-w-0 overflow-hidden border-b border-[color:var(--app-border)] px-1 sm:px-3 md:px-6">
+        <div className="flex w-max min-w-full touch-pan-y items-center gap-4">
+          {tabs.map(tab => {
+            const Icon = tab.icon;
+            const active = tab.id === activeTab;
+            return (
+              <button key={tab.id} type="button" onClick={() => onTabChange(tab.id)} aria-current={active ? 'page' : undefined} className={cn(
+                'inline-flex min-h-10 shrink-0 items-center gap-1.5 border-b-2 px-0.5 text-[10px] font-bold transition',
+                active ? 'border-[color:var(--app-accent)] text-[color:var(--app-accent)]' : 'border-transparent text-[color:var(--app-text-soft)] hover:text-[color:var(--app-text)]',
+              )}>
+                <Icon className="h-3.5 w-3.5" />
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {loading ? (
