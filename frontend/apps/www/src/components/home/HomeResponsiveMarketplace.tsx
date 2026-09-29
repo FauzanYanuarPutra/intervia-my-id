@@ -4456,9 +4456,6 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
         <HomeBusinessMapSection locale={locale} />
         <DailyLoginRewardCard locale={locale} compact />
         <TrendingSearchSection isId={isId} />
-        
-
-        <PublicReferencesSection isId={isId} items={publicReferences} />
         {recommendationsLoading ? (
           <RecommendationsLoadingSkeleton isId={isId} />
         ) : recommendations.length > 0 ? (
@@ -4469,6 +4466,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
         ) : (
           <DemandListingsSection isId={isId} items={demandRecommendations} />
         )}
+        <PublicReferencesSection isId={isId} items={publicReferences} />
         <HomeNewsSection locale={locale} items={homeNewsItems} />
         <ReelsPanel isId={isId} items={reels} />
         <HomeCommunityGroupsSection
@@ -4526,9 +4524,6 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
         <HomeBusinessMapSection locale={locale} />
               <DailyLoginRewardCard locale={locale} compact />
               <TrendingSearchSection isId={isId} />
-              
-
-              <PublicReferencesSection isId={isId} items={publicReferences} />
               {recommendationsLoading ? (
                 <RecommendationsLoadingSkeleton isId={isId} />
               ) : recommendations.length > 0 ? (
@@ -4539,6 +4534,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
         ) : (
           <DemandListingsSection isId={isId} items={demandRecommendations} />
         )}
+              <PublicReferencesSection isId={isId} items={publicReferences} />
         <HomeNewsSection locale={locale} items={homeNewsItems} />
               <div className="grid gap-4">
                 <ReelsPanel isId={isId} items={reels} />
