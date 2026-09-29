@@ -932,15 +932,24 @@ export function ExploreCategoryClient({
 
     params.delete('cursor');
 
-    router.replace(
-      appendSearchParams(
-        `/${locale}${buildExploreCategoryHref(
-          category,
-        )}`,
-        params,
-      ),
-      { scroll: false },
+    const nextHref = appendSearchParams(
+      `/${locale}${buildExploreCategoryHref(
+        category,
+      )}`,
+      params,
     );
+
+    // Mode changes are navigational state. Keep them in browser history so
+    // returning from a result/detail page restores the exact supply/demand
+    // surface instead of collapsing back to the bare /explore route.
+    const currentHref =
+      typeof window !== 'undefined'
+        ? `${window.location.pathname}${window.location.search}`
+        : '';
+
+    if (nextHref !== currentHref) {
+      router.push(nextHref, { scroll: false });
+    }
   };
 
   const load = useCallback(
