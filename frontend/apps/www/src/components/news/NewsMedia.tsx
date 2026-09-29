@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useState } from 'react';
 import { LajukanImage } from '@/components/common/LajukanImage';
 import { Newspaper } from 'lucide-react';
