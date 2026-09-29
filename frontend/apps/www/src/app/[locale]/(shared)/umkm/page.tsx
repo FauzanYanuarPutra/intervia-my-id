@@ -12,7 +12,7 @@ import {
   type UmkmStore,
 } from '@/lib/super-app/umkm-commerce';
 import {
-  isPublicUmkmStoreVisible,
+  isPublicUmkmDiscoveryVisible,
   mergeDeepLinkedUmkmStore,
 } from '@/lib/super-app/umkm-public-discovery';
 import { projectPublicUmkmStore } from '@/lib/super-app/umkm-public-store';
@@ -133,7 +133,7 @@ export default async function UmkmPage({ params, searchParams }: PageProps) {
       query: resolvedSearchParams.q?.trim() || undefined,
       city: resolvedSearchParams.city?.trim() || undefined,
       activeOnly: true,
-      includeReferences: false,
+      includeReferences: true,
       limit: 10,
     }),
     getDeepLinkedStore(deepLinkedSlug, deepLinkedStoreId),
@@ -141,13 +141,13 @@ export default async function UmkmPage({ params, searchParams }: PageProps) {
   const listedStores =
     listedStoresResult.status === 'fulfilled'
       ? listedStoresResult.value
-          .filter(isPublicUmkmStoreVisible)
+          .filter(isPublicUmkmDiscoveryVisible)
           .map((store) => toDiscoveryStore(store))
       : undefined;
   const deepLinkedStoreRaw =
     deepLinkedStoreResult.status === 'fulfilled' &&
     deepLinkedStoreResult.value &&
-    isPublicUmkmStoreVisible(deepLinkedStoreResult.value)
+    isPublicUmkmDiscoveryVisible(deepLinkedStoreResult.value)
       ? deepLinkedStoreResult.value
       : null;
   const deepLinkedProducts = deepLinkedStoreRaw
