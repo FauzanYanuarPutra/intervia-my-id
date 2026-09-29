@@ -155,8 +155,8 @@ const HOME_CONTENT_REQUEST_TIMEOUT_MS = 12000;
 const HOME_CONTENT_FALLBACK_TIMEOUT_MS = 4500;
 const HOME_CONTENT_TOTAL_TIMEOUT_MS = 18000;
 const HOME_MARKETPLACE_FETCH_LIMIT = 48;
-const HOME_SUPPLY_LISTING_SLOTS = 8;
-const HOME_SUPPLY_STORE_SLOTS = 4;
+const HOME_SUPPLY_LISTING_SLOTS = 6;
+const HOME_SUPPLY_STORE_SLOTS = 6;
 
 type Tone =
   | 'emerald'
@@ -317,14 +317,17 @@ function buildHomeSupplyItems(
   // registered Lajukan businesses so a long listing feed cannot hide them.
   const listingSlots = Math.min(HOME_SUPPLY_LISTING_SLOTS, maxItems);
   const storeSlots = Math.min(HOME_SUPPLY_STORE_SLOTS, maxItems - listingSlots);
+  // First-party Lajukan businesses are the strongest source of truth for
+  // the Home business recommendation surface. Put them before transactional
+  // listings so a real Lajukan store is not buried behind generic records.
   const selected = [
-    ...listingItems.slice(0, listingSlots),
     ...storeItems.slice(0, storeSlots),
+    ...listingItems.slice(0, listingSlots),
   ];
 
   if (selected.length < maxItems) {
-    selected.push(...listingItems.slice(listingSlots, maxItems));
     selected.push(...storeItems.slice(storeSlots, maxItems));
+    selected.push(...listingItems.slice(listingSlots, maxItems));
   }
 
   const seen = new Set<string>();
@@ -4091,7 +4094,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
 
     const loadNativeBusinessStores = async () => {
       const params = new URLSearchParams({
-        limit: '12',
+        limit: '24',
         map: '1',
         include_references: '0',
       });
@@ -4123,10 +4126,9 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
         database_only: '1',
         marketplace_only: '1',
       });
-      addViewerLocation(params);
-      if (viewerLocationKey) {
-        params.set('nearby', '1');
-      }
+      // Demand is a nationwide opportunity board, not a nearby-only feed.
+      // Do not let the viewer's location hide valid requests published by
+      // businesses in another city.
       return fetchHomeContent(params, demandController.signal);
     };
 
