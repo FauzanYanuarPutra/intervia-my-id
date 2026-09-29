@@ -502,7 +502,7 @@ function DataSection({
     const params = new URLSearchParams();
     if (config.key === 'latest-needs') {
       params.set('side', 'demand');
-      params.set('tab', 'needs');
+      params.set('tab', 'all');
     } else if (kind === 'business') {
       params.set('side', 'supply');
       params.set('tab', 'businesses');
@@ -1038,7 +1038,7 @@ export function ExploreCategoryClient({
     );
 
     if (searchSide === 'demand') {
-      params.set('tab', 'needs');
+      params.set('tab', 'all');
     } else if (
       params.get('tab') === 'needs'
     ) {
@@ -1315,7 +1315,7 @@ export function ExploreCategoryClient({
     if (searchSide === 'demand') {
       params.set(
         'tab',
-        'needs',
+        'all',
       );
     } else if (
       params.get('tab') ===
@@ -1367,7 +1367,7 @@ export function ExploreCategoryClient({
     ) {
       params.set(
         'tab',
-        'needs',
+        'all',
       );
     }
 
@@ -1395,7 +1395,7 @@ export function ExploreCategoryClient({
     isSocialCategory
       ? searchState.tab
       : searchSide === 'demand'
-        ? 'needs'
+        ? 'all'
         : [
               'all',
               'products',
@@ -1692,7 +1692,7 @@ export function ExploreCategoryClient({
                       <input
                         type="hidden"
                         name="tab"
-                        value="needs"
+                        value="all"
                       />
                     ) : null}
                   </>
