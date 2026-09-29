@@ -83,13 +83,20 @@ export function ContentLocationMapClient({
         zoom={15}
         minZoom={5}
         maxZoom={19}
+        preferCanvas
         scrollWheelZoom={false}
         zoomControl={false}
         attributionControl={false}
         className="leaflet-content-location-map h-full w-full"
       >
         <ContentMapCenter point={point} />
-        <TileLayer attribution={OPEN_MAP_TILE_ATTRIBUTION} url={OPEN_MAP_TILE_URL} />
+        <TileLayer
+          attribution={OPEN_MAP_TILE_ATTRIBUTION}
+          url={OPEN_MAP_TILE_URL}
+          keepBuffer={1}
+          updateWhenIdle
+          updateWhenZooming={false}
+        />
         <AttributionControl position="bottomleft" prefix={false} />
         <ZoomControl position="bottomright" />
         <Marker position={position} icon={markerIcon}>
