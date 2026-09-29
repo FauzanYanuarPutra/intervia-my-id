@@ -43,6 +43,7 @@ import {
   type GlobalSearchSide,
   type GlobalSearchTab,
 } from '@/lib/search/globalSearch';
+import { getListingSideLabel } from '@/lib/content/listingSide';
 import { cn } from '@/lib/utils';
 
 function appendSearchParams(
@@ -1271,15 +1272,11 @@ export function ExploreAllSearchClient({
   }> = [
     {
       value: 'supply',
-      label: isId
-        ? 'Saya mencari'
-        : 'I am looking for',
+      label: getListingSideLabel('supply', isId ? 'id' : 'en'),
     },
     {
       value: 'demand',
-      label: isId
-        ? 'Saya menawarkan'
-        : 'I am offering',
+      label: getListingSideLabel('demand', isId ? 'id' : 'en'),
     },
     {
       value: 'people',
