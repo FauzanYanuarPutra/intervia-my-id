@@ -1299,7 +1299,7 @@ export function UmkmDiscoveryPanel({
       isId,
       mapBounds,
       query,
-      mapRequestLimit,
+      requestLimit,
       selectedSlug,
       selectedStoreIdInitial,
       queryViewerLocation,
@@ -1472,7 +1472,7 @@ export function UmkmDiscoveryPanel({
         }
       }
     },
-    [city, mapBounds, mapRangeKm, query, queryViewerLocation, mapRequestLimit],
+    [city, mapBounds, mapRangeKm, query, queryViewerLocation, referencePageLimit],
   );
 
   useEffect(() => {
