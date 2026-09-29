@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { ArrowLeft, Hash } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { NewsInfiniteGrid } from '@/components/news/NewsInfiniteGrid';
-import { buildNewsFacetUrl, getNewsLanguageAvailability, getPublishedNews } from '@/lib/news';
+import { buildNewsFacetPath, buildNewsFacetUrl, getNewsLanguageAvailability, getPublishedNews } from '@/lib/news';
 
 type Props = {
   params: Promise<{ locale: string; topic: string }>;
@@ -81,6 +81,16 @@ export default async function NewsTopicPage({ params, searchParams }: Props) {
         {isId ? 'Belum ada berita untuk topik ini.' : 'No news for this topic yet.'}
       </div>
     )}
+    {nextCursor ? (
+      <Link
+        href={buildNewsFacetPath('topic', value) + `?cursor=${encodeURIComponent(nextCursor)}`}
+        rel="next"
+        className="sr-only"
+        aria-label={isId ? 'Topik berita berikutnya' : 'Next topic news page'}
+      >
+        {isId ? 'Topik berita berikutnya' : 'Next topic news page'}
+      </Link>
+    ) : null}
     </main>
   );
 }
