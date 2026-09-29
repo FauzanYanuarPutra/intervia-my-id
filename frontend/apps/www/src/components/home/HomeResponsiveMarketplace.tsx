@@ -345,6 +345,7 @@ type PublicReferenceItem = {
   summary: string;
   location: string;
   image?: string;
+  fallbackImage?: string;
   href: string;
   sourceTitle: string;
   sourceUrl: string;
@@ -1307,9 +1308,21 @@ function mapApiItemToPublicReference(
   const mapped = mapContentToPublicReference(contentItem);
   if (!mapped) return null;
   const publicPath = readText(item.public_path);
+  const placeKind = getUmkmPlaceKind({
+    id,
+    slug: readText(item.id),
+    name: title,
+    description: readText(item.description) || null,
+    city: readText(item.city) || null,
+    address: readText(item.address) || null,
+    lat: Number(metadata.latitude) || 0,
+    lng: Number(metadata.longitude) || 0,
+    metadata,
+  });
 
   return {
     ...mapped,
+    fallbackImage: NATIVE_BUSINESS_CATEGORY_ARTWORK[placeKind],
     id,
     location:
       readText(item.address) ||
@@ -2652,9 +2665,9 @@ export function PublicReferencesSection({
               >
                 {/* IMAGE */}
                 <div className="relative aspect-[16/8.5] w-full shrink-0 overflow-hidden bg-zinc-100">
-                  {item.image ? (
+                  {item.image || item.fallbackImage ? (
                     <Image
-                      src={item.image}
+                      src={item.image || item.fallbackImage || ''}
                       alt={item.title}
                       fill
                       sizes="
@@ -2662,7 +2675,10 @@ export function PublicReferencesSection({
                         (max-width: 768px) 230px,
                         240px
                       "
-                      className="object-cover transition-transform duration-300 group-hover:scale-[1.025]"
+                      className={cn(
+                        'transition-transform duration-300 group-hover:scale-[1.025]',
+                        item.image ? 'object-cover' : 'object-contain p-10',
+                      )}
                     />
                   ) : (
                     <div className="flex h-full items-center justify-center text-zinc-400">
