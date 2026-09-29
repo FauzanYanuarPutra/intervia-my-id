@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   ArrowRight,
   CircleAlert,
@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 
 import { CompactSeeAllButton } from '@/components/common/CompactSectionAction';
+import { InfiniteScrollSentinel } from '@/components/common/InfiniteScrollSentinel';
 import { ExploreCardMedia } from '@/components/explore/cards/ExploreCardMedia';
 import { LocalizedAnchor as Link } from '@/components/navigation/LocalizedAnchor';
 import { BusinessSearchCard } from '@/components/search/result-cards/BusinessSearchCard';
@@ -75,10 +76,6 @@ function ResultTypeTabs({ payload, activeTab, locale, searchSide = 'supply', onS
       </div>
     </div>
   );
-}
-
-function ReferenceNextBatchAction({ cursor, isId, onNextCursor }: { cursor: string; isId: boolean; onNextCursor: (cursor: string) => void }) {
-  return <div className="mt-5 flex flex-col items-start gap-2 border-t border-[color:var(--app-border)] pt-4 sm:flex-row sm:items-center sm:justify-between"><p className="text-[11px] leading-5 text-[color:var(--app-text-soft)]">{isId ? 'Daftar berikutnya akan mengganti hasil saat ini agar halaman tetap ringan.' : 'The next batch replaces the current results to keep this page lightweight.'}</p><button type="button" onClick={() => onNextCursor(cursor)} className="inline-flex min-h-10 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg bg-[color:var(--app-accent)] px-4 text-xs font-black text-white">{isId ? 'Muat berikutnya' : 'Load next'}<ArrowRight className="h-4 w-4" aria-hidden="true" /></button></div>;
 }
 
 function metadataText(item: GlobalSearchItem, key: string): string { const value = item.metadata[key]; return typeof value === 'string' ? value.trim() : ''; }
@@ -347,33 +344,59 @@ function SearchGroupSection({
   compact,
   onSelectTab,
   onNextCursor,
+  loadingCursor,
+  appendError,
+  onRetryNext,
 }: {
   groupKey: GlobalSearchGroupKey;
   group: GlobalSearchGroup;
   locale: LajukanLocale;
   compact: boolean;
   onSelectTab?: (tab: GlobalSearchTab) => void;
-  onNextCursor?: (cursor: string) => void;
+  onNextCursor?: (groupKey: GlobalSearchGroupKey, cursor: string) => void;
+  loadingCursor?: string | null;
+  appendError?: string | null;
+  onRetryNext?: () => void;
 }) {
   const isId = locale === 'id';
-  const sectionRef = useRef<HTMLElement | null>(null);
-  const [page, setPage] = useState(1);
-
-  if (!group.available || (group.items.length === 0 && !group.error)) {
-    return null;
-  }
-
-  const copy = SEARCH_GROUP_COPY[groupKey];
   const pageSize = groupKey === 'videos' ? 8 : 6;
-  const totalPages = compact
-    ? Math.max(1, Math.ceil(group.items.length / pageSize))
-    : 1;
-  const safePage = Math.min(page, totalPages);
-  const pageStart = (safePage - 1) * pageSize;
+  const [visibleCount, setVisibleCount] = useState(
+    compact ? pageSize : Number.MAX_SAFE_INTEGER,
+  );
+
   const items = compact
-    ? group.items.slice(pageStart, pageStart + pageSize)
+    ? group.items.slice(0, visibleCount)
     : group.items;
 
+  const canRevealLocalItems =
+    compact && visibleCount < group.items.length;
+  const activeCursor = group.nextCursor;
+  const isLoadingNext = Boolean(
+    loadingCursor && activeCursor === loadingCursor,
+  );
+
+  const loadNext = useCallback(() => {
+    if (canRevealLocalItems) {
+      setVisibleCount(current =>
+        Math.min(current + pageSize, group.items.length),
+      );
+      return;
+    }
+
+    if (activeCursor && onNextCursor && !isLoadingNext) {
+      onNextCursor(groupKey, activeCursor);
+    }
+  }, [
+    activeCursor,
+    canRevealLocalItems,
+    group.items.length,
+    groupKey,
+    isLoadingNext,
+    onNextCursor,
+    pageSize,
+  ]);
+
+  const copy = SEARCH_GROUP_COPY[groupKey];
   const fullGridClass =
     groupKey === 'videos'
       ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4'
@@ -387,24 +410,12 @@ function SearchGroupSection({
             ? 'sm:grid-cols-2 lg:grid-cols-3'
             : 'sm:grid-cols-2 xl:grid-cols-3';
 
-  const changePage = (nextPage: number) => {
-    const clamped = Math.max(1, Math.min(totalPages, nextPage));
-    setPage(clamped);
-    if (typeof window !== 'undefined') {
-      window.requestAnimationFrame(() => {
-        sectionRef.current?.scrollIntoView({
-          behavior: 'smooth',
-          block: 'start',
-        });
-      });
-    }
-  };
+  if (!group.available || (group.items.length === 0 && !group.error)) {
+    return null;
+  }
 
   return (
-    <section
-      ref={sectionRef}
-      className="mt-3 scroll-mt-3 rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3.5 sm:p-4"
-    >
+    <section className="mt-3 rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3.5 sm:p-4">
       <div className="flex items-end justify-between gap-3">
         <div>
           <h2 className="text-base font-bold text-[color:var(--app-text)]">
@@ -432,12 +443,7 @@ function SearchGroupSection({
         </div>
       ) : (
         <>
-          <div
-            className={cn(
-              'mt-3 grid gap-3',
-              fullGridClass,
-            )}
-          >
+          <div className={cn('mt-3 grid gap-3', fullGridClass)}>
             {items.map(item => (
               <div key={`${item.kind}-${item.id}`}>
                 {renderSearchCard(item, locale)}
@@ -445,51 +451,18 @@ function SearchGroupSection({
             ))}
           </div>
 
-          {compact && totalPages > 1 ? (
-            <div className="mt-4 flex flex-col gap-2 border-t border-[color:var(--app-border)] pt-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-[10px] font-semibold text-[color:var(--app-text-soft)] sm:text-[11px]">
-                {isId
-                  ? `Halaman ${safePage} dari ${totalPages}`
-                  : `Page ${safePage} of ${totalPages}`}
-              </p>
-
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  disabled={safePage <= 1}
-                  onClick={() => changePage(safePage - 1)}
-                  className="inline-flex min-h-8 items-center justify-center rounded-[9px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-[10px] font-black text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] disabled:cursor-not-allowed disabled:opacity-35"
-                >
-                  {isId ? 'Sebelumnya' : 'Previous'}
-                </button>
-
-                <span
-                  aria-live="polite"
-                  className="inline-flex min-h-8 min-w-12 items-center justify-center rounded-[9px] bg-[color:var(--app-surface-muted)] px-2 text-[10px] font-black text-[color:var(--app-text-soft)]"
-                >
-                  {safePage}/{totalPages}
-                </span>
-
-                <button
-                  type="button"
-                  disabled={safePage >= totalPages}
-                  onClick={() => changePage(safePage + 1)}
-                  className="inline-flex min-h-8 items-center justify-center rounded-[9px] bg-[color:var(--app-accent)] px-3 text-[10px] font-black text-white transition hover:bg-[color:var(--app-accent-strong)] disabled:cursor-not-allowed disabled:opacity-35"
-                >
-                  {isId ? 'Berikutnya' : 'Next'}
-                </button>
-              </div>
-            </div>
-          ) : null}
-
-          {!compact &&
-          groupKey === 'references' &&
-          group.nextCursor &&
-          onNextCursor ? (
-            <ReferenceNextBatchAction
-              cursor={group.nextCursor}
-              isId={isId}
-              onNextCursor={onNextCursor}
+          {(compact
+            ? canRevealLocalItems || Boolean(activeCursor)
+            : Boolean(activeCursor)) || appendError ? (
+            <InfiniteScrollSentinel
+              hasMore={canRevealLocalItems || Boolean(activeCursor)}
+              loading={isLoadingNext}
+              error={appendError}
+              onLoadMore={loadNext}
+              onRetry={onRetryNext}
+              label={isId ? 'Muat hasil berikutnya' : 'Load more results'}
+              loadingLabel={isId ? 'Memuat hasil berikutnya...' : 'Loading more results...'}
+              retryLabel={isId ? 'Coba lagi' : 'Retry'}
             />
           ) : null}
         </>
@@ -498,7 +471,7 @@ function SearchGroupSection({
   );
 }
 
-export function ExploreSearchResults({ payload, loading, error, locale, compact = true, activeTab = 'all', searchSide = 'supply', onSelectTab, onNextCursor, onRetry }: { payload: GlobalSearchResponse; loading: boolean; error: boolean; locale: LajukanLocale; compact?: boolean; activeTab?: GlobalSearchTab; searchSide?: 'supply' | 'demand'; onSelectTab?: (tab: GlobalSearchTab) => void; onNextCursor?: (cursor: string) => void; onRetry?: () => void }) {
+export function ExploreSearchResults({ payload, loading, error, locale, compact = true, activeTab = 'all', searchSide = 'supply', onSelectTab, onNextCursor, onRetry }: { payload: GlobalSearchResponse; loading: boolean; error: boolean; locale: LajukanLocale; compact?: boolean; activeTab?: GlobalSearchTab; searchSide?: 'supply' | 'demand'; onSelectTab?: (tab: GlobalSearchTab) => void; onNextCursor?: (groupKey: GlobalSearchGroupKey, cursor: string) => void; loadingCursor?: string | null; appendError?: string | null; onRetryNext?: () => void; onRetry?: () => void }) {
   const isId = locale === 'id';
   const safeReferenceItems = payload.groups.references.items.filter(hasCompleteReferenceProvenance);
   const visiblePayload: GlobalSearchResponse = safeReferenceItems.length === payload.groups.references.items.length ? payload : { ...payload, groups: { ...payload.groups, references: { ...payload.groups.references, items: safeReferenceItems, total: safeReferenceItems.length === 0 ? 0 : Math.max(safeReferenceItems.length, payload.groups.references.total) } } };
@@ -550,5 +523,5 @@ export function ExploreSearchResults({ payload, loading, error, locale, compact 
       : SEARCH_GROUPS.filter(
           groupKey => groupKey === activeTab,
         );
-  return <>{loading || error ? <div role="status" className="mt-3 flex items-center justify-between gap-3 rounded-[12px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-2 text-xs font-semibold text-[color:var(--app-text-soft)]"><span>{loading ? (isId ? 'Memperbarui hasil. Hasil terakhir tetap ditampilkan.' : 'Refreshing results. The latest available results remain visible.') : (isId ? 'Pembaruan gagal. Hasil terakhir yang tersedia tetap ditampilkan.' : 'Refresh failed. The latest available results remain visible.')}</span>{error && onRetry ? <button type="button" onClick={onRetry} className="shrink-0 font-bold text-[color:var(--app-accent)]">{isId ? 'Coba lagi' : 'Retry'}</button> : null}</div> : null}<ResultTypeTabs payload={visiblePayload} activeTab={activeTab} locale={locale} searchSide={searchSide} onSelectTab={onSelectTab} />{groups.map(groupKey => <SearchGroupSection key={groupKey} groupKey={groupKey} group={visiblePayload.groups[groupKey]} locale={locale} compact={compact && activeTab === 'all'} onSelectTab={onSelectTab} onNextCursor={onNextCursor} />)}</>;
+  return <>{loading || error ? <div role="status" className="mt-3 flex items-center justify-between gap-3 rounded-[12px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-2 text-xs font-semibold text-[color:var(--app-text-soft)]"><span>{loading ? (isId ? 'Memperbarui hasil. Hasil terakhir tetap ditampilkan.' : 'Refreshing results. The latest available results remain visible.') : (isId ? 'Pembaruan gagal. Hasil terakhir yang tersedia tetap ditampilkan.' : 'Refresh failed. The latest available results remain visible.')}</span>{error && onRetry ? <button type="button" onClick={onRetry} className="shrink-0 font-bold text-[color:var(--app-accent)]">{isId ? 'Coba lagi' : 'Retry'}</button> : null}</div> : null}<ResultTypeTabs payload={visiblePayload} activeTab={activeTab} locale={locale} searchSide={searchSide} onSelectTab={onSelectTab} />{groups.map(groupKey => <SearchGroupSection key={groupKey} groupKey={groupKey} group={visiblePayload.groups[groupKey]} locale={locale} compact={compact && activeTab === 'all'} onSelectTab={onSelectTab} onNextCursor={onNextCursor} loadingCursor={loadingCursor} appendError={appendError} onRetryNext={onRetryNext} />)}</>;
 }
