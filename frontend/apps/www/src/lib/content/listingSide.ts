@@ -15,6 +15,7 @@ type ResolveListingSideInput = {
   listing_intent?: unknown;
   market_intent?: unknown;
   intent?: unknown;
+  pricing_mode?: unknown;
 };
 
 type LocaleCode = 'id' | 'en';
@@ -249,6 +250,8 @@ export function resolveListingSide(
     metadata?.direction,
     metadata?.buyer_intent,
     metadata?.request_mode,
+    input.pricing_mode === 'request' ? 'request' :
+      input.pricing_mode === 'fixed' ? 'fixed' : input.pricing_mode,
   ];
 
   for (const candidate of explicitCandidates) {
