@@ -2284,8 +2284,8 @@ function HomeListingCarouselSection({
             <p className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400 sm:text-[11px]">
               {isDemand
                 ? isId
-                  ? 'Belum ada kebutuhan yang dipublikasikan saat ini.'
-                  : 'No active requests have been posted yet.'
+                  ? 'Belum ada permintaan aktif yang bisa ditampilkan.'
+                  : 'No active requests to show right now.'
                 : isId
                   ? 'Belum ada penawaran yang relevan saat ini.'
                   : 'No relevant offers right now.'}
