@@ -82,6 +82,8 @@ const MARKER_CLUSTER_TIGHT_DISTANCE_PX = 24;
 const MARKER_CLICK_FOCUS_ZOOM = 17;
 const MARKER_CLICK_FOCUS_STEP = 2;
 const MARKER_FOCUS_DURATION = 0.45;
+const AUTO_DOT_RENDER_THRESHOLD = 360;
+const VIEWPORT_RENDER_PADDING = 0.28;
 const MARKER_CLUSTER_FRAME_WIDTH_RATIO = 0.58;
 const MARKER_CLUSTER_FRAME_HEIGHT_RATIO = 0.5;
 const CLUSTER_POPUP_VISIBLE_LIMIT = 6;
@@ -1233,6 +1235,42 @@ function ManualMarkerFocusController({
   return null;
 }
 
+
+function useViewportStorePresentations(
+  storePresentations: StorePresentation[],
+  selectedStoreId?: string | null,
+): StorePresentation[] {
+  const map = useMap();
+  const [viewportVersion, setViewportVersion] = useState(0);
+
+  useMapEvents({
+    moveend: () => setViewportVersion(value => value + 1),
+    zoomend: () => setViewportVersion(value => value + 1),
+    resize: () => setViewportVersion(value => value + 1),
+  });
+
+  return useMemo(() => {
+    if (!storePresentations.length) return [];
+
+    const paddedBounds = map.getBounds().pad(VIEWPORT_RENDER_PADDING);
+    const visible = storePresentations.filter(({ store }) =>
+      paddedBounds.contains([store.lat, store.lng]),
+    );
+
+    if (
+      selectedStoreId &&
+      !visible.some(({ store }) => store.id === selectedStoreId)
+    ) {
+      const selected = storePresentations.find(
+        ({ store }) => store.id === selectedStoreId,
+      );
+      if (selected) visible.push(selected);
+    }
+
+    return visible;
+  }, [map, selectedStoreId, storePresentations, viewportVersion]);
+}
+
 function getCompactDotRadius(zoom: number): number {
   if (zoom <= 5) return 2.25;
   if (zoom <= 8) return 2.5;
@@ -1253,6 +1291,10 @@ function StoreDotsLayer({
 }) {
   const map = useMap();
   const [zoom, setZoom] = useState(() => map.getZoom());
+  const visibleStorePresentations = useViewportStorePresentations(
+    storePresentations,
+    selectedStoreId,
+  );
 
   useMapEvents({ zoomend: () => setZoom(map.getZoom()) });
 
@@ -1260,7 +1302,7 @@ function StoreDotsLayer({
 
   return (
     <>
-      {storePresentations.map(({ store, ui }) => {
+      {visibleStorePresentations.map(({ store, ui }) => {
         const isReference = isUmkmMapPublicReference(store);
         const palette = isReference
           ? { badge: '#94a3b8', border: '#cbd5e1', text: '#64748b' }
@@ -1322,6 +1364,10 @@ function StoreMarkersLayer({
     showPopups && storePresentations.length <= 120;
   const [zoom, setZoom] = useState(() => map.getZoom());
   const deferredZoom = useDeferredValue(zoom);
+  const visibleStorePresentations = useViewportStorePresentations(
+    storePresentations,
+    selectedStoreId,
+  );
 
   useMapEvents({
     zoomend: () => {
@@ -1332,11 +1378,11 @@ function StoreMarkersLayer({
   const markerLayer = useMemo(
     () =>
       buildStoreMarkerLayer(
-        storePresentations,
+        visibleStorePresentations,
         deferredZoom,
         selectedStoreId,
       ),
-    [deferredZoom, selectedStoreId, storePresentations],
+    [deferredZoom, selectedStoreId, visibleStorePresentations],
   );
 
   const focusMarker = useCallback(
@@ -1346,15 +1392,17 @@ function StoreMarkersLayer({
         Math.max(minZoom, zoom + MARKER_CLICK_FOCUS_STEP),
       );
 
-      onMarkerFocus?.({
-        lat: point.lat,
-        lng: point.lng,
-        zoom: targetZoom,
-      });
-
-      map.flyTo([point.lat, point.lng], targetZoom, {
-        duration: MARKER_FOCUS_DURATION,
-      });
+      if (onMarkerFocus) {
+        onMarkerFocus({
+          lat: point.lat,
+          lng: point.lng,
+          zoom: targetZoom,
+        });
+      } else {
+        map.flyTo([point.lat, point.lng], targetZoom, {
+          duration: MARKER_FOCUS_DURATION,
+        });
+      }
 
       return targetZoom;
     },
@@ -1369,15 +1417,17 @@ function StoreMarkersLayer({
           Math.max(MARKER_CLUSTER_PICKER_ZOOM, zoom + 1),
         );
 
-        onMarkerFocus?.({
-          lat: cluster.lat,
-          lng: cluster.lng,
-          zoom: targetZoom,
-        });
-
-        map.flyTo([cluster.lat, cluster.lng], targetZoom, {
-          duration: MARKER_FOCUS_DURATION,
-        });
+        if (onMarkerFocus) {
+          onMarkerFocus({
+            lat: cluster.lat,
+            lng: cluster.lng,
+            zoom: targetZoom,
+          });
+        } else {
+          map.flyTo([cluster.lat, cluster.lng], targetZoom, {
+            duration: MARKER_FOCUS_DURATION,
+          });
+        }
         return;
       }
 
@@ -1786,7 +1836,9 @@ export function UmkmStoreMapClient({
     >
       <MapSizeStabilizer />
       <MapInteractivityController interactive={interactive} />
-      <MapBoundsReporter onBoundsChange={onBoundsChange} />
+      {onBoundsChange ? (
+        <MapBoundsReporter onBoundsChange={onBoundsChange} />
+      ) : null}
       <MapFocusController
         stores={validStores}
         selectedStoreId={selectedStoreId}
@@ -1852,7 +1904,8 @@ export function UmkmStoreMapClient({
         </>
       ) : null}
 
-      {markerStyle === 'dots' ? (
+      {markerStyle === 'dots' ||
+      (!showPopups && validStores.length > AUTO_DOT_RENDER_THRESHOLD) ? (
         <StoreDotsLayer
           storePresentations={storePresentations}
           selectedStoreId={selectedStoreId}
