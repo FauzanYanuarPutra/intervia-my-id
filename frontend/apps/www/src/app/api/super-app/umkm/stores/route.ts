@@ -51,6 +51,17 @@ type PublicReferenceList = {
   next_offset?: number;
 };
 
+type PublicMapPoint = {
+  id: string;
+  slug: string;
+  name: string;
+  city: string;
+  lat: number;
+  lng: number;
+  category: string;
+  source_kind: string;
+};
+
 type PublicReferenceMapItem = {
   id: string;
   slug: string;
@@ -441,6 +452,37 @@ function parseCoord(value: string | null): number | null {
   if (!value) return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+async function listPublicMapPoints(options: {
+  q?: string;
+  city?: string;
+  category?: string;
+  limit: number;
+  bounds?: { minLat: number; maxLat: number; minLng: number; maxLng: number };
+  viewer?: { lat: number; lng: number } | null;
+}): Promise<PublicMapPoint[]> {
+  const params = new URLSearchParams({ limit: String(Math.min(2000, Math.max(1, options.limit))) });
+  if (options.q) params.set('q', options.q);
+  if (options.city) params.set('city', options.city);
+  if (options.category) params.set('category', options.category);
+  if (options.viewer) {
+    params.set('viewer_lat', String(options.viewer.lat));
+    params.set('viewer_lng', String(options.viewer.lng));
+  }
+  if (options.bounds) {
+    params.set('min_lat', String(options.bounds.minLat));
+    params.set('max_lat', String(options.bounds.maxLat));
+    params.set('min_lng', String(options.bounds.minLng));
+    params.set('max_lng', String(options.bounds.maxLng));
+  }
+  const response = await fetch(
+    `${MARKETPLACE_URL}/v1/map/places?${params.toString()}`,
+    { cache: 'no-store', signal: AbortSignal.timeout(1800) },
+  );
+  if (!response.ok) throw new Error(`map points unavailable (${response.status})`);
+  const payload = (await response.json()) as { items?: PublicMapPoint[] };
+  return Array.isArray(payload.items) ? payload.items : [];
 }
 
 function parseRadiusKm(value: string | null): number | null {
@@ -864,6 +906,59 @@ export async function GET(req: NextRequest) {
       { error: 'Failed to load UMKM stores' },
       { status: 500 },
     );
+  }
+}
+
+export async function GET_MAP_POINTS(req: NextRequest) {
+  try {
+    const security = await enforceAuthRouteSecurity(req, {
+      routeKey: 'super-app-umkm-map-points',
+      ipLimit: 600,
+      deviceLimit: 500,
+      windowSeconds: 3600,
+    });
+    if (!security.ok) return security.response;
+    const rl = await enforceRateLimit({
+      key: `superapp:umkm:map-points:${security.ip}`,
+      limit: 300,
+      windowSeconds: 3600,
+      message: 'Too many map point requests. Please retry shortly.',
+    });
+    if (!rl.ok) return rl.response;
+
+    const url = new URL(req.url);
+    const parsed = parseMapBounds(url);
+    if (!parsed) return NextResponse.json({ error: 'Invalid map query' }, { status: 400 });
+    const viewerLat = parseCoord(url.searchParams.get('viewer_lat'));
+    const viewerLng = parseCoord(url.searchParams.get('viewer_lng'));
+    const viewer =
+      viewerLat !== null && viewerLng !== null && isCoordinateValid({ lat: viewerLat, lng: viewerLng })
+        ? { lat: viewerLat, lng: viewerLng }
+        : null;
+    if ((url.searchParams.get('viewer_lat') !== null) !== (url.searchParams.get('viewer_lng') !== null)) {
+      return NextResponse.json({ error: 'Viewer coordinates must be provided together' }, { status: 400 });
+    }
+    if (url.searchParams.get('viewer_lat') !== null && !viewer) {
+      return NextResponse.json({ error: 'Invalid viewer coordinates' }, { status: 400 });
+    }
+    const limit = Math.min(2000, Math.max(1, Number(url.searchParams.get('limit') || '1000')));
+    if (!Number.isSafeInteger(limit)) {
+      return NextResponse.json({ error: 'Invalid map point limit' }, { status: 400 });
+    }
+    const items = await listPublicMapPoints({
+      q: parsed.query.q || undefined,
+      city: parsed.query.city || undefined,
+      limit,
+      bounds: parsed.bounds,
+      viewer,
+    });
+    return NextResponse.json(
+      { data: { items, count: items.length } },
+      { headers: { 'Cache-Control': viewer ? 'private, no-store' : 'public, s-maxage=10, stale-while-revalidate=30' } },
+    );
+  } catch (error) {
+    console.warn('[UMKM_MAP_POINTS_ERROR]', error);
+    return NextResponse.json({ error: 'Failed to load map points' }, { status: 502 });
   }
 }
 
