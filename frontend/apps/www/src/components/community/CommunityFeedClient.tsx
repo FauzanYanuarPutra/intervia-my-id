@@ -6641,6 +6641,44 @@ export default function CommunityFeedClient({
     null,
   );
 
+  const [feedTabsEmblaRef, feedTabsEmblaApi] = useEmblaCarousel({
+    align: 'start',
+    containScroll: 'trimSnaps',
+    dragFree: false,
+    loop: false,
+  });
+  const [searchTabsEmblaRef, searchTabsEmblaApi] = useEmblaCarousel({
+    align: 'start',
+    containScroll: 'trimSnaps',
+    dragFree: false,
+    loop: false,
+  });
+  const activeFeedTabIndex = TABS.findIndex(tab => tab.id === activeTab);
+  const activeSearchTabIndex = SEARCH_TABS.findIndex(
+    tab => tab.id === searchKind,
+  );
+
+  useEmblaWheelGestures(feedTabsEmblaApi, {
+    enabled: TABS.length > 1,
+    desktopOnly: true,
+    threshold: 42,
+  });
+  useEmblaWheelGestures(searchTabsEmblaApi, {
+    enabled: SEARCH_TABS.length > 1,
+    desktopOnly: true,
+    threshold: 42,
+  });
+
+  useEffect(() => {
+    if (!feedTabsEmblaApi || activeFeedTabIndex < 0) return;
+    feedTabsEmblaApi.scrollTo(activeFeedTabIndex);
+  }, [activeFeedTabIndex, feedTabsEmblaApi]);
+
+  useEffect(() => {
+    if (!searchTabsEmblaApi || activeSearchTabIndex < 0) return;
+    searchTabsEmblaApi.scrollTo(activeSearchTabIndex);
+  }, [activeSearchTabIndex, searchTabsEmblaApi]);
+
   const avatar = readCommunityAvatar(user);
   const threadParam = searchParams.get('thread');
   const selectedThreadId =
@@ -7078,40 +7116,45 @@ export default function CommunityFeedClient({
               </form>
 
               {isSearchMode ? (
-                <div className="mt-3 flex gap-2 overflow-x-auto pb-1 lg:hidden" data-auto-scrollbar>
-                  {SEARCH_TABS.map(tab => (
-                    <SearchFilterButton
-                      key={tab.id}
-                      tab={tab}
-                      isId={isId}
-                      active={searchKind === tab.id}
-                      count={searchCountFor(searchResults?.counts, tab.id)}
-                      onClick={() => handleSearchKindChange(tab.id)}
-                    />
-                  ))}
+                <div ref={searchTabsEmblaRef} className="mt-3 min-w-0 overflow-hidden pb-1 lg:hidden">
+                  <div className="flex w-max min-w-full touch-pan-y gap-2">
+                    {SEARCH_TABS.map(tab => (
+                      <SearchFilterButton
+                        key={tab.id}
+                        tab={tab}
+                        isId={isId}
+                        active={searchKind === tab.id}
+                        count={searchCountFor(searchResults?.counts, tab.id)}
+                        onClick={() => handleSearchKindChange(tab.id)}
+                      />
+                    ))}
+                  </div>
                 </div>
               ) : (
-                <div className="mt-3 flex items-center gap-5 overflow-x-auto border-t border-[color:var(--app-border)] pt-2" data-auto-scrollbar>
-                  {TABS.map(tab => {
-                    const Icon = tab.icon;
-                    const active = activeTab === tab.id;
-                    return (
-                      <button
-                        key={tab.id}
-                        type="button"
-                        onClick={() => setActiveTab(tab.id)}
-                        className={cn(
-                          'inline-flex min-h-10 shrink-0 items-center gap-2 border-b-2 px-1 text-xs font-bold transition',
-                          active
-                            ? 'border-[color:var(--app-accent)] text-[color:var(--app-accent)]'
-                            : 'border-transparent text-[color:var(--app-text-soft)] hover:text-[color:var(--app-text)]',
-                        )}
-                      >
-                        <Icon className="h-4 w-4" />
-                        {isId ? tab.labelId : tab.labelEn}
-                      </button>
-                    );
-                  })}
+                <div ref={feedTabsEmblaRef} className="mt-3 min-w-0 overflow-hidden border-t border-[color:var(--app-border)] pt-2">
+                  <div className="flex w-max min-w-full touch-pan-y items-center gap-5">
+                    {TABS.map(tab => {
+                      const Icon = tab.icon;
+                      const active = activeTab === tab.id;
+                      return (
+                        <button
+                          key={tab.id}
+                          type="button"
+                          onClick={() => setActiveTab(tab.id)}
+                          aria-current={active ? 'page' : undefined}
+                          className={cn(
+                            'inline-flex min-h-10 shrink-0 items-center gap-2 border-b-2 px-1 text-xs font-bold transition',
+                            active
+                              ? 'border-[color:var(--app-accent)] text-[color:var(--app-accent)]'
+                              : 'border-transparent text-[color:var(--app-text-soft)] hover:text-[color:var(--app-text)]',
+                          )}
+                        >
+                          <Icon className="h-4 w-4" />
+                          {isId ? tab.labelId : tab.labelEn}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </section>
