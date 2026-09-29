@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, ArrowRight, MapPin } from 'lucide-react';
+import { ArrowLeft, MapPin } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { NewsInfiniteGrid } from '@/components/news/NewsInfiniteGrid';
-import { buildNewsFacetPath, buildNewsFacetUrl, buildNewsPath, getNewsLanguageAvailability, getPublishedNews } from '@/lib/news';
+import { buildNewsFacetUrl, getNewsLanguageAvailability, getPublishedNews } from '@/lib/news';
 
 type Props = {
   params: Promise<{ locale: string; location: string }>;
@@ -73,6 +73,7 @@ export default async function NewsLocationPage({ params, searchParams }: Props) 
           initialNextCursor={nextCursor}
           locale={locale}
           location={value}
+          fallbackHref={`/news/location/${encodeURIComponent(value)}?cursor=${encodeURIComponent(nextCursor || '')}`}
         />
       ) : (
         <div className="rounded-[26px] border border-dashed border-slate-300 p-8 text-center text-sm font-semibold text-slate-500 dark:border-white/15">
