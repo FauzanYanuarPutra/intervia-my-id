@@ -1625,10 +1625,9 @@ export async function GET(req: NextRequest) {
         candidates.length < Math.min(Math.max(requestedLimit * 4, 40), 100) ||
         requestedOffset > 0;
       if (shouldExpandCandidates) {
-        const expanded = await fetchExpandedCandidates(
-          req,
-          searchParams,
-          requestedLimit,
+        const expanded = filterByRequestedMarketplaceSide(
+          await fetchExpandedCandidates(req, searchParams, requestedLimit),
+          requestedMarketplaceSide,
         );
         if (expanded.length > 0) {
           candidates = mergeUniqueContent([...candidates, ...expanded]);
@@ -1659,10 +1658,9 @@ export async function GET(req: NextRequest) {
       const shouldExpandCandidates =
         candidates.length < Math.min(Math.max(requestedLimit * 2, 14), 40);
       if (shouldExpandCandidates) {
-        const expanded = await fetchExpandedCandidates(
-          req,
-          searchParams,
-          requestedLimit,
+        const expanded = filterByRequestedMarketplaceSide(
+          await fetchExpandedCandidates(req, searchParams, requestedLimit),
+          requestedMarketplaceSide,
         );
         if (expanded.length > 0) {
           candidates = mergeUniqueContent([...candidates, ...expanded]);
