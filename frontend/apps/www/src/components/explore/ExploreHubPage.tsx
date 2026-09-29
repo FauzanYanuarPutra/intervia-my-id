@@ -254,22 +254,22 @@ export function ExploreHubPage({ locale, initialIntent = 'supply' }: { locale: L
           <div className="grid gap-2 sm:grid-cols-2">
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-3 dark:border-emerald-900/60 dark:bg-emerald-950/30">
               <p className="text-xs font-black text-emerald-900 dark:text-emerald-100">
-                {isId ? 'Saya mencari' : 'I am looking for'}
+                {isId ? 'Penawaran' : 'Offers'}
               </p>
               <p className="mt-1.5 text-[11px] leading-5 text-emerald-900/75 dark:text-emerald-100/75">
                 {isId
-                  ? 'Untuk mencari produk, supplier, jasa, alat, tempat usaha, orang, komunitas, dan kebutuhan lain.'
-                  : 'Find products, suppliers, services, equipment, places, people, communities, and more.'}
+                  ? 'Untuk menemukan produk, supplier, jasa, alat, tempat usaha, dan penawaran lain.'
+                  : 'Find products, suppliers, services, equipment, places, and other offers.'}
               </p>
             </div>
             <div className="rounded-2xl border border-blue-200 bg-blue-50/70 p-3 dark:border-blue-900/60 dark:bg-blue-950/30">
               <p className="text-xs font-black text-blue-900 dark:text-blue-100">
-                {isId ? 'Saya menawarkan' : 'I am offering'}
+                {isId ? 'Kebutuhan' : 'Needs'}
               </p>
               <p className="mt-1.5 text-[11px] leading-5 text-blue-900/75 dark:text-blue-100/75">
                 {isId
-                  ? 'Untuk menemukan kebutuhan pembeli yang bisa cocok dengan produk atau jasa yang kamu tawarkan.'
-                  : 'Find buyer needs that may match the products or services you offer.'}
+                  ? 'Untuk menemukan permintaan pembeli yang sedang mencari produk atau jasa.'
+                  : 'Find active buyer requests for products or services.'}
               </p>
             </div>
             <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900/60">
