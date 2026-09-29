@@ -24,6 +24,7 @@ import {
 } from '@/components/explore/ExploreVisualSystem';
 import { Header } from '@/components/layout/Header';
 import { CompactSeeAllLink } from '@/components/common/CompactSectionAction';
+import { InfiniteScrollSentinel } from '@/components/common/InfiniteScrollSentinel';
 import { EmblaDesktopControls } from '@/components/common/EmblaDesktopControls';
 import { LocalizedAnchor as Link } from '@/components/navigation/LocalizedAnchor';
 import { trackLajukanEvent } from '@/lib/analytics/lajukanEvents';
@@ -42,7 +43,7 @@ import type {
   ExploreFaq,
   ExploreGuide,
 } from '@/lib/explore/exploreData';
-import type { GlobalSearchItem } from '@/lib/search/globalSearch';
+import { dedupeGlobalSearchItems, type GlobalSearchGroupKey, type GlobalSearchItem, type GlobalSearchResponse } from '@/lib/search/globalSearch';
 import {
   emptyGlobalSearchResponse,
   parseGlobalSearchState,
@@ -452,54 +453,71 @@ function DataSection({
   locale,
   category,
   kind,
+  nextCursor,
+  loadingCursor,
+  appendError,
+  onNextCursor,
+  onRetryNext,
 }: {
   config: ExploreSectionConfig;
   items: GlobalSearchItem[];
   locale: LajukanLocale;
   category: LajukanExploreCategory;
-  kind:
-    | 'listing'
-    | 'business'
-    | 'community'
-    | 'video';
+  kind: 'listing' | 'business' | 'community' | 'video';
+  nextCursor?: string | null;
+  loadingCursor?: string | null;
+  appendError?: string | null;
+  onNextCursor?: (cursor: string) => void;
+  onRetryNext?: () => void;
 }) {
   const isId = locale === 'id';
-  const sectionRef = useRef<HTMLElement | null>(null);
-  const [page, setPage] = useState(1);
-
-  if (items.length === 0) return null;
-
   const isNeedSection = config.key === 'latest-needs';
   const forcedSide =
     kind === 'listing'
-      ? isNeedSection
-        ? 'demand'
-        : 'supply'
+      ? isNeedSection ? 'demand' : 'supply'
       : undefined;
 
-  const normalizedItems = items.map(item =>
-    withResolvedSide(item, forcedSide),
+  const normalizedItems = useMemo(
+    () => dedupeGlobalSearchItems(
+      items.map(item => withResolvedSide(item, forcedSide)),
+    ),
+    [forcedSide, items],
+  );
+  const pageSize = kind === 'listing' || kind === 'video' ? 8 : 6;
+  const [visibleCount, setVisibleCount] = useState(pageSize);
+  const canRevealLocalItems = visibleCount < normalizedItems.length;
+  const isLoadingNext = Boolean(
+    loadingCursor && nextCursor && loadingCursor === nextCursor,
   );
 
-  const pageSize =
-    kind === 'listing' || kind === 'video'
-      ? 8
-      : 6;
-  const totalPages = Math.max(
-    1,
-    Math.ceil(normalizedItems.length / pageSize),
-  );
-  const safePage = Math.min(page, totalPages);
-  const pageStart = (safePage - 1) * pageSize;
-  const pageItems = normalizedItems.slice(
-    pageStart,
-    pageStart + pageSize,
-  );
+  useEffect(() => {
+    setVisibleCount(pageSize);
+  }, [items.length, pageSize]);
+
+  const loadNext = useCallback(() => {
+    if (canRevealLocalItems) {
+      setVisibleCount(current =>
+        Math.min(current + pageSize, normalizedItems.length),
+      );
+      return;
+    }
+    if (nextCursor && onNextCursor && !isLoadingNext) {
+      onNextCursor(nextCursor);
+    }
+  }, [
+    canRevealLocalItems,
+    isLoadingNext,
+    nextCursor,
+    normalizedItems.length,
+    onNextCursor,
+    pageSize,
+  ]);
+
+  if (normalizedItems.length === 0) return null;
 
   const seeAllHref = (() => {
     if (kind === 'community') return '/community';
     if (kind === 'video') return '/reels';
-
     const params = new URLSearchParams();
     if (config.key === 'latest-needs') {
       params.set('side', 'demand');
@@ -512,11 +530,7 @@ function DataSection({
       params.set('tab', 'all');
     }
     params.set('sort', 'latest');
-
-    return appendSearchParams(
-      buildExploreCategoryHref(category),
-      params,
-    );
+    return appendSearchParams(buildExploreCategoryHref(category), params);
   })();
 
   const gridClass =
@@ -524,68 +538,35 @@ function DataSection({
       ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4'
       : kind === 'listing'
         ? 'grid-cols-2 md:grid-cols-3 xl:grid-cols-4'
-        : isNeedSection ||
-            kind === 'business' ||
-            kind === 'community'
+        : isNeedSection || kind === 'business' || kind === 'community'
           ? 'sm:grid-cols-2 lg:grid-cols-3'
           : 'grid-cols-2 md:grid-cols-3 xl:grid-cols-4';
 
   const renderCard = (item: GlobalSearchItem) => {
-    if (kind === 'business') {
-      return <ExploreBusinessCard item={item} locale={locale} />;
-    }
-    if (kind === 'community') {
-      return <ExploreCommunityCard item={item} locale={locale} />;
-    }
-    if (kind === 'video') {
-      return <ExploreVideoCard item={item} />;
-    }
+    if (kind === 'business') return <ExploreBusinessCard item={item} locale={locale} />;
+    if (kind === 'community') return <ExploreCommunityCard item={item} locale={locale} />;
+    if (kind === 'video') return <ExploreVideoCard item={item} />;
     return <ExploreListingCard item={item} locale={locale} />;
   };
 
-  const changePage = (nextPage: number) => {
-    const clamped = Math.max(1, Math.min(totalPages, nextPage));
-    setPage(clamped);
-
-    if (typeof window !== 'undefined') {
-      window.requestAnimationFrame(() => {
-        sectionRef.current?.scrollIntoView({
-          behavior: 'smooth',
-          block: 'start',
-        });
-      });
-    }
-  };
-
   return (
-    <section
-      ref={sectionRef}
-      className="mt-3 scroll-mt-3 rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 sm:p-4"
-    >
+    <section className="mt-3 scroll-mt-3 rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 sm:p-4">
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
           <h2 className="min-w-0 truncate text-[13px] font-black text-[color:var(--app-text)] sm:text-sm">
             {isId ? config.titleId : config.titleEn}
           </h2>
-
-          {config.key === 'latest-listings' &&
-          kind === 'listing' ? (
+          {config.key === 'latest-listings' && kind === 'listing' ? (
             <p className="mt-0.5 text-[9px] font-medium text-[color:var(--app-text-soft)] sm:text-[10px]">
-              {isId
-                ? 'Produk dan jasa yang sedang ditawarkan.'
-                : 'Products and services currently offered.'}
+              {isId ? 'Produk dan jasa yang sedang ditawarkan.' : 'Products and services currently offered.'}
             </p>
           ) : null}
-
           {config.key === 'latest-needs' ? (
             <p className="mt-0.5 text-[9px] font-medium text-[color:var(--app-text-soft)] sm:text-[10px]">
-              {isId
-                ? 'Permintaan dari pengguna yang sedang mencari penyedia.'
-                : 'Requests from users currently looking for providers.'}
+              {isId ? 'Permintaan dari pengguna yang sedang mencari penyedia.' : 'Requests from users currently looking for providers.'}
             </p>
           ) : null}
         </div>
-
         <CompactSeeAllLink
           href={seeAllHref}
           isId={isId}
@@ -601,62 +582,29 @@ function DataSection({
               },
             });
           }}
-          ariaLabel={
-            isId
-              ? `Lihat semua ${config.titleId}`
-              : `View all ${config.titleEn}`
-          }
+          ariaLabel={isId ? `Lihat semua ${config.titleId}` : `View all ${config.titleEn}`}
         />
       </div>
 
-      <div
-        className={cn('mt-2.5 grid gap-3', gridClass)}
-        aria-label={isId ? config.titleId : config.titleEn}
-      >
-        {pageItems.map(item => (
+      <div className={cn('mt-2.5 grid gap-3', gridClass)} aria-label={isId ? config.titleId : config.titleEn}>
+        {normalizedItems.slice(0, visibleCount).map(item => (
           <div key={`${kind}-${item.id}`} className="min-w-0">
-            <div className="h-full w-full">
-              {renderCard(item)}
-            </div>
+            <div className="h-full w-full">{renderCard(item)}</div>
           </div>
         ))}
       </div>
 
-      {totalPages > 1 ? (
-        <div className="mt-4 flex flex-col gap-2 border-t border-[color:var(--app-border)] pt-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-[10px] font-semibold text-[color:var(--app-text-soft)] sm:text-[11px]">
-            {isId
-              ? `Halaman ${safePage} dari ${totalPages} · ${normalizedItems.length} hasil dimuat`
-              : `Page ${safePage} of ${totalPages} · ${normalizedItems.length} loaded results`}
-          </p>
-
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              disabled={safePage <= 1}
-              onClick={() => changePage(safePage - 1)}
-              className="inline-flex min-h-8 items-center justify-center rounded-[9px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-[10px] font-black text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] disabled:cursor-not-allowed disabled:opacity-35"
-            >
-              {isId ? 'Sebelumnya' : 'Previous'}
-            </button>
-
-            <span
-              aria-live="polite"
-              className="inline-flex min-h-8 min-w-12 items-center justify-center rounded-[9px] bg-[color:var(--app-surface-muted)] px-2 text-[10px] font-black text-[color:var(--app-text-soft)]"
-            >
-              {safePage}/{totalPages}
-            </span>
-
-            <button
-              type="button"
-              disabled={safePage >= totalPages}
-              onClick={() => changePage(safePage + 1)}
-              className="inline-flex min-h-8 items-center justify-center rounded-[9px] bg-[color:var(--app-accent)] px-3 text-[10px] font-black text-white transition hover:bg-[color:var(--app-accent-strong)] disabled:cursor-not-allowed disabled:opacity-35"
-            >
-              {isId ? 'Berikutnya' : 'Next'}
-            </button>
-          </div>
-        </div>
+      {canRevealLocalItems || nextCursor || appendError ? (
+        <InfiniteScrollSentinel
+          hasMore={canRevealLocalItems || Boolean(nextCursor)}
+          loading={isLoadingNext}
+          error={appendError}
+          onLoadMore={loadNext}
+          onRetry={onRetryNext}
+          label={isId ? 'Muat hasil berikutnya' : 'Load more results'}
+          loadingLabel={isId ? 'Memuat hasil berikutnya...' : 'Loading more results...'}
+          retryLabel={isId ? 'Coba lagi' : 'Retry'}
+        />
       ) : null}
     </section>
   );
@@ -848,6 +796,11 @@ export function ExploreCategoryClient({
     searchRetryKey,
     setSearchRetryKey,
   ] = useState(0);
+
+  const [categoryLoadingCursor, setCategoryLoadingCursor] = useState<string | null>(null);
+  const [categoryAppendError, setCategoryAppendError] = useState<string | null>(null);
+  const [searchLoadingCursor, setSearchLoadingCursor] = useState<string | null>(null);
+  const [searchAppendError, setSearchAppendError] = useState<string | null>(null);
 
   const [helpOpen, setHelpOpen] = useState(false);
 
