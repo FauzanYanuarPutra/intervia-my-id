@@ -27,6 +27,7 @@ export type GlobalSearchState = {
   distanceKm: number | null;
   sort: GlobalSearchSort;
   cursor: string;
+  offset: number;
 };
 
 export type GlobalSearchItem = {
@@ -134,6 +135,11 @@ export function parseGlobalSearchState(
   const requestedCategory = cleanText(input.get('category'), 80).toLowerCase();
   const category = getExploreCategoryBySlug(requestedCategory)?.slug || '';
   const requestedSort = cleanText(input.get('sort'), 32).toLowerCase();
+  const requestedOffset = cleanText(input.get('offset'), 32);
+  const parsedOffset = /^\\d+$/.test(requestedOffset) ? Number(requestedOffset) : 0;
+  const offset = Number.isSafeInteger(parsedOffset)
+    ? Math.min(Math.max(parsedOffset, 0), 10_000)
+    : 0;
 
   return {
     query: cleanText(input.get('q'), 160),
@@ -147,6 +153,7 @@ export function parseGlobalSearchState(
       ? (requestedSort as GlobalSearchSort)
       : 'relevance',
     cursor: cleanText(input.get('cursor'), 120),
+    offset,
   };
 }
 
@@ -163,6 +170,7 @@ export function serializeGlobalSearchState(state: GlobalSearchState): string {
   }
   if (state.sort !== 'relevance') params.set('sort', state.sort);
   if (state.cursor) params.set('cursor', state.cursor);
+  if (state.offset > 0) params.set('offset', String(state.offset));
   return params.toString();
 }
 

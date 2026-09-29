@@ -61,6 +61,41 @@ describe('GET /api/explore/[category]', () => {
     expect(payload.groups.products.available).toBe(false);
   });
 
+  it('preserves the reels pagination cursor for Explore video sections', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+      const url = new URL(String(input));
+      if (url.pathname === '/api/community/groups') {
+        return Response.json({ data: [] });
+      }
+      if (url.pathname === '/api/community/feed') {
+        return Response.json({ items: [] });
+      }
+      if (url.pathname === '/api/reels') {
+        return Response.json({
+          items: [
+            {
+              id: 'video-1',
+              title: 'Video supplier',
+              videoSrc: '/video.jpg',
+            },
+          ],
+          nextCursor: 12,
+          hasMore: true,
+        });
+      }
+      return new Response(null, { status: 404 });
+    });
+
+    const response = await GET(
+      new NextRequest('https://www.lajukan.com/api/explore/video'),
+      { params: Promise.resolve({ category: 'video' }) },
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.groups.videos.nextCursor).toBe('12');
+  });
+
   it('loads community discovery from groups and feed without a keyword search', async () => {
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')

@@ -617,6 +617,7 @@ export function GlobalSearchPageClient({ locale }: { locale: LajukanLocale }) {
         }
       });
       params.delete('cursor');
+    params.delete('offset');
       const href = `${pathname}${params.toString() ? `?${params.toString()}` : ''}`;
       router[mode](href, { scroll: false });
     },
