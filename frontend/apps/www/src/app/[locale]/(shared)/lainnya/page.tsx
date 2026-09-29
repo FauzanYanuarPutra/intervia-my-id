@@ -1,4 +1,6 @@
+import type { Metadata } from 'next';
 import { Link } from '@/i18n/navigation';
+import { buildPublicPageMetadata } from '@/lib/seo/publicPageMetadata';
 import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 import { UMKM_DISCOVERY_PATH, buildUsahaPath } from '@/lib/umkmSurface';
 import {
@@ -23,6 +25,18 @@ import {
 type PageProps = {
   params: Promise<{ locale: string }>;
 };
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { locale } = await params;
+  return buildPublicPageMetadata({
+    locale,
+    path: '/lainnya',
+    titleId: 'Lainnya | Lajukan',
+    titleEn: 'More | Lajukan',
+    descriptionId: 'Akses cepat ke pencarian supplier, usaha, pembelajaran, komunitas, video, dan fitur Lajukan lainnya.',
+    descriptionEn: 'Quick access to sourcing, businesses, learning, community, video, and other Lajukan features.',
+  });
+}
 
 function DecisionPathCard({
   eyebrow,
