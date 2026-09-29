@@ -20,8 +20,12 @@ use std::{
 use tokio::sync::Semaphore;
 use tower_http::cors::CorsLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use intent::infer_marketplace_intent;
+use tools::{ToolCallTrace, ToolRegistry, ToolRegistryConfig};
 
+mod intent;
 mod runtime_metrics;
+mod tools;
 
 const SERVICE_NAME: &str = "lajukan-ai-orchestrator";
 const SERVICE_VERSION: &str = "2.0.3";
@@ -32,6 +36,7 @@ struct AppState {
     config: Config,
     concurrency: Arc<Semaphore>,
     request_counter: Arc<AtomicU64>,
+    tools: ToolRegistry,
 }
 
 #[derive(Clone)]
@@ -48,6 +53,13 @@ struct Config {
     vllm_kyc_model: String,
     vllm_structured_outputs: bool,
     vllm_reasoning_effort: String,
+    vllm_fast_model: String,
+    vllm_embedding_model: String,
+
+    marketplace_url: String,
+    marketplace_service_token: String,
+    ai_tool_timeout_ms: u64,
+    ai_tool_limit: usize,
 
     ocr_url: String,
     liveness_url: String,
@@ -340,12 +352,19 @@ async fn main() {
         http,
         concurrency: Arc::new(Semaphore::new(config.max_concurrent_ai)),
         request_counter: Arc::new(AtomicU64::new(1)),
+        tools: ToolRegistry::new(ToolRegistryConfig {
+            marketplace_url: config.marketplace_url.clone(),
+            service_token: config.marketplace_service_token.clone(),
+            timeout_ms: config.ai_tool_timeout_ms,
+            max_results: config.ai_tool_limit,
+        }),
         config: config.clone(),
     });
 
     let app = Router::new()
         .route("/health", get(handle_health))
         .route("/ready", get(handle_ready))
+        .route("/ready/deep", get(handle_ready_deep))
         .route("/metrics", get(handle_metrics))
         .route("/v1/capabilities", get(handle_capabilities))
         .route("/v1/chat", post(handle_chat))
@@ -459,6 +478,21 @@ impl Config {
                 .unwrap_or_else(|_| "none".to_string())
                 .trim()
                 .to_ascii_lowercase(),
+            vllm_fast_model: non_empty_env("VLLM_FAST_MODEL")
+                .or_else(|| non_empty_env("AI_FAST_MODEL"))
+                .unwrap_or_else(|| vllm_model.clone()),
+            vllm_embedding_model: env::var("VLLM_EMBEDDING_MODEL")
+                .unwrap_or_default()
+                .trim()
+                .to_string(),
+
+            marketplace_url: service_url(
+                "MARKETPLACE_URL",
+                "http://marketplace_service:8081",
+            ),
+            marketplace_service_token: env::var("MARKETPLACE_SERVICE_TOKEN").unwrap_or_default(),
+            ai_tool_timeout_ms: env_u64("AI_TOOL_TIMEOUT_MS", 5_000, 500, 20_000),
+            ai_tool_limit: env_usize("AI_TOOL_LIMIT", 12, 1, 30),
 
             ocr_url: service_url("OCR_URL", "http://ocr_service:8000/predict"),
             liveness_url: service_url("LIVENESS_URL", "http://liveness_service:8000/check"),
@@ -519,6 +553,7 @@ async fn handle_health(State(state): State<Arc<AppState>>) -> Json<Value> {
         "version": SERVICE_VERSION,
         "configured": {
             "vllm": !state.config.vllm_chat_url.is_empty(),
+            "marketplace_tools": state.tools.configured(),
             "rag": !state.config.rag_url.is_empty(),
             "ocr": !state.config.ocr_url.is_empty(),
             "liveness": !state.config.liveness_url.is_empty(),
