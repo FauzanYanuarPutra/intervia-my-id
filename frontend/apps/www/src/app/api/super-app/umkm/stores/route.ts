@@ -718,7 +718,10 @@ export async function GET(req: NextRequest) {
     const rankingOrigin = hasViewer
       ? { lat: viewerLat as number, lng: viewerLng as number }
       : null;
-    const candidateLimit = limit;
+    const candidateLimit =
+      !mine && !referencesOnly
+        ? Math.min(limit + 1, Math.max(0, maxPublicWindow - offset))
+        : limit;
     const referencesPromise = includeReferences
       ? listPublicMapReferences({
           query: query || undefined,
@@ -859,9 +862,8 @@ export async function GET(req: NextRequest) {
     const storesCanContinue =
       !mine &&
       !referencesOnly &&
-      stores.length >= candidateLimit &&
-      backendRowsConsumed > 0 &&
-      offset + backendRowsConsumed < maxPublicWindow;
+      offset + limit < maxPublicWindow &&
+      visibleStores.length > limit;
     const hasMore = referencesOnly
       ? referenceHasMore
       : mine
@@ -870,7 +872,7 @@ export async function GET(req: NextRequest) {
     const nextOffset = referencesOnly
       ? (referenceHasMore ? referenceNextOffset : null)
       : hasMore
-        ? offset + backendRowsConsumed
+        ? offset + limit
         : null;
 
     return NextResponse.json(
@@ -884,7 +886,7 @@ export async function GET(req: NextRequest) {
           next_cursor: referencesOnly ? referenceNextCursor : null,
           loaded_count: referencesOnly
             ? offset + limitedItems.length
-            : offset + stores.length,
+            : offset + Math.min(limitedItems.length, limit),
           has_more: hasMore,
           next_offset: nextOffset,
         },

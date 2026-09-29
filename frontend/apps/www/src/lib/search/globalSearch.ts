@@ -135,11 +135,18 @@ export function parseGlobalSearchState(
   const requestedCategory = cleanText(input.get('category'), 80).toLowerCase();
   const category = getExploreCategoryBySlug(requestedCategory)?.slug || '';
   const requestedSort = cleanText(input.get('sort'), 32).toLowerCase();
+  const requestedCursor = cleanText(input.get('cursor'), 120);
+  const cursorOffset =
+    /^\d+$/.test(requestedCursor) ? Number(requestedCursor) : null;
   const requestedOffset = cleanText(input.get('offset'), 32);
-  const parsedOffset = /^\\d+$/.test(requestedOffset) ? Number(requestedOffset) : 0;
-  const offset = Number.isSafeInteger(parsedOffset)
+  const parsedOffset = /^\d+$/.test(requestedOffset) ? Number(requestedOffset) : 0;
+  const legacyOffset = Number.isSafeInteger(parsedOffset)
     ? Math.min(Math.max(parsedOffset, 0), 10_000)
     : 0;
+  const offset =
+    cursorOffset !== null && Number.isSafeInteger(cursorOffset)
+      ? Math.min(Math.max(cursorOffset, 0), 10_000)
+      : legacyOffset;
 
   return {
     query: cleanText(input.get('q'), 160),
@@ -160,7 +167,7 @@ export function parseGlobalSearchState(
 export function serializeGlobalSearchState(state: GlobalSearchState): string {
   const params = new URLSearchParams();
   if (state.query) params.set('q', state.query);
-  if (state.tab !== 'all' || state.side !== 'all') params.set('tab', state.tab);
+  if (state.tab !== 'all') params.set('tab', state.tab);
   if (state.side !== 'all') params.set('side', state.side);
   if (state.category) params.set('category', state.category);
   if (state.subcategory) params.set('subcategory', state.subcategory);
@@ -169,8 +176,12 @@ export function serializeGlobalSearchState(state: GlobalSearchState): string {
     params.set('distance', String(state.distanceKm));
   }
   if (state.sort !== 'relevance') params.set('sort', state.sort);
-  if (state.cursor) params.set('cursor', state.cursor);
-  if (state.offset > 0) params.set('offset', String(state.offset));
+  if (state.cursor) {
+    params.set('cursor', state.cursor);
+  } else if (state.offset > 0) {
+    // Preserve legacy offset URLs only when no cursor is present.
+    params.set('offset', String(state.offset));
+  }
   return params.toString();
 }
 

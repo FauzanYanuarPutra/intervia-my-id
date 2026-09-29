@@ -68,6 +68,7 @@ export default async function NewsTopicPage({ params, searchParams }: Props) {
         <p className="mt-3 max-w-2xl text-sm font-semibold leading-7 text-slate-600 dark:text-slate-300">{isId ? 'Kumpulan berita terverifikasi yang terhubung ke topik ini.' : 'Reviewed news connected to this topic.'}</p>
       </section>
       {items.length ? (
+      <>
         <NewsInfiniteGrid
           initialItems={items}
           initialNextCursor={nextCursor}
@@ -75,6 +76,18 @@ export default async function NewsTopicPage({ params, searchParams }: Props) {
           topic={value}
           fallbackHref={`/news/topic/${encodeURIComponent(value)}?cursor=${encodeURIComponent(nextCursor || '')}`}
         />
+        <noscript>
+          {nextCursor ? (
+            <a
+              rel="next"
+              href={`/news/topic/${encodeURIComponent(value)}?cursor=${encodeURIComponent(nextCursor)}`}
+              className="sr-only"
+            >
+              {isId ? 'Berita berikutnya' : 'Next stories'}
+            </a>
+          ) : null}
+        </noscript>
+      </>
       ) : (
         <div className="rounded-[26px] border border-dashed border-slate-300 p-8 text-center text-sm font-semibold text-slate-500 dark:border-white/15">
                     {isId ? 'Belum ada berita untuk topik ini.' : 'No news for this topic yet.'}
