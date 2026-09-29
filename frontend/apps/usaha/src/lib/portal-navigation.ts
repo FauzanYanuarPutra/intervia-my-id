@@ -33,9 +33,10 @@ const desktopPrimaryOrder: PortalSection[] = [
   'finance',
 ];
 
-const mobilePrimaryOrder: PortalSection[] = ['home', 'orders', 'products', 'finance'];
+const mobilePrimaryOrder: PortalSection[] = ['home', 'orders', 'products', 'inventory'];
 
 const menuOrder: PortalSection[] = [
+  'finance',
   'products',
   'reports',
   'channels',

@@ -19,8 +19,8 @@ describe('merchant OS foundation', () => {
   it('uses the memorable mobile top-level jobs', () => {
     const navigation = read('../../lib/portal-navigation.ts');
     const mobile = read('./MobileNav.tsx');
-    expect(navigation).toContain("const mobilePrimaryOrder: PortalSection[] = ['home', 'orders', 'products', 'finance'];");
-    expect(mobile).toContain('Lainnya');
+    expect(navigation).toContain("const mobilePrimaryOrder: PortalSection[] = ['home', 'orders', 'products', 'inventory'];");
+    expect(mobile).toContain('Menu');
     expect(mobile).toContain('ModalSurface');
     expect(mobile).not.toContain("orders: 'Jual'");
   });

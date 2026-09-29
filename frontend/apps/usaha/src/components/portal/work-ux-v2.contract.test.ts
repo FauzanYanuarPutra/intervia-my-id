@@ -23,8 +23,8 @@ describe('Usaha workspace UX v2', () => {
   });
 
   it('keeps the flow guide available without forcing it open on every workspace', () => {
-    expect(flowGuide).toContain('<details');
-    expect(flowGuide).toContain('currentSection === \'home\'');
-    expect(flowGuide).toContain('group-open:hidden');
+    expect(flowGuide).toContain("if (currentSection !== 'home') return null;");
+    expect(flowGuide).toContain('Langkah berikutnya');
+    expect(flowGuide).not.toContain('<details');
   });
 });

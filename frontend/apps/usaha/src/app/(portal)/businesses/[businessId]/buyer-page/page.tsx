@@ -24,14 +24,16 @@ export default async function BuyerPagePreview({ params }: PageProps) {
   const canManageBuyerPage = canManageInfo || canManageProducts;
   const businessPoint = toLatLng(business.latitude, business.longitude);
   const businessLocationQuery = buildBusinessLocationQuery({ name: business.name, address: business.address, city: business.city, locationQuery: business.locationQuery });
+  const hasPublicStorefront = Boolean(business.publicUrl);
+  const hasGoogleMapsUrl = Boolean(business.googleMapsUrl);
 
   return (
     <PortalShell activeBusiness={business} availableBusinesses={businesses} viewerName={account?.name ?? null} currentSection="buyerPage">
       <PageHeader
         eyebrow="Kelola usaha"
-        title="Tampilan toko"
-        description="Cek apa yang dilihat pelanggan, lalu buka halaman publik aslinya."
-        action={<a href={business.publicUrl} target="_blank" rel="noreferrer" className="portal-button-primary"><Store className="h-4 w-4" /> Buka toko <ExternalLink className="h-4 w-4" /></a>}
+        title="Toko Saya"
+        description="Cek apa yang pelanggan lihat, lalu buka toko publik setelah datanya siap."
+        action={hasPublicStorefront ? <a href={business.publicUrl} target="_blank" rel="noreferrer" className="portal-button-primary"><Store className="h-4 w-4" /> Buka toko <ExternalLink className="h-4 w-4" /></a> : <Link href={canManageInfo ? `/businesses/${business.id}/info` : `/businesses/${business.id}/buyer-page`} className="portal-button-primary"><Store className="h-4 w-4" /> Siapkan toko</Link>}
       />
 
       <MetricStrip items={[
@@ -51,7 +53,7 @@ export default async function BuyerPagePreview({ params }: PageProps) {
             <div className="space-y-3">
               <div className="merchant-action-row rounded-xl bg-[#f7f9f6]"><span className="text-sm text-portal-soft">Kategori</span><strong className="text-sm text-portal-ink">{business.category}</strong></div>
               <div className="merchant-action-row rounded-xl bg-[#f7f9f6]"><span className="text-sm text-portal-soft">Kontak</span><strong className="text-sm text-portal-ink">{business.phone || 'Belum diisi'}</strong></div>
-              <div className="rounded-xl bg-[#f7f9f6] p-3.5"><p className="text-xs font-semibold text-portal-soft">URL publik</p><p className="mt-1 break-all text-sm font-semibold text-portal-ink">{business.publicUrl}</p></div>
+              <div className="rounded-xl bg-[#f7f9f6] p-3.5"><p className="text-xs font-semibold text-portal-soft">URL publik</p><p className="mt-1 break-all text-sm font-semibold text-portal-ink">{business.publicUrl || 'Belum tersedia. Lengkapi data usaha terlebih dahulu.'}</p></div>
             </div>
             <div className="space-y-2">
               <BusinessLocationMap value={businessPoint} searchQuery={businessLocationQuery} markerLabel={business.name} heightClassName="h-[220px] w-full" />
@@ -68,8 +70,8 @@ export default async function BuyerPagePreview({ params }: PageProps) {
               : 'Kamu bisa melihat storefront dan lokasinya. Perubahan profil atau produk membutuhkan akses pengelolaan.'}
           </p>
           <div className="mt-4 grid gap-2">
-            <a href={business.publicUrl} target="_blank" rel="noreferrer" className="portal-button-primary"><Store className="h-4 w-4" /> Buka storefront</a>
-            <a href={business.googleMapsUrl} target="_blank" rel="noreferrer" className="portal-button-secondary"><MapPinned className="h-4 w-4" /> Google Maps</a>
+            {hasPublicStorefront ? <a href={business.publicUrl} target="_blank" rel="noreferrer" className="portal-button-primary"><Store className="h-4 w-4" /> Buka storefront</a> : <Link href={canManageInfo ? `/businesses/${business.id}/info` : `/businesses/${business.id}/buyer-page`} className="portal-button-primary"><Store className="h-4 w-4" /> Siapkan toko</Link>}
+            {hasGoogleMapsUrl ? <a href={business.googleMapsUrl} target="_blank" rel="noreferrer" className="portal-button-secondary"><MapPinned className="h-4 w-4" /> Google Maps</a> : null}
             {canManageInfo ? <Link href={`/businesses/${business.id}/info`} className="portal-button-secondary">Edit profil</Link> : null}
             {canManageProducts ? <Link href={`/businesses/${business.id}/products`} className="portal-button-secondary">Kelola produk</Link> : null}
           </div>

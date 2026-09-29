@@ -10,6 +10,7 @@ import {
 } from '@/lib/portal-navigation';
 import { buildSectionHref } from '@/lib/portal-logic';
 import type { BusinessRecord, PortalSection } from '@/lib/portal-types';
+import { portalSectionUserLabel } from '@/lib/portal-navigation-labels';
 import { portalSectionVisual } from '@/lib/portal-visual';
 
 type MobileNavProps = {
@@ -26,7 +27,7 @@ export function MobileNav({ business, currentSection }: MobileNavProps) {
   const primary = mobilePrimaryNavigation(activeBusiness.permissions);
   const primaryIds = new Set(primary.map(item => item.id));
   const more = portalMenuNavigation(activeBusiness.permissions).filter(item => !primaryIds.has(item.id));
-  const management = more.filter(item => ['growth', 'parties', 'products', 'reports', 'channels', 'buyerPage', 'work'].includes(item.id));
+  const management = more.filter(item => ['finance', 'growth', 'parties', 'products', 'reports', 'channels', 'buyerPage', 'work'].includes(item.id));
   const settings = more.filter(item => !management.some(groupItem => groupItem.id === item.id));
 
   function menuLink(item: (typeof more)[number]) {
@@ -46,7 +47,7 @@ export function MobileNav({ business, currentSection }: MobileNavProps) {
         <span className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${visual.iconClass}`}>
           <Icon className="h-[18px] w-[18px]" />
         </span>
-        <span className="min-w-0 flex-1 truncate">{item.label}</span>
+        <span className="min-w-0 flex-1 truncate">{portalSectionUserLabel(item.id)}</span>
       </Link>
     );
   }
@@ -93,7 +94,7 @@ export function MobileNav({ business, currentSection }: MobileNavProps) {
             <span className="inline-flex h-7 w-7 items-center justify-center rounded-[10px] bg-[#f1f4f2] text-portal-soft">
               <Menu className="h-[18px] w-[18px]" />
             </span>
-            <span className="max-w-full truncate">Lainnya</span>
+            <span className="max-w-full truncate">Menu</span>
           </button>
         </div>
       </nav>
@@ -101,7 +102,7 @@ export function MobileNav({ business, currentSection }: MobileNavProps) {
       <ModalSurface
         open={moreOpen}
         onOpenChange={setMoreOpen}
-        ariaLabel="Menu lainnya"
+        ariaLabel="Menu usaha"
         presentation="sheet"
         size="sm"
         returnFocusRef={moreButtonRef}
@@ -109,12 +110,12 @@ export function MobileNav({ business, currentSection }: MobileNavProps) {
         <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-slate-200" />
         <div className="flex items-start justify-between gap-4 border-b border-portal-line px-4 pb-3 pt-3">
           <div>
-            <p className="text-base font-black text-portal-ink">Lainnya</p>
-            <p className="mt-0.5 text-xs text-portal-soft">Tumbuh, pelanggan, pekerjaan, produk, laporan, kanal jual, dan pengaturan usaha.</p>
+            <p className="text-base font-black text-portal-ink">Menu usaha</p>
+            <p className="mt-0.5 text-xs text-portal-soft">Pelanggan, laporan, jual online, pekerjaan, uang, dan pengaturan usaha.</p>
           </div>
           <button
             type="button"
-            aria-label="Tutup menu lainnya"
+            aria-label="Tutup menu usaha"
             className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-portal-soft transition hover:bg-[#f3f5f2] hover:text-portal-ink"
             onClick={() => setMoreOpen(false)}
           >

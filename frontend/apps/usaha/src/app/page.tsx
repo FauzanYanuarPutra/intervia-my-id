@@ -207,13 +207,6 @@ export default async function HomePage({
     setupIncomplete: incompleteSetup,
   });
 
-  const requiredSetupSteps = setupSteps.filter(step => !step.optional);
-  const completedSetupSteps = requiredSetupSteps.filter(step => step.done).length;
-  const readiness = requiredSetupSteps.length
-    ? Math.round((completedSetupSteps / requiredSetupSteps.length) * 100)
-    : 100;
-  const nextSetupStep = setupSteps.find(step => !step.done && !step.optional) ?? null;
-
   const recentEntries = canViewFinance
     ? financeEntries.filter(entry => entry.occurred_on === today).slice(0, 5)
     : [];
@@ -223,30 +216,9 @@ export default async function HomePage({
       <PageHeader
         eyebrow="Hari ini"
         title={business.name}
-        description="Lihat kondisi usaha, lalu kerjakan yang paling penting."
+        description="Lihat kondisi usaha, lalu kerjakan satu hal yang paling penting."
         meta={<><StatusBadge tone={business.isOpen ? 'success' : 'neutral'}>{status.label}</StatusBadge><span className="text-xs text-portal-soft">{business.city} · {business.category}</span></>}
       />
-
-      <section className="merchant-surface-bordered overflow-hidden" aria-labelledby="workspace-readiness-title">
-        <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
-          <div className="min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-[.12em] text-portal-forest">Siap ditemukan pelanggan</p>
-            <h2 id="workspace-readiness-title" className="mt-1 text-lg font-black tracking-[-.03em] text-portal-ink">Usahamu {readiness}% siap dipakai.</h2>
-            <p className="mt-1 max-w-2xl text-sm leading-6 text-portal-soft">
-              {nextSetupStep
-                ? `Berikutnya: ${nextSetupStep.label}. ${nextSetupStep.hint}`
-                : 'Fondasi usaha sudah lengkap. Sekarang fokus menjaga katalog dan jualan tetap rapi.'}
-            </p>
-            <div className="mt-3 h-2 max-w-xl overflow-hidden rounded-full bg-portal-mist" role="progressbar" aria-label="Kesiapan usaha" aria-valuemin={0} aria-valuemax={100} aria-valuenow={readiness}>
-              <div className="h-full rounded-full bg-portal-forest transition-all" style={{ width: `${readiness}%` }} />
-            </div>
-          </div>
-          <div className="flex shrink-0 flex-wrap gap-2">
-            {nextSetupStep ? <Link href={dashboard.priority.href.startsWith('/') ? dashboard.priority.href : '#setup-checklist'} className="portal-button-primary">Kerjakan berikutnya <ArrowRight className="h-4 w-4" /></Link> : null}
-            <Link href="#setup-checklist" className="portal-button-secondary">Lihat checklist</Link>
-          </div>
-        </div>
-      </section>
 
       <PendingOrganizationInvitations />
 
@@ -302,23 +274,25 @@ export default async function HomePage({
         </section>
       ) : null}
 
-      <section className="merchant-surface-bordered overflow-hidden">
-        <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
-          <div className="flex min-w-0 items-start gap-3">
-            <span className="portal-icon-tile mt-0.5 shrink-0"><ArrowRight className="h-4 w-4" /></span>
-            <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-[0.1em] text-portal-soft">{dashboard.priority.priority > 0 ? 'Perlu perhatian' : 'Kondisi usaha'}</p>
-              <h2 className="mt-1 text-base font-black tracking-[-0.025em] text-portal-ink">{dashboard.priority.title}</h2>
-              <p className="mt-1 max-w-2xl text-sm leading-6 text-portal-soft">{dashboard.priority.description}</p>
+      {dashboard.priority.priority > 0 ? (
+        <section className="merchant-surface-bordered overflow-hidden">
+          <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+            <div className="flex min-w-0 items-start gap-3">
+              <span className="portal-icon-tile mt-0.5 shrink-0"><ArrowRight className="h-4 w-4" /></span>
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-[0.1em] text-portal-forest">Perlu perhatian</p>
+                <h2 className="mt-1 text-base font-black tracking-[-0.025em] text-portal-ink">{dashboard.priority.title}</h2>
+                <p className="mt-1 max-w-2xl text-sm leading-6 text-portal-soft">{dashboard.priority.description}</p>
+              </div>
             </div>
+            {dashboard.priority.href.startsWith('/') ? (
+              <Link href={dashboard.priority.href} className="portal-button-secondary shrink-0">
+                Kerjakan <ArrowRight className="h-4 w-4" />
+              </Link>
+            ) : null}
           </div>
-          {dashboard.priority.href.startsWith('/') ? (
-            <Link href={dashboard.priority.href} className="portal-button-secondary shrink-0">
-              Kerjakan <ArrowRight className="h-4 w-4" />
-            </Link>
-          ) : null}
-        </div>
-      </section>
+        </section>
+      ) : null}
 
       {dashboard.showSetup ? (
         <details id="setup-checklist" className="merchant-surface-bordered group">

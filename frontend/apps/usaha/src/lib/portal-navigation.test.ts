@@ -5,6 +5,7 @@ import {
   portalMenuNavigation,
 } from './portal-navigation';
 import type { PermissionId } from './portal-types';
+import { portalSectionUserLabel } from './portal-navigation-labels';
 
 const ownerPermissions: PermissionId[] = [
   'viewInfo',
@@ -43,14 +44,21 @@ describe('portal navigation', () => {
     ]);
   });
 
-  it('keeps mobile daily work focused on home, sales, goods, and money', () => {
+  it('keeps mobile daily work focused on home, sales, products, and stock', () => {
     expect(mobilePrimaryNavigation(ownerPermissions).map(item => item.id)).toEqual([
       'home',
       'orders',
       'products',
-      'finance',
+      'inventory',
     ]);
     expect(portalMenuNavigation(ownerPermissions).map(item => item.id)).toContain('products');
+    expect(portalMenuNavigation(ownerPermissions).map(item => item.id)).toContain('finance');
+  });
+
+  it('uses clearer labels for merchant-facing secondary destinations', () => {
+    expect(portalSectionUserLabel('channels')).toBe('Jual Online');
+    expect(portalSectionUserLabel('buyerPage')).toBe('Toko Saya');
+    expect(portalSectionUserLabel('products')).toBe('Produk');
   });
 
   it('preserves primary order when permissions hide destinations', () => {

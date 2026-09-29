@@ -30,9 +30,9 @@ describe('Lajukan interaction system', () => {
     expect(css).toContain('env(safe-area-inset-bottom)');
   });
 
-  it('makes Lainnya a responsive dismissible sheet instead of an absolute details popup', () => {
+  it('makes Menu a responsive dismissible sheet instead of an absolute details popup', () => {
     const mobile = read('../portal/MobileNav.tsx');
-    expect(mobile).toContain('Lainnya');
+    expect(mobile).toContain('Menu');
     expect(mobile).toContain('ModalSurface');
     expect(mobile).not.toContain('<details');
     expect(mobile).not.toContain('absolute bottom-[calc(100%+.55rem)]');

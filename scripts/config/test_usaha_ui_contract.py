@@ -49,7 +49,7 @@ class UsahaBusinessOsUiContractTests(unittest.TestCase):
             "products: 'Produk'",
             "inventory: 'Stok'",
             "finance: 'Uang'",
-            "const mobilePrimaryOrder: PortalSection[] = ['home', 'orders', 'products', 'finance'];",
+            "const mobilePrimaryOrder: PortalSection[] = ['home', 'orders', 'products', 'inventory'];",
         ):
             self.assertIn(marker, navigation)
         self.assertNotIn("orders: 'Jualan'", navigation)
@@ -128,7 +128,7 @@ class UsahaBusinessOsUiContractTests(unittest.TestCase):
         finance = (
             USAHA / "app/(portal)/businesses/[businessId]/finance/page.tsx"
         ).read_text(encoding="utf-8")
-        for marker in ("WorkspaceTabs", "Aktivitas", "Rencana", "Transfer aplikasi"):
+        for marker in ("WorkspaceTabs", "Aktivitas", "Rencana", "Transfer & potongan"):
             self.assertIn(marker, finance)
 
     def test_settings_family_uses_compact_settings_center_patterns(self) -> None:

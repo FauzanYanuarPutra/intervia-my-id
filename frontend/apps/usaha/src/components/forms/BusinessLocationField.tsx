@@ -209,20 +209,20 @@ export function BusinessLocationField({
     <div className="grid gap-3 rounded-[18px] border border-portal-line/70 bg-portal-sand/20 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-sm font-bold text-portal-ink">Titik peta</p>
+          <p className="text-sm font-bold text-portal-ink">Lokasi usaha</p>
           <p className="mt-0.5 text-xs leading-5 text-portal-soft">
-            Paste link Maps, cari tempat, atau pakai GPS.
+            Cari alamat atau nama tempat. Lajukan akan memasang titik peta otomatis.
           </p>
         </div>
         <span className="rounded-full border border-portal-line/70 bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-portal-forest">
-          {point ? 'Tersimpan' : 'Opsional'}
+          {point ? 'Sudah dipasang' : 'Wajib'}
         </span>
       </div>
 
       <label className="grid gap-1.5 text-sm font-semibold text-portal-ink">
-        Link Maps / nama tempat
+        Cari lokasi
         <input
-          placeholder="Contoh: Kopi Braga Bandung"
+          placeholder="Contoh: Jalan Braga No. 10, Bandung"
           value={locationQuery}
           onChange={event => onLocationQueryChange(event.target.value)}
           className="portal-input"
@@ -306,7 +306,7 @@ export function BusinessLocationField({
       <div className="flex flex-wrap gap-2 text-xs">
         {point ? (
           <div className="rounded-full border border-portal-line/70 bg-white px-2.5 py-1 font-semibold text-portal-ink">
-            Lat {point.lat} | Lng {point.lng}
+            Titik lokasi sudah terpasang
           </div>
         ) : (
           <div className="rounded-full border border-portal-line/70 bg-white px-2.5 py-1 font-semibold text-portal-soft">

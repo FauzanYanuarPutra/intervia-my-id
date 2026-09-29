@@ -40,14 +40,14 @@ export default async function BusinessFinancePage({ params, searchParams }: Page
   const tabs = [
     { id: 'activity', label: 'Aktivitas', href: `/businesses/${business.id}/finance?view=activity` },
     { id: 'plan', label: 'Rencana', badge: obligations.filter(item => item.active).length, href: `/businesses/${business.id}/finance?view=plan` },
-    ...(showSettlement ? [{ id: 'transfers', label: 'Settlement & potongan', href: `/businesses/${business.id}/finance?view=transfers` }] : []),
+    ...(showSettlement ? [{ id: 'transfers', label: 'Transfer & potongan', href: `/businesses/${business.id}/finance?view=transfers` }] : []),
   ];
 
   return (
     <PortalShell activeBusiness={business} availableBusinesses={businesses} viewerName={account?.name ?? null} currentSection="finance">
       <PageHeader
         eyebrow="Uang"
-        title={activeView === 'activity' ? 'Uang usaha' : activeView === 'plan' ? 'Rencana uang' : 'Transfer aplikasi'}
+        title={activeView === 'activity' ? 'Uang usaha' : activeView === 'plan' ? 'Rencana uang' : 'Transfer & potongan'}
         description={activeView === 'activity' ? 'Lihat uang masuk dan keluar. Penjualan dari Kasir masuk otomatis.' : activeView === 'plan' ? 'Lihat yang aman dipakai setelah tagihan dan cadangan.' : 'Cocokkan omzet, potongan, refund, dan transfer bersih dari platform.'}
       />
 

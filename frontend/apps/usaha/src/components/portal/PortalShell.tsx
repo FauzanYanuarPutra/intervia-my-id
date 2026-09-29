@@ -126,7 +126,7 @@ export function PortalShell({
                   rel="noreferrer"
                   className="portal-button-ghost hidden lg:inline-flex"
                 >
-                  <ExternalLink className="h-4 w-4" /> Lihat toko
+                  <ExternalLink className="h-4 w-4" /> Toko Saya
                 </a>
               ) : null}
               {!accountPage ? <QuickCreateMenu business={activeBusiness} /> : null}
@@ -143,7 +143,7 @@ export function PortalShell({
         </main>
       </div>
 
-      {!accountPage ? <QuickCreateMenu business={activeBusiness} mobile /> : null}
+      {!accountPage && currentSection !== 'home' ? <QuickCreateMenu business={activeBusiness} mobile /> : null}
       {!accountPage ? <MobileNav business={activeBusiness} currentSection={currentSection} /> : null}
     </div>
   );
