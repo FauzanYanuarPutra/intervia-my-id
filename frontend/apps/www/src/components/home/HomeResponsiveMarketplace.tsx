@@ -150,7 +150,8 @@ type BeforeInstallPromptEvent = Event & {
 
 const HOME_COMMUNITY_PAGE_SIZE = 6;
 const HOME_COMMUNITY_REQUEST_TIMEOUT_MS = 12000;
-const HOME_CONTENT_REQUEST_TIMEOUT_MS = 8000;
+const HOME_CONTENT_REQUEST_TIMEOUT_MS = 12000;
+const HOME_CONTENT_FALLBACK_TIMEOUT_MS = 4500;
 
 type Tone =
   | 'emerald'
@@ -3835,6 +3836,61 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
       params.set('viewer_lng', viewerLng);
     };
 
+    const fetchHomeContent = async (
+      params: URLSearchParams,
+      parentSignal: AbortSignal,
+      fallbackSignal: AbortSignal,
+    ) => {
+      const request = async (
+        requestParams: URLSearchParams,
+        signal: AbortSignal,
+      ) => {
+        const response = await fetch(
+          `/api/content?${requestParams.toString()}`,
+          {
+            cache: 'no-store',
+            credentials: 'include',
+            signal,
+          },
+        );
+        const payload = await response.json().catch(() => null);
+        return { response, payload };
+      };
+
+      try {
+        const { response, payload } = await request(
+          params,
+          AbortSignal.any([
+            parentSignal,
+            AbortSignal.timeout(HOME_CONTENT_REQUEST_TIMEOUT_MS),
+          ]),
+        );
+        if (response.ok) return extractContentItems(payload);
+        if (parentSignal.aborted) throw new Error('home_content_aborted');
+      } catch (error) {
+        if (parentSignal.aborted) throw error;
+      }
+
+      // Network/backend degradation should not blank the Home surface. Retry
+      // with the lightweight native-Lajukan query: no owner hydration and no
+      // nearby candidate expansion, while keeping database-only as the source
+      // of truth so external references cannot displace native listings.
+      const fallbackParams = new URLSearchParams(params);
+      fallbackParams.set('limit', '8');
+      fallbackParams.delete('include_owner');
+      fallbackParams.delete('nearby');
+
+      const { response, payload } = await request(fallbackParams, fallbackSignal);
+      if (!response.ok) {
+        throw new Error(
+          payload && typeof payload === 'object' && 'error' in payload
+            ? String((payload as { error?: unknown }).error || 'home_content_unavailable')
+            : 'home_content_unavailable',
+        );
+      }
+      return extractContentItems(payload);
+    };
+
     const loadListings = async () => {
       const params = new URLSearchParams({
         limit: '12',
@@ -3848,14 +3904,11 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
       if (viewerLocationKey) {
         params.set('nearby', '1');
       }
-      const response = await fetch(`/api/content?${params.toString()}`, {
-        cache: 'no-store',
-        credentials: 'include',
-        signal: listingController.signal,
-      });
-      const payload = await response.json().catch(() => null);
-      if (!response.ok) throw new Error('content_supply_unavailable');
-      return extractContentItems(payload);
+      return fetchHomeContent(
+        params,
+        listingController.signal,
+        listingController.signal,
+      );
     };
 
     const loadDemandListings = async () => {
@@ -3871,14 +3924,11 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
       if (viewerLocationKey) {
         params.set('nearby', '1');
       }
-      const response = await fetch(`/api/content?${params.toString()}`, {
-        cache: 'no-store',
-        credentials: 'include',
-        signal: demandController.signal,
-      });
-      const payload = await response.json().catch(() => null);
-      if (!response.ok) throw new Error('content_demand_unavailable');
-      return extractContentItems(payload);
+      return fetchHomeContent(
+        params,
+        demandController.signal,
+        demandController.signal,
+      );
     };
 
     const loadReferences = async () => {
