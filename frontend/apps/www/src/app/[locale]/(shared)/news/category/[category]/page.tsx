@@ -81,8 +81,8 @@ export default async function NewsCategoryPage({ params, searchParams }: Props) 
         initialNextCursor={nextCursor}
         locale={locale}
           category={label}
-        eyebrow={{isId ? 'Kategori berita' : 'News category'}}
-        title={{isId ? `Berita ${label} terbaru` : `Latest ${label} news`}}
+        eyebrow={isId ? 'Kategori berita' : 'News category'}
+        title={isId ? `Berita ${label} terbaru` : `Latest ${label} news`}
       />
     ) : (
       <div className="rounded-[26px] border border-dashed border-slate-300 p-8 text-center text-sm font-semibold text-slate-500 dark:border-white/15">
