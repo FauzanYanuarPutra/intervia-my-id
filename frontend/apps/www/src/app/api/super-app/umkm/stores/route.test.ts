@@ -314,7 +314,7 @@ describe('GET /api/super-app/umkm/stores', () => {
     expect(response.status).toBe(200);
     expect(listUmkmStoresMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        limit: 2,
+        limit: 3,
         viewer: { lat: -6.2, lng: 106.8 },
       }),
     );
@@ -737,7 +737,7 @@ describe('GET /api/super-app/umkm/stores', () => {
     );
     expect(
       payload.data.items.map((item: { id: string }) => item.id),
-    ).toEqual(['store-10', 'store-11', 'store-12', 'store-13', 'store-14']);
+    ).toEqual(['store-14', 'store-13', 'store-12', 'store-11', 'store-10']);
     expect(payload.data).toMatchObject({
       loaded_count: 15,
       has_more: false,
