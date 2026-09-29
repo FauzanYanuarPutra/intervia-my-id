@@ -113,7 +113,14 @@ export default function ReelsFeedClient({ isId }: { isId: boolean }) {
   const activeFeed =
     feedState.requestSearch === requestSearch
       ? feedState
-      : { requestSearch, status: 'loading' as const, items: [] };
+      : {
+        requestSearch,
+        status: 'loading' as const,
+        items: [],
+        nextCursor: null,
+        hasMore: false,
+        error: null,
+      };
   const items = activeFeed.items;
   const loading = activeFeed.status === 'loading';
 
