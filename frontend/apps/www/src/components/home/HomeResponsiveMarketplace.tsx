@@ -294,6 +294,8 @@ type PublicReferenceItem = {
   sourceUrl: string;
   sourceLicense: string;
   sourceLicenseUrl: string;
+  sourceContactUrl: string;
+  sourceContactType: 'whatsapp' | 'source';
   imageAttribution: string;
 };
 
@@ -1063,6 +1065,8 @@ function mapContentToPublicReference(
     sourceUrl: reference.sourceUrl,
     sourceLicense: reference.sourceLicense,
     sourceLicenseUrl: reference.sourceLicenseUrl,
+    sourceContactUrl: reference.sourceContactUrl,
+    sourceContactType: reference.sourceContactType,
     imageAttribution:
       reference.imageAttribution || contentImageAttribution(item),
   };
@@ -2485,45 +2489,55 @@ export function PublicReferencesSection({
               </Link>
 
               {/* SOURCE */}
-              <a
-                href={item.sourceUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={`${isId ? 'Buka sumber' : 'Open source'}: ${
-                  item.sourceTitle
-                }`}
-                className="
-                  group/source
-                  mx-2.5
-                  flex min-h-8
-                  items-center
-                  justify-between
-                  gap-2
-                  border-t border-zinc-100
-                  py-1.5
-                  focus-visible:outline-none
-                  focus-visible:ring-2
-                  focus-visible:ring-blue-500
-                "
-              >
-                <div className="min-w-0 flex-1">
+              <div className="mx-2.5 flex min-h-8 items-center justify-between gap-2 border-t border-zinc-100 py-1.5">
+                <a
+                  href={item.sourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={
+                    `${isId ? 'Buka sumber' : 'Open source'}: ${item.sourceTitle}`,
+                  }
+                  className="min-w-0 flex-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                >
                   <p className="truncate text-[8px] font-semibold text-zinc-500">
                     {item.sourceTitle}
                   </p>
-
                   {item.sourceLicense ? (
                     <p className="truncate text-[7px] text-zinc-400">
                       {item.sourceLicense}
                     </p>
                   ) : null}
-                </div>
-
-                <span className="inline-flex shrink-0 items-center gap-0.5 text-[8px] font-semibold text-blue-600">
-                  {isId ? 'Sumber' : 'Source'}
-
-                  <ExternalLink className="h-2.5 w-2.5" />
-                </span>
-              </a>
+                </a>
+                {item.sourceContactUrl ? (
+                  <a
+                    href={item.sourceContactUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={
+                      isId
+                        ? item.sourceContactType === 'whatsapp'
+                          ? 'Hubungi via WhatsApp'
+                          : 'Hubungi sumber'
+                        : item.sourceContactType === 'whatsapp'
+                          ? 'Contact via WhatsApp'
+                          : 'Contact source'
+                    }
+                    className="inline-flex min-h-7 shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2 text-[8px] font-bold text-emerald-700 ring-1 ring-emerald-100"
+                  >
+                    <MessageCircle className="h-2.5 w-2.5" />
+                    {item.sourceContactType === 'whatsapp'
+                      ? 'WhatsApp'
+                      : isId
+                        ? 'Kontak'
+                        : 'Contact'}
+                  </a>
+                ) : (
+                  <span className="inline-flex shrink-0 items-center gap-0.5 text-[8px] font-semibold text-blue-600">
+                    {isId ? 'Sumber' : 'Source'}
+                    <ExternalLink className="h-2.5 w-2.5" />
+                  </span>
+                )}
+              </div>          </a>
             </article>
           ))}
         </div>
