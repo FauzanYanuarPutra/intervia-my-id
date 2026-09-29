@@ -74,6 +74,76 @@ const HOME_MAP_REFERENCE_LEGEND = {
   color: '#94a3b8',
 };
 
+
+
+function normalizeMapPointItem(item: {
+  id?: unknown;
+  slug?: unknown;
+  name?: unknown;
+  city?: unknown;
+  lat?: unknown;
+  lng?: unknown;
+  category?: unknown;
+  source_kind?: unknown;
+  metadata?: unknown;
+}): MapPointItem | null {
+  const lat =
+    typeof item.lat === 'number' ? item.lat : Number(item.lat);
+  const lng =
+    typeof item.lng === 'number' ? item.lng : Number(item.lng);
+
+  if (
+    typeof item.id !== 'string' ||
+    typeof item.slug !== 'string' ||
+    typeof item.name !== 'string' ||
+    !Number.isFinite(lat) ||
+    !Number.isFinite(lng)
+  ) {
+    return null;
+  }
+
+  const metadata =
+    item.metadata && typeof item.metadata === 'object'
+      ? (item.metadata as Record<string, unknown>)
+      : {};
+  const source =
+    typeof item.source_kind === 'string'
+      ? item.source_kind
+      : typeof metadata.source === 'string'
+        ? metadata.source
+        : '';
+  const recordKind =
+    typeof metadata.record_kind === 'string'
+      ? metadata.record_kind
+      : '';
+
+  return {
+    id: item.id,
+    slug: item.slug,
+    name: item.name,
+    city: typeof item.city === 'string' ? item.city : '',
+    lat,
+    lng,
+    category:
+      typeof item.category === 'string' && item.category.trim()
+        ? item.category
+        : typeof metadata.marketplace_category_slug === 'string'
+          ? metadata.marketplace_category_slug
+          : typeof metadata.category === 'string'
+            ? metadata.category
+            : 'business',
+    source_kind:
+      metadata.is_public_reference === true
+        ? 'reference_store'
+        : source === 'usaha_portal' || source === 'lajukan_store'
+          ? 'lajukan_store'
+          : recordKind.includes('reference')
+            ? 'reference_store'
+            : 'registered_store',
+    metadata,
+  };
+}
+
 function normalizeStores(items: UmkmMapStore[]): UmkmMapStore[] {
   return items.filter(
     store =>
@@ -199,55 +269,8 @@ export function HomeBusinessMapSection({
 
           if (fallbackResponse.ok && Array.isArray(fallbackPayload.data?.items)) {
             mapItems = fallbackPayload.data.items
-              .map(item => {
-                const lat = typeof item.lat === 'number' ? item.lat : Number(item.lat);
-                const lng = typeof item.lng === 'number' ? item.lng : Number(item.lng);
-                if (
-                  typeof item.id !== 'string' ||
-                  typeof item.slug !== 'string' ||
-                  typeof item.name !== 'string' ||
-                  !Number.isFinite(lat) ||
-                  !Number.isFinite(lng)
-                ) {
-                  return null;
-                }
-
-                const metadata =
-                  item.metadata && typeof item.metadata === 'object'
-                    ? (item.metadata as Record<string, unknown>)
-                    : {};
-                const source = typeof metadata.source === 'string'
-                  ? metadata.source
-                  : '';
-                const recordKind = typeof metadata.record_kind === 'string'
-                  ? metadata.record_kind
-                  : '';
-
-                return {
-                  id: item.id,
-                  slug: item.slug,
-                  name: item.name,
-                  city: typeof item.city === 'string' ? item.city : '',
-                  lat,
-                  lng,
-                  category:
-                    typeof metadata.marketplace_category_slug === 'string'
-                      ? metadata.marketplace_category_slug
-                      : typeof metadata.category === 'string'
-                        ? metadata.category
-                        : 'business',
-                  source_kind:
-                    metadata.is_public_reference === true
-                      ? 'reference_store'
-                      : source === 'usaha_portal'
-                        ? 'lajukan_store'
-                        : recordKind.includes('reference')
-                          ? 'reference_store'
-                          : 'registered_store',
-                  metadata,
-                } satisfies MapPointItem;
-              })
-              .filter((item): item is MapPointItem => item !== null);
+              .map(normalizeMapPointItem)
+              .filter((item): item is MapPointItem => Boolean(item));
 
             totalCount =
               typeof fallbackPayload.data?.count === 'number'
@@ -278,7 +301,9 @@ export function HomeBusinessMapSection({
               referenceResponse.ok &&
               Array.isArray(referencePayload.data?.items)
             ) {
-              mapItems = referencePayload.data.items;
+              mapItems = referencePayload.data.items
+                .map(normalizeMapPointItem)
+                .filter((item): item is MapPointItem => Boolean(item));
               totalCount =
                 typeof referencePayload.data?.count === 'number'
                   ? referencePayload.data.count
