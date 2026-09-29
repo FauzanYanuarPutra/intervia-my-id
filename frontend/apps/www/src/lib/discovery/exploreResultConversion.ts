@@ -74,7 +74,7 @@ export function getZeroResultRecovery({
   return [
     {
       label: isId ? 'Jelajahi kategori' : 'Browse categories',
-      href: '/explore',
+      href: `/${locale}/explore?side=${searchSide}&tab=all`,
       analyticsAction: 'browse_explore',
     },
     searchSide === 'demand'
