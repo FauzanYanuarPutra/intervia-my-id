@@ -935,59 +935,49 @@ function DiscoveryScopeControl({
       role="group"
       aria-label={isId ? 'Filter jenis lokasi' : 'Filter location type'}
       data-testid="umkm-scope-filter"
-      className={cn(
-        'flex min-w-0 items-center gap-1 overflow-x-auto',
-        'rounded-[14px] border border-slate-200 bg-white p-1',
-        'shadow-[0_8px_20px_-16px_rgba(15,23,42,0.18)]',
-        '[scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
-        'dark:border-white/10',
-        'dark:bg-slate-900/75',
-        'dark:shadow-black/20',
-      )}
+      className="min-w-0 rounded-[14px] border border-slate-200 bg-white p-1 shadow-[0_8px_20px_-16px_rgba(15,23,42,0.18)] dark:border-white/10 dark:bg-slate-900/75 dark:shadow-black/20"
     >
-      {options.map(option => {
-        const active = scope === option.value;
+      <EmblaInlineRail contentClassName="items-center gap-1">
+        {options.map(option => {
+          const active = scope === option.value;
 
-        return (
-          <button
-            key={option.value}
-            type="button"
-            onClick={() => onChange(option.value)}
-            aria-pressed={active}
-            className={cn(
-              'relative shrink-0 rounded-full',
-              'font-semibold leading-none',
-              'transition-all duration-200 ease-out',
-              'outline-none',
-
-              compact
-                ? 'min-h-7 px-2.5 text-[9.5px]'
-                : 'min-h-8 px-3 text-[10.5px]',
-
-              active
-                ? option.activeClass
-                : [
-                    'border border-transparent bg-white text-slate-600',
-                    'hover:border-slate-200 hover:text-slate-900',
-                    'hover:shadow-sm',
-                    'dark:text-slate-400',
-                    'dark:hover:bg-white/[0.07]',
-                    'dark:hover:text-slate-100',
-                  ],
-
-              'focus-visible:ring-2',
-              'focus-visible:ring-[color:var(--app-accent)]/40',
-              'focus-visible:ring-offset-1',
-              'focus-visible:ring-offset-white',
-              'dark:focus-visible:ring-offset-slate-950',
-
-              'active:scale-[0.97]',
-            )}
-          >
-            {option.label}
-          </button>
-        );
-      })}
+          return (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => onChange(option.value)}
+              aria-pressed={active}
+              className={cn(
+                'relative shrink-0 rounded-full',
+                'font-semibold leading-none',
+                'transition-all duration-200 ease-out',
+                'outline-none',
+                compact
+                  ? 'min-h-7 px-2.5 text-[9.5px]'
+                  : 'min-h-8 px-3 text-[10.5px]',
+                active
+                  ? option.activeClass
+                  : [
+                      'border border-transparent bg-white text-slate-600',
+                      'hover:border-slate-200 hover:text-slate-900',
+                      'hover:shadow-sm',
+                      'dark:text-slate-400',
+                      'dark:hover:bg-white/[0.07]',
+                      'dark:hover:text-slate-100',
+                    ],
+                'focus-visible:ring-2',
+                'focus-visible:ring-[color:var(--app-accent)]/40',
+                'focus-visible:ring-offset-1',
+                'focus-visible:ring-offset-white',
+                'dark:focus-visible:ring-offset-slate-950',
+                'active:scale-[0.97]',
+              )}
+            >
+              {option.label}
+            </button>
+          );
+        })}
+      </EmblaInlineRail>
     </div>
   );
 }
