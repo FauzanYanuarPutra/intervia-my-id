@@ -7,6 +7,7 @@ import {
   Database,
   ExternalLink,
   MapPin,
+  MessageCircle,
   PackageSearch,
   ShieldCheck,
 } from 'lucide-react';
