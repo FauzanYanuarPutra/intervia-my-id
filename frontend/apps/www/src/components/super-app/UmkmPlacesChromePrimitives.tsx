@@ -10,7 +10,6 @@ import {
   Lock,
   LockOpen,
   Heart,
-  ImageOff,
   MapPin,
   Route,
   ShoppingBag,
@@ -144,11 +143,13 @@ export function PlaceThumb({
   alt,
   className,
   overlayLabel,
+  kind,
 }: {
   src: string;
   alt: string;
   className?: string;
   overlayLabel?: string;
+  kind?: UmkmPlacePresentation['kind'];
 }) {
   const hasImage =
     Boolean(src.trim()) &&
@@ -172,11 +173,22 @@ export function PlaceThumb({
         />
       ) : (
         <div
-          className="flex h-full min-h-16 w-full items-center justify-center bg-[linear-gradient(145deg,#f1f5f9,#ecfdf5)] text-emerald-700"
+          className="flex h-full min-h-16 w-full flex-col items-center justify-center gap-1.5 bg-[linear-gradient(145deg,#f8fafc,#ecfdf5)] px-3 text-center"
           role="img"
-          aria-label={`${alt}: photo unavailable`}
+          aria-label={kind ? `${alt}: ${kind} category illustration` : `${alt}: photo unavailable`}
         >
-          <ImageOff className="h-5 w-5" aria-hidden="true" />
+          <span
+            className={cn(
+              'inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/90 shadow-[0_10px_20px_-14px_rgba(15,23,42,0.25)]',
+              kind ? toneClass(kind) : 'bg-teal-50 text-teal-700',
+            )}
+          >
+            {(() => {
+              const Icon = kind ? getPlaceIcon(kind) : Store;
+              return <Icon className="h-5 w-5" aria-hidden="true" />;
+            })()}
+          </span>
+          {kind ? <span className="text-[9px] font-bold capitalize text-slate-600">{kind}</span> : null}
         </div>
       )}
       {overlayLabel ? (
@@ -192,10 +204,12 @@ function PlaceGallery({
   images,
   coverImage,
   name,
+  kind,
 }: {
   images: string[];
   coverImage: string;
   name: string;
+  kind?: UmkmPlacePresentation['kind'];
 }) {
   const gallery = (images.length ? images : [coverImage]).filter(Boolean);
   if (!gallery.length) return null;
@@ -205,6 +219,7 @@ function PlaceGallery({
       <PlaceThumb
         src={gallery[0]}
         alt={`${name} 1`}
+        kind={kind}
         className="h-[164px] w-full rounded-[18px] sm:h-[188px]"
       />
     </div>
@@ -548,6 +563,7 @@ export function SelectedPlaceCard<T extends UmkmMapStore>({
         images={gallery}
         coverImage={item.ui.coverImage}
         name={item.store.name}
+        kind={item.ui.kind}
       />
 
       <div className="min-w-0 space-y-2 px-3 py-3 sm:space-y-2.5 sm:p-3.5">
@@ -686,6 +702,7 @@ export function PlaceListButton<T extends UmkmMapStore>({
               key={`${item.store.id}-${image}-${index}`}
               src={image}
               alt={item.store.name}
+              kind={item.ui.kind}
               className="h-[76px] rounded-[14px] sm:h-[88px] sm:rounded-[16px]"
             />
           ))}

@@ -10,13 +10,14 @@ import {
 } from '@/lib/umkmSurface';
 import { formatDistanceKm } from '@/lib/geo/distance';
 import { buildUmkmPlacePresentation } from '@/lib/super-app/umkm-place-ui';
+import { getPlaceIcon, toneClass } from '@/components/super-app/UmkmPlacesChromePrimitives';
 import type { LatLng } from '@/lib/super-app/maps';
 import { Modal } from '@/components/common/Modal';
 import { EmblaDesktopControls } from '@/components/common/EmblaDesktopControls';
 import { useEmblaWheelGestures } from '@/components/common/useEmblaWheelGestures';
 import { CompactSeeAllLink } from '@/components/common/CompactSectionAction';
 import { useViewerLocation } from '@/components/super-app/useViewerLocation';
-import { ArrowRight, BadgeCheck, ImageOff, Target, ChevronRight } from 'lucide-react';
+import { ArrowRight, BadgeCheck, Target, ChevronRight } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import useEmblaCarousel from 'embla-carousel-react';
 
@@ -107,6 +108,7 @@ export default function HomeUmkmCard({
   isId: boolean;
 }) {
   const { store, ui } = item;
+  const CategoryIcon = getPlaceIcon(ui.kind);
   const isPublicReference = isUmkmMapPublicReference(store);
   const metadata =
     store.metadata &&
@@ -182,10 +184,24 @@ export default function HomeUmkmCard({
               className="object-cover transition duration-300 motion-reduce:transform-none group-hover:scale-[1.03]"
             />
           ) : (
-            <div className="flex h-full min-h-[132px] flex-col items-center justify-center gap-2 bg-[linear-gradient(145deg,#f1f5f9,#ecfdf5)] px-3 text-center text-[10px] font-bold leading-4 text-slate-600">
-              <ImageOff className="h-5 w-5 text-emerald-700" />
-              <span>
-                {isId ? 'Belum ada foto berizin' : 'No licensed photo yet'}
+            <div
+              className="flex h-full min-h-[132px] flex-col items-center justify-center gap-2 bg-[linear-gradient(145deg,#f8fafc,#ecfdf5)] px-3 text-center"
+              role="img"
+              aria-label={isId ? 'Ilustrasi kategori' : 'Category illustration'}
+            >
+              <span
+                className={cn(
+                  'inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/90 shadow-[0_10px_24px_-14px_rgba(15,23,42,0.28)]',
+                  toneClass(ui.markerTone),
+                )}
+              >
+                <CategoryIcon className="h-6 w-6" aria-hidden="true" />
+              </span>
+              <span className="text-[10px] font-black tracking-tight text-slate-700">
+                {ui.kindLabel}
+              </span>
+              <span className="text-[9px] font-medium text-slate-500">
+                {isId ? 'Ilustrasi kategori · bukan foto lokasi' : 'Category illustration · not a location photo'}
               </span>
             </div>
           )}
