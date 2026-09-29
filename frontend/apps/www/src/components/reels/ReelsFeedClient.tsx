@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { Link, useRouter } from '@/i18n/navigation';
 import { LajukanImage } from '@/components/common/LajukanImage';
@@ -75,8 +75,12 @@ export default function ReelsFeedClient({ isId }: { isId: boolean }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const search = searchParams.toString();
-  const requestSearch = search ? `${search}&limit=18` : 'limit=18';
+  const requestSearch = useMemo(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('cursor');
+    params.set('limit', '18');
+    return params.toString();
+  }, [searchParams]);
   const storeHint = searchParams.get('store') || '';
   const urlQuery = searchParams.get('q') || '';
   const urlCity = searchParams.get('city') || '';
