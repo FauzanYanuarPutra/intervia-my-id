@@ -277,9 +277,9 @@ export function getListingSideLabel(
   locale: LocaleCode,
 ): string {
   if (locale === 'id') {
-    return side === 'demand' ? 'Sedang mencari' : 'Sedang menawarkan';
+    return side === 'demand' ? 'Kebutuhan Pembeli' : 'Penawaran';
   }
-  return side === 'demand' ? 'Looking for' : 'Offering';
+  return side === 'demand' ? 'Buyer needs' : 'Offers';
 }
 
 export function getListingSideActorLabel(
@@ -287,9 +287,9 @@ export function getListingSideActorLabel(
   locale: LocaleCode,
 ): string {
   if (locale === 'id') {
-    return side === 'demand' ? 'Pencari' : 'Penyedia';
+    return side === 'demand' ? 'Pembeli' : 'Penyedia';
   }
-  return side === 'demand' ? 'Seeker' : 'Provider';
+  return side === 'demand' ? 'Buyer' : 'Provider';
 }
 
 export function getListingSideVerbLabel(
@@ -297,9 +297,9 @@ export function getListingSideVerbLabel(
   locale: LocaleCode,
 ): string {
   if (locale === 'id') {
-    return side === 'demand' ? 'Sedang mencari' : 'Sedang menawarkan';
+    return side === 'demand' ? 'Membutuhkan' : 'Menawarkan';
   }
-  return side === 'demand' ? 'Looking for' : 'Offering';
+  return side === 'demand' ? 'Needs' : 'Offering';
 }
 
 export function getListingSideObjectLabel(
@@ -307,9 +307,9 @@ export function getListingSideObjectLabel(
   locale: LocaleCode,
 ): string {
   if (locale === 'id') {
-    return side === 'demand' ? 'Kebutuhan' : 'Penawaran';
+    return side === 'demand' ? 'Kebutuhan Pembeli' : 'Penawaran';
   }
-  return side === 'demand' ? 'Need' : 'Offer';
+  return side === 'demand' ? 'Buyer need' : 'Offer';
 }
 
 export function getListingSideCounterpartyLabel(
@@ -378,29 +378,29 @@ export function getListingSideContextLabel(
   const normalizedType = normalizeType(type);
   if (locale === 'id') {
     if (normalizedType === 'company') return 'Profil Perusahaan';
-    if (normalizedType === 'job') return side === 'demand' ? 'Sedang mencari kandidat' : 'Menawarkan posisi';
+    if (normalizedType === 'job') return side === 'demand' ? 'Membutuhkan kandidat' : 'Menawarkan posisi';
     if (normalizedType === 'service')
-      return side === 'demand' ? 'Sedang mencari jasa' : 'Menawarkan jasa';
+      return side === 'demand' ? 'Membutuhkan jasa' : 'Menawarkan jasa';
     if (normalizedType === 'property')
-      return side === 'demand' ? 'Sedang mencari properti' : 'Menawarkan properti';
+      return side === 'demand' ? 'Membutuhkan properti' : 'Menawarkan properti';
     if (normalizedType === 'tool_rental')
-      return side === 'demand' ? 'Sedang mencari sewa' : 'Menawarkan sewa';
+      return side === 'demand' ? 'Membutuhkan sewa' : 'Menawarkan sewa';
     if (normalizedType === 'business_transfer')
-      return side === 'demand' ? 'Sedang mencari usaha untuk diambil alih' : 'Menawarkan oper usaha';
-    return side === 'demand' ? 'Sedang mencari produk' : 'Menawarkan produk';
+      return side === 'demand' ? 'Membutuhkan usaha untuk diambil alih' : 'Menawarkan oper usaha';
+    return side === 'demand' ? 'Membutuhkan produk' : 'Menawarkan produk';
   }
 
   if (normalizedType === 'company') return 'Company Profile';
-  if (normalizedType === 'job') return side === 'demand' ? 'Looking for candidates' : 'Offering a position';
+  if (normalizedType === 'job') return side === 'demand' ? 'Needs candidates' : 'Offering a position';
   if (normalizedType === 'service')
-    return side === 'demand' ? 'Looking for a service' : 'Offering a service';
+    return side === 'demand' ? 'Needs a service' : 'Offering a service';
   if (normalizedType === 'property')
-    return side === 'demand' ? 'Looking for a property' : 'Offering a property';
+    return side === 'demand' ? 'Needs a property' : 'Offering a property';
   if (normalizedType === 'tool_rental')
-    return side === 'demand' ? 'Looking for a rental' : 'Offering a rental';
+    return side === 'demand' ? 'Needs a rental' : 'Offering a rental';
   if (normalizedType === 'business_transfer')
-    return side === 'demand' ? 'Looking for a business to acquire' : 'Offering a business transfer';
-  return side === 'demand' ? 'Looking for a product' : 'Product offer';
+    return side === 'demand' ? 'Needs a business to acquire' : 'Offering a business transfer';
+  return side === 'demand' ? 'Needs a product' : 'Product offer';
 }
 
 export function filterFieldsForListingSide(
