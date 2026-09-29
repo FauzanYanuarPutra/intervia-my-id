@@ -467,7 +467,7 @@ function DataSection({
   nextCursor?: string | null;
   loadingCursor?: string | null;
   appendError?: string | null;
-  onNextCursor?: (cursor: string) => void;
+  onNextCursor?: (cursor: string, side: 'supply' | 'demand') => void;
   onRetryNext?: () => void;
 }) {
   const isId = locale === 'id';
@@ -490,10 +490,6 @@ function DataSection({
     loadingCursor && nextCursor && loadingCursor === nextCursor,
   );
 
-  useEffect(() => {
-    setVisibleCount(pageSize);
-  }, [items.length, pageSize]);
-
   const loadNext = useCallback(() => {
     if (canRevealLocalItems) {
       setVisibleCount(current =>
@@ -502,7 +498,7 @@ function DataSection({
       return;
     }
     if (nextCursor && onNextCursor && !isLoadingNext) {
-      onNextCursor(nextCursor);
+      onNextCursor(nextCursor, forcedSide || 'supply');
     }
   }, [
     canRevealLocalItems,
@@ -1093,18 +1089,12 @@ export function ExploreCategoryClient({
     async (
       kind: 'listing' | 'business',
       cursor: string,
+      side: 'supply' | 'demand',
     ) => {
       if (categoryLoadingCursor) return;
 
-      const isLatestNeeds =
-        kind === 'listing' &&
-        category.id !== 'community' &&
-        category.id !== 'video' &&
-        category.sections.some(
-          section => section.key === 'latest-needs',
-        );
-
-      const side = isLatestNeeds ? 'demand' : 'supply';
+      const effectiveSide =
+        kind === 'listing' ? side : 'supply';
       const tab = kind === 'business' ? 'businesses' : 'all';
 
       setCategoryLoadingCursor(cursor);
@@ -1113,7 +1103,7 @@ export function ExploreCategoryClient({
       try {
         const params = new URLSearchParams({
           category: category.slug,
-          side,
+          side: effectiveSide,
           tab,
           sort: 'latest',
           cursor,
@@ -1160,7 +1150,7 @@ export function ExploreCategoryClient({
             };
           };
 
-          if (side === 'demand') {
+          if (effectiveSide === 'demand') {
             mergeGroup('needs');
           } else if (kind === 'business') {
             mergeGroup('businesses');
@@ -1185,8 +1175,6 @@ export function ExploreCategoryClient({
       }
     },
     [
-      category.id,
-      category.sections,
       category.slug,
       categoryLoadingCursor,
       isId,
@@ -2411,13 +2399,13 @@ export function ExploreCategoryClient({
                           loadingCursor={categoryLoadingCursor}
                           appendError={categoryAppendError}
                           onNextCursor={cursor => {
-                            void loadCategoryMore('listing', cursor);
+                            void loadCategoryMore('listing', cursor, 'demand');
                           }}
                           onRetryNext={() => {
                             const cursor =
                               groups?.needs.nextCursor || null;
                             if (cursor) {
-                              void loadCategoryMore('listing', cursor);
+                              void loadCategoryMore('listing', cursor, 'demand');
                             }
                           }}
                         />
@@ -2450,13 +2438,13 @@ export function ExploreCategoryClient({
                           loadingCursor={categoryLoadingCursor}
                           appendError={categoryAppendError}
                           onNextCursor={cursor => {
-                            void loadCategoryMore('business', cursor);
+                            void loadCategoryMore('business', cursor, 'supply');
                           }}
                           onRetryNext={() => {
                             const cursor =
                               groups?.businesses.nextCursor || null;
                             if (cursor) {
-                              void loadCategoryMore('business', cursor);
+                              void loadCategoryMore('business', cursor, 'supply');
                             }
                           }}
                         />
@@ -2515,7 +2503,7 @@ export function ExploreCategoryClient({
                               category.id !== 'community' &&
                               category.id !== 'video'
                             ) {
-                              void loadCategoryMore('listing', cursor);
+                              void loadCategoryMore('listing', cursor, 'demand');
                             }
                           }}
                           onRetryNext={() => {
@@ -2528,7 +2516,7 @@ export function ExploreCategoryClient({
                               category.id !== 'community' &&
                               category.id !== 'video'
                             ) {
-                              void loadCategoryMore('listing', cursor);
+                              void loadCategoryMore('listing', cursor, 'demand');
                             }
                           }}
                         />
