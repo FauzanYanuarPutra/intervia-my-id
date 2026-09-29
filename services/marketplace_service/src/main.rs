@@ -11642,7 +11642,11 @@ async fn list_content(
                   coalesce(metadata->>'skills', '') ILIKE ('%' || $2 || '%') OR
                   coalesce(metadata->>'profession', '') ILIKE ('%' || $2 || '%') OR
                   coalesce(metadata->>'property_type', '') ILIKE ('%' || $2 || '%') OR
-                  coalesce(metadata->>'work_mode', '') ILIKE ('%' || $2 || '%')
+                  coalesce(metadata->>'work_mode', '') ILIKE ('%' || $2 || '%') OR
+                  coalesce(metadata->>'marketplace_category_slug', '') ILIKE ('%' || $2 || '%') OR
+                  coalesce(metadata->>'marketplace_subcategory_slug', '') ILIKE ('%' || $2 || '%') OR
+                  coalesce(content_items.listing_intent, '') ILIKE ('%' || $2 || '%') OR
+                  coalesce(content_items.content_type, '') ILIKE ('%' || $2 || '%')
                 )
               )
           )
@@ -11736,8 +11740,17 @@ async fn list_content(
                   WHEN regexp_replace(lower(btrim(coalesce(metadata->>'listing_side', ''))), '[_-]+', ' ', 'g')
                     IN ('supply', 'offer', 'offering', 'available', 'provider', 'seller', 'sell', 'penyedia', 'menawarkan', 'menyediakan', 'tersedia')
                     THEN 'supply'
+                  WHEN regexp_replace(lower(btrim(coalesce(content_items.listing_intent, ''))), '[_-]+', ' ', 'g')
+                    IN ('demand', 'need', 'needs', 'needed', 'request', 'requested', 'wanted', 'looking', 'seeker', 'buyer request', 'buy request', 'pencari', 'mencari', 'dibutuhkan', 'butuh', 'minta')
+                    THEN 'demand'
+                  WHEN regexp_replace(lower(btrim(coalesce(content_items.listing_intent, ''))), '[_-]+', ' ', 'g')
+                    IN ('supply', 'offer', 'offering', 'available', 'provider', 'seller', 'sell', 'penyedia', 'menawarkan', 'menyediakan', 'tersedia')
+                    THEN 'supply'
+                  WHEN lower(btrim(coalesce(content_items.content_type, ''))) IN ('request', 'need', 'needs', 'demand')
+                    THEN 'demand'
                   WHEN btrim(coalesce(metadata->>'market_side', '')) = ''
                     AND btrim(coalesce(metadata->>'listing_side', '')) = ''
+                    AND btrim(coalesce(content_items.listing_intent, '')) = ''
                     THEN 'supply'
                   ELSE NULL
                 END
