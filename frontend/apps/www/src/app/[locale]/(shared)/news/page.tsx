@@ -44,15 +44,6 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
   };
 }
 
-function buildNewsIndexHref(filters: { category?: string; query?: string; cursor?: string }) {
-  const params = new URLSearchParams();
-  if (filters.category) params.set('category', filters.category);
-  if (filters.query) params.set('q', filters.query);
-  if (filters.cursor) params.set('cursor', filters.cursor);
-  const query = params.toString();
-  return query ? `/news?${query}` : '/news';
-}
-
 export default async function NewsIndexPage({ params, searchParams }: PageProps) {
   const { locale } = await params;
   const filters = await searchParams;
