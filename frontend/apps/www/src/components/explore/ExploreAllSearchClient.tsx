@@ -146,7 +146,7 @@ function canonicalizeMarketplaceParams(
   params.set('side', side);
 
   if (side === 'demand') {
-    params.set('tab', 'needs');
+    params.set('tab', 'all');
     return;
   }
 
@@ -973,11 +973,7 @@ export function ExploreAllSearchClient({
     updateParams(
       {
         side: mode,
-        tab:
-          mode ===
-          'demand'
-            ? 'needs'
-            : 'all',
+        tab: 'all',
         category:
           activeCategory?.slug ||
           null,
@@ -1015,11 +1011,13 @@ export function ExploreAllSearchClient({
       'demand'
     ) {
       /**
-       * Demand has exactly one marketplace tab.
+       * Demand has one contextual marketplace view:
+       * All demand results. The backend represents these
+       * items in the `needs` group.
        */
       updateParams({
         side: 'demand',
-        tab: 'needs',
+        tab: 'all',
       });
 
       void trackLajukanEvent(
@@ -1248,7 +1246,7 @@ export function ExploreAllSearchClient({
         ? 'users'
         : searchSide ===
             'demand'
-          ? 'needs'
+          ? 'all'
           : SUPPLY_TABS.has(
                 state.tab,
               )
@@ -1453,7 +1451,7 @@ export function ExploreAllSearchClient({
                   <input
                     type="hidden"
                     name="tab"
-                    value="needs"
+                    value="all"
                   />
                 ) : (
                   <input
