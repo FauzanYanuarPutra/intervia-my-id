@@ -913,7 +913,7 @@ export default function CommunityGroupDetailClient({
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[color:var(--app-surface-muted)] pb-[max(24px,env(safe-area-inset-bottom))] pt-0">
-      <div className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 px-3 py-2 pt-[max(8px,env(safe-area-inset-top))] backdrop-blur lg:hidden">
+      {/* <div className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 px-3 py-2 pt-[max(8px,env(safe-area-inset-top))] backdrop-blur lg:hidden">
         <div className="flex min-h-9 items-center gap-2">
           <Link
             href="/community"
@@ -968,7 +968,7 @@ export default function CommunityGroupDetailClient({
             </button>
           ) : null}
         </div>
-      </div>
+      </div> */}
 
       <div className="mx-auto grid w-full max-w-[1180px] grid-cols-1 gap-4 px-0 sm:px-2 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start lg:px-3 xl:px-0">
         <aside className="hidden">
