@@ -102,6 +102,7 @@ type MapPointResponse = {
       lng: number;
       category: string;
       source_kind: string;
+      metadata?: Record<string, unknown>;
     }>;
   };
   error?: string;
@@ -1495,21 +1496,27 @@ export function UmkmDiscoveryPanel({
               description: null,
               phone: null,
               metadata: {
-                marketplace_category_slug: point.category,
-                umkm_category: point.category,
+                ...(point.metadata || {}),
+                marketplace_category_slug:
+                  point.metadata?.marketplace_category_slug || point.category,
+                umkm_category:
+                  point.metadata?.umkm_category,
                 record_kind:
                   point.source_kind.includes('reference')
-                    ? 'open_data_reference'
-                    : 'registered_store',
-                market_side: point.source_kind.includes('reference')
-                  ? 'reference'
-                  : 'supply',
-                is_transactional: !point.source_kind.includes('reference'),
-                reference_publication_status: point.source_kind.includes('reference')
-                  ? 'published'
-                  : undefined,
+                    ? point.metadata?.record_kind || 'open_data_reference'
+                    : point.metadata?.record_kind || 'registered_store',
+                market_side:
+                  point.source_kind.includes('reference')
+                    ? 'reference'
+                    : point.metadata?.market_side || 'supply',
+                is_transactional:
+                  !point.source_kind.includes('reference'),
+                reference_publication_status:
+                  point.source_kind.includes('reference')
+                    ? 'published'
+                    : point.metadata?.reference_publication_status,
                 claimable: point.source_kind.includes('reference'),
-                source_dataset: point.source_kind,
+                source_dataset: point.metadata?.source_dataset || point.source_kind,
                 is_public_reference: point.source_kind.includes('reference'),
               },
               online_order_enabled: false,
