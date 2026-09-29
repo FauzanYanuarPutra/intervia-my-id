@@ -169,7 +169,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { locale, slug } = await params;
   const item = await fetchPropertyContent(slug);
-  if (!item) return { title: 'Property Not Found | Lajukan' };
+  if (!item) return { title: 'Property Not Found | Lajukan', robots: { index: false, follow: true } };
 
   const property = mapToPropertyDetail(item);
   return {
