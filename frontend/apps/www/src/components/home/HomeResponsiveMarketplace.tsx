@@ -3831,6 +3831,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
         side: 'demand',
         include_owner: '1',
         database_only: '1',
+        marketplace_only: '1',
       });
       addViewerLocation(params);
       if (viewerLocationKey) {
