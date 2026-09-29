@@ -973,7 +973,6 @@ function mapContentToRecommendation(
   item: ContentItem,
   isId: boolean,
   allowViewerDistance = false,
-  forcedSide?: 'supply' | 'demand',
 ): RecommendationItem | null {
   if (!item.id || !item.title) return null;
   const images = resolveImageGallery(item);
@@ -981,11 +980,9 @@ function mapContentToRecommendation(
   const statsRating = item.seller_stats?.rating ?? item.rating;
   const statsReviews = item.seller_stats?.review_count ?? item.review_count;
   const type = item.content_type || item.category;
-  const side = forcedSide || resolveListingSide({
+  const side = resolveListingSide({
     type,
     metadata: item.metadata,
-    title: item.title,
-    summary: item.summary,
   });
   const vendor =
     readText(item.owner_profile?.full_name) ||
@@ -3879,7 +3876,6 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
                 item,
                 isId,
                 Boolean(viewerLocationKey),
-                'supply',
               ),
             )
             .filter((item): item is RecommendationItem => Boolean(item))
@@ -3912,7 +3908,6 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
                 item,
                 isId,
                 Boolean(viewerLocationKey),
-                'demand',
               ),
             )
             .filter((item): item is RecommendationItem => Boolean(item))
