@@ -135,6 +135,18 @@ function exploreMetadataCopy(
     };
   }
 
+  if (side === 'supply') {
+    return {
+      title: isId
+        ? 'Lihat Penawaran Usaha | Lajukan'
+        : 'Explore Business Offers | Lajukan',
+
+      description: isId
+        ? 'Jelajahi produk, jasa, dan usaha yang menawarkan sesuatu di Lajukan.'
+        : 'Explore products, services, and businesses offering something on Lajukan.',
+    };
+  }
+
   return {
     title: isId
       ? 'Cari Kebutuhan Usaha | Lajukan'
