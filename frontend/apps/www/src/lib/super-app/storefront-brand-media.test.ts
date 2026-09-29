@@ -77,4 +77,46 @@ describe('public storefront brand media', () => {
       }),
     ).toMatchObject({ galleryUrls: ['/api/forum/media/interior.webp'] });
   });
+  it('uses an approved contributor photo when no owner image exists', () => {
+    expect(
+      resolveStorefrontBrandMedia({
+        gallery_media_primary: '/api/forum/media/contributor-primary.jpg',
+        gallery_media_items: [
+          {
+            url: '/api/forum/media/contributor-primary.jpg',
+            media_type: 'image',
+            is_primary: true,
+          },
+          {
+            url: '/api/forum/media/contributor-second.jpg',
+            media_type: 'image',
+          },
+        ],
+      }),
+    ).toMatchObject({
+      logoUrl: null,
+      coverUrl: '/api/forum/media/contributor-primary.jpg',
+      galleryUrls: ['/api/forum/media/contributor-second.jpg'],
+      seoImageUrl: '/api/forum/media/contributor-primary.jpg',
+    });
+  });
+
+  it('ignores approved contributor videos as card artwork', () => {
+    expect(
+      resolveStorefrontBrandMedia({
+        gallery_media_items: [
+          {
+            url: '/api/forum/media/place-video.mp4',
+            media_type: 'video',
+            is_primary: true,
+          },
+          {
+            url: '/api/forum/media/place-photo.jpg',
+            media_type: 'image',
+          },
+        ],
+      }).coverUrl,
+    ).toBe('/api/forum/media/place-photo.jpg');
+  });
+
 });
