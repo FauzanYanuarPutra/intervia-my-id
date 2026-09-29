@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { ArrowLeft, MapPin } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { NewsInfiniteGrid } from '@/components/news/NewsInfiniteGrid';
-import { buildNewsFacetUrl, getNewsLanguageAvailability, getPublishedNews } from '@/lib/news';
+import { buildNewsFacetPath, buildNewsFacetUrl, getNewsLanguageAvailability, getPublishedNews } from '@/lib/news';
 
 type Props = {
   params: Promise<{ locale: string; location: string }>;
@@ -81,6 +81,16 @@ export default async function NewsLocationPage({ params, searchParams }: Props) 
         {isId ? 'Belum ada berita untuk wilayah ini.' : 'No news for this location yet.'}
       </div>
     )}
+    {nextCursor ? (
+      <Link
+        href={buildNewsFacetPath('location', value) + `?cursor=${encodeURIComponent(nextCursor)}`}
+        rel="next"
+        className="sr-only"
+        aria-label={isId ? 'Berita daerah berikutnya' : 'Next local news page'}
+      >
+        {isId ? 'Berita daerah berikutnya' : 'Next local news page'}
+      </Link>
+    ) : null}
     </main>
   );
 }
