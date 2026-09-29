@@ -22,6 +22,7 @@ type MapPointsResponse = {
       lng: number;
       category: string;
       source_kind: string;
+      metadata?: Record<string, unknown>;
     }>;
   };
   error?: string;
