@@ -175,7 +175,7 @@ async fn persist_reference_record(
     resource_url: Option<&str>,
     resource_license: &str,
     raw: &Value,
-) -> Result<Uuid, sqlx::Error> {
+) -> Result<(Uuid, bool), sqlx::Error> {
     let safe = if source.8 { raw.clone() } else { redact(raw) };
     let record_id = raw
         .get("_id")
@@ -189,14 +189,48 @@ async fn persist_reference_record(
         "open_data_reference"
     };
 
-    sqlx::query(
-        "INSERT INTO data_import_records (job_id,source_id,source_record_id,source_url,source_hash,record_kind,license_snapshot,attribution_snapshot,raw_metadata,validation_status,validation_reason,last_seen_at,updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'accepted',$10,NOW(),NOW()) ON CONFLICT (source_id,source_record_id) DO UPDATE SET job_id=EXCLUDED.job_id,source_url=EXCLUDED.source_url,source_hash=EXCLUDED.source_hash,raw_metadata=EXCLUDED.raw_metadata,validation_status='accepted',last_seen_at=NOW(),updated_at=NOW()",
+    // Refresh unchanged records with a single lightweight UPDATE. Re-runs of the
+    // same external dataset therefore avoid the heavier entity-resolution and
+    // reference-promotion pipeline below.
+    if let Some(id) = sqlx::query_scalar::<_, Uuid>(
+        "UPDATE data_import_records
+         SET job_id=$1,
+             source_url=$4,
+             last_seen_at=NOW(),
+             updated_at=NOW()
+         WHERE source_id=$2
+           AND source_record_id=$3
+           AND source_hash=$5
+         RETURNING id",
     )
     .bind(job_id)
     .bind(source.0)
     .bind(&record_id)
     .bind(resource_url)
-    .bind(source_hash)
+    .bind(&source_hash)
+    .fetch_optional(&state.db)
+    .await?
+    {
+        return Ok((id, false));
+    }
+
+    sqlx::query(
+        "INSERT INTO data_import_records (job_id,source_id,source_record_id,source_url,source_hash,record_kind,license_snapshot,attribution_snapshot,raw_metadata,validation_status,validation_reason,last_seen_at,updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'accepted',$10,NOW(),NOW())
+         ON CONFLICT (source_id,source_record_id) DO UPDATE
+         SET job_id=EXCLUDED.job_id,
+             source_url=EXCLUDED.source_url,
+             source_hash=EXCLUDED.source_hash,
+             raw_metadata=EXCLUDED.raw_metadata,
+             validation_status='accepted',
+             last_seen_at=NOW(),
+             updated_at=NOW()",
+    )
+    .bind(job_id)
+    .bind(source.0)
+    .bind(&record_id)
+    .bind(resource_url)
+    .bind(&source_hash)
     .bind(kind)
     .bind(if resource_license.is_empty() {
         source.5.as_deref()
@@ -209,13 +243,15 @@ async fn persist_reference_record(
     .execute(&state.db)
     .await?;
 
-    sqlx::query_scalar::<_, Uuid>(
+    let id = sqlx::query_scalar::<_, Uuid>(
         "SELECT id FROM data_import_records WHERE source_id=$1 AND source_record_id=$2 LIMIT 1",
     )
     .bind(source.0)
     .bind(&record_id)
     .fetch_one(&state.db)
-    .await
+    .await?;
+
+    Ok((id, true))
 }
 
 async fn publish_aggregate_if_needed(
@@ -411,8 +447,11 @@ async fn run_inner(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
                 )
                 .await
                 {
-                    Ok(import_record_id) => {
+                    Ok((import_record_id, changed)) => {
                         accepted += 1;
+                        if !changed {
+                            continue;
+                        }
                         match crate::data_entity_resolution::index_record(
                             &state.db,
                             source.0,
@@ -520,8 +559,11 @@ async fn run_inner(state: Arc<AppState>, job_id: Uuid) -> Result<()> {
                 )
                 .await
                 {
-                    Ok(import_record_id) => {
+                    Ok((import_record_id, changed)) => {
                         accepted += 1;
+                        if !changed {
+                            continue;
+                        }
                         match crate::data_entity_resolution::index_record(
                             &state.db,
                             source.0,
