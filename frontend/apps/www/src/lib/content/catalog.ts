@@ -37,6 +37,12 @@ export type ContentItem = {
   category?: string;
   content_status?: string | null;
   status?: string | null;
+  side?: string | null;
+  listing_side?: string | null;
+  market_side?: string | null;
+  listing_intent?: string | null;
+  market_intent?: string | null;
+  intent?: string | null;
   cover_image?: string | null;
   image_url?: string | null;
   image_urls?: unknown;
