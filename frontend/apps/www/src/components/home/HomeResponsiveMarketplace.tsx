@@ -103,7 +103,7 @@ import {
 import { resolveContentPriceUnitLabel } from '@/lib/content/priceUnit';
 import { buildContentHref } from '@/lib/content/routes';
 import {
-  getListingSideObjectLabel,
+  getListingSideContextLabel,
   getListingValueFallback,
   resolveListingSide,
 } from '@/lib/content/listingSide';
@@ -2235,11 +2235,11 @@ function HomeListingCarouselSection({
       aria-label={
         isDemand
           ? isId
-            ? 'Sedang dicari pembeli'
-            : 'Sought by buyers'
+            ? 'Sedang mencari'
+            : 'People looking for it'
           : isId
-            ? 'Tersedia untuk usahamu'
-            : 'Available for your business'
+            ? 'Yang tersedia'
+            : 'Available now'
       }
     >
       <div className="flex min-w-0 items-center gap-1.5 px-2 sm:px-3 md:px-4 lg:px-6">
@@ -2252,18 +2252,18 @@ function HomeListingCarouselSection({
         <h2 className="min-w-0 truncate text-[11px] font-bold leading-5 tracking-tight text-[color:var(--app-text)] sm:text-xs">
           {isDemand
             ? isId
-              ? 'Sedang dicari pembeli'
-              : 'Sought by buyers'
+              ? 'Sedang mencari'
+              : 'People looking for it'
             : isId
-              ? 'Tersedia untuk usahamu'
-              : 'Available for your business'}
+              ? 'Yang tersedia'
+              : 'Available now'}
         </h2>
 
         <span className="hidden shrink-0 text-[9px] font-medium text-zinc-400 sm:inline">
           {isDemand
             ? isId
-              ? 'Permintaan produk & jasa yang sedang aktif'
-              : 'Active product & service requests'
+              ? 'Pelaku usaha yang sedang mencari produk atau jasa'
+              : 'Businesses currently looking for products or services'
             : isId
               ? 'Produk, jasa, lokasi & sewa yang tersedia'
               : 'Products, services, places & rentals available'}
@@ -2919,7 +2919,7 @@ function RecommendationCard({
           {/* SIDE */}
           {item.side ? (
             <span
-              title={getListingSideObjectLabel(item.side, isId ? 'id' : 'en')}
+              title={getListingSideContextLabel(item.side, item.contentType, isId ? 'id' : 'en')}
               className={cn(
                 'max-w-[42%] shrink-0 truncate rounded-full px-2 py-1 text-[8px] font-bold leading-none sm:max-w-[45%] sm:text-[9px]',
                 isDemand
