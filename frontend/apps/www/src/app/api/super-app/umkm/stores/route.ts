@@ -909,59 +909,6 @@ export async function GET(req: NextRequest) {
   }
 }
 
-export async function GET_MAP_POINTS(req: NextRequest) {
-  try {
-    const security = await enforceAuthRouteSecurity(req, {
-      routeKey: 'super-app-umkm-map-points',
-      ipLimit: 600,
-      deviceLimit: 500,
-      windowSeconds: 3600,
-    });
-    if (!security.ok) return security.response;
-    const rl = await enforceRateLimit({
-      key: `superapp:umkm:map-points:${security.ip}`,
-      limit: 300,
-      windowSeconds: 3600,
-      message: 'Too many map point requests. Please retry shortly.',
-    });
-    if (!rl.ok) return rl.response;
-
-    const url = new URL(req.url);
-    const parsed = parseMapBounds(url);
-    if (!parsed) return NextResponse.json({ error: 'Invalid map query' }, { status: 400 });
-    const viewerLat = parseCoord(url.searchParams.get('viewer_lat'));
-    const viewerLng = parseCoord(url.searchParams.get('viewer_lng'));
-    const viewer =
-      viewerLat !== null && viewerLng !== null && isCoordinateValid({ lat: viewerLat, lng: viewerLng })
-        ? { lat: viewerLat, lng: viewerLng }
-        : null;
-    if ((url.searchParams.get('viewer_lat') !== null) !== (url.searchParams.get('viewer_lng') !== null)) {
-      return NextResponse.json({ error: 'Viewer coordinates must be provided together' }, { status: 400 });
-    }
-    if (url.searchParams.get('viewer_lat') !== null && !viewer) {
-      return NextResponse.json({ error: 'Invalid viewer coordinates' }, { status: 400 });
-    }
-    const limit = Math.min(2000, Math.max(1, Number(url.searchParams.get('limit') || '1000')));
-    if (!Number.isSafeInteger(limit)) {
-      return NextResponse.json({ error: 'Invalid map point limit' }, { status: 400 });
-    }
-    const items = await listPublicMapPoints({
-      q: parsed.query.q || undefined,
-      city: parsed.query.city || undefined,
-      limit,
-      bounds: parsed.bounds,
-      viewer,
-    });
-    return NextResponse.json(
-      { data: { items, count: items.length } },
-      { headers: { 'Cache-Control': viewer ? 'private, no-store' : 'public, s-maxage=10, stale-while-revalidate=30' } },
-    );
-  } catch (error) {
-    console.warn('[UMKM_MAP_POINTS_ERROR]', error);
-    return NextResponse.json({ error: 'Failed to load map points' }, { status: 502 });
-  }
-}
-
 export async function POST(req: NextRequest) {
   try {
     const auth = await requireAuth(req);
