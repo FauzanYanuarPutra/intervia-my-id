@@ -251,9 +251,9 @@ type RecommendationItem = {
 function recommendationScore(item: RecommendationItem): number {
   let score = 0;
 
-  // First-party Lajukan sources always rank ahead of public/imported references.
-  // Transactional marketplace listings are preferred for discovery; registered
-  // business profiles are complementary and fill the remaining Home slots.
+  // First-party Lajukan data must win over external/imported data. Native
+  // business profiles and transactional listings are both first-party; the
+  // Home composer decides their slot order explicitly.
   score += Math.max(0, 20 - item.sourcePriority * 5);
 
   if (item.verified) score += 8;
@@ -307,14 +307,14 @@ function buildHomeSupplyItems(
   maxItems = 12,
 ): RecommendationItem[] {
   const listingItems = rankRecommendations(
-    contentItems.map(item => ({ ...item, sourcePriority: 0 })),
+    contentItems.map(item => ({ ...item, sourcePriority: 1 })),
   );
   const storeItems = rankRecommendations(
-    nativeStoreItems.map(item => ({ ...item, sourcePriority: 1 })),
+    nativeStoreItems.map(item => ({ ...item, sourcePriority: 0 })),
   );
 
-  // Keep transactional offers visible first, while reserving a few slots for
-  // registered Lajukan businesses so a long listing feed cannot hide them.
+  // Registered Lajukan businesses are first-party business truth. Put them
+  // first, then fill the remaining slots with first-party marketplace offers.
   const listingSlots = Math.min(HOME_SUPPLY_LISTING_SLOTS, maxItems);
   const storeSlots = Math.min(HOME_SUPPLY_STORE_SLOTS, maxItems - listingSlots);
   // First-party Lajukan businesses are the strongest source of truth for
