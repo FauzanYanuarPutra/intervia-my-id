@@ -11,10 +11,18 @@ type HomeBusinessMapSectionProps = {
   locale: string;
 };
 
-type StoresResponse = {
+type MapPointsResponse = {
   data?: {
-    items?: UmkmMapStore[];
-    stores_backend_degraded?: boolean;
+    items?: Array<{
+      id: string;
+      slug: string;
+      name: string;
+      city: string;
+      lat: number;
+      lng: number;
+      category: string;
+      source_kind: string;
+    }>;
   };
   error?: string;
 };
@@ -82,14 +90,14 @@ export function HomeBusinessMapSection({
         try {
           setError(null);
           const response = await fetch(
-            '/api/super-app/umkm/stores?map=1&limit=200&include_references=1&min_lat=-11&max_lat=6&min_lng=95&max_lng=141',
+            '/api/super-app/umkm/map-points?limit=200&min_lat=-11&max_lat=6&min_lng=95&max_lng=141',
             {
               cache: 'default',
               credentials: 'include',
               signal: controller.signal,
             },
           );
-          const payload = (await response.json().catch(() => ({}))) as StoresResponse;
+          const payload = (await response.json().catch(() => ({}))) as MapPointsResponse;
 
           if (!response.ok || !payload.data?.items) {
             throw new Error(
@@ -99,8 +107,26 @@ export function HomeBusinessMapSection({
           }
 
           if (!active) return;
-          setStores(payload.data.items);
-          setBackendDegraded(payload.data.stores_backend_degraded === true);
+          setStores(
+            payload.data.items.map(item => ({
+              id: item.id,
+              slug: item.slug,
+              name: item.name,
+              city: item.city,
+              address: item.city,
+              lat: item.lat,
+              lng: item.lng,
+              metadata: {
+                marketplace_category_slug: item.category,
+                record_kind:
+                  item.source_kind.includes('reference')
+                    ? item.source_kind
+                    : undefined,
+                is_public_reference: item.source_kind.includes('reference'),
+              },
+            })),
+          );
+          setBackendDegraded(false);
           setError(null);
           setLoading(false);
           return;
@@ -212,6 +238,7 @@ export function HomeBusinessMapSection({
           controls={false}
           theme="default"
           focusMode="indonesia"
+          showPopups={false}
           className="leaflet-home-map h-[126px] w-full sm:h-[140px]"
         />
 
