@@ -75,7 +75,14 @@ impl ToolRegistry {
 
         {
             let mut query = url.query_pairs_mut();
-            query.append_pair("q", &intent.normalized_query);
+            let search_query = if intent.search_query.trim().is_empty() {
+                intent.normalized_query.trim()
+            } else {
+                intent.search_query.trim()
+            };
+            if !search_query.is_empty() {
+                query.append_pair("q", search_query);
+            }
             query.append_pair("marketplace_only", "true");
             query.append_pair("status", "active");
             query.append_pair("limit", &self.config.max_results.clamp(1, 30).to_string());
@@ -204,7 +211,11 @@ impl ToolRegistry {
                 name: "search_listings".to_string(),
                 status: "success".to_string(),
                 result_count: sources.len(),
-                query: intent.normalized_query.clone(),
+                query: if intent.search_query.trim().is_empty() {
+                    intent.normalized_query.clone()
+                } else {
+                    intent.search_query.clone()
+                },
                 side: intent.side.as_str().to_string(),
                 category: intent.category.clone(),
                 location: intent.location.clone(),
