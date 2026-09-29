@@ -1,4 +1,6 @@
+import type { Metadata } from 'next';
 import { LocalizedLink } from '@/components/ui-kit';
+import { buildPublicPageMetadata } from '@/lib/seo/publicPageMetadata';
 import SupportTicketForm from '@/components/support/SupportTicketForm';
 import { ArrowRight, BookOpenCheck, Building2, CheckCircle2, Clock3, FileText, ImageIcon, LifeBuoy, MessageCircle, ShieldCheck, UserRoundCheck, type LucideIcon } from 'lucide-react';
 import { buildUsahaPath } from '@/lib/umkmSurface';
@@ -27,6 +29,18 @@ const helpShortcuts = [
   { label: 'Chat tidak nyambung', hint: 'DM, grup, support room' },
   { label: 'Listing saya salah', hint: 'Judul, kategori, foto, status' },
 ];
+
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
+  const { locale } = await params;
+  return buildPublicPageMetadata({
+    locale,
+    path: '/support',
+    titleId: 'Bantuan Lajukan',
+    titleEn: 'Lajukan Support',
+    descriptionId: 'Dapatkan bantuan untuk akun, listing, media, chat, komunitas, dan halaman usaha di Lajukan.',
+    descriptionEn: 'Get help with your account, listings, media, chat, community, and business pages on Lajukan.',
+  });
+}
 
 export default function SupportPage() {
   return (
