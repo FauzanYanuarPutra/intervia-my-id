@@ -2320,6 +2320,7 @@ export function ExploreCategoryClient({
                             category
                           }
                           kind="listing"
+                          initialNextCursor={groups?.needs.nextCursor}
                         />
                       );
                     }
@@ -2385,6 +2386,14 @@ export function ExploreCategoryClient({
                                 ? 'video'
                                 : 'listing'
                           }
+                          initialNextCursor={
+                            category.id === 'video'
+                              ? groups?.videos.nextCursor
+                              : category.id === 'community'
+                                ? null
+                                : groups?.products.nextCursor ||
+                                  groups?.services.nextCursor
+                          }
                         />
                       );
                     }
@@ -2392,6 +2401,9 @@ export function ExploreCategoryClient({
                     if (
                       section.key ===
                       'communities'
+                    if (
+                      section.key ===
+                      'communities')
                     ) {
                       return (
                         <DataSection
@@ -2436,6 +2448,7 @@ export function ExploreCategoryClient({
                             category
                           }
                           kind="video"
+                          initialNextCursor={groups?.videos.nextCursor}
                         />
                       );
                     }
