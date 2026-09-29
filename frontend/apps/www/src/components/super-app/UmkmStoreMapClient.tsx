@@ -1533,15 +1533,23 @@ export function UmkmStoreMapClient({
         const cached = ROUTE_CACHE.get(cacheKey);
         if (cached && cached.expiresAt > now) {
           const payload = { data: cached.payload } as RoutingResponse;
-          if (!active) return;
-          const nextRoutePositions = (payload.data?.points || [])
+          if (!active || !payload.data) return;
+
+          if (payload.data.used_fallback) {
+            setRoutePositions(null);
+            onRouteResolved?.({
+              distance_m: payload.data.distance_m,
+              duration_s: payload.data.duration_s,
+              used_fallback: true,
+              provider: payload.data.provider,
+            });
+            return;
+          }
+
+          const nextRoutePositions = payload.data.points
             .map(point => [point.lat, point.lng] as [number, number])
             .filter(isValidRoutePoint);
-          if (
-            nextRoutePositions.length >= 2 &&
-            payload.data &&
-            !payload.data.used_fallback
-          ) {
+          if (nextRoutePositions.length >= 2) {
             setRoutePositions(nextRoutePositions);
             onRouteResolved?.({
               distance_m: payload.data.distance_m,
