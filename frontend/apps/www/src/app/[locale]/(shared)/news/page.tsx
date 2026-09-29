@@ -111,7 +111,7 @@ export default async function NewsIndexPage({ params, searchParams }: PageProps)
             <h1 className="max-w-4xl text-[28px] font-black leading-[1.04] tracking-[-0.055em] text-slate-950 dark:text-white sm:text-[42px]">
               {isId ? 'Berita yang bantu kamu mengambil langkah.' : 'News that helps you decide what to do next.'}
             </h1>
-            <p className="mt-2.5 max-w-2xl text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300 sm:text-[15px]">
+            <p className="mt-2.5 max-w-2xl text-[13px] font-semibold leading-6 text-slate-600 dark:text-slate-300 sm:text-[15px]">
               {isId
                 ? 'Ringkas, jelas, dan fokus pada perubahan yang punya arti untuk usaha.'
                 : 'Clear, practical updates focused on changes that matter to businesses.'}
