@@ -2627,11 +2627,12 @@ function RecommendationCard({
         )}
       >
         {image ? (
-          <img
+          <Image
             src={image}
             alt={item.title || fallbackTitle}
+            fill
+            sizes="(max-width: 640px) 76vw, 240px"
             loading="lazy"
-            decoding="async"
             draggable={false}
             className="
               h-full
