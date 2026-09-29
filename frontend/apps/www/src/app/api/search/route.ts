@@ -1498,6 +1498,16 @@ async function fetchJson(
   }
 }
 
+function nextContentOffsetCursor(payload: JsonRecord | null): string | null {
+  if (!payload || payload.has_more !== true) return null;
+  const offset = readNumber(payload.offset) ?? 0;
+  const limit = readNumber(payload.limit) ?? 0;
+  const nextOffset = Math.round(offset + limit);
+  return Number.isSafeInteger(nextOffset) && nextOffset > offset
+    ? String(nextOffset)
+    : null;
+}
+
 function group(
   items: Array<
     GlobalSearchItem | null
@@ -1767,6 +1777,10 @@ export async function GET(
           ? '24'
           : '48',
     });
+
+  if (state.offset > 0) {
+    params.set('offset', String(state.offset));
+  }
 
   if (effectiveQuery) {
     params.set(
@@ -2333,6 +2347,8 @@ export async function GET(
         return true;
       });
 
+  const contentNextCursor = nextContentOffsetCursor(contentPayload);
+
   const businessPayload =
     asRecord(
       asRecord(
@@ -2391,6 +2407,7 @@ export async function GET(
         : null,
       relevanceQuery,
     );
+  response.groups.products.nextCursor = contentNextCursor;
 
   /**
    * Supply = services.
@@ -2413,6 +2430,7 @@ export async function GET(
         : null,
       relevanceQuery,
     );
+  response.groups.services.nextCursor = contentNextCursor;
 
   /**
    * Demand = needs.
@@ -2435,6 +2453,7 @@ export async function GET(
         : null,
       relevanceQuery,
     );
+  response.groups.needs.nextCursor = contentNextCursor;
 
   response.groups.references =
     group(
