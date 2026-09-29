@@ -1,3 +1,5 @@
+import { buildPublicPageMetadata } from '@/lib/seo/publicPageMetadata';
+import type { Metadata } from 'next';
 import { Cookie, SlidersHorizontal, ShieldCheck } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import {
@@ -15,6 +17,18 @@ import {
 type PageProps = {
   params: Promise<{ locale: string }>;
 };
+
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
+  const { locale } = await params;
+  return buildPublicPageMetadata({
+    locale,
+    path: '/cookie-policy',
+    titleId: 'Kebijakan Cookie | Lajukan',
+    titleEn: 'Cookie Policy | Lajukan',
+    descriptionId: 'Pelajari jenis cookie yang digunakan Lajukan, tujuan penggunaannya, serta cara mengontrol preferensi cookie.',
+    descriptionEn: 'Learn which cookies Lajukan uses, why they are used, and how to control cookie preferences.',
+  });
+}
 
 export default async function CookiePolicyPage({ params }: PageProps) {
   const { locale } = await params;
