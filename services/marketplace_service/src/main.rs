@@ -11810,11 +11810,42 @@ async fn list_content(
                   WHEN regexp_replace(lower(btrim(coalesce(content_items.listing_intent, ''))), '[_-]+', ' ', 'g')
                     IN ('supply', 'offer', 'offering', 'available', 'provider', 'seller', 'sell', 'penyedia', 'menawarkan', 'menyediakan', 'tersedia')
                     THEN 'supply'
+                  -- Keep the SQL side filter in parity with the frontend persisted-side resolver.
+                  -- Older request listings may only have these intent fields in metadata.
+                  WHEN regexp_replace(lower(btrim(coalesce(metadata->>'intent', ''))), '[_-]+', ' ', 'g')
+                    IN ('demand', 'need', 'needs', 'needed', 'request', 'requested', 'wanted', 'looking', 'seeker', 'buyer', 'buyer request', 'buy request', 'pencari', 'mencari', 'dibutuhkan', 'butuh', 'membutuhkan', 'minta')
+                    THEN 'demand'
+                  WHEN regexp_replace(lower(btrim(coalesce(metadata->>'intent', ''))), '[_-]+', ' ', 'g')
+                    IN ('supply', 'offer', 'offering', 'available', 'provider', 'seller', 'sell', 'penyedia', 'menawarkan', 'menyediakan', 'tersedia')
+                    THEN 'supply'
+                  WHEN regexp_replace(lower(btrim(coalesce(metadata->>'market_intent', ''))), '[_-]+', ' ', 'g')
+                    IN ('demand', 'need', 'needs', 'needed', 'request', 'requested', 'wanted', 'looking', 'seeker', 'buyer', 'buyer request', 'buy request', 'pencari', 'mencari', 'dibutuhkan', 'butuh', 'membutuhkan', 'minta')
+                    THEN 'demand'
+                  WHEN regexp_replace(lower(btrim(coalesce(metadata->>'market_intent', ''))), '[_-]+', ' ', 'g')
+                    IN ('supply', 'offer', 'offering', 'available', 'provider', 'seller', 'sell', 'penyedia', 'menawarkan', 'menyediakan', 'tersedia')
+                    THEN 'supply'
+                  WHEN regexp_replace(lower(btrim(coalesce(metadata->>'direction', ''))), '[_-]+', ' ', 'g')
+                    IN ('demand', 'need', 'needs', 'needed', 'request', 'requested', 'wanted', 'looking', 'seeker', 'buyer', 'buyer request', 'buy request', 'pencari', 'mencari', 'dibutuhkan', 'butuh', 'membutuhkan', 'minta')
+                    THEN 'demand'
+                  WHEN regexp_replace(lower(btrim(coalesce(metadata->>'direction', ''))), '[_-]+', ' ', 'g')
+                    IN ('supply', 'offer', 'offering', 'available', 'provider', 'seller', 'sell', 'penyedia', 'menawarkan', 'menyediakan', 'tersedia')
+                    THEN 'supply'
+                  WHEN regexp_replace(lower(btrim(coalesce(metadata->>'buyer_intent', ''))), '[_-]+', ' ', 'g')
+                    IN ('demand', 'need', 'needs', 'needed', 'request', 'requested', 'wanted', 'looking', 'seeker', 'buyer', 'buyer request', 'buy request', 'pencari', 'mencari', 'dibutuhkan', 'butuh', 'membutuhkan', 'minta')
+                    THEN 'demand'
+                  WHEN regexp_replace(lower(btrim(coalesce(metadata->>'request_mode', ''))), '[_-]+', ' ', 'g')
+                    IN ('request', 'demand', 'need', 'needs', 'needed', 'requested', 'wanted', 'looking', 'mencari', 'pencari', 'dibutuhkan', 'butuh', 'membutuhkan', 'minta')
+                    THEN 'demand'
                   WHEN lower(btrim(coalesce(content_items.content_type, ''))) IN ('request', 'need', 'needs', 'demand')
                     THEN 'demand'
                   WHEN btrim(coalesce(metadata->>'market_side', '')) = ''
                     AND btrim(coalesce(metadata->>'listing_side', '')) = ''
                     AND btrim(coalesce(content_items.listing_intent, '')) = ''
+                    AND btrim(coalesce(metadata->>'intent', '')) = ''
+                    AND btrim(coalesce(metadata->>'market_intent', '')) = ''
+                    AND btrim(coalesce(metadata->>'direction', '')) = ''
+                    AND btrim(coalesce(metadata->>'buyer_intent', '')) = ''
+                    AND btrim(coalesce(metadata->>'request_mode', '')) = ''
                     THEN 'supply'
                   ELSE NULL
                 END
