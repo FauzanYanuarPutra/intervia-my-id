@@ -47,7 +47,7 @@ describe('HomeUmkmCard', () => {
     expect(html).toContain('Warung Uji');
     expect(html).toContain('Jam belum diisi');
     expect(html).toContain('/toko/warung-uji');
-    expect(html).toContain('Ilustrasi kategori');
+    expect(html).toContain('/images/business-categories/food.svg');
     expect(html).not.toContain('Buka sekarang');
     expect(html).not.toContain('Aktif');
   });
