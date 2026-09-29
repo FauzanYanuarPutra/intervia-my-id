@@ -152,6 +152,7 @@ const HOME_COMMUNITY_PAGE_SIZE = 6;
 const HOME_COMMUNITY_REQUEST_TIMEOUT_MS = 12000;
 const HOME_CONTENT_REQUEST_TIMEOUT_MS = 12000;
 const HOME_CONTENT_FALLBACK_TIMEOUT_MS = 4500;
+const HOME_CONTENT_TOTAL_TIMEOUT_MS = 18000;
 
 type Tone =
   | 'emerald'
@@ -3818,11 +3819,11 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
     const referenceController = new AbortController();
     const listingTimeoutId = window.setTimeout(
       () => listingController.abort(),
-      HOME_CONTENT_REQUEST_TIMEOUT_MS,
+      HOME_CONTENT_TOTAL_TIMEOUT_MS,
     );
     const demandTimeoutId = window.setTimeout(
       () => demandController.abort(),
-      HOME_CONTENT_REQUEST_TIMEOUT_MS,
+      HOME_CONTENT_TOTAL_TIMEOUT_MS,
     );
     const referenceTimeoutId = window.setTimeout(
       () => referenceController.abort(),
