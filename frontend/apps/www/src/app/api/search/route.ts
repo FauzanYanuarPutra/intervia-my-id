@@ -293,6 +293,7 @@ function inferSide(
       item.content_type ??
       item.type ??
       item.category,
+    kind: item.kind,
     metadata,
   });
 }
