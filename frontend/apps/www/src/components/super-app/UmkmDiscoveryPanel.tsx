@@ -1038,6 +1038,7 @@ export function UmkmDiscoveryPanel({
   const activeReferencesRequestRef = useRef<AbortController | null>(null);
   const selectedPreviewRef = useRef<HTMLDivElement | null>(null);
   const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
+  const immersiveLoadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
   const pendingScrollStoreIdRef = useRef<string | null>(null);
   const mobileMapRef = useRef<HTMLDivElement | null>(null);
   const desktopMapRef = useRef<HTMLDivElement | null>(null);
@@ -1428,7 +1429,7 @@ export function UmkmDiscoveryPanel({
         }
       }
     },
-    [city, mapBounds, mapRangeKm, query, queryViewerLocation, referencePageLimit],
+    [city, mapRangeKm, query, queryViewerLocation, referencePageLimit],
   );
 
   useEffect(() => {
@@ -1846,8 +1847,11 @@ export function UmkmDiscoveryPanel({
   ]);
 
   useEffect(() => {
-    const sentinel = loadMoreSentinelRef.current;
-    if (!sentinel || !canLoadMoreList) return;
+    const sentinels = [
+      loadMoreSentinelRef.current,
+      immersiveLoadMoreSentinelRef.current,
+    ].filter((node): node is HTMLDivElement => Boolean(node));
+    if (!sentinels.length || !canLoadMoreList) return;
 
     const observer = new IntersectionObserver(
       entries => {
@@ -1861,7 +1865,7 @@ export function UmkmDiscoveryPanel({
       },
     );
 
-    observer.observe(sentinel);
+    sentinels.forEach(sentinel => observer.observe(sentinel));
     return () => observer.disconnect();
   }, [canLoadMoreList, handleLoadMore]);
 
@@ -2708,23 +2712,12 @@ export function UmkmDiscoveryPanel({
                       );
                     })}
 
-                    {canLoadMoreList ? (
-                      <button
-                        type="button"
-                        data-testid="umkm-load-more"
-                        onClick={handleLoadMore}
-                        disabled={loadingMoreForScope}
-                        className="mx-1.5 my-2 inline-flex min-h-[36px] items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-[10px] font-bold text-slate-700 transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)] dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
-                      >
-                        {loadingMoreForScope
-                          ? isId
-                            ? 'Memuat 10 berikutnya...'
-                            : 'Loading next 10...'
-                          : isId
-                            ? 'Muat 10 lagi'
-                            : 'Load 10 more'}
-                      </button>
-                    ) : null}
+                    <div
+                      ref={immersiveLoadMoreSentinelRef}
+                      data-testid="umkm-load-more-sentinel-immersive"
+                      aria-hidden="true"
+                      className="h-1 w-full"
+                    />
                   </div>
                 ) : (
                   <div
