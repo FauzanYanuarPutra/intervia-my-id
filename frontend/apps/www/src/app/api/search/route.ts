@@ -1778,6 +1778,8 @@ export async function GET(
           : '48',
     });
 
+  // Numeric pagination cursors are normalized to state.offset by
+  // parseGlobalSearchState(). Legacy offset URLs remain supported too.
   if (state.offset > 0) {
     params.set('offset', String(state.offset));
   }
