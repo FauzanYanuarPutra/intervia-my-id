@@ -1768,8 +1768,8 @@ export function ExploreCategoryClient({
                     )}
                   >
                     {isId
-                      ? 'Cari kebutuhan'
-                      : 'Find needs'}
+                      ? 'Cari kebutuhan pembeli'
+                      : 'Find buyer needs'}
                   </button>
                 </div>
 
@@ -1792,8 +1792,8 @@ export function ExploreCategoryClient({
                   >
                     {searchSide === 'demand'
                       ? isId
-                        ? 'Mode cari kebutuhan'
-                        : 'Find-needs mode'
+                        ? 'Mode cari kebutuhan pembeli'
+                        : 'Find buyer needs mode'
                       : isId
                         ? 'Mode cari penawaran'
                         : 'Find-offers mode'}
