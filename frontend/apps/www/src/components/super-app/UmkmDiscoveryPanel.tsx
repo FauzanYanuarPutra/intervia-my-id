@@ -1382,13 +1382,6 @@ export function UmkmDiscoveryPanel({
       if (mapRangeKm !== null && queryViewerLocation) {
         params.set('radius_km', String(mapRangeKm));
       }
-      if (mapBounds) {
-        params.set('min_lat', mapBounds.minLat.toFixed(6));
-        params.set('max_lat', mapBounds.maxLat.toFixed(6));
-        params.set('min_lng', mapBounds.minLng.toFixed(6));
-        params.set('max_lng', mapBounds.maxLng.toFixed(6));
-      }
-
       try {
         const response = await fetch(
           `/api/super-app/umkm/stores?${params.toString()}`,
