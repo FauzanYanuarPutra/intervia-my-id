@@ -2391,8 +2391,8 @@ function HomeListingCarouselSection({
               ? 'Pelaku usaha yang sedang mencari produk atau jasa'
               : 'Businesses currently looking for products or services'
             : isId
-              ? 'Produk, jasa, lokasi & sewa yang tersedia'
-              : 'Products, services, places & rentals available'}
+              ? 'Pelaku usaha yang sedang menawarkan produk, jasa, lokasi & sewa'
+              : 'Businesses currently offering products, services, places & rentals'}
         </span>
 
         <Link
