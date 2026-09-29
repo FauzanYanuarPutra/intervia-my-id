@@ -952,16 +952,47 @@ out center tags;
             let safe = Value::Object(safe_map);
             let source_hash = hash(&safe);
 
-            let result = sqlx::query(
-                "INSERT INTO data_import_records (job_id,source_id,source_record_id,source_url,source_hash,record_kind,license_snapshot,attribution_snapshot,raw_metadata,validation_status,validation_reason,last_seen_at,updated_at)
-                 VALUES ($1,$2,$3,$4,$5,'real_openstreetmap_reference',$6,$7,$8,'accepted','OSM public reference; contact fields intentionally excluded',NOW(),NOW())
-                 ON CONFLICT (source_id,source_record_id) DO UPDATE SET job_id=EXCLUDED.job_id,source_url=EXCLUDED.source_url,source_hash=EXCLUDED.source_hash,raw_metadata=EXCLUDED.raw_metadata,validation_status='accepted',last_seen_at=NOW(),updated_at=NOW()"
+            let unchanged_id = sqlx::query_scalar::<_, Uuid>(
+                "UPDATE data_import_records
+                 SET job_id=$1,
+                     source_url=$4,
+                     last_seen_at=NOW(),
+                     updated_at=NOW()
+                 WHERE source_id=$2
+                   AND source_record_id=$3
+                   AND source_hash=$5
+                 RETURNING id",
             )
             .bind(job_id)
             .bind(*source_id)
             .bind(&source_record_id)
             .bind(safe.get("source_url").and_then(Value::as_str))
-            .bind(source_hash)
+            .bind(&source_hash)
+            .fetch_optional(&state.db)
+            .await?;
+
+            if unchanged_id.is_some() {
+                accepted += 1;
+                continue;
+            }
+
+            let result = sqlx::query(
+                "INSERT INTO data_import_records (job_id,source_id,source_record_id,source_url,source_hash,record_kind,license_snapshot,attribution_snapshot,raw_metadata,validation_status,validation_reason,last_seen_at,updated_at)
+                 VALUES ($1,$2,$3,$4,$5,'real_openstreetmap_reference',$6,$7,$8,'accepted','OSM public reference; contact fields intentionally excluded',NOW(),NOW())
+                 ON CONFLICT (source_id,source_record_id) DO UPDATE
+                 SET job_id=EXCLUDED.job_id,
+                     source_url=EXCLUDED.source_url,
+                     source_hash=EXCLUDED.source_hash,
+                     raw_metadata=EXCLUDED.raw_metadata,
+                     validation_status='accepted',
+                     last_seen_at=NOW(),
+                     updated_at=NOW()"
+            )
+            .bind(job_id)
+            .bind(*source_id)
+            .bind(&source_record_id)
+            .bind(safe.get("source_url").and_then(Value::as_str))
+            .bind(&source_hash)
             .bind(license_name.as_deref())
             .bind(attribution.as_deref())
             .bind(&safe)
