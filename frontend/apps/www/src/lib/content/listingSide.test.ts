@@ -40,6 +40,24 @@ describe('listing side presentation', () => {
     );
   });
 
+  it('accepts a top-level persisted side as the source of truth', () => {
+    expect(
+      resolveListingSide({
+        type: 'product',
+        side: 'demand',
+        title: 'Produk yang ditawarkan',
+      }),
+    ).toBe('demand');
+
+    expect(
+      resolveListingSide({
+        type: 'product',
+        side: 'supply',
+        title: 'Sedang mencari supplier',
+      }),
+    ).toBe('supply');
+  });
+
   it('recognizes explicit demand and supply aliases without reading prose', () => {
     expect(
       resolveListingSide({
