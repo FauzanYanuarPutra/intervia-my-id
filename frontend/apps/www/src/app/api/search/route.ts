@@ -1439,6 +1439,41 @@ async function fetchJson(
         'authorization',
       );
 
+    const forwardedFor =
+      req.headers.get(
+        'x-forwarded-for',
+      );
+
+    const realIp =
+      req.headers.get(
+        'x-real-ip',
+      );
+
+    const userAgent =
+      req.headers.get(
+        'user-agent',
+      );
+
+    const acceptLanguage =
+      req.headers.get(
+        'accept-language',
+      );
+
+    const secChUa =
+      req.headers.get(
+        'sec-ch-ua',
+      );
+
+    const secChUaPlatform =
+      req.headers.get(
+        'sec-ch-ua-platform',
+      );
+
+    const secChUaMobile =
+      req.headers.get(
+        'sec-ch-ua-mobile',
+      );
+
     if (cookie) {
       headers.set(
         'cookie',
@@ -1450,6 +1485,55 @@ async function fetchJson(
       headers.set(
         'authorization',
         authorization,
+      );
+    }
+
+    if (forwardedFor) {
+      headers.set(
+        'x-forwarded-for',
+        forwardedFor,
+      );
+    }
+
+    if (realIp) {
+      headers.set(
+        'x-real-ip',
+        realIp,
+      );
+    }
+
+    if (userAgent) {
+      headers.set(
+        'user-agent',
+        userAgent,
+      );
+    }
+
+    if (acceptLanguage) {
+      headers.set(
+        'accept-language',
+        acceptLanguage,
+      );
+    }
+
+    if (secChUa) {
+      headers.set(
+        'sec-ch-ua',
+        secChUa,
+      );
+    }
+
+    if (secChUaPlatform) {
+      headers.set(
+        'sec-ch-ua-platform',
+        secChUaPlatform,
+      );
+    }
+
+    if (secChUaMobile) {
+      headers.set(
+        'sec-ch-ua-mobile',
+        secChUaMobile,
       );
     }
 
