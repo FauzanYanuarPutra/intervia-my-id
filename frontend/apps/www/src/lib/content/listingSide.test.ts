@@ -84,6 +84,20 @@ describe('listing side presentation', () => {
 
     expect(
       resolveListingSide({
+        type: 'product',
+        metadata: { intent: 'request' },
+      }),
+    ).toBe('demand');
+
+    expect(
+      resolveListingSide({
+        type: 'product',
+        metadata: { side: 'provider' },
+      }),
+    ).toBe('supply');
+
+    expect(
+      resolveListingSide({
         kind: 'needs',
         type: 'product',
       }),
