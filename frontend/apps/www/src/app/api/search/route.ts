@@ -1154,6 +1154,14 @@ function mapPublicReferenceItem(
           ? reference.imageLicenseUrl
           : '',
 
+      sourceContactUrl:
+        reference.sourceContactUrl.length <= 2048
+          ? reference.sourceContactUrl
+          : '',
+
+      sourceContactType:
+        reference.sourceContactType,
+
       distanceKm,
 
       isTransactional:
