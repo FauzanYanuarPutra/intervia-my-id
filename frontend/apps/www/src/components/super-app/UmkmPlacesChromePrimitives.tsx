@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import { LajukanImage } from '@/components/common/LajukanImage';
 import {
   Briefcase,
   Gift,
@@ -164,12 +165,13 @@ export function PlaceThumb({
       )}
     >
       {hasImage ? (
-        /* eslint-disable-next-line @next/next/no-img-element */
-        <img
+        <LajukanImage
           src={src}
           alt={alt}
-          className="h-full w-full object-cover"
+          fill
           loading="lazy"
+          sizes="(max-width: 640px) 76vw, (max-width: 1024px) 360px, 420px"
+          className="h-full w-full object-cover"
         />
       ) : (
         <div
