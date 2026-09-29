@@ -71,6 +71,17 @@ describe('global search URL state', () => {
     expect(serializeGlobalSearchState(state)).toBe('q=kopi&tab=references');
   });
 
+  it('prefers a numeric cursor as the pagination source while keeping legacy offset URLs compatible', () => {
+    const state = parseGlobalSearchState(
+      new URLSearchParams('q=kemasan&side=supply&cursor=96&offset=48'),
+    );
+    expect(state.cursor).toBe('96');
+    expect(state.offset).toBe(96);
+    expect(serializeGlobalSearchState(state)).toBe(
+      'q=kemasan&side=supply&cursor=96&offset=96',
+    );
+  });
+
   it('parses and serializes a safe pagination offset', () => {
     const state = parseGlobalSearchState(
       new URLSearchParams('q=kemasan&side=supply&offset=48'),
