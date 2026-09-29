@@ -1117,9 +1117,9 @@ export function UmkmDiscoveryPanel({
     },
     [],
   );
-  const requestLimit = Math.max(50, Math.min(200, limit));
-  const mapRequestLimit = 200;
-  const mapPointLimit = 2000;
+  const requestLimit = Math.max(50, Math.min(120, limit));
+  const referencePageLimit = 100;
+  const mapPointLimit = 1200;
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1198,7 +1198,7 @@ export function UmkmDiscoveryPanel({
         if (mapRangeKm !== null && queryViewerLocation) {
           params.set('radius_km', String(mapRangeKm));
         }
-        params.set('limit', String(mapRequestLimit));
+        params.set('limit', String(requestLimit));
         params.set('offset', String(offset));
         params.set('map', '1');
         if (mapBounds) {
@@ -1407,10 +1407,9 @@ export function UmkmDiscoveryPanel({
 
       const params = new URLSearchParams({
         references_only: '1',
-        limit: String(mapRequestLimit),
+        limit: String(referencePageLimit),
         offset: String(safeCursor ? 0 : safeOffset || 0),
       });
-      params.set('map', '1');
       if (safeCursor) params.set('cursor', safeCursor);
       if (query?.trim()) params.set('q', query.trim());
       if (city?.trim()) params.set('city', city.trim());
