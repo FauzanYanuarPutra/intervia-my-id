@@ -613,7 +613,9 @@ function DataSection({
         tab: forcedSide === 'demand' ? 'all' : 'all',
         sort: 'latest',
         limit: '48',
-        offset: nextCursor,
+        // The search endpoint exposes the next content offset
+        // as an opaque cursor string. Keep the browser contract cursor-based.
+        cursor: nextCursor,
       });
 
       const response = await fetch(`/api/search?${params.toString()}`, {
@@ -2404,9 +2406,6 @@ export function ExploreCategoryClient({
                     if (
                       section.key ===
                       'communities'
-                    if (
-                      section.key ===
-                      'communities')
                     ) {
                       return (
                         <DataSection
