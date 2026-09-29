@@ -176,8 +176,12 @@ export function serializeGlobalSearchState(state: GlobalSearchState): string {
     params.set('distance', String(state.distanceKm));
   }
   if (state.sort !== 'relevance') params.set('sort', state.sort);
-  if (state.cursor) params.set('cursor', state.cursor);
-  if (state.offset > 0) params.set('offset', String(state.offset));
+  if (state.cursor) {
+    params.set('cursor', state.cursor);
+  } else if (state.offset > 0) {
+    // Preserve legacy offset URLs only when no cursor is present.
+    params.set('offset', String(state.offset));
+  }
   return params.toString();
 }
 
