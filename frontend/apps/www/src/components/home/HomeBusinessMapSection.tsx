@@ -117,10 +117,12 @@ export function HomeBusinessMapSection({
             lat: item.lat,
             lng: item.lng,
             metadata: {
-              marketplace_category_slug: item.category,
+              ...(item.metadata || {}),
+              marketplace_category_slug:
+                item.metadata?.marketplace_category_slug || item.category,
               record_kind: item.source_kind.includes('reference')
                 ? item.source_kind
-                : undefined,
+                : item.metadata?.record_kind,
               is_public_reference: item.source_kind.includes('reference'),
             },
           })),
