@@ -175,6 +175,19 @@ export default async function NewsIndexPage({ params, searchParams }: PageProps)
             query={query}
             batchSize={36}
           />
+          {nextCursor ? (
+            <Link
+              href={`/news?${new URLSearchParams({
+                ...(category ? { category } : {}),
+                ...(query ? { q: query } : {}),
+                cursor: nextCursor,
+              }).toString()}`}
+              rel="next"
+              className="sr-only"
+            >
+              {isId ? 'Berita berikutnya' : 'Next stories'}
+            </Link>
+          ) : null}
         </section>
       ) : null}
 
