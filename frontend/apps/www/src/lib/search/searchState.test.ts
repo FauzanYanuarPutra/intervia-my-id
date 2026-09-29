@@ -16,5 +16,7 @@ describe('Explore search state',()=>{
   });
   it('retains only meaningful category redirect state',()=>{
     expect(retainedCategorySearch({category:'mesin-alat',q:' blender ',tab:'all',sort:'relevance',location:'Bandung',cursor:'abc',junk:'x'})).toBe('?q=blender&location=Bandung&cursor=abc');
+    expect(retainedCategorySearch({category:'mesin-alat',q:' blender ',side:'demand',tab:'all',sort:'relevance'})).toBe('?q=blender&side=demand&tab=all');
+    expect(retainedCategorySearch({category:'mesin-alat',side:'supply',tab:'all'})).toBe('?side=supply&tab=all');
   });
 });
