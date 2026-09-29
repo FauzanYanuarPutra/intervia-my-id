@@ -15,6 +15,24 @@ export const fetchCache = 'force-no-store';
 const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://www.lajukan.com').replace(/\/+$/, '');
 const marketplaceBase = (process.env.INTERNAL_MARKETPLACE_URL || process.env.NEXT_PUBLIC_MARKETPLACE_URL || 'http://localhost:8081').replace(/\/+$/, '');
 const locales = ['id', 'en'] as const;
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  fallback: T,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>(resolve => {
+        timer = setTimeout(() => resolve(fallback), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 const CONTENT_SITEMAP_LIMIT = 100;
 const CONTENT_SITEMAP_MAX_ITEMS = 1000;
 const CONTENT_SITEMAP_FETCH_TIMEOUT_MS = 2500;
@@ -145,7 +163,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ),
   );
 
-  const blogItems = await getAllPublishedBlogArticlesForSitemap();
+  const blogItems = await withTimeout(getAllPublishedBlogArticlesForSitemap(), 12_000, []);
   const blogBySlug = new Map<string, { id?: typeof blogItems[number]; en?: typeof blogItems[number] }>();
   blogItems.forEach(article => {
     const current = blogBySlug.get(article.slug) || {};
@@ -198,10 +216,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   // Public business storefronts are the durable SEO targets; the map is discovery,
   // while each /toko/:slug page contains the LocalBusiness entity details.
-  const umkmStores = await listUmkmStores({
-    activeOnly: true,
-    limit: 200,
-  }).catch(() => []);
+  const umkmStores = await withTimeout(
+    listUmkmStores({ activeOnly: true, limit: 200 }).catch(() => []),
+    10_000,
+    [],
+  );
   umkmStores
     .filter(isPublicUmkmStoreVisible)
     .forEach(store => {
@@ -223,7 +242,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       });
     });
 
-  const newsItems = await getNewsForSitemap(1000);
+  const newsItems = await withTimeout(getNewsForSitemap(1000), 15_000, []);
   newsItems.forEach(article => {
     const lang = article.language === 'en' ? 'en' : 'id';
     sitemapEntries.push({
@@ -281,5 +300,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }
   }
 
-  return sitemapEntries;
+  return Array.from(new Map(sitemapEntries.map(entry => [entry.url, entry])).values());
 }
