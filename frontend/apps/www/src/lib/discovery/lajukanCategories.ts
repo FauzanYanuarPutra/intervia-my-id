@@ -1,5 +1,5 @@
 import {
-  getListingSideVerbLabel,
+  getListingSideObjectLabel,
   resolveListingSide,
   type ListingSide,
 } from '@/lib/content/listingSide';
@@ -134,10 +134,13 @@ export function normalizeExploreSide(
 }
 
 /**
- * Convert the canonical marketplace side into a UI verb.
+ * Convert the canonical marketplace side into the noun used by discovery UI.
  *
- * supply -> Menawarkan
- * demand -> Membutuhkan
+ * supply -> Penawaran
+ * demand -> Kebutuhan
+ *
+ * Actions can still use verbs such as "Tawarkan bantuan"; this helper is
+ * intentionally for labels, tabs, chips, and section context.
  */
 export function getExploreSideLabel({
   locale,
@@ -145,7 +148,7 @@ export function getExploreSideLabel({
 }: ExploreSideInput & {
   locale: LajukanLocale;
 }): string {
-  return getListingSideVerbLabel(
+  return getListingSideObjectLabel(
     normalizeExploreSide(item),
     locale,
   );
