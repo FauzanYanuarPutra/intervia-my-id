@@ -597,7 +597,7 @@ export default function BusinessModerationWorkspace() {
             ))}
           </div>
         )
-      ) :       {loading ? (
+      ) : loading ? (
         <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
           {Array.from({ length: 6 }).map((_, index) => (
             <article key={index} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
