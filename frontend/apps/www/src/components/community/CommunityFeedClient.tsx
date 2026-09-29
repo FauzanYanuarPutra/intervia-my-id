@@ -6639,6 +6639,7 @@ export default function CommunityFeedClient({
   const [feedError, setFeedError] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
+  const loadingMoreRef = useRef(false);
   const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
   const feedScopeKeyRef = useRef('');
   const [refreshKey, setRefreshKey] = useState(0);
@@ -6891,7 +6892,8 @@ export default function CommunityFeedClient({
   }, [isId, searchUrl]);
 
   const loadMore = useCallback(async () => {
-    if (!hasMore || nextCursor == null || loadingMore) return;
+    if (!hasMore || nextCursor == null || loadingMore || loadingMoreRef.current) return;
+    loadingMoreRef.current = true;
     setLoadingMore(true);
     setLoadMoreError(null);
     try {
@@ -6922,8 +6924,24 @@ export default function CommunityFeedClient({
           ),
         ];
       });
-      setNextCursor(payload.nextCursor ?? null);
-      setHasMore(Boolean(payload.hasMore));
+      const requestedCursor = nextCursor;
+      const returnedCursor =
+        typeof payload.nextCursor === 'number'
+          ? payload.nextCursor
+          : null;
+      const returnedHasMore = Boolean(payload.hasMore);
+      const cursorProgressed =
+        returnedCursor == null ||
+        returnedCursor !== requestedCursor;
+
+      setNextCursor(
+        returnedHasMore && cursorProgressed
+          ? returnedCursor
+          : null,
+      );
+      setHasMore(
+        returnedHasMore && cursorProgressed,
+      );
     } catch {
       setLoadMoreError(
         isId
@@ -6932,6 +6950,7 @@ export default function CommunityFeedClient({
       );
     } finally {
       if (feedScopeKeyRef.current === feedScopeKey) {
+        loadingMoreRef.current = false;
         setLoadingMore(false);
       }
     }
