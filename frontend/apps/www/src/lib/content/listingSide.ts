@@ -31,6 +31,10 @@ const DEMAND_SIGNALS = new Set([
   'wanted',
   'looking_for',
   'buyer',
+  'buy',
+  'buying',
+  'purchase',
+  'purchasing',
   'buyer_request',
   'buy_request',
   'mencari',
@@ -146,11 +150,11 @@ function normalizeType(value: unknown): string {
   if (!normalized) return '';
   if (normalized.includes('job')) return 'job';
   if (
-    normalized.includes('business transfer') ||
-    normalized.includes('business handover') ||
-    normalized.includes('oper usaha') ||
-    normalized.includes('jual usaha') ||
-    normalized.includes('usaha berjalan') ||
+    normalized.includes('business_transfer') ||
+    normalized.includes('business_handover') ||
+    normalized.includes('oper_usaha') ||
+    normalized.includes('jual_usaha') ||
+    normalized.includes('usaha_berjalan') ||
     normalized.includes('handover') ||
     normalized.includes('takeover')
   ) {
@@ -252,9 +256,11 @@ export function resolveListingSide(
     if (explicit) return explicit;
   }
 
+  const normalizedKind = normalizeType(input.kind);
+  if (normalizedKind === 'need') return 'demand';
+
   const normalizedType =
     normalizeType(input.type) ||
-    normalizeType(input.kind) ||
     normalizeType(metadata?.type) ||
     normalizeType(metadata?.content_type) ||
     normalizeType(metadata?.category);
