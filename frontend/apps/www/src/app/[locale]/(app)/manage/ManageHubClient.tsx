@@ -463,7 +463,7 @@ export default function ManageHubClient({ isId }: ManageHubClientProps) {
         id: 'listing',
         href: '/my-listings',
         title: isId ? 'Listing' : 'Listings',
-        description: isId ? 'Yang kamu tawarkan dan yang kamu cari.' : 'What you offer and what you are looking for.',
+        description: isId ? 'Penawaran dan kebutuhan pembeli.' : 'Offers and buyer needs.',
         icon: ClipboardList,
         value: counts.activeListings + counts.draftListings + counts.archivedListings,
         valueLabel: isId ? 'total' : 'total',
