@@ -3839,7 +3839,6 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
     const fetchHomeContent = async (
       params: URLSearchParams,
       parentSignal: AbortSignal,
-      fallbackSignal: AbortSignal,
     ) => {
       const request = async (
         requestParams: URLSearchParams,
@@ -3880,7 +3879,13 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
       fallbackParams.delete('include_owner');
       fallbackParams.delete('nearby');
 
-      const { response, payload } = await request(fallbackParams, fallbackSignal);
+      const { response, payload } = await request(
+        fallbackParams,
+        AbortSignal.any([
+          parentSignal,
+          AbortSignal.timeout(HOME_CONTENT_FALLBACK_TIMEOUT_MS),
+        ]),
+      );
       if (!response.ok) {
         throw new Error(
           payload && typeof payload === 'object' && 'error' in payload
@@ -3904,11 +3909,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
       if (viewerLocationKey) {
         params.set('nearby', '1');
       }
-      return fetchHomeContent(
-        params,
-        listingController.signal,
-        listingController.signal,
-      );
+      return fetchHomeContent(params, listingController.signal);
     };
 
     const loadDemandListings = async () => {
@@ -3924,11 +3925,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
       if (viewerLocationKey) {
         params.set('nearby', '1');
       }
-      return fetchHomeContent(
-        params,
-        demandController.signal,
-        demandController.signal,
-      );
+      return fetchHomeContent(params, demandController.signal);
     };
 
     const loadReferences = async () => {
