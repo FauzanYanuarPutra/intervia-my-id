@@ -2471,11 +2471,11 @@ function HomeListingCarouselSection({
         <h2 className="min-w-0 truncate text-[11px] font-bold leading-5 tracking-tight text-[color:var(--app-text)] sm:text-xs">
           {isDemand
             ? isId
-              ? 'Sedang mencari penyedia'
-              : 'Looking for a provider'
+              ? 'Ada yang mencari'
+              : 'People looking for providers'
             : isId
-              ? 'Sedang menawarkan'
-              : 'Currently offering'}
+              ? 'Ada yang menawarkan'
+              : 'People offering'}
         </h2>
 
         <span className="hidden shrink-0 text-[9px] font-medium text-zinc-400 sm:inline">
@@ -2484,8 +2484,8 @@ function HomeListingCarouselSection({
               ? 'Pelaku usaha yang sedang mencari produk, jasa, atau penyedia'
               : 'Businesses currently looking for products, services, or providers'
             : isId
-              ? 'Produk, jasa, tempat, dan sewa yang sedang ditawarkan'
-              : 'Products, services, places, and rentals currently offered'}
+              ? 'Produk, jasa, tempat, dan sewa yang tersedia'
+              : 'Products, services, places, and rentals currently available'}
         </span>
 
         <Link
