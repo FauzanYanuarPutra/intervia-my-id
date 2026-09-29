@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  isPublicUmkmDiscoveryVisible,
+  isPublicUmkmReferenceVisible,
   isPublicUmkmStoreVisible,
   mergeDeepLinkedUmkmStore,
 } from './umkm-public-discovery';
@@ -60,6 +62,69 @@ describe('isPublicUmkmStoreVisible', () => {
       isPublicUmkmStoreVisible({
         is_active: true,
         metadata,
+      }),
+    ).toBe(false);
+  });
+});
+
+describe('isPublicUmkmReferenceVisible', () => {
+  const publishedReference = {
+    is_active: true,
+    metadata: {
+      reference_publication_status: 'published',
+      record_kind: 'government_reference',
+      market_side: 'reference',
+      is_transactional: false,
+      claimable: true,
+      source_dataset: 'data-go-id-denpasar-umkm',
+      source_url: 'https://data.go.id/dataset/dataset/umkm',
+      source_license: 'Creative Commons Attribution',
+    },
+  };
+
+  it('allows a fully-provenanced published reference', () => {
+    expect(isPublicUmkmReferenceVisible(publishedReference)).toBe(true);
+    expect(isPublicUmkmDiscoveryVisible(publishedReference)).toBe(true);
+  });
+
+  it('rejects missing publication or provenance requirements', () => {
+    expect(
+      isPublicUmkmReferenceVisible({
+        ...publishedReference,
+        metadata: {
+          ...publishedReference.metadata,
+          reference_publication_status: 'draft',
+        },
+      }),
+    ).toBe(false);
+    expect(
+      isPublicUmkmReferenceVisible({
+        ...publishedReference,
+        metadata: {
+          ...publishedReference.metadata,
+          source_license: '',
+        },
+      }),
+    ).toBe(false);
+    expect(
+      isPublicUmkmReferenceVisible({
+        ...publishedReference,
+        metadata: {
+          ...publishedReference.metadata,
+          market_side: 'supply',
+        },
+      }),
+    ).toBe(false);
+  });
+
+  it('does not let a normal transactional store pass as a reference', () => {
+    expect(
+      isPublicUmkmReferenceVisible({
+        is_active: true,
+        metadata: {
+          ...publishedReference.metadata,
+          is_transactional: true,
+        },
       }),
     ).toBe(false);
   });
