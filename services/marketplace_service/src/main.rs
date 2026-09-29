@@ -1100,6 +1100,32 @@ struct MapReferenceRow {
 }
 
 #[derive(Debug, Serialize)]
+struct MapPlacePoint {
+    id: String,
+    slug: String,
+    name: String,
+    city: String,
+    lat: f64,
+    lng: f64,
+    category: String,
+    source_kind: String,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct ListMapPlacesQuery {
+    q: Option<String>,
+    city: Option<String>,
+    category: Option<String>,
+    limit: Option<i64>,
+    min_lat: Option<f64>,
+    max_lat: Option<f64>,
+    min_lng: Option<f64>,
+    max_lng: Option<f64>,
+    viewer_lat: Option<f64>,
+    viewer_lng: Option<f64>,
+}
+
+#[derive(Debug, Serialize)]
 struct ListMapReferencesResponse {
     items: Vec<MapReferenceRow>,
     limit: i64,
@@ -2215,6 +2241,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/metrics", get(service_metrics))
         .route("/", get(root))
         .route("/v1/map/references", get(list_map_references))
+        .route("/v1/map/places", get(list_map_places))
         .route("/v1/content", get(list_content).post(create_content))
         .route(
             "/v1/content/moderation/queue",
@@ -11267,6 +11294,159 @@ async fn list_map_references(
                 "failed to load map references",
             )
             .into_response()
+        }
+    }
+}
+
+async fn list_map_places(
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<ListMapPlacesQuery>,
+) -> impl IntoResponse {
+    const MAX_LIMIT: i64 = 2000;
+    let limit = query.limit.unwrap_or(1000).clamp(1, MAX_LIMIT);
+    let q = match clean_map_reference_filter(query.q, MAP_REFERENCE_MAX_QUERY_LEN, "invalid map places query") {
+        Ok(value) => value,
+        Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
+    };
+    let city = match clean_map_reference_filter(query.city, MAP_REFERENCE_MAX_CITY_LEN, "invalid map places city") {
+        Ok(value) => value,
+        Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
+    };
+    let category = clean_text(query.category).map(|v| make_slug(&v));
+    let bounds = match (
+        query.min_lat, query.max_lat, query.min_lng, query.max_lng
+    ) {
+        (Some(min_lat), Some(max_lat), Some(min_lng), Some(max_lng))
+            if min_lat.is_finite() && max_lat.is_finite() && min_lng.is_finite() && max_lng.is_finite()
+                && (-90.0..=90.0).contains(&min_lat) && (-90.0..=90.0).contains(&max_lat)
+                && (-180.0..=180.0).contains(&min_lng) && (-180.0..=180.0).contains(&max_lng)
+                && min_lat <= max_lat && min_lng <= max_lng =>
+        {
+            Some((min_lat, max_lat, min_lng, max_lng))
+        }
+        (None, None, None, None) => None,
+        _ => return err(StatusCode::BAD_REQUEST, "invalid map bounds").into_response(),
+    };
+    let viewer = match (query.viewer_lat, query.viewer_lng) {
+        (Some(lat), Some(lng))
+            if lat.is_finite() && lng.is_finite()
+                && (-90.0..=90.0).contains(&lat) && (-180.0..=180.0).contains(&lng) =>
+            Some((lat, lng)),
+        (None, None) => None,
+        _ => return err(StatusCode::BAD_REQUEST, "invalid viewer coordinates").into_response(),
+    };
+
+    let mut statement = QueryBuilder::<Postgres>::new(
+        r#"
+        SELECT id, slug, name, city, lat, lng, category, source_kind
+        FROM (
+          SELECT
+            'store:' || s.id::text AS id,
+            s.slug,
+            s.name,
+            s.city,
+            s.lat,
+            s.lng,
+            COALESCE(
+              NULLIF(lower(s.metadata->>'marketplace_category_slug'), ''),
+              NULLIF(lower(s.metadata->>'umkm_category'), ''),
+              NULLIF(lower(s.metadata->>'business_type'), ''),
+              'business'
+            ) AS category,
+            CASE
+              WHEN lower(COALESCE(s.metadata->>'record_kind','')) LIKE '%reference%'
+                OR lower(COALESCE(s.metadata->>'market_side','')) = 'reference'
+              THEN 'reference_store'
+              ELSE 'registered_store'
+            END AS source_kind
+          FROM umkm_stores s
+          WHERE s.is_active = TRUE
+            AND s.lat BETWEEN -90 AND 90
+            AND s.lng BETWEEN -180 AND 180
+            AND (
+              lower(COALESCE(s.metadata->>'is_transactional','true')) <> 'false'
+              OR lower(COALESCE(s.metadata->>'market_side','')) = 'reference'
+              OR lower(COALESCE(s.metadata->>'record_kind','')) LIKE '%reference%'
+            )
+
+          UNION ALL
+
+          SELECT
+            'reference:' || c.id::text AS id,
+            COALESCE(c.slug, 'reference-' || c.id::text),
+            c.title,
+            COALESCE(c.metadata->>'city', c.metadata->>'location', 'Indonesia'),
+            public.lajukan_safe_map_coordinate(c.metadata->>'latitude'),
+            public.lajukan_safe_map_coordinate(c.metadata->>'longitude'),
+            COALESCE(
+              NULLIF(lower(c.metadata->>'marketplace_category_slug'), ''),
+              NULLIF(lower(c.metadata->>'umkm_category'), ''),
+              NULLIF(lower(c.metadata->>'business_type'), ''),
+              NULLIF(lower(c.metadata->>'category'), ''),
+              'business'
+            ) AS category,
+            'reference_content' AS source_kind
+          FROM content_items c
+          WHERE c.content_status = 'active'
+            AND c.metadata->>'reference_publication_status' = 'published'
+            AND lower(COALESCE(c.metadata->>'market_side','')) = 'reference'
+            AND lower(COALESCE(c.metadata->>'is_transactional','true')) = 'false'
+            AND c.metadata->>'record_kind' IN (
+              'government_reference','open_data_reference','licensed_reference',
+              'external_content_reference','real_openstreetmap_reference',
+              'osm_provider_reference','wikidata_reference'
+            )
+            AND public.lajukan_safe_map_coordinate(c.metadata->>'latitude') BETWEEN -90 AND 90
+            AND public.lajukan_safe_map_coordinate(c.metadata->>'longitude') BETWEEN -180 AND 180
+        ) places
+        WHERE 1=1
+        "#,
+    );
+
+    if let Some(value) = q.as_deref() {
+        statement.push(" AND lower(name || ' ' || COALESCE(city,'')) LIKE ")
+            .push_bind(format!("%{}%", escape_like_literal(&value.to_lowercase())))
+            .push(" ESCAPE '\\'");
+    }
+    if let Some(value) = city.as_deref() {
+        statement.push(" AND lower(city) LIKE ")
+            .push_bind(format!("%{}%", escape_like_literal(&value.to_lowercase())))
+            .push(" ESCAPE '\\'");
+    }
+    if let Some(value) = category.as_deref() {
+        statement.push(" AND lower(category) = ").push_bind(value);
+    }
+    if let Some((min_lat,max_lat,min_lng,max_lng)) = bounds {
+        statement.push(" AND lat BETWEEN ").push_bind(min_lat).push(" AND ").push_bind(max_lat)
+            .push(" AND lng BETWEEN ").push_bind(min_lng).push(" AND ").push_bind(max_lng);
+    }
+    statement.push(" ORDER BY ");
+    if let Some((lat,lng)) = viewer {
+        statement.push("point(lng,lat) <-> point(").push_bind(lng).push(",").push_bind(lat).push(") ASC");
+    } else {
+        statement.push("category ASC, name ASC, id ASC");
+    }
+    statement.push(" LIMIT ").push_bind(limit);
+
+    match statement.build().fetch_all(&state.db).await {
+        Ok(rows) => {
+            let items = rows.into_iter().filter_map(|row| {
+                Some(MapPlacePoint {
+                    id: row.try_get("id").ok()?,
+                    slug: row.try_get("slug").ok()?,
+                    name: row.try_get("name").ok()?,
+                    city: row.try_get("city").ok()?,
+                    lat: row.try_get("lat").ok()?,
+                    lng: row.try_get("lng").ok()?,
+                    category: row.try_get("category").ok()?,
+                    source_kind: row.try_get("source_kind").ok()?,
+                })
+            }).collect::<Vec<_>>();
+            (StatusCode::OK, Json(json!({"items": items, "count": items.len()}))).into_response()
+        }
+        Err(error) => {
+            tracing::error!("list_map_places error: {:?}", error);
+            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load map places").into_response()
         }
     }
 }
