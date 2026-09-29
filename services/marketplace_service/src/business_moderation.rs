@@ -1111,7 +1111,7 @@ async fn sync_store_public_media_metadata(
         .map(|(media_url, _, _)| {
             items
                 .iter()
-                .any(|item| item.get("url").and_then(Value::as_str) == Some(media_url.as_str()))
+                .any(|item| item.get("url").and_then(Value::as_str) == Some(*media_url))
         })
         .unwrap_or(false);
 
