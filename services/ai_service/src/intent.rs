@@ -131,7 +131,7 @@ fn build_search_query(query: &str) -> String {
         .map(|token| token.trim_matches(|character: char| !character.is_alphanumeric() && character != '-' ))
         .filter(|token| {
             !token.is_empty()
-                && !stop_words.iter().any(|word| word == token.to_ascii_lowercase())
+                && !stop_words.iter().any(|word| word.eq_ignore_ascii_case(token))
                 && !is_quantity_token(token)
         })
         .collect::<Vec<_>>()
