@@ -303,13 +303,61 @@ function projectPublicMetadata(
   return projected;
 }
 
+function sanitizePublicGalleryMediaItems(value: unknown): unknown {
+  if (!Array.isArray(value)) return undefined;
+
+  return value.slice(0, 24).flatMap(item => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return [];
+    const source = item as Record<string, unknown>;
+    const url = typeof source.url === 'string' ? source.url.trim() : '';
+    if (!url) return [];
+
+    const mediaType =
+      source.media_type === 'video' ? 'video' : 'image';
+    const caption =
+      typeof source.caption === 'string'
+        ? source.caption.trim().slice(0, 500)
+        : '';
+    const uploaderName =
+      typeof source.uploader_name === 'string'
+        ? source.uploader_name.trim().slice(0, 160)
+        : '';
+    const uploaderUsername =
+      typeof source.uploader_username === 'string'
+        ? source.uploader_username.trim().slice(0, 80)
+        : '';
+
+    return [
+      {
+        id:
+          typeof source.id === 'string'
+            ? source.id.slice(0, 100)
+            : undefined,
+        url: url.slice(0, 2048),
+        media_type: mediaType,
+        caption: caption || null,
+        uploader_name: uploaderName || null,
+        uploader_username: uploaderUsername || null,
+        is_primary: source.is_primary === true,
+        created_at:
+          typeof source.created_at === 'string'
+            ? source.created_at.slice(0, 40)
+            : null,
+      },
+    ];
+  });
+}
+
 function projectPublicMetadataKeys(
   metadata: Record<string, unknown>,
 ): Record<string, unknown> {
   const projected: Record<string, unknown> = {};
 
   for (const key of PUBLIC_METADATA_KEYS) {
-    const value = sanitizeMetadataValue(metadata[key]);
+    const value =
+      key === 'gallery_media_items'
+        ? sanitizePublicGalleryMediaItems(metadata[key])
+        : sanitizeMetadataValue(metadata[key]);
     if (value !== undefined) projected[key] = value;
   }
 
