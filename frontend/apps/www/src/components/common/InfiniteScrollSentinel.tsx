@@ -6,6 +6,7 @@ import { useInView } from 'react-intersection-observer';
 
 export type InfiniteScrollSentinelProps = {
   enabled?: boolean;
+  root?: Element | null;
   hasMore: boolean;
   loading: boolean;
   onLoadMore: () => Promise<void> | void;
@@ -15,6 +16,7 @@ export type InfiniteScrollSentinelProps = {
 
 export function InfiniteScrollSentinel({
   enabled = true,
+  root = null,
   hasMore,
   loading,
   onLoadMore,
@@ -23,6 +25,7 @@ export function InfiniteScrollSentinel({
 }: InfiniteScrollSentinelProps) {
   const triggerLockRef = useRef(false);
   const { ref, inView } = useInView({
+    root,
     rootMargin: '700px 0px',
     threshold: 0.01,
     triggerOnce: false,
