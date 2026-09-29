@@ -94,6 +94,7 @@ import {
   matchUploadedContentImages,
 } from '@/lib/content/uploadMedia';
 import { activeListingNeedsPrimaryImage } from '@/lib/content/listingFlowRules';
+import { getListingSideLabel } from '@/lib/content/listingSide';
 import { trackLajukanEvent } from '@/lib/analytics/lajukanEvents';
 
 import { mapCreationDraftToListingPrefill } from '@/lib/creation-drafts/adapters';
@@ -5232,7 +5233,7 @@ export default function CreateListingWizard({
           )
         : text(
             locale,
-            'Kita tentukan dulu ya: kamu mau menawarkan atau sedang mencari sesuatu?',
+            'Kita tentukan dulu ya: kamu mau menawarkan atau membutuhkan sesuatu?',
             'Purpose not selected',
           );
 
@@ -6916,17 +6917,17 @@ export default function CreateListingWizard({
               {[
                 {
                   value: 'request' as const,
-                  titleId: 'Membutuhkan sesuatu',
-                  titleEn: 'Need something',
-                  shortId: 'Saya membutuhkan barang / jasa',
+                  titleId: getListingSideLabel('demand', 'id'),
+                  titleEn: getListingSideLabel('demand', 'en'),
+                  shortId: 'Pasang kebutuhan pembeli',
                   shortEn: 'I need a product / service',
                   imageSrc: '/images/create/kategori/cari.png',
                 },
                 {
                   value: 'offer' as const,
-                  titleId: 'Tawarkan sesuatu',
-                  titleEn: 'Offer something',
-                  shortId: 'Saya punya barang / jasa',
+                  titleId: getListingSideLabel('supply', 'id'),
+                  titleEn: getListingSideLabel('supply', 'en'),
+                  shortId: 'Pasang penawaran',
                   shortEn: 'I offer a product / service',
                   imageSrc: '/images/create/kategori/tawar.png',
                 },
