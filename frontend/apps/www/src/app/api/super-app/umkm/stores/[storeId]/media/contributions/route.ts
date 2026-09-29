@@ -22,6 +22,41 @@ async function readStoreId(params: Promise<{ storeId: string }>) {
   return storeId.trim();
 }
 
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ storeId: string }> },
+) {
+  const { storeId } = await params;
+  if (!storeId || storeId.length > 100) {
+    return NextResponse.json({ error: 'Store tidak valid.' }, { status: 400 });
+  }
+
+  try {
+    const upstream = await fetch(
+      `${MARKETPLACE_URL}/v1/umkm/stores/${encodeURIComponent(storeId)}/media/contributions`,
+      {
+        headers: { Accept: 'application/json' },
+        cache: 'no-store',
+        signal: AbortSignal.timeout(10000),
+      },
+    );
+    const payload = await upstream.json().catch(() => ({}));
+    return NextResponse.json(payload, {
+      status: upstream.status,
+      headers: {
+        'Cache-Control': upstream.ok
+          ? 'public, s-maxage=30, stale-while-revalidate=120'
+          : 'no-store',
+      },
+    });
+  } catch {
+    return NextResponse.json(
+      { error: 'Media usaha belum tersedia.' },
+      { status: 503 },
+    );
+  }
+}
+
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ storeId: string }> },
