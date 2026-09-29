@@ -153,6 +153,9 @@ const HOME_COMMUNITY_REQUEST_TIMEOUT_MS = 12000;
 const HOME_CONTENT_REQUEST_TIMEOUT_MS = 12000;
 const HOME_CONTENT_FALLBACK_TIMEOUT_MS = 4500;
 const HOME_CONTENT_TOTAL_TIMEOUT_MS = 18000;
+const HOME_MARKETPLACE_FETCH_LIMIT = 48;
+const HOME_SUPPLY_LISTING_SLOTS = 8;
+const HOME_SUPPLY_STORE_SLOTS = 4;
 
 type Tone =
   | 'emerald'
@@ -247,9 +250,9 @@ type RecommendationItem = {
 function recommendationScore(item: RecommendationItem): number {
   let score = 0;
 
-  // Native Lajukan business/store data is the first-party source of truth.
-  // It must stay ahead of generic listings and can never be displaced by
-  // imported/reference content simply because the latter has richer media.
+  // First-party Lajukan sources always rank ahead of public/imported references.
+  // Transactional marketplace listings are preferred for discovery; registered
+  // business profiles are complementary and fill the remaining Home slots.
   score += Math.max(0, 20 - item.sourcePriority * 5);
 
   if (item.verified) score += 8;
@@ -290,8 +293,45 @@ function rankRecommendations(items: RecommendationItem[]): RecommendationItem[] 
       (right.distanceKm ?? Number.POSITIVE_INFINITY);
     if (Number.isFinite(distanceDelta) && distanceDelta !== 0) return distanceDelta;
 
+    const updatedDelta = (right.updatedAt ?? 0) - (left.updatedAt ?? 0);
+    if (updatedDelta !== 0) return updatedDelta;
+
     return left.title.localeCompare(right.title, 'id');
   });
+}
+
+function buildHomeSupplyItems(
+  contentItems: RecommendationItem[],
+  nativeStoreItems: RecommendationItem[],
+  maxItems = 12,
+): RecommendationItem[] {
+  const listingItems = rankRecommendations(
+    contentItems.map(item => ({ ...item, sourcePriority: 0 })),
+  );
+  const storeItems = rankRecommendations(
+    nativeStoreItems.map(item => ({ ...item, sourcePriority: 1 })),
+  );
+
+  // Keep transactional offers visible first, while reserving a few slots for
+  // registered Lajukan businesses so a long listing feed cannot hide them.
+  const listingSlots = Math.min(HOME_SUPPLY_LISTING_SLOTS, maxItems);
+  const storeSlots = Math.min(HOME_SUPPLY_STORE_SLOTS, maxItems - listingSlots);
+  const selected = [
+    ...listingItems.slice(0, listingSlots),
+    ...storeItems.slice(0, storeSlots),
+  ];
+
+  if (selected.length < maxItems) {
+    selected.push(...listingItems.slice(listingSlots, maxItems));
+    selected.push(...storeItems.slice(storeSlots, maxItems));
+  }
+
+  const seen = new Set<string>();
+  return selected.filter(item => {
+    if (seen.has(item.id)) return false;
+    seen.add(item.id);
+    return true;
+  }).slice(0, maxItems);
 }
 
 type PublicReferenceItem = {
@@ -2378,21 +2418,21 @@ function HomeListingCarouselSection({
         <h2 className="min-w-0 truncate text-[11px] font-bold leading-5 tracking-tight text-[color:var(--app-text)] sm:text-xs">
           {isDemand
             ? isId
-              ? 'Sedang mencari'
-              : 'People looking for it'
+              ? 'Sedang mencari penyedia'
+              : 'Looking for a provider'
             : isId
-              ? 'Yang tersedia'
-              : 'Available now'}
+              ? 'Sedang menawarkan'
+              : 'Currently offering'}
         </h2>
 
         <span className="hidden shrink-0 text-[9px] font-medium text-zinc-400 sm:inline">
           {isDemand
             ? isId
-              ? 'Pelaku usaha yang sedang mencari produk atau jasa'
-              : 'Businesses currently looking for products or services'
+              ? 'Pelaku usaha yang sedang mencari produk, jasa, atau penyedia'
+              : 'Businesses currently looking for products, services, or providers'
             : isId
-              ? 'Pelaku usaha yang sedang menawarkan produk, jasa, lokasi & sewa'
-              : 'Businesses currently offering products, services, places & rentals'}
+              ? 'Produk, jasa, tempat, dan sewa yang sedang ditawarkan'
+              : 'Products, services, places, and rentals currently offered'}
         </span>
 
         <Link
@@ -2410,11 +2450,11 @@ function HomeListingCarouselSection({
             <p className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400 sm:text-[11px]">
               {isDemand
                 ? isId
-                  ? 'Belum ada permintaan aktif yang bisa ditampilkan.'
+                  ? 'Belum ada kebutuhan aktif yang bisa ditampilkan.'
                   : 'No active requests to show right now.'
                 : isId
-                  ? 'Belum ada penawaran yang relevan saat ini.'
-                  : 'No relevant offers right now.'}
+                  ? 'Belum ada penawaran aktif yang bisa ditampilkan.'
+                  : 'No active offers to show right now.'}
             </p>
           </div>
         </div>
@@ -4025,7 +4065,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
 
     const loadListings = async () => {
       const params = new URLSearchParams({
-        limit: '12',
+        limit: String(HOME_MARKETPLACE_FETCH_LIMIT),
         status: 'active',
         side: 'supply',
         include_owner: '1',
@@ -4066,7 +4106,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
 
     const loadDemandListings = async () => {
       const params = new URLSearchParams({
-        limit: '12',
+        limit: String(HOME_MARKETPLACE_FETCH_LIMIT),
         status: 'active',
         side: 'demand',
         include_owner: '1',
@@ -4113,27 +4153,23 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
           .map(item => mapNativeStoreToRecommendation(item, isId))
           .filter((item): item is RecommendationItem => Boolean(item));
 
-        const listingItems = rankRecommendations([
-          ...nativeBusinessItems,
-          ...contentItems
-            .filter(isHomeRecommendationEligible)
-            .map(item =>
-              mapContentToRecommendation(
-                item,
-                isId,
-                Boolean(viewerLocationKey),
-              ),
-            )
-            .filter((item): item is RecommendationItem => Boolean(item))
-            .filter(item => item.side === 'supply')
-            .map(item => ({ ...item, sourcePriority: 1 })),
-        ])
-          .filter(
-            (item, index, allItems) =>
-              allItems.findIndex(candidate => candidate.id === item.id) ===
-              index,
+        const transactionalSupplyItems = contentItems
+          .filter(isHomeRecommendationEligible)
+          .map(item =>
+            mapContentToRecommendation(
+              item,
+              isId,
+              Boolean(viewerLocationKey),
+            ),
           )
-          .slice(0, 12);
+          .filter((item): item is RecommendationItem => Boolean(item))
+          .filter(item => item.side === 'supply');
+
+        const listingItems = buildHomeSupplyItems(
+          transactionalSupplyItems,
+          nativeBusinessItems,
+          12,
+        );
 
         if (!active) return;
         setRecommendations(listingItems);
@@ -4160,8 +4196,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
             )
             .filter((item): item is RecommendationItem => Boolean(item))
             .filter(item => item.side === 'demand')
-            .filter(item => !userId || item.ownerId !== userId)
-            .map(item => ({ ...item, sourcePriority: 1 }))
+            .map(item => ({ ...item, sourcePriority: 0 }))
             .filter(
               (item, index, allItems) =>
                 allItems.findIndex(candidate => candidate.id === item.id) ===
@@ -4218,7 +4253,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
       demandController.abort();
       referenceController.abort();
     };
-  }, [isId, userId, viewerLocationKey]);
+  }, [isId, viewerLocationKey]);
 
   const loadCommunityPostsPage = useCallback(async () => {
     const requestSeq = communityRequestSeqRef.current + 1;
