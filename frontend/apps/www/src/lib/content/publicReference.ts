@@ -83,11 +83,18 @@ function sourceWhatsAppUrl(metadata: JsonRecord): string {
       metadata.phone,
       metadata.phone_number,
       metadata.phoneNumber,
+      metadata.whatsapp,
+      metadata.whatsapp_number,
+      metadata.whatsapp_phone,
+      metadata.contact_whatsapp,
       metadata.contact_phone,
       metadata.contactPhone,
       contact.phone,
       contact.phone_number,
       contact.phoneNumber,
+      contact.whatsapp,
+      contact.whatsapp_number,
+      contact.whatsapp_phone,
     ].find(value => readText(value)),
   );
   return phone.length >= 8 ? `https://wa.me/${phone}` : '';
