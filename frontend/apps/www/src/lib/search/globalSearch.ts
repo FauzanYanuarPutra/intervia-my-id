@@ -135,11 +135,18 @@ export function parseGlobalSearchState(
   const requestedCategory = cleanText(input.get('category'), 80).toLowerCase();
   const category = getExploreCategoryBySlug(requestedCategory)?.slug || '';
   const requestedSort = cleanText(input.get('sort'), 32).toLowerCase();
+  const requestedCursor = cleanText(input.get('cursor'), 120);
+  const cursorOffset =
+    /^\\d+$/.test(requestedCursor) ? Number(requestedCursor) : null;
   const requestedOffset = cleanText(input.get('offset'), 32);
   const parsedOffset = /^\\d+$/.test(requestedOffset) ? Number(requestedOffset) : 0;
-  const offset = Number.isSafeInteger(parsedOffset)
+  const legacyOffset = Number.isSafeInteger(parsedOffset)
     ? Math.min(Math.max(parsedOffset, 0), 10_000)
     : 0;
+  const offset =
+    cursorOffset !== null && Number.isSafeInteger(cursorOffset)
+      ? Math.min(Math.max(cursorOffset, 0), 10_000)
+      : legacyOffset;
 
   return {
     query: cleanText(input.get('q'), 160),
