@@ -931,7 +931,17 @@ async fn run_ai_endpoint(
         let intent = infer_marketplace_intent(&user_message);
         if intent.should_search {
             marketplace_search_query = Some(intent.clone());
-            match state.tools.execute_marketplace_search(&intent).await {
+            let use_umkm_tool =
+                task == AiTask::Chat
+                    && intent.category == "unknown"
+                    && matches!(intent.side, intent::MarketplaceSide::Unknown);
+            let execution = if use_umkm_tool {
+                state.tools.execute_umkm_search(&intent).await
+            } else {
+                state.tools.execute_marketplace_search(&intent).await
+            };
+
+            match execution {
                 Ok(execution) => {
                     let tool_sources = execution
                         .sources
@@ -950,7 +960,10 @@ async fn run_ai_endpoint(
                     marketplace_search_zero = execution
                         .traces
                         .iter()
-                        .any(|trace| trace.name == "search_listings" && trace.result_count == 0);
+                        .any(|trace| {
+                            matches!(trace.name.as_str(), "search_listings" | "search_umkm")
+                                && trace.result_count == 0
+                        });
                     tool_calls.extend(execution.traces);
                 }
                 Err(error) => {
@@ -960,7 +973,13 @@ async fn run_ai_endpoint(
                         safe_error(&error, 180)
                     ));
                     tool_calls.push(ToolCallTrace {
-                        name: "search_listings".to_string(),
+                        name: if intent.category == "unknown"
+                            && matches!(intent.side, intent::MarketplaceSide::Unknown)
+                        {
+                            "search_umkm".to_string()
+                        } else {
+                            "search_listings".to_string()
+                        },
                         status: "error".to_string(),
                         result_count: 0,
                         query: intent.normalized_query,
@@ -1004,9 +1023,9 @@ async fn run_ai_endpoint(
     if task == AiTask::Chat && marketplace_search_zero {
         let intent = marketplace_search_query.as_ref();
         let response = if locale == "id" {
-            "Belum ditemukan listing Lajukan yang cocok dengan pencarianmu."
+            "Belum ditemukan data Lajukan yang cocok dengan pencarianmu."
         } else {
-            "No matching Lajukan listings were found for your search."
+            "No matching Lajukan data was found for your search."
         };
 
         return json_response_with_request_id(
@@ -1029,8 +1048,8 @@ async fn run_ai_endpoint(
                 "provider": "lajukan-tool-registry",
                 "grounded": true,
                 "sources": [{
-                    "id": "tool:search_listings:empty",
-                    "title": "Lajukan marketplace search",
+                    "id": "tool:lajukan_search:empty",
+                    "title": "Lajukan grounded search",
                     "url": "",
                     "kind": "tool_empty_result",
                 }],
