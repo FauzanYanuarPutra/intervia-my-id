@@ -22,7 +22,7 @@ export default async function ContentDetailPage({ params }: PageProps) {
     notFound();
   }
   if (result.status === 'unavailable') {
-    throw new Error('Marketplace service unavailable');
+    notFound();
   }
 
   const isActive = isPublicContentActive(result.content);
