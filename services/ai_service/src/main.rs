@@ -2300,7 +2300,11 @@ fn validate_task_data(task: AiTask, data: &mut Value) -> Vec<String> {
             warnings.push(format!("invalid_{}_type_normalized", field));
             return;
         };
-        let normalized = raw.trim().to_ascii_lowercase().replace(['_', ' '], "-");
+        let normalized = raw
+            .trim()
+            .to_ascii_lowercase()
+            .replace('_', "-")
+            .replace(' ', "-");
         if allowed.iter().any(|allowed| *allowed == normalized) {
             *value = Value::String(normalized);
         } else {
