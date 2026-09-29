@@ -833,34 +833,27 @@ export async function GET(req: NextRequest) {
       return item.distance_km <= radiusKm;
     });
 
-    const sortedItems = hasViewer
-      ? [...filteredItems].sort((a, b) => {
-          if (a.distance_km !== null && b.distance_km !== null) {
-            return a.distance_km - b.distance_km;
-          }
-          if (a.distance_km !== null) return -1;
-          if (b.distance_km !== null) return 1;
-          return b.updated_at.localeCompare(a.updated_at);
-        })
-      : filteredItems;
-    const rankedItems =
-      includeReferences && !hasViewer && referenceItems.length > 0
-        ? (() => {
-            const storesOnly = sortedItems.filter(
-              item => !item.id.startsWith('reference:'),
-            );
-            const referencesOnly = sortedItems.filter(item =>
-              item.id.startsWith('reference:'),
-            );
-            const interleaved: typeof sortedItems = [];
-            const length = Math.max(storesOnly.length, referencesOnly.length);
-            for (let index = 0; index < length; index += 1) {
-              if (storesOnly[index]) interleaved.push(storesOnly[index]);
-              if (referencesOnly[index]) interleaved.push(referencesOnly[index]);
-            }
-            return interleaved;
-          })()
-        : sortedItems;
+    const sourcePriority = (item: { id: string; metadata?: JsonRecord }) => {
+      if (item.id.startsWith('reference:')) return 2;
+      const source = readText(item.metadata?.source).toLowerCase();
+      return source === 'usaha_portal' ? 0 : 1;
+    };
+
+    const sortedItems = [...filteredItems].sort((a, b) => {
+      const priorityDelta = sourcePriority(a) - sourcePriority(b);
+      if (priorityDelta !== 0) return priorityDelta;
+
+      if (a.distance_km !== null && b.distance_km !== null) {
+        return a.distance_km - b.distance_km;
+      }
+      if (a.distance_km !== null) return -1;
+      if (b.distance_km !== null) return 1;
+      return b.updated_at.localeCompare(a.updated_at);
+    });
+
+    // Keep the API contract explicit: Lajukan-native records first,
+    // other registered records second, public references last.
+    const rankedItems = sortedItems;
     const limitedItems = rankedItems.slice(0, limit);
     const backendRowsConsumed = stores.length;
     const storesCanContinue =

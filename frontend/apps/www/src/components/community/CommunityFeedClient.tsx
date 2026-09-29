@@ -8,6 +8,7 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -15,6 +16,7 @@ import {
   type DragEvent,
   type FormEvent,
   type ReactNode,
+  type RefObject,
 } from 'react';
 import { createPortal } from 'react-dom';
 import {
@@ -2137,9 +2139,11 @@ function CommunityReportDialog({
 function CommunityFormattedBody({
   body,
   collapsed = false,
+  contentRef,
 }: {
   body: string;
   collapsed?: boolean;
+  contentRef?: RefObject<HTMLDivElement | null>;
 }) {
   const normalized = String(body || '')
     .replace(/\r\n?/g, '\n')
@@ -2151,6 +2155,7 @@ function CommunityFormattedBody({
 
   return (
     <div
+      ref={contentRef}
       className={cn(
         'space-y-2 break-words text-sm leading-6 text-[color:var(--app-text)]',
         collapsed
@@ -2159,11 +2164,15 @@ function CommunityFormattedBody({
       )}
     >
       {paragraphs.map((paragraph, index) => (
-        <p
-          key={index}
-          className="whitespace-pre-wrap"
-        >
-          {paragraph}
+        <p key={index} className="m-0">
+          {paragraph.split('\n').map((line, lineIndex) => (
+            <span
+              key={lineIndex}
+              className="block min-h-0"
+            >
+              {line || '\u00a0'}
+            </span>
+          ))}
         </p>
       ))}
     </div>
@@ -2194,6 +2203,8 @@ export function CommunityPostCard({
   const [likeSaving, setLikeSaving] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
   const [bodyExpanded, setBodyExpanded] = useState(false);
+  const [canExpandBody, setCanExpandBody] = useState(false);
+  const bodyContentRef = useRef<HTMLDivElement>(null);
 
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
@@ -2218,11 +2229,34 @@ export function CommunityPostCard({
   );
 
   const displayBody = poll ? poll.body : item.body;
-  const canExpandBody =
-    displayBody.trim().length > 240 || displayBody.includes('\n');
   const isQuestionPost = item.tags.some(tag =>
     /^(tanya|question|ask|help|support)$/i.test(tag.slug || tag.name),
   );
+  useLayoutEffect(() => {
+    setBodyExpanded(false);
+  }, [item.id]);
+
+  useLayoutEffect(() => {
+    if (bodyExpanded) return;
+
+    const element = bodyContentRef.current;
+    if (!element) {
+      setCanExpandBody(false);
+      return;
+    }
+
+    const measure = () => {
+      setCanExpandBody(element.scrollHeight > element.clientHeight + 2);
+    };
+
+    measure();
+
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [bodyExpanded, displayBody]);
+
   const feedMediaItems = getFeedMediaItems(item);
   const safeMedia = feedMediaItems[0] || null;
 
@@ -6607,6 +6641,44 @@ export default function CommunityFeedClient({
     null,
   );
 
+  const [feedTabsEmblaRef, feedTabsEmblaApi] = useEmblaCarousel({
+    align: 'start',
+    containScroll: 'trimSnaps',
+    dragFree: false,
+    loop: false,
+  });
+  const [searchTabsEmblaRef, searchTabsEmblaApi] = useEmblaCarousel({
+    align: 'start',
+    containScroll: 'trimSnaps',
+    dragFree: false,
+    loop: false,
+  });
+  const activeFeedTabIndex = TABS.findIndex(tab => tab.id === activeTab);
+  const activeSearchTabIndex = SEARCH_TABS.findIndex(
+    tab => tab.id === searchKind,
+  );
+
+  useEmblaWheelGestures(feedTabsEmblaApi, {
+    enabled: TABS.length > 1,
+    desktopOnly: true,
+    threshold: 42,
+  });
+  useEmblaWheelGestures(searchTabsEmblaApi, {
+    enabled: SEARCH_TABS.length > 1,
+    desktopOnly: true,
+    threshold: 42,
+  });
+
+  useEffect(() => {
+    if (!feedTabsEmblaApi || activeFeedTabIndex < 0) return;
+    feedTabsEmblaApi.scrollTo(activeFeedTabIndex);
+  }, [activeFeedTabIndex, feedTabsEmblaApi]);
+
+  useEffect(() => {
+    if (!searchTabsEmblaApi || activeSearchTabIndex < 0) return;
+    searchTabsEmblaApi.scrollTo(activeSearchTabIndex);
+  }, [activeSearchTabIndex, searchTabsEmblaApi]);
+
   const avatar = readCommunityAvatar(user);
   const threadParam = searchParams.get('thread');
   const selectedThreadId =
@@ -7044,40 +7116,45 @@ export default function CommunityFeedClient({
               </form>
 
               {isSearchMode ? (
-                <div className="mt-3 flex gap-2 overflow-x-auto pb-1 lg:hidden" data-auto-scrollbar>
-                  {SEARCH_TABS.map(tab => (
-                    <SearchFilterButton
-                      key={tab.id}
-                      tab={tab}
-                      isId={isId}
-                      active={searchKind === tab.id}
-                      count={searchCountFor(searchResults?.counts, tab.id)}
-                      onClick={() => handleSearchKindChange(tab.id)}
-                    />
-                  ))}
+                <div ref={searchTabsEmblaRef} className="mt-3 min-w-0 overflow-hidden pb-1 lg:hidden">
+                  <div className="flex w-max min-w-full touch-pan-y gap-2">
+                    {SEARCH_TABS.map(tab => (
+                      <SearchFilterButton
+                        key={tab.id}
+                        tab={tab}
+                        isId={isId}
+                        active={searchKind === tab.id}
+                        count={searchCountFor(searchResults?.counts, tab.id)}
+                        onClick={() => handleSearchKindChange(tab.id)}
+                      />
+                    ))}
+                  </div>
                 </div>
               ) : (
-                <div className="mt-3 flex items-center gap-5 overflow-x-auto border-t border-[color:var(--app-border)] pt-2" data-auto-scrollbar>
-                  {TABS.map(tab => {
-                    const Icon = tab.icon;
-                    const active = activeTab === tab.id;
-                    return (
-                      <button
-                        key={tab.id}
-                        type="button"
-                        onClick={() => setActiveTab(tab.id)}
-                        className={cn(
-                          'inline-flex min-h-10 shrink-0 items-center gap-2 border-b-2 px-1 text-xs font-bold transition',
-                          active
-                            ? 'border-[color:var(--app-accent)] text-[color:var(--app-accent)]'
-                            : 'border-transparent text-[color:var(--app-text-soft)] hover:text-[color:var(--app-text)]',
-                        )}
-                      >
-                        <Icon className="h-4 w-4" />
-                        {isId ? tab.labelId : tab.labelEn}
-                      </button>
-                    );
-                  })}
+                <div ref={feedTabsEmblaRef} className="mt-3 min-w-0 overflow-hidden border-t border-[color:var(--app-border)] pt-2">
+                  <div className="flex w-max min-w-full touch-pan-y items-center gap-5">
+                    {TABS.map(tab => {
+                      const Icon = tab.icon;
+                      const active = activeTab === tab.id;
+                      return (
+                        <button
+                          key={tab.id}
+                          type="button"
+                          onClick={() => setActiveTab(tab.id)}
+                          aria-current={active ? 'page' : undefined}
+                          className={cn(
+                            'inline-flex min-h-10 shrink-0 items-center gap-2 border-b-2 px-1 text-xs font-bold transition',
+                            active
+                              ? 'border-[color:var(--app-accent)] text-[color:var(--app-accent)]'
+                              : 'border-transparent text-[color:var(--app-text-soft)] hover:text-[color:var(--app-text)]',
+                          )}
+                        >
+                          <Icon className="h-4 w-4" />
+                          {isId ? tab.labelId : tab.labelEn}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </section>
