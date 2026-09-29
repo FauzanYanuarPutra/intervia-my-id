@@ -4145,7 +4145,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
       setRecommendationsLoading(true);
       try {
         const [contentItems, nativeStores] = await Promise.all([
-          loadListings(),
+          loadListings().catch(() => []),
           loadNativeBusinessStores().catch(() => []),
         ]);
 
