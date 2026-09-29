@@ -82,12 +82,8 @@ export function HomeBusinessMapSection({
     let active = true;
 
     async function load() {
-      const maxAttempts = 3;
-
-      for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      try {
         if (!active || controller.signal.aborted) return;
-
-        try {
           setError(null);
           const response = await fetch(
             '/api/super-app/umkm/map-points?limit=200&min_lat=-11&max_lat=6&min_lng=95&max_lng=141',
@@ -101,8 +97,12 @@ export function HomeBusinessMapSection({
 
           if (!response.ok || !payload.data?.items) {
             throw new Error(
-              payload.error ||
-                (isId ? 'Peta usaha belum siap.' : 'Business map unavailable.'),
+              response.status === 429
+                ? isId
+                  ? 'Peta sedang sibuk. Coba lagi sebentar.'
+                  : 'The map is busy. Please try again shortly.'
+                : payload.error ||
+                  (isId ? 'Peta usaha belum siap.' : 'Business map unavailable.'),
             );
           }
 
@@ -132,13 +132,6 @@ export function HomeBusinessMapSection({
           return;
         } catch (loadError) {
           if (!active || controller.signal.aborted) return;
-          if (attempt < maxAttempts - 1) {
-            await new Promise(resolve =>
-              window.setTimeout(resolve, 350 * (attempt + 1)),
-            );
-            continue;
-          }
-
           setError(
             loadError instanceof Error
               ? loadError.message
@@ -263,8 +256,13 @@ export function HomeBusinessMapSection({
         ) : null}
 
         {error && !loading ? (
-          <div className="absolute inset-x-2 bottom-2.5 z-10 rounded-lg border border-rose-200/80 bg-white/92 px-2 py-1.5 text-[8px] font-semibold text-rose-700 shadow-sm backdrop-blur sm:inset-x-3 sm:text-[9px]">
-            {error}
+          <div className="absolute inset-x-2 bottom-2.5 z-10 flex items-center gap-2 rounded-lg border border-rose-200/80 bg-white/95 px-2 py-1.5 shadow-sm backdrop-blur sm:inset-x-3">
+            <span className="min-w-0 flex-1 text-[8px] font-semibold text-rose-700 sm:text-[9px]">
+              {error}
+            </span>
+            <button type="button" onClick={() => window.location.reload()} className="shrink-0 rounded-full bg-slate-900 px-2 py-1 text-[8px] font-bold text-white">
+              {isId ? 'Coba lagi' : 'Retry'}
+            </button>
           </div>
         ) : null}
 
