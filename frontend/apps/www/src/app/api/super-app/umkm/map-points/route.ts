@@ -120,14 +120,17 @@ export async function GET(req: NextRequest) {
       `${MARKETPLACE_URL}/v1/map/places?${params.toString()}`,
       {
         cache: 'no-store',
-        signal: AbortSignal.timeout(1800),
+        signal: AbortSignal.timeout(4000),
       },
     );
     if (!response.ok) {
       return NextResponse.json({ error: 'Map data source unavailable' }, { status: 502 });
     }
 
-    const payload = (await response.json()) as { items?: MapPoint[] };
+    const payload = (await response.json()) as {
+      items?: MapPoint[];
+      total_count?: number;
+    };
     const items = Array.isArray(payload.items)
       ? payload.items.filter(
           item =>
@@ -140,8 +143,21 @@ export async function GET(req: NextRequest) {
         )
       : [];
 
+    const totalCount =
+      typeof payload.total_count === 'number' &&
+      Number.isFinite(payload.total_count) &&
+      payload.total_count >= 0
+        ? Math.floor(payload.total_count)
+        : items.length;
+
     return NextResponse.json(
-      { data: { items, count: items.length } },
+      {
+        data: {
+          items,
+          count: items.length,
+          total_count: totalCount,
+        },
+      },
       {
         headers: {
           'Cache-Control': hasViewer
