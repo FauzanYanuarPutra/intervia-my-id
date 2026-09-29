@@ -1,6 +1,8 @@
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { Link } from '@/i18n/navigation';
 import { LajukanImage } from '@/components/common/LajukanImage';
+import { buildPublicPageMetadata } from '@/lib/seo/publicPageMetadata';
 import {
   BookOpen,
   CheckCircle2,
@@ -84,6 +86,36 @@ async function getCourse(slug: string): Promise<CourseDetail | null> {
   } catch {
     return null;
   }
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { locale, slug } = await params;
+  const courseDetail = await getCourse(slug);
+
+  if (!courseDetail?.course?.title) {
+    return {
+      title: locale === 'id' ? 'Materi tidak ditemukan | Lajukan' : 'Course not found | Lajukan',
+      robots: { index: false, follow: true },
+    };
+  }
+
+  const title = courseDetail.course.title;
+  const description =
+    courseDetail.course.summary ||
+    courseDetail.course.description ||
+    (locale === 'id'
+      ? 'Materi belajar bisnis di Lajukan.'
+      : 'Business learning content on Lajukan.');
+
+  return buildPublicPageMetadata({
+    locale,
+    path: '/learn/' + encodeURIComponent(courseDetail.course.slug || slug),
+    titleId: title + ' | Lajukan Learn',
+    titleEn: title + ' | Lajukan Learn',
+    descriptionId: description,
+    descriptionEn: description,
+    imageUrl: courseDetail.course.thumbnail_url || undefined,
+  });
 }
 
 function formatDuration(seconds: number, isId: boolean) {
