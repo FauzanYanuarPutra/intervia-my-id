@@ -365,6 +365,7 @@ struct ReelsFeedQuery {
     q: Option<String>,
     store: Option<String>,
     city: Option<String>,
+    cursor: Option<i64>,
     limit: Option<i64>,
 }
 
