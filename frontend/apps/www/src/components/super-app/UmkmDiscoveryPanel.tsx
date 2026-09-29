@@ -1585,6 +1585,7 @@ export function UmkmDiscoveryPanel({
                   : undefined,
                 claimable: point.source_kind.includes('reference'),
                 source_dataset: point.source_kind,
+                is_public_reference: point.source_kind.includes('reference'),
               },
               online_order_enabled: false,
               offline_order_enabled: false,
@@ -1651,10 +1652,29 @@ export function UmkmDiscoveryPanel({
   const mapStores = useMemo(() => {
     const merged = new Map(visibleStores.map(item => [item.store.id, item.store]));
     for (const point of mapPoints) {
+      const pointIsReference = point.metadata?.is_public_reference === true;
+      if (discoveryScope === 'registered' && pointIsReference) continue;
+      if (discoveryScope === 'references' && !pointIsReference) continue;
+      if (
+        category &&
+        category !== 'all' &&
+        !matchesUmkmDiscoveryCategory(
+          {
+            kind: 'unknown',
+            name: point.name,
+            description: point.description,
+            address: point.address,
+            metadata: point.metadata,
+          },
+          category,
+        )
+      ) {
+        continue;
+      }
       if (!merged.has(point.id)) merged.set(point.id, point);
     }
     return Array.from(merged.values());
-  }, [mapPoints, visibleStores]);
+  }, [category, discoveryScope, mapPoints, visibleStores]);
   const selectedPlace = useMemo(
     () => visibleStores.find(item => item.store.id === selectedStoreId) || null,
     [selectedStoreId, visibleStores],
