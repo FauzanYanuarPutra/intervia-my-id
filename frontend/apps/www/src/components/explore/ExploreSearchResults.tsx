@@ -38,6 +38,7 @@ export const SEARCH_GROUPS: GlobalSearchGroupKey[] = [
   'products', 'services', 'businesses', 'references', 'needs', 'communities', 'videos', 'users',
 ];
 const DEFAULT_SEARCH_GROUPS: GlobalSearchGroupKey[] = ['products', 'services', 'businesses'];
+const DEMAND_SEARCH_GROUPS: GlobalSearchGroupKey[] = ['needs'];
 const SUPPLY_RESULT_TABS: GlobalSearchTab[] = ['all', 'products', 'services', 'businesses'];
 const DEDICATED_TABS = new Set<GlobalSearchTab>(['needs', 'users', 'references']);
 
@@ -52,8 +53,8 @@ export const SEARCH_GROUP_COPY: Record<GlobalSearchGroupKey, { labelId: string; 
   users: { labelId: 'Orang & Keahlian', labelEn: 'Users', descriptionId: 'Profil pelaku usaha, penjual, freelancer, dan keahlian yang bisa kamu lihat.', descriptionEn: 'People and business owner profiles you can inspect.' },
 };
 
-function ResultTypeTabs({ payload, activeTab, locale, onSelectTab }: { payload: GlobalSearchResponse; activeTab: GlobalSearchTab; locale: LajukanLocale; onSelectTab?: (tab: GlobalSearchTab) => void }) {
-  if (!onSelectTab || DEDICATED_TABS.has(activeTab)) return null;
+function ResultTypeTabs({ payload, activeTab, locale, searchSide = 'supply', onSelectTab }: { payload: GlobalSearchResponse; activeTab: GlobalSearchTab; locale: LajukanLocale; searchSide?: 'supply' | 'demand'; onSelectTab?: (tab: GlobalSearchTab) => void }) {
+  if (!onSelectTab || searchSide === 'demand' || DEDICATED_TABS.has(activeTab)) return null;
   const isId = locale === 'id';
   const tabs = SUPPLY_RESULT_TABS.filter(tab => tab === 'all' || Boolean(payload.groups[tab as GlobalSearchGroupKey]?.available && (payload.groups[tab as GlobalSearchGroupKey].total > 0 || tab === activeTab)));
   if (tabs.length <= 1) return null;
@@ -271,16 +272,20 @@ function SearchSkeleton({
   locale,
   compact = true,
   activeTab = 'all',
+  searchSide = 'supply',
   showTypeTabs = false,
 }: {
   locale: LajukanLocale;
   compact?: boolean;
   activeTab?: GlobalSearchTab;
+  searchSide?: 'supply' | 'demand';
   showTypeTabs?: boolean;
 }) {
   const skeletonGroups =
     activeTab === 'all'
-      ? DEFAULT_SEARCH_GROUPS
+      ? searchSide === 'demand'
+        ? DEMAND_SEARCH_GROUPS
+        : DEFAULT_SEARCH_GROUPS
       : [activeTab as GlobalSearchGroupKey];
 
   return (
@@ -470,28 +475,52 @@ export function ExploreSearchResults({ payload, loading, error, locale, compact 
   const safeReferenceItems = payload.groups.references.items.filter(hasCompleteReferenceProvenance);
   const visiblePayload: GlobalSearchResponse = safeReferenceItems.length === payload.groups.references.items.length ? payload : { ...payload, groups: { ...payload.groups, references: { ...payload.groups.references, items: safeReferenceItems, total: safeReferenceItems.length === 0 ? 0 : Math.max(safeReferenceItems.length, payload.groups.references.total) } } };
   const referenceNextCursor = activeTab === 'references' ? visiblePayload.groups.references.nextCursor : null;
-  const hasVisibleItems = activeTab === 'all' ? DEFAULT_SEARCH_GROUPS.some(key => visiblePayload.groups[key].items.length > 0) : visiblePayload.groups[activeTab as GlobalSearchGroupKey]?.items.length > 0;
+  const allGroups =
+    searchSide === 'demand'
+      ? DEMAND_SEARCH_GROUPS
+      : DEFAULT_SEARCH_GROUPS;
+  const hasVisibleItems =
+    activeTab === 'all'
+      ? allGroups.some(
+          key =>
+            visiblePayload.groups[key].items.length > 0,
+        )
+      : visiblePayload.groups[activeTab as GlobalSearchGroupKey]?.items.length > 0;
   if (loading && !hasVisibleItems) {
     return (
       <SearchSkeleton
         locale={locale}
         compact={compact}
         activeTab={activeTab}
+        searchSide={searchSide}
         showTypeTabs={Boolean(
-          onSelectTab && !DEDICATED_TABS.has(activeTab),
+          onSelectTab &&
+            searchSide !== 'demand' &&
+            !DEDICATED_TABS.has(activeTab),
         )}
       />
     );
   }
   if (error && !hasVisibleItems) return <section className="py-3"><div className="flex flex-col items-start gap-4 rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="flex items-center gap-2 text-sm font-bold"><CircleAlert className="h-4 w-4 text-amber-600" />{isId ? 'Hasil belum bisa dimuat.' : 'Results could not be loaded.'}</p><p className="mt-1 text-xs text-[color:var(--app-text-soft)]">{isId ? 'Coba lagi sebentar.' : 'Please retry in a moment.'}</p></div>{onRetry ? <button type="button" onClick={onRetry} className="min-h-10 rounded-[8px] border px-4 text-xs font-bold">{isId ? 'Coba lagi' : 'Retry'}</button> : null}</div></section>;
   const activeGroupKey = activeTab === 'all' ? null : activeTab as GlobalSearchGroupKey;
-  const displayedTotal = activeGroupKey ? visiblePayload.groups[activeGroupKey]?.total || 0 : DEFAULT_SEARCH_GROUPS.reduce((total, key) => total + (visiblePayload.groups[key]?.total || 0), 0);
+  const displayedTotal = activeGroupKey
+    ? visiblePayload.groups[activeGroupKey]?.total || 0
+    : allGroups.reduce(
+        (total, key) =>
+          total + (visiblePayload.groups[key]?.total || 0),
+        0,
+      );
 
   if (displayedTotal === 0) {
     const recoveryActions = getZeroResultRecovery({ locale, searchSide, activeTab });
-    return <><ResultTypeTabs payload={visiblePayload} activeTab={activeTab} locale={locale} onSelectTab={onSelectTab} /><section className="py-3"><div className="rounded-[18px] border border-dashed border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-muted)] p-4 sm:p-5"><p className="flex items-center gap-2 text-sm font-bold text-[color:var(--app-text)]"><PackageSearch className="h-4 w-4 text-[color:var(--app-accent)]" />{activeTab !== 'all' && activeTab !== 'references' ? (isId ? `Belum ada hasil ${SEARCH_GROUP_COPY[activeTab as GlobalSearchGroupKey].labelId.toLowerCase()}` : `No ${SEARCH_GROUP_COPY[activeTab as GlobalSearchGroupKey].labelEn.toLowerCase()} results yet`) : (isId ? 'Belum ada hasil yang cocok.' : 'No matching results yet.')}</p><p className="mt-1 text-xs leading-5 text-[color:var(--app-text-soft)]">{activeTab === 'references' ? (isId ? 'Coba nama usaha, jenis tempat, atau kota lain. Hanya data dengan sumber dan lisensi yang jelas yang ditampilkan.' : 'Try another business name, place type, or city. Only data with a clear source and license is shown.') : (isId ? 'Coba kata yang lebih umum, jelajahi kategori lain, atau pasang kebutuhan/penawaran agar pihak yang cocok bisa menemukanmu.' : 'Try a broader keyword, browse another category, or post a need/offer so the right people can find you.')}</p>{referenceNextCursor && onNextCursor ? <ReferenceNextBatchAction cursor={referenceNextCursor} isId={isId} onNextCursor={onNextCursor} /> : null}<div className="mt-4 flex flex-wrap gap-2">{recoveryActions.map((action, index) => <Link key={action.analyticsAction} href={action.href} onClick={() => { void trackLajukanEvent('search.zero_result_action_clicked', { properties: { active_tab: activeTab, search_side: searchSide, action: action.analyticsAction } }); }} className={cn('inline-flex min-h-10 items-center gap-2 rounded-[10px] px-4 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)]', index === recoveryActions.length - 1 && activeTab !== 'references' ? 'bg-[color:var(--app-accent)] text-white hover:opacity-90' : 'border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)] hover:border-[color:var(--app-accent-border)]')}>{action.label}<ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>)}</div></div></section></>;
+    return <><ResultTypeTabs payload={visiblePayload} activeTab={activeTab} locale={locale} searchSide={searchSide} onSelectTab={onSelectTab} /><section className="py-3"><div className="rounded-[18px] border border-dashed border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-muted)] p-4 sm:p-5"><p className="flex items-center gap-2 text-sm font-bold text-[color:var(--app-text)]"><PackageSearch className="h-4 w-4 text-[color:var(--app-accent)]" />{activeTab !== 'all' && activeTab !== 'references' ? (isId ? `Belum ada hasil ${SEARCH_GROUP_COPY[activeTab as GlobalSearchGroupKey].labelId.toLowerCase()}` : `No ${SEARCH_GROUP_COPY[activeTab as GlobalSearchGroupKey].labelEn.toLowerCase()} results yet`) : (isId ? 'Belum ada hasil yang cocok.' : 'No matching results yet.')}</p><p className="mt-1 text-xs leading-5 text-[color:var(--app-text-soft)]">{activeTab === 'references' ? (isId ? 'Coba nama usaha, jenis tempat, atau kota lain. Hanya data dengan sumber dan lisensi yang jelas yang ditampilkan.' : 'Try another business name, place type, or city. Only data with a clear source and license is shown.') : (isId ? 'Coba kata yang lebih umum, jelajahi kategori lain, atau pasang kebutuhan/penawaran agar pihak yang cocok bisa menemukanmu.' : 'Try a broader keyword, browse another category, or post a need/offer so the right people can find you.')}</p>{referenceNextCursor && onNextCursor ? <ReferenceNextBatchAction cursor={referenceNextCursor} isId={isId} onNextCursor={onNextCursor} /> : null}<div className="mt-4 flex flex-wrap gap-2">{recoveryActions.map((action, index) => <Link key={action.analyticsAction} href={action.href} onClick={() => { void trackLajukanEvent('search.zero_result_action_clicked', { properties: { active_tab: activeTab, search_side: searchSide, action: action.analyticsAction } }); }} className={cn('inline-flex min-h-10 items-center gap-2 rounded-[10px] px-4 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)]', index === recoveryActions.length - 1 && activeTab !== 'references' ? 'bg-[color:var(--app-accent)] text-white hover:opacity-90' : 'border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)] hover:border-[color:var(--app-accent-border)]')}>{action.label}<ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>)}</div></div></section></>;
   }
 
-  const groups = activeTab === 'all' ? DEFAULT_SEARCH_GROUPS : SEARCH_GROUPS.filter(groupKey => groupKey === activeTab);
+  const groups =
+    activeTab === 'all'
+      ? allGroups
+      : SEARCH_GROUPS.filter(
+          groupKey => groupKey === activeTab,
+        );
   return <>{loading || error ? <div role="status" className="mt-3 flex items-center justify-between gap-3 rounded-[12px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-2 text-xs font-semibold text-[color:var(--app-text-soft)]"><span>{loading ? (isId ? 'Memperbarui hasil. Hasil terakhir tetap ditampilkan.' : 'Refreshing results. The latest available results remain visible.') : (isId ? 'Pembaruan gagal. Hasil terakhir yang tersedia tetap ditampilkan.' : 'Refresh failed. The latest available results remain visible.')}</span>{error && onRetry ? <button type="button" onClick={onRetry} className="shrink-0 font-bold text-[color:var(--app-accent)]">{isId ? 'Coba lagi' : 'Retry'}</button> : null}</div> : null}<ResultTypeTabs payload={visiblePayload} activeTab={activeTab} locale={locale} onSelectTab={onSelectTab} />{groups.map(groupKey => <SearchGroupSection key={groupKey} groupKey={groupKey} group={visiblePayload.groups[groupKey]} locale={locale} compact={compact && activeTab === 'all'} onSelectTab={onSelectTab} onNextCursor={onNextCursor} />)}</>;
 }
