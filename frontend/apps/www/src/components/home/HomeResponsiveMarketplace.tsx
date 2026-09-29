@@ -2389,7 +2389,7 @@ function RecommendationsLoadingSkeleton({
       aria-label={
         demand
           ? isId
-            ? 'Memuat kebutuhan yang sedang dipublikasikan'
+            ? 'Memuat kebutuhan pembeli yang dipublikasikan'
             : 'Loading current requests'
           : isId
             ? 'Memuat rekomendasi listing'
@@ -2454,7 +2454,7 @@ function HomeListingCarouselSection({
       aria-label={
         isDemand
           ? isId
-            ? 'Sedang mencari'
+            ? 'Kebutuhan pembeli'
             : 'People looking for it'
           : isId
             ? 'Yang tersedia'
@@ -2481,7 +2481,7 @@ function HomeListingCarouselSection({
         <span className="hidden shrink-0 text-[9px] font-medium text-zinc-400 sm:inline">
           {isDemand
             ? isId
-              ? 'Pelaku usaha yang sedang mencari produk, jasa, atau penyedia'
+              ? 'Pembeli yang membutuhkan produk, jasa, atau penyedia'
               : 'Businesses currently looking for products, services, or providers'
             : isId
               ? 'Produk, jasa, tempat, dan sewa yang tersedia'
@@ -2939,7 +2939,7 @@ function RecommendationCard({
           >
             {isDemand
               ? isId
-                ? 'Kebutuhan usaha'
+                ? 'Kebutuhan pembeli'
                 : 'Business request'
               : isId
                 ? 'Listing Lajukan'
@@ -3632,7 +3632,7 @@ function RightRail({
     },
     {
       id: 'requests',
-      label: isId ? 'Kebutuhan aktif' : 'Active requests',
+      label: isId ? 'Kebutuhan pembeli aktif' : 'Active buyer needs',
       value: resolveCountLabel(summary?.requests?.active, '0'),
       icon: ClipboardList,
       tone: 'bg-amber-50 text-amber-700 ring-amber-100 dark:bg-amber-950/40 dark:text-amber-200 dark:ring-amber-900/60',
@@ -4555,8 +4555,8 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
             ? [
                 {
                   id: 'requests',
-                  label: isId ? 'Yang Saya Butuhkan' : 'My Needs',
-                  caption: isId ? 'Kebutuhan aktif' : 'Active briefs and needs',
+                  label: isId ? 'Kebutuhan Saya' : 'My Needs',
+                  caption: isId ? 'Kebutuhan pembeli aktif' : 'Active buyer needs',
                   href: '/my-projects',
                   icon: ClipboardList,
                 },
@@ -4678,7 +4678,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
             ? [
                 {
                   id: 'requests',
-                  label: isId ? 'Yang Saya Butuhkan' : 'My Needs',
+                  label: isId ? 'Kebutuhan Saya' : 'My Needs',
                   caption: isId ? 'Login untuk akses' : 'Login to access',
                   href: '/login',
                   icon: ClipboardList,
