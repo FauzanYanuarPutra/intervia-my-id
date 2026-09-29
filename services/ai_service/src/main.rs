@@ -466,8 +466,10 @@ impl Config {
             vllm_api_key: env::var("VLLM_API_KEY").unwrap_or_default(),
             vllm_structured_model: non_empty_env("VLLM_STRUCTURED_MODEL")
                 .unwrap_or_else(|| vllm_model.clone()),
-            vllm_vision_model: non_empty_env("VLLM_VISION_MODEL")
-                .unwrap_or_else(|| vllm_model.clone()),
+            vllm_vision_model: env::var("VLLM_VISION_MODEL")
+                .unwrap_or_default()
+                .trim()
+                .to_string(),
             vllm_kyc_model: non_empty_env("VLLM_KYC_MODEL").unwrap_or_else(|| vllm_model.clone()),
             vllm_model,
             vllm_fallback_model: non_empty_env("VLLM_FALLBACK_MODEL")
@@ -1010,6 +1012,27 @@ async fn run_ai_endpoint(
         .clamp(128, state.config.max_output_tokens);
 
     let has_vision_media = request.media.iter().any(|media| !media.data_url.is_empty());
+
+    if has_vision_media && state.config.vllm_vision_model.is_empty() {
+        return json_response_with_request_id(
+            StatusCode::SERVICE_UNAVAILABLE,
+            &request_id,
+            json!({
+                "status": "error",
+                "request_id": request_id,
+                "task": task.as_str(),
+                "response": localized_ai_unavailable(locale),
+                "data": {},
+                "error": "VISION_MODEL_NOT_CONFIGURED",
+                "message": if locale == "id" {
+                    "Model vision AI belum dikonfigurasi."
+                } else {
+                    "The AI vision model is not configured."
+                },
+                "latency_ms": started.elapsed().as_millis(),
+            }),
+        );
+    }
 
     let model = if has_vision_media {
         &state.config.vllm_vision_model
