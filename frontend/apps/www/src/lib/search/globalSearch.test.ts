@@ -70,6 +70,28 @@ describe('global search URL state', () => {
     expect(state.tab).toBe('references');
     expect(serializeGlobalSearchState(state)).toBe('q=kopi&tab=references');
   });
+
+  it('parses and serializes a safe pagination offset', () => {
+    const state = parseGlobalSearchState(
+      new URLSearchParams('q=kemasan&side=supply&offset=48'),
+    );
+    expect(state.offset).toBe(48);
+    expect(serializeGlobalSearchState(state)).toBe(
+      'q=kemasan&side=supply&offset=48',
+    );
+  });
+
+  it('clamps invalid or oversized pagination offsets', () => {
+    expect(
+      parseGlobalSearchState(new URLSearchParams('offset=-4')).offset,
+    ).toBe(0);
+    expect(
+      parseGlobalSearchState(new URLSearchParams('offset=999999')).offset,
+    ).toBe(10000);
+    expect(
+      parseGlobalSearchState(new URLSearchParams('offset=oops')).offset,
+    ).toBe(0);
+  });
 });
 
 describe('global search result ordering', () => {
