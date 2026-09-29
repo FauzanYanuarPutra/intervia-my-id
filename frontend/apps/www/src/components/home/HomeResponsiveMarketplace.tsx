@@ -2453,8 +2453,8 @@ function HomeListingCarouselSection({
                   ? 'Belum ada kebutuhan aktif yang bisa ditampilkan.'
                   : 'No active requests to show right now.'
                 : isId
-                  ? 'Belum ada penawaran aktif yang bisa ditampilkan.'
-                  : 'No active offers to show right now.'}
+                  ? 'Belum ada penawaran aktif di Lajukan saat ini.'
+                  : 'No active Lajukan offers right now.'}
             </p>
           </div>
         </div>
@@ -4658,9 +4658,9 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
         <TrendingSearchSection isId={isId} />
         {recommendationsLoading ? (
           <RecommendationsLoadingSkeleton isId={isId} />
-        ) : recommendations.length > 0 ? (
+        ) : (
           <RecommendationsSection isId={isId} items={recommendations} />
-        ) : null}
+        )}
         {demandRecommendationsLoading ? (
           <RecommendationsLoadingSkeleton isId={isId} demand />
         ) : (
@@ -4726,9 +4726,9 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
               <TrendingSearchSection isId={isId} />
               {recommendationsLoading ? (
                 <RecommendationsLoadingSkeleton isId={isId} />
-              ) : recommendations.length > 0 ? (
+              ) : (
                 <RecommendationsSection isId={isId} items={recommendations} />
-              ) : null}
+              )}
               {demandRecommendationsLoading ? (
           <RecommendationsLoadingSkeleton isId={isId} demand />
         ) : (
