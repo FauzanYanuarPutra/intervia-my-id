@@ -1083,10 +1083,8 @@ export function UmkmDiscoveryPanel({
   const [storesBackendDegraded, setStoresBackendDegraded] = useState(false);
   const [mapPoints, setMapPoints] = useState<UmkmMapStore[]>([]);
   const activeMapPointsRequestRef = useRef<AbortController | null>(null);
-  const handleMapBoundsChange = useCallback(() => {
-    // Deliberately ignored: map panning must not trigger a network reload.
-    // The geo-only dataset is loaded once and reused client-side.
-  }, []);
+  // Map points are loaded as a stable geo snapshot. Panning never starts a
+  // network request, so the map remains responsive while the user drags.
   const requestLimit = Math.max(24, Math.min(60, Math.max(limit * 3, 24)));
   const referencePageLimit = 60;
   const mapPointLimit = 1800;
