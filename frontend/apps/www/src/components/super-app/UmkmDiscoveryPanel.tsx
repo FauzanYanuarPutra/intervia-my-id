@@ -1339,39 +1339,6 @@ export function UmkmDiscoveryPanel({
     city,
   ]);
 
-  useEffect(() => {
-    const mapAutoLoadEnabled = variant === 'immersive' || mapOnly;
-    if (
-      !mapAutoLoadEnabled ||
-      !mapBounds ||
-      !hasMore ||
-      loading ||
-      loadingMore ||
-      nextOffset === null
-    ) {
-      return;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      void loadStoresPage({
-        offset: nextOffset,
-        append: true,
-        silent: true,
-      });
-    }, 125);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [
-    hasMore,
-    loadStoresPage,
-    loading,
-    loadingMore,
-    mapBounds,
-    mapOnly,
-    nextOffset,
-    variant,
-  ]);
-
   const loadReferencesPage = useCallback(
     async ({
       cursor,
