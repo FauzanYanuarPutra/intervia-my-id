@@ -1744,8 +1744,8 @@ export function ExploreCategoryClient({
                     )}
                   >
                     {isId
-                      ? 'Menawarkan'
-                      : 'Offering'}
+                      ? 'Cari penawaran'
+                      : 'Find offers'}
                   </button>
 
                   <button
@@ -1768,8 +1768,8 @@ export function ExploreCategoryClient({
                     )}
                   >
                     {isId
-                      ? 'Membutuhkan'
-                      : 'Needs'}
+                      ? 'Cari kebutuhan'
+                      : 'Find needs'}
                   </button>
                 </div>
 
@@ -1792,11 +1792,11 @@ export function ExploreCategoryClient({
                   >
                     {searchSide === 'demand'
                       ? isId
-                        ? 'Mode Membutuhkan'
-                        : 'Needs mode'
+                        ? 'Mode cari kebutuhan'
+                        : 'Find-needs mode'
                       : isId
-                        ? 'Mode Menawarkan'
-                        : 'Offers mode'}
+                        ? 'Mode cari penawaran'
+                        : 'Find-offers mode'}
                   </p>
                   <p className="mt-0.5 text-[9px] font-medium leading-4 text-zinc-600 dark:text-zinc-400 sm:text-[10px]">
                     {searchSide === 'demand'
