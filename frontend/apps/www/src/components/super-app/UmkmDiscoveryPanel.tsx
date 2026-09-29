@@ -1080,39 +1080,15 @@ export function UmkmDiscoveryPanel({
   const [canUseDesktopMapPanel, setCanUseDesktopMapPanel] = useState(false);
   const [reloadNonce, setReloadNonce] = useState(0);
   const [storesBackendDegraded, setStoresBackendDegraded] = useState(false);
-  const [mapBounds, setMapBounds] = useState<{
-    minLat: number;
-    maxLat: number;
-    minLng: number;
-    maxLng: number;
-  } | null>(null);
   const [mapPoints, setMapPoints] = useState<UmkmMapStore[]>([]);
   const activeMapPointsRequestRef = useRef<AbortController | null>(null);
-  const handleMapBoundsChange = useCallback(
-    (nextBounds: {
-      minLat: number;
-      maxLat: number;
-      minLng: number;
-      maxLng: number;
-    }) => {
-      setMapBounds(current => {
-        if (
-          current &&
-          Math.abs(current.minLat - nextBounds.minLat) < 0.0001 &&
-          Math.abs(current.maxLat - nextBounds.maxLat) < 0.0001 &&
-          Math.abs(current.minLng - nextBounds.minLng) < 0.0001 &&
-          Math.abs(current.maxLng - nextBounds.maxLng) < 0.0001
-        ) {
-          return current;
-        }
-        return nextBounds;
-      });
-    },
-    [],
-  );
+  const handleMapBoundsChange = useCallback(() => {
+    // Deliberately ignored: map panning must not trigger a network reload.
+    // The geo-only dataset is loaded once and reused client-side.
+  }, []);
   const requestLimit = Math.max(24, Math.min(60, Math.max(limit * 3, 24)));
   const referencePageLimit = 60;
-  const mapPointLimit = 600;
+  const mapPointLimit = 1800;
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1438,18 +1414,15 @@ export function UmkmDiscoveryPanel({
     };
   }, [loadReferencesPage, query, city, discoveryScope]);
   useEffect(() => {
-    if (!mapBounds) return;
-
     activeMapPointsRequestRef.current?.abort();
     const controller = new AbortController();
     activeMapPointsRequestRef.current = controller;
 
+    // Load a stable nationwide geo-only snapshot once per search/location
+    // context. Panning the map never changes the request, so the user gets
+    // progressive nearest-to-farthest data without loading flashes.
     const params = new URLSearchParams({
       limit: String(mapPointLimit),
-      min_lat: mapBounds.minLat.toFixed(6),
-      max_lat: mapBounds.maxLat.toFixed(6),
-      min_lng: mapBounds.minLng.toFixed(6),
-      max_lng: mapBounds.maxLng.toFixed(6),
     });
     if (query?.trim()) params.set('q', query.trim());
     if (city?.trim()) params.set('city', city.trim());
@@ -1527,7 +1500,7 @@ export function UmkmDiscoveryPanel({
         activeMapPointsRequestRef.current = null;
       }
     };
-  }, [city, mapBounds, mapPointLimit, query, queryViewerLocation]);
+  }, [city, mapPointLimit, query, queryViewerLocation]);
 
   const preparedStores = useMemo(
     () =>
