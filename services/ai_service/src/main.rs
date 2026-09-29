@@ -908,10 +908,14 @@ async fn run_ai_endpoint(
     let mut warnings = Vec::<String>::new();
     let mut sources = request.sources.clone();
     let mut tool_calls: Vec<ToolCallTrace> = Vec::new();
+    let mut marketplace_search_query = None;
+    let mut marketplace_search_zero = false;
+    let mut marketplace_search_failed = false;
 
     if matches!(task, AiTask::Chat | AiTask::MarketplaceMatch) {
         let intent = infer_marketplace_intent(&user_message);
         if intent.should_search {
+            marketplace_search_query = Some(intent.clone());
             match state.tools.execute_marketplace_search(&intent).await {
                 Ok(execution) => {
                     let tool_sources = execution
@@ -928,9 +932,14 @@ async fn run_ai_endpoint(
                     let mut tool_sources = tool_sources;
                     dedupe_sources(&mut sources, &mut tool_sources);
                     sources.extend(tool_sources);
+                    marketplace_search_zero = execution
+                        .traces
+                        .iter()
+                        .any(|trace| trace.name == "search_listings" && trace.result_count == 0);
                     tool_calls.extend(execution.traces);
                 }
                 Err(error) => {
+                    marketplace_search_failed = true;
                     warnings.push(format!(
                         "tool_search_listings_unavailable: {}",
                         safe_error(&error, 180)
@@ -947,6 +956,82 @@ async fn run_ai_endpoint(
                 }
             }
         }
+    }
+
+    if task == AiTask::Chat && marketplace_search_failed {
+        let intent = marketplace_search_query.as_ref();
+        return json_response_with_request_id(
+            StatusCode::BAD_GATEWAY,
+            &request_id,
+            json!({
+                "status": "error",
+                "request_id": request_id,
+                "task": task.as_str(),
+                "response": if locale == "id" {
+                    "Pencarian data Lajukan sedang tidak tersedia. Coba lagi sebentar."
+                } else {
+                    "Lajukan data search is temporarily unavailable. Please try again shortly."
+                },
+                "data": {
+                    "search_query": intent.map(|value| value.search_query.clone()).unwrap_or_default(),
+                    "side": intent.map(|value| value.side.as_str()).unwrap_or("unknown"),
+                    "category": intent.map(|value| value.category.clone()).unwrap_or_default(),
+                    "location": intent.map(|value| value.location.clone()).unwrap_or_default(),
+                },
+                "tool_calls": tool_calls,
+                "grounded": false,
+                "error": "MARKETPLACE_TOOL_UNAVAILABLE",
+                "latency_ms": started.elapsed().as_millis(),
+            }),
+        );
+    }
+
+    if task == AiTask::Chat && marketplace_search_zero {
+        let intent = marketplace_search_query.as_ref();
+        let response = if locale == "id" {
+            "Belum ditemukan listing Lajukan yang cocok dengan pencarianmu."
+        } else {
+            "No matching Lajukan listings were found for your search."
+        };
+
+        return json_response_with_request_id(
+            StatusCode::OK,
+            &request_id,
+            json!({
+                "status": "success",
+                "request_id": request_id,
+                "task": task.as_str(),
+                "response": response,
+                "message": response,
+                "data": {
+                    "search_query": intent.map(|value| value.search_query.clone()).unwrap_or_default(),
+                    "side": intent.map(|value| value.side.as_str()).unwrap_or("unknown"),
+                    "category": intent.map(|value| value.category.clone()).unwrap_or_default(),
+                    "location": intent.map(|value| value.location.clone()).unwrap_or_default(),
+                    "result_count": 0,
+                },
+                "model": "tool-only",
+                "provider": "lajukan-tool-registry",
+                "grounded": true,
+                "sources": [{
+                    "id": "tool:search_listings:empty",
+                    "title": "Lajukan marketplace search",
+                    "url": "",
+                    "kind": "tool_empty_result",
+                }],
+                "tool_calls": tool_calls,
+                "grounding": {
+                    "source_count": 0,
+                    "tool_count": tool_calls.len(),
+                    "rag_enabled": false,
+                },
+                "warnings": ["NO_MATCHING_MARKETPLACE_LISTINGS"],
+                "needs_clarification": false,
+                "questions": [],
+                "confidence": 1.0,
+                "latency_ms": started.elapsed().as_millis(),
+            }),
+        );
     }
 
     let use_rag = request.use_rag.unwrap_or_else(|| {
