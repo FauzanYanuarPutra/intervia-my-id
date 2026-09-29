@@ -8,6 +8,7 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -15,6 +16,7 @@ import {
   type DragEvent,
   type FormEvent,
   type ReactNode,
+  type RefObject,
 } from 'react';
 import { createPortal } from 'react-dom';
 import {
@@ -2137,9 +2139,11 @@ function CommunityReportDialog({
 function CommunityFormattedBody({
   body,
   collapsed = false,
+  contentRef,
 }: {
   body: string;
   collapsed?: boolean;
+  contentRef?: RefObject<HTMLDivElement | null>;
 }) {
   const normalized = String(body || '')
     .replace(/\r\n?/g, '\n')
@@ -2151,6 +2155,7 @@ function CommunityFormattedBody({
 
   return (
     <div
+      ref={contentRef}
       className={cn(
         'space-y-2 break-words text-sm leading-6 text-[color:var(--app-text)]',
         collapsed
@@ -2159,11 +2164,15 @@ function CommunityFormattedBody({
       )}
     >
       {paragraphs.map((paragraph, index) => (
-        <p
-          key={index}
-          className="whitespace-pre-wrap"
-        >
-          {paragraph}
+        <p key={index} className="m-0">
+          {paragraph.split('\n').map((line, lineIndex) => (
+            <span
+              key={lineIndex}
+              className="block min-h-0"
+            >
+              {line || '\u00a0'}
+            </span>
+          ))}
         </p>
       ))}
     </div>
@@ -2194,6 +2203,8 @@ export function CommunityPostCard({
   const [likeSaving, setLikeSaving] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
   const [bodyExpanded, setBodyExpanded] = useState(false);
+  const [canExpandBody, setCanExpandBody] = useState(false);
+  const bodyContentRef = useRef<HTMLDivElement>(null);
 
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
@@ -2218,11 +2229,34 @@ export function CommunityPostCard({
   );
 
   const displayBody = poll ? poll.body : item.body;
-  const canExpandBody =
-    displayBody.trim().length > 240 || displayBody.includes('\n');
   const isQuestionPost = item.tags.some(tag =>
     /^(tanya|question|ask|help|support)$/i.test(tag.slug || tag.name),
   );
+  useLayoutEffect(() => {
+    setBodyExpanded(false);
+  }, [item.id]);
+
+  useLayoutEffect(() => {
+    if (bodyExpanded) return;
+
+    const element = bodyContentRef.current;
+    if (!element) {
+      setCanExpandBody(false);
+      return;
+    }
+
+    const measure = () => {
+      setCanExpandBody(element.scrollHeight > element.clientHeight + 2);
+    };
+
+    measure();
+
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [bodyExpanded, displayBody]);
+
   const feedMediaItems = getFeedMediaItems(item);
   const safeMedia = feedMediaItems[0] || null;
 
