@@ -18,7 +18,7 @@ import { useEmblaWheelGestures } from '@/components/common/useEmblaWheelGestures
 import { CompactSeeAllLink } from '@/components/common/CompactSectionAction';
 import { useViewerLocation } from '@/components/super-app/useViewerLocation';
 import { ArrowRight, BadgeCheck, Target, ChevronRight } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import useEmblaCarousel from 'embla-carousel-react';
 
 import {
@@ -328,8 +328,12 @@ export function HomeUmkmMapPreview({
 
   useEffect(() => {
     let active = true;
+    const requestRef = { current: null as AbortController | null };
 
     async function load(isInitial = false) {
+      requestRef.current?.abort();
+      const controller = new AbortController();
+      requestRef.current = controller;
       try {
         if (isInitial) {
           setLoading(true);
@@ -352,6 +356,7 @@ export function HomeUmkmMapPreview({
           {
             cache: 'default',
             credentials: 'include',
+            signal: controller.signal,
           },
         );
 
@@ -368,11 +373,11 @@ export function HomeUmkmMapPreview({
           );
         }
 
-        if (!active) return;
+        if (!active || controller.signal.aborted) return;
 
         setStores(json.data.items);
       } catch (loadError) {
-        if (!active) return;
+        if (!active || controller.signal.aborted) return;
 
         if (isInitial) {
           setError(
@@ -400,6 +405,7 @@ export function HomeUmkmMapPreview({
 
     return () => {
       active = false;
+      requestRef.current?.abort();
       window.clearInterval(intervalId);
     };
   }, [isId, viewerLocation]);
