@@ -75,6 +75,17 @@ export default async function NewsTopicPage({ params, searchParams }: Props) {
           topic={value}
           fallbackHref={`/news/topic/${encodeURIComponent(value)}?cursor=${encodeURIComponent(nextCursor || '')}`}
         />
+        <noscript>
+          {nextCursor ? (
+            <a
+              rel="next"
+              href={`/news/topic/${encodeURIComponent(value)}?cursor=${encodeURIComponent(nextCursor)}`}
+              className="sr-only"
+            >
+              {isId ? 'Berita berikutnya' : 'Next stories'}
+            </a>
+          ) : null}
+        </noscript>
       ) : (
         <div className="rounded-[26px] border border-dashed border-slate-300 p-8 text-center text-sm font-semibold text-slate-500 dark:border-white/15">
                     {isId ? 'Belum ada berita untuk topik ini.' : 'No news for this topic yet.'}
