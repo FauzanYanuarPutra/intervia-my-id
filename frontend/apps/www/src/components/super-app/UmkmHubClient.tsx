@@ -45,6 +45,7 @@ import {
 } from '@/lib/umkmSurface';
 import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 import { prepareUploadFile } from '@/lib/media/prepareUploadMedia';
+import { EmblaInlineRail } from '@/components/common/EmblaInlineRail';
 import { cn } from '@/lib/utils';
 import {
   buildDefaultCustomFieldsForBusiness,
@@ -9137,55 +9138,60 @@ export function UmkmHubClient({
                                 </InlineBadge>
                               </div>
 
-                              <div className="-mx-1 mt-2 flex gap-1.5 overflow-x-auto px-1 pb-1">
-                                {storeCreateSteps.map((step, index) => {
-                                  const active = step.id === storeCreateStep;
-                                  const done =
-                                    index < storeCreateStepIndex ||
-                                    (index === storeCreateStepIndex &&
-                                      step.id !== 'operations' &&
-                                      storeCreateValidation[step.id]);
-                                  const unlocked =
-                                    index <=
-                                    highestUnlockedStoreCreateStepIndex;
+                              <div className="-mx-1 mt-2 px-1 pb-1">
+                                <EmblaInlineRail
+                                  contentClassName="items-center gap-1.5"
+                                  dragFree
+                                >
+                                  {storeCreateSteps.map((step, index) => {
+                                    const active = step.id === storeCreateStep;
+                                    const done =
+                                      index < storeCreateStepIndex ||
+                                      (index === storeCreateStepIndex &&
+                                        step.id !== 'operations' &&
+                                        storeCreateValidation[step.id]);
+                                    const unlocked =
+                                      index <=
+                                      highestUnlockedStoreCreateStepIndex;
 
-                                  return (
-                                    <button
-                                      key={step.id}
-                                      type="button"
-                                      onClick={() =>
-                                        jumpToStoreCreateStep(step.id)
-                                      }
-                                      disabled={!unlocked}
-                                      className={cn(
-                                        'ui-pressable inline-flex min-h-[38px] shrink-0 items-center gap-2 rounded-full px-3 text-left transition',
-                                        active
-                                          ? 'bg-[color:color-mix(in_srgb,var(--app-accent-soft)_36%,white)] shadow-[0_14px_28px_-24px_rgba(15,23,42,0.18)] ring-1 ring-[color:var(--app-accent-border)]'
-                                          : unlocked
-                                            ? 'bg-slate-50/92 ring-1 ring-slate-200/80 hover:bg-white dark:bg-slate-900/72 dark:ring-slate-800/80'
-                                            : 'cursor-not-allowed bg-slate-100/80 opacity-65 ring-1 ring-dashed ring-slate-200/80 dark:bg-slate-900/60 dark:ring-slate-800/80',
-                                      )}
-                                    >
-                                      <span
+                                    return (
+                                      <button
+                                        key={step.id}
+                                        type="button"
+                                        onClick={() =>
+                                          jumpToStoreCreateStep(step.id)
+                                        }
+                                        disabled={!unlocked}
                                         className={cn(
-                                          'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold',
-                                          active || done
-                                            ? 'bg-[color:var(--app-accent)] text-white'
-                                            : 'bg-white text-[color:var(--app-accent)] ring-1 ring-slate-200/80 dark:bg-slate-950 dark:ring-slate-800/80',
+                                          'ui-pressable inline-flex min-h-[38px] shrink-0 items-center gap-2 rounded-full px-3 text-left transition',
+                                          active
+                                            ? 'bg-[color:color-mix(in_srgb,var(--app-accent-soft)_36%,white)] shadow-[0_14px_28px_-24px_rgba(15,23,42,0.18)] ring-1 ring-[color:var(--app-accent-border)]'
+                                            : unlocked
+                                              ? 'bg-slate-50/92 ring-1 ring-slate-200/80 hover:bg-white dark:bg-slate-900/72 dark:ring-slate-800/80'
+                                              : 'cursor-not-allowed bg-slate-100/80 opacity-65 ring-1 ring-dashed ring-slate-200/80 dark:bg-slate-900/60 dark:ring-slate-800/80',
                                         )}
                                       >
-                                        {done ? (
-                                          <CheckCircle2 className="h-3.5 w-3.5" />
-                                        ) : (
-                                          index + 1
-                                        )}
-                                      </span>
-                                      <span className="whitespace-nowrap text-[11px] font-bold text-[color:var(--app-text)]">
-                                        {step.title}
-                                      </span>
-                                    </button>
-                                  );
-                                })}
+                                        <span
+                                          className={cn(
+                                            'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold',
+                                            active || done
+                                              ? 'bg-[color:var(--app-accent)] text-white'
+                                              : 'bg-white text-[color:var(--app-accent)] ring-1 ring-slate-200/80 dark:bg-slate-950 dark:ring-slate-800/80',
+                                          )}
+                                        >
+                                          {done ? (
+                                            <CheckCircle2 className="h-3.5 w-3.5" />
+                                          ) : (
+                                            index + 1
+                                          )}
+                                        </span>
+                                        <span className="whitespace-nowrap text-[11px] font-bold text-[color:var(--app-text)]">
+                                          {step.title}
+                                        </span>
+                                      </button>
+                                    );
+                                  })}
+                                </EmblaInlineRail>
                               </div>
 
                               <div className={cn(manageInfoCardClass, 'mt-2')}>
