@@ -78,13 +78,13 @@ export default async function NewsCategoryPage({ params, searchParams }: Props) 
     {items.length ? (
       <>
         <NewsInfiniteGrid
-        initialItems={items}
+          initialItems={items}
         initialNextCursor={nextCursor}
         locale={locale}
         category={label}
         fallbackHref={`/news/category/${category.toLowerCase()}?cursor=${encodeURIComponent(nextCursor || '')}`}
-      />
-      {nextCursor ? (
+        />
+        {nextCursor ? (
         <a
           href={`/news/category/${category.toLowerCase()}?cursor=${encodeURIComponent(nextCursor)}`}
           rel="next"
