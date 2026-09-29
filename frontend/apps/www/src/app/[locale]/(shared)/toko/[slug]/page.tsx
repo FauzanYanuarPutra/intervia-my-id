@@ -265,6 +265,14 @@ function PrimaryAction({
   );
 }
 
+async function getPublicStoreBySlugSafe(slug: string): Promise<UmkmStore | null> {
+  try {
+    return await getUmkmStoreBySlug(slug);
+  } catch {
+    return null;
+  }
+}
+
 async function getStoreProducts(store: UmkmStore) {
   return loadStorefrontCatalog(
     () =>
@@ -282,13 +290,14 @@ export async function generateMetadata({
 }: PageProps): Promise<Metadata> {
   const { locale, slug } = await params;
   const isId = locale === 'id';
-  const storedStore = await getUmkmStoreBySlug(slug);
+  const storedStore = await getPublicStoreBySlugSafe(slug);
 
   if (!storedStore || !isPublicUmkmStoreVisible(storedStore)) {
     return {
       title: isId
         ? 'Toko tidak ditemukan | Lajukan'
         : 'Business not found | Lajukan',
+      robots: { index: false, follow: true },
     };
   }
 
@@ -307,7 +316,15 @@ export async function generateMetadata({
   return {
     title: `${store.name} | Lajukan`,
     description,
-    alternates: { canonical: publicUrl },
+    alternates: {
+      canonical: publicUrl,
+      languages: {
+        id: baseUrl + '/id/toko/' + store.slug,
+        en: baseUrl + '/en/toko/' + store.slug,
+        'x-default': baseUrl + '/id/toko/' + store.slug,
+      },
+    },
+    robots: { index: true, follow: true },
     openGraph: {
       title: store.name,
       description,
@@ -327,7 +344,7 @@ export async function generateMetadata({
 export default async function TokoPage({ params }: PageProps) {
   const { locale, slug } = await params;
   const isId = locale === 'id';
-  const storedStore = await getUmkmStoreBySlug(slug);
+  const storedStore = await getPublicStoreBySlugSafe(slug);
 
   if (!storedStore || !isPublicUmkmStoreVisible(storedStore)) {
     notFound();
