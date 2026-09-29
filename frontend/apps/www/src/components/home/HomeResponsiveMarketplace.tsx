@@ -2496,7 +2496,7 @@ export function PublicReferencesSection({
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label={
-                    `${isId ? 'Buka sumber' : 'Open source'}: ${item.sourceTitle}`,
+                    `${isId ? 'Buka sumber' : 'Open source'}: ${item.sourceTitle}`
                   }
                   className="min-w-0 flex-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                 >
