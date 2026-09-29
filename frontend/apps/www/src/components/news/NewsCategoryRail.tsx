@@ -45,7 +45,7 @@ export function NewsCategoryRail({
           <Link
             href="/news"
             className={
-              \`ml-1.5 shrink-0 snap-start rounded-full px-3.5 py-2 text-xs font-black transition \` +
+              `ml-1.5 shrink-0 snap-start rounded-full px-3.5 py-2 text-xs font-black transition ` +
               (activeCategory
                 ? 'border border-slate-200 bg-white text-slate-700 hover:border-emerald-200 hover:text-emerald-700 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200'
                 : 'bg-emerald-700 text-white shadow-sm')
@@ -60,9 +60,9 @@ export function NewsCategoryRail({
             return (
               <Link
                 key={category}
-                href={\`/news?category=\${encodeURIComponent(category)}\`}
+                href={`/news?category=${encodeURIComponent(category)}`}
                 className={
-                  \`ml-1.5 shrink-0 snap-start rounded-full px-3.5 py-2 text-xs font-bold transition \` +
+                  `ml-1.5 shrink-0 snap-start rounded-full px-3.5 py-2 text-xs font-bold transition ` +
                   (active
                     ? 'bg-emerald-700 font-black text-white shadow-sm'
                     : 'border border-slate-200 bg-white text-slate-700 hover:border-emerald-200 hover:text-emerald-700 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200')
