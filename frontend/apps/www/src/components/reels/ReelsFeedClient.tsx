@@ -75,6 +75,8 @@ export default function ReelsFeedClient({ isId }: { isId: boolean }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
+  const search = searchParams.toString();
+
   const requestSearch = useMemo(() => {
     const params = new URLSearchParams(searchParams.toString());
     params.delete('cursor');
