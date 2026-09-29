@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import {
   AlertTriangle,
   ArrowRight,
@@ -23,6 +24,7 @@ import {
 } from '@/data/educationHub';
 import { pickText } from '@/data/trustCenter';
 import { Link } from '@/i18n/navigation';
+import { buildPublicPageMetadata } from '@/lib/seo/publicPageMetadata';
 
 type PageProps = {
   params: Promise<{ locale: string }>;
@@ -172,6 +174,18 @@ function formatPrice(course: LearningCourse) {
 
 function formatKind(format: string | null) {
   return formatMeta[format ?? 'mixed'] ?? formatMeta.mixed;
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { locale } = await params;
+  return buildPublicPageMetadata({
+    locale,
+    path: '/education',
+    titleId: 'Education Bisnis & UMKM | Lajukan',
+    titleEn: 'Business & SME Education | Lajukan',
+    descriptionId: 'Pelajari materi bisnis, operasional, keamanan transaksi, listing, pemasaran, dan pengembangan usaha melalui Education Lajukan.',
+    descriptionEn: 'Learn business, operations, transaction safety, listings, marketing, and growth through Lajukan Education.',
+  });
 }
 
 export default async function EducationPage({ params }: PageProps) {
