@@ -236,37 +236,23 @@ export function HomeBusinessMapSection({
             <p className="truncate text-[9px] font-medium text-slate-500 sm:text-[10px]">
             {loading
               ? isId
-                ? 'Menyiapkan peta…'
-                : 'Preparing the map…'
-              : isId
-                ? summary.businessCount > 0 && summary.referenceCount > 0
-                  ? `${summary.businessCount} usaha · ${summary.referenceCount} referensi publik`
-                  : summary.businessCount > 0
-                    ? `${summary.businessCount} usaha terpetakan`
-                    : summary.referenceCount > 0
-                      ? `${summary.referenceCount} referensi lokasi publik`
-                      : error
-                        ? isId
-                          ? 'Data titik peta belum termuat'
-                          : 'Map point data unavailable'
-                        : summary.mappedCount > 0
-                          ? totalMappedCount > summary.mappedCount
-                            ? isId
-                              ? `${summary.mappedCount.toLocaleString('id-ID')} dari ${totalMappedCount.toLocaleString('id-ID')} titik`
-                              : `${summary.mappedCount.toLocaleString('en-US')} of ${totalMappedCount.toLocaleString('en-US')} points`
-                            : isId
-                              ? `${totalMappedCount.toLocaleString('id-ID')} titik terpetakan`
-                              : `${totalMappedCount.toLocaleString('en-US')} mapped points`
-                          : isId
-                            ? 'Belum ada lokasi terpetakan'
-                            : 'No mapped locations'
-                : summary.businessCount > 0 && summary.referenceCount > 0
-                  ? `${summary.businessCount} businesses · ${summary.referenceCount} public references`
-                  : summary.businessCount > 0
-                    ? `${summary.businessCount} businesses mapped`
-                    : summary.referenceCount > 0
-                      ? `${summary.referenceCount} public map references`
-                      : 'No mapped points'}
+                ? "Menyiapkan peta…" 
+                : "Preparing the map…" 
+              : error && summary.mappedCount === 0
+                ? isId
+                  ? "Data titik peta belum termuat"
+                  : "Map point data unavailable"
+                : totalMappedCount > 0
+                  ? totalMappedCount > summary.mappedCount
+                    ? isId
+                      ? `${summary.mappedCount.toLocaleString("id-ID")} titik ditampilkan · total ${totalMappedCount.toLocaleString("id-ID")}`
+                      : `${summary.mappedCount.toLocaleString("en-US")} points shown · total ${totalMappedCount.toLocaleString("en-US")}`
+                    : isId
+                      ? `${totalMappedCount.toLocaleString("id-ID")} titik · ${summary.businessCount} usaha · ${summary.referenceCount} referensi`
+                      : `${totalMappedCount.toLocaleString("en-US")} points · ${summary.businessCount} businesses · ${summary.referenceCount} references`
+                  : isId
+                    ? "Belum ada lokasi terpetakan"
+                    : "No mapped locations"}
           </p>
         </div>
 
