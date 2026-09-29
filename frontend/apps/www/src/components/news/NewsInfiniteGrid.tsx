@@ -13,6 +13,7 @@ type NewsInfiniteGridProps = {
   topic?: string;
   location?: string;
   query?: string;
+  fallbackHref?: string;
   variant?: 'grid' | 'compact';
 };
 
@@ -38,6 +39,7 @@ export function NewsInfiniteGrid({
   topic,
   location,
   query,
+  fallbackHref = '/news',
   variant = 'grid',
 }: NewsInfiniteGridProps) {
   const initialKey = useMemo(
@@ -119,7 +121,7 @@ export function NewsInfiniteGrid({
         {nextCursor ? (
           <div className="flex justify-center py-4">
             <a
-              href="/news"
+              href={fallbackHref}
               rel="next"
               className="inline-flex min-h-10 items-center rounded-full border border-slate-200 bg-white px-5 text-xs font-black text-slate-700 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200"
             >
