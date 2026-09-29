@@ -223,3 +223,149 @@ impl ToolRegistry {
         })
     }
 }
+
+
+    pub async fn execute_umkm_search(
+        &self,
+        intent: &MarketplaceIntent,
+    ) -> Result<ToolExecution, String> {
+        if !self.configured() || !intent.should_search {
+            return Ok(ToolExecution::default());
+        }
+
+        let mut url = Url::parse(&format!(
+            "{}/v1/umkm/stores",
+            self.config.marketplace_url.trim_end_matches('/')
+        ))
+        .map_err(|error| format!("invalid_marketplace_url: {}", error))?;
+
+        {
+            let mut query = url.query_pairs_mut();
+            let search_query = if intent.search_query.trim().is_empty() {
+                intent.normalized_query.trim()
+            } else {
+                intent.search_query.trim()
+            };
+            if !search_query.is_empty() {
+                query.append_pair("q", search_query);
+            }
+            if !intent.location.is_empty() {
+                query.append_pair("city", &intent.location);
+            }
+            query.append_pair("include_references", "false");
+            query.append_pair("limit", &self.config.max_results.clamp(1, 30).to_string());
+        }
+
+        let mut request = self
+            .http
+            .get(url)
+            .header("accept", "application/json")
+            .header("x-lajukan-ai-tool", "1");
+
+        if !self.config.service_token.is_empty() {
+            request = request.bearer_auth(&self.config.service_token);
+        }
+
+        let response = request
+            .send()
+            .await
+            .map_err(|error| format!("umkm_network: {}", error))?;
+        let status = response.status();
+        let payload = response
+            .json::<Value>()
+            .await
+            .map_err(|error| format!("umkm_invalid_json: {}", error))?;
+
+        if !status.is_success() {
+            return Err(format!("umkm_http_{}", status.as_u16()));
+        }
+
+        let items = payload
+            .get("items")
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default();
+
+        let mut sources = Vec::new();
+        for item in items.iter().take(self.config.max_results.clamp(1, 30)) {
+            let id = item
+                .get("id")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .trim()
+                .to_string();
+            let name = item
+                .get("name")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .trim()
+                .to_string();
+            if id.is_empty() || name.is_empty() {
+                continue;
+            }
+
+            let city = item
+                .get("city")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .trim();
+            let address = item
+                .get("address")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .trim();
+            let description = item
+                .get("description")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .trim();
+            let metadata = item.get("metadata");
+            let category = metadata
+                .and_then(|value| value.get("category"))
+                .or_else(|| metadata.and_then(|value| value.get("business_category")))
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .trim();
+            let phone = item
+                .get("phone")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .trim();
+
+            let detail = format!(
+                "Usaha nyata Lajukan. ID: {}. Nama: {}. Kota: {}. Alamat: {}. Kategori: {}. Telepon publik: {}. Deskripsi: {}",
+                id,
+                name,
+                city,
+                address,
+                category,
+                if phone.is_empty() { "Tidak dicantumkan" } else { phone },
+                description
+            );
+
+            sources.push(ToolSource {
+                id: format!("umkm:{}", id),
+                title: name,
+                content: detail,
+                url: format!("/id/umkm/{}", id),
+                kind: "lajukan_umkm".to_string(),
+            });
+        }
+
+        Ok(ToolExecution {
+            sources: sources.clone(),
+            traces: vec![ToolCallTrace {
+                name: "search_umkm".to_string(),
+                status: "success".to_string(),
+                result_count: sources.len(),
+                query: if intent.search_query.trim().is_empty() {
+                    intent.normalized_query.clone()
+                } else {
+                    intent.search_query.clone()
+                },
+                side: intent.side.as_str().to_string(),
+                category: intent.category.clone(),
+                location: intent.location.clone(),
+            }],
+        })
+    }
