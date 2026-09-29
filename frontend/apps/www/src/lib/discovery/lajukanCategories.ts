@@ -1239,7 +1239,7 @@ export function buildCategorySearchHref({
     params.set('side', side);
 
     if (side === 'demand') {
-      params.set('tab', 'needs');
+      params.set('tab', 'all');
     }
   }
 
