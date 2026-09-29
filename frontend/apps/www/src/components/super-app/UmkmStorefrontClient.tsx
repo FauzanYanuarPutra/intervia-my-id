@@ -41,6 +41,7 @@ import {
 import { useRouter } from '@/i18n/navigation';
 import { LocalizedAnchor } from '@/components/navigation/LocalizedAnchor';
 import { Modal } from '@/components/common/Modal';
+import { EmblaInlineRail } from '@/components/common/EmblaInlineRail';
 import { useToast } from '@/components/system/feedback/ToastProvider';
 import { useAuth } from '@/context/AuthContext';
 import { localProductImageForCategory } from '@/lib/media/localSeedMedia';
@@ -3655,29 +3656,37 @@ export function UmkmStorefrontClient({
                             {isId ? 'Lihat semua' : 'See all'}
                           </button>
                         </div>
-                        <div className="mt-2 flex gap-2 overflow-x-auto snap-x snap-mandatory pb-1 [scrollbar-width:thin]">
-                          {heroFeaturedProducts.map(product => (
-                            <button
-                              key={product.id}
-                              type="button"
-                              onClick={() => handleTabChange('menu')}
-                              className="flex min-w-[230px] shrink-0 snap-start items-center gap-3 rounded-[16px] border border-[color:var(--app-border)] bg-white p-2.5 text-left transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950"
-                            >
-                              <ProductThumbnail
-                                product={product}
-                                className="relative h-14 w-14 shrink-0 overflow-hidden rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)]"
-                              />
-                              <div className="min-w-0 flex-1">
-                                <p className="truncate text-[12px] font-bold text-[color:var(--app-text)]">
-                                  {product.name}
-                                </p>
-                                <p className="mt-0.5 text-[11px] font-semibold text-[color:var(--app-accent)]">
-                                  {formatIdr(product.price_cents)}
-                                </p>
-                                <span className="mt-2 inline-flex text-[9px] font-bold text-[color:var(--app-text-soft)]">
-                                  {isId ? 'Geser untuk lihat lainnya' : 'Swipe for more'}
-                                </span>
-                              </div>
+                        <div className="mt-2">
+                          <EmblaInlineRail
+                            contentClassName="items-stretch gap-2"
+                            itemClassName="w-[230px] min-w-[230px]"
+                          >
+                            {heroFeaturedProducts.map(product => (
+                              <button
+                                key={product.id}
+                                type="button"
+                                onClick={() => handleTabChange('menu')}
+                                className="flex h-full min-h-[82px] w-full items-center gap-3 rounded-[16px] border border-[color:var(--app-border)] bg-white p-2.5 text-left transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950"
+                              >
+                                <ProductThumbnail
+                                  product={product}
+                                  className="relative h-14 w-14 shrink-0 overflow-hidden rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)]"
+                                />
+                                <div className="min-w-0 flex-1">
+                                  <p className="truncate text-[12px] font-bold text-[color:var(--app-text)]">
+                                    {product.name}
+                                  </p>
+                                  <p className="mt-0.5 text-[11px] font-semibold text-[color:var(--app-accent)]">
+                                    {formatIdr(product.price_cents)}
+                                  </p>
+                                  <span className="mt-2 inline-flex text-[9px] font-bold text-[color:var(--app-text-soft)]">
+                                    {isId ? 'Geser untuk lihat lainnya' : 'Swipe for more'}
+                                  </span>
+                                </div>
+                              </button>
+                            ))}
+                          </EmblaInlineRail>
+                        </div>
                             </button>
                           ))}
                         </div>
@@ -3819,11 +3828,8 @@ export function UmkmStorefrontClient({
           </div>
         </section>
 
-        <nav className="sticky top-2 z-20 rounded-[18px] border border-emerald-100/90 bg-white/95 p-1 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.18)]  dark:border-emerald-400/14 dark:bg-[color:var(--app-surface-strong)]/94 sm:top-4 sm:rounded-[20px]">
-          <div
-            className="flex flex-nowrap items-center gap-1.5 overflow-x-auto"
-            data-auto-scrollbar
-          >
+        <nav className="sticky top-2 z-20 rounded-[18px] border border-emerald-100/90 bg-white/95 p-1 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.18)] dark:border-emerald-400/14 dark:bg-[color:var(--app-surface-strong)]/94 sm:top-4 sm:rounded-[20px]">
+          <EmblaInlineRail contentClassName="items-center gap-1.5">
             {visibleTabs.map(tab => {
               const isActive = activeTab === tab.key;
               return (
@@ -3843,7 +3849,7 @@ export function UmkmStorefrontClient({
                 </button>
               );
             })}
-          </div>
+          </EmblaInlineRail>
         </nav>
 
         {showTabIntroPanel && tabHighlights ? (
@@ -4362,14 +4368,17 @@ export function UmkmStorefrontClient({
                 ) : null}
 
                 {storeGallery.length > 0 ? (
-                  <div className="mt-4 flex gap-3 overflow-x-auto snap-x snap-mandatory pb-2 [scrollbar-width:thin]">
-                    {storeGallery.map((item, index) => {
-                      return (
+                  <div className="mt-4">
+                    <EmblaInlineRail
+                      contentClassName="items-stretch gap-3"
+                      itemClassName="w-[78vw] min-w-[78vw] max-w-[330px] sm:w-[300px] sm:min-w-[300px] sm:max-w-[300px]"
+                    >
+                      {storeGallery.map((item, index) => (
                         <button
                           key={'rail-' + item.id}
                           type="button"
                           onClick={() => openGalleryPreview(index)}
-                          className="group relative h-[220px] w-[78vw] max-w-[330px] shrink-0 snap-start overflow-hidden rounded-[22px] border border-[color:var(--app-accent-border)] bg-slate-100 text-left shadow-[0_16px_32px_-28px_rgba(15,23,42,0.18)] sm:h-[250px] sm:w-[300px]"
+                          className="group relative h-[220px] w-full overflow-hidden rounded-[22px] border border-[color:var(--app-accent-border)] bg-slate-100 text-left shadow-[0_16px_32px_-28px_rgba(15,23,42,0.18)] sm:h-[250px]"
                         >
                           {item.mediaType === 'video' ? (
                             <video src={item.src} muted playsInline preload="metadata" className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]" />
@@ -4381,8 +4390,8 @@ export function UmkmStorefrontClient({
                             <span className="mt-0.5 block text-[10px] text-white/75">{index + 1}/{storeGallery.length}</span>
                           </span>
                         </button>
-                      );
-                    })}
+                      ))}
+                    </EmblaInlineRail>
                   </div>
                 ) : null}
 
@@ -5347,7 +5356,7 @@ export function UmkmStorefrontClient({
               ) : null}
             </div>
             {storeGallery.length > 1 ? (
-              <div className="flex gap-2 overflow-x-auto pb-1">
+              <EmblaInlineRail contentClassName="items-center gap-2">
                 {storeGallery.map((item, index) => (
                   <button
                     key={`gallery-preview-${item.id}`}
@@ -5369,7 +5378,7 @@ export function UmkmStorefrontClient({
                     />
                   </button>
                 ))}
-              </div>
+              </EmblaInlineRail>
             ) : null}
           </div>
         ) : null}
