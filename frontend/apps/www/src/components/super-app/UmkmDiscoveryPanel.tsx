@@ -1452,38 +1452,6 @@ export function UmkmDiscoveryPanel({
     };
   }, [loadReferencesPage, query, city, discoveryScope]);
   useEffect(() => {
-    const mapAutoLoadEnabled = variant === 'immersive' || mapOnly;
-    if (
-      !mapAutoLoadEnabled ||
-      !mapBounds ||
-      !referenceHasMore ||
-      loadingMoreReferences ||
-      (referenceNextCursor === null && referenceNextOffset === null)
-    ) {
-      return;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      void loadReferencesPage({
-        cursor: referenceNextCursor,
-        offset: referenceNextOffset,
-        append: true,
-      });
-    }, 150);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [
-    loadReferencesPage,
-    loadingMoreReferences,
-    mapBounds,
-    mapOnly,
-    referenceHasMore,
-    referenceNextCursor,
-    referenceNextOffset,
-    variant,
-  ]);
-
-  useEffect(() => {
     if (!mapBounds) return;
 
     activeMapPointsRequestRef.current?.abort();
