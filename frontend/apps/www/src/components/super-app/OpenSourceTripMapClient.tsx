@@ -431,6 +431,7 @@ export function OpenSourceTripMapClient({
     <MapContainer
       center={[origin.lat, origin.lng]}
       zoom={14}
+      preferCanvas
       scrollWheelZoom
       className={className || 'h-64 w-full'}
       attributionControl={false}
@@ -442,7 +443,13 @@ export function OpenSourceTripMapClient({
         fitPaddingTop={fitPaddingTop}
         fitPaddingBottom={fitPaddingBottom}
       />
-      <TileLayer url={tileUrl} attribution={tileAttribution} />
+      <TileLayer
+        url={tileUrl}
+        attribution={tileAttribution}
+        keepBuffer={1}
+        updateWhenIdle
+        updateWhenZooming={false}
+      />
       <AttributionControl position="bottomright" prefix={false} />
 
       {polyline.length > 1 ? (
