@@ -70,12 +70,12 @@ export default async function NewsIndexPage({ params, searchParams }: PageProps)
   });
 
   const sliderItems = items.slice(0, 6);
-  const grid = cursor ? items.slice(6) : items.slice(1);
+  const grid = cursor ? items.slice(6) : items.slice(sliderItems.length);
 
   return (
-    <main className="page-shell page-rhythm pb-12 pt-4 sm:pt-6">
-      <section className="overflow-hidden rounded-[28px] border border-emerald-100/80 bg-[linear-gradient(135deg,#effcf5_0%,#ffffff_48%,#fffaf1_100%)] shadow-[0_28px_70px_-58px_rgba(15,23,42,0.35)] dark:border-white/10 dark:bg-[linear-gradient(135deg,#06261b_0%,#0f172a_62%,#1c1917_100%)]">
-        <div className="p-4 sm:p-6 lg:p-7">
+    <main className="page-shell page-rhythm min-w-0 overflow-x-clip pb-12 pt-3 sm:pt-5">
+      <section className="min-w-0 overflow-hidden rounded-[24px] border border-emerald-100/80 bg-[linear-gradient(135deg,#effcf5_0%,#ffffff_48%,#fffaf1_100%)] shadow-[0_28px_70px_-58px_rgba(15,23,42,0.35)] dark:border-white/10 dark:bg-[linear-gradient(135deg,#06261b_0%,#0f172a_62%,#1c1917_100%)]">
+        <div className="p-3.5 sm:p-5 md:p-6 lg:p-7">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-2.5">
               <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[13px] border border-emerald-100 bg-white p-2 shadow-sm dark:border-emerald-400/20 dark:bg-white/10">
@@ -107,8 +107,8 @@ export default async function NewsIndexPage({ params, searchParams }: PageProps)
             </div>
           </div>
 
-          <div className="mt-5 max-w-3xl">
-            <h1 className="text-[30px] font-black leading-[1.03] tracking-[-0.055em] text-slate-950 dark:text-white sm:text-[42px]">
+          <div className="mt-4 max-w-3xl sm:mt-5">
+            <h1 className="max-w-4xl text-[28px] font-black leading-[1.04] tracking-[-0.055em] text-slate-950 dark:text-white sm:text-[42px]">
               {isId ? 'Berita yang bantu kamu mengambil langkah.' : 'News that helps you decide what to do next.'}
             </h1>
             <p className="mt-2.5 max-w-2xl text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300 sm:text-[15px]">
@@ -118,7 +118,7 @@ export default async function NewsIndexPage({ params, searchParams }: PageProps)
             </p>
           </div>
 
-          <form method="get" className="mt-5 flex flex-col gap-2 sm:flex-row" role="search">
+          <form method="get" className="mt-4 flex min-w-0 flex-col gap-2 sm:mt-5 sm:flex-row" role="search">
             {category ? <input type="hidden" name="category" value={category} /> : null}
             <label htmlFor="news-search" className="sr-only">{isId ? 'Cari berita' : 'Search news'}</label>
             <div className="relative min-w-0 flex-1">
@@ -129,17 +129,17 @@ export default async function NewsIndexPage({ params, searchParams }: PageProps)
                 defaultValue={query}
                 maxLength={160}
                 placeholder={isId ? 'Cari berita, topik, atau kategori…' : 'Search stories, topics, or categories…'}
-                className="min-h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-sm font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 dark:border-white/10 dark:bg-slate-950/30 dark:text-white dark:focus:ring-emerald-950"
+                className="min-h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-sm font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 dark:border-white/10 dark:bg-slate-950/30 dark:text-white dark:focus:ring-emerald-950"
               />
             </div>
-            <button type="submit" className="min-h-11 rounded-xl bg-emerald-700 px-5 text-sm font-black text-white transition hover:bg-emerald-800">
+            <button type="submit" className="min-h-11 shrink-0 rounded-xl bg-emerald-700 px-5 text-sm font-black text-white transition hover:bg-emerald-800">
               {isId ? 'Cari berita' : 'Search'}
             </button>
           </form>
         </div>
       </section>
 
-      <nav aria-label={isId ? 'Kategori berita' : 'News categories'} className="-mx-1 flex gap-1.5 overflow-x-auto px-1 py-0.5 scrollbar-none">
+      <nav aria-label={isId ? 'Kategori berita' : 'News categories'} className="-mx-1 flex min-w-0 gap-1.5 overflow-x-auto overscroll-x-contain px-1 py-0.5 scrollbar-none">
         <Link
           href="/news"
           className={!category
@@ -183,7 +183,7 @@ export default async function NewsIndexPage({ params, searchParams }: PageProps)
       ) : null}
 
       {grid.length ? (
-        <section className="mt-8">
+        <section className="mt-7 sm:mt-8">
           <div className="mb-3 flex items-end justify-between gap-3">
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-300">
@@ -197,7 +197,7 @@ export default async function NewsIndexPage({ params, searchParams }: PageProps)
               {grid.length} {isId ? 'artikel' : 'stories'}
             </span>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {grid.map(item => (
               <NewsCard key={item.id} article={item} locale={locale} variant="grid" />
             ))}
