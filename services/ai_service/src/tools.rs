@@ -222,8 +222,6 @@ impl ToolRegistry {
             }],
         })
     }
-}
-
 
     pub async fn execute_umkm_search(
         &self,
