@@ -35,6 +35,24 @@ type MapPointsResponse = {
   error?: string;
 };
 
+type PublicStoreListResponse = {
+  data?: {
+    items?: Array<{
+      id?: unknown;
+      slug?: unknown;
+      name?: unknown;
+      city?: unknown;
+      address?: unknown;
+      lat?: unknown;
+      lng?: unknown;
+      metadata?: unknown;
+      updated_at?: unknown;
+    }>;
+    count?: number;
+  };
+  error?: string;
+};
+
 const HOME_MAP_CATEGORY_LEGEND: Array<{
   kind: UmkmPlaceKind;
   labelId: string;
@@ -136,7 +154,7 @@ export function HomeBusinessMapSection({
         if (!active || controller.signal.aborted) return;
         setError(null);
         const response = await fetch(
-          '/api/super-app/umkm/map-points?limit=2000&min_lat=-11&max_lat=6&min_lng=95&max_lng=141',
+          '/api/super-app/umkm/map-points?limit=800&min_lat=-11&max_lat=6&min_lng=95&max_lng=141',
           {
             cache: 'default',
             credentials: 'include',
@@ -156,14 +174,92 @@ export function HomeBusinessMapSection({
           );
         }
 
-        if (!active) return;
-        setTotalMappedCount(
+        // Home map is intentionally geo-light. If the dedicated projection has
+        // no rows yet, fall back to the public store projection instead of
+        // showing an empty basemap. Both sources contain real database-backed
+        // locations; no decorative/fake points are introduced.
+        let mapItems = payload.data.items;
+        let totalCount =
           typeof payload.data.total_count === 'number'
             ? payload.data.total_count
-            : payload.data.items.length,
-        );
+            : mapItems.length;
+
+        if (mapItems.length === 0) {
+          const fallbackResponse = await fetch(
+            '/api/super-app/umkm/stores?limit=200&map=1&include_references=1&min_lat=-11&max_lat=6&min_lng=95&max_lng=141',
+            {
+              cache: 'default',
+              credentials: 'include',
+              signal: controller.signal,
+            },
+          );
+          const fallbackPayload = (await fallbackResponse
+            .json()
+            .catch(() => ({}))) as PublicStoreListResponse;
+
+          if (fallbackResponse.ok && Array.isArray(fallbackPayload.data?.items)) {
+            mapItems = fallbackPayload.data.items
+              .map(item => {
+                const lat = typeof item.lat === 'number' ? item.lat : Number(item.lat);
+                const lng = typeof item.lng === 'number' ? item.lng : Number(item.lng);
+                if (
+                  typeof item.id !== 'string' ||
+                  typeof item.slug !== 'string' ||
+                  typeof item.name !== 'string' ||
+                  !Number.isFinite(lat) ||
+                  !Number.isFinite(lng)
+                ) {
+                  return null;
+                }
+
+                const metadata =
+                  item.metadata && typeof item.metadata === 'object'
+                    ? (item.metadata as Record<string, unknown>)
+                    : {};
+                const source = typeof metadata.source === 'string'
+                  ? metadata.source
+                  : '';
+                const recordKind = typeof metadata.record_kind === 'string'
+                  ? metadata.record_kind
+                  : '';
+
+                return {
+                  id: item.id,
+                  slug: item.slug,
+                  name: item.name,
+                  city: typeof item.city === 'string' ? item.city : '',
+                  lat,
+                  lng,
+                  category:
+                    typeof metadata.marketplace_category_slug === 'string'
+                      ? metadata.marketplace_category_slug
+                      : typeof metadata.category === 'string'
+                        ? metadata.category
+                        : 'business',
+                  source_kind:
+                    metadata.is_public_reference === true
+                      ? 'reference_store'
+                      : source === 'usaha_portal'
+                        ? 'lajukan_store'
+                        : recordKind.includes('reference')
+                          ? 'reference_store'
+                          : 'registered_store',
+                  metadata,
+                } satisfies MapPointItem;
+              })
+              .filter((item): item is MapPointItem => item !== null);
+
+            totalCount =
+              typeof fallbackPayload.data?.count === 'number'
+                ? fallbackPayload.data.count
+                : mapItems.length;
+          }
+        }
+
+        if (!active) return;
+        setTotalMappedCount(totalCount);
         setStores(
-          payload.data.items.map(item => ({
+          mapItems.map(item => ({
             id: item.id,
             slug: item.slug,
             name: item.name,
