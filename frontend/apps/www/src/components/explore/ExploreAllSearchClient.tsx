@@ -977,7 +977,9 @@ export function ExploreAllSearchClient({
           activeSubcategory?.slug ||
           null,
       },
-      'replace',
+      // Supply/demand changes are navigational state. Keep them in history
+      // so Back restores the exact marketplace surface instead of /explore.
+      'push',
     );
   };
 
