@@ -185,7 +185,22 @@ export default async function NewsIndexPage({ params, searchParams }: PageProps)
             fallbackHref={buildNewsIndexHref({ category, query, cursor: nextCursor || undefined })}
           />
         </section>
-      ) : null}
+      ) : null}          <noscript>
+            {nextCursor ? (
+              <a
+                rel="next"
+                href={buildNewsIndexHref({
+                  category,
+                  query,
+                  cursor: nextCursor,
+                })}
+                className="sr-only"
+              >
+                {isId ? 'Berita berikutnya' : 'Next stories'}
+              </a>
+            ) : null}
+          </noscript>
+
 
     </main>
   );
