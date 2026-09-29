@@ -11874,7 +11874,8 @@ async fn list_content(
               NOT COALESCE($15::bool, FALSE)
               OR content_type IN (
                   'product', 'service', 'job', 'property', 'auction', 'tender',
-                  'material', 'tool_rental', 'business_transfer', 'request'
+                  'material', 'tool_rental', 'business_transfer',
+                  'request', 'need', 'needs', 'demand'
               )
           )
           AND (
