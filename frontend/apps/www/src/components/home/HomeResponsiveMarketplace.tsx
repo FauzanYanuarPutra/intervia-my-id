@@ -3374,7 +3374,7 @@ function RightRail({
     },
     {
       id: 'requests',
-      label: isId ? 'Membutuhkan' : 'Needs',
+      label: isId ? 'Kebutuhan aktif' : 'Active requests',
       value: resolveCountLabel(summary?.requests?.active, '0'),
       icon: ClipboardList,
       tone: 'bg-amber-50 text-amber-700 ring-amber-100 dark:bg-amber-950/40 dark:text-amber-200 dark:ring-amber-900/60',
