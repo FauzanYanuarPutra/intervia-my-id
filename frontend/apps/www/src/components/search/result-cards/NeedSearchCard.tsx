@@ -15,6 +15,7 @@ import {
   normalizeContentMediaUrl,
 } from '@/lib/content/catalog';
 import {
+  getListingSideObjectLabel,
   getListingSideVerbLabel,
   getListingValueFallback,
 } from '@/lib/content/listingSide';
@@ -159,7 +160,7 @@ export function NeedSearchCard({
 
   const visibleFactItems = factItems.slice(0, 3);
   const statusLabel = requestStatusLabel(item, locale);
-  const sideStatusLabel = `${getListingSideVerbLabel('demand', locale)} - ${statusLabel}`;
+  const sideStatusLabel = `${getListingSideObjectLabel('demand', locale)} · ${statusLabel}`;
   const action = getExploreResultAction('needs', locale);
 
   const imageCandidates = [
