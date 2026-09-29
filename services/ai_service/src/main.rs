@@ -6,6 +6,7 @@ use axum::{
     Json, Router,
 };
 use bytes::Bytes;
+use intent::{infer_marketplace_intent, MarketplaceSide};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 use std::{
@@ -18,10 +19,9 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 use tokio::sync::Semaphore;
+use tools::{ToolCallTrace, ToolRegistry, ToolRegistryConfig};
 use tower_http::cors::CorsLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-use intent::{infer_marketplace_intent, MarketplaceSide};
-use tools::{ToolCallTrace, ToolRegistry, ToolRegistryConfig};
 
 mod intent;
 mod runtime_metrics;
@@ -489,10 +489,7 @@ impl Config {
                 .trim()
                 .to_string(),
 
-            marketplace_url: service_url(
-                "MARKETPLACE_URL",
-                "http://marketplace_service:8081",
-            ),
+            marketplace_url: service_url("MARKETPLACE_URL", "http://marketplace_service:8081"),
             marketplace_service_token: env::var("MARKETPLACE_SERVICE_TOKEN").unwrap_or_default(),
             ai_tool_timeout_ms: env_u64("AI_TOOL_TIMEOUT_MS", 5_000, 500, 20_000),
             ai_tool_limit: env_usize("AI_TOOL_LIMIT", 12, 1, 30),
@@ -614,7 +611,10 @@ async fn handle_ready(State(state): State<Arc<AppState>>) -> Response {
     let vision_ready = if state.config.vllm_vision_model.trim().is_empty() {
         None
     } else {
-        Some(model_list_contains(&parsed, &state.config.vllm_vision_model))
+        Some(model_list_contains(
+            &parsed,
+            &state.config.vllm_vision_model,
+        ))
     };
 
     let required_ready = primary_ready && structured_ready && fast_ready;
@@ -951,10 +951,9 @@ async fn run_ai_endpoint(
         let intent = infer_marketplace_intent(&user_message);
         if intent.should_search {
             marketplace_search_query = Some(intent.clone());
-            let use_umkm_tool =
-                task == AiTask::Chat
-                    && intent.category == "unknown"
-                    && matches!(intent.side, MarketplaceSide::Unknown);
+            let use_umkm_tool = task == AiTask::Chat
+                && intent.category == "unknown"
+                && matches!(intent.side, MarketplaceSide::Unknown);
             let execution = if use_umkm_tool {
                 state.tools.execute_umkm_search(&intent).await
             } else {
@@ -977,13 +976,10 @@ async fn run_ai_endpoint(
                     let mut tool_sources = tool_sources;
                     dedupe_sources(&mut sources, &mut tool_sources);
                     sources.extend(tool_sources);
-                    marketplace_search_zero = execution
-                        .traces
-                        .iter()
-                        .any(|trace| {
-                            matches!(trace.name.as_str(), "search_listings" | "search_umkm")
-                                && trace.result_count == 0
-                        });
+                    marketplace_search_zero = execution.traces.iter().any(|trace| {
+                        matches!(trace.name.as_str(), "search_listings" | "search_umkm")
+                            && trace.result_count == 0
+                    });
                     tool_calls.extend(execution.traces);
                 }
                 Err(error) => {
@@ -1234,35 +1230,44 @@ async fn run_ai_endpoint(
         None
     };
 
-    let (response_text, mut data, needs_clarification, questions, mut confidence, mut output_warnings) =
-        if let Some(parsed) = parsed {
-            parse_response_envelope(parsed, &raw_content)
-        } else if structured {
-            (
-                raw_content.clone(),
-                json!({}),
-                false,
-                Vec::<String>::new(),
-                0.45,
-                vec!["structured_output_parse_failed".to_string()],
-            )
-        } else {
-            (
-                raw_content.clone(),
-                json!({}),
-                false,
-                Vec::<String>::new(),
-                0.75,
-                Vec::<String>::new(),
-            )
-        };
+    let (
+        response_text,
+        mut data,
+        needs_clarification,
+        questions,
+        mut confidence,
+        mut output_warnings,
+    ) = if let Some(parsed) = parsed {
+        parse_response_envelope(parsed, &raw_content)
+    } else if structured {
+        (
+            raw_content.clone(),
+            json!({}),
+            false,
+            Vec::<String>::new(),
+            0.45,
+            vec!["structured_output_parse_failed".to_string()],
+        )
+    } else {
+        (
+            raw_content.clone(),
+            json!({}),
+            false,
+            Vec::<String>::new(),
+            0.75,
+            Vec::<String>::new(),
+        )
+    };
 
     warnings.append(&mut output_warnings);
 
     let validation_warnings = validate_task_data(task, &mut data);
     warnings.extend(validation_warnings);
 
-    if tool_calls.iter().any(|call| call.result_count == 0 && call.status == "success") {
+    if tool_calls
+        .iter()
+        .any(|call| call.result_count == 0 && call.status == "success")
+    {
         confidence = confidence.min(0.5);
     }
 
@@ -1955,11 +1960,9 @@ async fn call_vllm(
     {
         Ok(result) => Ok(result),
         Err(primary_error)
-            if !(
-                !state.config.vllm_vision_model.is_empty()
-                    && state.config.vllm_vision_model != state.config.vllm_model
-                    && model == state.config.vllm_vision_model
-            )
+            if !(!state.config.vllm_vision_model.is_empty()
+                && state.config.vllm_vision_model != state.config.vllm_model
+                && model == state.config.vllm_vision_model)
                 && !state.config.vllm_fallback_model.is_empty()
                 && state.config.vllm_fallback_model != model
                 && is_model_unavailable_error(&primary_error) =>
@@ -2471,12 +2474,10 @@ fn validate_task_data(task: AiTask, data: &mut Value) -> Vec<String> {
             .replace('_', "-")
             .replace(' ', "-");
 
-        let canonical = allowed.iter().copied().find(|candidate| {
-            candidate
-                .replace('_', "-")
-                .replace(' ', "-")
-                == normalized
-        });
+        let canonical = allowed
+            .iter()
+            .copied()
+            .find(|candidate| candidate.replace('_', "-").replace(' ', "-") == normalized);
 
         if let Some(canonical) = canonical {
             *value = Value::String(canonical.to_string());

@@ -112,26 +112,60 @@ fn build_search_query(query: &str) -> String {
         .filter_map(|marker| lower.find(marker))
         .min();
 
-    let product_part = location_start
-        .map(|index| &query[..index])
-        .unwrap_or(query);
+    let product_part = location_start.map(|index| &query[..index]).unwrap_or(query);
 
     let stop_words = [
-        "cari", "carikan", "mencari", "mau cari", "aku cari", "saya cari",
-        "kami cari", "butuh", "membutuhkan", "aku butuh", "saya butuh",
-        "kami butuh", "supplier", "pemasok", "penjual", "pembeli", "buyer",
-        "seller", "menjual", "jualan", "jual", "menawarkan", "penawaran",
-        "tersedia", "ready", "stok", "ada", "yang", "saya", "aku", "kami",
-        "dong", "tolong", "untuk", "dengan", "budget", "harga", "maksimal",
+        "cari",
+        "carikan",
+        "mencari",
+        "mau cari",
+        "aku cari",
+        "saya cari",
+        "kami cari",
+        "butuh",
+        "membutuhkan",
+        "aku butuh",
+        "saya butuh",
+        "kami butuh",
+        "supplier",
+        "pemasok",
+        "penjual",
+        "pembeli",
+        "buyer",
+        "seller",
+        "menjual",
+        "jualan",
+        "jual",
+        "menawarkan",
+        "penawaran",
+        "tersedia",
+        "ready",
+        "stok",
+        "ada",
+        "yang",
+        "saya",
+        "aku",
+        "kami",
+        "dong",
+        "tolong",
+        "untuk",
+        "dengan",
+        "budget",
+        "harga",
+        "maksimal",
         "minimal",
     ];
 
     product_part
         .split_whitespace()
-        .map(|token| token.trim_matches(|character: char| !character.is_alphanumeric() && character != '-' ))
+        .map(|token| {
+            token.trim_matches(|character: char| !character.is_alphanumeric() && character != '-')
+        })
         .filter(|token| {
             !token.is_empty()
-                && !stop_words.iter().any(|word| word.eq_ignore_ascii_case(token))
+                && !stop_words
+                    .iter()
+                    .any(|word| word.eq_ignore_ascii_case(token))
                 && !is_quantity_token(token)
         })
         .collect::<Vec<_>>()
@@ -338,7 +372,8 @@ mod tests {
 
     #[test]
     fn finds_buyer_side() {
-        let intent = infer_marketplace_intent("Saya jual kardus dan sedang cari pembeli di Bintaro");
+        let intent =
+            infer_marketplace_intent("Saya jual kardus dan sedang cari pembeli di Bintaro");
         assert!(intent.should_search);
         assert_eq!(intent.side, MarketplaceSide::Demand);
     }
