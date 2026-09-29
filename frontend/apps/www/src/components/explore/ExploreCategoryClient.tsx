@@ -508,6 +508,7 @@ function DataSection({
       params.set('tab', 'businesses');
     } else {
       params.set('side', 'supply');
+      params.set('tab', 'all');
     }
     params.set('sort', 'latest');
 
