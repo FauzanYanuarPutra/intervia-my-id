@@ -56,7 +56,7 @@ describe('Lajukan explore taxonomy', () => {
       'Penawaran',
     );
     expect(getExploreSideLabel({ side: 'demand', locale: 'id' })).toBe(
-      'Kebutuhan',
+      'Kebutuhan Pembeli',
     );
     expect(
       normalizeExploreSide({
