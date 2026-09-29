@@ -2,10 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import useEmblaCarousel from 'embla-carousel-react';
-import { ArrowLeft, ArrowRight, Clock3, MapPin } from 'lucide-react';
+import { Clock3, MapPin } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import type { LajukanNewsArticle } from '@/lib/news';
 import { NewsMedia } from '@/components/news/NewsMedia';
+import { EmblaDesktopControls } from '@/components/common/EmblaDesktopControls';
+import { useEmblaWheelGestures } from '@/components/common/useEmblaWheelGestures';
 
 function formatDate(value: string, locale: string) {
   const date = new Date(value);
@@ -59,59 +61,49 @@ export function NewsCarousel({
     };
   }, [emblaApi, onSelect]);
 
-  const canPrev = Boolean(emblaApi?.canScrollPrev());
-  const canNext = Boolean(emblaApi?.canScrollNext());
   const dots = useMemo(() => Math.min(articles.length, 6), [articles.length]);
+
+  useEmblaWheelGestures(emblaApi, {
+    enabled: articles.length > 1,
+    desktopOnly: true,
+    threshold: 42,
+  });
 
   if (!articles.length) return null;
 
   return (
     <section className={related ? 'mt-0' : 'mt-1'}>
-      <div className="mb-3 flex items-end justify-between gap-3">
+      <div className="mb-3 flex min-w-0 items-end justify-between gap-3">
         <div className="min-w-0">
           {eyebrow ? (
             <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-300">
               {eyebrow}
             </p>
           ) : null}
-          <h2 className="mt-1 text-[20px] font-black tracking-[-0.035em] text-slate-950 dark:text-white sm:text-[22px]">
+          <h2 className="mt-1 truncate text-[20px] font-black tracking-[-0.035em] text-slate-950 dark:text-white sm:text-[22px]">
             {title}
           </h2>
         </div>
         {articles.length > 1 ? (
-          <div className="hidden shrink-0 items-center gap-1.5 sm:flex">
-            <button
-              type="button"
-              aria-label={locale === 'id' ? 'Berita sebelumnya' : 'Previous story'}
-              onClick={() => emblaApi?.scrollPrev()}
-              disabled={!canPrev}
-              className="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:border-emerald-200 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-35 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              aria-label={locale === 'id' ? 'Berita berikutnya' : 'Next story'}
-              onClick={() => emblaApi?.scrollNext()}
-              disabled={!canNext}
-              className="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:border-emerald-200 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-35 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200"
-            >
-              <ArrowRight className="h-4 w-4" />
-            </button>
-          </div>
+          <EmblaDesktopControls
+            api={emblaApi}
+            isId={locale === 'id'}
+            compact
+            className="lg:flex"
+          />
         ) : null}
       </div>
 
-      <div ref={viewportRef} className="overflow-hidden" data-news-carousel>
-        <div className="-ml-3 flex touch-pan-y">
+      <div ref={viewportRef} className="min-w-0 overflow-hidden" data-news-carousel>
+        <div className="-ml-2.5 flex touch-pan-y sm:-ml-3">
           {articles.map(article => (
             <div
               key={article.id}
-              className={`min-w-0 shrink-0 grow-0 pl-3 ${related ? 'basis-[86%] sm:basis-1/2 xl:basis-1/3' : 'basis-[94%] sm:basis-[72%] lg:basis-[58%]'}`}
+              className={`min-w-0 shrink-0 grow-0 pl-2.5 sm:pl-3 ${related ? 'basis-[87%] sm:basis-[49%] xl:basis-[32%]' : 'basis-[92%] sm:basis-[68%] lg:basis-[54%]'}`}
             >
               <Link
                 href={'/news/' + article.slug}
-                className="group block h-full overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_18px_44px_-34px_rgba(15,23,42,0.28)] transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-[0_22px_48px_-32px_rgba(15,23,42,0.32)] dark:border-white/10 dark:bg-slate-900"
+                className="group block h-full min-w-0 overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-[0_18px_44px_-34px_rgba(15,23,42,0.28)] transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-[0_22px_48px_-32px_rgba(15,23,42,0.32)] dark:border-white/10 dark:bg-slate-900"
               >
                 <div className="relative">
                   <NewsMedia
@@ -163,7 +155,7 @@ export function NewsCarousel({
       </div>
 
       {articles.length > 1 ? (
-        <div className="mt-3 flex items-center justify-center gap-1.5 sm:justify-start">
+        <div className="mt-3 flex min-w-0 items-center justify-center gap-1.5 sm:justify-start">
           {Array.from({ length: dots }).map((_, index) => (
             <button
               key={index}
