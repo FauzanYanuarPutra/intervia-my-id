@@ -20,7 +20,7 @@ use std::{
 use tokio::sync::Semaphore;
 use tower_http::cors::CorsLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-use intent::infer_marketplace_intent;
+use intent::{infer_marketplace_intent, MarketplaceSide};
 use tools::{ToolCallTrace, ToolRegistry, ToolRegistryConfig};
 
 mod intent;
@@ -934,7 +934,7 @@ async fn run_ai_endpoint(
             let use_umkm_tool =
                 task == AiTask::Chat
                     && intent.category == "unknown"
-                    && matches!(intent.side, intent::MarketplaceSide::Unknown);
+                    && matches!(intent.side, MarketplaceSide::Unknown);
             let execution = if use_umkm_tool {
                 state.tools.execute_umkm_search(&intent).await
             } else {
@@ -974,7 +974,7 @@ async fn run_ai_endpoint(
                     ));
                     tool_calls.push(ToolCallTrace {
                         name: if intent.category == "unknown"
-                            && matches!(intent.side, intent::MarketplaceSide::Unknown)
+                            && matches!(intent.side, MarketplaceSide::Unknown)
                         {
                             "search_umkm".to_string()
                         } else {
