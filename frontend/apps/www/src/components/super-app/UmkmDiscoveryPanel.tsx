@@ -1049,7 +1049,7 @@ export function UmkmDiscoveryPanel({
   } = useViewerLocation({
     isId,
     autoRequest: false,
-    watch: true,
+    watch: false,
   });
   const viewerQueryLat = viewerLocation
     ? Number(viewerLocation.lat.toFixed(3))
@@ -1117,9 +1117,9 @@ export function UmkmDiscoveryPanel({
     },
     [],
   );
-  const requestLimit = Math.max(50, Math.min(120, limit));
-  const referencePageLimit = 100;
-  const mapPointLimit = 1200;
+  const requestLimit = Math.max(24, Math.min(60, Math.max(limit * 3, 24)));
+  const referencePageLimit = 60;
+  const mapPointLimit = 600;
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1201,12 +1201,6 @@ export function UmkmDiscoveryPanel({
         params.set('limit', String(requestLimit));
         params.set('offset', String(offset));
         params.set('map', '1');
-        if (mapBounds) {
-          params.set('min_lat', mapBounds.minLat.toFixed(6));
-          params.set('max_lat', mapBounds.maxLat.toFixed(6));
-          params.set('min_lng', mapBounds.minLng.toFixed(6));
-          params.set('max_lng', mapBounds.maxLng.toFixed(6));
-        }
 
         const res = await fetch(
           `/api/super-app/umkm/stores?${params.toString()}`,
@@ -1295,9 +1289,9 @@ export function UmkmDiscoveryPanel({
     },
     [
       city,
+      category,
       deepLinkedInitialStore,
       isId,
-      mapBounds,
       query,
       requestLimit,
       selectedSlug,
@@ -1311,7 +1305,6 @@ export function UmkmDiscoveryPanel({
     setListPage(1);
     if (
       hasInitialStores &&
-      !mapBounds &&
       !queryViewerLocation &&
       reloadNonce === 0
     ) {
@@ -1328,7 +1321,7 @@ export function UmkmDiscoveryPanel({
           silent: hasInitialStores,
         });
       },
-      mapBounds ? 180 : 0,
+      query || city ? 80 : 0,
     );
 
     return () => {
@@ -1339,10 +1332,11 @@ export function UmkmDiscoveryPanel({
     hasInitialStores,
     initialStores,
     loadStoresPage,
-    mapBounds,
     reloadNonce,
     requestLimit,
     queryViewerLocation,
+    query,
+    city,
   ]);
 
   useEffect(() => {
@@ -1481,19 +1475,15 @@ export function UmkmDiscoveryPanel({
     setReferenceNextCursor(null);
     setReferenceNextOffset(null);
     setStores(current => mergeUmkmPublicReferencePage(current, [], false));
-    const timeoutId = window.setTimeout(
-      () => {
-        void loadReferencesPage({ append: false });
-      },
-      mapBounds ? 450 : 350,
-    );
+    const timeoutId = window.setTimeout(() => {
+      void loadReferencesPage({ append: false });
+    }, 180);
 
     return () => {
       window.clearTimeout(timeoutId);
       activeReferencesRequestRef.current?.abort();
     };
-  }, [loadReferencesPage, mapBounds]);
-
+  }, [loadReferencesPage, query, city, discoveryScope]);
   useEffect(() => {
     const mapAutoLoadEnabled = variant === 'immersive' || mapOnly;
     if (
@@ -1547,10 +1537,11 @@ export function UmkmDiscoveryPanel({
       params.set('viewer_lng', queryViewerLocation.lng.toFixed(3));
     }
 
-    void fetch(`/api/super-app/umkm/map-points?${params.toString()}`, {
-      cache: 'default',
-      signal: controller.signal,
-    })
+    const timerId = window.setTimeout(() => {
+      void fetch(`/api/super-app/umkm/map-points?${params.toString()}`, {
+        cache: 'default',
+        signal: controller.signal,
+      })
       .then(async response => {
         const payload = (await response.json().catch(() => ({}))) as MapPointResponse;
         if (!response.ok || controller.signal.aborted) return;
@@ -1595,13 +1586,15 @@ export function UmkmDiscoveryPanel({
             })),
         );
       })
-      .catch(error => {
-        if (!controller.signal.aborted) {
-          console.warn('[UMKM_MAP_POINTS_CLIENT_ERROR]', error);
-        }
-      });
+        .catch(error => {
+          if (!controller.signal.aborted) {
+            console.warn('[UMKM_MAP_POINTS_CLIENT_ERROR]', error);
+          }
+        });
+    }, 320);
 
     return () => {
+      window.clearTimeout(timerId);
       controller.abort();
       if (activeMapPointsRequestRef.current === controller) {
         activeMapPointsRequestRef.current = null;
@@ -1624,7 +1617,6 @@ export function UmkmDiscoveryPanel({
         const isReference = isUmkmMapPublicReference(place.store);
         if (discoveryScope === 'registered' && isReference) return false;
         if (discoveryScope === 'references' && !isReference) return false;
-        if (isReference) return true;
         return matchesUmkmDiscoveryCategory(
           {
             kind: place.ui.kind,
@@ -1654,21 +1646,30 @@ export function UmkmDiscoveryPanel({
       const pointIsReference = point.metadata?.is_public_reference === true;
       if (discoveryScope === 'registered' && pointIsReference) continue;
       if (discoveryScope === 'references' && !pointIsReference) continue;
-      if (
-        category &&
-        category !== 'all' &&
-        !matchesUmkmDiscoveryCategory(
+      if (category && category !== 'all') {
+        const pointUi = buildUmkmPlacePresentation(
           {
-            kind: 'general',
+            ...point,
+            address: point.city || 'Indonesia',
+            description: point.description ?? null,
+            phone: point.phone ?? null,
+            metadata: point.metadata ?? {},
+          },
+          isId,
+          viewerLocation,
+        );
+        if (!matchesUmkmDiscoveryCategory(
+          {
+            kind: pointUi.kind,
             name: point.name,
             description: point.description,
-            address: point.address,
+            address: point.city,
             metadata: point.metadata,
           },
           category,
-        )
-      ) {
-        continue;
+        )) {
+          continue;
+        }
       }
       if (!merged.has(point.id)) {
         merged.set(point.id, {
