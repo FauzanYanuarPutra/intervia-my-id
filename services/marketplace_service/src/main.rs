@@ -11404,6 +11404,9 @@ async fn list_map_places(
               WHEN lower(COALESCE(s.metadata->>'record_kind','')) LIKE '%reference%'
                 OR lower(COALESCE(s.metadata->>'market_side','')) = 'reference'
               THEN 'reference_store'
+              WHEN lower(COALESCE(s.metadata->>'source','')) = 'usaha_portal'
+                OR s.owner_user_id IS NOT NULL
+              THEN 'lajukan_store'
               ELSE 'registered_store'
             END AS source_kind
           FROM umkm_stores s
@@ -11524,18 +11527,20 @@ async fn list_map_places(
     }
     statement.push(" ORDER BY ");
     if let Some((lat, lng)) = viewer {
-        statement
-            .push("point(lng,lat) <-> point(")
-            .push_bind(lng)
-            .push(",")
-            .push_bind(lat)
-            .push(") ASC");
+        statement.push(
+            "CASE WHEN source_kind = 'lajukan_store' THEN 0              WHEN source_kind = 'registered_store' THEN 1              ELSE 2 END ASC,              point(lng,lat) <-> point(",
+        )
+        .push_bind(lng)
+        .push(",")
+        .push_bind(lat)
+        .push(") ASC");
     } else {
-        // A nationwide overview is capped at 2,000 points. Use a deterministic
-        // hash rather than category/name ordering so the visible sample does
-        // not over-represent one taxonomy and stays geographically representative
-        // across repeated requests.
-        statement.push("md5(id) ASC");
+        // Native Lajukan records are deliberately surfaced first. Within
+        // each source tier, keep a deterministic hash so repeated nationwide
+        // requests remain stable without making references displace local data.
+        statement.push(
+            "CASE WHEN source_kind = 'lajukan_store' THEN 0              WHEN source_kind = 'registered_store' THEN 1              ELSE 2 END ASC, md5(id) ASC",
+        );
     }
     statement.push(" LIMIT ").push_bind(limit);
 
