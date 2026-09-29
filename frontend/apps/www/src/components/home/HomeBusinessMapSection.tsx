@@ -446,7 +446,9 @@ export function HomeBusinessMapSection({
           theme="default"
           focusMode="indonesia"
           showPopups={false}
-          markerStyle="default"
+          // Home is a coverage preview: show the actual distribution as
+          // lightweight colored dots instead of hiding most points in clusters.
+          markerStyle="dots"
           className="leaflet-home-map h-[126px] w-full sm:h-[140px]"
         />
 
