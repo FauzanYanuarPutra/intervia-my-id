@@ -5,6 +5,7 @@ on:
     branches: [main]
 
 permissions:
+  # Keep this workflow explicitly validating the bot-formatted main commit.
   contents: write
 
 concurrency:
