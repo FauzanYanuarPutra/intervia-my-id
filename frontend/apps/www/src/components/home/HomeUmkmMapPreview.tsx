@@ -19,6 +19,7 @@ import { CompactSeeAllLink } from '@/components/common/CompactSectionAction';
 import { useViewerLocation } from '@/components/super-app/useViewerLocation';
 import { ArrowRight, BadgeCheck, Target, ChevronRight } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { cn } from '@/lib/utils';
 import useEmblaCarousel from 'embla-carousel-react';
 
 import {
@@ -57,8 +58,6 @@ type PreparedStore = {
 };
 
 /* ================= CONFIG ================= */
-const REFRESH_MS = 60000;
-
 function formatDistance(distanceKm: number | null | undefined): string | null {
   return formatDistanceKm(distanceKm);
 }
@@ -327,86 +326,51 @@ export function HomeUmkmMapPreview({
   /* ================= FETCH DATA ================= */
 
   useEffect(() => {
+    const controller = new AbortController();
     let active = true;
-    const requestRef = { current: null as AbortController | null };
 
-    async function load(isInitial = false) {
-      requestRef.current?.abort();
-      const controller = new AbortController();
-      requestRef.current = controller;
+    async function load() {
+      setLoading(true);
+      setError(null);
       try {
-        if (isInitial) {
-          setLoading(true);
-        }
-
-        setError(null);
-
-        const params = new URLSearchParams({
-          limit: '18',
-          include_references: '1',
-        });
-
+        const params = new URLSearchParams({ limit: '18', include_references: '1' });
         if (viewerLocation) {
           params.set('viewer_lat', String(viewerLocation.lat));
           params.set('viewer_lng', String(viewerLocation.lng));
         }
-
-        const res = await fetch(
+        const response = await fetch(
           `/api/super-app/umkm/stores?${params.toString()}`,
-          {
-            cache: 'default',
-            credentials: 'include',
-            signal: controller.signal,
-          },
+          { cache: 'default', credentials: 'include', signal: controller.signal },
         );
-
-        const json = (await res
-          .json()
-          .catch(() => ({}))) as StoresResponse;
-
-        if (!res.ok || !json.data?.items) {
+        const json = (await response.json().catch(() => ({}))) as StoresResponse;
+        if (!response.ok || !json.data?.items) {
           throw new Error(
-            json.error ||
-              (isId
-                ? 'Peta usaha belum siap.'
-                : 'Business map unavailable.'),
+            response.status === 429
+              ? isId
+                ? 'Peta sedang sibuk. Coba lagi sebentar.'
+                : 'The map is busy. Please try again shortly.'
+              : json.error || (isId ? 'Peta usaha belum siap.' : 'Business map unavailable.'),
           );
         }
-
-        if (!active || controller.signal.aborted) return;
-
+        if (!active) return;
         setStores(json.data.items);
       } catch (loadError) {
         if (!active || controller.signal.aborted) return;
-
-        if (isInitial) {
-          setError(
-            loadError instanceof Error
-              ? loadError.message
-              : isId
-                ? 'Peta usaha belum siap.'
-                : 'Business map unavailable.',
-          );
-        }
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : isId
+              ? 'Peta usaha belum siap.'
+              : 'Business map unavailable.',
+        );
       } finally {
-        if (!active) return;
-
-        if (isInitial) {
-          setLoading(false);
-        }
+        if (active && !controller.signal.aborted) setLoading(false);
       }
     }
-
-    void load(true);
-
-    const intervalId = window.setInterval(() => {
-      void load(false);
-    }, REFRESH_MS);
-
+    void load();
     return () => {
       active = false;
-      requestRef.current?.abort();
-      window.clearInterval(intervalId);
+      controller.abort();
     };
   }, [isId, viewerLocation]);
 
@@ -544,9 +508,14 @@ export function HomeUmkmMapPreview({
 
           {!loading && error && stores.length === 0 ? (
             <div className="px-1 sm:px-3 md:px-6">
-              <p className="rounded-lg border border-red-100 bg-red-50/60 px-2.5 py-2 text-[10px] font-medium text-red-500 sm:text-[11px]">
-                {error}
-              </p>
+              <div className="flex items-center gap-2 rounded-lg border border-red-100 bg-red-50/60 px-2.5 py-2">
+                <p className="min-w-0 flex-1 text-[10px] font-medium text-red-500 sm:text-[11px]">
+                  {error}
+                </p>
+                <button type="button" onClick={() => window.location.reload()} className="shrink-0 rounded-full bg-white px-2.5 py-1.5 text-[9px] font-bold text-red-600 shadow-sm">
+                  {isId ? 'Coba lagi' : 'Retry'}
+                </button>
+              </div>
             </div>
           ) : null}
 
