@@ -50,6 +50,12 @@ const HOME_MAP_CATEGORY_LEGEND: Array<{
   { kind: 'general', labelId: 'Lainnya', labelEn: 'Other', color: '#0f766e' },
 ];
 
+const HOME_MAP_REFERENCE_LEGEND = {
+  labelId: 'Referensi publik',
+  labelEn: 'Public references',
+  color: '#94a3b8',
+};
+
 function normalizeStores(items: UmkmMapStore[]): UmkmMapStore[] {
   return items.filter(
     store =>
@@ -79,7 +85,7 @@ export function summarizeHomeBusinessMapStores(stores: UmkmMapStore[]) {
       .map(city => city.toLocaleLowerCase('id-ID')),
   );
 
-  const categoryCounts = validStores.reduce<Record<UmkmPlaceKind, number>>(
+  const categoryCounts = businesses.reduce<Record<UmkmPlaceKind, number>>(
     (counts, store) => {
       const kind = getUmkmPlaceKind(store);
       counts[kind] += 1;
@@ -231,7 +237,7 @@ export function HomeBusinessMapSection({
       <div className="flex items-center justify-between gap-2 px-3 py-2.5 sm:px-3.5">
         <div className="min-w-0">
             <h2 className="truncate text-[12px] font-black tracking-tight text-slate-950 sm:text-[13px]">
-              {isId ? 'Sebaran UMKM Indonesia' : 'Indonesian business map'}
+              {isId ? 'Sebaran usaha & referensi Indonesia' : 'Indonesia business & reference map'}
             </h2>
             <p className="truncate text-[9px] font-medium text-slate-500 sm:text-[10px]">
             {loading
@@ -330,6 +336,19 @@ export function HomeBusinessMapSection({
               </span>
             );
           })}
+          {summary.referenceCount > 0 ? (
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-[8px] font-semibold text-slate-600 shadow-sm sm:text-[9px]">
+              <span
+                className="h-1.5 w-1.5 rounded-full"
+                style={{ backgroundColor: HOME_MAP_REFERENCE_LEGEND.color }}
+                aria-hidden="true"
+              />
+              {isId ? HOME_MAP_REFERENCE_LEGEND.labelId : HOME_MAP_REFERENCE_LEGEND.labelEn}
+              <span className="font-black text-slate-900">
+                {summary.referenceCount.toLocaleString(isId ? 'id-ID' : 'en-US')}
+              </span>
+            </span>
+          ) : null}
         </div>
       ) : null
     </section>
