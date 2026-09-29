@@ -1706,18 +1706,42 @@ function businessMatchesRequestedTaxonomy(
     metadata.marketplaceSubcategorySlug,
   ).toLowerCase();
 
-  if (subcategory && explicitSubcategory) {
-    return explicitSubcategory === subcategory;
+  const requestedCategory = category
+    ? getExploreCategoryBySlug(category)
+    : undefined;
+
+  if (
+    requestedCategory &&
+    subcategory &&
+    explicitSubcategory
+  ) {
+    const explicitSubcategoryIsKnown =
+      requestedCategory.subcategories.some(
+        candidate =>
+          candidate.slug === explicitSubcategory,
+      );
+
+    if (explicitSubcategoryIsKnown) {
+      return explicitSubcategory === subcategory;
+    }
   }
 
   if (category && explicitCategory) {
-    return (
-      explicitCategory === category ||
-      getExploreCategoryBySlug(explicitCategory)?.slug === category
-    );
+    const explicitExploreCategory =
+      getExploreCategoryBySlug(
+        explicitCategory,
+      );
+
+    if (!explicitExploreCategory) {
+      // The record may use a separate UMKM taxonomy (for example
+      // "culinary"). Do not invent a mapping or discard it.
+      return true;
+    }
+
+    return explicitExploreCategory.slug === category;
   }
 
-  // Do not guess when the business record has no explicit marketplace taxonomy.
+  // Do not guess when the business record has no recognized Explore taxonomy.
   return true;
 }
 
