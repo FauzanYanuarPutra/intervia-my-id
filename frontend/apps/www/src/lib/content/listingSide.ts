@@ -5,16 +5,23 @@ export type MarketSide = 'seeker' | 'provider';
 
 type ResolveListingSideInput = {
   type?: unknown;
+  kind?: unknown;
   metadata?: unknown;
   title?: unknown;
   summary?: unknown;
   side?: unknown;
+  listing_side?: unknown;
+  market_side?: unknown;
+  listing_intent?: unknown;
+  market_intent?: unknown;
+  intent?: unknown;
 };
 
 type LocaleCode = 'id' | 'en';
 
-const DEMAND_SIGNALS = [
+const DEMAND_SIGNALS = new Set([
   'seeker',
+  'seeking',
   'demand',
   'need',
   'needs',
@@ -22,19 +29,27 @@ const DEMAND_SIGNALS = [
   'request',
   'requested',
   'wanted',
-  'looking',
+  'looking_for',
+  'buyer',
+  'buy',
+  'buying',
+  'purchase',
+  'purchasing',
   'buyer_request',
   'buy_request',
   'mencari',
+  'pencari',
   'dibutuhkan',
   'butuh',
+  'membutuhkan',
   'minta',
-] as const;
+]);
 
-const SUPPLY_SIGNALS = [
+const SUPPLY_SIGNALS = new Set([
   'provider',
   'supply',
   'offer',
+  'offers',
   'offering',
   'available',
   'seller',
@@ -42,9 +57,10 @@ const SUPPLY_SIGNALS = [
   'menawarkan',
   'menyediakan',
   'tersedia',
-] as const;
+  'penyedia',
+]);
 
-const DEMAND_ONLY_TYPES = new Set(['job']);
+const DEMAND_ONLY_TYPES = new Set(['job', 'need']);
 const DEMAND_ENABLED_TYPES = new Set([
   'product',
   'service',
@@ -124,8 +140,8 @@ function asString(value: unknown): string {
 function normalizeSignal(value: unknown): string {
   return asString(value)
     .toLowerCase()
-    .replace(/[_-]+/g, ' ')
-    .replace(/\s+/g, ' ')
+    .replace(/[\s-]+/g, '_')
+    .replace(/_+/g, '_')
     .trim();
 }
 
@@ -134,11 +150,11 @@ function normalizeType(value: unknown): string {
   if (!normalized) return '';
   if (normalized.includes('job')) return 'job';
   if (
-    normalized.includes('business transfer') ||
-    normalized.includes('business handover') ||
-    normalized.includes('oper usaha') ||
-    normalized.includes('jual usaha') ||
-    normalized.includes('usaha berjalan') ||
+    normalized.includes('business_transfer') ||
+    normalized.includes('business_handover') ||
+    normalized.includes('oper_usaha') ||
+    normalized.includes('jual_usaha') ||
+    normalized.includes('usaha_berjalan') ||
     normalized.includes('handover') ||
     normalized.includes('takeover')
   ) {
@@ -165,7 +181,7 @@ function normalizeType(value: unknown): string {
     return 'tool_rental';
   if (
     normalized.includes('property') ||
-    normalized.includes('real estate') ||
+    normalized.includes('real_estate') ||
     normalized.includes('realestate')
   )
     return 'property';
@@ -177,14 +193,21 @@ function normalizeType(value: unknown): string {
     normalized.includes('store')
   )
     return 'product';
+  if (
+    normalized === 'need' ||
+    normalized === 'needs' ||
+    normalized === 'demand' ||
+    normalized === 'request'
+  )
+    return 'need';
   return normalized;
 }
 
 function detectExplicitSide(value: unknown): ListingSide | null {
   const signal = normalizeSignal(value);
   if (!signal) return null;
-  if (DEMAND_SIGNALS.some(token => signal.includes(token))) return 'demand';
-  if (SUPPLY_SIGNALS.some(token => signal.includes(token))) return 'supply';
+  if (DEMAND_SIGNALS.has(signal)) return 'demand';
+  if (SUPPLY_SIGNALS.has(signal)) return 'supply';
   return null;
 }
 
@@ -206,11 +229,22 @@ export function resolveListingSide(
   input: ResolveListingSideInput,
 ): ListingSide {
   const metadata = asObject(input.metadata);
+
+  // Side is a persisted contract, not something inferred from prose.
+  // A title such as "Butuh supplier" can describe a product offer and must
+  // never override the explicit side stored by the listing/search backend.
   const explicitCandidates = [
     input.side,
-    metadata?.market_side,
+    input.listing_side,
+    input.market_side,
+    input.listing_intent,
+    input.market_intent,
+    input.intent,
+    metadata?.side,
     metadata?.listing_side,
+    metadata?.market_side,
     metadata?.listing_intent,
+    metadata?.market_intent,
     metadata?.intent,
     metadata?.direction,
     metadata?.buyer_intent,
@@ -222,13 +256,8 @@ export function resolveListingSide(
     if (explicit) return explicit;
   }
 
-  const inferredSide = detectExplicitSide(
-    [input.title, input.summary, metadata?.headline, metadata?.tagline]
-      .map(value => asString(value))
-      .filter(Boolean)
-      .join(' '),
-  );
-  if (inferredSide) return inferredSide;
+  const normalizedKind = normalizeType(input.kind);
+  if (normalizedKind === 'need') return 'demand';
 
   const normalizedType =
     normalizeType(input.type) ||

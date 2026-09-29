@@ -16,6 +16,7 @@ import {
 } from '@/lib/super-app/location-guard';
 import { enforceRateLimit, getClientIp } from '@/lib/rateLimit';
 import { isEditorialContentRecord } from '@/lib/server/contentEditorial';
+import { resolveListingSide, type ListingSide } from '@/lib/content/listingSide';
 
 const marketplaceBase =
   process.env.INTERNAL_MARKETPLACE_URL ||
@@ -286,6 +287,77 @@ function isEnabledFlag(value: string | null): boolean {
     normalized === 'database' ||
     normalized === 'content_items'
   );
+}
+
+function normalizeRequestedMarketplaceSide(value: string | null): ListingSide | null {
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
+
+  if (!normalized || normalized === 'all') return null;
+
+  if (
+    [
+      'supply',
+      'provider',
+      'providers',
+      'offer',
+      'offers',
+      'offering',
+      'seller',
+      'sell',
+      'penawaran',
+      'menawarkan',
+    ].includes(normalized)
+  ) {
+    return 'supply';
+  }
+
+  if (
+    [
+      'demand',
+      'seeker',
+      'seekers',
+      'need',
+      'needs',
+      'request',
+      'requests',
+      'buyer',
+      'buy',
+      'kebutuhan',
+      'membutuhkan',
+    ].includes(normalized)
+  ) {
+    return 'demand';
+  }
+
+  return null;
+}
+
+function filterByRequestedMarketplaceSide(
+  items: ContentRecord[],
+  requestedSide: ListingSide | null,
+): ContentRecord[] {
+  if (!requestedSide) return items;
+
+  return items.filter(item => {
+    const metadata = asObject(item.metadata);
+
+    const resolvedSide = resolveListingSide({
+      type: item.content_type ?? item.type ?? item.category,
+      kind: item.kind,
+      side: item.side,
+      listing_side: item.listing_side,
+      market_side: item.market_side,
+      listing_intent: item.listing_intent,
+      market_intent: item.market_intent,
+      intent: item.intent,
+      metadata,
+    });
+
+    return resolvedSide === requestedSide;
+  });
 }
 
 function asObject(value: unknown): ContentRecord | null {
@@ -1416,6 +1488,12 @@ export async function GET(req: NextRequest) {
   }
   searchParams.set('status', 'active');
   const queryText = (searchParams.get('q') || '').trim();
+  const requestedMarketplaceSide = normalizeRequestedMarketplaceSide(
+    searchParams.get('side'),
+  );
+  if (requestedMarketplaceSide) {
+    searchParams.set('side', requestedMarketplaceSide);
+  }
   const requestedLimit = parseSafeInt(searchParams.get('limit'), 20, 1, 100);
   const rawOffsetText = (searchParams.get('offset') || '0').trim();
   const rawOffset = Number(rawOffsetText);
@@ -1497,7 +1575,10 @@ export async function GET(req: NextRequest) {
       requestedLimit,
       requestedOffset,
     );
-    let resolvedItems = filterEditorialContent(resolvedPayload.items || []);
+    let resolvedItems = filterByRequestedMarketplaceSide(
+      filterEditorialContent(resolvedPayload.items || []),
+      requestedMarketplaceSide,
+    );
     resolvedPayload = { ...resolvedPayload, items: resolvedItems };
 
     const shouldIncludeDiscoverCandidates =
@@ -1507,12 +1588,15 @@ export async function GET(req: NextRequest) {
         requestedType === 'freelancer' ||
         queryText.length >= 2);
     const discoverCandidates = shouldIncludeDiscoverCandidates
-      ? await fetchDiscoverContentCandidates(req, {
-          requestedType,
-          query: queryText,
-          locationFilter: searchParams.get('location') || '',
-          limit: requestedLimit,
-        })
+      ? filterByRequestedMarketplaceSide(
+          await fetchDiscoverContentCandidates(req, {
+            requestedType,
+            query: queryText,
+            locationFilter: searchParams.get('location') || '',
+            limit: requestedLimit,
+          }),
+          requestedMarketplaceSide,
+        )
       : [];
 
     if (shouldFallbackTalent && resolvedItems.length === 0) {
@@ -1527,7 +1611,10 @@ export async function GET(req: NextRequest) {
           requestedLimit,
           requestedOffset,
         );
-        resolvedItems = resolvedPayload.items || [];
+        resolvedItems = filterByRequestedMarketplaceSide(
+          resolvedPayload.items || [],
+          requestedMarketplaceSide,
+        );
       }
     }
 
@@ -1637,7 +1724,12 @@ export async function GET(req: NextRequest) {
 
     resolvedPayload = {
       ...resolvedPayload,
-      items: filterEditorialContent(resolvedPayload.items || []),
+      items: filterEditorialContent(
+        filterByRequestedMarketplaceSide(
+          resolvedPayload.items || [],
+          requestedMarketplaceSide,
+        ),
+      ),
     };
 
     return NextResponse.json(resolvedPayload, {

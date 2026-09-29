@@ -973,7 +973,6 @@ function mapContentToRecommendation(
   item: ContentItem,
   isId: boolean,
   allowViewerDistance = false,
-  forcedSide?: 'supply' | 'demand',
 ): RecommendationItem | null {
   if (!item.id || !item.title) return null;
   const images = resolveImageGallery(item);
@@ -981,11 +980,15 @@ function mapContentToRecommendation(
   const statsRating = item.seller_stats?.rating ?? item.rating;
   const statsReviews = item.seller_stats?.review_count ?? item.review_count;
   const type = item.content_type || item.category;
-  const side = forcedSide || resolveListingSide({
+  const side = resolveListingSide({
     type,
+    side: item.side,
+    listing_side: item.listing_side,
+    market_side: item.market_side,
+    listing_intent: item.listing_intent,
+    market_intent: item.market_intent,
+    intent: item.intent,
     metadata: item.metadata,
-    title: item.title,
-    summary: item.summary,
   });
   const vendor =
     readText(item.owner_profile?.full_name) ||
@@ -2252,7 +2255,7 @@ function HomeListingCarouselSection({
         </span>
 
         <Link
-          href={isDemand ? '/explore?side=demand' : '/explore?side=supply'}
+          href={isDemand ? '/explore?side=demand&tab=all' : '/explore?side=supply&tab=all'}
           className="ml-auto inline-flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-1 text-[9px] font-bold text-[color:var(--app-accent)] hover:bg-[color:var(--app-accent-soft)]"
         >
           {isId ? 'Lihat semua' : 'See all'}
@@ -2269,8 +2272,8 @@ function HomeListingCarouselSection({
                   ? 'Belum ada kebutuhan yang dipublikasikan saat ini.'
                   : 'No active requests have been posted yet.'
                 : isId
-                  ? 'Belum ada rekomendasi saat ini.'
-                  : 'No recommendations right now.'}
+                  ? 'Belum ada penawaran yang relevan saat ini.'
+                  : 'No relevant offers right now.'}
             </p>
           </div>
         </div>
@@ -3374,7 +3377,7 @@ function RightRail({
     },
     {
       id: 'requests',
-      label: isId ? 'Membutuhkan' : 'Needs',
+      label: isId ? 'Kebutuhan aktif' : 'Active requests',
       value: resolveCountLabel(summary?.requests?.active, '0'),
       icon: ClipboardList,
       tone: 'bg-amber-50 text-amber-700 ring-amber-100 dark:bg-amber-950/40 dark:text-amber-200 dark:ring-amber-900/60',
@@ -3879,7 +3882,6 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
                 item,
                 isId,
                 Boolean(viewerLocationKey),
-                'supply',
               ),
             )
             .filter((item): item is RecommendationItem => Boolean(item))
@@ -3912,7 +3914,6 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
                 item,
                 isId,
                 Boolean(viewerLocationKey),
-                'demand',
               ),
             )
             .filter((item): item is RecommendationItem => Boolean(item))

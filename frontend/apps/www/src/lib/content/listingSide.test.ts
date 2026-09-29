@@ -40,12 +40,60 @@ describe('listing side presentation', () => {
     );
   });
 
-  it('recognizes listing_intent=request as demand', () => {
+  it('accepts a top-level persisted side as the source of truth', () => {
     expect(
       resolveListingSide({
         type: 'product',
+        side: 'demand',
+        title: 'Produk yang ditawarkan',
+      }),
+    ).toBe('demand');
+
+    expect(
+      resolveListingSide({
+        type: 'product',
+        side: 'supply',
+        title: 'Sedang mencari supplier',
+      }),
+    ).toBe('supply');
+  });
+
+  it('recognizes explicit demand and supply aliases without reading prose', () => {
+    expect(
+      resolveListingSide({
+        type: 'product',
+        title: 'Butuh supplier kemasan',
         metadata: { listing_intent: 'request' },
       }),
     ).toBe('demand');
+
+    expect(
+      resolveListingSide({
+        type: 'product',
+        title: 'Butuh supplier kemasan',
+        metadata: { market_side: 'provider' },
+      }),
+    ).toBe('supply');
+
+    expect(
+      resolveListingSide({
+        type: 'service',
+        metadata: { market_side: 'seeker' },
+      }),
+    ).toBe('demand');
+
+    expect(
+      resolveListingSide({
+        kind: 'needs',
+        type: 'product',
+      }),
+    ).toBe('demand');
+
+    expect(
+      resolveListingSide({
+        type: 'product',
+        title: 'Looking for supplier',
+      }),
+    ).toBe('supply');
   });
 });

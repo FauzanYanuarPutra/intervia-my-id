@@ -1,6 +1,12 @@
+import {
+  getListingSideObjectLabel,
+  resolveListingSide,
+  type ListingSide,
+} from '@/lib/content/listingSide';
+
 export type LajukanLocale = 'id' | 'en';
 
-export type ExploreSide = 'supply' | 'demand';
+export type ExploreSide = ListingSide;
 
 export type CategoryBadgeTone =
   | 'primary'
@@ -98,19 +104,8 @@ export type LajukanExploreCategory = {
 };
 
 /**
- * Input side data returned by different API layers.
- *
- * The backend may expose the same marketplace side under:
- * - side
- * - listing_side
- * - market_side
- * - listing_intent
- * - market_intent
- * - intent
- * - metadata.*
- *
- * `label` / `contentType` are intentionally NOT part of side resolution.
- * They describe the content type, not whether it is offered or requested.
+ * Side values come from the same canonical marketplace contract used by
+ * listings, search results, and Home. Explore only adapts the input shape.
  */
 export type ExploreSideInput = {
   side?: string | null;
@@ -120,110 +115,32 @@ export type ExploreSideInput = {
   market_intent?: string | null;
   intent?: string | null;
   kind?: string | null;
-
-  metadata?: {
-    listing_side?: string | null;
-    market_side?: string | null;
-    listing_intent?: string | null;
-    market_intent?: string | null;
-    intent?: string | null;
-  } | null;
+  metadata?: Record<string, unknown> | null;
 };
 
-function normalizeSideValue(
-  value?: string | null,
-): ExploreSide | null {
-  const normalized = String(value || '')
-    .trim()
-    .toLowerCase();
-
-  if (
-    normalized === 'supply' ||
-    normalized === 'offer' ||
-    normalized === 'offering'
-  ) {
-    return 'supply';
-  }
-
-  if (
-    normalized === 'demand' ||
-    normalized === 'need' ||
-    normalized === 'needs' ||
-    normalized === 'looking' ||
-    normalized === 'looking_for'
-  ) {
-    return 'demand';
-  }
-
-  return null;
-}
-
-/**
- * Resolve supply/demand from the most authoritative available field.
- *
- * Priority:
- * 1. side
- * 2. listing_side
- * 3. market_side
- * 4. metadata.listing_side
- * 5. metadata.market_side
- * 6. listing_intent
- * 7. market_intent
- * 8. intent
- * 9. metadata.listing_intent
- * 10. metadata.market_intent
- * 11. metadata.intent
- * 12. kind === need/needs/demand
- *
- * IMPORTANT:
- * A product is NOT automatically a demand.
- * A category that supports `need` is NOT automatically a demand.
- */
 export function normalizeExploreSide(
   item: ExploreSideInput,
 ): ExploreSide {
-  const candidates = [
-    item.side,
-    item.listing_side,
-    item.market_side,
-    item.metadata?.listing_side,
-    item.metadata?.market_side,
-    item.listing_intent,
-    item.market_intent,
-    item.intent,
-    item.metadata?.listing_intent,
-    item.metadata?.market_intent,
-    item.metadata?.intent,
-  ];
-
-  for (const candidate of candidates) {
-    const resolved = normalizeSideValue(candidate);
-
-    if (resolved) {
-      return resolved;
-    }
-  }
-
-  const normalizedKind = String(item.kind || '')
-    .trim()
-    .toLowerCase();
-
-  if (
-    normalizedKind === 'need' ||
-    normalizedKind === 'needs' ||
-    normalizedKind === 'demand'
-  ) {
-    return 'demand';
-  }
-
-  return 'supply';
+  return resolveListingSide({
+    side: item.side,
+    listing_side: item.listing_side,
+    market_side: item.market_side,
+    listing_intent: item.listing_intent,
+    market_intent: item.market_intent,
+    intent: item.intent,
+    kind: item.kind,
+    metadata: item.metadata,
+  });
 }
 
 /**
- * Convert marketplace side to UI text.
+ * Convert the canonical marketplace side into the noun used by discovery UI.
  *
- * supply -> Menawarkan
- * demand -> Mencari
+ * supply -> Penawaran
+ * demand -> Kebutuhan
+ *
+ * Actions can still use verbs such as "Tawarkan bantuan"; this helper is
+ * intentionally for labels, tabs, chips, and section context.
  */
 export function getExploreSideLabel({
   locale,
@@ -231,17 +148,10 @@ export function getExploreSideLabel({
 }: ExploreSideInput & {
   locale: LajukanLocale;
 }): string {
-  const side = normalizeExploreSide(item);
-
-  if (side === 'demand') {
-    return locale === 'id'
-      ? 'Mencari'
-      : 'Looking for';
-  }
-
-  return locale === 'id'
-    ? 'Menawarkan'
-    : 'Offering';
+  return getListingSideObjectLabel(
+    normalizeExploreSide(item),
+    locale,
+  );
 }
 
 const COMMON_MARKETPLACE_SECTIONS: ExploreSectionConfig[] = [
