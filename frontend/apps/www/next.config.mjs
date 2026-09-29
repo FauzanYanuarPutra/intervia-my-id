@@ -54,6 +54,11 @@ const nextConfig = {
     return [{ source: '/socket/:path*', destination: `${CHAT_SERVICE_ORIGIN}/socket/:path*` }];
   },
   images: {
+    // Keep responsive image variants focused on real Lajukan layouts instead
+    // of generating desktop/4K variants that are rarely needed on slow networks.
+    deviceSizes: [320, 480, 640, 750, 960, 1200, 1440, 1920, 2048],
+    imageSizes: [48, 64, 96, 128, 160, 192, 256, 320],
+    qualities: [60, 70, 75, 80],
     formats: ['image/avif', 'image/webp'],
     minimumCacheTTL: 60 * 60 * 24 * 7,
     remotePatterns: [
