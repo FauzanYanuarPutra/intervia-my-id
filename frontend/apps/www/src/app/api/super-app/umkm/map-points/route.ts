@@ -162,7 +162,7 @@ export async function GET(req: NextRequest) {
         headers: {
           'Cache-Control': hasViewer
             ? 'private, no-store'
-            : 'public, s-maxage=15, stale-while-revalidate=60',
+            : 'public, s-maxage=45, stale-while-revalidate=180',
         },
       },
     );
