@@ -73,7 +73,7 @@ describe('Lajukan explore taxonomy', () => {
         subcategory: 'packaging',
       }),
     ).toBe(
-      '/explore/materials-suppliers?q=botol+plastik&side=demand&tab=needs&subcategory=packaging',
+      '/explore/materials-suppliers?q=botol+plastik&side=demand&tab=all&subcategory=packaging',
     );
   });
 });
