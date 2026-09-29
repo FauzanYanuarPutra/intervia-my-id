@@ -103,7 +103,7 @@ import {
 import { resolveContentPriceUnitLabel } from '@/lib/content/priceUnit';
 import { buildContentHref } from '@/lib/content/routes';
 import {
-  getListingSideVerbLabel,
+  getListingSideObjectLabel,
   getListingValueFallback,
   resolveListingSide,
 } from '@/lib/content/listingSide';
