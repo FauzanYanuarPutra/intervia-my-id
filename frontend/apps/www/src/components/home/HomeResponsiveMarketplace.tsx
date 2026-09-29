@@ -1079,6 +1079,7 @@ function mapContentToRecommendation(
       readText(item.metadata?.contentStatus) ||
       'active',
     updatedAt: item.updated_at ? Date.parse(item.updated_at) || undefined : undefined,
+    sourcePriority: 1,
   };
 }
 
@@ -1198,7 +1199,6 @@ function mapContentToPublicReference(
     sourceLicenseUrl: reference.sourceLicenseUrl,
     sourceContactUrl: reference.sourceContactUrl,
     sourceContactType: reference.sourceContactType,
-    sourcePriority: 10,
     imageAttribution:
       reference.imageAttribution || contentImageAttribution(item),
   };
