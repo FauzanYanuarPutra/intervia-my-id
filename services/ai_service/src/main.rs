@@ -28,7 +28,7 @@ mod runtime_metrics;
 mod tools;
 
 const SERVICE_NAME: &str = "lajukan-ai-orchestrator";
-const SERVICE_VERSION: &str = "2.1.0";
+const SERVICE_VERSION: &str = "2.2.0";
 
 #[derive(Clone)]
 struct AppState {
@@ -367,6 +367,7 @@ async fn main() {
         .route("/ready/deep", get(handle_ready_deep))
         .route("/metrics", get(handle_metrics))
         .route("/v1/capabilities", get(handle_capabilities))
+        .route("/v1/tools", get(handle_tools))
         .route("/v1/chat", post(handle_chat))
         .route("/v1/assist", post(handle_assist))
         .route("/v1/listing/generate", post(handle_listing_generate))
@@ -749,6 +750,19 @@ async fn handle_ready_deep(State(state): State<Arc<AppState>>) -> Response {
     }
 }
 
+async fn handle_tools(State(state): State<Arc<AppState>>) -> Json<Value> {
+    Json(json!({
+        "service": SERVICE_NAME,
+        "version": SERVICE_VERSION,
+        "policy": {
+            "default_permissions": ["READ", "SEARCH", "ANALYZE"],
+            "confirmation_required": ["WRITE", "PUBLISH", "TRANSACTION"],
+            "implicit_mutation": false,
+        },
+        "tools": state.tools.catalog(),
+    }))
+}
+
 async fn handle_capabilities() -> Json<Value> {
     Json(json!({
         "service": SERVICE_NAME,
@@ -775,6 +789,7 @@ async fn handle_capabilities() -> Json<Value> {
             "health": "/health",
             "ready": "/ready",
             "ready_deep": "/ready/deep",
+            "tools": "/v1/tools",
             "chat": "/v1/chat",
             "assist": "/v1/assist",
             "listing_generate": "/v1/listing/generate",
@@ -795,6 +810,10 @@ async fn handle_capabilities() -> Json<Value> {
         "tool_registry": {
             "search_listings": true,
             "search_umkm": true,
+            "find_suppliers": true,
+            "find_buyers": true,
+            "create_listing_draft": true,
+            "publish_listing": false,
             "marketplace_source_of_truth": true,
             "mutation": false
         },
@@ -1274,6 +1293,8 @@ async fn run_ai_endpoint(
             "source_count": sources.len(),
             "tool_count": tool_calls.len(),
             "rag_enabled": use_rag && !state.config.rag_url.is_empty(),
+            "native_lajukan_priority": true,
+            "references_allowed_as_secondary": false,
         },
         "warnings": warnings,
         "needs_clarification": needs_clarification,
