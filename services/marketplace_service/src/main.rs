@@ -11936,6 +11936,11 @@ async fn list_content(
                   WHEN regexp_replace(lower(btrim(coalesce(metadata->>'request_mode', ''))), '[_-]+', ' ', 'g')
                     IN ('request', 'demand', 'need', 'needs', 'needed', 'requested', 'wanted', 'looking', 'mencari', 'pencari', 'dibutuhkan', 'butuh', 'membutuhkan', 'minta')
                     THEN 'demand'
+                  -- pricing_mode=request is the canonical persisted signal for
+                  -- older demand listings whose listing_intent metadata was not
+                  -- populated. Keep DB filtering in parity with the frontend.
+                  WHEN lower(btrim(coalesce(content_items.pricing_mode, ''))) = 'request'
+                    THEN 'demand'
                   WHEN lower(btrim(coalesce(content_items.content_type, ''))) IN ('request', 'need', 'needs', 'demand')
                     THEN 'demand'
                   WHEN btrim(coalesce(metadata->>'market_side', '')) = ''
