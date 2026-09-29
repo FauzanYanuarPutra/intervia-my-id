@@ -1,11 +1,10 @@
 import type { Metadata } from 'next';
 import { Search, Send, Store, TrendingUp } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
-import { NewsCard } from '@/components/news/NewsCard';
 import { NewsInfiniteGrid } from '@/components/news/NewsInfiniteGrid';
 import { NewsCarousel } from '@/components/news/NewsCarousel';
 import { NewsCategoryRail } from '@/components/news/NewsCategoryRail';
-import { buildNewsFacetPath, buildNewsUrl, getPublishedNews } from '@/lib/news';
+import { buildNewsUrl, getPublishedNews } from '@/lib/news';
 
 type PageProps = {
   params: Promise<{ locale: string }>;
