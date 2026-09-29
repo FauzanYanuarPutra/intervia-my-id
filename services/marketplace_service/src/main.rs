@@ -11792,6 +11792,12 @@ async fn list_content(
                     AND coalesce(metadata->>'is_transactional', 'true') = 'false'
                     AND lower(coalesce(metadata->>'record_kind', '')) LIKE '%reference%'
                     THEN 'reference'
+                  WHEN regexp_replace(lower(btrim(coalesce(metadata->>'side', ''))), '[_-]+', ' ', 'g')
+                    IN ('demand', 'need', 'needs', 'needed', 'request', 'requested', 'wanted', 'looking', 'seeker', 'buyer', 'buyer request', 'buy request', 'pencari', 'mencari', 'dibutuhkan', 'butuh', 'membutuhkan', 'minta')
+                    THEN 'demand'
+                  WHEN regexp_replace(lower(btrim(coalesce(metadata->>'side', ''))), '[_-]+', ' ', 'g')
+                    IN ('supply', 'offer', 'offering', 'available', 'provider', 'seller', 'sell', 'penyedia', 'menawarkan', 'menyediakan', 'tersedia')
+                    THEN 'supply'
                   WHEN regexp_replace(lower(btrim(coalesce(metadata->>'market_side', ''))), '[_-]+', ' ', 'g')
                     IN ('demand', 'need', 'needs', 'needed', 'request', 'requested', 'wanted', 'looking', 'seeker', 'buyer request', 'buy request', 'pencari', 'mencari', 'dibutuhkan', 'butuh', 'minta')
                     THEN 'demand'
