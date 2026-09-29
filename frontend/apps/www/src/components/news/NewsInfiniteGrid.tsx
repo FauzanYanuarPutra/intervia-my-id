@@ -56,7 +56,7 @@ export function NewsInfiniteGrid({
     setNextCursor(initialNextCursor);
     setLoading(false);
     setError(false);
-  }, [initialKey, initialItems, initialNextCursor]);
+  }, [initialKey, initialNextCursor]);
 
   const loadMore = useCallback(async () => {
     if (!nextCursor || loading) return;
