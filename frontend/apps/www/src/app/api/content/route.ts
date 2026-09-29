@@ -353,6 +353,7 @@ function filterByRequestedMarketplaceSide(
       listing_intent: item.listing_intent,
       market_intent: item.market_intent,
       intent: item.intent,
+      pricing_mode: item.pricing_mode,
       metadata,
     });
 
