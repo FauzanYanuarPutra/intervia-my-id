@@ -1891,7 +1891,7 @@ function HeroVisualStage({
   return (
     <section
       className={cn(
-        'mx-auto w-full max-w-7xl px-2 pb-3 pt-2 sm:px-3 sm:pb-5 sm:pt-3 lg:px-0',
+        'mx-auto w-full max-w-7xl',
         className,
       )}
       aria-labelledby="home-main-heading"
