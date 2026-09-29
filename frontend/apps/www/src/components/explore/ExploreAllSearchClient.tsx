@@ -137,7 +137,7 @@ function normalizeQuery(
  *
  * demand:
  *   side=demand
- *   tab=needs
+ *   tab=all
  */
 function canonicalizeMarketplaceParams(
   params: URLSearchParams,
