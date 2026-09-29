@@ -3069,6 +3069,7 @@ export function CommunityPostCard({
             <CommunityFormattedBody
               body={displayBody}
               collapsed={!bodyExpanded}
+              contentRef={bodyContentRef}
             />
 
             {canExpandBody ? (
