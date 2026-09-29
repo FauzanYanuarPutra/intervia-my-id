@@ -1,6 +1,23 @@
 import type { UmkmStore } from './umkm-commerce.types';
 
 const PUBLIC_METADATA_KEYS = [
+  // Public reference/provenance fields. These contain source metadata only;
+  // never owner IDs, claims, private contacts, or transactional state.
+  'record_kind',
+  'market_side',
+  'is_transactional',
+  'is_public_reference',
+  'reference_publication_status',
+  'claimable',
+  'source_dataset',
+  'source_url',
+  'source_title',
+  'source_provider',
+  'source_license',
+  'source_license_url',
+  'source_attribution',
+  'public_path',
+  'reference_subtype',
   'source',
   'portal_public_url',
   'store_photo_url',
