@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ArrowRight,
   CircleAlert,
@@ -363,6 +363,12 @@ function SearchGroupSection({
   const [visibleCount, setVisibleCount] = useState(
     compact ? pageSize : Number.MAX_SAFE_INTEGER,
   );
+
+  useEffect(() => {
+    setVisibleCount(
+      compact ? pageSize : Number.MAX_SAFE_INTEGER,
+    );
+  }, [compact, groupKey, pageSize]);
 
   const items = compact
     ? group.items.slice(0, visibleCount)
