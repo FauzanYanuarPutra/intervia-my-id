@@ -912,6 +912,58 @@ export const businessModerationApi = {
     );
   },
 
+  storeMedia: async (
+    token: string,
+    params: { status?: string; q?: string; store_id?: string; limit?: string; offset?: string } = {},
+  ) => {
+    const query = new URLSearchParams(
+      Object.fromEntries(Object.entries(params).filter(([, value]) => value)),
+    ).toString();
+    return fetchJson<{
+      items: Array<{
+        id: string;
+        store_id: string;
+        store_name: string;
+        city: string;
+        media_url: string;
+        media_type: 'image' | 'video';
+        caption?: string | null;
+        uploader_user_id: string;
+        uploader_name?: string | null;
+        uploader_username?: string | null;
+        status: 'pending' | 'approved' | 'rejected' | 'hidden';
+        is_primary: boolean;
+        review_note?: string | null;
+        reviewed_by?: string | null;
+        reviewed_at?: string | null;
+        created_at: string;
+      }>;
+      count: number;
+      limit: number;
+      offset: number;
+      has_more: boolean;
+    }>(
+      `${MARKETPLACE_URL}/v1/crm/store-media${query ? `?${query}` : ''}`,
+      { method: 'GET', token },
+    );
+  },
+
+  reviewStoreMedia: async (
+    token: string,
+    id: string,
+    data: {
+      action: 'approve' | 'reject' | 'hide';
+      note?: string;
+      set_primary?: boolean;
+      placement?: 'gallery' | 'cover' | 'logo';
+    },
+  ) => {
+    return fetchJson(
+      `${MARKETPLACE_URL}/v1/crm/store-media/${encodeURIComponent(id)}/review`,
+      { method: 'POST', token, body: JSON.stringify(data) },
+    );
+  },
+
   notifications: async (token: string, unreadOnly = false) => {
     const query = new URLSearchParams({
       unread_only: unreadOnly ? 'true' : 'false',
