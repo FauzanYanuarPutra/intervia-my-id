@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from '@/i18n/navigation';
 import { CompactSeeAllLink } from '@/components/common/CompactSectionAction';
+import { EmblaInlineRail } from '@/components/common/EmblaInlineRail';
 import { MarketplaceDiscoveryCard } from '@/components/discovery/MarketplaceDiscoveryCard';
 import { HorizontalRail } from '@/components/home/minimal/HorizontalRail';
 import { type User, useAuth } from '@/context/AuthContext';
@@ -1030,6 +1031,28 @@ export function HomeDiscoveryFeed({
       ];
 
   const browseHref = resolveBrowseHref(filter, 'newest');
+
+  const filterButtons = FILTER_OPTIONS.map(option => (
+    <button
+      key={option.value}
+      type="button"
+      onClick={() => setFilter(option.value)}
+      aria-pressed={filter === option.value}
+      className={cn(
+        'ui-pressable inline-flex min-h-[32px] shrink-0 items-center rounded-full px-3 py-1 text-[10px] font-semibold transition',
+        compact
+          ? filter === option.value
+            ? 'border border-[color:var(--app-accent-border)] bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] text-white shadow-[0_14px_28px_-22px_color-mix(in_srgb,var(--app-accent)_44%,transparent)]'
+            : 'border border-transparent bg-white text-slate-600 hover:border-[color:var(--app-accent-border)] hover:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_24%,white)] hover:text-[color:var(--app-accent)] dark:bg-slate-950/86 dark:text-slate-300 dark:hover:border-[color:var(--app-accent-border)] dark:hover:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_18%,rgba(15,23,42,0.98))] dark:hover:text-[color:var(--app-accent)]'
+          : filter === option.value
+            ? 'border border-[color:var(--app-accent-border)] bg-[color:color-mix(in_srgb,var(--app-accent-soft)_26%,white)] text-[color:var(--app-accent-strong)] shadow-[0_12px_28px_-24px_color-mix(in_srgb,var(--app-accent)_28%,transparent)] dark:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_20%,rgba(15,23,42,0.98))] dark:text-[color:var(--app-accent)]'
+            : 'border border-slate-200 bg-white text-slate-600 hover:border-[color:var(--app-accent-border)] hover:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_24%,white)] hover:text-[color:var(--app-accent)] dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-[color:var(--app-accent-border)] dark:hover:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_18%,rgba(15,23,42,0.98))] dark:hover:text-[color:var(--app-accent)]',
+      )}
+    >
+      {isId ? option.labelId : option.labelEn}
+    </button>
+  ));
+
   const activeLoading = loading;
   return (
     <section className="ui-page-section ui-home-section-shell">
@@ -1068,35 +1091,17 @@ export function HomeDiscoveryFeed({
               />
             </div>
           )}
-          <div
-            className={cn(
-              'flex gap-1.5',
-              compact
-                ? 'mt-0 overflow-x-auto rounded-[18px] bg-slate-100/90 p-0.5 pb-0.5 no-scrollbar dark:bg-slate-900/80'
-                : 'mt-2 flex-wrap',
-            )}
-          >
-            {FILTER_OPTIONS.map(option => (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => setFilter(option.value)}
-                aria-pressed={filter === option.value}
-                className={cn(
-                  'ui-pressable inline-flex min-h-[32px] shrink-0 items-center rounded-full px-3 py-1 text-[10px] font-semibold transition',
-                  compact
-                    ? filter === option.value
-                      ? 'border border-[color:var(--app-accent-border)] bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] text-white shadow-[0_14px_28px_-22px_color-mix(in_srgb,var(--app-accent)_44%,transparent)]'
-                      : 'border border-transparent bg-white text-slate-600 hover:border-[color:var(--app-accent-border)] hover:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_24%,white)] hover:text-[color:var(--app-accent)] dark:bg-slate-950/86 dark:text-slate-300 dark:hover:border-[color:var(--app-accent-border)] dark:hover:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_18%,rgba(15,23,42,0.98))] dark:hover:text-[color:var(--app-accent)]'
-                    : filter === option.value
-                      ? 'border border-[color:var(--app-accent-border)] bg-[color:color-mix(in_srgb,var(--app-accent-soft)_26%,white)] text-[color:var(--app-accent-strong)] shadow-[0_12px_28px_-24px_color-mix(in_srgb,var(--app-accent)_28%,transparent)] dark:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_20%,rgba(15,23,42,0.98))] dark:text-[color:var(--app-accent)]'
-                      : 'border border-slate-200 bg-white text-slate-600 hover:border-[color:var(--app-accent-border)] hover:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_24%,white)] hover:text-[color:var(--app-accent)] dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-[color:var(--app-accent-border)] dark:hover:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_18%,rgba(15,23,42,0.98))] dark:hover:text-[color:var(--app-accent)]',
-                )}
-              >
-                {isId ? option.labelId : option.labelEn}
-              </button>
-            ))}
-          </div>
+          {compact ? (
+            <EmblaInlineRail
+              className="rounded-[18px] bg-slate-100/90 p-0.5 dark:bg-slate-900/80"
+              contentClassName="items-center gap-1.5"
+              dragFree
+            >
+              {filterButtons}
+            </EmblaInlineRail>
+          ) : (
+            <div className="mt-2 flex flex-wrap gap-1.5">{filterButtons}</div>
+          )}
 
           {compact ? null : (
             <div className="mt-2.5 flex flex-wrap items-center gap-1.5 sm:gap-2">
