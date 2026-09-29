@@ -443,7 +443,7 @@ export function HomeBusinessMapSection({
           theme="default"
           focusMode="indonesia"
           showPopups={false}
-          markerStyle="dots"
+          markerStyle="default"
           className="leaflet-home-map h-[126px] w-full sm:h-[140px]"
         />
 
