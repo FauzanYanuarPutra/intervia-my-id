@@ -7,6 +7,7 @@ import {
   type ChangeEvent,
   type FormEvent,
 } from 'react';
+import useEmblaCarousel from 'embla-carousel-react';
 import {
   Camera,
   ChevronLeft,
@@ -43,6 +44,7 @@ import {
 import { prepareUploadFiles } from '@/lib/media/prepareUploadMedia';
 import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 import { cn } from '@/lib/utils';
+import { useEmblaWheelGestures } from '@/components/common/useEmblaWheelGestures';
 import type {
   CommunityFeedItem,
   CommunityFeedOverview,
@@ -72,6 +74,15 @@ type GroupTab =
   | 'rules';
 
 type GroupFeedSort = 'most-relevant' | 'recent-activity' | 'new-posts';
+
+const GROUP_TAB_ORDER: GroupTab[] = [
+  'discussion',
+  'featured',
+  'members',
+  'media',
+  'about',
+  'rules',
+];
 
 function compactNumber(value: number | undefined) {
   const safe = Math.max(Number(value || 0), 0);
@@ -498,6 +509,12 @@ export default function CommunityGroupDetailClient({
   const [moderators, setModerators] = useState<CommunityGroupMember[]>([]);
   const [membersTotal, setMembersTotal] = useState(0);
   const [activeTab, setActiveTab] = useState<GroupTab>('discussion');
+  const [groupTabsRef, groupTabsApi] = useEmblaCarousel({
+    align: 'start',
+    containScroll: 'trimSnaps',
+    dragFree: false,
+    loop: false,
+  });
   const [loadingGroup, setLoadingGroup] = useState(true);
   const [loadingFeed, setLoadingFeed] = useState(false);
   const [loadingMembers, setLoadingMembers] = useState(false);
@@ -513,6 +530,18 @@ export default function CommunityGroupDetailClient({
   const [loadingMore, setLoadingMore] = useState(false);
   const [membersModalGroup, setMembersModalGroup] =
     useState<CommunityGroup | null>(null);
+
+  useEmblaWheelGestures(groupTabsApi, {
+    enabled: true,
+    desktopOnly: true,
+    threshold: 42,
+  });
+
+  useEffect(() => {
+    if (!groupTabsApi) return;
+    const index = GROUP_TAB_ORDER.indexOf(activeTab);
+    if (index >= 0) groupTabsApi.scrollTo(index);
+  }, [activeTab, groupTabsApi]);
 
   const selectedThreadId = searchParams.get('thread');
   const loginHref = buildLoginHref(pathname, searchParams.toString());
@@ -1233,25 +1262,28 @@ export default function CommunityGroupDetailClient({
           </section>
 
           <nav
-            className="sticky top-[calc(58px+env(safe-area-inset-top))] z-20 -mx-0 flex min-w-0 overflow-x-auto border-y border-slate-200 bg-white/96 px-2 py-1.5 backdrop-blur lg:top-0"
+            className="sticky top-[calc(58px+env(safe-area-inset-top))] z-20 -mx-0 border-y border-slate-200 bg-white/96 py-1.5 backdrop-blur lg:top-0"
             aria-label={isId ? 'Navigasi group' : 'Group navigation'}
           >
-            <div className="flex w-max min-w-full items-center gap-1">
-              {tabs.map(tab => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setActiveTab(tab.id)}
-                  className={cn(
-                    'min-h-9 shrink-0 snap-start rounded-full px-3.5 text-[11px] font-extrabold transition sm:text-xs',
-                    activeTab === tab.id
-                      ? 'bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
-                      : 'text-[color:var(--app-text-soft)] hover:bg-slate-100 hover:text-[color:var(--app-text)]',
-                  )}
-                >
-                  {tab.label}
-                </button>
-              ))}
+            <div ref={groupTabsRef} className="min-w-0 overflow-hidden px-2">
+              <div className="flex w-max min-w-full touch-pan-y items-center gap-1">
+                {tabs.map(tab => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setActiveTab(tab.id)}
+                    aria-current={activeTab === tab.id ? 'page' : undefined}
+                    className={cn(
+                      'min-h-9 shrink-0 rounded-full px-3.5 text-[11px] font-extrabold transition sm:text-xs',
+                      activeTab === tab.id
+                        ? 'bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
+                        : 'text-[color:var(--app-text-soft)] hover:bg-slate-100 hover:text-[color:var(--app-text)]',
+                    )}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </nav>
 
