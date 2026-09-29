@@ -2927,7 +2927,7 @@ function RecommendationCard({
                   : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-900 dark:text-zinc-300',
               )}
             >
-              {getListingSideObjectLabel(item.side, isId ? 'id' : 'en')}
+              {getListingSideContextLabel(item.side, item.contentType, isId ? 'id' : 'en')}
             </span>
           ) : null}
         </div>
