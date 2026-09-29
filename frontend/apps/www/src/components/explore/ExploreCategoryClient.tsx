@@ -1262,13 +1262,12 @@ export function ExploreCategoryClient({
           return section.key === 'latest-needs';
         }
 
-        // Supply is the default mode, but the category landing page should
-        // still expose current demand so providers can discover who is
-        // looking for something in this category.
+        // Each mode owns its own result surface:
+        // supply -> providers + offers
+        // demand -> needs
         return [
           'featured-providers',
           'latest-listings',
-          'latest-needs',
         ].includes(section.key);
       },
     );
@@ -1772,6 +1771,42 @@ export function ExploreCategoryClient({
                       ? 'Membutuhkan'
                       : 'Needs'}
                   </button>
+                </div>
+
+                <div
+                  className={cn(
+                    'mt-2 rounded-[11px] border px-3 py-2.5',
+                    searchSide === 'demand'
+                      ? 'border-amber-200 bg-amber-50/70 dark:border-amber-900/60 dark:bg-amber-950/20'
+                      : 'border-emerald-200 bg-emerald-50/70 dark:border-emerald-900/60 dark:bg-emerald-950/20',
+                  )}
+                  aria-live="polite"
+                >
+                  <p
+                    className={cn(
+                      'text-[10px] font-black sm:text-[11px]',
+                      searchSide === 'demand'
+                        ? 'text-amber-900 dark:text-amber-200'
+                        : 'text-emerald-900 dark:text-emerald-200',
+                    )}
+                  >
+                    {searchSide === 'demand'
+                      ? isId
+                        ? 'Mode Membutuhkan'
+                        : 'Needs mode'
+                      : isId
+                        ? 'Mode Menawarkan'
+                        : 'Offers mode'}
+                  </p>
+                  <p className="mt-0.5 text-[9px] font-medium leading-4 text-zinc-600 dark:text-zinc-400 sm:text-[10px]">
+                    {searchSide === 'demand'
+                      ? isId
+                        ? 'Di bawah hanya tampil kebutuhan pembeli yang sedang mencari produk, jasa, atau supplier.'
+                        : 'Below you will only see buyer needs looking for products, services, or suppliers.'
+                      : isId
+                        ? 'Di bawah hanya tampil usaha, penyedia, produk, dan jasa yang sedang ditawarkan.'
+                        : 'Below you will only see businesses, providers, products, and services currently offered.'}
+                  </p>
                 </div>
               ) : null}
 
