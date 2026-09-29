@@ -109,7 +109,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   return buildPublicPageMetadata({
     locale,
-    path: '/learn/' + encodeURIComponent(courseDetail.course.slug || slug),
+    path: (`/learn/${encodeURIComponent(courseDetail.course.slug || slug)}`) as `/${string}`,
     titleId: title + ' | Lajukan Learn',
     titleEn: title + ' | Lajukan Learn',
     descriptionId: description,
