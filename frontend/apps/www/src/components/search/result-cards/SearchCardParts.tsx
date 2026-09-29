@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 
 import { LocalizedAnchor as Link } from '@/components/navigation/LocalizedAnchor';
-import { getListingSideVerbLabel } from '@/lib/content/listingSide';
+import { getListingSideObjectLabel } from '@/lib/content/listingSide';
 import type { GlobalSearchItem } from '@/lib/search/globalSearch';
 import { cn } from '@/lib/utils';
 
@@ -86,7 +86,7 @@ export function getSideLabel(
   locale: 'id' | 'en',
 ): string | null {
   if (item.side === 'demand' || item.side === 'supply') {
-    return getListingSideVerbLabel(item.side, locale);
+    return getListingSideObjectLabel(item.side, locale);
   }
   return null;
 }
