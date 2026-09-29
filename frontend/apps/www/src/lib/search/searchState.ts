@@ -7,7 +7,8 @@ function hasMeaningfulExploreValue(key:string,value:string):boolean{if(!value)re
 export function hasExploreResultState(searchParams:ExploreSearchParams):boolean{
   if(firstParam(searchParams.q).length>=2)return true;
   if(RESULT_TABS.has(firstParam(searchParams.tab)))return true;
-  if(firstParam(searchParams.side)==='demand')return true;
+  const side=firstParam(searchParams.side);
+  if(side==='demand'||side==='supply')return true;
   for(const [key,rawValue] of Object.entries(searchParams)){if(!EXPLORE_RESULT_PARAMS.has(key)||key==='q'||key==='tab'||key==='side')continue;if(hasMeaningfulExploreValue(key,firstParam(rawValue)))return true}
   return false;
 }
