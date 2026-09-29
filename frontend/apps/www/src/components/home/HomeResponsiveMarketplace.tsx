@@ -103,7 +103,7 @@ import {
 import { resolveContentPriceUnitLabel } from '@/lib/content/priceUnit';
 import { buildContentHref } from '@/lib/content/routes';
 import {
-  getListingSideVerbLabel,
+  getListingSideObjectLabel,
   getListingValueFallback,
   resolveListingSide,
 } from '@/lib/content/listingSide';
@@ -2217,11 +2217,11 @@ function HomeListingCarouselSection({
       aria-label={
         isDemand
           ? isId
-            ? 'Membutuhkan'
-            : 'People who need something'
+            ? 'Kebutuhan pembeli'
+            : 'Buyer needs'
           : isId
-            ? 'Yang ditawarkan untuk usahamu'
-            : 'What is being offered for your business'
+            ? 'Penawaran untuk usahamu'
+            : 'Offers for your business'
       }
     >
       <div className="flex min-w-0 items-center gap-1.5 px-2 sm:px-3 md:px-4 lg:px-6">
@@ -2234,21 +2234,21 @@ function HomeListingCarouselSection({
         <h2 className="min-w-0 truncate text-[11px] font-bold leading-5 tracking-tight text-[color:var(--app-text)] sm:text-xs">
           {isDemand
             ? isId
-              ? 'Membutuhkan'
-              : 'People who need something'
+              ? 'Kebutuhan'
+              : 'Needs'
             : isId
-              ? 'Menawarkan'
-              : 'Offering'}
+              ? 'Penawaran'
+              : 'Offers'}
         </h2>
 
         <span className="hidden shrink-0 text-[9px] font-medium text-zinc-400 sm:inline">
           {isDemand
             ? isId
-              ? 'Kebutuhan yang sedang dipublikasikan'
-              : 'Current needs posted by others'
+              ? 'Permintaan pembeli yang sedang dicari'
+              : 'Buyer requests currently being sought'
             : isId
-              ? 'Produk, jasa, lokasi & sewa'
-              : 'Products, services, places & rentals'}
+              ? 'Produk, jasa, lokasi & sewa yang tersedia'
+              : 'Available products, services, places & rentals'}
         </span>
 
         <Link
@@ -2901,7 +2901,7 @@ function RecommendationCard({
           {/* SIDE */}
           {item.side ? (
             <span
-              title={getListingSideVerbLabel(item.side, isId ? 'id' : 'en')}
+              title={getListingSideObjectLabel(item.side, isId ? 'id' : 'en')}
               className={cn(
                 'max-w-[42%] shrink-0 truncate rounded-full px-2 py-1 text-[8px] font-bold leading-none sm:max-w-[45%] sm:text-[9px]',
                 isDemand
@@ -2909,7 +2909,7 @@ function RecommendationCard({
                   : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-900 dark:text-zinc-300',
               )}
             >
-              {getListingSideVerbLabel(item.side, isId ? 'id' : 'en')}
+              {getListingSideObjectLabel(item.side, isId ? 'id' : 'en')}
             </span>
           ) : null}
         </div>
@@ -3831,6 +3831,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
         side: 'demand',
         include_owner: '1',
         database_only: '1',
+        marketplace_only: '1',
       });
       addViewerLocation(params);
       if (viewerLocationKey) {

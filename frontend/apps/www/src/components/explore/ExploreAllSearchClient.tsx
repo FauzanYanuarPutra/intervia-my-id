@@ -1270,14 +1270,14 @@ export function ExploreAllSearchClient({
     {
       value: 'supply',
       label: isId
-        ? 'Menawarkan'
-        : 'Offering',
+        ? 'Saya mencari'
+        : 'I am looking for',
     },
     {
       value: 'demand',
       label: isId
-        ? 'Membutuhkan'
-        : 'Looking for',
+        ? 'Saya menawarkan'
+        : 'I am offering',
     },
     {
       value: 'people',
@@ -1308,11 +1308,11 @@ export function ExploreAllSearchClient({
         : searchSide ===
             'demand'
           ? isId
-            ? 'Cari yang kamu butuhkan'
-            : 'Find what you need'
+            ? 'Temukan kebutuhan pembeli'
+            : 'Find buyer needs'
           : isId
-            ? 'Lihat penawaran usaha'
-            : 'Explore business offers';
+            ? 'Temukan penawaran untuk usahamu'
+            : 'Find offers for your business';
 
   /**
    * Search placeholder follows actual mode.

@@ -126,24 +126,24 @@ function exploreMetadataCopy(
   if (side === 'demand') {
     return {
       title: isId
-        ? 'Cari Calon Pembeli | Lajukan'
-        : 'Find Potential Buyers | Lajukan',
+        ? 'Kebutuhan Pembeli | Lajukan'
+        : 'Buyer Needs | Lajukan',
 
       description: isId
-        ? 'Lihat permintaan aktif dari calon pembeli di berbagai kategori usaha.'
-        : 'Find active requests from potential buyers across business categories.',
+        ? 'Lihat kebutuhan dan permintaan aktif dari pembeli di berbagai kategori usaha.'
+        : 'Browse active buyer needs and requests across business categories.',
     };
   }
 
   if (side === 'supply') {
     return {
       title: isId
-        ? 'Lihat Penawaran Usaha | Lajukan'
-        : 'Explore Business Offers | Lajukan',
+        ? 'Penawaran Usaha | Lajukan'
+        : 'Business Offers | Lajukan',
 
       description: isId
-        ? 'Jelajahi produk, jasa, dan usaha yang menawarkan sesuatu di Lajukan.'
-        : 'Explore products, services, and businesses offering something on Lajukan.',
+        ? 'Jelajahi produk, jasa, dan usaha yang tersedia di Lajukan.'
+        : 'Explore products, services, and businesses available on Lajukan.',
     };
   }
 

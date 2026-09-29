@@ -166,7 +166,7 @@ export function ExploreHubPage({ locale, initialIntent = 'supply' }: { locale: L
         <ExploreSurface elevated className="p-3.5 sm:p-5 lg:p-6">
           <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(260px,0.82fr)_minmax(0,1.18fr)] lg:items-end lg:gap-7">
             <div className="min-w-0">
-              <h1 className="text-[clamp(1.55rem,5vw,2.55rem)] font-black leading-[1.02] tracking-[-0.045em] text-zinc-950 dark:text-white">{intent === 'demand' ? isId ? 'Temukan calon pembeli untuk penawaranmu' : 'Find buyers for what you offer' : isId ? 'Temukan yang dibutuhkan usahamu' : 'Find what your business needs'}</h1>
+              <h1 className="text-[clamp(1.55rem,5vw,2.55rem)] font-black leading-[1.02] tracking-[-0.045em] text-zinc-950 dark:text-white">{intent === 'demand' ? isId ? 'Temukan kebutuhan pembeli' : 'Find buyer needs' : isId ? 'Temukan penawaran untuk usahamu' : 'Find offers for your business'}</h1>
               <button
                 type="button"
                 onClick={() => setShowExploreInfo(true)}
@@ -176,8 +176,8 @@ export function ExploreHubPage({ locale, initialIntent = 'supply' }: { locale: L
                 <Info className="h-3.5 w-3.5" aria-hidden="true" />
                 {isId ? 'Cara kerja Jelajahi' : 'How Explore works'}
               </button>
-              <p className="mt-2 max-w-[560px] text-[11px] font-medium leading-5 text-zinc-500 dark:text-zinc-400 sm:text-xs">{intent === 'demand' ? isId ? 'Cari kebutuhan pembeli berdasarkan produk, jasa, kategori, dan lokasi.' : 'Find buyer needs by product, service, category, and location.' : isId ? 'Cari supplier, jasa, mesin, tempat usaha, orang dengan keahlian, atau kebutuhan pembeli.' : 'Find suppliers, services, equipment, business places, skilled people, or buyer needs.'}</p>
-              <ExploreModeTabs value={intent} options={[{ value: 'supply' as const, label: isId ? 'Saya mencari' : 'I am looking for', hint: isId ? 'Supplier, produk, jasa & lainnya' : 'Suppliers, products, services & more' },{ value: 'demand' as const, label: isId ? 'Saya menawarkan' : 'I am offering', hint: isId ? 'Temukan kebutuhan pembeli' : 'Find buyer needs' }]} onChange={handleIntentChange} ariaLabel={isId ? 'Tujuan pencarian' : 'Search purpose'} className="mt-3 w-full max-w-[560px]" />
+              <p className="mt-2 max-w-[560px] text-[11px] font-medium leading-5 text-zinc-500 dark:text-zinc-400 sm:text-xs">{intent === 'demand' ? isId ? 'Lihat permintaan pembeli berdasarkan produk, jasa, kategori, dan lokasi.' : 'Browse buyer requests by product, service, category, and location.' : isId ? 'Lihat produk, jasa, supplier, mesin, dan lokasi yang tersedia untuk usahamu.' : 'Browse products, services, suppliers, equipment, and places available for your business.'}</p>
+              <ExploreModeTabs value={intent} options={[{ value: 'supply' as const, label: isId ? 'Saya mencari' : 'I am looking for', hint: isId ? 'Penawaran: produk, jasa, supplier & lainnya' : 'Offers: products, services, suppliers & more' },{ value: 'demand' as const, label: isId ? 'Saya menawarkan' : 'I am offering', hint: isId ? 'Kebutuhan: permintaan pembeli' : 'Needs: active buyer requests' }]} onChange={handleIntentChange} ariaLabel={isId ? 'Tujuan pencarian' : 'Search purpose'} className="mt-3 w-full max-w-[560px]" />
             </div>
             <div className="min-w-0">
               <form role="search" action={`/${locale}/explore`} method="get" onSubmit={event => { event.preventDefault(); const submitted = new FormData(event.currentTarget).get('q'); submitSearch(typeof submitted === 'string' ? submitted : query); }} className={cn('flex min-h-[50px] w-full min-w-0 items-center gap-2 rounded-[14px] border border-zinc-200 bg-zinc-50 p-1.5 pl-3','transition focus-within:border-emerald-300 focus-within:bg-white focus-within:ring-4 focus-within:ring-emerald-500/5','dark:border-zinc-800 dark:bg-zinc-900/75 dark:focus-within:border-emerald-800 dark:focus-within:bg-zinc-950','sm:min-h-[54px]')}>
@@ -254,22 +254,22 @@ export function ExploreHubPage({ locale, initialIntent = 'supply' }: { locale: L
           <div className="grid gap-2 sm:grid-cols-2">
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-3 dark:border-emerald-900/60 dark:bg-emerald-950/30">
               <p className="text-xs font-black text-emerald-900 dark:text-emerald-100">
-                {isId ? 'Saya mencari' : 'I am looking for'}
+                {isId ? 'Penawaran' : 'Offers'}
               </p>
               <p className="mt-1.5 text-[11px] leading-5 text-emerald-900/75 dark:text-emerald-100/75">
                 {isId
-                  ? 'Untuk mencari produk, supplier, jasa, alat, tempat usaha, orang, komunitas, dan kebutuhan lain.'
-                  : 'Find products, suppliers, services, equipment, places, people, communities, and more.'}
+                  ? 'Untuk menemukan produk, supplier, jasa, alat, tempat usaha, dan penawaran lain.'
+                  : 'Find products, suppliers, services, equipment, places, and other offers.'}
               </p>
             </div>
             <div className="rounded-2xl border border-blue-200 bg-blue-50/70 p-3 dark:border-blue-900/60 dark:bg-blue-950/30">
               <p className="text-xs font-black text-blue-900 dark:text-blue-100">
-                {isId ? 'Saya menawarkan' : 'I am offering'}
+                {isId ? 'Kebutuhan' : 'Needs'}
               </p>
               <p className="mt-1.5 text-[11px] leading-5 text-blue-900/75 dark:text-blue-100/75">
                 {isId
-                  ? 'Untuk menemukan kebutuhan pembeli yang bisa cocok dengan produk atau jasa yang kamu tawarkan.'
-                  : 'Find buyer needs that may match the products or services you offer.'}
+                  ? 'Untuk menemukan permintaan pembeli yang sedang mencari produk atau jasa.'
+                  : 'Find active buyer requests for products or services.'}
               </p>
             </div>
             <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900/60">
