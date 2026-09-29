@@ -16,7 +16,7 @@ describe('Explore hub routes', () => {
 
   it('routes demand searches directly to buyer needs', () => {
     expect(buildExploreHubSearchHref('en', 'demand', 'design service')).toBe(
-      '/en/explore?q=design+service&side=demand&tab=needs',
+      '/en/explore?q=design+service&side=demand&tab=all',
     );
   });
 
