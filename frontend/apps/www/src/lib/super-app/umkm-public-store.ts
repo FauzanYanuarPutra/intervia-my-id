@@ -32,6 +32,8 @@ const PUBLIC_METADATA_KEYS = [
   'gallery_images',
   'gallery_videos',
   'gallery_media',
+  'gallery_media_items',
+  'gallery_media_primary',
   'images',
   'photos',
   'video_urls',
