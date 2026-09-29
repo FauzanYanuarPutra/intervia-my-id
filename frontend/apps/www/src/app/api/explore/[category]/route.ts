@@ -352,20 +352,57 @@ export async function GET(
     // Category overview is taxonomy-driven. Do not turn the category's
     // semantic seed query into a strict text filter; that can hide valid
     // supply/demand records whose wording differs from the category label.
-    const searchParams = new URLSearchParams({
+    const supplyParams = new URLSearchParams({
       category: category.slug,
       tab: 'all',
+      side: 'supply',
       sort: 'latest',
     });
-    const searchResult = await fetchInternalJson(
-      req,
-      `/api/search?${searchParams.toString()}`,
-    );
-    if (searchResult.ok && asRecord(searchResult.payload)) {
-      const searchPayload = searchResult.payload as GlobalSearchResponse;
-      groups = searchPayload.groups;
-      degraded = false;
-    }
+    const demandParams = new URLSearchParams({
+      category: category.slug,
+      tab: 'needs',
+      side: 'demand',
+      sort: 'latest',
+    });
+
+    const [supplyResult, demandResult] = await Promise.all([
+      fetchInternalJson(
+        req,
+        `/api/search?${supplyParams.toString()}`,
+      ),
+      fetchInternalJson(
+        req,
+        `/api/search?${demandParams.toString()}`,
+      ),
+    ]);
+
+    const supplyPayload = supplyResult.ok
+      ? (asRecord(supplyResult.payload) as GlobalSearchResponse | null)
+      : null;
+    const demandPayload = demandResult.ok
+      ? (asRecord(demandResult.payload) as GlobalSearchResponse | null)
+      : null;
+
+    groups = {
+      products:
+        supplyPayload?.groups.products || unavailableExploreGroup(),
+      services:
+        supplyPayload?.groups.services || unavailableExploreGroup(),
+      businesses:
+        supplyPayload?.groups.businesses || unavailableExploreGroup(),
+      references:
+        unavailableExploreGroup(),
+      needs:
+        demandPayload?.groups.needs || unavailableExploreGroup(),
+      communities:
+        unavailableExploreGroup(),
+      videos:
+        unavailableExploreGroup(),
+      users:
+        unavailableExploreGroup(),
+    };
+
+    degraded = !supplyResult.ok && !demandResult.ok;
   }
 
   const payload: ExploreCategoryResponse = {
