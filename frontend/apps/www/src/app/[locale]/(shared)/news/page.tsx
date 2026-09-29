@@ -3,14 +3,13 @@ import { Search, Send, Store, TrendingUp } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { NewsCard } from '@/components/news/NewsCard';
 import { NewsCarousel } from '@/components/news/NewsCarousel';
+import { NewsCategoryRail } from '@/components/news/NewsCategoryRail';
 import { buildNewsFacetPath, buildNewsUrl, getPublishedNews } from '@/lib/news';
 
 type PageProps = {
   params: Promise<{ locale: string }>;
   searchParams: Promise<{ category?: string; q?: string; cursor?: string }>;
 };
-
-const CATEGORIES = ['Ekonomi', 'Bisnis', 'UMKM', 'Teknologi', 'Keuangan', 'Regulasi', 'Industri', 'Daerah'] as const;
 
 export async function generateMetadata({ params, searchParams }: PageProps): Promise<Metadata> {
   const { locale } = await params;
@@ -139,29 +138,7 @@ export default async function NewsIndexPage({ params, searchParams }: PageProps)
         </div>
       </section>
 
-      <nav aria-label={isId ? 'Kategori berita' : 'News categories'} className="-mx-1 flex min-w-0 gap-1.5 overflow-x-auto overscroll-x-contain px-1 py-0.5 scrollbar-none">
-      <div className="flex min-w-0 gap-1.5 overflow-x-auto scrollbar-none snap-x snap-mandatory">
-        <Link
-          href="/news"
-          className={!category
-            ? 'shrink-0 snap-start rounded-full bg-emerald-700 px-3.5 py-2 text-xs font-black text-white shadow-sm'
-            : 'shrink-0 snap-start rounded-full border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 transition hover:border-emerald-200 hover:text-emerald-700 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200'}
-        >
-          {isId ? 'Semua' : 'All'}
-        </Link>
-        {CATEGORIES.map(item => (
-          <Link
-            key={item}
-            href={buildNewsFacetPath('topic', item)}
-            className={category?.toLowerCase() === item.toLowerCase()
-              ? 'shrink-0 snap-start rounded-full bg-emerald-700 px-3.5 py-2 text-xs font-black text-white shadow-sm'
-              : 'shrink-0 snap-start rounded-full border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 transition hover:border-emerald-200 hover:text-emerald-700 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200'}
-          >
-            {item}
-          </Link>
-        ))}
-      </div>
-      </nav>
+      <NewsCategoryRail activeCategory={category} locale={locale} />
 
       {!items.length ? (
         <section className="rounded-[24px] border border-dashed border-slate-300 bg-white p-8 text-center dark:border-white/15 dark:bg-slate-900">
