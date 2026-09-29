@@ -115,6 +115,7 @@ export type ExploreSideInput = {
   market_intent?: string | null;
   intent?: string | null;
   kind?: string | null;
+  pricing_mode?: string | null;
   metadata?: Record<string, unknown> | null;
 };
 
@@ -129,6 +130,7 @@ export function normalizeExploreSide(
     market_intent: item.market_intent,
     intent: item.intent,
     kind: item.kind,
+    pricing_mode: item.pricing_mode,
     metadata: item.metadata,
   });
 }
