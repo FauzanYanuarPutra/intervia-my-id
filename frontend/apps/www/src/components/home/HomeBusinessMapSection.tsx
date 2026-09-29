@@ -73,6 +73,7 @@ export function HomeBusinessMapSection({
   const [stores, setStores] = useState<UmkmMapStore[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
 
   const mapHref = `${UMKM_DISCOVERY_PATH}?view=map`;
 
@@ -146,7 +147,7 @@ export function HomeBusinessMapSection({
       active = false;
       controller.abort();
     };
-  }, [isId]);
+  }, [isId, retryKey]);
 
   const summary = useMemo(
     () => summarizeHomeBusinessMapStores(stores),
@@ -252,7 +253,7 @@ export function HomeBusinessMapSection({
             <span className="min-w-0 flex-1 text-[8px] font-semibold text-rose-700 sm:text-[9px]">
               {error}
             </span>
-            <button type="button" onClick={() => window.location.reload()} className="shrink-0 rounded-full bg-slate-900 px-2 py-1 text-[8px] font-bold text-white">
+            <button type="button" onClick={() => setRetryKey(value => value + 1)} className="shrink-0 rounded-full bg-slate-900 px-2 py-1 text-[8px] font-bold text-white">
               {isId ? 'Coba lagi' : 'Retry'}
             </button>
           </div>
