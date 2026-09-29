@@ -128,7 +128,7 @@ import {
 } from '@/components/community/CommunityFeedClient';
 import { normalizeCommunityMediaItems } from '@/components/community/community-feed-helpers';
 import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
-import { UMKM_DISCOVERY_PATH } from '@/lib/umkmSurface';
+import { buildUmkmMapPlacePath, UMKM_DISCOVERY_PATH } from '@/lib/umkmSurface';
 import {
   LAJUKAN_EXPLORE_CATEGORIES,
   buildExploreCategoryHref,
@@ -241,10 +241,16 @@ type RecommendationItem = {
   ownerId?: string | null;
   contentStatus: string;
   updatedAt?: number;
+  sourcePriority: number;
 };
 
 function recommendationScore(item: RecommendationItem): number {
   let score = 0;
+
+  // Native Lajukan business/store data is the first-party source of truth.
+  // It must stay ahead of generic listings and can never be displaced by
+  // imported/reference content simply because the latter has richer media.
+  score += Math.max(0, 20 - item.sourcePriority * 5);
 
   if (item.verified) score += 8;
   if (item.image || item.images.length) score += 4;
@@ -273,6 +279,9 @@ function recommendationScore(item: RecommendationItem): number {
 
 function rankRecommendations(items: RecommendationItem[]): RecommendationItem[] {
   return [...items].sort((left, right) => {
+    const sourceDelta = left.sourcePriority - right.sourcePriority;
+    if (sourceDelta !== 0) return sourceDelta;
+
     const scoreDelta = recommendationScore(right) - recommendationScore(left);
     if (scoreDelta !== 0) return scoreDelta;
 
@@ -314,6 +323,27 @@ type PublicReferenceApiItem = {
 type PublicReferenceApiResponse = {
   data?: {
     items?: PublicReferenceApiItem[];
+  };
+};
+
+type HomeNativeStoreApiItem = {
+  id?: unknown;
+  slug?: unknown;
+  name?: unknown;
+  city?: unknown;
+  address?: unknown;
+  description?: unknown;
+  lat?: unknown;
+  lng?: unknown;
+  phone?: unknown;
+  metadata?: unknown;
+  updated_at?: unknown;
+  content_status?: unknown;
+};
+
+type HomeNativeStoreApiResponse = {
+  data?: {
+    items?: HomeNativeStoreApiItem[];
   };
 };
 
@@ -1052,6 +1082,101 @@ function mapContentToRecommendation(
   };
 }
 
+function mapNativeStoreToRecommendation(
+  item: HomeNativeStoreApiItem,
+  isId: boolean,
+): RecommendationItem | null {
+  const id = readText(item.id);
+  const slug = readText(item.slug);
+  const title = readText(item.name);
+  if (!id || !slug || !title) return null;
+
+  const metadata =
+    item.metadata &&
+    typeof item.metadata === 'object' &&
+    !Array.isArray(item.metadata)
+      ? (item.metadata as Record<string, unknown>)
+      : {};
+
+  const coverImage =
+    readText(metadata.cover_image) ||
+    readText(metadata.coverImage) ||
+    readText(metadata.logo_url) ||
+    readText(metadata.logoUrl);
+
+  const categoryLabel =
+    readText(metadata.category_label) ||
+    readText(metadata.segment) ||
+    readText(metadata.business_type) ||
+    (isId ? 'Usaha Lajukan' : 'Lajukan business');
+
+  const ratingValue = Number(metadata.rating);
+  const reviewCount = Number(metadata.review_count);
+  const ownerId =
+    readText(metadata.owner_id) ||
+    readText(metadata.owner_user_id) ||
+    null;
+
+  return {
+    id: `store:${id}`,
+    title,
+    summary:
+      readText(item.description) ||
+      readText(metadata.description) ||
+      (isId
+        ? 'Usaha yang terdaftar langsung di Lajukan.'
+        : 'Business registered directly on Lajukan.'),
+    vendor:
+      readText(metadata.owner_name) ||
+      readText(metadata.owner_full_name) ||
+      (isId ? 'Usaha Lajukan' : 'Lajukan business'),
+    location:
+      readText(item.city) ||
+      readText(item.address) ||
+      readText(metadata.city) ||
+      '',
+    rating:
+      Number.isFinite(ratingValue) && ratingValue > 0
+        ? ratingValue.toFixed(1)
+        : '-',
+    reviews:
+      Number.isFinite(reviewCount) && reviewCount >= 0
+        ? formatCompactCount(reviewCount, '0')
+        : '0',
+    price: '',
+    unit: '',
+    image: coverImage || undefined,
+    images: coverImage ? [coverImage] : [],
+    href: buildUmkmMapPlacePath({
+      slug,
+      metadata: {
+        ...metadata,
+        is_public_reference: false,
+      },
+    }),
+    badge: isId ? 'Data Lajukan' : 'Lajukan data',
+    badgeTone: 'emerald',
+    typeLabel: categoryLabel,
+    createHref: '/usaha',
+    entityType: 'umkm',
+    distanceKm: null,
+    distanceLabel: null,
+    contentType: 'umkm',
+    verified:
+      metadata.verified === true ||
+      metadata.identity_verified === true ||
+      metadata.business_verified === true,
+    side: 'supply',
+    imageAttribution: undefined,
+    ownerId,
+    contentStatus: 'active',
+    updatedAt: readText(item.updated_at)
+      ? Date.parse(readText(item.updated_at))
+      : undefined,
+    sourcePriority: 0,
+  };
+}
+
 function mapContentToPublicReference(
   item: ContentItem,
 ): PublicReferenceItem | null {
@@ -1073,6 +1198,7 @@ function mapContentToPublicReference(
     sourceLicenseUrl: reference.sourceLicenseUrl,
     sourceContactUrl: reference.sourceContactUrl,
     sourceContactType: reference.sourceContactType,
+    sourcePriority: 10,
     imageAttribution:
       reference.imageAttribution || contentImageAttribution(item),
   };
@@ -3913,6 +4039,31 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
       return fetchHomeContent(params, listingController.signal);
     };
 
+    const loadNativeBusinessStores = async () => {
+      const params = new URLSearchParams({
+        limit: '12',
+        map: '1',
+        include_references: '0',
+      });
+      addViewerLocation(params);
+
+      const response = await fetch(
+        `/api/super-app/umkm/stores?${params.toString()}`,
+        {
+          cache: 'no-store',
+          credentials: 'include',
+          signal: listingController.signal,
+        },
+      );
+      const payload = (await response
+        .json()
+        .catch(() => null)) as HomeNativeStoreApiResponse | null;
+
+      if (!response.ok) throw new Error('native_businesses_unavailable');
+
+      return Array.isArray(payload?.data?.items) ? payload.data.items : [];
+    };
+
     const loadDemandListings = async () => {
       const params = new URLSearchParams({
         limit: '12',
@@ -3953,8 +4104,18 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
     const loadHomeListings = async () => {
       setRecommendationsLoading(true);
       try {
-        const listingItems = rankRecommendations(
-          (await loadListings())
+        const [contentItems, nativeStores] = await Promise.all([
+          loadListings(),
+          loadNativeBusinessStores().catch(() => []),
+        ]);
+
+        const nativeBusinessItems = nativeStores
+          .map(item => mapNativeStoreToRecommendation(item, isId))
+          .filter((item): item is RecommendationItem => Boolean(item));
+
+        const listingItems = rankRecommendations([
+          ...nativeBusinessItems,
+          ...contentItems
             .filter(isHomeRecommendationEligible)
             .map(item =>
               mapContentToRecommendation(
@@ -3965,12 +4126,14 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
             )
             .filter((item): item is RecommendationItem => Boolean(item))
             .filter(item => item.side === 'supply')
-            .filter(
-              (item, index, allItems) =>
-                allItems.findIndex(candidate => candidate.id === item.id) ===
-                index,
-            ),
-        ).slice(0, 12);
+            .map(item => ({ ...item, sourcePriority: 1 })),
+        ])
+          .filter(
+            (item, index, allItems) =>
+              allItems.findIndex(candidate => candidate.id === item.id) ===
+              index,
+          )
+          .slice(0, 12);
 
         if (!active) return;
         setRecommendations(listingItems);
@@ -3998,6 +4161,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
             .filter((item): item is RecommendationItem => Boolean(item))
             .filter(item => item.side === 'demand')
             .filter(item => !userId || item.ownerId !== userId)
+            .map(item => ({ ...item, sourcePriority: 1 }))
             .filter(
               (item, index, allItems) =>
                 allItems.findIndex(candidate => candidate.id === item.id) ===
