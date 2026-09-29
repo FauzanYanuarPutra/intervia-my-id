@@ -349,8 +349,10 @@ export async function GET(
         ? !social.communityAvailable
         : !social.videosAvailable;
   } else {
+    // Category overview is taxonomy-driven. Do not turn the category's
+    // semantic seed query into a strict text filter; that can hide valid
+    // supply/demand records whose wording differs from the category label.
     const searchParams = new URLSearchParams({
-      q: category.searchQuery,
       category: category.slug,
       tab: 'all',
       sort: 'latest',
