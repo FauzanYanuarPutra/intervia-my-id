@@ -85,6 +85,12 @@ const MARKER_CLUSTER_FRAME_HEIGHT_RATIO = 0.5;
 const CLUSTER_POPUP_VISIBLE_LIMIT = 6;
 const STORE_MARKER_ICON_CACHE = new Map<string, DivIcon>();
 const CLUSTER_MARKER_ICON_CACHE = new Map<string, DivIcon>();
+const ROUTE_CACHE_TTL_MS = 30_000;
+const ROUTE_CACHE_MAX_ENTRIES = 24;
+const ROUTE_CACHE = new Map<
+  string,
+  { expiresAt: number; payload: RoutingResponse['data'] }
+>();
 
 type MarkerFocusTarget = {
   lat: number;
@@ -725,21 +731,25 @@ function distanceSquared(a: ProjectedPoint, b: ProjectedPoint): number {
 function isTightCluster(items: StorePresentation[]): boolean {
   if (items.length < 2) return false;
 
-  const projected = items.map(({ store }) =>
-    projectLatLngToWorld(store, MARKER_CLUSTER_MAX_ZOOM),
-  );
-  let maxDistanceSquared = 0;
+  // A cluster is considered "tight" only when its projected bounding-box
+  // diagonal fits inside the picker threshold. This is conservative (it may
+  // classify a few borderline clusters as non-tight) but avoids the O(n²)
+  // all-pairs scan that becomes expensive for dense imported references.
+  let minX = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
 
-  for (let index = 0; index < projected.length; index += 1) {
-    for (let cursor = index + 1; cursor < projected.length; cursor += 1) {
-      maxDistanceSquared = Math.max(
-        maxDistanceSquared,
-        distanceSquared(projected[index], projected[cursor]),
-      );
-    }
+  for (const { store } of items) {
+    const projected = projectLatLngToWorld(store, MARKER_CLUSTER_MAX_ZOOM);
+    minX = Math.min(minX, projected.x);
+    maxX = Math.max(maxX, projected.x);
+    minY = Math.min(minY, projected.y);
+    maxY = Math.max(maxY, projected.y);
   }
 
-  return maxDistanceSquared <= MARKER_CLUSTER_TIGHT_DISTANCE_PX ** 2;
+  const diagonalSquared = (maxX - minX) ** 2 + (maxY - minY) ** 2;
+  return diagonalSquared <= MARKER_CLUSTER_TIGHT_DISTANCE_PX ** 2;
 }
 
 function resolveClusterAnchor(
@@ -1199,6 +1209,11 @@ function StoreMarkersLayer({
   showPopups: boolean;
 }) {
   const map = useMap();
+  // Rendering hundreds of hidden Popup trees is significantly heavier than
+  // the marker layer itself. Keep the richer popup UI for smaller datasets;
+  // large map datasets use the tooltip + selection/details surface instead.
+  const renderSinglePopups =
+    showPopups && storePresentations.length <= 120;
   const [zoom, setZoom] = useState(() => map.getZoom());
 
   useMapEvents({
@@ -1301,7 +1316,7 @@ function StoreMarkersLayer({
               <Tooltip direction="top" offset={[0, -8]}>
                 {store.name}
               </Tooltip>
-              {showPopups ? (
+              {renderSinglePopups ? (
                 <Popup className="umkm-store-map-popup" maxWidth={270}>
                   <StorePopupSummary
                     store={store}
@@ -1507,6 +1522,37 @@ export function UmkmStoreMapClient({
       }
 
       try {
+        const cacheKey = [
+          routeOrigin.lat.toFixed(4),
+          routeOrigin.lng.toFixed(4),
+          routeDestination.lat.toFixed(5),
+          routeDestination.lng.toFixed(5),
+          'driving',
+        ].join(':');
+        const now = Date.now();
+        const cached = ROUTE_CACHE.get(cacheKey);
+        if (cached && cached.expiresAt > now) {
+          const payload = { data: cached.payload } as RoutingResponse;
+          if (!active) return;
+          const nextRoutePositions = (payload.data?.points || [])
+            .map(point => [point.lat, point.lng] as [number, number])
+            .filter(isValidRoutePoint);
+          if (
+            nextRoutePositions.length >= 2 &&
+            payload.data &&
+            !payload.data.used_fallback
+          ) {
+            setRoutePositions(nextRoutePositions);
+            onRouteResolved?.({
+              distance_m: payload.data.distance_m,
+              duration_s: payload.data.duration_s,
+              used_fallback: false,
+              provider: payload.data.provider,
+            });
+          }
+          return;
+        }
+
         const res = await fetch('/api/super-app/routing', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
@@ -1522,6 +1568,17 @@ export function UmkmStoreMapClient({
           signal: controller.signal,
         });
         const payload = (await res.json().catch(() => ({}))) as RoutingResponse;
+        if (res.ok && payload.data) {
+          ROUTE_CACHE.set(cacheKey, {
+            expiresAt: Date.now() + ROUTE_CACHE_TTL_MS,
+            payload: payload.data,
+          });
+          while (ROUTE_CACHE.size > ROUTE_CACHE_MAX_ENTRIES) {
+            const oldestKey = ROUTE_CACHE.keys().next().value;
+            if (typeof oldestKey !== 'string') break;
+            ROUTE_CACHE.delete(oldestKey);
+          }
+        }
         if (!active) return;
 
         if (
@@ -1592,6 +1649,7 @@ export function UmkmStoreMapClient({
       zoom={initialMapZoom}
       minZoom={3}
       maxZoom={18}
+      preferCanvas
       scrollWheelZoom={interactive}
       dragging={interactive}
       touchZoom={interactive}
@@ -1616,7 +1674,13 @@ export function UmkmStoreMapClient({
         focusOffset={focusOffset}
       />
       <ManualMarkerFocusController target={manualMarkerFocus} />
-      <TileLayer url={tileUrl} attribution={tileAttribution} />
+      <TileLayer
+        url={tileUrl}
+        attribution={tileAttribution}
+        keepBuffer={1}
+        updateWhenIdle
+        updateWhenZooming={false}
+      />
       <AttributionControl position="bottomright" prefix={false} />
       {controls ? <ZoomControl position="bottomright" /> : null}
 
