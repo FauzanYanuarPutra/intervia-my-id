@@ -11358,7 +11358,17 @@ async fn list_map_places(
     // after a user selects a place.
     let mut statement = QueryBuilder::<Postgres>::new(
         r#"
-        SELECT id, slug, name, city, lat, lng, category, source_kind
+        SELECT
+          id,
+          slug,
+          name,
+          city,
+          lat,
+          lng,
+          category,
+          source_kind,
+          metadata,
+          COUNT(*) OVER() AS total_count
         FROM (
           SELECT
             s.id::text AS id,
@@ -11527,6 +11537,11 @@ async fn list_map_places(
 
     match statement.build().fetch_all(&state.db).await {
         Ok(rows) => {
+            let total_count = rows
+                .first()
+                .and_then(|row| row.try_get::<i64, _>("total_count").ok())
+                .unwrap_or(0);
+
             let items = rows
                 .into_iter()
                 .filter_map(|row| {
@@ -11545,7 +11560,11 @@ async fn list_map_places(
                 .collect::<Vec<_>>();
             (
                 StatusCode::OK,
-                Json(json!({"items": items, "count": items.len()})),
+                Json(json!({
+                    "items": items,
+                    "count": items.len(),
+                    "total_count": total_count,
+                })),
             )
                 .into_response()
         }
