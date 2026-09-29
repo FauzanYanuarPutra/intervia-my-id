@@ -2300,13 +2300,22 @@ fn validate_task_data(task: AiTask, data: &mut Value) -> Vec<String> {
             warnings.push(format!("invalid_{}_type_normalized", field));
             return;
         };
+
         let normalized = raw
             .trim()
             .to_ascii_lowercase()
             .replace('_', "-")
             .replace(' ', "-");
-        if allowed.iter().any(|allowed| *allowed == normalized) {
-            *value = Value::String(normalized);
+
+        let canonical = allowed.iter().copied().find(|candidate| {
+            candidate
+                .replace('_', "-")
+                .replace(' ', "-")
+                == normalized
+        });
+
+        if let Some(canonical) = canonical {
+            *value = Value::String(canonical.to_string());
         } else {
             *value = Value::String("unknown".to_string());
             warnings.push(format!("invalid_{}_normalized_to_unknown", field));
@@ -2342,8 +2351,8 @@ fn validate_task_data(task: AiTask, data: &mut Value) -> Vec<String> {
                     "service",
                     "job",
                     "property",
-                    "tool-rental",
-                    "business-transfer",
+                    "tool_rental",
+                    "business_transfer",
                     "company",
                     "unknown",
                 ],
@@ -2378,8 +2387,8 @@ fn validate_task_data(task: AiTask, data: &mut Value) -> Vec<String> {
                     "service",
                     "job",
                     "property",
-                    "tool-rental",
-                    "business-transfer",
+                    "tool_rental",
+                    "business_transfer",
                     "company",
                     "profile",
                     "unknown",
