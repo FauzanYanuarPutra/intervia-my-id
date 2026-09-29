@@ -44,6 +44,16 @@ pub struct ToolExecution {
     pub traces: Vec<ToolCallTrace>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct ToolDefinition {
+    pub name: String,
+    pub description: String,
+    pub permission: String,
+    pub source_of_truth: String,
+    pub enabled: bool,
+}
+
+
 impl ToolRegistry {
     pub fn new(config: ToolRegistryConfig) -> Self {
         let http = Client::builder()
@@ -57,6 +67,67 @@ impl ToolRegistry {
 
     pub fn configured(&self) -> bool {
         !self.config.marketplace_url.is_empty()
+    }
+
+    pub fn catalog(&self) -> Vec<ToolDefinition> {
+        vec![
+            ToolDefinition {
+                name: "search_listings".to_string(),
+                description: "Search active Lajukan supply/demand marketplace records.".to_string(),
+                permission: "READ".to_string(),
+                source_of_truth: "marketplace_db".to_string(),
+                enabled: self.configured(),
+            },
+            ToolDefinition {
+                name: "search_umkm".to_string(),
+                description: "Search native Lajukan UMKM/business records without public references.".to_string(),
+                permission: "READ".to_string(),
+                source_of_truth: "marketplace_db".to_string(),
+                enabled: self.configured(),
+            },
+            ToolDefinition {
+                name: "find_suppliers".to_string(),
+                description: "Find Lajukan supply listings that can satisfy a buyer need.".to_string(),
+                permission: "READ".to_string(),
+                source_of_truth: "marketplace_db".to_string(),
+                enabled: self.configured(),
+            },
+            ToolDefinition {
+                name: "find_buyers".to_string(),
+                description: "Find Lajukan demand listings looking for a product or service.".to_string(),
+                permission: "READ".to_string(),
+                source_of_truth: "marketplace_db".to_string(),
+                enabled: self.configured(),
+            },
+            ToolDefinition {
+                name: "get_listing".to_string(),
+                description: "Reserved contract for a single listing lookup.".to_string(),
+                permission: "READ".to_string(),
+                source_of_truth: "marketplace_db".to_string(),
+                enabled: false,
+            },
+            ToolDefinition {
+                name: "get_umkm".to_string(),
+                description: "Reserved contract for a single native UMKM lookup.".to_string(),
+                permission: "READ".to_string(),
+                source_of_truth: "marketplace_db".to_string(),
+                enabled: false,
+            },
+            ToolDefinition {
+                name: "create_listing_draft".to_string(),
+                description: "Generate an AI draft only; publishing still requires explicit user action.".to_string(),
+                permission: "DRAFT".to_string(),
+                source_of_truth: "ai_service".to_string(),
+                enabled: true,
+            },
+            ToolDefinition {
+                name: "publish_listing".to_string(),
+                description: "Never executed implicitly by AI; requires explicit confirmation.".to_string(),
+                permission: "PUBLISH".to_string(),
+                source_of_truth: "marketplace_db".to_string(),
+                enabled: false,
+            },
+        ]
     }
 
     pub async fn execute_marketplace_search(
