@@ -153,7 +153,7 @@ export function HomeBusinessMapSection({
         if (!active || controller.signal.aborted) return;
         setError(null);
         const response = await fetch(
-          '/api/super-app/umkm/map-points?limit=800&min_lat=-11&max_lat=6&min_lng=95&max_lng=141',
+          '/api/super-app/umkm/map-points?limit=1800&min_lat=-11&max_lat=6&min_lng=95&max_lng=141',
           {
             cache: 'default',
             credentials: 'include',
@@ -182,8 +182,11 @@ export function HomeBusinessMapSection({
             : mapItems.length;
 
         if (!response.ok || mapItems.length === 0) {
+          // Prefer the native Lajukan store projection first. It is cheaper
+          // than hydrating references and guarantees local records are not
+          // hidden by a secondary public-reference query.
           const fallbackResponse = await fetch(
-            '/api/super-app/umkm/stores?limit=200&map=1&include_references=1&min_lat=-11&max_lat=6&min_lng=95&max_lng=141',
+            '/api/super-app/umkm/stores?limit=200&map=1&include_references=0&min_lat=-11&max_lat=6&min_lng=95&max_lng=141',
             {
               cache: 'default',
               credentials: 'include',
@@ -257,6 +260,30 @@ export function HomeBusinessMapSection({
                   ? 'Data peta usaha belum tersedia.'
                   : 'Business map data is unavailable.'),
             );
+          } else if (mapItems.length === 0) {
+            // Native records can legitimately be empty. Public references are
+            // a secondary fallback only, so they never displace native data.
+            const referenceResponse = await fetch(
+              '/api/super-app/umkm/stores?limit=200&map=1&references_only=1&min_lat=-11&max_lat=6&min_lng=95&max_lng=141',
+              {
+                cache: 'default',
+                credentials: 'include',
+                signal: controller.signal,
+              },
+            );
+            const referencePayload = (await referenceResponse
+              .json()
+              .catch(() => ({}))) as PublicStoreListResponse;
+            if (
+              referenceResponse.ok &&
+              Array.isArray(referencePayload.data?.items)
+            ) {
+              mapItems = referencePayload.data.items;
+              totalCount =
+                typeof referencePayload.data?.count === 'number'
+                  ? referencePayload.data.count
+                  : mapItems.length;
+            }
           }
         }
 
