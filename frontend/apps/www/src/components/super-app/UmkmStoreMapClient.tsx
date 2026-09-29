@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { ExternalLink, MapPin, Navigation, Route, Store } from 'lucide-react';
 import {
   AttributionControl,
@@ -1155,6 +1155,8 @@ function MapBoundsReporter({
   onBoundsChange?: (bounds: UmkmMapBounds) => void;
 }) {
   const map = useMap();
+  const timerRef = useRef<number | null>(null);
+
   const reportBounds = useCallback(() => {
     if (!onBoundsChange) return;
     const bounds = map.getBounds();
@@ -1165,11 +1167,29 @@ function MapBoundsReporter({
       maxLng: bounds.getEast(),
     });
   }, [map, onBoundsChange]);
-  useMapEvents({ moveend: reportBounds });
+
+  const scheduleBoundsReport = useCallback(() => {
+    if (timerRef.current !== null) {
+      window.clearTimeout(timerRef.current);
+    }
+    timerRef.current = window.setTimeout(() => {
+      timerRef.current = null;
+      reportBounds();
+    }, 120);
+  }, [reportBounds]);
+
+  useMapEvents({ moveend: scheduleBoundsReport });
 
   useEffect(() => {
-    map.whenReady(reportBounds);
-  }, [map, reportBounds]);
+    map.whenReady(scheduleBoundsReport);
+    return () => {
+      if (timerRef.current !== null) {
+        window.clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [map, scheduleBoundsReport]);
+
   return null;
 }
 
@@ -1215,6 +1235,7 @@ function StoreMarkersLayer({
   const renderSinglePopups =
     showPopups && storePresentations.length <= 120;
   const [zoom, setZoom] = useState(() => map.getZoom());
+  const deferredZoom = useDeferredValue(zoom);
 
   useMapEvents({
     zoomend: () => {
@@ -1223,8 +1244,13 @@ function StoreMarkersLayer({
   });
 
   const markerLayer = useMemo(
-    () => buildStoreMarkerLayer(storePresentations, zoom, selectedStoreId),
-    [selectedStoreId, storePresentations, zoom],
+    () =>
+      buildStoreMarkerLayer(
+        storePresentations,
+        deferredZoom,
+        selectedStoreId,
+      ),
+    [deferredZoom, selectedStoreId, storePresentations],
   );
 
   const focusMarker = useCallback(
