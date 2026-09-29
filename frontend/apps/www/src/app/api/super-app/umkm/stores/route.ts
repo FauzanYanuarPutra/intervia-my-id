@@ -259,13 +259,6 @@ function slugifyReferenceTitle(value: string): string {
   );
 }
 
-function referenceBusinessType(categorySlug: string): string {
-  if (categorySlug === 'services') return 'jasa';
-  if (categorySlug === 'machines-tools') return 'manufaktur';
-  if (categorySlug === 'business-places') return 'toko';
-  return 'ritel';
-}
-
 function mapPublicReference(
   item: PublicReferenceContent,
   viewer: { lat: number; lng: number } | null,
@@ -373,8 +366,7 @@ function mapPublicReference(
       image_url: coverImage,
       gallery_images:
         projectedGallery.length > 0 ? projectedGallery : [coverImage],
-      umkm_category: referenceBusinessType(categorySlug),
-      business_type: referenceBusinessType(categorySlug),
+      reference_category_slug: categorySlug || null,
     },
     recommended_qr: null,
     distance_km: distanceKm === null ? null : Number(distanceKm.toFixed(2)),
