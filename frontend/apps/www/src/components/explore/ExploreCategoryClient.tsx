@@ -597,13 +597,19 @@ function DataSection({
               .filter((item): item is GlobalSearchItem => Boolean(item))
           : [];
 
-        setExtraItems(current => [...current, ...incoming]);
-        setNextCursor(
+        const returnedCursor =
           payload.nextCursor != null && payload.hasMore !== false
             ? String(payload.nextCursor)
-            : null,
+            : null;
+        setExtraItems(current => [...current, ...incoming]);
+        setNextCursor(
+          incoming.length === 0 || returnedCursor === nextCursor
+            ? null
+            : returnedCursor,
         );
-        setVisibleCount(current => current + Math.min(pageSize, incoming.length));
+        if (incoming.length > 0) {
+          setVisibleCount(current => current + Math.min(pageSize, incoming.length));
+        }
         return;
       }
 
@@ -632,13 +638,19 @@ function DataSection({
           ? payload.groups.needs?.items || []
           : incoming;
 
-      setExtraItems(current => [...current, ...nextItems]);
-      setNextCursor(
+      const returnedCursor =
         (forcedSide === 'demand'
           ? payload.groups.needs?.nextCursor
-          : payload.groups.products?.nextCursor || payload.groups.services?.nextCursor) || null,
+          : payload.groups.products?.nextCursor || payload.groups.services?.nextCursor) || null;
+      setExtraItems(current => [...current, ...nextItems]);
+      setNextCursor(
+        nextItems.length === 0 || returnedCursor === nextCursor
+          ? null
+          : returnedCursor,
       );
-      setVisibleCount(current => current + Math.min(pageSize, nextItems.length));
+      if (nextItems.length > 0) {
+        setVisibleCount(current => current + Math.min(pageSize, nextItems.length));
+      }
     } catch {
       setLoadError(true);
     } finally {
