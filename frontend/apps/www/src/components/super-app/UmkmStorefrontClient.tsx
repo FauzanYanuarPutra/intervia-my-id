@@ -82,6 +82,7 @@ import {
   type UmkmMapTheme,
 } from './UmkmStoreMap';
 import { useViewerLocation } from './useViewerLocation';
+import { UmkmStoreMediaContribution } from './UmkmStoreMediaContribution';
 
 type UmkmStorefrontClientProps = {
   isId: boolean;
@@ -341,6 +342,9 @@ type StoreGalleryItem = {
   title: string;
   caption: string;
   mediaType: 'image' | 'video';
+  uploaderName?: string | null;
+  uploaderUsername?: string | null;
+  contributed?: boolean;
 };
 
 type StoreReelItem = {
@@ -627,9 +631,41 @@ function readStoreImageUrls(store: StoreRecord): string[] {
   ]);
 }
 
-function readStoreGalleryMedia(store: StoreRecord): { src: string; mediaType: 'image' | 'video' }[] {
+function readStoreGalleryMedia(
+  store: StoreRecord,
+): Array<{
+  id?: string;
+  src: string;
+  mediaType: 'image' | 'video';
+  caption?: string | null;
+  uploaderName?: string | null;
+  uploaderUsername?: string | null;
+  contributed?: boolean;
+}> {
   const metadata = asRecord(store.metadata);
-  const raw = uniqueTexts([
+  const contributionItems = Array.isArray(metadata.gallery_media_items)
+    ? metadata.gallery_media_items
+        .map((value, index) => {
+          const item = asRecord(value);
+          const src = readText(item.url || item.media_url);
+          if (!src) return null;
+          return {
+            id: readText(item.id) || `contributed-${index}`,
+            src,
+            mediaType:
+              readText(item.media_type).toLowerCase() === 'video'
+                ? ('video' as const)
+                : ('image' as const),
+            caption: readText(item.caption) || null,
+            uploaderName: readText(item.uploader_name) || null,
+            uploaderUsername: readText(item.uploader_username) || null,
+            contributed: true,
+          };
+        })
+        .filter(Boolean)
+    : [];
+
+  const legacyUrls = uniqueTexts([
     ...readTextArray(metadata.gallery_media),
     ...readTextArray(metadata.gallery_images),
     ...readTextArray(metadata.gallery_videos),
@@ -642,10 +678,26 @@ function readStoreGalleryMedia(store: StoreRecord): { src: string; mediaType: 'i
     ...readTextArray(metadata.videos),
   ]);
 
-  return raw.map(src => ({
-    src,
-    mediaType: isVideoUrl(src) ? 'video' : 'image',
-  }));
+  const contributedUrls = new Set(
+    contributionItems.map(item => (item ? item.src : '')).filter(Boolean),
+  );
+  const legacyItems = legacyUrls
+    .filter(src => !contributedUrls.has(src))
+    .map(src => ({
+      src,
+      mediaType: isVideoUrl(src) ? ('video' as const) : ('image' as const),
+      contributed: false,
+    }));
+
+  return [...contributionItems, ...legacyItems] as Array<{
+    id?: string;
+    src: string;
+    mediaType: 'image' | 'video';
+    caption?: string | null;
+    uploaderName?: string | null;
+    uploaderUsername?: string | null;
+    contributed?: boolean;
+  }>;
 }
 
 function getStoreGalleryLikeKey(item: StoreGalleryItem): string {
@@ -2771,10 +2823,17 @@ export function UmkmStorefrontClient({
 
     const metadataMedia: StoreGalleryItem[] = readStoreGalleryMedia(store).map(
       (item, index): StoreGalleryItem => ({
-        id: `place-${index}`,
+        id: item.id || `place-${index}`,
         src: item.src,
-        title:
-          item.mediaType === 'video'
+        title: item.contributed
+          ? item.mediaType === 'video'
+            ? isId
+              ? 'Video dari komunitas'
+              : 'Community video'
+            : isId
+              ? 'Foto dari komunitas'
+              : 'Community photo'
+          : item.mediaType === 'video'
             ? isId
               ? 'Video usaha'
               : 'Business video'
@@ -2786,10 +2845,14 @@ export function UmkmStorefrontClient({
                 ? 'Foto usaha'
                 : 'Business photo',
         caption:
-          index === 0
+          item.caption ||
+          (index === 0
             ? `${placeHeader?.categoryLabel || store.name} / ${store.city}`
-            : store.address || store.city,
+            : store.address || store.city),
         mediaType: item.mediaType,
+        uploaderName: item.uploaderName,
+        uploaderUsername: item.uploaderUsername,
+        contributed: item.contributed,
       }),
     );
     const placeImages: StoreGalleryItem[] = (placeHeader?.gallery || []).map(
@@ -2845,10 +2908,10 @@ export function UmkmStorefrontClient({
   const heroVisualSrc =
     heroCoverItem?.mediaType === 'video'
       ? DEFAULT_STOREFRONT_HERO_IMAGE
-      : heroCoverItem?.src || DEFAULT_STOREFRONT_HERO_IMAGE;
+      : heroCoverItem?.src || placeHeader?.coverImage || DEFAULT_STOREFRONT_HERO_IMAGE;
   const heroDisplaySrc =
     failedHeroImageSrc === heroVisualSrc
-      ? DEFAULT_STOREFRONT_HERO_IMAGE
+      ? placeHeader?.coverImage || DEFAULT_STOREFRONT_HERO_IMAGE
       : heroVisualSrc;
   const heroVisualAlt =
     heroCoverItem?.mediaType === 'video'
@@ -4301,7 +4364,13 @@ export function UmkmStorefrontClient({
                       {isId ? 'Lihat visual usaha sebelum order' : 'See the business visuals before ordering'}
                     </h2>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <UmkmStoreMediaContribution
+                      storeId={store.id}
+                      isId={isId}
+                      loginHref={loginHref}
+                      onSubmitted={() => window.location.reload()}
+                    />
                     {isStoreOwner ? (
                       <>
                         <input
@@ -4384,6 +4453,13 @@ export function UmkmStorefrontClient({
                           )}
                           <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent p-3 pt-10 text-white">
                             <span className="block text-[12px] font-bold">{item.title}</span>
+                            {item.contributed &&
+                            (item.uploaderName || item.uploaderUsername) ? (
+                              <span className="mt-0.5 block truncate text-[10px] text-white/80">
+                                {isId ? 'Diunggah oleh ' : 'Uploaded by '}
+                                {item.uploaderName || item.uploaderUsername}
+                              </span>
+                            ) : null}
                             <span className="mt-0.5 block text-[10px] text-white/75">{index + 1}/{storeGallery.length}</span>
                           </span>
                         </button>
@@ -4443,6 +4519,13 @@ export function UmkmStorefrontClient({
                               <p className="text-[12px] font-semibold">
                                 {item.title}
                               </p>
+                              {item.contributed &&
+                              (item.uploaderName || item.uploaderUsername) ? (
+                                <p className="mt-1 text-[10px] font-semibold text-white/85">
+                                  {isId ? 'Diunggah oleh ' : 'Uploaded by '}
+                                  {item.uploaderName || item.uploaderUsername}
+                                </p>
+                              ) : null}
                               <p className="mt-1 line-clamp-2 text-[11px] text-white/78">
                                 {item.caption}
                               </p>
@@ -5315,6 +5398,13 @@ export function UmkmStorefrontClient({
                 <p className="mt-1 text-[12px] leading-6 text-[color:var(--app-text-soft)]">
                   {activeGalleryItem.caption}
                 </p>
+                {activeGalleryItem.contributed &&
+                (activeGalleryItem.uploaderName || activeGalleryItem.uploaderUsername) ? (
+                  <p className="mt-1 text-[11px] font-semibold text-[color:var(--app-accent)]">
+                    {isId ? 'Diunggah oleh ' : 'Uploaded by '}
+                    {activeGalleryItem.uploaderName || activeGalleryItem.uploaderUsername}
+                  </p>
+                ) : null}
                 <button
                   type="button"
                   onClick={() => void toggleGalleryLike(activeGalleryItem)}
