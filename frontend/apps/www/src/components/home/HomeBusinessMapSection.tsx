@@ -187,16 +187,20 @@ export function HomeBusinessMapSection({
                 ? 'Menyiapkan peta…'
                 : 'Preparing the map…'
               : isId
-                ? summary.businessCount > 0
-                  ? `${summary.businessCount} usaha terpetakan`
-                  : summary.referenceCount > 0
-                    ? `${summary.referenceCount} referensi lokasi publik`
-                    : 'Belum ada titik'
-                : summary.businessCount > 0
-                  ? `${summary.businessCount} businesses mapped`
-                  : summary.referenceCount > 0
-                    ? `${summary.referenceCount} public map references`
-                    : 'No mapped points'}
+                ? summary.businessCount > 0 && summary.referenceCount > 0
+                  ? `${summary.businessCount} usaha · ${summary.referenceCount} referensi publik`
+                  : summary.businessCount > 0
+                    ? `${summary.businessCount} usaha terpetakan`
+                    : summary.referenceCount > 0
+                      ? `${summary.referenceCount} referensi lokasi publik`
+                      : 'Belum ada titik'
+                : summary.businessCount > 0 && summary.referenceCount > 0
+                  ? `${summary.businessCount} businesses · ${summary.referenceCount} public references`
+                  : summary.businessCount > 0
+                    ? `${summary.businessCount} businesses mapped`
+                    : summary.referenceCount > 0
+                      ? `${summary.referenceCount} public map references`
+                      : 'No mapped points'}
           </p>
         </div>
 
