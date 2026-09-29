@@ -1,3 +1,5 @@
+import { buildPublicPageMetadata } from '@/lib/seo/publicPageMetadata';
+import type { Metadata } from 'next';
 import {
   Ban,
   CreditCard,
@@ -23,6 +25,18 @@ import {
 type PageProps = {
   params: Promise<{ locale: string }>;
 };
+
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
+  const { locale } = await params;
+  return buildPublicPageMetadata({
+    locale,
+    path: '/terms',
+    titleId: 'Syarat & Ketentuan | Lajukan',
+    titleEn: 'Terms of Service | Lajukan',
+    descriptionId: 'Baca aturan penggunaan Lajukan, hak dan kewajiban pengguna, serta ketentuan layanan dan transaksi.',
+    descriptionEn: 'Read Lajukan usage rules, user rights and responsibilities, and service and transaction terms.',
+  });
+}
 
 export default async function TermsPage({ params }: PageProps) {
   const { locale } = await params;
