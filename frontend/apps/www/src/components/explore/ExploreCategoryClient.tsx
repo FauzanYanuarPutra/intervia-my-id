@@ -485,10 +485,11 @@ function DataSection({
       ? 8
       : 6;
   const [visibleCount, setVisibleCount] = useState(pageSize);
+  const itemSetKey = `${config.key}:${kind}:${items.length}:${items[0]?.id || ''}:${items[items.length - 1]?.id || ''}`;
 
   useEffect(() => {
     setVisibleCount(pageSize);
-  }, [items, kind, pageSize]);
+  }, [itemSetKey, pageSize]);
 
   const visibleItems = normalizedItems.slice(
     0,
