@@ -1106,6 +1106,15 @@ async fn sync_store_public_media_metadata(
     owner_gallery.extend(approved_urls);
     owner_gallery.truncate(24);
 
+    let still_approved = placement
+        .as_ref()
+        .map(|(media_url, _, _)| {
+            items
+                .iter()
+                .any(|item| item.get("url").and_then(Value::as_str) == Some(media_url.as_str()))
+        })
+        .unwrap_or(false);
+
     let mut object = metadata.as_object_mut().cloned().unwrap_or_default();
     object.insert("gallery_media".to_string(), json!(owner_gallery));
     object.insert("gallery_media_items".to_string(), Value::Array(items));
@@ -1116,9 +1125,6 @@ async fn sync_store_public_media_metadata(
     }
 
     if let Some((media_url, placement, approved)) = placement {
-        let still_approved = items
-            .iter()
-            .any(|item| item.get("url").and_then(Value::as_str) == Some(media_url));
         if approved && still_approved {
             match placement {
                 "cover" => {
