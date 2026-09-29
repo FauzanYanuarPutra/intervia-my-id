@@ -13,13 +13,13 @@ import {
 
 describe('listing side presentation', () => {
   it('keeps buyer demand and provider supply labels distinct', () => {
-    expect(getListingSideLabel('demand', 'id')).toBe('Sedang mencari');
-    expect(getListingSideLabel('supply', 'id')).toBe('Sedang menawarkan');
-    expect(getListingSideActorLabel('demand', 'id')).toBe('Pencari');
+    expect(getListingSideLabel('demand', 'id')).toBe('Kebutuhan Pembeli');
+    expect(getListingSideLabel('supply', 'id')).toBe('Penawaran');
+    expect(getListingSideActorLabel('demand', 'id')).toBe('Pembeli');
     expect(getListingSideActorLabel('supply', 'id')).toBe('Penyedia');
-    expect(getListingSideVerbLabel('demand', 'id')).toBe('Sedang mencari');
-    expect(getListingSideVerbLabel('supply', 'id')).toBe('Sedang menawarkan');
-    expect(getListingSideObjectLabel('demand', 'id')).toBe('Kebutuhan');
+    expect(getListingSideVerbLabel('demand', 'id')).toBe('Membutuhkan');
+    expect(getListingSideVerbLabel('supply', 'id')).toBe('Menawarkan');
+    expect(getListingSideObjectLabel('demand', 'id')).toBe('Kebutuhan Pembeli');
     expect(getListingSideObjectLabel('supply', 'id')).toBe('Penawaran');
     expect(getListingSideCounterpartyLabel('demand', 'id')).toBe('penyedia');
     expect(getListingSideCounterpartyLabel('supply', 'id')).toBe('pembeli');
