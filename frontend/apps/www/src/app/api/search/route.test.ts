@@ -354,6 +354,74 @@ describe('GET /api/search', () => {
     );
   });
 
+  it('browses supply and demand tabs without requiring a keyword', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+      const url = new URL(String(input));
+
+      if (url.pathname === '/api/content') {
+        if (url.searchParams.get('side') === 'demand') {
+          return Response.json({
+            items: [
+              {
+                id: 'need-1',
+                type: 'product',
+                side: 'seeker',
+                title: 'Butuh kemasan kopi',
+              },
+            ],
+          });
+        }
+
+        return Response.json({
+          items: [
+            {
+              id: 'offer-1',
+              type: 'product',
+              side: 'provider',
+              title: 'Supplier kemasan kopi',
+            },
+          ],
+        });
+      }
+
+      if (url.pathname === '/api/super-app/umkm/stores') {
+        return Response.json({
+          data: {
+            items: [
+              {
+                id: 'store-1',
+                slug: 'toko-kopi',
+                name: 'Toko Kopi',
+                is_active: true,
+                metadata: {},
+              },
+            ],
+          },
+        });
+      }
+
+      throw new TypeError('unexpected source');
+    });
+
+    const supplyResponse = await GET(searchRequest('side=supply'));
+    const supplyPayload = await supplyResponse.json();
+
+    expect(supplyResponse.status).toBe(200);
+    expect(supplyPayload.total).toBe(2);
+    expect(supplyPayload.groups.products.items[0].id).toBe('offer-1');
+    expect(supplyPayload.groups.businesses.items[0].id).toBe('store-1');
+    expect(supplyPayload.groups.needs.total).toBe(0);
+
+    const demandResponse = await GET(searchRequest('side=demand'));
+    const demandPayload = await demandResponse.json();
+
+    expect(demandResponse.status).toBe(200);
+    expect(demandPayload.total).toBe(1);
+    expect(demandPayload.groups.needs.items[0].id).toBe('need-1');
+    expect(demandPayload.groups.products.total).toBe(0);
+    expect(demandPayload.groups.businesses.total).toBe(0);
+  });
+
   it('separates kebutuhan from penawaran using side=demand', async () => {
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')
