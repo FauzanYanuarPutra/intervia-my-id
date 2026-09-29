@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { Link, useRouter } from '@/i18n/navigation';
 import { LajukanImage } from '@/components/common/LajukanImage';
+import { InfiniteScrollTrigger } from '@/components/common/InfiniteScrollTrigger';
 import {
   ArrowRight,
   Clapperboard,
@@ -39,6 +40,9 @@ type FeedState = {
   requestSearch: string;
   status: 'loading' | 'ready';
   items: ReelItem[];
+  nextCursor: string | null;
+  hasMore: boolean;
+  error: boolean;
 };
 
 function getReelFilterCss(filterPreset?: ReelItem['filterPreset']) {
@@ -101,11 +105,21 @@ export default function ReelsFeedClient({ isId }: { isId: boolean }) {
     requestSearch,
     status: 'loading',
     items: [],
+    nextCursor: null,
+    hasMore: false,
+    error: false,
   });
   const activeFeed =
     feedState.requestSearch === requestSearch
       ? feedState
-      : { requestSearch, status: 'loading' as const, items: [] };
+      : {
+          requestSearch,
+          status: 'loading' as const,
+          items: [] as ReelItem[],
+          nextCursor: null,
+          hasMore: false,
+          error: false,
+        };
   const items = activeFeed.items;
   const loading = activeFeed.status === 'loading';
 
@@ -131,20 +145,50 @@ export default function ReelsFeedClient({ isId }: { isId: boolean }) {
   useEffect(() => {
     let alive = true;
 
+    setFeedState({
+      requestSearch,
+      status: 'loading',
+      items: [],
+      nextCursor: null,
+      hasMore: false,
+      error: false,
+    });
+
     fetch(`/api/reels/feed?${requestSearch}`, { cache: 'no-store' })
-      .then(res => res.json())
+      .then(async res => {
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error('reels_feed_failed');
+        return payload as {
+          data?: ReelItem[];
+          nextCursor?: string | number | null;
+          hasMore?: boolean;
+        };
+      })
       .then(payload => {
+        if (!alive) return;
+        const incoming = Array.isArray(payload.data) ? payload.data : [];
+        setFeedState({
+          requestSearch,
+          status: 'ready',
+          items: incoming,
+          nextCursor:
+            payload.nextCursor != null && payload.hasMore !== false
+              ? String(payload.nextCursor)
+              : null,
+          hasMore: Boolean(payload.hasMore && payload.nextCursor != null),
+          error: false,
+        });
+      })
+      .catch(() => {
         if (alive) {
           setFeedState({
             requestSearch,
             status: 'ready',
-            items: Array.isArray(payload.data) ? payload.data : [],
+            items: [],
+            nextCursor: null,
+            hasMore: false,
+            error: true,
           });
-        }
-      })
-      .catch(() => {
-        if (alive) {
-          setFeedState({ requestSearch, status: 'ready', items: [] });
         }
       });
 
@@ -152,6 +196,74 @@ export default function ReelsFeedClient({ isId }: { isId: boolean }) {
       alive = false;
     };
   }, [requestSearch]);
+
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState(false);
+
+  useEffect(() => {
+    setLoadingMore(false);
+    setLoadMoreError(false);
+  }, [requestSearch]);
+
+  const loadMore = useCallback(async () => {
+    if (
+      feedState.requestSearch !== requestSearch ||
+      !activeFeed.nextCursor ||
+      !activeFeed.hasMore ||
+      loadingMore
+    ) {
+      return;
+    }
+
+    const cursor = activeFeed.nextCursor;
+    setLoadingMore(true);
+    setLoadMoreError(false);
+
+    try {
+      const params = new URLSearchParams(requestSearch);
+      params.set('cursor', cursor);
+      const response = await fetch(`/api/reels/feed?${params.toString()}`, {
+        cache: 'no-store',
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        data?: ReelItem[];
+        nextCursor?: string | number | null;
+        hasMore?: boolean;
+      };
+      if (!response.ok) throw new Error('reels_pagination_failed');
+
+      const incoming = Array.isArray(payload.data) ? payload.data : [];
+      setFeedState(current => {
+        if (current.requestSearch !== requestSearch) return current;
+        const seen = new Set(current.items.map(item => item.id));
+        const appended = incoming.filter(item => {
+          if (!item?.id || seen.has(item.id)) return false;
+          seen.add(item.id);
+          return true;
+        });
+        const returnedCursor =
+          payload.nextCursor != null && payload.hasMore !== false
+            ? String(payload.nextCursor)
+            : null;
+        return {
+          ...current,
+          items: [...current.items, ...appended],
+          nextCursor:
+            appended.length === 0 || returnedCursor === cursor
+              ? null
+              : returnedCursor,
+          hasMore:
+            appended.length > 0 &&
+            Boolean(returnedCursor && returnedCursor !== cursor),
+          error: false,
+        };
+      });
+    } catch {
+      setLoadMoreError(true);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [activeFeed.hasMore, activeFeed.nextCursor, feedState.requestSearch, loadingMore, requestSearch]);
 
   const submitFilters = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -396,6 +508,16 @@ export default function ReelsFeedClient({ isId }: { isId: boolean }) {
               })
             : null}
         </section>
+
+        {!loading && items.length > 0 ? (
+          <InfiniteScrollTrigger
+            hasMore={activeFeed.hasMore}
+            loading={loadingMore}
+            error={loadMoreError}
+            onLoadMore={loadMore}
+            isId={isId}
+          />
+        ) : null}
       </div>
     </main>
   );
