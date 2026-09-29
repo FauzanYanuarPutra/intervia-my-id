@@ -11,6 +11,7 @@ import {
   Users,
 } from 'lucide-react';
 
+import { EmblaInlineRail } from '@/components/common/EmblaInlineRail';
 import { LajukanImage } from '@/components/common/LajukanImage';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/components/system/feedback/ToastProvider';
@@ -200,30 +201,36 @@ export default function CommunityGroupDirectoryClient({
           </div>
 
           <nav
-            className="mt-3 flex gap-2 overflow-x-auto"
+            className="mt-3"
             aria-label={isId ? 'Filter grup' : 'Group filters'}
           >
-            {(
-              [
-                ['all', isId ? 'Semua' : 'All'],
-                ['joined', isId ? 'Sudah join' : 'Joined'],
-                ['recommended', isId ? 'Disarankan' : 'Recommended'],
-              ] as Array<[Scope, string]>
-            ).map(([nextScope, label]) => (
-              <button
-                key={nextScope}
-                type="button"
-                onClick={() => setScope(nextScope)}
-                className={cn(
-                  'inline-flex min-h-9 shrink-0 items-center rounded-full border px-3.5 text-xs font-bold transition',
-                  scope === nextScope
-                    ? 'border-[color:var(--app-accent)] bg-[color:var(--app-accent)] text-white'
-                    : 'border-[color:var(--app-border)] bg-white text-[color:var(--app-text-soft)] hover:border-[color:var(--app-accent-border)]',
-                )}
-              >
-                {label}
-              </button>
-            ))}
+            <EmblaInlineRail
+              className="rounded-[15px]"
+              contentClassName="items-center gap-2"
+              dragFree
+            >
+              {(
+                [
+                  ['all', isId ? 'Semua' : 'All'],
+                  ['joined', isId ? 'Sudah join' : 'Joined'],
+                  ['recommended', isId ? 'Disarankan' : 'Recommended'],
+                ] as Array<[Scope, string]>
+              ).map(([nextScope, label]) => (
+                <button
+                  key={nextScope}
+                  type="button"
+                  onClick={() => setScope(nextScope)}
+                  className={cn(
+                    'inline-flex min-h-9 shrink-0 items-center rounded-full border px-3.5 text-xs font-bold transition',
+                    scope === nextScope
+                      ? 'border-[color:var(--app-accent)] bg-[color:var(--app-accent)] text-white'
+                      : 'border-[color:var(--app-border)] bg-white text-[color:var(--app-text-soft)] hover:border-[color:var(--app-accent-border)]',
+                  )}
+                >
+                  {label}
+                  </button>
+              ))}
+            </EmblaInlineRail>
           </nav>
         </header>
 
