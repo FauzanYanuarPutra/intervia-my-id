@@ -4,6 +4,10 @@ import { useEffect, useMemo, useState } from 'react';
 import type { KeyboardEvent, MouseEvent } from 'react';
 import { ArrowUpRight } from 'lucide-react';
 import { Link, useRouter } from '@/i18n/navigation';
+import {
+  getUmkmPlaceKind,
+  type UmkmPlaceKind,
+} from '@/lib/super-app/umkm-place-ui';
 import { UMKM_DISCOVERY_PATH } from '@/lib/umkmSurface';
 import { UmkmStoreMap, type UmkmMapStore } from '@/components/super-app/UmkmStoreMap';
 
@@ -11,22 +15,40 @@ type HomeBusinessMapSectionProps = {
   locale: string;
 };
 
+type MapPointItem = {
+  id: string;
+  slug: string;
+  name: string;
+  city: string;
+  lat: number;
+  lng: number;
+  category: string;
+  source_kind: string;
+  metadata?: Record<string, unknown>;
+};
+
 type MapPointsResponse = {
   data?: {
-    items?: Array<{
-      id: string;
-      slug: string;
-      name: string;
-      city: string;
-      lat: number;
-      lng: number;
-      category: string;
-      source_kind: string;
-      metadata?: Record<string, unknown>;
-    }>;
+    items?: MapPointItem[];
+    total_count?: number;
   };
   error?: string;
 };
+
+const HOME_MAP_CATEGORY_LEGEND: Array<{
+  kind: UmkmPlaceKind;
+  labelId: string;
+  labelEn: string;
+  color: string;
+}> = [
+  { kind: 'food', labelId: 'Kuliner', labelEn: 'Food', color: '#d93025' },
+  { kind: 'retail', labelId: 'Toko', labelEn: 'Retail', color: '#2563eb' },
+  { kind: 'service', labelId: 'Jasa', labelEn: 'Services', color: '#7c3aed' },
+  { kind: 'craft', labelId: 'Kriya', labelEn: 'Craft', color: '#c2410c' },
+  { kind: 'agri', labelId: 'Agri', labelEn: 'Agri', color: '#059669' },
+  { kind: 'workshop', labelId: 'Bengkel', labelEn: 'Workshop', color: '#475569' },
+  { kind: 'general', labelId: 'Lainnya', labelEn: 'Other', color: '#0f766e' },
+];
 
 function normalizeStores(items: UmkmMapStore[]): UmkmMapStore[] {
   return items.filter(
@@ -57,12 +79,30 @@ export function summarizeHomeBusinessMapStores(stores: UmkmMapStore[]) {
       .map(city => city.toLocaleLowerCase('id-ID')),
   );
 
+  const categoryCounts = validStores.reduce<Record<UmkmPlaceKind, number>>(
+    (counts, store) => {
+      const kind = getUmkmPlaceKind(store);
+      counts[kind] += 1;
+      return counts;
+    },
+    {
+      food: 0,
+      retail: 0,
+      service: 0,
+      craft: 0,
+      agri: 0,
+      workshop: 0,
+      general: 0,
+    },
+  );
+
   return {
     validStores,
     businessCount: businesses.length,
     referenceCount: references.length,
     mappedCount: validStores.length,
     cityCount: cities.size,
+    categoryCounts,
   };
 }
 
@@ -75,6 +115,7 @@ export function HomeBusinessMapSection({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retryKey, setRetryKey] = useState(0);
+  const [totalMappedCount, setTotalMappedCount] = useState(0);
 
   const mapHref = `${UMKM_DISCOVERY_PATH}?view=map`;
 
@@ -84,11 +125,12 @@ export function HomeBusinessMapSection({
 
     async function load() {
       setLoading(true);
+      setTotalMappedCount(0);
       try {
         if (!active || controller.signal.aborted) return;
         setError(null);
         const response = await fetch(
-          '/api/super-app/umkm/map-points?limit=80&min_lat=-11&max_lat=6&min_lng=95&max_lng=141',
+          '/api/super-app/umkm/map-points?limit=2000&min_lat=-11&max_lat=6&min_lng=95&max_lng=141',
           {
             cache: 'default',
             credentials: 'include',
@@ -109,6 +151,11 @@ export function HomeBusinessMapSection({
         }
 
         if (!active) return;
+        setTotalMappedCount(
+          typeof payload.data.total_count === 'number'
+            ? payload.data.total_count
+            : payload.data.items.length,
+        );
         setStores(
           payload.data.items.map(item => ({
             id: item.id,
@@ -198,7 +245,21 @@ export function HomeBusinessMapSection({
                     ? `${summary.businessCount} usaha terpetakan`
                     : summary.referenceCount > 0
                       ? `${summary.referenceCount} referensi lokasi publik`
-                      : 'Belum ada titik'
+                      : error
+                        ? isId
+                          ? 'Data titik peta belum termuat'
+                          : 'Map point data unavailable'
+                        : summary.mappedCount > 0
+                          ? totalMappedCount > summary.mappedCount
+                            ? isId
+                              ? `${summary.mappedCount.toLocaleString('id-ID')} dari ${totalMappedCount.toLocaleString('id-ID')} titik`
+                              : `${summary.mappedCount.toLocaleString('en-US')} of ${totalMappedCount.toLocaleString('en-US')} points`
+                            : isId
+                              ? `${totalMappedCount.toLocaleString('id-ID')} titik terpetakan`
+                              : `${totalMappedCount.toLocaleString('en-US')} mapped points`
+                          : isId
+                            ? 'Belum ada lokasi terpetakan'
+                            : 'No mapped locations'
                 : summary.businessCount > 0 && summary.referenceCount > 0
                   ? `${summary.businessCount} businesses · ${summary.referenceCount} public references`
                   : summary.businessCount > 0
@@ -236,14 +297,15 @@ export function HomeBusinessMapSection({
           theme="default"
           focusMode="indonesia"
           showPopups={false}
+          markerStyle="dots"
           className="leaflet-home-map h-[126px] w-full sm:h-[140px]"
         />
 
         <div className="pointer-events-none absolute inset-x-2.5 bottom-2.5 z-10 flex items-center justify-between gap-2 sm:inset-x-3 sm:bottom-3">
           <span className="rounded-full border border-white/90 bg-white/92 px-2.5 py-1.5 text-[8px] font-black text-slate-700 shadow-sm backdrop-blur sm:text-[9px]">
             Indonesia
-            {!loading && summary.mappedCount > 0
-              ? ` · ${summary.mappedCount} titik`
+            {!loading && !error && totalMappedCount > 0
+              ? ` · ${totalMappedCount.toLocaleString('id-ID')} titik`
               : ''}
           </span>
           <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white shadow-[0_10px_24px_-12px_rgba(5,150,105,0.9)] transition-transform duration-200 group-hover/map:translate-x-0.5 group-hover/map:scale-105">
@@ -253,7 +315,7 @@ export function HomeBusinessMapSection({
 
 
         {error && !loading ? (
-          <div className="absolute inset-x-2 bottom-2.5 z-10 flex items-center gap-2 rounded-lg border border-rose-200/80 bg-white/95 px-2 py-1.5 shadow-sm backdrop-blur sm:inset-x-3">
+          <div className="absolute inset-x-2 top-2 z-10 flex items-center gap-2 rounded-lg border border-rose-200/80 bg-white/95 px-2 py-1.5 shadow-sm backdrop-blur sm:inset-x-3">
             <span className="min-w-0 flex-1 text-[8px] font-semibold text-rose-700 sm:text-[9px]">
               {error}
             </span>
@@ -264,6 +326,26 @@ export function HomeBusinessMapSection({
         ) : null}
 
       </div>
+      {!loading && !error && summary.mappedCount > 0 ? (
+        <div
+          className="flex items-center gap-1.5 overflow-x-auto px-2 py-1.5 sm:px-3"
+          aria-label={isId ? 'Legenda kategori peta' : 'Map category legend'}
+        >
+          {HOME_MAP_CATEGORY_LEGEND.filter(category => summary.categoryCounts[category.kind] > 0).map(category => {
+            const count = summary.categoryCounts[category.kind];
+            return (
+              <span
+                key={category.kind}
+                className="inline-flex shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-[8px] font-semibold text-slate-600 shadow-sm sm:text-[9px]"
+              >
+                <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: category.color }} aria-hidden="true" />
+                {isId ? category.labelId : category.labelEn}
+                <span className="font-black text-slate-900">{count.toLocaleString(isId ? 'id-ID' : 'en-US')}</span>
+              </span>
+            );
+          })}
+        </div>
+      ) : null
     </section>
   );
 }
