@@ -394,7 +394,7 @@ function listingManagementCategoryLabel(
 
 function listingSideFilterLabel(side: ListingSideFilter, locale: string): string {
   if (side === 'all') return locale === 'id' ? 'Semua' : 'All';
-  return getListingSideVerbLabel(side, locale === 'id' ? 'id' : 'en');
+  return getListingSideObjectLabel(side, locale === 'id' ? 'id' : 'en');
 }
 
 function normalizeManagementStatus(value: string): string {
@@ -1077,7 +1077,7 @@ export default function MyListingsPage() {
                       summary: item.summary,
                     });
                     const itemCategory = listingManagementCategoryId(item);
-                    const itemSideLabel = getListingSideVerbLabel(
+                    const itemSideLabel = getListingSideObjectLabel(
                       itemSide,
                       locale === 'id' ? 'id' : 'en',
                     );
