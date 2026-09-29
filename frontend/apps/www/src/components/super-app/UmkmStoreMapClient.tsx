@@ -1299,6 +1299,8 @@ function StoreDotsLayer({
   useMapEvents({ zoomend: () => setZoom(map.getZoom()) });
 
   const radius = getCompactDotRadius(zoom);
+  const renderDotTooltips =
+    interactive && storePresentations.length <= AUTO_DOT_RENDER_THRESHOLD;
 
   return (
     <>
@@ -1327,7 +1329,7 @@ function StoreDotsLayer({
                 : undefined
             }
           >
-            {interactive ? (
+            {renderDotTooltips ? (
               <Tooltip direction="top" offset={[0, -4]}>
                 {store.name} · {ui.kindLabel}
               </Tooltip>
