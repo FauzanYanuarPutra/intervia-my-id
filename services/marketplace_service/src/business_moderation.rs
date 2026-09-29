@@ -990,7 +990,11 @@ async fn review_crm_store_media(
 
     if let Err(error) = tx.commit().await {
         tracing::error!("review_crm_store_media commit error: {:?}", error);
-        return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to save media review").into_response();
+        return err(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to save media review",
+        )
+        .into_response();
     }
 
     if let Err(error) = sync_store_public_media_metadata(
