@@ -2732,6 +2732,12 @@ export default function ChatRoomPage() {
   const [messageActionPlacement, setMessageActionPlacement] = useState<
     'above' | 'below'
   >('above');
+  const [messageActionPosition, setMessageActionPosition] = useState({
+    top: 0,
+    left: 0,
+    maxHeight: 320,
+    ready: false,
+  });
   const {
     status: voiceNoteStatus,
     durationMs: voiceNoteDurationMs,
@@ -5100,16 +5106,17 @@ export default function ChatRoomPage() {
   const syncMessageActionPlacement = useCallback(
     (messageId: string) => {
       const menu = document.getElementById(`message-actions-${messageId}`);
-      const anchor = menu?.parentElement?.querySelector(
-        'button[aria-haspopup="menu"]',
-      ) as HTMLElement | null;
+      const anchor = document.getElementById(
+        `message-action-trigger-${messageId}`,
+      );
       if (!menu || !anchor) return;
 
       const anchorRect = anchor.getBoundingClientRect();
       const menuRect = menu.getBoundingClientRect();
-      const chatViewportRect = messagesViewportRef.current?.getBoundingClientRect();
+      const chatViewportRect =
+        messagesViewportRef.current?.getBoundingClientRect();
       const padding = 8;
-      const gap = 8;
+      const gap = 6;
       const topBoundary = Math.max(
         padding,
         chatViewportRect?.top ?? padding,
@@ -5129,26 +5136,69 @@ export default function ChatRoomPage() {
 
       const fitsAbove = menuRect.height <= availableAbove;
       const fitsBelow = menuRect.height <= availableBelow;
-
-      setMessageActionPlacement(
+      const placement =
         fitsAbove
           ? 'above'
           : fitsBelow
             ? 'below'
-            : availableBelow > availableAbove
+            : availableBelow >= availableAbove
               ? 'below'
-              : 'above',
+              : 'above';
+
+      const maxHeight = Math.max(
+        92,
+        placement === 'above' ? availableAbove : availableBelow,
       );
+
+      const leftRaw =
+        anchorRect.left + menuRect.width <= window.innerWidth - padding
+          ? anchorRect.left
+          : anchorRect.right - menuRect.width;
+      const left = Math.max(
+        padding,
+        Math.min(
+          leftRaw,
+          window.innerWidth - menuRect.width - padding,
+        ),
+      );
+
+      const topRaw =
+        placement === 'above'
+          ? anchorRect.top - menuRect.height - gap
+          : anchorRect.bottom + gap;
+      const top = Math.max(
+        topBoundary,
+        Math.min(
+          topRaw,
+          bottomBoundary - Math.min(menuRect.height, maxHeight),
+        ),
+      );
+
+      setMessageActionPlacement(placement);
+      setMessageActionPosition({
+        top,
+        left,
+        maxHeight,
+        ready: true,
+      });
     },
     [],
   );
 
   useEffect(() => {
-    if (!openMessageActionsId) return;
+    if (!openMessageActionsId) {
+      setMessageActionPosition(current => ({ ...current, ready: false }));
+      return;
+    }
 
-    const sync = () => syncMessageActionPlacement(openMessageActionsId);
+    const sync = () => {
+      syncMessageActionPlacement(openMessageActionsId);
+      window.requestAnimationFrame(() => {
+        syncMessageActionPlacement(openMessageActionsId);
+      });
+    };
+
     const frame = window.requestAnimationFrame(sync);
-
     window.addEventListener('resize', sync);
     window.addEventListener('scroll', sync, true);
 
@@ -7504,18 +7554,23 @@ export default function ChatRoomPage() {
                             : 'sm:opacity-0 sm:group-hover/message:opacity-100 sm:group-focus-within/message:opacity-100'
                         } ${isOwn ? 'order-first' : 'order-last'}`}
                         onBlur={event => {
+                          const nextTarget = event.relatedTarget as Node | null;
+                          const portalMenu = document.getElementById(
+                            `message-actions-${msg.id}`,
+                          );
                           if (
-                            !event.currentTarget.contains(
-                              event.relatedTarget as Node | null,
-                            )
+                            event.currentTarget.contains(nextTarget) ||
+                            Boolean(nextTarget && portalMenu?.contains(nextTarget))
                           ) {
-                            setOpenMessageActionsId(current =>
-                              current === msg.id ? null : current,
-                            );
+                            return;
                           }
+                          setOpenMessageActionsId(current =>
+                            current === msg.id ? null : current,
+                          );
                         }}
                       >
                         <button
+                          id={`message-action-trigger-${msg.id}`}
                           type="button"
                           onClick={() =>
                             setOpenMessageActionsId(current =>
@@ -7527,7 +7582,7 @@ export default function ChatRoomPage() {
                               setOpenMessageActionsId(null);
                             }
                           }}
-                          className="inline-flex !min-h-0 h-[34px] w-[34px] items-center justify-center rounded-full border border-black/[0.08] bg-white/95 text-[#54656f] shadow-[0_1px_3px_rgba(17,27,33,0.18)] backdrop-blur-sm transition-[background-color,color,box-shadow,transform] duration-150 hover:bg-[#f0f2f5] hover:text-[#008f72] active:scale-[0.96] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#25d366]/35 focus-visible:ring-offset-1 focus-visible:ring-offset-white dark:border-white/[0.10] dark:bg-[#202c33]/96 dark:text-[#aebac1] dark:shadow-[0_1px_3px_rgba(0,0,0,0.28)] dark:hover:bg-[#2a3942] dark:hover:text-[#25d366] dark:focus-visible:ring-offset-[#111b21] sm:h-9 sm:w-9"
+                          className="inline-flex !min-h-0 h-[30px] w-[30px] items-center justify-center rounded-full border border-black/[0.08] bg-white/95 text-[#54656f] shadow-[0_1px_3px_rgba(17,27,33,0.18)] backdrop-blur-sm transition-[background-color,color,box-shadow,transform] duration-150 hover:bg-[#f0f2f5] hover:text-[#008f72] active:scale-[0.96] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#25d366]/35 focus-visible:ring-offset-1 focus-visible:ring-offset-white dark:border-white/[0.10] dark:bg-[#202c33]/96 dark:text-[#aebac1] dark:shadow-[0_1px_3px_rgba(0,0,0,0.28)] dark:hover:bg-[#2a3942] dark:hover:text-[#25d366] dark:focus-visible:ring-offset-[#111b21] sm:h-8 sm:w-8"
                           title={
                             chatLocale === 'id'
                               ? 'Aksi pesan'
@@ -7545,34 +7600,67 @@ export default function ChatRoomPage() {
                           <ChevronDown className="h-4 w-4" />
                         </button>
 
-                        {openMessageActionsId === msg.id ? (
-                          <motion.div
-                            id={`message-actions-${msg.id}`}
-                            role="menu"
-                            aria-orientation="vertical"
-                            initial={reduceMotion ? false : { opacity: 0, scale: 0.96, y: 5 }}
-                            animate={
-                              reduceMotion
-                                ? undefined
-                                : {
-                                    opacity: 1,
-                                    scale: 1,
-                                    y: 0,
-                                    transition: { duration: 0.12, ease: 'easeOut' },
-                                  }
-                            }
-                            style={{ transformOrigin: isOwn ? 'bottom left' : 'bottom right' }}
-                            className={`absolute bottom-full z-50 mb-2 w-[184px] max-w-[calc(100vw-1.25rem)] overflow-hidden rounded-[14px] border border-black/[0.08] bg-white/[0.98] p-1 shadow-[0_10px_34px_rgba(17,27,33,0.22),0_2px_8px_rgba(17,27,33,0.10)] backdrop-blur-xl dark:border-white/[0.08] dark:bg-[#233138]/[0.98] dark:shadow-[0_12px_36px_rgba(0,0,0,0.42)] ${isOwn ? 'left-0' : 'right-0'}`}
-                          >
+                        {openMessageActionsId === msg.id &&
+                          typeof document !== 'undefined'
+                          ? createPortal(
+                              <motion.div
+                                id={`message-actions-${msg.id}`}
+                                role="menu"
+                                aria-orientation="vertical"
+                                initial={
+                                  reduceMotion
+                                    ? false
+                                    : {
+                                        opacity: 0,
+                                        scale: 0.96,
+                                        y:
+                                          messageActionPlacement === 'above'
+                                            ? 4
+                                            : -4,
+                                      }
+                                }
+                                animate={
+                                  reduceMotion
+                                    ? undefined
+                                    : {
+                                        opacity: 1,
+                                        scale: 1,
+                                        y: 0,
+                                        transition: {
+                                          duration: 0.1,
+                                          ease: 'easeOut',
+                                        },
+                                      }
+                                }
+                                onMouseDown={event => event.stopPropagation()}
+                                style={{
+                                  position: 'fixed',
+                                  top: messageActionPosition.top,
+                                  left: messageActionPosition.left,
+                                  maxHeight: messageActionPosition.maxHeight,
+                                  transformOrigin:
+                                    messageActionPlacement === 'above'
+                                      ? isOwn
+                                        ? 'bottom left'
+                                        : 'bottom right'
+                                      : isOwn
+                                        ? 'top left'
+                                        : 'top right',
+                                  visibility: messageActionPosition.ready
+                                    ? 'visible'
+                                    : 'hidden',
+                                }}
+                                className="z-[2147482000] w-[164px] max-w-[calc(100vw-16px)] overflow-y-auto overscroll-contain rounded-[12px] border border-black/[0.08] bg-white/[0.98] p-0.5 shadow-[0_8px_26px_rgba(17,27,33,0.20),0_2px_7px_rgba(17,27,33,0.08)] backdrop-blur-xl [scrollbar-width:thin] dark:border-white/[0.08] dark:bg-[#233138]/[0.98] dark:shadow-[0_10px_30px_rgba(0,0,0,0.40)]"
+                              >
                             {isOwn && status === 'failed' ? (
                               <button
                                 type="button"
                                 role="menuitem"
                                 onClick={() => handleRetryMessage(msg)}
                                 disabled={sending}
-                                className="flex min-h-10 w-full items-center gap-3 rounded-[10px] px-3 text-left text-[13px] font-semibold text-[#008f72] transition-[background-color,color] duration-150 hover:bg-[#f0f2f5] focus:bg-[#f0f2f5] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#25d366]/25 disabled:cursor-not-allowed disabled:opacity-50 dark:text-[#25d366] dark:hover:bg-[#2a3942] dark:focus:bg-[#2a3942]"
+                                className="flex min-h-8 w-full items-center gap-2 rounded-[9px] px-2.5 text-left text-[11.5px] font-semibold text-[#008f72] transition-[background-color,color] duration-150 hover:bg-[#f0f2f5] focus:bg-[#f0f2f5] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#25d366]/25 disabled:cursor-not-allowed disabled:opacity-50 dark:text-[#25d366] dark:hover:bg-[#2a3942] dark:focus:bg-[#2a3942]"
                               >
-                                <Send className="h-[17px] w-[17px] shrink-0" aria-hidden="true" />
+                                <Send className="h-4 w-4 shrink-0" aria-hidden="true" />
                                 {chatLocale === 'id'
                                   ? 'Kirim ulang'
                                   : 'Send again'}
@@ -7585,9 +7673,9 @@ export default function ChatRoomPage() {
                                 setOpenMessageActionsId(null);
                                 handleReplyToMessage(msg);
                               }}
-                              className="flex min-h-10 w-full items-center gap-3 rounded-[10px] px-3 text-left text-[13px] font-medium text-[#111b21] transition-[background-color,color] duration-150 hover:bg-[#f0f2f5] focus:bg-[#f0f2f5] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#25d366]/20 dark:text-[#e9edef] dark:hover:bg-[#2a3942] dark:focus:bg-[#2a3942]"
+                              className="flex min-h-8 w-full items-center gap-2 rounded-[9px] px-2.5 text-left text-[11.5px] font-medium text-[#111b21] transition-[background-color,color] duration-150 hover:bg-[#f0f2f5] focus:bg-[#f0f2f5] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#25d366]/20 dark:text-[#e9edef] dark:hover:bg-[#2a3942] dark:focus:bg-[#2a3942]"
                             >
-                              <Reply className="h-[17px] w-[17px] shrink-0" aria-hidden="true" />
+                              <Reply className="h-4 w-4 shrink-0" aria-hidden="true" />
                               {chatLocale === 'id' ? 'Balas' : 'Reply'}
                             </button>
                             <button
@@ -7597,9 +7685,9 @@ export default function ChatRoomPage() {
                                 setOpenMessageActionsId(null);
                                 handleQuoteMessage(msg);
                               }}
-                              className="flex min-h-10 w-full items-center gap-3 rounded-[10px] px-3 text-left text-[13px] font-medium text-[#111b21] transition-[background-color,color] duration-150 hover:bg-[#f0f2f5] focus:bg-[#f0f2f5] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#25d366]/20 dark:text-[#e9edef] dark:hover:bg-[#2a3942] dark:focus:bg-[#2a3942]"
+                              className="flex min-h-8 w-full items-center gap-2 rounded-[9px] px-2.5 text-left text-[11.5px] font-medium text-[#111b21] transition-[background-color,color] duration-150 hover:bg-[#f0f2f5] focus:bg-[#f0f2f5] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#25d366]/20 dark:text-[#e9edef] dark:hover:bg-[#2a3942] dark:focus:bg-[#2a3942]"
                             >
-                              <Quote className="h-[17px] w-[17px] shrink-0" aria-hidden="true" />
+                              <Quote className="h-4 w-4 shrink-0" aria-hidden="true" />
                               {chatLocale === 'id' ? 'Kutip' : 'Quote'}
                             </button>
                             <button
@@ -7609,13 +7697,15 @@ export default function ChatRoomPage() {
                                 setOpenMessageActionsId(null);
                                 void handleCopyMessage(msg);
                               }}
-                              className="flex min-h-10 w-full items-center gap-3 rounded-[10px] px-3 text-left text-[13px] font-medium text-[#111b21] transition-[background-color,color] duration-150 hover:bg-[#f0f2f5] focus:bg-[#f0f2f5] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#25d366]/20 dark:text-[#e9edef] dark:hover:bg-[#2a3942] dark:focus:bg-[#2a3942]"
+                              className="flex min-h-8 w-full items-center gap-2 rounded-[9px] px-2.5 text-left text-[11.5px] font-medium text-[#111b21] transition-[background-color,color] duration-150 hover:bg-[#f0f2f5] focus:bg-[#f0f2f5] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#25d366]/20 dark:text-[#e9edef] dark:hover:bg-[#2a3942] dark:focus:bg-[#2a3942]"
                             >
-                              <Copy className="h-[17px] w-[17px] shrink-0" aria-hidden="true" />
+                              <Copy className="h-4 w-4 shrink-0" aria-hidden="true" />
                               {chatLocale === 'id' ? 'Salin' : 'Copy'}
                             </button>
-                          </motion.div>
-                        ) : null}
+                              </motion.div>,
+                              document.body,
+                            )
+                          : null}
                       </div>
                     );
 
