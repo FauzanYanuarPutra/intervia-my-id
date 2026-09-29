@@ -167,7 +167,7 @@ export async function generateMetadata({
   const item = await fetchJobContent(slug);
 
   if (!item) {
-    return { title: 'Job Not Found | Lajukan' };
+    return { title: 'Job Not Found | Lajukan', robots: { index: false, follow: true } };
   }
 
   const job = mapToJobDetail(item);
