@@ -1943,8 +1943,18 @@ export function UmkmDiscoveryPanel({
 
   const handleSelectStore = useCallback(
     (storeId: string, options?: { scrollToPreview?: boolean }) => {
-      const store = visibleStores.find(item => item.store.id === storeId)?.store;
+      const store =
+        visibleStores.find(item => item.store.id === storeId)?.store ||
+        mapPoints.find(item => item.id === storeId) ||
+        null;
       if (!store) return;
+
+      if (!visibleStores.some(item => item.store.id === storeId)) {
+        setStores(current => {
+          if (current.some(item => item.id === storeId)) return current;
+          return [...current, store as DiscoveryStore];
+        });
+      }
 
       pendingScrollStoreIdRef.current = options?.scrollToPreview
         ? storeId
@@ -1984,7 +1994,7 @@ export function UmkmDiscoveryPanel({
         }
       }
     },
-    [variant, visibleStores],
+    [mapPoints, variant, visibleStores],
   );
 
   const handleClearSelectedStore = useCallback(() => {
