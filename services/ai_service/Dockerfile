@@ -89,7 +89,7 @@ HEALTHCHECK \
     --timeout=5s \
     --start-period=10s \
     --retries=5 \
-    CMD curl -fsS http://localhost:8080/health || exit 1
+    CMD curl -fsS http://localhost:8080/ready || exit 1
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 
