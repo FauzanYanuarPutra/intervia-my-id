@@ -4508,7 +4508,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
             ? [
                 {
                   id: 'requests',
-                  label: isId ? 'Yang Saya Butuhkan' : 'My Needs',
+                  label: isId ? 'Kebutuhan Saya' : 'My Needs',
                   caption: isId ? 'Kebutuhan pembeli aktif' : 'Active buyer needs',
                   href: '/my-projects',
                   icon: ClipboardList,
@@ -4631,7 +4631,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
             ? [
                 {
                   id: 'requests',
-                  label: isId ? 'Yang Saya Butuhkan' : 'My Needs',
+                  label: isId ? 'Kebutuhan Saya' : 'My Needs',
                   caption: isId ? 'Login untuk akses' : 'Login to access',
                   href: '/login',
                   icon: ClipboardList,
