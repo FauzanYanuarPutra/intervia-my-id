@@ -2883,8 +2883,8 @@ function RecommendationCard({
           >
             {isDemand
               ? isId
-                ? 'Kebutuhan usaha'
-                : 'Business request'
+                ? 'Kebutuhan pembeli'
+                : 'Buyer need'
               : isId
                 ? 'Listing Lajukan'
                 : 'Lajukan listing'}
@@ -3576,7 +3576,7 @@ function RightRail({
     },
     {
       id: 'requests',
-      label: isId ? 'Kebutuhan aktif' : 'Active requests',
+      label: isId ? 'Kebutuhan pembeli aktif' : 'Active buyer needs',
       value: resolveCountLabel(summary?.requests?.active, '0'),
       icon: ClipboardList,
       tone: 'bg-amber-50 text-amber-700 ring-amber-100 dark:bg-amber-950/40 dark:text-amber-200 dark:ring-amber-900/60',
