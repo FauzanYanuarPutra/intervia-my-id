@@ -65,6 +65,50 @@ pub struct ListCrmBusinessReferencesQuery {
     pub offset: Option<i64>,
 }
 
+#[derive(Debug, Deserialize, Default)]
+pub struct ListCrmStoreMediaQuery {
+    pub status: Option<String>,
+    pub store_id: Option<Uuid>,
+    pub q: Option<String>,
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateStoreMediaContributionRequest {
+    pub media_url: String,
+    #[serde(default = "default_store_media_type")]
+    pub media_type: String,
+    pub caption: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ReviewStoreMediaRequest {
+    pub action: String,
+    pub note: Option<String>,
+    #[serde(default)]
+    pub set_primary: bool,
+    pub placement: Option<String>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct PublicStoreMediaRow {
+    pub id: Uuid,
+    pub store_id: Uuid,
+    pub media_url: String,
+    pub media_type: String,
+    pub caption: Option<String>,
+    pub uploader_user_id: Uuid,
+    pub uploader_name: Option<String>,
+    pub uploader_username: Option<String>,
+    pub is_primary: bool,
+    pub created_at: DateTime<Utc>,
+}
+
+fn default_store_media_type() -> String {
+    "image".to_string()
+}
+
 #[derive(Debug, Serialize, Clone)]
 pub struct CrmBusinessRow {
     /// The moderation identity is the legacy/public-store UUID. Keep this stable because
@@ -446,6 +490,15 @@ pub(crate) fn router() -> Router<Arc<AppState>> {
             "/v1/crm/businesses/{id}/verification/review",
             post(review_business_verification),
         )
+        .route("/v1/crm/store-media", get(list_crm_store_media))
+        .route(
+            "/v1/crm/store-media/{media_id}/review",
+            post(review_crm_store_media),
+        )
+        .route(
+            "/v1/umkm/stores/{store_ref}/media/contributions",
+            get(list_public_store_media).post(create_store_media_contribution),
+        )
         .route(
             "/v1/crm/appeals/{appeal_id}/review",
             post(review_business_appeal),
@@ -472,6 +525,537 @@ pub(crate) fn router() -> Router<Arc<AppState>> {
             "/v1/umkm/stores/{store_ref}/verification/request",
             post(request_business_verification),
         )
+}
+
+
+async fn list_public_store_media(
+    State(state): State<Arc<AppState>>,
+    Path(store_ref): Path<String>,
+) -> impl IntoResponse {
+    let store = match find_public_umkm_store_row(&state.db, store_ref.trim()).await {
+        Ok(Some(store)) => store,
+        Ok(None) => return err(StatusCode::NOT_FOUND, "store not found").into_response(),
+        Err(error) => {
+            tracing::error!("list_public_store_media store lookup error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load store").into_response();
+        }
+    };
+
+    let rows = match sqlx::query(
+        r#"
+        SELECT
+          id, store_id, media_url, media_type, caption, uploader_user_id,
+          uploader_name_snapshot, uploader_username_snapshot, is_primary, created_at
+        FROM umkm_store_media_contributions
+        WHERE store_id = $1
+          AND status = 'approved'
+        ORDER BY is_primary DESC, created_at DESC, id ASC
+        LIMIT 24
+        "#,
+    )
+    .bind(store.id)
+    .fetch_all(&state.db)
+    .await
+    {
+        Ok(rows) => rows,
+        Err(error) => {
+            tracing::error!("list_public_store_media query error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load store media")
+                .into_response();
+        }
+    };
+
+    let items = rows
+        .into_iter()
+        .map(|row| PublicStoreMediaRow {
+            id: row.get("id"),
+            store_id: row.get("store_id"),
+            media_url: row.get("media_url"),
+            media_type: row.get("media_type"),
+            caption: row.get("caption"),
+            uploader_user_id: row.get("uploader_user_id"),
+            uploader_name: row.get("uploader_name_snapshot"),
+            uploader_username: row.get("uploader_username_snapshot"),
+            is_primary: row.get("is_primary"),
+            created_at: row.get("created_at"),
+        })
+        .collect::<Vec<_>>();
+
+    (StatusCode::OK, Json(json!({ "items": items, "count": items.len() }))).into_response()
+}
+
+async fn create_store_media_contribution(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(store_ref): Path<String>,
+    Json(payload): Json<CreateStoreMediaContributionRequest>,
+) -> impl IntoResponse {
+    let actor_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(value) => value,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+
+    let store = match find_public_umkm_store_row(&state.db, store_ref.trim()).await {
+        Ok(Some(store)) => store,
+        Ok(None) => return err(StatusCode::NOT_FOUND, "store not found").into_response(),
+        Err(error) => {
+            tracing::error!("create_store_media_contribution store lookup error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load store").into_response();
+        }
+    };
+
+    if !store.is_active {
+        return err(StatusCode::NOT_FOUND, "store not available").into_response();
+    }
+
+    let media_url = payload.media_url.trim().to_string();
+    if !valid_store_media_url(&media_url) {
+        return err(StatusCode::BAD_REQUEST, "invalid media url").into_response();
+    }
+
+    let media_type = payload.media_type.trim().to_ascii_lowercase();
+    if !matches!(media_type.as_str(), "image" | "video") {
+        return err(StatusCode::BAD_REQUEST, "unsupported media type").into_response();
+    }
+
+    let caption = payload.caption
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| value.chars().take(500).collect::<String>());
+
+    let recent_count: i64 = match sqlx::query_scalar(
+        r#"
+        SELECT COUNT(*)::bigint
+        FROM umkm_store_media_contributions
+        WHERE uploader_user_id = $1
+          AND created_at >= NOW() - interval '24 hours'
+          AND status <> 'rejected'
+        "#,
+    )
+    .bind(actor_id)
+    .fetch_one(&state.db)
+    .await
+    {
+        Ok(value) => value,
+        Err(error) => {
+            tracing::error!("create_store_media_contribution quota error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to validate media quota")
+                .into_response();
+        }
+    };
+
+    if recent_count >= 30 {
+        return err(
+            StatusCode::TOO_MANY_REQUESTS,
+            "too many media contributions; try again later",
+        )
+        .into_response();
+    }
+
+    let identity = sqlx::query(
+        r#"
+        SELECT full_name, username
+        FROM users_read_model
+        WHERE user_id = $1
+        "#,
+    )
+    .bind(actor_id)
+    .fetch_optional(&state.db)
+    .await;
+
+    let (uploader_name, uploader_username) = match identity {
+        Ok(Some(row)) => (
+            row.get::<Option<String>, _>("full_name"),
+            row.get::<Option<String>, _>("username"),
+        ),
+        Ok(None) => (None, None),
+        Err(error) => {
+            tracing::error!("create_store_media_contribution identity error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load contributor")
+                .into_response();
+        }
+    };
+
+    let row = match sqlx::query(
+        r#"
+        INSERT INTO umkm_store_media_contributions (
+          store_id, uploader_user_id, media_url, media_type, caption,
+          uploader_name_snapshot, uploader_username_snapshot, status
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
+        ON CONFLICT (store_id, media_url)
+        DO UPDATE SET
+          caption = COALESCE(EXCLUDED.caption, umkm_store_media_contributions.caption),
+          updated_at = NOW()
+        RETURNING
+          id, store_id, media_url, media_type, caption, uploader_user_id,
+          uploader_name_snapshot, uploader_username_snapshot, is_primary, created_at
+        "#,
+    )
+    .bind(store.id)
+    .bind(actor_id)
+    .bind(&media_url)
+    .bind(&media_type)
+    .bind(&caption)
+    .bind(&uploader_name)
+    .bind(&uploader_username)
+    .fetch_one(&state.db)
+    .await
+    {
+        Ok(row) => row,
+        Err(error) => {
+            tracing::error!("create_store_media_contribution insert error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to submit media")
+                .into_response();
+        }
+    };
+
+    let item = PublicStoreMediaRow {
+        id: row.get("id"),
+        store_id: row.get("store_id"),
+        media_url: row.get("media_url"),
+        media_type: row.get("media_type"),
+        caption: row.get("caption"),
+        uploader_user_id: row.get("uploader_user_id"),
+        uploader_name: row.get("uploader_name_snapshot"),
+        uploader_username: row.get("uploader_username_snapshot"),
+        is_primary: row.get("is_primary"),
+        created_at: row.get("created_at"),
+    };
+
+    (StatusCode::CREATED, Json(json!({
+        "item": item,
+        "status": "pending",
+        "message": "Media submitted for review."
+    }))).into_response()
+}
+
+async fn list_crm_store_media(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<ListCrmStoreMediaQuery>,
+) -> impl IntoResponse {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+        Some(value) => value,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    if !has_business_read_access(&claims) {
+        return err(StatusCode::FORBIDDEN, "business media read permission required").into_response();
+    }
+
+    let status = normalize_text(query.status, 20)
+        .filter(|value| !value.eq_ignore_ascii_case("all"))
+        .unwrap_or_else(|| "pending".to_string());
+    let q = normalize_text(query.q, BUSINESS_MAX_QUERY_LEN);
+    let limit = query.limit.unwrap_or(50).clamp(1, BUSINESS_MAX_LIMIT);
+    let offset = query.offset.unwrap_or(0).max(0);
+
+    let rows = match sqlx::query(
+        r#"
+        SELECT
+          m.id, m.store_id, s.name AS store_name, s.city,
+          m.media_url, m.media_type, m.caption, m.uploader_user_id,
+          m.uploader_name_snapshot, m.uploader_username_snapshot,
+          m.status, m.is_primary, m.review_note, m.reviewed_by, m.reviewed_at,
+          m.created_at
+        FROM umkm_store_media_contributions m
+        JOIN umkm_stores s ON s.id = m.store_id
+        WHERE ($1::text IS NULL OR m.status = $1)
+          AND ($2::uuid IS NULL OR m.store_id = $2)
+          AND (
+            $3::text IS NULL OR
+            s.name ILIKE '%' || $3 || '%' OR
+            s.city ILIKE '%' || $3 || '%' OR
+            COALESCE(m.uploader_name_snapshot, '') ILIKE '%' || $3 || '%' OR
+            COALESCE(m.uploader_username_snapshot, '') ILIKE '%' || $3 || '%'
+          )
+        ORDER BY m.created_at ASC, m.id ASC
+        LIMIT $4 OFFSET $5
+        "#,
+    )
+    .bind(&status)
+    .bind(query.store_id)
+    .bind(&q)
+    .bind(limit)
+    .bind(offset)
+    .fetch_all(&state.db)
+    .await
+    {
+        Ok(rows) => rows,
+        Err(error) => {
+            tracing::error!("list_crm_store_media query error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load media queue")
+                .into_response();
+        }
+    };
+
+    let items = rows.into_iter().map(|row| json!({
+        "id": row.get::<Uuid, _>("id"),
+        "store_id": row.get::<Uuid, _>("store_id"),
+        "store_name": row.get::<String, _>("store_name"),
+        "city": row.get::<String, _>("city"),
+        "media_url": row.get::<String, _>("media_url"),
+        "media_type": row.get::<String, _>("media_type"),
+        "caption": row.get::<Option<String>, _>("caption"),
+        "uploader_user_id": row.get::<Uuid, _>("uploader_user_id"),
+        "uploader_name": row.get::<Option<String>, _>("uploader_name_snapshot"),
+        "uploader_username": row.get::<Option<String>, _>("uploader_username_snapshot"),
+        "status": row.get::<String, _>("status"),
+        "is_primary": row.get::<bool, _>("is_primary"),
+        "review_note": row.get::<Option<String>, _>("review_note"),
+        "reviewed_by": row.get::<Option<Uuid>, _>("reviewed_by"),
+        "reviewed_at": row.get::<Option<DateTime<Utc>>, _>("reviewed_at"),
+        "created_at": row.get::<DateTime<Utc>, _>("created_at"),
+    })).collect::<Vec<_>>();
+
+    (StatusCode::OK, Json(json!({
+        "items": items,
+        "count": items.len(),
+        "limit": limit,
+        "offset": offset,
+        "has_more": items.len() as i64 == limit
+    }))).into_response()
+}
+
+async fn review_crm_store_media(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(media_id): Path<Uuid>,
+    Json(payload): Json<ReviewStoreMediaRequest>,
+) -> impl IntoResponse {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+        Some(value) => value,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    if !has_business_moderation_access(&claims) {
+        return err(StatusCode::FORBIDDEN, "business media moderation permission required")
+            .into_response();
+    }
+
+    let action = payload.action.trim().to_ascii_lowercase();
+    if !matches!(action.as_str(), "approve" | "reject" | "hide") {
+        return err(StatusCode::BAD_REQUEST, "unsupported media review action").into_response();
+    }
+
+    let placement = payload.placement
+        .as_deref()
+        .unwrap_or("gallery")
+        .trim()
+        .to_ascii_lowercase();
+    if !matches!(placement.as_str(), "gallery" | "cover" | "logo") {
+        return err(StatusCode::BAD_REQUEST, "unsupported media placement").into_response();
+    }
+
+    let note = payload.note
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| value.chars().take(BUSINESS_MAX_REASON_LEN).collect::<String>());
+
+    let mut tx = match state.db.begin().await {
+        Ok(tx) => tx,
+        Err(error) => {
+            tracing::error!("review_crm_store_media begin tx error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to review media").into_response();
+        }
+    };
+
+    let row = match sqlx::query(
+        r#"
+        SELECT id, store_id, media_url, media_type
+        FROM umkm_store_media_contributions
+        WHERE id = $1
+        FOR UPDATE
+        "#,
+    )
+    .bind(media_id)
+    .fetch_optional(&mut *tx)
+    .await
+    {
+        Ok(Some(row)) => row,
+        Ok(None) => return err(StatusCode::NOT_FOUND, "media contribution not found").into_response(),
+        Err(error) => {
+            tracing::error!("review_crm_store_media load error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load media").into_response();
+        }
+    };
+
+    let store_id: Uuid = row.get("store_id");
+    let media_url: String = row.get("media_url");
+
+    if payload.set_primary && action == "approve" {
+        sqlx::query(
+            r#"
+            UPDATE umkm_store_media_contributions
+            SET is_primary = FALSE, updated_at = NOW()
+            WHERE store_id = $1
+            "#,
+        )
+        .bind(store_id)
+        .execute(&mut *tx)
+        .await
+        .ok();
+    }
+
+    let new_status = if action == "approve" { "approved" } else if action == "reject" { "rejected" } else { "hidden" };
+    sqlx::query(
+        r#"
+        UPDATE umkm_store_media_contributions
+        SET status = $2,
+            is_primary = CASE WHEN $2 = 'approved' THEN ($3 AND $4) ELSE FALSE END,
+            review_note = $5,
+            reviewed_by = $6,
+            reviewed_at = NOW(),
+            updated_at = NOW()
+        WHERE id = $1
+        "#,
+    )
+    .bind(media_id)
+    .bind(new_status)
+    .bind(action == "approve")
+    .bind(payload.set_primary)
+    .bind(&note)
+    .bind(user_id_from_auth(&headers, &state.jwt_secret))
+    .execute(&mut *tx)
+    .await
+    .map_err(|error| {
+        tracing::error!("review_crm_store_media update error: {:?}", error);
+        error
+    })
+    .ok();
+
+    if let Err(error) = tx.commit().await {
+        tracing::error!("review_crm_store_media commit error: {:?}", error);
+        return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to save media review").into_response();
+    }
+
+    if let Err(error) = sync_store_public_media_metadata(&state.db, store_id, Some((&media_url, &placement, action == "approve"))).await {
+        tracing::error!("review_crm_store_media metadata sync error: {:?}", error);
+        return err(StatusCode::INTERNAL_SERVER_ERROR, "media reviewed but public projection sync failed").into_response();
+    }
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "ok": true,
+            "id": media_id,
+            "store_id": store_id,
+            "status": new_status,
+            "placement": placement
+        })),
+    ).into_response()
+}
+
+async fn sync_store_public_media_metadata(
+    db: &sqlx::PgPool,
+    store_id: Uuid,
+    placement: Option<(&str, &str, bool)>,
+) -> Result<(), sqlx::Error> {
+    let current_metadata: Value = sqlx::query_scalar(
+        "SELECT metadata FROM umkm_stores WHERE id = $1"
+    )
+    .bind(store_id)
+    .fetch_one(db)
+    .await?;
+
+    let mut metadata = current_metadata;
+    let mut owner_gallery = metadata
+        .get("gallery_media")
+        .and_then(Value::as_array)
+        .map(|values| {
+            values.iter().filter_map(Value::as_str).map(str::to_owned).collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+
+    let rows = sqlx::query(
+        r#"
+        SELECT id, media_url, media_type, caption, uploader_user_id,
+               uploader_name_snapshot, uploader_username_snapshot, is_primary, created_at
+        FROM umkm_store_media_contributions
+        WHERE store_id = $1 AND status = 'approved'
+        ORDER BY is_primary DESC, created_at DESC, id ASC
+        LIMIT 24
+        "#,
+    )
+    .bind(store_id)
+    .fetch_all(db)
+    .await?;
+
+    let mut items = Vec::with_capacity(rows.len());
+    let mut approved_urls = Vec::with_capacity(rows.len());
+    let mut primary_url: Option<String> = None;
+    for row in rows {
+        let url: String = row.get("media_url");
+        if !owner_gallery.iter().any(|item| item == &url) {
+            approved_urls.push(url.clone());
+        }
+        let is_primary: bool = row.get("is_primary");
+        if is_primary && primary_url.is_none() {
+            primary_url = Some(url.clone());
+        }
+        items.push(json!({
+            "id": row.get::<Uuid, _>("id"),
+            "url": url,
+            "media_type": row.get::<String, _>("media_type"),
+            "caption": row.get::<Option<String>, _>("caption"),
+            "uploader_user_id": row.get::<Uuid, _>("uploader_user_id"),
+            "uploader_name": row.get::<Option<String>, _>("uploader_name_snapshot"),
+            "uploader_username": row.get::<Option<String>, _>("uploader_username_snapshot"),
+            "is_primary": is_primary,
+            "created_at": row.get::<DateTime<Utc>, _>("created_at"),
+        }));
+    }
+
+    owner_gallery.extend(approved_urls);
+    owner_gallery.truncate(24);
+
+    let mut object = metadata.as_object_mut().cloned().unwrap_or_default();
+    object.insert("gallery_media".to_string(), json!(owner_gallery));
+    object.insert("gallery_media_items".to_string(), Value::Array(items));
+    if let Some(primary) = primary_url {
+        object.insert("gallery_media_primary".to_string(), json!(primary));
+    } else {
+        object.remove("gallery_media_primary");
+    }
+
+    if let Some((media_url, placement, approved)) = placement {
+        if approved {
+            match placement {
+                "cover" => {
+                    object.insert("store_photo_url".to_string(), json!(media_url));
+                    object.insert("cover_image_url".to_string(), json!(media_url));
+                    object.insert("cover_url".to_string(), json!(media_url));
+                }
+                "logo" => {
+                    object.insert("logo_url".to_string(), json!(media_url));
+                    object.insert("image_url".to_string(), json!(media_url));
+                }
+                _ => {}
+            }
+        }
+    }
+
+    sqlx::query("UPDATE umkm_stores SET metadata = $2, updated_at = NOW() WHERE id = $1")
+        .bind(store_id)
+        .bind(Value::Object(object))
+        .execute(db)
+        .await?;
+
+    Ok(())
+}
+
+fn valid_store_media_url(value: &str) -> bool {
+    if value.is_empty() || value.len() > 2048 {
+        return false;
+    }
+    let Some(filename) = value.strip_prefix("/api/forum/media/") else {
+        return false;
+    };
+    !filename.is_empty()
+        && filename.len() <= 200
+        && filename.chars().next().is_some_and(|value| value.is_ascii_alphanumeric())
+        && filename.chars().all(|value| value.is_ascii_alphanumeric() || matches!(value, '.' | '_' | '-'))
 }
 
 async fn list_crm_business_references(
