@@ -182,6 +182,7 @@ export default async function NewsIndexPage({ params, searchParams }: PageProps)
             locale={locale}
             category={category}
             query={query}
+            fallbackHref={buildNewsIndexHref({ category, query, cursor: nextCursor || undefined })}
           />
         </section>
       ) : null}
