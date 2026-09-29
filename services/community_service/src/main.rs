@@ -6051,7 +6051,7 @@ async fn list_reels_feed(
     let store = clean_optional(query.store);
     let city = clean_optional(query.city);
 
-    let rows = sqlx::query_as::<_, ReelRow>(
+    let mut rows = sqlx::query_as::<_, ReelRow>(
         r#"
         SELECT
           r.id, r.creator_user_id,
