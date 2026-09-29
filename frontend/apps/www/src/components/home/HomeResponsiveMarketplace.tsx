@@ -2336,7 +2336,7 @@ function RecommendationsLoadingSkeleton({
       aria-label={
         demand
           ? isId
-            ? 'Memuat kebutuhan yang sedang dipublikasikan'
+            ? 'Memuat kebutuhan pembeli yang dipublikasikan'
             : 'Loading current requests'
           : isId
             ? 'Memuat rekomendasi listing'
@@ -2450,7 +2450,7 @@ function HomeListingCarouselSection({
             <p className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400 sm:text-[11px]">
               {isDemand
                 ? isId
-                  ? 'Belum ada kebutuhan aktif yang bisa ditampilkan.'
+                  ? 'Belum ada kebutuhan pembeli aktif yang bisa ditampilkan.'
                   : 'No active requests to show right now.'
                 : isId
                   ? 'Belum ada penawaran aktif di Lajukan saat ini.'
@@ -4499,7 +4499,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
                 {
                   id: 'requests',
                   label: isId ? 'Yang Saya Butuhkan' : 'My Needs',
-                  caption: isId ? 'Kebutuhan aktif' : 'Active briefs and needs',
+                  caption: isId ? 'Kebutuhan pembeli aktif' : 'Active buyer needs',
                   href: '/my-projects',
                   icon: ClipboardList,
                 },
