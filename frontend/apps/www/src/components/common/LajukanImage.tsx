@@ -40,6 +40,9 @@ function shouldBypassOptimizer(src: ImageProps['src'] | null | undefined) {
   // intentionally routed through Next's Image Optimizer so the browser can
   // receive AVIF/WebP at the requested dimensions instead of the original file.
   if (/^data:|^blob:/i.test(src)) return true;
+  // Chat media is authenticated and must never be fetched by the public
+  // optimizer without the viewer's room authorization context.
+  if (src.startsWith('/api/chat/media/')) return true;
   if (src.startsWith('/')) return false;
   if (/^https?:\/\//i.test(src)) return !isOptimizableRemoteUrl(src);
 
