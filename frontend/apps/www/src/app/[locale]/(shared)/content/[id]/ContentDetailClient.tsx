@@ -4036,15 +4036,38 @@ export default function ContentDetailClient({
                 : 'Chat provider';
 
   const actionButtons = publicReference ? (
-    <a
-      href={publicReference.sourceUrl}
-      target="_blank"
-      rel="noreferrer"
-      className={detailPrimaryButtonClass}
-    >
-      <ExternalLink className="mr-2 h-4 w-4" />
-      {locale === 'id' ? 'Buka sumber asli' : 'Open original source'}
-    </a>
+    <div className="grid w-full gap-2 lg:grid-cols-1">
+      {publicReference.sourceContactUrl ? (
+        <a
+          href={publicReference.sourceContactUrl}
+          target="_blank"
+          rel="noreferrer"
+          className={detailPrimaryButtonClass}
+        >
+          <MessageCircle className="mr-2 h-4 w-4" />
+          {locale === 'id'
+            ? publicReference.sourceContactType === 'whatsapp'
+              ? 'Hubungi via WhatsApp'
+              : 'Hubungi sumber'
+            : publicReference.sourceContactType === 'whatsapp'
+              ? 'Contact via WhatsApp'
+              : 'Contact source'}
+        </a>
+      ) : null}
+      <a
+        href={publicReference.sourceUrl}
+        target="_blank"
+        rel="noreferrer"
+        className={
+          publicReference.sourceContactUrl
+            ? detailSecondaryButtonClass
+            : detailPrimaryButtonClass
+        }
+      >
+        <ExternalLink className="mr-2 h-4 w-4" />
+        {locale === 'id' ? 'Buka sumber asli' : 'Open original source'}
+      </a>
+    </div>
   ) : (
     <div className="grid w-full grid-cols-2 gap-2 lg:grid-cols-1 [&>*:only-child]:col-span-2 lg:[&>*:only-child]:col-span-1">
       {isOwner && (
