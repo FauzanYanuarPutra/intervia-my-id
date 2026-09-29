@@ -863,7 +863,7 @@ export default function MyListingsPage() {
     const pageDescription =
       locale === 'id'
         ? 'Kelola semua yang kamu tawarkan dan yang sedang kamu cari.'
-        : 'Manage everything you offer and everything you are looking for.';
+        : 'Manage all your offers and buyer needs.';
     const closeDetails = (target: EventTarget & HTMLElement) => {
       target.closest('details')?.removeAttribute('open');
     };
