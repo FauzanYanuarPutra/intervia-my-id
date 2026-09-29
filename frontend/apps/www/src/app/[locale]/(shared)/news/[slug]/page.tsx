@@ -164,7 +164,7 @@ export default async function NewsArticlePage({ params }: PageProps) {
         <Link
           href="/news"
           data-news-action="news_home_clicked"
-          className="text-emerald-700 transition hover:text-emerald-800 hover:underline dark:text-emerald-300"
+          className="!min-h-[0px] text-emerald-700 transition hover:text-emerald-800 hover:underline dark:text-emerald-300"
         >
           Lajukan News
         </Link>
