@@ -2217,8 +2217,8 @@ function HomeListingCarouselSection({
       aria-label={
         isDemand
           ? isId
-            ? 'Kebutuhan'
-            : 'Active needs'
+            ? 'Kebutuhan pembeli'
+            : 'Buyer needs'
           : isId
             ? 'Penawaran untuk usahamu'
             : 'Offers for your business'
@@ -2244,11 +2244,11 @@ function HomeListingCarouselSection({
         <span className="hidden shrink-0 text-[9px] font-medium text-zinc-400 sm:inline">
           {isDemand
             ? isId
-              ? 'Permintaan yang sedang dicari'
-              : 'Requests currently being sought'
+              ? 'Permintaan pembeli yang sedang dicari'
+              : 'Buyer requests currently being sought'
             : isId
-              ? 'Produk, jasa, lokasi & sewa'
-              : 'Products, services, places & rentals'}
+              ? 'Produk, jasa, lokasi & sewa yang tersedia'
+              : 'Available products, services, places & rentals'}
         </span>
 
         <Link
@@ -2901,7 +2901,7 @@ function RecommendationCard({
           {/* SIDE */}
           {item.side ? (
             <span
-              title={getListingSideVerbLabel(item.side, isId ? 'id' : 'en')}
+              title={getListingSideObjectLabel(item.side, isId ? 'id' : 'en')}
               className={cn(
                 'max-w-[42%] shrink-0 truncate rounded-full px-2 py-1 text-[8px] font-bold leading-none sm:max-w-[45%] sm:text-[9px]',
                 isDemand
@@ -2909,7 +2909,7 @@ function RecommendationCard({
                   : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-900 dark:text-zinc-300',
               )}
             >
-              {getListingSideVerbLabel(item.side, isId ? 'id' : 'en')}
+              {getListingSideObjectLabel(item.side, isId ? 'id' : 'en')}
             </span>
           ) : null}
         </div>
