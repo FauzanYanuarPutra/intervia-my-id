@@ -70,13 +70,13 @@ export default async function NewsLocationPage({ params, searchParams }: Props) 
       {items.length ? (
         <>
           <NewsInfiniteGrid
-          initialItems={items}
+            initialItems={items}
           initialNextCursor={nextCursor}
           locale={locale}
           location={value}
           fallbackHref={`/news/location/${encodeURIComponent(value)}?cursor=${encodeURIComponent(nextCursor || '')}`}
-        />
-        {nextCursor ? (
+          />
+          {nextCursor ? (
           <a
             href={`/news/location/${encodeURIComponent(value)}?cursor=${encodeURIComponent(nextCursor)}`}
             rel="next"
@@ -87,7 +87,7 @@ export default async function NewsLocationPage({ params, searchParams }: Props) 
           ) : null}
         </>
       ) : (
-        <div className="rounded-[26px" border border-dashed border-slate-300 p-8 text-center text-sm font-semibold text-slate-500 dark:border-white/15">
+        <div className="rounded-[26px] border border-dashed border-slate-300 p-8 text-center text-sm font-semibold text-slate-500 dark:border-white/15">
                     {isId ? 'Belum ada berita untuk wilayah ini.' : 'No news for this location yet.'}
         </div>
       )}
