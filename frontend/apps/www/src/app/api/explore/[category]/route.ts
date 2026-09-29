@@ -43,6 +43,12 @@ function asArray(value: unknown): JsonRecord[] {
     : [];
 }
 
+function readString(value: unknown): string {
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  return '';
+}
+
 function forwardedHeaders(req: NextRequest): Headers {
   const headers = new Headers();
   const cookie = req.headers.get('cookie');
