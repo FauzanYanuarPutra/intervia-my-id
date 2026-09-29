@@ -1660,7 +1660,7 @@ export function UmkmDiscoveryPanel({
         category !== 'all' &&
         !matchesUmkmDiscoveryCategory(
           {
-            kind: 'unknown',
+            kind: 'general',
             name: point.name,
             description: point.description,
             address: point.address,
@@ -1671,7 +1671,14 @@ export function UmkmDiscoveryPanel({
       ) {
         continue;
       }
-      if (!merged.has(point.id)) merged.set(point.id, point);
+      if (!merged.has(point.id)) {
+        merged.set(point.id, {
+          ...point,
+          description: point.description ?? null,
+          phone: point.phone ?? null,
+          metadata: point.metadata ?? {},
+        });
+      }
     }
     return Array.from(merged.values());
   }, [category, discoveryScope, mapPoints, visibleStores]);
