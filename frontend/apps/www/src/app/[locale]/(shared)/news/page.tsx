@@ -62,6 +62,14 @@ export default async function NewsIndexPage({ params, searchParams }: PageProps)
   const sliderItems = items.slice(0, 6);
   const grid = items.slice(sliderItems.length);
 
+  const nextNewsHref = nextCursor
+    ? `/news?${new URLSearchParams({
+        ...(category ? { category } : {}),
+        ...(query ? { q: query } : {}),
+        cursor: nextCursor,
+      }).toString()}`
+    : null;
+
   return (
     <main className="page-shell page-shell-wide page-rhythm min-w-0 overflow-x-clip pb-12 pt-3 sm:pt-5">
       <section className="min-w-0 overflow-hidden rounded-[24px] border border-emerald-100/80 bg-[linear-gradient(135deg,#effcf5_0%,#ffffff_48%,#fffaf1_100%)] shadow-[0_28px_70px_-58px_rgba(15,23,42,0.35)] dark:border-white/10 dark:bg-[linear-gradient(135deg,#06261b_0%,#0f172a_62%,#1c1917_100%)]">
@@ -162,6 +170,16 @@ export default async function NewsIndexPage({ params, searchParams }: PageProps)
           eyebrow={isId ? 'Lebih banyak' : 'More stories'}
           title={isId ? 'Berita terbaru lainnya' : 'More from Lajukan News'}
         />
+      ) : null}
+      {nextNewsHref ? (
+        <Link
+          href={nextNewsHref}
+          rel="next"
+          className="sr-only"
+          aria-label={isId ? 'Berita berikutnya' : 'Next news page'}
+        >
+          {isId ? 'Berita berikutnya' : 'Next news page'}
+        </Link>
       ) : null}
     </main>
   );
