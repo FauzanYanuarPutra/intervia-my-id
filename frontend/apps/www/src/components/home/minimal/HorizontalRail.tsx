@@ -51,7 +51,7 @@ export function HorizontalRail({
     if (!railApi) return;
 
     railApi.reInit();
-    syncRailState();
+    const frame = window.requestAnimationFrame(syncRailState);
 
     const onSelect = () => syncRailState();
     const onReInit = () => syncRailState();
@@ -60,6 +60,7 @@ export function HorizontalRail({
     railApi.on('reInit', onReInit);
 
     return () => {
+      window.cancelAnimationFrame(frame);
       railApi.off('select', onSelect);
       railApi.off('reInit', onReInit);
     };

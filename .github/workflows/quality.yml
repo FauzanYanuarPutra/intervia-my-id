@@ -221,7 +221,7 @@ jobs:
           assert "'market_side', 'reference'" in sql
           assert "reference_subtype" in sql
           assert "aggregate_data" in sql
-          assert "owner_id = NULL" in sql
+          assert "NULL, 'profile', slug, name" in sql
           assert "INSERT INTO users_read_model" not in sql
           assert "owner_id, content_type, slug, title" in sql
           print("real-data SQL generation contract passed")

@@ -107,7 +107,6 @@ export default function HomeUmkmCard({
   isId: boolean;
 }) {
   const { store, ui } = item;
-  const CategoryIcon = getPlaceIcon(ui.kind);
   const isPublicReference = isUmkmMapPublicReference(store);
   const metadata =
     store.metadata &&
@@ -194,7 +193,10 @@ export default function HomeUmkmCard({
                   toneClass(ui.markerTone),
                 )}
               >
-                <CategoryIcon className="h-6 w-6" aria-hidden="true" />
+                {(() => {
+                  const Icon = getPlaceIcon(ui.kind);
+                  return <Icon className="h-6 w-6" aria-hidden="true" />;
+                })()}
               </span>
               <span className="text-[10px] font-black tracking-tight text-slate-700">
                 {ui.kindLabel}
