@@ -11561,6 +11561,26 @@ async fn list_map_places(
               'product', 'service', 'material', 'tool_rental',
               'property', 'business_transfer', 'request', 'auction', 'tender'
             )
+            AND NOT EXISTS (
+              SELECT 1
+              FROM umkm_stores existing_store
+              WHERE existing_store.is_active = TRUE
+                AND existing_store.owner_user_id = c.owner_id
+                AND public.lajukan_safe_map_coordinate(existing_store.lat::text) =
+                    public.lajukan_safe_map_coordinate(
+                      COALESCE(
+                        NULLIF(c.metadata->>'latitude', ''),
+                        NULLIF(c.metadata->>'lat', '')
+                      )
+                    )
+                AND public.lajukan_safe_map_coordinate(existing_store.lng::text) =
+                    public.lajukan_safe_map_coordinate(
+                      COALESCE(
+                        NULLIF(c.metadata->>'longitude', ''),
+                        NULLIF(c.metadata->>'lng', '')
+                      )
+                    )
+            )
         ) places
         WHERE 1=1
         "#,
