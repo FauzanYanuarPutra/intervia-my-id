@@ -1432,7 +1432,7 @@ export function UmkmDiscoveryPanel({
         const response = await fetch(
           `/api/super-app/umkm/stores?${params.toString()}`,
           {
-            cache: 'no-store',
+            cache: 'default',
             credentials: 'include',
             signal: controller.signal,
           },
@@ -1549,7 +1549,7 @@ export function UmkmDiscoveryPanel({
     }
 
     void fetch(`/api/super-app/umkm/map-points?${params.toString()}`, {
-      cache: 'no-store',
+      cache: 'default',
       signal: controller.signal,
     })
       .then(async response => {
