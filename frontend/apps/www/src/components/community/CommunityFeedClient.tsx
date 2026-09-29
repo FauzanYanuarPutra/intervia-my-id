@@ -2157,7 +2157,7 @@ function CommunityFormattedBody({
     <div
       ref={contentRef}
       className={cn(
-        'space-y-2 break-words text-sm leading-6 text-[color:var(--app-text)]',
+        'space-y-2 break-words whitespace-pre-line text-sm leading-6 text-[color:var(--app-text)]',
         collapsed
           ? 'max-h-[9rem] overflow-hidden sm:max-h-[10.5rem]'
           : 'max-h-none',
@@ -2229,6 +2229,9 @@ export function CommunityPostCard({
   );
 
   const displayBody = poll ? poll.body : item.body;
+  const bodyHasPotentialOverflow =
+    displayBody.trim().length > 220 ||
+    displayBody.split(/\r?\n/).length > 4;
   const isQuestionPost = item.tags.some(tag =>
     /^(tanya|question|ask|help|support)$/i.test(tag.slug || tag.name),
   );
@@ -2241,12 +2244,15 @@ export function CommunityPostCard({
 
     const element = bodyContentRef.current;
     if (!element) {
-      setCanExpandBody(false);
+      setCanExpandBody(bodyHasPotentialOverflow);
       return;
     }
 
     const measure = () => {
-      setCanExpandBody(element.scrollHeight > element.clientHeight + 2);
+      setCanExpandBody(
+        element.scrollHeight > element.clientHeight + 2 ||
+          bodyHasPotentialOverflow,
+      );
     };
 
     measure();
@@ -2255,7 +2261,7 @@ export function CommunityPostCard({
     const observer = new ResizeObserver(measure);
     observer.observe(element);
     return () => observer.disconnect();
-  }, [bodyExpanded, displayBody]);
+  }, [bodyExpanded, bodyHasPotentialOverflow, displayBody]);
 
   const feedMediaItems = getFeedMediaItems(item);
   const safeMedia = feedMediaItems[0] || null;
@@ -3072,7 +3078,7 @@ export function CommunityPostCard({
               contentRef={bodyContentRef}
             />
 
-            {canExpandBody ? (
+            {canExpandBody || bodyHasPotentialOverflow ? (
               <button
                 type="button"
                 onClick={() => setBodyExpanded(current => !current)}
