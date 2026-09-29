@@ -43,6 +43,7 @@ import {
   type GlobalSearchSide,
   type GlobalSearchTab,
 } from '@/lib/search/globalSearch';
+import { getListingSideLabel } from '@/lib/content/listingSide';
 import { cn } from '@/lib/utils';
 
 function appendSearchParams(
@@ -1271,15 +1272,11 @@ export function ExploreAllSearchClient({
   }> = [
     {
       value: 'supply',
-      label: isId
-        ? 'Saya mencari'
-        : 'I am looking for',
+      label: getListingSideLabel('supply', isId ? 'id' : 'en'),
     },
     {
       value: 'demand',
-      label: isId
-        ? 'Saya menawarkan'
-        : 'I am offering',
+      label: getListingSideLabel('demand', isId ? 'id' : 'en'),
     },
     {
       value: 'people',
@@ -1331,7 +1328,7 @@ export function ExploreAllSearchClient({
         : searchSide ===
             'demand'
           ? isId
-            ? 'Cari produk, jasa, supplier, atau kebutuhan...'
+            ? 'Cari produk, jasa, supplier, atau kebutuhan pembeli...'
             : 'Search products, services, suppliers, or needs...'
           : isId
             ? 'Cari produk, jasa, supplier, atau mesin...'
@@ -1950,7 +1947,7 @@ export function ExploreAllSearchClient({
         <div className="space-y-3 overflow-y-auto pr-1">
           <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-300">
             {isId
-              ? 'Setiap bagian punya tujuan berbeda. Hasil penawaran dan kebutuhan bisa ditindaklanjuti di Lajukan, sedangkan data referensi publik bukan berarti penawaran Lajukan.'
+              ? 'Setiap bagian punya tujuan berbeda. Hasil penawaran dan kebutuhan pembeli bisa ditindaklanjuti di Lajukan, sedangkan data referensi publik bukan berarti penawaran Lajukan.'
               : 'Each section has a different purpose. Offers and needs can be acted on in Lajukan, while public references are not Lajukan offers.'}
           </p>
           <div className="space-y-2">

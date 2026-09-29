@@ -32,6 +32,7 @@ import {
   type ExploreHubIntent as HubIntent,
 } from '@/lib/discovery/exploreHubRoutes';
 import { cn } from '@/lib/utils';
+import { getListingSideLabel } from '@/lib/content/listingSide';
 
 type CategoryCardItem = {
   id: string;
@@ -178,7 +179,7 @@ export function ExploreHubPage({ locale, initialIntent = 'supply' }: { locale: L
                 {isId ? 'Cara kerja Jelajahi' : 'How Explore works'}
               </button>
               <p className="mt-2 max-w-[560px] text-[11px] font-medium leading-5 text-zinc-500 dark:text-zinc-400 sm:text-xs">{intent === 'demand' ? isId ? 'Lihat permintaan pembeli berdasarkan produk, jasa, kategori, dan lokasi.' : 'Browse buyer requests by product, service, category, and location.' : isId ? 'Lihat produk, jasa, supplier, mesin, dan lokasi yang tersedia untuk usahamu.' : 'Browse products, services, suppliers, equipment, and places available for your business.'}</p>
-              <ExploreModeTabs value={intent} options={[{ value: 'supply' as const, label: isId ? 'Cari penawaran' : 'Find offers', hint: isId ? 'Produk, jasa, supplier, mesin & lainnya' : 'Products, services, suppliers, equipment & more' },{ value: 'demand' as const, label: isId ? 'Cari kebutuhan pembeli' : 'Find buyer needs', hint: isId ? 'Permintaan aktif yang sedang dicari pembeli' : 'Active requests from buyers' }]} onChange={handleIntentChange} ariaLabel={isId ? 'Tujuan pencarian' : 'Search purpose'} className="mt-3 w-full max-w-[560px]" />
+              <ExploreModeTabs value={intent} options={[{ value: 'supply' as const, label: getListingSideLabel('supply', isId ? 'id' : 'en'), hint: isId ? 'Produk, jasa, supplier, mesin & lainnya' : 'Products, services, suppliers, equipment & more' },{ value: 'demand' as const, label: getListingSideLabel('demand', isId ? 'id' : 'en'), hint: isId ? 'Permintaan aktif dari pembeli' : 'Active buyer needs' }]} onChange={handleIntentChange} ariaLabel={isId ? 'Tujuan pencarian' : 'Search purpose'} className="mt-3 w-full max-w-[560px]" />
             </div>
             <div className="min-w-0">
               <form role="search" action={`/${locale}/explore`} method="get" onSubmit={event => { event.preventDefault(); const submitted = new FormData(event.currentTarget).get('q'); submitSearch(typeof submitted === 'string' ? submitted : query); }} className={cn('flex min-h-[50px] w-full min-w-0 items-center gap-2 rounded-[14px] border border-zinc-200 bg-zinc-50 p-1.5 pl-3','transition focus-within:border-emerald-300 focus-within:bg-white focus-within:ring-4 focus-within:ring-emerald-500/5','dark:border-zinc-800 dark:bg-zinc-900/75 dark:focus-within:border-emerald-800 dark:focus-within:bg-zinc-950','sm:min-h-[54px]')}>
@@ -235,7 +236,7 @@ export function ExploreHubPage({ locale, initialIntent = 'supply' }: { locale: L
 
         <section className="relative mt-3 overflow-hidden rounded-[18px] border border-emerald-100 bg-[linear-gradient(135deg,#ffffff_0%,#f7fff9_58%,#ecfdf5_100%)] shadow-[0_18px_38px_-32px_rgba(15,23,42,0.22)] sm:rounded-[22px] dark:border-emerald-900/50 dark:bg-[linear-gradient(135deg,#07120f_0%,#0b1b16_62%,#10251e_100%)]">
           <div className="relative z-10 grid min-w-0 grid-cols-1 px-4 pt-5 sm:min-h-[260px] sm:grid-cols-[minmax(0,0.82fr)_minmax(280px,1.18fr)] sm:items-center sm:gap-4 sm:px-5 sm:py-5 lg:min-h-[290px] lg:grid-cols-[minmax(0,0.78fr)_minmax(360px,1.22fr)] lg:gap-6 lg:px-7 lg:py-6">
-            <div className="relative z-20 min-w-0"><div className="inline-flex items-center gap-1.5 text-[10px] font-extrabold text-emerald-700 sm:text-[11px] dark:text-emerald-300"><span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />{intent === 'demand' ? isId ? 'Untuk penjual' : 'For sellers' : isId ? 'Belum menemukan yang pas?' : 'Still looking?'}</div><h2 className="mt-2 max-w-[540px] text-[18px] font-black leading-[1.15] tracking-[-0.025em] text-zinc-950 sm:text-xl lg:text-2xl dark:text-white">{intent === 'demand' ? isId ? 'Tampilkan produk atau jasamu ke calon pembeli' : 'Put your offer in front of potential buyers' : isId ? 'Pasang kebutuhan agar penyedia bisa menemukanmu' : 'Post your need so providers can find you'}</h2><p className="mt-2 max-w-[460px] text-[11px] font-medium leading-[17px] text-zinc-600 sm:text-xs sm:leading-5 dark:text-zinc-300">{intent === 'demand' ? isId ? 'Buat listing yang jelas agar calon pembeli mudah memahami penawaranmu.' : 'Create a clear listing so buyers can understand your offer.' : isId ? 'Jelaskan apa yang dibutuhkan, lokasi, dan detail penting supaya penawaran lebih relevan.' : 'Describe what you need, location, and key details for more relevant offers.'}</p><Link href={intent === 'demand' ? '/create?side=supply' : '/create?side=demand'} className={cn('group mt-4 inline-flex min-h-10 max-w-full items-center justify-center gap-2','rounded-[11px] border border-emerald-600 px-4 text-[11px] font-black','bg-emerald-600 text-white shadow-[0_14px_28px_-22px_rgba(5,150,105,0.75)] transition hover:bg-emerald-700','focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2','sm:min-h-11 sm:px-5 sm:text-xs')}><span className="truncate">{intent === 'demand' ? isId ? 'Pasang produk / jasa' : 'Post product / service' : isId ? 'Pasang kebutuhan' : 'Post a need'}</span><ArrowRight aria-hidden="true" className="h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5" /></Link></div>
+            <div className="relative z-20 min-w-0"><div className="inline-flex items-center gap-1.5 text-[10px] font-extrabold text-emerald-700 sm:text-[11px] dark:text-emerald-300"><span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />{intent === 'demand' ? isId ? 'Untuk penjual' : 'For sellers' : isId ? 'Belum menemukan yang pas?' : 'Still looking?'}</div><h2 className="mt-2 max-w-[540px] text-[18px] font-black leading-[1.15] tracking-[-0.025em] text-zinc-950 sm:text-xl lg:text-2xl dark:text-white">{intent === 'demand' ? isId ? 'Tampilkan produk atau jasamu ke calon pembeli' : 'Put your offer in front of potential buyers' : isId ? 'Pasang kebutuhan agar penyedia bisa menemukanmu' : 'Post your need so providers can find you'}</h2><p className="mt-2 max-w-[460px] text-[11px] font-medium leading-[17px] text-zinc-600 sm:text-xs sm:leading-5 dark:text-zinc-300">{intent === 'demand' ? isId ? 'Buat listing yang jelas agar calon pembeli mudah memahami penawaranmu.' : 'Create a clear listing so buyers can understand your offer.' : isId ? 'Jelaskan apa yang dibutuhkan, lokasi, dan detail penting supaya penawaran lebih relevan.' : 'Describe what you need, location, and key details for more relevant offers.'}</p><Link href={intent === 'demand' ? '/create?side=supply' : '/create?side=demand'} className={cn('group mt-4 inline-flex min-h-10 max-w-full items-center justify-center gap-2','rounded-[11px] border border-emerald-600 px-4 text-[11px] font-black','bg-emerald-600 text-white shadow-[0_14px_28px_-22px_rgba(5,150,105,0.75)] transition hover:bg-emerald-700','focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2','sm:min-h-11 sm:px-5 sm:text-xs')}><span className="truncate">{intent === 'demand' ? isId ? 'Pasang penawaran' : 'Post an offer' : isId ? 'Pasang kebutuhan pembeli' : 'Post a buyer need'}</span><ArrowRight aria-hidden="true" className="h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5" /></Link></div>
             <div aria-hidden="true" className="relative -mx-2 mt-2 h-[210px] min-w-0 sm:-mr-3 sm:mt-0 sm:h-full sm:min-h-[230px] lg:-mr-5 lg:min-h-[260px]"><Image src={ctaImage} alt="" fill sizes="(max-width: 639px) calc(100vw - 32px), (max-width: 1023px) 48vw, 520px" className="relative z-10 object-contain object-bottom drop-shadow-[0_18px_30px_rgba(16,185,129,0.16)] sm:object-right" /></div>
           </div>
         </section>
@@ -265,11 +266,11 @@ export function ExploreHubPage({ locale, initialIntent = 'supply' }: { locale: L
             </div>
             <div className="rounded-2xl border border-blue-200 bg-blue-50/70 p-3 dark:border-blue-900/60 dark:bg-blue-950/30">
               <p className="text-xs font-black text-blue-900 dark:text-blue-100">
-                {isId ? 'Kebutuhan' : 'Needs'}
+                {getListingSideLabel('demand', isId ? 'id' : 'en')}
               </p>
               <p className="mt-1.5 text-[11px] leading-5 text-blue-900/75 dark:text-blue-100/75">
                 {isId
-                  ? 'Untuk menemukan permintaan pembeli yang sedang mencari produk atau jasa.'
+                  ? 'Untuk menemukan kebutuhan pembeli yang sedang membutuhkan produk atau jasa.'
                   : 'Find active buyer requests for products or services.'}
               </p>
             </div>
@@ -279,7 +280,7 @@ export function ExploreHubPage({ locale, initialIntent = 'supply' }: { locale: L
               </p>
               <p className="mt-1.5 text-[11px] leading-5 text-zinc-600 dark:text-zinc-300">
                 {isId
-                  ? 'Tab seperti Produk, Jasa, Usaha, Kebutuhan, Video, Komunitas, dan Orang membantu mempersempit hasil.'
+                  ? 'Tab seperti Produk, Jasa, Usaha, Kebutuhan Pembeli, Video, Komunitas, dan Orang membantu mempersempit hasil.'
                   : 'Tabs such as Products, Services, Businesses, Needs, Videos, Communities, and Users help narrow results.'}
               </p>
             </div>

@@ -2349,7 +2349,7 @@ function RecommendationsLoadingSkeleton({
       aria-label={
         demand
           ? isId
-            ? 'Memuat kebutuhan yang sedang dipublikasikan'
+            ? 'Memuat kebutuhan pembeli yang dipublikasikan'
             : 'Loading current requests'
           : isId
             ? 'Memuat rekomendasi listing'
@@ -2414,8 +2414,8 @@ function HomeListingCarouselSection({
       aria-label={
         isDemand
           ? isId
-            ? 'Sedang mencari'
-            : 'People looking for it'
+            ? 'Kebutuhan pembeli'
+            : 'Buyer needs'
           : isId
             ? 'Yang tersedia'
             : 'Available now'
@@ -2431,18 +2431,18 @@ function HomeListingCarouselSection({
         <h2 className="min-w-0 truncate text-[11px] font-bold leading-5 tracking-tight text-[color:var(--app-text)] sm:text-xs">
           {isDemand
             ? isId
-              ? 'Sedang mencari penyedia'
-              : 'Looking for a provider'
+              ? 'Kebutuhan pembeli'
+              : 'Buyer needs'
             : isId
-              ? 'Sedang menawarkan'
-              : 'Currently offering'}
+              ? 'Penawaran'
+              : 'Offers'}
         </h2>
 
         <span className="hidden shrink-0 text-[9px] font-medium text-zinc-400 sm:inline">
           {isDemand
             ? isId
-              ? 'Pelaku usaha yang sedang mencari produk, jasa, atau penyedia'
-              : 'Businesses currently looking for products, services, or providers'
+              ? 'Pembeli yang membutuhkan produk, jasa, atau penyedia'
+              : 'Buyers who need products, services, or providers'
             : isId
               ? 'Produk, jasa, tempat, dan sewa yang sedang ditawarkan'
               : 'Products, services, places, and rentals currently offered'}
@@ -2463,7 +2463,7 @@ function HomeListingCarouselSection({
             <p className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400 sm:text-[11px]">
               {isDemand
                 ? isId
-                  ? 'Belum ada kebutuhan aktif yang bisa ditampilkan.'
+                  ? 'Belum ada kebutuhan pembeli aktif yang bisa ditampilkan.'
                   : 'No active requests to show right now.'
                 : isId
                   ? 'Belum ada penawaran aktif di Lajukan saat ini.'
@@ -4510,8 +4510,8 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
             ? [
                 {
                   id: 'requests',
-                  label: isId ? 'Yang Saya Butuhkan' : 'My Needs',
-                  caption: isId ? 'Kebutuhan aktif' : 'Active briefs and needs',
+                  label: isId ? 'Kebutuhan Saya' : 'My Needs',
+                  caption: isId ? 'Kebutuhan pembeli aktif' : 'Active buyer needs',
                   href: '/my-projects',
                   icon: ClipboardList,
                 },
@@ -4633,7 +4633,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
             ? [
                 {
                   id: 'requests',
-                  label: isId ? 'Yang Saya Butuhkan' : 'My Needs',
+                  label: isId ? 'Kebutuhan Saya' : 'My Needs',
                   caption: isId ? 'Login untuk akses' : 'Login to access',
                   href: '/login',
                   icon: ClipboardList,
