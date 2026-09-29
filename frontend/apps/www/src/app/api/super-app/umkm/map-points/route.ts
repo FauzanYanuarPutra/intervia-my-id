@@ -32,6 +32,7 @@ type MapPoint = {
   lng: number;
   category: string;
   source_kind: string;
+  metadata?: Record<string, unknown>;
 };
 
 export async function GET(req: NextRequest) {
