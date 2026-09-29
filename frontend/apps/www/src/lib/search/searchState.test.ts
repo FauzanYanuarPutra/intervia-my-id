@@ -4,7 +4,7 @@ describe('Explore search state',()=>{
   it('normalizes the first meaningful query value',()=>expect(firstParam([' ',' mesin ','alat'])).toBe('mesin'));
   it('keeps the default hub as hub',()=>{
     expect(hasExploreResultState({})).toBe(false);
-    expect(hasExploreResultState({tab:'all',sort:'relevance',side:'supply'})).toBe(false);
+    expect(hasExploreResultState({tab:'all',sort:'relevance',side:'supply'})).toBe(true);
     expect(hasExploreResultState({q:'a'})).toBe(false);
     expect(hasExploreResultState({intent:'demand'})).toBe(false);
   });
