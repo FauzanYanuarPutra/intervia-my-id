@@ -2220,11 +2220,11 @@ function HomeListingCarouselSection({
       aria-label={
         isDemand
           ? isId
-            ? 'Kebutuhan pembeli'
-            : 'Buyer needs'
+            ? 'Sedang dicari pembeli'
+            : 'Sought by buyers'
           : isId
-            ? 'Penawaran untuk usahamu'
-            : 'Offers for your business'
+            ? 'Tersedia untuk usahamu'
+            : 'Available for your business'
       }
     >
       <div className="flex min-w-0 items-center gap-1.5 px-2 sm:px-3 md:px-4 lg:px-6">
@@ -2237,21 +2237,21 @@ function HomeListingCarouselSection({
         <h2 className="min-w-0 truncate text-[11px] font-bold leading-5 tracking-tight text-[color:var(--app-text)] sm:text-xs">
           {isDemand
             ? isId
-              ? 'Kebutuhan'
-              : 'Needs'
+              ? 'Sedang dicari pembeli'
+              : 'Sought by buyers'
             : isId
-              ? 'Penawaran'
-              : 'Offers'}
+              ? 'Tersedia untuk usahamu'
+              : 'Available for your business'}
         </h2>
 
         <span className="hidden shrink-0 text-[9px] font-medium text-zinc-400 sm:inline">
           {isDemand
             ? isId
-              ? 'Permintaan pembeli yang sedang dicari'
-              : 'Buyer requests currently being sought'
+              ? 'Permintaan produk & jasa yang sedang aktif'
+              : 'Active product & service requests'
             : isId
               ? 'Produk, jasa, lokasi & sewa yang tersedia'
-              : 'Available products, services, places & rentals'}
+              : 'Products, services, places & rentals available'}
         </span>
 
         <Link
