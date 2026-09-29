@@ -905,8 +905,62 @@ async fn run_ai_endpoint(
 
     let mut warnings = Vec::<String>::new();
     let mut sources = request.sources.clone();
+    let mut tool_calls: Vec<ToolCallTrace> = Vec::new();
 
-    if request.use_rag.unwrap_or(false) && !state.config.rag_url.is_empty() {
+    if matches!(task, AiTask::Chat | AiTask::MarketplaceMatch) {
+        let intent = infer_marketplace_intent(&user_message);
+        if intent.should_search {
+            match state.tools.execute_marketplace_search(&intent).await {
+                Ok(execution) => {
+                    let tool_sources = execution
+                        .sources
+                        .into_iter()
+                        .map(|source| GroundingSource {
+                            id: source.id,
+                            title: source.title,
+                            content: source.content,
+                            url: source.url,
+                            kind: source.kind,
+                        })
+                        .collect::<Vec<_>>();
+                    dedupe_sources(&mut sources, &mut tool_sources.clone());
+                    sources.extend(tool_sources);
+                    tool_calls.extend(execution.traces);
+                }
+                Err(error) => {
+                    warnings.push(format!(
+                        "tool_search_listings_unavailable: {}",
+                        safe_error(&error, 180)
+                    ));
+                    tool_calls.push(ToolCallTrace {
+                        name: "search_listings".to_string(),
+                        status: "error".to_string(),
+                        result_count: 0,
+                        query: intent.normalized_query,
+                        side: intent.side.as_str().to_string(),
+                        category: intent.category,
+                        location: intent.location,
+                    });
+                }
+            }
+        }
+    }
+
+    let use_rag = request.use_rag.unwrap_or_else(|| {
+        !state.config.rag_url.is_empty()
+            && matches!(
+                task,
+                AiTask::Chat
+                    | AiTask::ListingDraft
+                    | AiTask::ListingImprove
+                    | AiTask::SearchIntent
+                    | AiTask::BusinessAdvisor
+                    | AiTask::MarketplaceMatch
+                    | AiTask::AnalyticsInsight
+            )
+    });
+
+    if use_rag && !state.config.rag_url.is_empty() {
         match retrieve_rag_sources(
             &state,
             task,
@@ -960,6 +1014,11 @@ async fn run_ai_endpoint(
         &state.config.vllm_vision_model
     } else if structured {
         &state.config.vllm_structured_model
+    } else if matches!(task, AiTask::Chat | AiTask::ChatReply)
+        && tool_calls.is_empty()
+        && user_message.chars().count() <= 240
+    {
+        &state.config.vllm_fast_model
     } else {
         &state.config.vllm_model
     };
@@ -1012,7 +1071,7 @@ async fn run_ai_endpoint(
         None
     };
 
-    let (response_text, data, needs_clarification, questions, confidence, mut output_warnings) =
+    let (response_text, mut data, needs_clarification, questions, mut confidence, mut output_warnings) =
         if let Some(parsed) = parsed {
             parse_response_envelope(parsed, &raw_content)
         } else if structured {
@@ -1037,6 +1096,13 @@ async fn run_ai_endpoint(
 
     warnings.append(&mut output_warnings);
 
+    let validation_warnings = validate_task_data(task, &mut data);
+    warnings.extend(validation_warnings);
+
+    if tool_calls.iter().any(|call| call.result_count == 0 && call.status == "success") {
+        confidence = confidence.min(0.5);
+    }
+
     let refs: Vec<SourceRef> = sources
         .iter()
         .take(12)
@@ -1059,6 +1125,12 @@ async fn run_ai_endpoint(
         "provider": "vllm",
         "grounded": !refs.is_empty(),
         "sources": refs,
+        "tool_calls": tool_calls,
+        "grounding": {
+            "source_count": sources.len(),
+            "tool_count": tool_calls.len(),
+            "rag_enabled": use_rag && !state.config.rag_url.is_empty(),
+        },
         "warnings": warnings,
         "needs_clarification": needs_clarification,
         "questions": questions,
