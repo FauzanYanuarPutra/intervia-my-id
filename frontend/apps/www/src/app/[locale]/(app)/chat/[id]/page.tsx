@@ -5107,15 +5107,24 @@ export default function ChatRoomPage() {
 
       const anchorRect = anchor.getBoundingClientRect();
       const menuRect = menu.getBoundingClientRect();
+      const chatViewportRect = messagesViewportRef.current?.getBoundingClientRect();
       const padding = 8;
       const gap = 8;
+      const topBoundary = Math.max(
+        padding,
+        chatViewportRect?.top ?? padding,
+      );
+      const bottomBoundary = Math.min(
+        window.innerHeight - padding,
+        chatViewportRect?.bottom ?? window.innerHeight - padding,
+      );
       const availableAbove = Math.max(
         0,
-        anchorRect.top - padding - gap,
+        anchorRect.top - topBoundary - gap,
       );
       const availableBelow = Math.max(
         0,
-        window.innerHeight - anchorRect.bottom - padding - gap,
+        bottomBoundary - anchorRect.bottom - gap,
       );
 
       const fitsAbove = menuRect.height <= availableAbove;
