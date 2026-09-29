@@ -388,7 +388,7 @@ function EmptyPrimarySection({
             ? isCommunity || isVideo
               ? 'Belum ada hasil yang cocok.'
               : mode === 'demand'
-                ? 'Belum ada kebutuhan yang cocok.'
+                ? 'Belum ada kebutuhan pembeli yang cocok.'
                 : 'Belum ada penawaran yang cocok.'
             : isCommunity || isVideo
               ? 'No matching results yet.'
@@ -404,8 +404,8 @@ function EmptyPrimarySection({
               : isCommunity
                 ? 'Buka Komunitas untuk melihat diskusi terbaru.'
                 : mode === 'demand'
-                  ? 'Belum menemukan kebutuhan yang cocok? Tawarkan produk atau jasamu.'
-                  : 'Belum menemukan penawaran yang cocok? Pasang kebutuhanmu agar penyedia dapat merespons.'
+                  ? 'Belum menemukan kebutuhan pembeli yang cocok? Tawarkan produk atau jasamu.'
+                  : 'Belum menemukan penawaran yang cocok? Pasang kebutuhan pembelimu agar penyedia dapat merespons.'
             : isVideo
               ? 'Open Videos to see the latest uploads.'
               : isCommunity
@@ -433,7 +433,7 @@ function EmptyPrimarySection({
               ? 'Buka Komunitas'
               : mode === 'demand'
                 ? 'Pasang penawaran'
-                : 'Pasang kebutuhan'
+                : 'Pasang kebutuhan pembeli'
           : isVideo
             ? 'Open Videos'
             : isCommunity
@@ -1795,16 +1795,16 @@ export function ExploreCategoryClient({
                     >
                       {searchSide === 'demand'
                         ? isId
-                          ? 'Mode cari kebutuhan pembeli'
+                          ? 'Mode kebutuhan pembeli'
                           : 'Find buyer needs mode'
                         : isId
-                          ? 'Mode cari penawaran'
+                          ? 'Mode penawaran'
                           : 'Find-offers mode'}
                     </p>
                     <p className="mt-0.5 text-[9px] font-medium leading-4 text-zinc-600 dark:text-zinc-400 sm:text-[10px]">
                       {searchSide === 'demand'
                         ? isId
-                          ? 'Di bawah hanya tampil kebutuhan pembeli yang sedang mencari produk, jasa, atau supplier.'
+                          ? 'Di bawah hanya tampil kebutuhan pembeli untuk produk, jasa, atau supplier.'
                           : 'Below you will only see buyer needs looking for products, services, or suppliers.'
                         : isId
                           ? 'Di bawah hanya tampil usaha, penyedia, produk, dan jasa yang sedang ditawarkan.'
