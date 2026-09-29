@@ -6639,6 +6639,7 @@ export default function CommunityFeedClient({
   const [loading, setLoading] = useState(true);
   const [feedError, setFeedError] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [feedScrollRoot, setFeedScrollRoot] = useState<HTMLElement | null>(null);
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const feedScopeKeyRef = useRef('');
   const [refreshKey, setRefreshKey] = useState(0);
@@ -7046,6 +7047,7 @@ export default function CommunityFeedClient({
           />
 
           <section
+            ref={setFeedScrollRoot}
             className="min-w-0 space-y-3 pt-2 lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:pr-1"
             data-auto-scrollbar
             data-community-feed-scroll
@@ -7254,6 +7256,7 @@ export default function CommunityFeedClient({
                 {hasMore ? (
                   <div className="flex flex-col items-center gap-2 py-2">
                     <InfiniteScrollSentinel
+                      root={feedScrollRoot}
                       hasMore
                       loading={loadingMore}
                       onLoadMore={loadMore}
