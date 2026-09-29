@@ -472,7 +472,7 @@ impl Config {
                 .trim()
                 .to_string(),
             vllm_kyc_model: non_empty_env("VLLM_KYC_MODEL").unwrap_or_else(|| vllm_model.clone()),
-            vllm_model,
+            vllm_model: vllm_model.clone(),
             vllm_fallback_model: non_empty_env("VLLM_FALLBACK_MODEL")
                 .or_else(|| non_empty_env("AI_FALLBACK_MODEL"))
                 .unwrap_or_else(|| "qwen3:4b".to_string()),
