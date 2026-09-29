@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import Image from 'next/image';
+import { LajukanImage } from '@/components/common/LajukanImage';
 import { Newspaper } from 'lucide-react';
 import type { LajukanNewsArticle } from '@/lib/news';
 import { normalizeNewsMediaUrl } from '@/lib/newsMediaUrl';
@@ -35,13 +35,13 @@ export function NewsMedia({
   return (
     <div className={'group relative overflow-hidden bg-slate-100 dark:bg-slate-800 ' + variantClass(variant) + ' ' + className}>
       {showImage ? (
-        <img
+        <LajukanImage
           src={coverUrl as string}
           alt={variant === 'thumb' ? '' : article.title}
+          fill
           className="h-full w-full object-cover object-center transition duration-500 group-hover:scale-[1.035]"
           loading={priority ? 'eager' : 'lazy'}
           fetchPriority={priority ? 'high' : 'auto'}
-          decoding="async"
           sizes={
             variant === 'thumb'
               ? '(max-width: 640px) 96px, 132px'
@@ -118,15 +118,18 @@ export function NewsArticleMedia({
   return (
     <figure className="overflow-hidden rounded-[24px] border border-slate-200 bg-slate-100 shadow-[0_18px_48px_-34px_rgba(15,23,42,0.34)] dark:border-white/10 dark:bg-slate-800">
       {showImage ? (
-        <img
-          src={coverUrl as string}
-          alt={article.title}
-          className="aspect-[16/9] w-full object-cover object-center"
-          loading="eager"
-          fetchPriority="high"
-          decoding="async"
-          onError={() => setFailed(true)}
-        />
+        <div className="relative aspect-[16/9] w-full">
+          <LajukanImage
+            src={coverUrl as string}
+            alt={article.title}
+            fill
+            sizes="(max-width: 1024px) 100vw, 1200px"
+            loading="eager"
+            fetchPriority="high"
+            className="object-cover object-center"
+            onError={() => setFailed(true)}
+          />
+        </div>
       ) : (
         <div className="flex min-h-48 items-center justify-between gap-5 bg-[linear-gradient(135deg,#ecfdf5_0%,#f8fafc_58%,#fff7ed_100%)] p-5 dark:bg-[linear-gradient(135deg,#06261b_0%,#0f172a_62%,#1c1917_100%)] sm:min-h-64 sm:p-8">
           <div className="min-w-0">
