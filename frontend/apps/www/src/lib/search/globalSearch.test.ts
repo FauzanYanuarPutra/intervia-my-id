@@ -78,7 +78,7 @@ describe('global search URL state', () => {
     expect(state.cursor).toBe('96');
     expect(state.offset).toBe(96);
     expect(serializeGlobalSearchState(state)).toBe(
-      'q=kemasan&side=supply&cursor=96&offset=96',
+      'q=kemasan&side=supply&cursor=96',
     );
   });
 
