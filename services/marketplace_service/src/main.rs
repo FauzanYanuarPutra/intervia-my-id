@@ -11304,23 +11304,35 @@ async fn list_map_places(
 ) -> impl IntoResponse {
     const MAX_LIMIT: i64 = 2000;
     let limit = query.limit.unwrap_or(1000).clamp(1, MAX_LIMIT);
-    let q = match clean_map_reference_filter(query.q, MAP_REFERENCE_MAX_QUERY_LEN, "invalid map places query") {
+    let q = match clean_map_reference_filter(
+        query.q,
+        MAP_REFERENCE_MAX_QUERY_LEN,
+        "invalid map places query",
+    ) {
         Ok(value) => value,
         Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
     };
-    let city = match clean_map_reference_filter(query.city, MAP_REFERENCE_MAX_CITY_LEN, "invalid map places city") {
+    let city = match clean_map_reference_filter(
+        query.city,
+        MAP_REFERENCE_MAX_CITY_LEN,
+        "invalid map places city",
+    ) {
         Ok(value) => value,
         Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
     };
     let category = clean_text(query.category).map(|v| make_slug(&v));
-    let bounds = match (
-        query.min_lat, query.max_lat, query.min_lng, query.max_lng
-    ) {
+    let bounds = match (query.min_lat, query.max_lat, query.min_lng, query.max_lng) {
         (Some(min_lat), Some(max_lat), Some(min_lng), Some(max_lng))
-            if min_lat.is_finite() && max_lat.is_finite() && min_lng.is_finite() && max_lng.is_finite()
-                && (-90.0..=90.0).contains(&min_lat) && (-90.0..=90.0).contains(&max_lat)
-                && (-180.0..=180.0).contains(&min_lng) && (-180.0..=180.0).contains(&max_lng)
-                && min_lat <= max_lat && min_lng <= max_lng =>
+            if min_lat.is_finite()
+                && max_lat.is_finite()
+                && min_lng.is_finite()
+                && max_lng.is_finite()
+                && (-90.0..=90.0).contains(&min_lat)
+                && (-90.0..=90.0).contains(&max_lat)
+                && (-180.0..=180.0).contains(&min_lng)
+                && (-180.0..=180.0).contains(&max_lng)
+                && min_lat <= max_lat
+                && min_lng <= max_lng =>
         {
             Some((min_lat, max_lat, min_lng, max_lng))
         }
@@ -11329,9 +11341,13 @@ async fn list_map_places(
     };
     let viewer = match (query.viewer_lat, query.viewer_lng) {
         (Some(lat), Some(lng))
-            if lat.is_finite() && lng.is_finite()
-                && (-90.0..=90.0).contains(&lat) && (-180.0..=180.0).contains(&lng) =>
-            Some((lat, lng)),
+            if lat.is_finite()
+                && lng.is_finite()
+                && (-90.0..=90.0).contains(&lat)
+                && (-180.0..=180.0).contains(&lng) =>
+        {
+            Some((lat, lng))
+        }
         (None, None) => None,
         _ => return err(StatusCode::BAD_REQUEST, "invalid viewer coordinates").into_response(),
     };
@@ -11433,25 +11449,39 @@ async fn list_map_places(
     );
 
     if let Some(value) = q.as_deref() {
-        statement.push(" AND lower(name || ' ' || COALESCE(city,'')) LIKE ")
+        statement
+            .push(" AND lower(name || ' ' || COALESCE(city,'')) LIKE ")
             .push_bind(format!("%{}%", escape_like_literal(&value.to_lowercase())))
             .push(" ESCAPE '\\'");
     }
     if let Some(value) = city.as_deref() {
-        statement.push(" AND lower(city) LIKE ")
+        statement
+            .push(" AND lower(city) LIKE ")
             .push_bind(format!("%{}%", escape_like_literal(&value.to_lowercase())))
             .push(" ESCAPE '\\'");
     }
     if let Some(value) = category.as_deref() {
         statement.push(" AND lower(category) = ").push_bind(value);
     }
-    if let Some((min_lat,max_lat,min_lng,max_lng)) = bounds {
-        statement.push(" AND lat BETWEEN ").push_bind(min_lat).push(" AND ").push_bind(max_lat)
-            .push(" AND lng BETWEEN ").push_bind(min_lng).push(" AND ").push_bind(max_lng);
+    if let Some((min_lat, max_lat, min_lng, max_lng)) = bounds {
+        statement
+            .push(" AND lat BETWEEN ")
+            .push_bind(min_lat)
+            .push(" AND ")
+            .push_bind(max_lat)
+            .push(" AND lng BETWEEN ")
+            .push_bind(min_lng)
+            .push(" AND ")
+            .push_bind(max_lng);
     }
     statement.push(" ORDER BY ");
-    if let Some((lat,lng)) = viewer {
-        statement.push("point(lng,lat) <-> point(").push_bind(lng).push(",").push_bind(lat).push(") ASC");
+    if let Some((lat, lng)) = viewer {
+        statement
+            .push("point(lng,lat) <-> point(")
+            .push_bind(lng)
+            .push(",")
+            .push_bind(lat)
+            .push(") ASC");
     } else {
         statement.push("category ASC, name ASC, id ASC");
     }
@@ -11459,23 +11489,34 @@ async fn list_map_places(
 
     match statement.build().fetch_all(&state.db).await {
         Ok(rows) => {
-            let items = rows.into_iter().filter_map(|row| {
-                Some(MapPlacePoint {
-                    id: row.try_get("id").ok()?,
-                    slug: row.try_get("slug").ok()?,
-                    name: row.try_get("name").ok()?,
-                    city: row.try_get("city").ok()?,
-                    lat: row.try_get("lat").ok()?,
-                    lng: row.try_get("lng").ok()?,
-                    category: row.try_get("category").ok()?,
-                    source_kind: row.try_get("source_kind").ok()?,
+            let items = rows
+                .into_iter()
+                .filter_map(|row| {
+                    Some(MapPlacePoint {
+                        id: row.try_get("id").ok()?,
+                        slug: row.try_get("slug").ok()?,
+                        name: row.try_get("name").ok()?,
+                        city: row.try_get("city").ok()?,
+                        lat: row.try_get("lat").ok()?,
+                        lng: row.try_get("lng").ok()?,
+                        category: row.try_get("category").ok()?,
+                        source_kind: row.try_get("source_kind").ok()?,
+                    })
                 })
-            }).collect::<Vec<_>>();
-            (StatusCode::OK, Json(json!({"items": items, "count": items.len()}))).into_response()
+                .collect::<Vec<_>>();
+            (
+                StatusCode::OK,
+                Json(json!({"items": items, "count": items.len()})),
+            )
+                .into_response()
         }
         Err(error) => {
             tracing::error!("list_map_places error: {:?}", error);
-            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load map places").into_response()
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load map places",
+            )
+            .into_response()
         }
     }
 }
