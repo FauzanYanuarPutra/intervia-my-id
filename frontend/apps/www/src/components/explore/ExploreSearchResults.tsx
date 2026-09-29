@@ -90,6 +90,10 @@ function PublicReferenceCard({ item, locale }: { item: GlobalSearchItem; locale:
   const sourceUrl = safeExternalHref(metadataText(item, 'sourceUrl'));
   const sourceLicense = metadataText(item, 'sourceLicense');
   const sourceLicenseUrl = safeExternalHref(metadataText(item, 'sourceLicenseUrl'));
+  const sourceContactUrl = safeExternalHref(
+    metadataText(item, 'sourceContactUrl'),
+  );
+  const sourceContactType = metadataText(item, 'sourceContactType');
   const imageAttribution = metadataText(item, 'imageAttribution');
   const imageSourceUrl = safeExternalHref(metadataText(item, 'imageSourceUrl'));
   const distanceKm = item.metadata.distanceKm;
@@ -97,7 +101,30 @@ function PublicReferenceCard({ item, locale }: { item: GlobalSearchItem; locale:
   return (
     <article data-testid="public-reference-card" className="flex h-full min-w-0 flex-col overflow-hidden rounded-[18px] border border-amber-200/80 bg-[color:var(--app-surface-strong)] dark:border-amber-900/60">
       <div className="relative"><Link href={item.href} className="block"><ExploreCardMedia src={item.image} alt={item.title} attribution={imageAttribution} sourceHref={imageSourceUrl || undefined} fallbackLabel={isId ? 'Lokasi usaha dari data publik' : 'Business location from public data'} className="aspect-[16/9] w-full" /></Link><span className="absolute left-2 top-2 inline-flex min-h-7 items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50/95 px-2.5 text-[10px] font-black text-amber-900"><Database className="h-3.5 w-3.5" aria-hidden="true" />{isId ? 'Data lokasi publik' : 'Public location data'}</span></div>
-      <div className="flex min-w-0 flex-1 flex-col p-3"><div className="flex min-w-0 items-center gap-2 text-[11px] font-bold text-[color:var(--app-text-soft)]"><span className="truncate">{item.label}</span>{distanceLabel ? <span className="ml-auto inline-flex shrink-0 items-center gap-1 text-[color:var(--app-accent)]"><MapPin className="h-3.5 w-3.5" />{distanceLabel}</span> : null}</div><Link href={item.href} className="mt-1.5"><h3 className="line-clamp-2 min-h-10 text-sm font-bold leading-5 text-[color:var(--app-text)]">{item.title}</h3></Link>{item.location ? <p className="mt-1.5 flex min-w-0 items-center gap-1.5 text-[11px] font-medium text-[color:var(--app-text-soft)]"><MapPin className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{item.location}</span></p> : null}{item.summary ? <p className="mt-2 line-clamp-2 text-xs leading-5 text-[color:var(--app-text-soft)]">{item.summary}</p> : null}<p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-[10px] font-semibold leading-4 text-amber-950 dark:border-amber-900/70 dark:bg-amber-950/40 dark:text-amber-100">{isId ? 'Bukan toko atau penawaran aktif di Lajukan. Gunakan untuk melihat lokasi; stok, harga, kontak, dan status usaha perlu dicek lagi.' : 'Not a Lajukan store or offer. Activity, ownership, stock, price, contact details, and verification are not implied.'}</p><div className="mt-auto grid gap-1.5 pt-3 text-[10px] font-bold">{sourceTitle && sourceUrl ? <a href={sourceUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-8 items-center gap-1.5 rounded-md border border-[color:var(--app-border)] px-2"><Database className="h-3.5 w-3.5" /><span className="truncate">{isId ? 'Sumber: ' : 'Source: '}{sourceTitle}</span><ExternalLink className="ml-auto h-3 w-3" /></a> : null}{sourceLicense && sourceLicenseUrl ? <a href={sourceLicenseUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-8 items-center gap-1.5 rounded-md border border-[color:var(--app-border)] px-2"><ShieldCheck className="h-3.5 w-3.5" /><span className="truncate">{isId ? 'Lisensi: ' : 'License: '}{sourceLicense}</span><ExternalLink className="ml-auto h-3 w-3" /></a> : null}</div></div>
+      <div className="flex min-w-0 flex-1 flex-col p-3"><div className="flex min-w-0 items-center gap-2 text-[11px] font-bold text-[color:var(--app-text-soft)]"><span className="truncate">{item.label}</span>{distanceLabel ? <span className="ml-auto inline-flex shrink-0 items-center gap-1 text-[color:var(--app-accent)]"><MapPin className="h-3.5 w-3.5" />{distanceLabel}</span> : null}</div><Link href={item.href} className="mt-1.5"><h3 className="line-clamp-2 min-h-10 text-sm font-bold leading-5 text-[color:var(--app-text)]">{item.title}</h3></Link>{item.location ? <p className="mt-1.5 flex min-w-0 items-center gap-1.5 text-[11px] font-medium text-[color:var(--app-text-soft)]"><MapPin className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{item.location}</span></p> : null}{item.summary ? <p className="mt-2 line-clamp-2 text-xs leading-5 text-[color:var(--app-text-soft)]">{item.summary}</p> : null}<p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-[10px] font-semibold leading-4 text-amber-950 dark:border-amber-900/70 dark:bg-amber-950/40 dark:text-amber-100">{isId ? 'Bukan toko atau penawaran aktif di Lajukan. Gunakan untuk melihat lokasi; stok, harga, kontak, dan status usaha perlu dicek lagi.' : 'Not a Lajukan store or offer. Activity, ownership, stock, price, contact details, and verification are not implied.'}</p><div className="mt-auto grid gap-1.5 pt-3 text-[10px] font-bold">{sourceTitle && sourceUrl ? <a href={sourceUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-8 items-center gap-1.5 rounded-md border border-[color:var(--app-border)] px-2"><Database className="h-3.5 w-3.5" /><span className="truncate">{isId ? 'Sumber: ' : 'Source: '}{sourceTitle}</span><ExternalLink className="ml-auto h-3 w-3" /></a> : null}{sourceContactUrl ? (
+                <a
+                  href={sourceContactUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex min-h-8 items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2 text-emerald-700"
+                >
+                  <MessageCircle className="h-3.5 w-3.5" />
+                  <span className="truncate">
+                    {sourceContactType === 'whatsapp'
+                      ? 'WhatsApp'
+                      : isId
+                        ? 'Kontak sumber'
+                        : 'Source contact'}
+                  </span>
+                </a>
+              ) : null}
+              {sourceLicense && sourceLicenseUrl ? (
+                <a href={sourceLicenseUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-8 items-center gap-1.5 rounded-md border border-[color:var(--app-border)] px-2">
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  <span className="truncate">{isId ? 'Lisensi: ' : 'License: '}{sourceLicense}</span>
+                  <ExternalLink className="ml-auto h-3 w-3" />
+                </a>
+              ) : null}</div></div>
     </article>
   );
 }
