@@ -983,6 +983,9 @@ export function ExploreCategoryClient({
   useEffect(() => {
     if (!isFilteredSearchMode) return;
 
+    setSearchLoadingCursor(null);
+    setSearchAppendError(null);
+
     const controller =
       new AbortController();
 
@@ -1085,6 +1088,188 @@ export function ExploreCategoryClient({
     searchSide,
     searchState.query,
   ]);
+
+  const loadCategoryMore = useCallback(
+    async (
+      kind: 'listing' | 'business',
+      cursor: string,
+    ) => {
+      if (categoryLoadingCursor) return;
+
+      const isLatestNeeds =
+        kind === 'listing' &&
+        category.id !== 'community' &&
+        category.id !== 'video' &&
+        category.sections.some(
+          section => section.key === 'latest-needs',
+        );
+
+      const side = isLatestNeeds ? 'demand' : 'supply';
+      const tab = kind === 'business' ? 'businesses' : 'all';
+
+      setCategoryLoadingCursor(cursor);
+      setCategoryAppendError(null);
+
+      try {
+        const params = new URLSearchParams({
+          category: category.slug,
+          side,
+          tab,
+          sort: 'latest',
+          cursor,
+        });
+
+        const response = await fetch(
+          `/api/search?${params.toString()}`,
+          { cache: 'no-store' },
+        );
+
+        if (!response.ok) {
+          throw new Error('category_append_failed');
+        }
+
+        const nextPayload =
+          (await response.json()) as GlobalSearchResponse;
+
+        setPayload(current => {
+          if (!current) return current;
+
+          const nextGroups = {
+            ...current.groups,
+          };
+
+          const mergeGroup = (
+            groupKey: GlobalSearchGroupKey,
+          ) => {
+            const previous = current.groups[groupKey];
+            const incoming = nextPayload.groups[groupKey];
+            if (!incoming.available) return;
+
+            const items = dedupeGlobalSearchItems([
+              ...previous.items,
+              ...incoming.items,
+            ]);
+
+            nextGroups[groupKey] = {
+              ...previous,
+              items,
+              total: items.length,
+              nextCursor: incoming.nextCursor,
+              available: incoming.available,
+              error: incoming.error,
+            };
+          };
+
+          if (side === 'demand') {
+            mergeGroup('needs');
+          } else if (kind === 'business') {
+            mergeGroup('businesses');
+          } else {
+            mergeGroup('products');
+            mergeGroup('services');
+          }
+
+          return {
+            ...current,
+            groups: nextGroups,
+          };
+        });
+      } catch {
+        setCategoryAppendError(
+          isId
+            ? 'Gagal memuat hasil berikutnya. Coba lagi.'
+            : 'Failed to load the next results. Try again.',
+        );
+      } finally {
+        setCategoryLoadingCursor(null);
+      }
+    },
+    [
+      category.id,
+      category.sections,
+      category.slug,
+      categoryLoadingCursor,
+      isId,
+    ],
+  );
+
+  const loadSearchMore = useCallback(
+    async (
+      groupKey: GlobalSearchGroupKey,
+      cursor: string,
+    ) => {
+      if (searchLoadingCursor) return;
+
+      setSearchLoadingCursor(cursor);
+      setSearchAppendError(null);
+
+      try {
+        const params = new URLSearchParams(searchKey);
+        params.delete('cursor');
+        params.set('cursor', cursor);
+        params.delete('type');
+        params.set('category', category.slug);
+        params.set('side', searchSide);
+
+        if (searchSide === 'demand') {
+          params.set('tab', 'all');
+        }
+
+        const response = await fetch(
+          `/api/search?${params.toString()}`,
+          { cache: 'no-store' },
+        );
+
+        if (!response.ok) {
+          throw new Error('search_append_failed');
+        }
+
+        const nextPayload =
+          (await response.json()) as GlobalSearchResponse;
+
+        setSearchPayload(current => {
+          const previous = current.groups[groupKey];
+          const incoming = nextPayload.groups[groupKey];
+          if (!incoming.available) return current;
+
+          const items = dedupeGlobalSearchItems([
+            ...previous.items,
+            ...incoming.items,
+          ]);
+
+          return {
+            ...current,
+            groups: {
+              ...current.groups,
+              [groupKey]: {
+                ...previous,
+                items,
+                total: items.length,
+                nextCursor: incoming.nextCursor,
+                available: incoming.available,
+                error: incoming.error,
+              },
+            },
+          };
+        });
+      } catch {
+        setSearchAppendError(
+          isId
+            ? 'Gagal memuat hasil berikutnya. Coba lagi.'
+            : 'Failed to load the next results. Try again.',
+        );
+      } finally {
+        setSearchLoadingCursor(null);
+      }
+    },
+    [
+      category.slug,
+      isId,
+      searchKey,
+      searchLoadingCursor,
+      searchSide,
+    ],
+  );
 
   useEffect(() => {
     void trackLajukanEvent(
@@ -2129,6 +2314,18 @@ export function ExploreCategoryClient({
               onSelectTab={
                 selectSearchTab
               }
+              onNextCursor={loadSearchMore}
+              loadingCursor={searchLoadingCursor}
+              appendError={searchAppendError}
+              onRetryNext={() => {
+                const groupKey =
+                  effectiveSearchTab as GlobalSearchGroupKey;
+                const cursor =
+                  searchPayload.groups[groupKey]?.nextCursor;
+                if (cursor) {
+                  void loadSearchMore(groupKey, cursor);
+                }
+              }}
               onRetry={() =>
                 setSearchRetryKey(
                   value => value + 1,
