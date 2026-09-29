@@ -146,13 +146,42 @@ function readNextOffsetCursor(
   payload: JsonRecord | null,
   source: SearchOffsetSource,
 ): string | null {
-  if (!payload || payload.has_more !== true) return null;
+  const sourcePayload =
+    source === 'business'
+      ? asRecord(payload?.data) || payload
+      : payload;
 
-  const offset = readNumber(payload.offset) ?? 0;
-  const limit = readNumber(payload.limit);
-  if (limit === null || limit <= 0) return null;
+  if (
+    !sourcePayload ||
+    sourcePayload.has_more !== true
+  ) {
+    return null;
+  }
 
-  return encodeOffsetCursor(source, offset + limit);
+  const nextOffset =
+    readNumber(sourcePayload.next_offset);
+  if (
+    nextOffset !== null &&
+    nextOffset >= 0
+  ) {
+    return encodeOffsetCursor(
+      source,
+      nextOffset,
+    );
+  }
+
+  const offset =
+    readNumber(sourcePayload.offset) ?? 0;
+  const limit =
+    readNumber(sourcePayload.limit);
+  if (limit === null || limit <= 0) {
+    return null;
+  }
+
+  return encodeOffsetCursor(
+    source,
+    offset + limit,
+  );
 }
 
 function readNumber(
