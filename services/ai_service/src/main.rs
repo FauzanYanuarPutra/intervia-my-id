@@ -923,7 +923,8 @@ async fn run_ai_endpoint(
                             kind: source.kind,
                         })
                         .collect::<Vec<_>>();
-                    dedupe_sources(&mut sources, &mut tool_sources.clone());
+                    let mut tool_sources = tool_sources;
+                    dedupe_sources(&mut sources, &mut tool_sources);
                     sources.extend(tool_sources);
                     tool_calls.extend(execution.traces);
                 }
@@ -1790,7 +1791,11 @@ async fn call_vllm(
     {
         Ok(result) => Ok(result),
         Err(primary_error)
-            if model != state.config.vllm_vision_model
+            if !(
+                !state.config.vllm_vision_model.is_empty()
+                    && state.config.vllm_vision_model != state.config.vllm_model
+                    && model == state.config.vllm_vision_model
+            )
                 && !state.config.vllm_fallback_model.is_empty()
                 && state.config.vllm_fallback_model != model
                 && is_model_unavailable_error(&primary_error) =>
