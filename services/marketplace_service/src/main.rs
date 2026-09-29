@@ -11531,7 +11531,11 @@ async fn list_map_places(
             .push_bind(lat)
             .push(") ASC");
     } else {
-        statement.push("category ASC, name ASC, id ASC");
+        // A nationwide overview is capped at 2,000 points. Use a deterministic
+        // hash rather than category/name ordering so the visible sample does
+        // not over-represent one taxonomy and stays geographically representative
+        // across repeated requests.
+        statement.push("md5(id) ASC");
     }
     statement.push(" LIMIT ").push_bind(limit);
 
