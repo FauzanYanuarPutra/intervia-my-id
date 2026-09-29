@@ -11360,7 +11360,7 @@ async fn list_map_places(
         SELECT id, slug, name, city, lat, lng, category, source_kind
         FROM (
           SELECT
-            'store:' || s.id::text AS id,
+            s.id::text AS id,
             s.slug,
             s.name,
             s.city,
