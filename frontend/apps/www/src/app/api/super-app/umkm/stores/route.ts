@@ -836,12 +836,7 @@ export async function GET(req: NextRequest) {
     const sourcePriority = (item: { id: string; metadata?: JsonRecord }) => {
       if (item.id.startsWith('reference:')) return 2;
       const source = readText(item.metadata?.source).toLowerCase();
-      const recordKind = readText(item.metadata?.record_kind).toLowerCase();
-      const native =
-        source === 'usaha_portal' ||
-        Boolean(readText(item.metadata?.owner_user_id)) ||
-        !recordKind.includes('reference');
-      return native ? 0 : 1;
+      return source === 'usaha_portal' ? 0 : 1;
     };
 
     const sortedItems = [...filteredItems].sort((a, b) => {
