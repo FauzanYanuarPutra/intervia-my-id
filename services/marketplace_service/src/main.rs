@@ -11352,6 +11352,9 @@ async fn list_map_places(
         _ => return err(StatusCode::BAD_REQUEST, "invalid viewer coordinates").into_response(),
     };
 
+    // Geo-only projection: detail payloads stay out of the map request.
+    // The browser can render many markers cheaply and fetch full details only
+    // after a user selects a place.
     let mut statement = QueryBuilder::<Postgres>::new(
         r#"
         SELECT id, slug, name, city, lat, lng, category, source_kind
