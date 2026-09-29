@@ -44,7 +44,7 @@ export function EmblaInlineRail({
         .join(' ')}
     >
       <div
-        className={['flex min-w-0 w-max min-w-full', contentClassName]
+        className={['flex min-w-full w-max', contentClassName]
           .filter(Boolean)
           .join(' ')}
       >
