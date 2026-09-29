@@ -12,6 +12,7 @@ describe('Explore search state',()=>{
     expect(hasExploreResultState({q:'mesin'})).toBe(true);
     expect(hasExploreResultState({tab:'products'})).toBe(true);
     expect(hasExploreResultState({side:'demand'})).toBe(true);
+    expect(hasExploreResultState({side:'supply'})).toBe(true);
     expect(hasExploreResultState({location:'Bandung'})).toBe(true);
   });
   it('retains only meaningful category redirect state',()=>{
