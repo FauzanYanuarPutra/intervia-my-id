@@ -1328,7 +1328,7 @@ export function ExploreAllSearchClient({
         : searchSide ===
             'demand'
           ? isId
-            ? 'Cari produk, jasa, supplier, atau kebutuhan...'
+            ? 'Cari produk, jasa, supplier, atau kebutuhan pembeli...'
             : 'Search products, services, suppliers, or needs...'
           : isId
             ? 'Cari produk, jasa, supplier, atau mesin...'
