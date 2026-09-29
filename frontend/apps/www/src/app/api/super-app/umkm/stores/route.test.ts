@@ -166,7 +166,9 @@ describe('GET /api/super-app/umkm/stores', () => {
       slug: undefined,
       backendOnly: true,
       activeOnly: true,
-      limit: 2,
+      limit: 3,
+      offset: 0,
+      includeReferences: false,
     });
     expect(listUmkmStoresForActorMock).not.toHaveBeenCalled();
 
@@ -649,8 +651,8 @@ describe('GET /api/super-app/umkm/stores', () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
         JSON.stringify({
-          items: Array.from({ length: 21 }, (_, index) =>
-            publicReference(index),
+          items: Array.from({ length: 10 }, (_, index) =>
+            publicReference(index + 10),
           ),
           has_more: true,
         }),
@@ -692,7 +694,7 @@ describe('GET /api/super-app/umkm/stores', () => {
 
   it('returns the requested progressive page with a sentinel-backed next offset', async () => {
     listUmkmStoresMock.mockResolvedValue(
-      Array.from({ length: 10 }, (_, index) => publicStore(index + 10)).reverse(),
+      Array.from({ length: 11 }, (_, index) => publicStore(index + 10)).reverse(),
     );
 
     const response = await GET(
