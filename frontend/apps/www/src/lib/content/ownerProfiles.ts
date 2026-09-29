@@ -124,7 +124,7 @@ export async function fetchOwnerPublicProfiles(args: {
   const { req, identityBase, items } = args;
   const ownerIds = Array.from(
     new Set(items.map(item => getOwnerId(item)).filter(Boolean)),
-  ).slice(0, 24);
+  ).slice(0, 12);
 
   if (ownerIds.length === 0) {
     return new Map();
@@ -142,7 +142,7 @@ export async function fetchOwnerPublicProfiles(args: {
           method: 'GET',
           headers,
           cache: 'no-store',
-          signal: AbortSignal.timeout(9000),
+          signal: AbortSignal.timeout(2500),
         },
       );
       if (!response.ok) return null;
