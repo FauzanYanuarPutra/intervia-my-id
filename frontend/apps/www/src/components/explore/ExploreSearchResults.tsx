@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ArrowRight,
   CircleAlert,
@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 
 import { CompactSeeAllButton } from '@/components/common/CompactSectionAction';
+import { InfiniteScrollSentinel } from '@/components/common/InfiniteScrollSentinel';
 import { ExploreCardMedia } from '@/components/explore/cards/ExploreCardMedia';
 import { LocalizedAnchor as Link } from '@/components/navigation/LocalizedAnchor';
 import { BusinessSearchCard } from '@/components/search/result-cards/BusinessSearchCard';
@@ -356,8 +357,6 @@ function SearchGroupSection({
   onNextCursor?: (cursor: string) => void;
 }) {
   const isId = locale === 'id';
-  const sectionRef = useRef<HTMLElement | null>(null);
-  const [page, setPage] = useState(1);
 
   if (!group.available || (group.items.length === 0 && !group.error)) {
     return null;
@@ -365,14 +364,25 @@ function SearchGroupSection({
 
   const copy = SEARCH_GROUP_COPY[groupKey];
   const pageSize = groupKey === 'videos' ? 8 : 6;
-  const totalPages = compact
-    ? Math.max(1, Math.ceil(group.items.length / pageSize))
-    : 1;
-  const safePage = Math.min(page, totalPages);
-  const pageStart = (safePage - 1) * pageSize;
+  const [visibleCount, setVisibleCount] = useState(
+    compact ? pageSize : group.items.length,
+  );
+
+  useEffect(() => {
+    setVisibleCount(compact ? pageSize : group.items.length);
+  }, [compact, group.items, groupKey, pageSize]);
+
   const items = compact
-    ? group.items.slice(pageStart, pageStart + pageSize)
+    ? group.items.slice(0, visibleCount)
     : group.items;
+  const hasMoreVisibleItems =
+    compact && visibleCount < group.items.length;
+
+  const loadMoreVisibleItems = () => {
+    setVisibleCount(current =>
+      Math.min(current + pageSize, group.items.length),
+    );
+  };
 
   const fullGridClass =
     groupKey === 'videos'
@@ -387,24 +397,8 @@ function SearchGroupSection({
             ? 'sm:grid-cols-2 lg:grid-cols-3'
             : 'sm:grid-cols-2 xl:grid-cols-3';
 
-  const changePage = (nextPage: number) => {
-    const clamped = Math.max(1, Math.min(totalPages, nextPage));
-    setPage(clamped);
-    if (typeof window !== 'undefined') {
-      window.requestAnimationFrame(() => {
-        sectionRef.current?.scrollIntoView({
-          behavior: 'smooth',
-          block: 'start',
-        });
-      });
-    }
-  };
-
   return (
-    <section
-      ref={sectionRef}
-      className="mt-3 scroll-mt-3 rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3.5 sm:p-4"
-    >
+    <section className="mt-3 scroll-mt-3 rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3.5 sm:p-4">
       <div className="flex items-end justify-between gap-3">
         <div>
           <h2 className="text-base font-bold text-[color:var(--app-text)]">
@@ -445,41 +439,15 @@ function SearchGroupSection({
             ))}
           </div>
 
-          {compact && totalPages > 1 ? (
-            <div className="mt-4 flex flex-col gap-2 border-t border-[color:var(--app-border)] pt-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-[10px] font-semibold text-[color:var(--app-text-soft)] sm:text-[11px]">
-                {isId
-                  ? `Halaman ${safePage} dari ${totalPages}`
-                  : `Page ${safePage} of ${totalPages}`}
-              </p>
-
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  disabled={safePage <= 1}
-                  onClick={() => changePage(safePage - 1)}
-                  className="inline-flex min-h-8 items-center justify-center rounded-[9px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-[10px] font-black text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] disabled:cursor-not-allowed disabled:opacity-35"
-                >
-                  {isId ? 'Sebelumnya' : 'Previous'}
-                </button>
-
-                <span
-                  aria-live="polite"
-                  className="inline-flex min-h-8 min-w-12 items-center justify-center rounded-[9px] bg-[color:var(--app-surface-muted)] px-2 text-[10px] font-black text-[color:var(--app-text-soft)]"
-                >
-                  {safePage}/{totalPages}
-                </span>
-
-                <button
-                  type="button"
-                  disabled={safePage >= totalPages}
-                  onClick={() => changePage(safePage + 1)}
-                  className="inline-flex min-h-8 items-center justify-center rounded-[9px] bg-[color:var(--app-accent)] px-3 text-[10px] font-black text-white transition hover:bg-[color:var(--app-accent-strong)] disabled:cursor-not-allowed disabled:opacity-35"
-                >
-                  {isId ? 'Berikutnya' : 'Next'}
-                </button>
-              </div>
-            </div>
+          {hasMoreVisibleItems ? (
+            <InfiniteScrollSentinel
+              hasMore
+              loading={false}
+              onLoadMore={loadMoreVisibleItems}
+              loadingLabel={
+                isId ? 'Menyiapkan hasil berikutnya…' : 'Preparing more results…'
+              }
+            />
           ) : null}
 
           {!compact &&
@@ -497,7 +465,6 @@ function SearchGroupSection({
     </section>
   );
 }
-
 export function ExploreSearchResults({ payload, loading, error, locale, compact = true, activeTab = 'all', searchSide = 'supply', onSelectTab, onNextCursor, onRetry }: { payload: GlobalSearchResponse; loading: boolean; error: boolean; locale: LajukanLocale; compact?: boolean; activeTab?: GlobalSearchTab; searchSide?: 'supply' | 'demand'; onSelectTab?: (tab: GlobalSearchTab) => void; onNextCursor?: (cursor: string) => void; onRetry?: () => void }) {
   const isId = locale === 'id';
   const safeReferenceItems = payload.groups.references.items.filter(hasCompleteReferenceProvenance);
