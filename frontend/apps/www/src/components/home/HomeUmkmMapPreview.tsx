@@ -334,7 +334,7 @@ export function HomeUmkmMapPreview({
         const res = await fetch(
           `/api/super-app/umkm/stores?${params.toString()}`,
           {
-            cache: 'no-store',
+            cache: 'default',
             credentials: 'include',
           },
         );
