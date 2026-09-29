@@ -73,8 +73,8 @@ export default async function NewsLocationPage({ params, searchParams }: Props) 
         initialNextCursor={nextCursor}
         locale={locale}
           location={value}
-        eyebrow={{isId ? 'Berita daerah' : 'Local news'}}
-        title={{isId ? `Berita terbaru dari ${value}` : `Latest news from ${value}`}}
+        eyebrow={isId ? 'Berita daerah' : 'Local news'}
+        title={isId ? `Berita terbaru dari ${value}` : `Latest news from ${value}`}
       />
     ) : (
       <div className="rounded-[26px] border border-dashed border-slate-300 p-8 text-center text-sm font-semibold text-slate-500 dark:border-white/15">
