@@ -32,7 +32,7 @@ export function buildExploreHubSearchHref(
   params.set('side', intent);
 
   if (intent === 'demand') {
-    params.set('tab', 'needs');
+    params.set('tab', 'all');
   }
 
   const search = params.toString();
