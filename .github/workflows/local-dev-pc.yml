@@ -150,7 +150,8 @@ jobs:
             "Docker Engine" = '(?i)Cannot connect to the Docker daemon|dockerDesktopLinuxEngine|API route and version|/_ping|error during connect|error response from daemon'
             "Docker BuildKit" = '(?i)frontend grpc server closed unexpectedly|BuildKit|failed to solve|rpc error.*(?:Unavailable|Canceled)'
             "Docker registry / network" = '(?i)TLS handshake timeout|context deadline exceeded|i/o timeout|temporary failure in name resolution|registry-1\.docker\.io|too many requests|HTTP (?:502|503|504)'
-            "Resource / memory / disk" = '(?i)out of memory|cannot allocate memory|no space left on device|ENOSPC|sign                        "PowerShell / launcher" = '(?i)CommandNotFoundException|ParameterBindingException|At .*\.ps1:\d+'
+            "Resource / memory / disk" = '(?i)out of memory|cannot allocate memory|no space left on device|ENOSPC|signal: killed'
+            "PowerShell / launcher" = '(?i)CommandNotFoundException|ParameterBindingException|At .*\.ps1:\d+'
             "Personal AI storage" = '(?i)SUPER_APP_POSTGRES_URL is missing|Personal AI tables are missing|PERSONAL_AI_STORAGE_UNAVAILABLE'
           }
 
