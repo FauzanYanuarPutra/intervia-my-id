@@ -154,6 +154,7 @@ export function LajukanImage({
       {...props}
       src={normalizedSrc}
       alt={alt}
+      quality={props.quality ?? 72}
       unoptimized={unoptimized ?? bypassOptimizer}
       onError={event => {
         onError?.(event);
