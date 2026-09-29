@@ -186,7 +186,7 @@ export function HomeBusinessMapSection({
           // than hydrating references and guarantees local records are not
           // hidden by a secondary public-reference query.
           const fallbackResponse = await fetch(
-            '/api/super-app/umkm/stores?limit=200&map=1&include_references=0&min_lat=-11&max_lat=6&min_lng=95&max_lng=141',
+            '/api/super-app/umkm/stores?limit=200&map=1&include_references=1&min_lat=-11&max_lat=6&min_lng=95&max_lng=141',
             {
               cache: 'default',
               credentials: 'include',
