@@ -11364,9 +11364,38 @@ async fn list_map_places(
             AND s.lat BETWEEN -90 AND 90
             AND s.lng BETWEEN -180 AND 180
             AND (
-              lower(COALESCE(s.metadata->>'is_transactional','true')) <> 'false'
-              OR lower(COALESCE(s.metadata->>'market_side','')) = 'reference'
-              OR lower(COALESCE(s.metadata->>'record_kind','')) LIKE '%reference%'
+              (
+                lower(COALESCE(s.metadata->>'is_transactional','true')) = 'false'
+                AND (
+                  lower(COALESCE(s.metadata->>'market_side','')) = 'reference'
+                  OR lower(COALESCE(s.metadata->>'record_kind','')) LIKE '%reference%'
+                )
+                AND NULLIF(btrim(COALESCE(s.metadata->>'source_url','')), '') IS NOT NULL
+                AND NULLIF(btrim(COALESCE(s.metadata->>'source_license','')), '') IS NOT NULL
+              )
+              OR (
+                lower(COALESCE(s.metadata->>'is_transactional','true')) <> 'false'
+                AND lower(COALESCE(s.metadata->>'market_side','')) <> 'reference'
+                AND lower(COALESCE(s.metadata->>'record_kind','')) NOT LIKE '%reference%'
+                AND (
+                  s.metadata->>'source' = 'usaha_portal'
+                  OR s.owner_user_id IS NOT NULL
+                  OR EXISTS (
+                    SELECT 1
+                    FROM business_locations location
+                    WHERE location.store_id = s.id
+                      AND location.public_visibility = TRUE
+                      AND location.status = 'active'
+                  )
+                )
+                AND COALESCE((
+                  SELECT latest.current_action
+                  FROM internal_moderation.business_moderation_cases latest
+                  WHERE latest.business_id = s.id
+                  ORDER BY latest.updated_at DESC
+                  LIMIT 1
+                ), 'approve') NOT IN ('hide','reject')
+              )
             )
 
           UNION ALL
