@@ -1234,10 +1234,10 @@ function ManualMarkerFocusController({
 }
 
 function getCompactDotRadius(zoom: number): number {
-  if (zoom <= 5) return 3;
-  if (zoom <= 8) return 3.25;
-  if (zoom <= 11) return 3.5;
-  return 3.75;
+  if (zoom <= 5) return 2.25;
+  if (zoom <= 8) return 2.5;
+  if (zoom <= 11) return 2.75;
+  return 3;
 }
 
 function StoreDotsLayer({
