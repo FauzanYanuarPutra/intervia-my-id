@@ -27,7 +27,6 @@ import {
   type LajukanLocale,
 } from '@/lib/discovery/lajukanCategories';
 import {
-  buildExploreHubIntentHref,
   buildExploreHubSearchHref,
   buildNearbyBusinessesHref,
   type ExploreHubIntent as HubIntent,
@@ -145,8 +144,10 @@ export function ExploreHubPage({ locale, initialIntent = 'supply' }: { locale: L
         value: nextIntent,
       },
     });
-    router.replace(
-      buildExploreHubIntentHref(locale, nextIntent),
+    // Marketplace mode is a real discovery state. Navigate to the
+    // canonical result URL so the selected side survives Back/Forward.
+    router.push(
+      buildExploreHubSearchHref(locale, nextIntent, ''),
       { scroll: false },
     );
   };
