@@ -997,6 +997,7 @@ export function ExploreCategoryClient({
     }
 
     params.delete('cursor');
+    params.delete('offset');
 
     const nextHref = appendSearchParams(
       `/${locale}${buildExploreCategoryHref(
@@ -1403,6 +1404,7 @@ export function ExploreCategoryClient({
     }
 
     params.delete('cursor');
+    params.delete('offset');
     params.delete('type');
     params.delete('category');
 
@@ -1450,6 +1452,7 @@ export function ExploreCategoryClient({
     }
 
     params.delete('cursor');
+    params.delete('offset');
 
     router.push(
       appendSearchParams(
