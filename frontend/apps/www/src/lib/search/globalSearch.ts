@@ -137,9 +137,9 @@ export function parseGlobalSearchState(
   const requestedSort = cleanText(input.get('sort'), 32).toLowerCase();
   const requestedCursor = cleanText(input.get('cursor'), 120);
   const cursorOffset =
-    /^\\d+$/.test(requestedCursor) ? Number(requestedCursor) : null;
+    /^\d+$/.test(requestedCursor) ? Number(requestedCursor) : null;
   const requestedOffset = cleanText(input.get('offset'), 32);
-  const parsedOffset = /^\\d+$/.test(requestedOffset) ? Number(requestedOffset) : 0;
+  const parsedOffset = /^\d+$/.test(requestedOffset) ? Number(requestedOffset) : 0;
   const legacyOffset = Number.isSafeInteger(parsedOffset)
     ? Math.min(Math.max(parsedOffset, 0), 10_000)
     : 0;
