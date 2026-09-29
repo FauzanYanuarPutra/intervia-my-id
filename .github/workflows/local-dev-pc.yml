@@ -4,41 +4,6 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-    inputs:
-      environment:
-        description: "Lajukan environment"
-        required: true
-        default: "development"
-        type: choice
-        options:
-          - development
-          - staging
-          - production
-      profiles:
-        description: "Docker profiles, comma-separated"
-        required: true
-        default: "backoffice,edge,local-ai,kyc,devtools,tunnel"
-        type: string
-      build:
-        description: "Build images before startup"
-        required: true
-        default: true
-        type: boolean
-      buildclear:
-        description: "Disable Docker build cache"
-        required: true
-        default: false
-        type: boolean
-      force_recreate:
-        description: "Force recreate containers"
-        required: true
-        default: false
-        type: boolean
-      down:
-        description: "Stop the stack instead of starting it"
-        required: true
-        default: false
-        type: boolean
 
 permissions:
   contents: read
@@ -67,7 +32,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path "$env:GITHUB_WORKSPACE\artifacts" | Out-Null
           Remove-Item "$env:GITHUB_WORKSPACE\artifacts\*" -Force -Recurse -ErrorAction SilentlyContinue
 
-      - name: Verify Windows/Docker runtime
+      - name: Verify Windows and Docker runtime
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
@@ -78,55 +43,29 @@ jobs:
           docker compose version
           docker info --format '{{json .ServerVersion}}'
 
-      - name: Run up.ps1
-        id: launcher
+      - name: Run Lajukan launcher
         shell: pwsh
-        env:
-          INPUT_ENVIRONMENT: \${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'development' }}
-          INPUT_PROFILES: \${{ github.event_name == 'workflow_dispatch' && inputs.profiles || 'backoffice,edge,local-ai,kyc,devtools,tunnel' }}
-          INPUT_BUILD: \${{ github.event_name == 'workflow_dispatch' && inputs.build || true }}
-          INPUT_BUILDCLEAR: \${{ github.event_name == 'workflow_dispatch' && inputs.buildclear || false }}
-          INPUT_FORCE_RECREATE: \${{ github.event_name == 'workflow_dispatch' && inputs.force_recreate || false }}
-          INPUT_DOWN: \${{ github.event_name == 'workflow_dispatch' && inputs.down || false }}
         run: |
           $ErrorActionPreference = "Continue"
           $log = Join-Path $env:GITHUB_WORKSPACE "artifacts\up.log"
-
-          $profileArgs = @()
-          foreach ($profile in ($env:INPUT_PROFILES -split ",")) {
-            $clean = $profile.Trim()
-            if ($clean) {
-              $profileArgs += @("-Profile", $clean)
-            }
-          }
-
           $args = @(
             "-NoLogo",
             "-NoProfile",
             "-ExecutionPolicy", "Bypass",
             "-File", "$env:GITHUB_WORKSPACE\up.ps1",
-            "-Environment", $env:INPUT_ENVIRONMENT
+            "-Environment", "development",
+            "-Profile", "backoffice",
+            "-Profile", "edge",
+            "-Profile", "local-ai",
+            "-Profile", "kyc",
+            "-Profile", "devtools",
+            "-Profile", "tunnel",
+            "-Build"
           )
-          $args += $profileArgs
-
-          if ([System.Convert]::ToBoolean($env:INPUT_BUILD)) {
-            $args += "-Build"
-          }
-          if ([System.Convert]::ToBoolean($env:INPUT_BUILDCLEAR)) {
-            $args += "-Buildclear"
-          }
-          if ([System.Convert]::ToBoolean($env:INPUT_FORCE_RECREATE)) {
-            $args += "-ForceRecreate"
-          }
-          if ([System.Convert]::ToBoolean($env:INPUT_DOWN)) {
-            $args += "-Down"
-          }
 
           Write-Host "Running: pwsh $($args -join ' ')"
           & pwsh @args 2>&1 | Tee-Object -FilePath $log
           $exitCode = $LASTEXITCODE
-
-          Write-Host ""
           Write-Host "up.ps1 exit code: $exitCode"
 
           if ($exitCode -ne 0) {
@@ -136,8 +75,6 @@ jobs:
       - name: Collect Docker diagnostics
         if: always()
         shell: pwsh
-        env:
-          INPUT_PROFILES: \${{ github.event_name == 'workflow_dispatch' && inputs.profiles || 'backoffice,edge,local-ai,kyc,devtools,tunnel' }}
         run: |
           $diag = Join-Path $env:GITHUB_WORKSPACE "artifacts\docker-diagnostics.txt"
           $ErrorActionPreference = "Continue"
@@ -158,11 +95,9 @@ jobs:
             if (Test-Path "$env:GITHUB_WORKSPACE\docker-compose.dev.yml") {
               $composeArgs += @("-f", "docker-compose.dev.yml")
             }
-            foreach ($profile in ($env:INPUT_PROFILES -split ",")) {
-              $clean = $profile.Trim()
-              if ($clean) {
-                $composeArgs += @("--profile", $clean)
-              }
+
+            foreach ($profile in @("backoffice","edge","local-ai","kyc","devtools","tunnel")) {
+              $composeArgs += @("--profile", $profile)
             }
 
             ([Environment]::NewLine + "===== docker compose ps -a =====") | Out-File $diag -Append
@@ -172,7 +107,7 @@ jobs:
             & docker compose @composeArgs logs --no-color --tail 250 2>&1 | Out-File $diag -Append
           }
 
-      - name: Classify failure and write summary
+      - name: Classify likely failure cause
         if: always()
         shell: pwsh
         run: |
@@ -181,20 +116,17 @@ jobs:
 
           $matches = [ordered]@{
             "TypeScript / Next.js" = '(?m)TS\d{3,5}|Failed to type check|Type error|webpack.*error'
-            "Rust / Cargo" = '(?m)error\[E\d+\]|Compiling .*service|cargo build.*failed|rustc'
+            "Rust / Cargo" = '(?m)error\[E\d+\]|cargo build.*failed|rustc'
             "Docker Engine" = '(?i)Cannot connect to the Docker daemon|dockerDesktopLinuxEngine|API route and version|/_ping|error during connect|error response from daemon'
             "Docker BuildKit" = '(?i)frontend grpc server closed unexpectedly|BuildKit|failed to solve|rpc error.*(?:Unavailable|Canceled)'
             "Docker registry / network" = '(?i)TLS handshake timeout|context deadline exceeded|i/o timeout|temporary failure in name resolution|registry-1\.docker\.io|too many requests|HTTP (?:502|503|504)'
             "Resource / memory / disk" = '(?i)out of memory|cannot allocate memory|no space left on device|ENOSPC|signal: killed'
-            "PowerShell / launcher" = '(?i)CommandNotFoundException|ParameterBindingException|At .*\.ps1:\d+|Lajukan launcher.*starting'
+            "PowerShell / launcher" = '(?i)CommandNotFoundException|ParameterBindingException|At .*\.ps1:\d+'
           }
 
           Add-Content $env:GITHUB_STEP_SUMMARY "## Lajukan local run"
-          Add-Content $env:GITHUB_STEP_SUMMARY ""
-          Add-Content $env:GITHUB_STEP_SUMMARY "- Commit: \${{ github.sha }}"
-          Add-Content $env:GITHUB_STEP_SUMMARY "- Trigger: \${{ github.event_name }}"
-          Add-Content $env:GITHUB_STEP_SUMMARY "- Runner: $env:COMPUTERNAME"
-          Add-Content $env:GITHUB_STEP_SUMMARY ""
+          Add-Content $env:GITHUB_STEP_SUMMARY "- Host: $env:COMPUTERNAME"
+          Add-Content $env:GITHUB_STEP_SUMMARY "- User: $env:USERNAME"
 
           $found = $false
           foreach ($entry in $matches.GetEnumerator()) {
@@ -205,14 +137,14 @@ jobs:
           }
 
           if (-not $found) {
-            Add-Content $env:GITHUB_STEP_SUMMARY "- No known error signature matched; open up.log for the exact failure."
+            Add-Content $env:GITHUB_STEP_SUMMARY "- No known error signature matched; open artifacts/up.log."
           }
 
       - name: Upload local run logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: lajukan-local-run-\${{ github.run_number }}
+          name: lajukan-local-run
           path: artifacts/
           if-no-files-found: warn
           retention-days: 14
