@@ -20,6 +20,26 @@ const LEGACY_IMAGE_KEYS = [
 ] as const;
 const GALLERY_KEYS = ['gallery_images', 'gallery', 'images', 'photos'] as const;
 
+function readApprovedContributionImages(metadata: Record<string, unknown>): string[] {
+  const primary = typeof metadata.gallery_media_primary === 'string'
+    ? metadata.gallery_media_primary.trim()
+    : '';
+  const items = Array.isArray(metadata.gallery_media_items)
+    ? metadata.gallery_media_items.flatMap(item => {
+        if (!item || typeof item !== 'object' || Array.isArray(item)) return [];
+        const record = item as Record<string, unknown>;
+        if (record.media_type === 'video') return [];
+        const url = typeof record.url === 'string'
+          ? record.url.trim()
+          : typeof record.media_url === 'string'
+            ? record.media_url.trim()
+            : '';
+        return url ? [url] : [];
+      })
+    : [];
+  return unique([primary, ...items]);
+}
+
 function publicMetadata(
   metadata: Record<string, unknown>,
 ): Record<string, unknown> {
@@ -81,10 +101,15 @@ export function resolveStorefrontBrandMedia(
   const explicitLogo = readText(publicMeta, LOGO_KEYS);
   const explicitCover = readText(publicMeta, COVER_KEYS);
   const legacyGeneralImage = readText(publicMeta, LEGACY_IMAGE_KEYS);
-  const rawGallery = unique(readTextArrays(publicMeta, GALLERY_KEYS));
+  const contributorGallery = readApprovedContributionImages(publicMeta);
+  const rawGallery = unique([
+    ...contributorGallery,
+    ...readTextArrays(publicMeta, GALLERY_KEYS),
+  ]);
   const logoUrl = usableImage(explicitLogo) ? explicitLogo : null;
   const coverUrl =
-    [explicitCover, rawGallery[0], legacyGeneralImage].find(usableImage) ?? null;
+    [explicitCover, contributorGallery[0], rawGallery[0], legacyGeneralImage]
+      .find(usableImage) ?? null;
   const galleryUrls = rawGallery
     .filter(image => image !== logoUrl && image !== coverUrl)
     .slice(0, 6);
