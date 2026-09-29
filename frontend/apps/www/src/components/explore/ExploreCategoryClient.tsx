@@ -43,10 +43,12 @@ import type {
   ExploreFaq,
   ExploreGuide,
 } from '@/lib/explore/exploreData';
-import { dedupeGlobalSearchItems, type GlobalSearchGroupKey, type GlobalSearchItem, type GlobalSearchResponse } from '@/lib/search/globalSearch';
 import {
+  dedupeGlobalSearchItems,
   emptyGlobalSearchResponse,
   parseGlobalSearchState,
+  type GlobalSearchGroupKey,
+  type GlobalSearchItem,
   type GlobalSearchResponse,
   type GlobalSearchTab,
 } from '@/lib/search/globalSearch';
@@ -502,6 +504,7 @@ function DataSection({
     }
   }, [
     canRevealLocalItems,
+    forcedSide,
     isLoadingNext,
     nextCursor,
     normalizedItems.length,
@@ -2405,7 +2408,7 @@ export function ExploreCategoryClient({
                             const cursor =
                               groups?.needs.nextCursor || null;
                             if (cursor) {
-                              void loadCategoryMore('listing', cursor, 'supply');
+                              void loadCategoryMore('listing', cursor, 'demand');
                             }
                           }}
                         />
