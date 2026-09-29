@@ -1,13 +1,7 @@
 import { ArrowLeft, ArrowRight } from 'lucide-react';
-import {
-  Children,
-  ReactNode,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
-import { useHorizontalDragScroll } from '@/hooks/useHorizontalDragScroll';
+import { Children, ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
+import useEmblaCarousel from 'embla-carousel-react';
+import { useEmblaWheelGestures } from '@/components/common/useEmblaWheelGestures';
 
 type HorizontalRailProps = {
   children: ReactNode;
@@ -24,19 +18,14 @@ export function HorizontalRail({
   showMobileControls = true,
   minimal = false,
 }: HorizontalRailProps) {
-  const {
-    ref: railRef,
-    onClickCapture,
-    onPointerCancel,
-    onPointerDown,
-    onPointerLeave,
-    onPointerMove,
-    onPointerUp,
-    onWheel,
-  } = useHorizontalDragScroll<HTMLDivElement>();
-
   const items = useMemo(() => Children.toArray(children), [children]);
   const childCount = items.length;
+  const [railRef, railApi] = useEmblaCarousel({
+    align: 'start',
+    containScroll: 'trimSnaps',
+    dragFree: false,
+    loop: false,
+  });
 
   const [activeIndex, setActiveIndex] = useState(0);
   const [hasOverflow, setHasOverflow] = useState(false);
@@ -44,109 +33,61 @@ export function HorizontalRail({
   const [canGoNext, setCanGoNext] = useState(false);
 
   const syncRailState = useCallback(() => {
-    const rail = railRef.current;
-    if (!rail) return;
+    if (!railApi) return;
 
-    const maxScrollLeft = Math.max(0, rail.scrollWidth - rail.clientWidth);
-    const overflowAmount = rail.scrollWidth - rail.clientWidth;
+    setActiveIndex(railApi.selectedScrollSnap());
+    setCanGoPrev(railApi.canScrollPrev());
+    setCanGoNext(railApi.canScrollNext());
+    setHasOverflow(railApi.scrollSnapList().length > 1);
+  }, [railApi]);
 
-    setHasOverflow(overflowAmount > 8);
-    setCanGoPrev(rail.scrollLeft > 4);
-    setCanGoNext(rail.scrollLeft < maxScrollLeft - 4);
-
-    const nodes = Array.from(rail.children) as HTMLElement[];
-    if (!nodes.length) {
-      setActiveIndex(0);
-      return;
-    }
-
-    const center = rail.scrollLeft + rail.clientWidth / 2;
-    let nearestIndex = 0;
-    let nearestDistance = Number.POSITIVE_INFINITY;
-
-    for (let index = 0; index < nodes.length; index += 1) {
-      const node = nodes[index];
-      const nodeCenter = node.offsetLeft + node.offsetWidth / 2;
-      const distance = Math.abs(nodeCenter - center);
-
-      if (distance < nearestDistance) {
-        nearestDistance = distance;
-        nearestIndex = index;
-      }
-    }
-
-    setActiveIndex(nearestIndex);
-  }, [railRef]);
+  useEmblaWheelGestures(railApi, {
+    enabled: true,
+    desktopOnly: true,
+    threshold: 42,
+  });
 
   useEffect(() => {
+    if (!railApi) return;
+
+    railApi.reInit();
     syncRailState();
-  }, [syncRailState, childCount, railRef]);
 
-  useEffect(() => {
-    const rail = railRef.current;
-    if (!rail) return;
+    const onSelect = () => syncRailState();
+    const onReInit = () => syncRailState();
 
-    let frame = 0;
-
-    const onScroll = () => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(syncRailState);
-    };
-
-    rail.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', syncRailState);
-
-    const resizeObserver = new ResizeObserver(() => {
-      syncRailState();
-    });
-
-    resizeObserver.observe(rail);
-    Array.from(rail.children).forEach(child => resizeObserver.observe(child));
+    railApi.on('select', onSelect);
+    railApi.on('reInit', onReInit);
 
     return () => {
-      cancelAnimationFrame(frame);
-      rail.removeEventListener('scroll', onScroll);
-      window.removeEventListener('resize', syncRailState);
-      resizeObserver.disconnect();
+      railApi.off('select', onSelect);
+      railApi.off('reInit', onReInit);
     };
-  }, [syncRailState, childCount, railRef]);
+  }, [railApi, childCount, syncRailState]);
 
   const scrollToIndex = useCallback(
     (index: number) => {
-      const rail = railRef.current;
-      if (!rail) return;
-
-      const nodes = Array.from(rail.children) as HTMLElement[];
-      if (!nodes.length) return;
-
-      const safeIndex = Math.max(0, Math.min(nodes.length - 1, index));
-      const target = nodes[safeIndex];
-
-      const left =
-        target.offsetLeft -
-        Math.max(16, (rail.clientWidth - target.offsetWidth) / 2);
-
-      rail.scrollTo({
-        left: Math.max(0, left),
-        behavior: 'smooth',
-      });
+      if (!railApi) return;
+      const safeIndex = Math.max(
+        0,
+        Math.min(railApi.scrollSnapList().length - 1, index),
+      );
+      railApi.scrollTo(safeIndex);
     },
-    [railRef],
+    [railApi],
   );
 
   const scrollByViewport = useCallback(
     (direction: 'prev' | 'next') => {
-      const rail = railRef.current;
-      if (!rail) return;
+      if (!railApi) return;
 
-      const delta = Math.max(rail.clientWidth * 0.9, 280);
-
-      rail.scrollBy({
-        left: direction === 'next' ? delta : -delta,
-        behavior: 'smooth',
-      });
+      if (direction === 'next') {
+        railApi.scrollNext();
+      } else {
+        railApi.scrollPrev();
+      }
     },
-    [railRef],
+    [railApi],
   );
 
   return (
@@ -163,55 +104,42 @@ export function HorizontalRail({
         </>
       ) : null}
 
-      <div
-        className={minimal ? 'overflow-visible' : '-mx-3 px-3 sm:mx-0 sm:px-0'}
-      >
+      <div className={minimal ? 'overflow-visible' : '-mx-3 px-3 sm:mx-0 sm:px-0'}>
         <div
           ref={railRef}
-          onClickCapture={onClickCapture}
-          onPointerCancel={onPointerCancel}
-          onPointerDown={onPointerDown}
-          onPointerLeave={onPointerLeave}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onWheel={onWheel}
           className={[
-            'flex w-full min-w-0 max-w-full overflow-x-auto overflow-y-visible',
-            'overscroll-x-contain no-scrollbar scroll-smooth',
-            '[scrollbar-gutter:stable] [-webkit-overflow-scrolling:touch]',
-            '[scroll-snap-type:x_mandatory]',
-            minimal ? 'gap-2' : 'gap-3 py-2',
-            hasOverflow ? 'cursor-grab active:cursor-grabbing' : '',
+            'w-full min-w-0 max-w-full overflow-hidden touch-pan-y',
+            minimal ? '' : 'py-2',
             className,
           ].join(' ')}
         >
-          {items.map((child, index) => (
-            <div
-              key={index}
-              className={[
-                'h-full min-w-0 shrink-0 self-stretch snap-start',
-                minimal
-                  ? 'basis-auto'
-                  : [
-                      // Mobile
-                      'w-[46vw] min-w-[46vw] max-w-[46vw]',
-
-                      // HP besar
-                      'xs:w-[42vw] xs:min-w-[42vw] xs:max-w-[42vw]',
-
-                      // Tablet
-                      'sm:w-[180px] sm:min-w-[180px] sm:max-w-[180px]',
-
-                      // Desktop
-                      'md:w-[190px] md:min-w-[190px] md:max-w-[190px]',
-                      'lg:w-[210px] lg:min-w-[210px] lg:max-w-[210px]',
-                      'xl:w-[220px] xl:min-w-[220px] xl:max-w-[220px]',
-                    ].join(' '),
-              ].join(' ')}
-            >
-              <div className="h-full w-full min-w-0">{child}</div>
-            </div>
-          ))}
+          <div
+            className={[
+              'flex min-w-0',
+              minimal ? 'gap-2' : 'gap-3',
+            ].join(' ')}
+          >
+            {items.map((child, index) => (
+              <div
+                key={index}
+                className={[
+                  'h-full min-w-0 shrink-0 self-stretch',
+                  minimal
+                    ? 'basis-auto'
+                    : [
+                        'w-[46vw] min-w-[46vw] max-w-[46vw]',
+                        'xs:w-[42vw] xs:min-w-[42vw] xs:max-w-[42vw]',
+                        'sm:w-[180px] sm:min-w-[180px] sm:max-w-[180px]',
+                        'md:w-[190px] md:min-w-[190px] md:max-w-[190px]',
+                        'lg:w-[210px] lg:min-w-[210px] lg:max-w-[210px]',
+                        'xl:w-[220px] xl:min-w-[220px] xl:max-w-[220px]',
+                      ].join(' '),
+                ].join(' ')}
+              >
+                <div className="h-full w-full min-w-0">{child}</div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -239,7 +167,7 @@ export function HorizontalRail({
             </button>
 
             <span className="min-w-[32px] text-center text-[9px] font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-              {activeIndex + 1}/{childCount}
+              {activeIndex + 1}/{Math.max(1, railApi?.scrollSnapList().length ?? childCount)}
             </span>
 
             <button
