@@ -69,6 +69,13 @@ describe('Lajukan explore taxonomy', () => {
         kind: 'needs',
       }),
     ).toBe('demand');
+
+    expect(
+      normalizeExploreSide({
+        kind: 'product',
+        pricing_mode: 'request',
+      }),
+    ).toBe('demand');
   });
 
   it('builds canonical explore search context', () => {
