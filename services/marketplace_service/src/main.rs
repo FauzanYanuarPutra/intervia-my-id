@@ -11303,7 +11303,7 @@ async fn list_map_places(
     State(state): State<Arc<AppState>>,
     Query(query): Query<ListMapPlacesQuery>,
 ) -> impl IntoResponse {
-    const MAX_LIMIT: i64 = 2000;
+    const MAX_LIMIT: i64 = 5000;
     let limit = query.limit.unwrap_or(1000).clamp(1, MAX_LIMIT);
     let q = match clean_map_reference_filter(
         query.q,
