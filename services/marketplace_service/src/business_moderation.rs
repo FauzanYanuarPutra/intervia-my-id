@@ -899,7 +899,7 @@ async fn review_crm_store_media(
     }
 
     let new_status = if action == "approve" { "approved" } else if action == "reject" { "rejected" } else { "hidden" };
-    sqlx::query(
+    if let Err(error) = sqlx::query(
         r#"
         UPDATE umkm_store_media_contributions
         SET status = $2,
@@ -919,11 +919,11 @@ async fn review_crm_store_media(
     .bind(user_id_from_auth(&headers, &state.jwt_secret))
     .execute(&mut *tx)
     .await
-    .map_err(|error| {
+    {
         tracing::error!("review_crm_store_media update error: {:?}", error);
-        error
-    })
-    .ok();
+        return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to save media review")
+            .into_response();
+    }
 
     if let Err(error) = tx.commit().await {
         tracing::error!("review_crm_store_media commit error: {:?}", error);
@@ -960,11 +960,28 @@ async fn sync_store_public_media_metadata(
     .await?;
 
     let mut metadata = current_metadata;
+    let contribution_urls = sqlx::query_scalar::<_, String>(
+        r#"
+        SELECT media_url
+        FROM umkm_store_media_contributions
+        WHERE store_id = $1
+        "#,
+    )
+    .bind(store_id)
+    .fetch_all(db)
+    .await?;
+
+    let contribution_url_set = contribution_urls.into_iter().collect::<std::collections::HashSet<_>>();
     let mut owner_gallery = metadata
         .get("gallery_media")
         .and_then(Value::as_array)
         .map(|values| {
-            values.iter().filter_map(Value::as_str).map(str::to_owned).collect::<Vec<_>>()
+            values
+                .iter()
+                .filter_map(Value::as_str)
+                .filter(|url| !contribution_url_set.contains(*url))
+                .map(str::to_owned)
+                .collect::<Vec<_>>()
         })
         .unwrap_or_default();
 
@@ -1020,7 +1037,10 @@ async fn sync_store_public_media_metadata(
     }
 
     if let Some((media_url, placement, approved)) = placement {
-        if approved {
+        let still_approved = items.iter().any(|item| {
+            item.get("url").and_then(Value::as_str) == Some(media_url)
+        });
+        if approved && still_approved {
             match placement {
                 "cover" => {
                     object.insert("store_photo_url".to_string(), json!(media_url));
@@ -1032,6 +1052,12 @@ async fn sync_store_public_media_metadata(
                     object.insert("image_url".to_string(), json!(media_url));
                 }
                 _ => {}
+            }
+        } else if !still_approved {
+            for key in ["store_photo_url", "cover_image_url", "cover_url", "logo_url", "image_url"] {
+                if object.get(key).and_then(Value::as_str) == Some(media_url) {
+                    object.remove(key);
+                }
             }
         }
     }
