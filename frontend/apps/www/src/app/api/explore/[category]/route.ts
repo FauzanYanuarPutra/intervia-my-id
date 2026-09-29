@@ -108,6 +108,14 @@ async function loadSocialExploreGroups(req: NextRequest): Promise<{
   const feedPayload = asRecord(communityFeedResult.payload);
   const videosPayload = asRecord(videosResult.payload);
   const communityAvailable = communityGroupsResult.ok || communityFeedResult.ok;
+  const communityNextCursor =
+    Boolean(feedPayload?.hasMore) && readString(feedPayload?.nextCursor)
+      ? readString(feedPayload?.nextCursor)
+      : null;
+  const videoNextCursor =
+    Boolean(videosPayload?.hasMore) && readString(videosPayload?.nextCursor)
+      ? readString(videosPayload?.nextCursor)
+      : null;
 
   return {
     groups: {
@@ -122,11 +130,12 @@ async function loadSocialExploreGroups(req: NextRequest): Promise<{
           ...asArray(feedPayload?.items).map(mapCommunityPost),
         ],
         communityAvailable,
+        communityNextCursor,
       ),
       videos: exploreGroup(
         asArray(videosPayload?.items).map(mapVideo),
         videosResult.ok,
-        readString(videosPayload?.nextCursor),
+        videoNextCursor,
       ),
       users: unavailableExploreGroup(),
     },
