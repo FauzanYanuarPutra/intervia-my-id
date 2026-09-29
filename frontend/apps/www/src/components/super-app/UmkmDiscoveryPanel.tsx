@@ -2076,8 +2076,8 @@ export function UmkmDiscoveryPanel({
           ? 'usaha'
           : 'businesses'
         : isId
-          ? 'usaha'
-          : 'businesses';
+          ? 'lokasi'
+          : 'locations';
   const resultHasMore =
     discoveryScope === 'references' ? canLoadMoreReferences : hasMore;
   const totalLabel =
