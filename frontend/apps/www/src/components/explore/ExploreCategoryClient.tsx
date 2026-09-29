@@ -52,6 +52,7 @@ import {
 import { exploreCategoryCopy } from '@/components/explore/ExploreCopy';
 import { Skeleton, SkeletonStack } from '@/components/ui/Skeleton';
 import { cn } from '@/lib/utils';
+import { getListingSideLabel } from '@/lib/content/listingSide';
 
 function appendSearchParams(
   path: string,
@@ -1757,7 +1758,7 @@ export function ExploreCategoryClient({
                           : 'text-zinc-500 hover:bg-white hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white',
                       )}
                     >
-                      {isId ? 'Cari penawaran' : 'Find offers'}
+                      {getListingSideLabel('supply', isId ? 'id' : 'en')}
                     </button>
 
                     <button
@@ -1771,9 +1772,7 @@ export function ExploreCategoryClient({
                           : 'text-zinc-500 hover:bg-white hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white',
                       )}
                     >
-                      {isId
-                        ? 'Cari kebutuhan pembeli'
-                        : 'Find buyer needs'}
+                      {getListingSideLabel('demand', isId ? 'id' : 'en')}
                     </button>
                   </div>
 
