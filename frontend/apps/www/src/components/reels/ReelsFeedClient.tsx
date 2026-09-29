@@ -85,23 +85,23 @@ export default function ReelsFeedClient({ isId }: { isId: boolean }) {
   const urlQuery = searchParams.get('q') || '';
   const urlCity = searchParams.get('city') || '';
   const [filterDraft, setFilterDraft] = useState({
-    source: search,
+    source: requestSearch,
     query: urlQuery,
     city: urlCity,
   });
-  const query = filterDraft.source === search ? filterDraft.query : urlQuery;
-  const city = filterDraft.source === search ? filterDraft.city : urlCity;
+  const query = filterDraft.source === requestSearch ? filterDraft.query : urlQuery;
+  const city = filterDraft.source === requestSearch ? filterDraft.city : urlCity;
   const setQuery = (value: string) => {
     setFilterDraft(current => ({
-      source: search,
+      source: requestSearch,
       query: value,
-      city: current.source === search ? current.city : urlCity,
+      city: current.source === requestSearch ? current.city : urlCity,
     }));
   };
   const setCity = (value: string) => {
     setFilterDraft(current => ({
-      source: search,
-      query: current.source === search ? current.query : urlQuery,
+      source: requestSearch,
+      query: current.source === requestSearch ? current.query : urlQuery,
       city: value,
     }));
   };

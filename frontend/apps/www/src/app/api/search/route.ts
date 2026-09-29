@@ -1778,6 +1778,8 @@ export async function GET(
           : '48',
     });
 
+  const businessLimit = state.category || state.subcategory ? 48 : 12;
+
   if (state.offset > 0) {
     params.set('offset', String(state.offset));
   }
@@ -2053,7 +2055,8 @@ export async function GET(
                   }
                 : {}),
               backend_only: '1',
-              limit: state.category || state.subcategory ? '48' : '12',
+              limit: String(businessLimit),
+              ...(state.offset > 0 ? { offset: String(state.offset) } : {}),
             },
           ).toString()}`,
           'businesses',
@@ -2535,6 +2538,13 @@ export async function GET(
         : null,
       relevanceQuery,
     );
+
+  const businessHasMore = readBoolean(businessPayload?.has_more);
+  const businessNextOffset = readNumber(businessPayload?.next_offset);
+  response.groups.businesses.nextCursor =
+    businessHasMore && businessNextOffset !== null
+      ? String(Math.max(0, Math.trunc(businessNextOffset)))
+      : null;
 
   response.groups.communities =
     group(
