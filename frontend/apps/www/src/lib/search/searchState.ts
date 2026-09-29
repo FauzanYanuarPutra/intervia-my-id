@@ -13,6 +13,14 @@ export function hasExploreResultState(searchParams:ExploreSearchParams):boolean{
 }
 export function retainedCategorySearch(input:ExploreSearchParams):string{
   const output=new URLSearchParams();
-  for(const key of RETAINED_CATEGORY_PARAMS){const value=firstParam(input[key]);if(!value)continue;if(key==='q'&&value.length<2)continue;if(key==='sort'&&value==='relevance')continue;if(key==='tab'&&value==='all')continue;if(key==='side'&&value==='supply')continue;output.set(key,value)}
+  const explicitSide=firstParam(input.side);
+  for(const key of RETAINED_CATEGORY_PARAMS){
+    const value=firstParam(input[key]);
+    if(!value)continue;
+    if(key==='q'&&value.length<2)continue;
+    if(key==='sort'&&value==='relevance')continue;
+    if(key==='tab'&&value==='all'&&!explicitSide)continue;
+    output.set(key,value);
+  }
   const query=output.toString();return query?`?${query}`:'';
 }
