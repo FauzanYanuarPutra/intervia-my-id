@@ -11494,6 +11494,73 @@ async fn list_map_places(
             )
             AND public.lajukan_safe_map_coordinate(c.metadata->>'latitude') BETWEEN -90 AND 90
             AND public.lajukan_safe_map_coordinate(c.metadata->>'longitude') BETWEEN -180 AND 180
+
+          UNION ALL
+
+          SELECT
+            'listing:' || c.id::text AS id,
+            COALESCE(c.slug, 'listing-' || c.id::text),
+            c.title,
+            COALESCE(c.metadata->>'city', c.metadata->>'location', c.metadata->>'address', 'Indonesia'),
+            public.lajukan_safe_map_coordinate(
+              COALESCE(
+                NULLIF(c.metadata->>'latitude', ''),
+                NULLIF(c.metadata->>'lat', '')
+              )
+            ),
+            public.lajukan_safe_map_coordinate(
+              COALESCE(
+                NULLIF(c.metadata->>'longitude', ''),
+                NULLIF(c.metadata->>'lng', '')
+              )
+            ),
+            COALESCE(
+              NULLIF(lower(c.metadata->>'marketplace_category_slug'), ''),
+              NULLIF(lower(c.metadata->>'umkm_category'), ''),
+              NULLIF(lower(c.metadata->>'business_type'), ''),
+              NULLIF(lower(c.metadata->>'category'), ''),
+              NULLIF(lower(c.category), ''),
+              'business'
+            ) AS category,
+            jsonb_strip_nulls(jsonb_build_object(
+              'marketplace_category_slug', NULLIF(lower(c.metadata->>'marketplace_category_slug'), ''),
+              'marketplace_subcategory_slug', NULLIF(lower(c.metadata->>'marketplace_subcategory_slug'), ''),
+              'umkm_category', NULLIF(lower(c.metadata->>'umkm_category'), ''),
+              'business_type', NULLIF(lower(c.metadata->>'business_type'), ''),
+              'store_type', NULLIF(lower(c.metadata->>'store_type'), ''),
+              'segment', NULLIF(lower(c.metadata->>'segment'), ''),
+              'category', NULLIF(lower(c.metadata->>'category'), ''),
+              'category_label', NULLIF(c.metadata->>'category_label', ''),
+              'city', NULLIF(c.metadata->>'city', ''),
+              'address', NULLIF(c.metadata->>'address', ''),
+              'source', 'lajukan_content',
+              'record_kind', 'lajukan_listing',
+              'public_path', NULLIF(c.metadata->>'public_path', ''),
+              'cover_image', NULLIF(c.cover_image, '')
+            )) AS metadata,
+            'lajukan_listing' AS source_kind
+          FROM content_items c
+          WHERE lower(c.content_status) IN ('active', 'published', 'live')
+            AND c.owner_id IS NOT NULL
+            AND lower(COALESCE(c.metadata->>'market_side','')) <> 'reference'
+            AND lower(COALESCE(c.metadata->>'record_kind','')) NOT LIKE '%reference%'
+            AND lower(COALESCE(c.metadata->>'is_transactional','true')) <> 'false'
+            AND public.lajukan_safe_map_coordinate(
+              COALESCE(
+                NULLIF(c.metadata->>'latitude', ''),
+                NULLIF(c.metadata->>'lat', '')
+              )
+            ) BETWEEN -90 AND 90
+            AND public.lajukan_safe_map_coordinate(
+              COALESCE(
+                NULLIF(c.metadata->>'longitude', ''),
+                NULLIF(c.metadata->>'lng', '')
+              )
+            ) BETWEEN -180 AND 180
+            AND c.content_type IN (
+              'product', 'service', 'material', 'tool_rental',
+              'property', 'business_transfer', 'request', 'auction', 'tender'
+            )
         ) places
         WHERE 1=1
         "#,
@@ -11528,7 +11595,7 @@ async fn list_map_places(
     statement.push(" ORDER BY ");
     if let Some((lat, lng)) = viewer {
         statement.push(
-            "CASE WHEN source_kind = 'lajukan_store' THEN 0              WHEN source_kind = 'registered_store' THEN 1              ELSE 2 END ASC,              point(lng,lat) <-> point(",
+            "CASE WHEN source_kind IN ('lajukan_store', 'lajukan_listing') THEN 0              WHEN source_kind = 'registered_store' THEN 1              ELSE 2 END ASC,              point(lng,lat) <-> point(",
         )
         .push_bind(lng)
         .push(",")
@@ -11539,7 +11606,7 @@ async fn list_map_places(
         // each source tier, keep a deterministic hash so repeated nationwide
         // requests remain stable without making references displace local data.
         statement.push(
-            "CASE WHEN source_kind = 'lajukan_store' THEN 0              WHEN source_kind = 'registered_store' THEN 1              ELSE 2 END ASC, md5(id) ASC",
+            "CASE WHEN source_kind IN ('lajukan_store', 'lajukan_listing') THEN 0              WHEN source_kind = 'registered_store' THEN 1              ELSE 2 END ASC, md5(id) ASC",
         );
     }
     statement.push(" LIMIT ").push_bind(limit);
