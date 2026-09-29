@@ -1,4 +1,5 @@
 import { CheckCircle2 } from 'lucide-react';
+import { EmblaInlineRail } from '@/components/common/EmblaInlineRail';
 import { cn } from '@/lib/utils';
 import type { UsahaSetupStep } from '../types';
 
@@ -6,14 +7,16 @@ export function SetupStepRail({ steps }: { steps: UsahaSetupStep[] }) {
   if (steps.length === 0) return null;
 
   return (
-    <div className="mt-4 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-      {steps.map((step, index) => (
-        <SetupStepPill
-          index={index}
-          key={`${step.label}-${index}`}
-          step={step}
-        />
-      ))}
+    <div className="mt-4 pb-1">
+      <EmblaInlineRail contentClassName="items-center gap-2" dragFree>
+        {steps.map((step, index) => (
+          <SetupStepPill
+            index={index}
+            key={`${step.label}-${index}`}
+            step={step}
+          />
+        ))}
+      </EmblaInlineRail>
     </div>
   );
 }
