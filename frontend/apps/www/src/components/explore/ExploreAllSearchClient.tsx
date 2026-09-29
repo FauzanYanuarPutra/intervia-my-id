@@ -471,11 +471,11 @@ export function ExploreAllSearchClient({
       ) {
         if (
           previousTab !==
-          'needs'
+          'all'
         ) {
           params.set(
             'tab',
-            'needs',
+            'all',
           );
 
           changed = true;
