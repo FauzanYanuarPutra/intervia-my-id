@@ -16,7 +16,6 @@ import {
 } from '@/lib/content/catalog';
 import {
   getListingSideObjectLabel,
-  getListingSideVerbLabel,
   getListingValueFallback,
 } from '@/lib/content/listingSide';
 import { priceUnitLabel } from '@/lib/content/priceUnit';
@@ -221,9 +220,7 @@ export function NeedSearchCard({
         <div className="min-w-0 w-full">
           <SearchCardEyebrow
             icon={Clock3}
-            label={
-              getListingSideVerbLabel('demand', locale)
-            }
+            label={getListingSideObjectLabel('demand', locale)}
             tone="blue"
             sideLabel={sideStatusLabel}
           />
