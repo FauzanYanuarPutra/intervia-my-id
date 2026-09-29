@@ -2134,6 +2134,42 @@ function CommunityReportDialog({
   );
 }
 
+function CommunityFormattedBody({
+  body,
+  collapsed = false,
+}: {
+  body: string;
+  collapsed?: boolean;
+}) {
+  const normalized = String(body || '')
+    .replace(/\r\n?/g, '\n')
+    .trim();
+
+  if (!normalized) return null;
+
+  const paragraphs = normalized.split(/\n{2,}/);
+
+  return (
+    <div
+      className={cn(
+        'space-y-2 break-words text-sm leading-6 text-[color:var(--app-text)]',
+        collapsed
+          ? 'max-h-[9rem] overflow-hidden sm:max-h-[10.5rem]'
+          : 'max-h-none',
+      )}
+    >
+      {paragraphs.map((paragraph, index) => (
+        <p
+          key={index}
+          className="whitespace-pre-wrap"
+        >
+          {paragraph}
+        </p>
+      ))}
+    </div>
+  );
+}
+
 export function CommunityPostCard({
   item,
   isId,
@@ -2995,17 +3031,18 @@ export function CommunityPostCard({
         </h2>
 
         {displayBody ? (
-          <div className="mt-1.5 text-sm leading-6 text-[color:var(--app-text)]">
-            <p className={cn('whitespace-pre-line', !bodyExpanded && 'line-clamp-2')}>
-              {displayBody}
-            </p>
+          <div className="mt-1.5">
+            <CommunityFormattedBody
+              body={displayBody}
+              collapsed={!bodyExpanded}
+            />
 
             {canExpandBody ? (
               <button
                 type="button"
                 onClick={() => setBodyExpanded(current => !current)}
                 aria-expanded={bodyExpanded}
-                className="mt-0.5 inline-flex font-semibold text-[color:var(--app-text-soft)] hover:text-[color:var(--app-text)]"
+                className="mt-1 inline-flex min-h-8 items-center font-semibold text-[color:var(--app-text-soft)] hover:text-[color:var(--app-text)]"
               >
                 {bodyExpanded
                   ? isId
