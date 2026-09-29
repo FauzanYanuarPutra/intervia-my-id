@@ -42,6 +42,23 @@ describe('public reference content', () => {
       imageSourceUrl: 'https://commons.wikimedia.org/wiki/File:Pasar_nyata.jpg',
       imageLicense: 'CC BY-SA 4.0',
       imageLicenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0/',
+      sourceContactUrl: '',
+      sourceContactType: 'source',
+    });
+  });
+
+  it('prefers an external WhatsApp contact when source contact data exists', () => {
+    expect(
+      readPublicReference({
+        ...referenceItem,
+        metadata: {
+          ...referenceItem.metadata,
+          phone: '081234567890',
+        },
+      }),
+    ).toMatchObject({
+      sourceContactUrl: 'https://wa.me/6281234567890',
+      sourceContactType: 'whatsapp',
     });
   });
 
