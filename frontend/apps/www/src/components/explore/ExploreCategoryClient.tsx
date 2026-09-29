@@ -1715,7 +1715,8 @@ export function ExploreCategoryClient({
               ) : null}
 
               {!isSocialCategory ? (
-                <div
+                <>
+                  <div
                   role="group"
                   aria-label={
                     isId
