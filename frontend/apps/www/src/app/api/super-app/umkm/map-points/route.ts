@@ -14,7 +14,7 @@ const QuerySchema = z.object({
   q: z.string().trim().max(120).optional(),
   city: z.string().trim().max(80).optional(),
   category: z.string().trim().max(80).optional(),
-  limit: z.coerce.number().int().min(1).max(2000).default(1000),
+  limit: z.coerce.number().int().min(1).max(5000).default(1000),
   min_lat: z.coerce.number().min(-90).max(90).optional(),
   max_lat: z.coerce.number().min(-90).max(90).optional(),
   min_lng: z.coerce.number().min(-180).max(180).optional(),
