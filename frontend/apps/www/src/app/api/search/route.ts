@@ -1621,10 +1621,18 @@ export async function GET(
   const isPeopleBrowse =
     state.tab === 'users';
 
+  const isMarketplaceBrowse =
+    state.side !== 'all' ||
+    state.tab === 'products' ||
+    state.tab === 'services' ||
+    state.tab === 'businesses' ||
+    state.tab === 'needs';
+
   if (
     effectiveQuery.length < 2 &&
     !isReferenceBrowse &&
-    !isPeopleBrowse
+    !isPeopleBrowse &&
+    !isMarketplaceBrowse
   ) {
     return NextResponse.json(
       emptyGlobalSearchResponse(
