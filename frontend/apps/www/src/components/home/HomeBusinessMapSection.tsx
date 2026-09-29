@@ -352,7 +352,7 @@ export function HomeBusinessMapSection({
             </span>
           ) : null}
         </div>
-      ) : null
+      ) : null}
     </section>
   );
 }
