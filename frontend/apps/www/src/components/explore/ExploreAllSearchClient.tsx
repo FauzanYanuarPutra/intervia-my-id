@@ -903,11 +903,7 @@ export function ExploreAllSearchClient({
     updateParams({
       q: clean || null,
       side: searchSide,
-      tab:
-        searchSide ===
-        'demand'
-          ? 'needs'
-          : 'all',
+      tab: 'all',
     });
   };
 
