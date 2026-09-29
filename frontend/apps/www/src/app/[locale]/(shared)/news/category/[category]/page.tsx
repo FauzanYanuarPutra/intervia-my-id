@@ -89,5 +89,15 @@ export default async function NewsCategoryPage({ params, searchParams }: Props) 
         {isId ? 'Belum ada berita terbit di kategori ini.' : 'No published news in this category yet.'}
       </div>
     )}
+    {nextCursor ? (
+      <Link
+        href={`/news/category/${category.toLowerCase()}?cursor=${encodeURIComponent(nextCursor)}`}
+        rel="next"
+        className="sr-only"
+        aria-label={isId ? 'Berita berikutnya' : 'Next news page'}
+      >
+        {isId ? 'Berita berikutnya' : 'Next news page'}
+      </Link>
+    ) : null}
   </main>;
 }
