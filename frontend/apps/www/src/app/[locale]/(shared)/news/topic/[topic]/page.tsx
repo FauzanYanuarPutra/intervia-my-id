@@ -73,8 +73,8 @@ export default async function NewsTopicPage({ params, searchParams }: Props) {
         initialNextCursor={nextCursor}
         locale={locale}
           topic={value}
-        eyebrow={{isId ? 'Topik berita' : 'News topic'}}
-        title={{isId ? `Berita terbaru tentang ${value}` : `Latest news about ${value}`}}
+        eyebrow={isId ? 'Topik berita' : 'News topic'}
+        title={isId ? `Berita terbaru tentang ${value}` : `Latest news about ${value}`}
       />
     ) : (
       <div className="rounded-[26px] border border-dashed border-slate-300 p-8 text-center text-sm font-semibold text-slate-500 dark:border-white/15">
