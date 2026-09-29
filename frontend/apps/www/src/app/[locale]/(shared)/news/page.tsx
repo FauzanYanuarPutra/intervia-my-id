@@ -1,10 +1,10 @@
 import type { Metadata } from 'next';
 import { Search, Send, Store, TrendingUp } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
-import { NewsCard } from '@/components/news/NewsCard';
+import { NewsInfiniteGrid } from '@/components/news/NewsInfiniteGrid';
 import { NewsCarousel } from '@/components/news/NewsCarousel';
 import { NewsCategoryRail } from '@/components/news/NewsCategoryRail';
-import { buildNewsFacetPath, buildNewsUrl, getPublishedNews } from '@/lib/news';
+import { buildNewsUrl, getPublishedNews } from '@/lib/news';
 
 type PageProps = {
   params: Promise<{ locale: string }>;
@@ -44,15 +44,6 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
   };
 }
 
-function buildNewsIndexHref(filters: { category?: string; query?: string; cursor?: string }) {
-  const params = new URLSearchParams();
-  if (filters.category) params.set('category', filters.category);
-  if (filters.query) params.set('q', filters.query);
-  if (filters.cursor) params.set('cursor', filters.cursor);
-  const query = params.toString();
-  return query ? `/news?${query}` : '/news';
-}
-
 export default async function NewsIndexPage({ params, searchParams }: PageProps) {
   const { locale } = await params;
   const filters = await searchParams;
@@ -70,6 +61,14 @@ export default async function NewsIndexPage({ params, searchParams }: PageProps)
 
   const sliderItems = items.slice(0, 6);
   const grid = items.slice(sliderItems.length);
+
+  const nextNewsHref = nextCursor
+    ? `/news?${new URLSearchParams({
+        ...(category ? { category } : {}),
+        ...(query ? { q: query } : {}),
+        cursor: nextCursor,
+      }).toString()}`
+    : null;
 
   return (
     <main className="page-shell page-shell-wide page-rhythm min-w-0 overflow-x-clip pb-12 pt-3 sm:pt-5">
@@ -162,38 +161,25 @@ export default async function NewsIndexPage({ params, searchParams }: PageProps)
       ) : null}
 
       {grid.length ? (
-        <section className="mt-7 sm:mt-8">
-          <div className="mb-3 flex items-end justify-between gap-3">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-300">
-                {isId ? 'Lebih banyak' : 'More stories'}
-              </p>
-              <h2 className="mt-1 text-xl font-black tracking-[-0.03em] text-slate-950 dark:text-white">
-                {isId ? 'Berita terbaru lainnya' : 'More from Lajukan News'}
-              </h2>
-            </div>
-            <span className="shrink-0 text-[10px] font-bold text-slate-400">
-              {grid.length} {isId ? 'artikel' : 'stories'}
-            </span>
-          </div>
-          <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {grid.map(item => (
-              <NewsCard key={item.id} article={item} locale={locale} variant="grid" />
-            ))}
-          </div>
-        </section>
+        <NewsInfiniteGrid
+          initialItems={grid}
+          initialNextCursor={nextCursor}
+          locale={locale}
+          category={category}
+          query={query}
+          eyebrow={isId ? 'Lebih banyak' : 'More stories'}
+          title={isId ? 'Berita terbaru lainnya' : 'More from Lajukan News'}
+        />
       ) : null}
-
-      {nextCursor ? (
-        <nav aria-label={isId ? 'Navigasi berita' : 'News navigation'} className="flex justify-center pt-5">
-          <Link
-            href={buildNewsIndexHref({ category, query, cursor: nextCursor })}
-            rel="next"
-            className="inline-flex min-h-10 items-center gap-2 rounded-full border border-slate-200 bg-white px-5 text-xs font-black text-slate-700 transition hover:border-emerald-300 hover:text-emerald-800 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200"
-          >
-            {isId ? 'Berita berikutnya' : 'Next stories'}
-          </Link>
-        </nav>
+      {nextNewsHref ? (
+        <Link
+          href={nextNewsHref}
+          rel="next"
+          className="sr-only"
+          aria-label={isId ? 'Berita berikutnya' : 'Next news page'}
+        >
+          {isId ? 'Berita berikutnya' : 'Next news page'}
+        </Link>
       ) : null}
     </main>
   );

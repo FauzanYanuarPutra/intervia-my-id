@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { Link, useRouter } from '@/i18n/navigation';
 import { LajukanImage } from '@/components/common/LajukanImage';
+import { InfiniteScrollSentinel } from '@/components/common/InfiniteScrollSentinel';
 import {
   ArrowRight,
   Clapperboard,
@@ -39,6 +40,9 @@ type FeedState = {
   requestSearch: string;
   status: 'loading' | 'ready';
   items: ReelItem[];
+  nextCursor: number | null;
+  hasMore: boolean;
+  error: string | null;
 };
 
 function getReelFilterCss(filterPreset?: ReelItem['filterPreset']) {
@@ -101,11 +105,22 @@ export default function ReelsFeedClient({ isId }: { isId: boolean }) {
     requestSearch,
     status: 'loading',
     items: [],
+    nextCursor: null,
+    hasMore: false,
+    error: null,
   });
+  const [loadingMore, setLoadingMore] = useState(false);
   const activeFeed =
     feedState.requestSearch === requestSearch
       ? feedState
-      : { requestSearch, status: 'loading' as const, items: [] };
+      : {
+        requestSearch,
+        status: 'loading' as const,
+        items: [],
+        nextCursor: null,
+        hasMore: false,
+        error: null,
+      };
   const items = activeFeed.items;
   const loading = activeFeed.status === 'loading';
 
@@ -131,20 +146,53 @@ export default function ReelsFeedClient({ isId }: { isId: boolean }) {
   useEffect(() => {
     let alive = true;
 
+    setLoadingMore(false);
+    setFeedState({
+      requestSearch,
+      status: 'loading',
+      items: [],
+      nextCursor: null,
+      hasMore: false,
+      error: null,
+    });
+
     fetch(`/api/reels/feed?${requestSearch}`, { cache: 'no-store' })
-      .then(res => res.json())
+      .then(async res => {
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(
+            typeof payload?.error === 'string'
+              ? payload.error
+              : 'Failed to load reels',
+          );
+        }
+        return payload;
+      })
       .then(payload => {
         if (alive) {
           setFeedState({
             requestSearch,
             status: 'ready',
             items: Array.isArray(payload.data) ? payload.data : [],
+            nextCursor:
+              typeof payload.nextCursor === 'number'
+                ? payload.nextCursor
+                : null,
+            hasMore: Boolean(payload.hasMore),
+            error: null,
           });
         }
       })
       .catch(() => {
         if (alive) {
-          setFeedState({ requestSearch, status: 'ready', items: [] });
+          setFeedState({
+            requestSearch,
+            status: 'ready',
+            items: [],
+            nextCursor: null,
+            hasMore: false,
+            error: 'failed',
+          });
         }
       });
 
@@ -152,6 +200,73 @@ export default function ReelsFeedClient({ isId }: { isId: boolean }) {
       alive = false;
     };
   }, [requestSearch]);
+
+  const loadMore = useCallback(async () => {
+    const cursor = activeFeed.nextCursor;
+    if (
+      activeFeed.requestSearch !== requestSearch ||
+      !activeFeed.hasMore ||
+      cursor == null ||
+      loading ||
+      loadingMore
+    ) {
+      return;
+    }
+
+    setLoadingMore(true);
+    try {
+      const params = new URLSearchParams(requestSearch);
+      params.set('cursor', String(cursor));
+      params.set('limit', '18');
+
+      const response = await fetch(
+        `/api/reels/feed?${params.toString()}`,
+        { cache: 'no-store' },
+      );
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(
+          typeof payload?.error === 'string'
+            ? payload.error
+            : 'Failed to load more reels',
+        );
+      }
+
+      const incoming = Array.isArray(payload.data) ? payload.data : [];
+      setFeedState(current => {
+        if (current.requestSearch !== requestSearch) return current;
+        const existing = new Set(current.items.map(item => item.id));
+        return {
+          ...current,
+          items: [
+            ...current.items,
+            ...incoming.filter((item: ReelItem) => !existing.has(item.id)),
+          ],
+          nextCursor:
+            typeof payload.nextCursor === 'number'
+              ? payload.nextCursor
+              : null,
+          hasMore: Boolean(payload.hasMore),
+          error: null,
+        };
+      });
+    } catch {
+      setFeedState(current =>
+        current.requestSearch === requestSearch
+          ? { ...current, error: 'failed' }
+          : current,
+      );
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [
+    activeFeed.hasMore,
+    activeFeed.nextCursor,
+    activeFeed.requestSearch,
+    loading,
+    loadingMore,
+    requestSearch,
+  ]);
 
   const submitFilters = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -396,6 +511,37 @@ export default function ReelsFeedClient({ isId }: { isId: boolean }) {
               })
             : null}
         </section>
+
+        {!loading && items.length > 0 ? (
+          <InfiniteScrollSentinel
+            hasMore={activeFeed.hasMore}
+            loading={loadingMore}
+            onLoadMore={loadMore}
+            loadingLabel={
+              isId ? 'Memuat reels berikutnya…' : 'Loading more reels…'
+            }
+          />
+        ) : null}
+
+        {activeFeed.error ? (
+          <div className="flex flex-col items-center gap-2 pb-2 text-center">
+            <p className="text-xs font-semibold text-amber-700">
+              {isId
+                ? 'Reels berikutnya belum bisa dimuat.'
+                : 'The next reels could not be loaded.'}
+            </p>
+            {activeFeed.hasMore ? (
+              <button
+                type="button"
+                onClick={() => void loadMore()}
+                disabled={loadingMore}
+                className="inline-flex min-h-9 items-center justify-center rounded-full border border-amber-200 bg-white px-3 text-xs font-black text-amber-800 disabled:opacity-60"
+              >
+                {isId ? 'Coba lagi' : 'Try again'}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </main>
   );

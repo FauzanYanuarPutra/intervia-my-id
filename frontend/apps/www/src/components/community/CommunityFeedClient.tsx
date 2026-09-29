@@ -4,6 +4,7 @@ import { LajukanImage as Image } from '@/components/common/LajukanImage';
 import { EmblaDesktopControls } from '@/components/common/EmblaDesktopControls';
 import { useEmblaWheelGestures } from '@/components/common/useEmblaWheelGestures';
 import { CompactSeeAllButton } from '@/components/common/CompactSectionAction';
+import { InfiniteScrollSentinel } from '@/components/common/InfiniteScrollSentinel';
 import { usePathname, useSearchParams } from 'next/navigation';
 import {
   useCallback,
@@ -6638,8 +6639,8 @@ export default function CommunityFeedClient({
   const [loading, setLoading] = useState(true);
   const [feedError, setFeedError] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [feedScrollRoot, setFeedScrollRoot] = useState<HTMLElement | null>(null);
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
-  const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
   const feedScopeKeyRef = useRef('');
   const [refreshKey, setRefreshKey] = useState(0);
   const [membersModalGroup, setMembersModalGroup] =
@@ -6947,31 +6948,6 @@ export default function CommunityFeedClient({
     submittedQuery,
   ]);
 
-  useEffect(() => {
-    const sentinel = loadMoreSentinelRef.current;
-    const root = sentinel?.closest<HTMLElement>('[data-community-feed-scroll]');
-    if (!sentinel || !root || !hasMore || loading || loadingMore) return;
-
-    const rootIsScrollContainer =
-      window.getComputedStyle(root).overflowY === 'auto' ||
-      window.getComputedStyle(root).overflowY === 'scroll';
-
-    const observer = new IntersectionObserver(
-      entries => {
-        if (entries.some(entry => entry.isIntersecting)) {
-          void loadMore();
-        }
-      },
-      {
-        root: rootIsScrollContainer ? root : null,
-        rootMargin: '900px 0px',
-        threshold: 0.01,
-      },
-    );
-
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [hasMore, loading, loadingMore, loadMore]);
 
   const handleSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -7071,6 +7047,7 @@ export default function CommunityFeedClient({
           />
 
           <section
+            ref={setFeedScrollRoot}
             className="min-w-0 space-y-3 pt-2 lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:pr-1"
             data-auto-scrollbar
             data-community-feed-scroll
@@ -7278,24 +7255,28 @@ export default function CommunityFeedClient({
                 ) : null}
                 {hasMore ? (
                   <div className="flex flex-col items-center gap-2 py-2">
-                    <div
-                      ref={loadMoreSentinelRef}
-                      aria-hidden="true"
-                      className="h-px w-full"
+                    <InfiniteScrollSentinel
+                      root={feedScrollRoot}
+                      hasMore
+                      loading={loadingMore}
+                      onLoadMore={loadMore}
+                      loadingLabel={
+                        isId
+                          ? 'Memuat diskusi berikutnya…'
+                          : 'Loading more discussions…'
+                      }
                     />
-                    <button
-                      type="button"
-                      onClick={() => void loadMore()}
-                      disabled={loadingMore}
-                      className="inline-flex min-h-[40px] items-center justify-center gap-2 rounded-full border border-[color:var(--app-border)] bg-white px-4 text-sm font-semibold text-[color:var(--app-text)] disabled:opacity-60"
-                    >
-                      {loadingMore ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
+                    {loadMoreError ? (
+                      <button
+                        type="button"
+                        onClick={() => void loadMore()}
+                        disabled={loadingMore}
+                        className="inline-flex min-h-[40px] items-center justify-center gap-2 rounded-full border border-[color:var(--app-border)] bg-white px-4 text-sm font-semibold text-[color:var(--app-text)] disabled:opacity-60"
+                      >
                         <ChevronRight className="h-4 w-4" />
-                      )}
-                      {isId ? 'Muat lagi' : 'Load more'}
-                    </button>
+                        {isId ? 'Coba lagi' : 'Try again'}
+                      </button>
+                    ) : null}
                   </div>
                 ) : null}
               </>

@@ -24,6 +24,7 @@ import {
 } from '@/components/explore/ExploreVisualSystem';
 import { Header } from '@/components/layout/Header';
 import { CompactSeeAllLink } from '@/components/common/CompactSectionAction';
+import { InfiniteScrollSentinel } from '@/components/common/InfiniteScrollSentinel';
 import { EmblaDesktopControls } from '@/components/common/EmblaDesktopControls';
 import { LocalizedAnchor as Link } from '@/components/navigation/LocalizedAnchor';
 import { trackLajukanEvent } from '@/lib/analytics/lajukanEvents';
@@ -464,8 +465,6 @@ function DataSection({
     | 'video';
 }) {
   const isId = locale === 'id';
-  const sectionRef = useRef<HTMLElement | null>(null);
-  const [page, setPage] = useState(1);
 
   if (items.length === 0) return null;
 
@@ -485,16 +484,25 @@ function DataSection({
     kind === 'listing' || kind === 'video'
       ? 8
       : 6;
-  const totalPages = Math.max(
-    1,
-    Math.ceil(normalizedItems.length / pageSize),
+  const [visibleCount, setVisibleCount] = useState(pageSize);
+  const itemSetKey = `${config.key}:${kind}:${items.length}:${items[0]?.id || ''}:${items[items.length - 1]?.id || ''}`;
+
+  useEffect(() => {
+    setVisibleCount(pageSize);
+  }, [itemSetKey, pageSize]);
+
+  const visibleItems = normalizedItems.slice(
+    0,
+    Math.min(visibleCount, normalizedItems.length),
   );
-  const safePage = Math.min(page, totalPages);
-  const pageStart = (safePage - 1) * pageSize;
-  const pageItems = normalizedItems.slice(
-    pageStart,
-    pageStart + pageSize,
-  );
+  const hasMoreVisibleItems =
+    visibleItems.length < normalizedItems.length;
+
+  const loadMoreVisibleItems = () => {
+    setVisibleCount(current =>
+      Math.min(current + pageSize, normalizedItems.length),
+    );
+  };
 
   const seeAllHref = (() => {
     if (kind === 'community') return '/community';
@@ -543,25 +551,8 @@ function DataSection({
     return <ExploreListingCard item={item} locale={locale} />;
   };
 
-  const changePage = (nextPage: number) => {
-    const clamped = Math.max(1, Math.min(totalPages, nextPage));
-    setPage(clamped);
-
-    if (typeof window !== 'undefined') {
-      window.requestAnimationFrame(() => {
-        sectionRef.current?.scrollIntoView({
-          behavior: 'smooth',
-          block: 'start',
-        });
-      });
-    }
-  };
-
   return (
-    <section
-      ref={sectionRef}
-      className="mt-3 scroll-mt-3 rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 sm:p-4"
-    >
+    <section className="mt-3 rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 sm:p-4">
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
           <h2 className="min-w-0 truncate text-[13px] font-black text-[color:var(--app-text)] sm:text-sm">
@@ -613,7 +604,7 @@ function DataSection({
         className={cn('mt-2.5 grid gap-3', gridClass)}
         aria-label={isId ? config.titleId : config.titleEn}
       >
-        {pageItems.map(item => (
+        {visibleItems.map(item => (
           <div key={`${kind}-${item.id}`} className="min-w-0">
             <div className="h-full w-full">
               {renderCard(item)}
@@ -622,46 +613,19 @@ function DataSection({
         ))}
       </div>
 
-      {totalPages > 1 ? (
-        <div className="mt-4 flex flex-col gap-2 border-t border-[color:var(--app-border)] pt-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-[10px] font-semibold text-[color:var(--app-text-soft)] sm:text-[11px]">
-            {isId
-              ? `Halaman ${safePage} dari ${totalPages} · ${normalizedItems.length} hasil dimuat`
-              : `Page ${safePage} of ${totalPages} · ${normalizedItems.length} loaded results`}
-          </p>
-
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              disabled={safePage <= 1}
-              onClick={() => changePage(safePage - 1)}
-              className="inline-flex min-h-8 items-center justify-center rounded-[9px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-[10px] font-black text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] disabled:cursor-not-allowed disabled:opacity-35"
-            >
-              {isId ? 'Sebelumnya' : 'Previous'}
-            </button>
-
-            <span
-              aria-live="polite"
-              className="inline-flex min-h-8 min-w-12 items-center justify-center rounded-[9px] bg-[color:var(--app-surface-muted)] px-2 text-[10px] font-black text-[color:var(--app-text-soft)]"
-            >
-              {safePage}/{totalPages}
-            </span>
-
-            <button
-              type="button"
-              disabled={safePage >= totalPages}
-              onClick={() => changePage(safePage + 1)}
-              className="inline-flex min-h-8 items-center justify-center rounded-[9px] bg-[color:var(--app-accent)] px-3 text-[10px] font-black text-white transition hover:bg-[color:var(--app-accent-strong)] disabled:cursor-not-allowed disabled:opacity-35"
-            >
-              {isId ? 'Berikutnya' : 'Next'}
-            </button>
-          </div>
-        </div>
+      {hasMoreVisibleItems ? (
+        <InfiniteScrollSentinel
+          hasMore
+          loading={false}
+          onLoadMore={loadMoreVisibleItems}
+          loadingLabel={
+            isId ? 'Menyiapkan hasil berikutnya…' : 'Preparing more results…'
+          }
+        />
       ) : null}
     </section>
   );
 }
-
 function ExploreHelpDialog({
   isId,
   guidesConfig,
