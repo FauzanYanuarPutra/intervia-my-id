@@ -56,7 +56,7 @@ type PreparedStore = {
 };
 
 /* ================= CONFIG ================= */
-const REFRESH_MS = 25000;
+const REFRESH_MS = 60000;
 
 function formatDistance(distanceKm: number | null | undefined): string | null {
   return formatDistanceKm(distanceKm);
