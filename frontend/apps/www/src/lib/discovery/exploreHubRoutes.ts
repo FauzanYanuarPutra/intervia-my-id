@@ -30,10 +30,7 @@ export function buildExploreHubSearchHref(
 
   if (clean) params.set('q', clean);
   params.set('side', intent);
-
-  if (intent === 'demand') {
-    params.set('tab', 'all');
-  }
+  params.set('tab', 'all');
 
   const search = params.toString();
   return `/${locale}/explore${search ? `?${search}` : ''}`;
