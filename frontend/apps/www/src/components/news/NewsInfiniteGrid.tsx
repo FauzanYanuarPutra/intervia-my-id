@@ -88,9 +88,14 @@ export function NewsInfiniteGrid({
         return [...current, ...appended];
       });
 
-      const next =
+      const candidateNext =
         payload.hasMore && payload.nextCursor
           ? payload.nextCursor
+          : null;
+      const next =
+        candidateNext &&
+        candidateNext !== cursor
+          ? candidateNext
           : null;
 
       cursorRef.current = next;
