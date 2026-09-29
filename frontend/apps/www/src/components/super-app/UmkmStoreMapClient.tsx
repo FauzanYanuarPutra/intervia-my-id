@@ -243,12 +243,15 @@ function buildStoreMarkerIcon(input: {
   markerTone: ReturnType<typeof buildUmkmPlacePresentation>['markerTone'];
   liveNow?: boolean | null;
   selected?: boolean;
+  imageUrl?: string | null;
+  imageIsCategoryArtwork?: boolean;
 }): DivIcon {
   const cacheKey = [
     input.kind,
     input.markerTone,
     input.liveNow === null ? 'null' : input.liveNow ? '1' : '0',
     input.selected ? '1' : '0',
+    input.selected && input.imageUrl && !input.imageIsCategoryArtwork ? input.imageUrl : '',
   ].join('|');
   const cached = STORE_MARKER_ICON_CACHE.get(cacheKey);
   if (cached) return cached;
@@ -283,10 +286,27 @@ function buildStoreMarkerIcon(input: {
       `
     : '';
 
+  const actualImageUrl =
+    input.selected &&
+    input.imageUrl &&
+    !input.imageIsCategoryArtwork &&
+    (/^https?:\/\//i.test(input.imageUrl) || input.imageUrl.startsWith('/'))
+      ? input.imageUrl
+      : null;
   const kindIcon = buildMarkerSymbolSvg({
     kind: input.kind,
     selected: input.selected,
   });
+  const markerContent = actualImageUrl
+    ? `
+        <span style="display:inline-flex;width:${size}px;height:${size}px;align-items:center;justify-content:center;position:relative;overflow:hidden;border-radius:999px;background:#ffffff;">
+          <img src="${escapeHtml(actualImageUrl)}" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" loading="lazy" />
+          <span style="position:absolute;right:-1px;bottom:-1px;display:inline-flex;width:13px;height:13px;align-items:center;justify-content:center;border:2px solid #ffffff;border-radius:999px;background:${palette.badge};box-sizing:border-box;">
+            ${buildMarkerSymbolSvg({ kind: input.kind, selected: false })}
+          </span>
+        </span>
+      `
+    : kindIcon;
 
   return divIcon({
     className: 'leaflet-superapp-marker-host',
@@ -340,7 +360,7 @@ function buildStoreMarkerIcon(input: {
             z-index:2;
           "
         >
-          ${kindIcon}
+          ${markerContent}
         </span>
 
         ${liveDot}
@@ -1330,6 +1350,8 @@ function StoreMarkersLayer({
                 kind: ui.kind,
                 markerTone: ui.markerTone,
                 selected: selectedStoreId === store.id,
+                imageUrl: ui.coverImage,
+                imageIsCategoryArtwork: ui.coverImageIsCategoryArtwork,
               })}
               zIndexOffset={active ? 480 : 220}
               eventHandlers={{
