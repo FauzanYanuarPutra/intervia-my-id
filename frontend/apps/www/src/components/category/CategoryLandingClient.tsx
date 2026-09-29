@@ -26,6 +26,7 @@ import {
   localContentImageForTopic,
   localHomeVisual,
 } from '@/lib/media/localSeedMedia';
+import { EmblaInlineRail } from '@/components/common/EmblaInlineRail';
 import { cn } from '@/lib/utils';
 
 type Copy = {
@@ -746,34 +747,39 @@ export function CategoryLandingClient({
           />
 
           <div className="space-y-3">
-            <div className="-mx-2 flex gap-2 overflow-x-auto px-2 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-              {CATEGORY_DEFINITIONS.map(item => {
-                const Icon = item.icon;
-                const tone = toneStyles(item.tone);
-                const active = mobileCategory === item.id;
+            <div className="-mx-2 px-2 pb-1">
+              <EmblaInlineRail
+                contentClassName="items-center gap-2"
+                dragFree
+              >
+                {CATEGORY_DEFINITIONS.map(item => {
+                  const Icon = item.icon;
+                  const tone = toneStyles(item.tone);
+                  const active = mobileCategory === item.id;
 
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => setMobileCategory(item.id)}
-                    className={cn(
-                      'inline-flex shrink-0 items-center gap-2 rounded-[15px] border px-2.5 py-1.5 text-left text-xs font-semibold transition',
-                      active ? tone.active : tone.idle,
-                    )}
-                  >
-                    <span
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setMobileCategory(item.id)}
                       className={cn(
-                        'inline-flex h-7 w-7 items-center justify-center rounded-[10px]',
-                        tone.icon,
+                        'inline-flex shrink-0 items-center gap-2 rounded-[15px] border px-2.5 py-1.5 text-left text-xs font-semibold transition',
+                        active ? tone.active : tone.idle,
                       )}
                     >
-                      <Icon className="h-3.5 w-3.5" />
-                    </span>
-                    <span>{pick(isId, item.label)}</span>
-                  </button>
-                );
-              })}
+                      <span
+                        className={cn(
+                          'inline-flex h-7 w-7 items-center justify-center rounded-[10px]',
+                          tone.icon,
+                        )}
+                      >
+                        <Icon className="h-3.5 w-3.5" />
+                      </span>
+                      <span>{pick(isId, item.label)}</span>
+                    </button>
+                  );
+                })}
+              </EmblaInlineRail>
             </div>
 
             <article
@@ -822,10 +828,15 @@ export function CategoryLandingClient({
             />
 
             {mobileShowcase.length > 0 ? (
-              <div className="-mx-2 flex gap-2.5 overflow-x-auto px-2 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-                {mobileShowcase.map(item => (
-                  <MobileShowcaseCard key={item.id} item={item} isId={isId} />
-                ))}
+              <div className="-mx-2 px-2 pb-1">
+                <EmblaInlineRail
+                  contentClassName="items-stretch gap-2.5"
+                  itemClassName="w-[76vw] min-w-[76vw] min-[390px]:w-[68vw] min-[390px]:min-w-[68vw] sm:w-[260px] sm:min-w-[260px]"
+                >
+                  {mobileShowcase.map(item => (
+                    <MobileShowcaseCard key={item.id} item={item} isId={isId} />
+                  ))}
+                </EmblaInlineRail>
               </div>
             ) : (
               <CategoryEmptyShowcase
