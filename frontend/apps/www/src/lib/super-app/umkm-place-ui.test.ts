@@ -164,6 +164,69 @@ describe('umkm place distance presentation', () => {
     expect(ui.coverImage).toBe('/images/business-categories/craft.svg');
   });
 
+  it('maps public-source OSM categories to the same visual kinds used by map markers', () => {
+    const food = buildUmkmPlacePresentation(
+      buildPlace({
+        name: 'Bakmi GM - Bintaro Exchange',
+        metadata: {
+          record_kind: 'real_openstreetmap_reference',
+          market_side: 'reference',
+          osm_primary_key: 'amenity',
+          osm_primary_value: 'restaurant',
+        },
+      }),
+      true,
+      null,
+    );
+    const bank = buildUmkmPlacePresentation(
+      buildPlace({
+        name: 'Bank Mandiri',
+        metadata: {
+          record_kind: 'real_openstreetmap_reference',
+          market_side: 'reference',
+          osm_primary_key: 'amenity',
+          osm_primary_value: 'bank',
+        },
+      }),
+      true,
+      null,
+    );
+    const mall = buildUmkmPlacePresentation(
+      buildPlace({
+        name: 'Bintaro Xchange Mall',
+        metadata: {
+          record_kind: 'real_openstreetmap_reference',
+          market_side: 'reference',
+          osm_primary_key: 'shop',
+          osm_primary_value: 'mall',
+        },
+      }),
+      true,
+      null,
+    );
+    const hotel = buildUmkmPlacePresentation(
+      buildPlace({
+        name: 'Hotel Santika Premiere Bintaro',
+        metadata: {
+          record_kind: 'real_openstreetmap_reference',
+          market_side: 'reference',
+          osm_primary_key: 'tourism',
+          osm_primary_value: 'hotel',
+        },
+      }),
+      true,
+      null,
+    );
+
+    expect(food.kind).toBe('food');
+    expect(bank.kind).toBe('service');
+    expect(mall.kind).toBe('retail');
+    expect(hotel.kind).toBe('service');
+    expect(food.coverImage).toBe('/images/business-categories/food.svg');
+    expect(bank.coverImage).toBe('/images/business-categories/service.svg');
+    expect(mall.coverImage).toBe('/images/business-categories/retail.svg');
+  });
+
   it('presents a public map reference without store or transaction claims', () => {
     const ui = buildUmkmPlacePresentation(
       buildPlace({

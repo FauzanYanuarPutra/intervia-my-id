@@ -218,10 +218,20 @@ function getBusinessHint(place: UmkmPlaceLike): string {
       place,
       'umkm_category',
       'business_type',
+      'category',
+      'category_label',
       'store_type',
       'segment',
       'umkm_focus',
       'business_focus',
+      'osm_primary_key',
+      'osm_primary_value',
+      'amenity',
+      'shop',
+      'tourism',
+      'office',
+      'building',
+      'place_type',
     ),
   ]
     .join(' ')
@@ -279,7 +289,21 @@ export function getUmkmPlaceKind(place: UmkmPlaceLike): UmkmPlaceKind {
   if (publishServices.includes('food')) return 'food';
   if (publishServices.includes('mart')) return 'retail';
   if (
-    /(jasa|service|salon|barber|desain|design|printing|laundry|studio|foto|fotografi|admin|konsultan|repair|kelas|kursus)/.test(
+    /(food|kuliner|makanan|minuman|restaurant|resto|fast[_ -]?food|cafe|coffee|bakery|food[_ -]?court|ice[_ -]?cream|bar|pub|warung|kedai|bakmi|mie|sate|ayam|burger|pizza)/.test(
+      hint,
+    )
+  ) {
+    return 'food';
+  }
+  if (
+    /(shop|toko|mall|department[_ -]?store|supermarket|hypermarket|convenience|grocery|retail|store|furniture|electronics|fashion|hardware|informa|courts|ace|ikea|minimarket)/.test(
+      hint,
+    )
+  ) {
+    return 'retail';
+  }
+  if (
+    /(bank|atm|finance|financial|insurance|hotel|resort|hostel|clinic|hospital|health|office|coworking|lawyer|accountant|accounting|consulting|consultant|notary|property[_ -]?management|real[_ -]?estate|travel[_ -]?agent|school|education|government|telecommunication|telecom|jasa|service|salon|barber|desain|design|printing|laundry|studio|foto|fotografi|admin|konsultan|repair|kelas|kursus)/.test(
       hint,
     )
   ) {
