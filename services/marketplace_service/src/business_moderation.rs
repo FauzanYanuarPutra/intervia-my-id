@@ -1126,7 +1126,6 @@ async fn sync_store_public_media_metadata(
 
     if let Some((media_url, placement, approved)) = placement {
         if approved && still_approved {
-        if approved && still_approved {
             match placement {
                 "cover" => {
                     object.insert("store_photo_url".to_string(), json!(media_url));
