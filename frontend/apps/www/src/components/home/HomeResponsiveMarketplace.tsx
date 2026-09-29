@@ -129,6 +129,7 @@ import {
 import { normalizeCommunityMediaItems } from '@/components/community/community-feed-helpers';
 import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 import { buildUmkmMapPlacePath, UMKM_DISCOVERY_PATH } from '@/lib/umkmSurface';
+import { resolveStorefrontBrandMedia } from '@/lib/super-app/storefront-brand-media';
 import {
   LAJUKAN_EXPLORE_CATEGORIES,
   buildExploreCategoryHref,
@@ -1139,11 +1140,20 @@ function mapNativeStoreToRecommendation(
       ? (item.metadata as Record<string, unknown>)
       : {};
 
+  const storefrontMedia = resolveStorefrontBrandMedia(metadata);
   const coverImage =
+    storefrontMedia.coverUrl ||
+    storefrontMedia.logoUrl ||
     readText(metadata.cover_image) ||
     readText(metadata.coverImage) ||
     readText(metadata.logo_url) ||
     readText(metadata.logoUrl);
+  const galleryImages = Array.from(
+    new Set([
+      coverImage,
+      ...storefrontMedia.galleryUrls,
+    ].filter(Boolean)),
+  ).slice(0, 4);
 
   const categoryLabel =
     readText(metadata.category_label) ||
@@ -1187,7 +1197,7 @@ function mapNativeStoreToRecommendation(
     price: '',
     unit: '',
     image: coverImage || undefined,
-    images: coverImage ? [coverImage] : [],
+    images: galleryImages,
     href: buildUmkmMapPlacePath({
       slug,
       metadata: {
