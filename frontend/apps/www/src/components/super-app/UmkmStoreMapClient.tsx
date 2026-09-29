@@ -5,6 +5,7 @@ import { ExternalLink, MapPin, Navigation, Route, Store } from 'lucide-react';
 import {
   AttributionControl,
   Circle,
+  CircleMarker,
   MapContainer,
   Marker,
   Polyline,
@@ -60,6 +61,7 @@ type UmkmStoreMapClientProps = {
   showPopups?: boolean;
   focusOffset?: UmkmMapFocusOffset;
   onBoundsChange?: (bounds: UmkmMapBounds) => void;
+  markerStyle?: 'default' | 'dots';
 };
 
 type RoutingResponse = {
@@ -1231,6 +1233,67 @@ function ManualMarkerFocusController({
   return null;
 }
 
+function getCompactDotRadius(zoom: number): number {
+  if (zoom <= 5) return 1.9;
+  if (zoom <= 8) return 2.2;
+  if (zoom <= 11) return 2.6;
+  return 3;
+}
+
+function StoreDotsLayer({
+  storePresentations,
+  selectedStoreId,
+  onSelectStore,
+  interactive,
+}: {
+  storePresentations: StorePresentation[];
+  selectedStoreId?: string | null;
+  onSelectStore?: (storeId: string) => void;
+  interactive: boolean;
+}) {
+  const map = useMap();
+  const [zoom, setZoom] = useState(() => map.getZoom());
+
+  useMapEvents({ zoomend: () => setZoom(map.getZoom()) });
+
+  const radius = getCompactDotRadius(zoom);
+
+  return (
+    <>
+      {storePresentations.map(({ store, ui }) => {
+        const palette = getMarkerPalette(ui.markerTone);
+        const selected = store.id === selectedStoreId;
+        return (
+          <CircleMarker
+            key={store.id}
+            center={[store.lat, store.lng]}
+            radius={selected ? Math.max(5, radius + 2) : radius}
+            interactive={interactive}
+            pathOptions={{
+              color: '#ffffff',
+              weight: selected ? 2 : 1,
+              opacity: 0.95,
+              fillColor: palette.badge,
+              fillOpacity: selected ? 1 : 0.9,
+            }}
+            eventHandlers={
+              interactive
+                ? { click: () => onSelectStore?.(store.id) }
+                : undefined
+            }
+          >
+            {interactive ? (
+              <Tooltip direction="top" offset={[0, -4]}>
+                {store.name} · {ui.kindLabel}
+              </Tooltip>
+            ) : null}
+          </CircleMarker>
+        );
+      })}
+    </>
+  );
+}
+
 function StoreMarkersLayer({
   storePresentations,
   selectedStoreId,
@@ -1488,6 +1551,7 @@ export function UmkmStoreMapClient({
   focusNonce = 0,
   focusOffset,
   onBoundsChange,
+  markerStyle = 'default',
   controls = true,
   showPopups = true,
 }: UmkmStoreMapClientProps) {
@@ -1784,15 +1848,24 @@ export function UmkmStoreMapClient({
         </>
       ) : null}
 
-      <StoreMarkersLayer
-        storePresentations={storePresentations}
-        selectedStoreId={selectedStoreId}
-        onSelectStore={onSelectStore}
-        onMarkerFocus={handleMarkerFocus}
-        isId={isId}
-        interactive={interactive}
-        showPopups={showPopups}
-      />
+      {markerStyle === 'dots' ? (
+        <StoreDotsLayer
+          storePresentations={storePresentations}
+          selectedStoreId={selectedStoreId}
+          onSelectStore={onSelectStore}
+          interactive={interactive}
+        />
+      ) : (
+        <StoreMarkersLayer
+          storePresentations={storePresentations}
+          selectedStoreId={selectedStoreId}
+          onSelectStore={onSelectStore}
+          onMarkerFocus={handleMarkerFocus}
+          isId={isId}
+          interactive={interactive}
+          showPopups={showPopups}
+        />
+      )}
 
       {routePositions ? (
         <Polyline
