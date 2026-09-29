@@ -129,7 +129,25 @@ export default function BusinessModerationWorkspace() {
   const { accessToken, user } = useAuth();
   const [businesses, setBusinesses] = useState<CrmBusiness[]>([]);
   const [references, setReferences] = useState<CrmBusinessReference[]>([]);
-  const [activeTab, setActiveTab] = useState<"businesses" | "references">("businesses");
+  const [activeTab, setActiveTab] = useState<"businesses" | "references" | "media">("businesses");
+  const [mediaItems, setMediaItems] = useState<Array<{
+    id: string;
+    store_id: string;
+    store_name: string;
+    city: string;
+    media_url: string;
+    media_type: "image" | "video";
+    caption?: string | null;
+    uploader_user_id: string;
+    uploader_name?: string | null;
+    uploader_username?: string | null;
+    status: "pending" | "approved" | "rejected" | "hidden";
+    is_primary: boolean;
+    review_note?: string | null;
+    created_at: string;
+  }>>([]);
+  const [mediaStatus, setMediaStatus] = useState("pending");
+  const [mediaLoading, setMediaLoading] = useState(false);
   const [referenceStatus, setReferenceStatus] = useState("active");
   const [referenceDraft, setReferenceDraft] = useState<{
     reference: CrmBusinessReference;
@@ -155,6 +173,24 @@ export default function BusinessModerationWorkspace() {
   const [severity, setSeverity] = useState<"low" | "medium" | "high" | "critical">("medium");
   const [busy, setBusy] = useState(false);
 
+  const loadMedia = useCallback(async (searchQuery = query) => {
+    if (!accessToken) return;
+    setMediaLoading(true);
+    try {
+      const response = await businessModerationApi.storeMedia(accessToken, {
+        limit: "100",
+        status: mediaStatus,
+        q: searchQuery,
+      });
+      setMediaItems(response.items || []);
+      setNotice("");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Antrean media gagal dimuat.");
+    } finally {
+      setMediaLoading(false);
+    }
+  }, [accessToken, mediaStatus, query]);
+
   const loadBusinesses = useCallback(async (searchQuery = '') => {
     if (!accessToken) return;
     setLoading(true);
@@ -178,8 +214,12 @@ export default function BusinessModerationWorkspace() {
   }, [accessToken, referenceStatus]);
 
   useEffect(() => {
+    if (activeTab === "media") {
+      void loadMedia();
+      return;
+    }
     void loadBusinesses();
-  }, [loadBusinesses]);
+  }, [activeTab, loadBusinesses, loadMedia]);
 
   useEffect(() => {
     const requested =
@@ -316,7 +356,7 @@ export default function BusinessModerationWorkspace() {
       ) : null}
 
       <div className="rounded-xl border border-slate-200 bg-white p-1.5">
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           <button
             type="button"
             onClick={() => setActiveTab("businesses")}
@@ -332,6 +372,14 @@ export default function BusinessModerationWorkspace() {
           >
             Data referensi peta
             <span className="ml-1 opacity-70">({references.length})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("media")}
+            className={`rounded-xl px-3 py-2.5 text-xs font-bold ${activeTab === "media" ? "bg-amber-500 text-white" : "bg-slate-50 text-slate-600"}`}
+          >
+            Media kontribusi
+            <span className="ml-1 opacity-70">({mediaItems.length})</span>
           </button>
         </div>
       </div>
@@ -360,7 +408,7 @@ export default function BusinessModerationWorkspace() {
               <option value="hidden">Disembunyikan</option>
               <option value="escalated">Peninjauan lanjut</option>
             </select>
-          ) : (
+          ) : activeTab === "references" ? (
             <select
               value={referenceStatus}
               onChange={event => setReferenceStatus(event.target.value)}
@@ -370,10 +418,24 @@ export default function BusinessModerationWorkspace() {
               <option value="archived">Disembunyikan</option>
               <option value="all">Semua referensi</option>
             </select>
+          ) : (
+            <select
+              value={mediaStatus}
+              onChange={event => setMediaStatus(event.target.value)}
+              className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold"
+            >
+              <option value="pending">Menunggu review</option>
+              <option value="approved">Disetujui</option>
+              <option value="rejected">Ditolak</option>
+              <option value="hidden">Disembunyikan</option>
+              <option value="all">Semua media</option>
+            </select>
           )}
           <button
             type="button"
-            onClick={() => void loadBusinesses(query)}
+            onClick={() =>
+              void (activeTab === "media" ? loadMedia(query) : loadBusinesses(query))
+            }
             className="min-h-11 rounded-xl bg-slate-950 px-4 text-sm font-bold text-white"
           >
             Refresh
@@ -381,7 +443,161 @@ export default function BusinessModerationWorkspace() {
         </div>
       </div>
 
-      {loading ? (
+      {activeTab === "media" ? (
+        mediaLoading ? (
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <article key={index} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                <div className="aspect-[4/3] animate-pulse bg-slate-100" />
+                <div className="space-y-2 p-4">
+                  <div className="h-4 w-2/3 animate-pulse rounded bg-slate-200" />
+                  <div className="h-3 w-full animate-pulse rounded bg-slate-100" />
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : !mediaItems.length ? (
+          <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center">
+            <p className="text-base font-bold text-slate-900">Tidak ada media pada antrean ini</p>
+            <p className="mt-1 text-sm text-slate-500">Foto dari pengguna masuk ke sini sebelum tampil publik.</p>
+          </div>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {mediaItems.map(item => (
+              <article key={item.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div className="aspect-[4/3] overflow-hidden bg-slate-100">
+                  {item.media_type === "video" ? (
+                    <video src={item.media_url} controls muted className="h-full w-full object-cover" />
+                  ) : (
+                    <img src={item.media_url} alt={item.store_name} className="h-full w-full object-cover" />
+                  )}
+                </div>
+                <div className="space-y-3 p-4">
+                  <div>
+                    <p className="text-sm font-black text-slate-950">{item.store_name}</p>
+                    <p className="text-[11px] font-semibold text-slate-500">{item.city}</p>
+                  </div>
+                  <div className="rounded-xl bg-slate-50 px-3 py-2 text-xs">
+                    <p className="font-bold text-slate-800">
+                      Diunggah oleh {item.uploader_name || item.uploader_username || "Pengguna"}
+                    </p>
+                    {item.caption ? <p className="mt-1 text-slate-500">{item.caption}</p> : null}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {item.status === "pending" ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            if (!accessToken) return;
+                            setBusy(true);
+                            try {
+                              await businessModerationApi.reviewStoreMedia(accessToken, item.id, {
+                                action: "approve",
+                                set_primary: false,
+                                placement: "gallery",
+                              });
+                              setNotice("Media disetujui dan dipublikasikan.");
+                              await loadMedia(query);
+                            } catch (error) {
+                              setNotice(error instanceof Error ? error.message : "Media gagal disetujui.");
+                            } finally {
+                              setBusy(false);
+                            }
+                          }}
+                          disabled={busy}
+                          className="min-h-9 rounded-xl bg-emerald-600 px-3 text-xs font-bold text-white disabled:opacity-60"
+                        >
+                          Setujui
+                        </button>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            if (!accessToken) return;
+                            setBusy(true);
+                            try {
+                              await businessModerationApi.reviewStoreMedia(accessToken, item.id, {
+                                action: "reject",
+                                note: "Tidak memenuhi standar media usaha.",
+                              });
+                              setNotice("Media ditolak.");
+                              await loadMedia(query);
+                            } catch (error) {
+                              setNotice(error instanceof Error ? error.message : "Media gagal ditolak.");
+                            } finally {
+                              setBusy(false);
+                            }
+                          }}
+                          disabled={busy}
+                          className="min-h-9 rounded-xl bg-rose-600 px-3 text-xs font-bold text-white disabled:opacity-60"
+                        >
+                          Tolak
+                        </button>
+                      </>
+                    ) : (
+                      <span className="rounded-full bg-slate-100 px-3 py-2 text-[11px] font-bold text-slate-600">
+                        {item.status}
+                      </span>
+                    )}
+                    {item.status === "pending" ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            if (!accessToken) return;
+                            setBusy(true);
+                            try {
+                              await businessModerationApi.reviewStoreMedia(accessToken, item.id, {
+                                action: "approve",
+                                set_primary: true,
+                                placement: "cover",
+                              });
+                              setNotice("Media disetujui dan dijadikan foto utama.");
+                              await loadMedia(query);
+                            } catch (error) {
+                              setNotice(error instanceof Error ? error.message : "Media gagal dipromosikan.");
+                            } finally {
+                              setBusy(false);
+                            }
+                          }}
+                          disabled={busy}
+                          className="min-h-9 rounded-xl border border-emerald-200 bg-emerald-50 px-3 text-xs font-bold text-emerald-700 disabled:opacity-60"
+                        >
+                          Setujui + Cover
+                        </button>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            if (!accessToken) return;
+                            setBusy(true);
+                            try {
+                              await businessModerationApi.reviewStoreMedia(accessToken, item.id, {
+                                action: "approve",
+                                set_primary: true,
+                                placement: "logo",
+                              });
+                              setNotice("Media disetujui dan dijadikan logo utama.");
+                              await loadMedia(query);
+                            } catch (error) {
+                              setNotice(error instanceof Error ? error.message : "Media gagal dipromosikan.");
+                            } finally {
+                              setBusy(false);
+                            }
+                          }}
+                          disabled={busy}
+                          className="min-h-9 rounded-xl border border-sky-200 bg-sky-50 px-3 text-xs font-bold text-sky-700 disabled:opacity-60"
+                        >
+                          Setujui + Logo
+                        </button>
+                      </>
+                    ) : null}
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        )
+      ) :       {loading ? (
         <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
           {Array.from({ length: 6 }).map((_, index) => (
             <article key={index} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
