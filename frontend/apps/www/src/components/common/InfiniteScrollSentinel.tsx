@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Loader2, RotateCcw } from 'lucide-react';
 
 type InfiniteScrollSentinelProps = {
@@ -31,6 +31,15 @@ export function InfiniteScrollSentinel({
   onRetry,
 }: InfiniteScrollSentinelProps) {
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const [supportsIntersectionObserver, setSupportsIntersectionObserver] =
+    useState(false);
+
+  useEffect(() => {
+    setSupportsIntersectionObserver(
+      typeof window !== 'undefined' &&
+        'IntersectionObserver' in window,
+    );
+  }, []);
 
   useEffect(() => {
     const sentinel = sentinelRef.current;
@@ -54,6 +63,20 @@ export function InfiniteScrollSentinel({
   }, [disabled, hasMore, loading, onLoadMore, rootMargin]);
 
   if (!hasMore && !error) return null;
+
+  const fallbackButton =
+    !supportsIntersectionObserver &&
+    hasMore &&
+    !loading &&
+    !error ? (
+      <button
+        type="button"
+        onClick={onLoadMore}
+        className="inline-flex min-h-9 items-center justify-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-[10px] font-black text-[color:var(--app-text)] shadow-sm"
+      >
+        {label}
+      </button>
+    ) : null;
 
   return (
     <div
@@ -83,6 +106,8 @@ export function InfiniteScrollSentinel({
           <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
           {loadingLabel}
         </div>
+      ) : fallbackButton ? (
+        fallbackButton
       ) : (
         <div className="flex w-full items-center justify-center py-1">
           <span className="sr-only">{label}</span>
