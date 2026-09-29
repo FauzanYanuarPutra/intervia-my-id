@@ -643,11 +643,13 @@ export async function GET(req: NextRequest) {
       !slug &&
       (url.searchParams.get('references_only') === '1' ||
         url.searchParams.get('references_only') === 'true');
+    // Map requests use the dedicated geo-only /map-points projection.
+    // Keep reference hydration explicit so the normal store list does not
+    // pay for a second reference query on every map movement.
     const includeReferences =
       !mine &&
       !slug &&
       (referencesOnly ||
-        mapRequest ||
         url.searchParams.get('include_references') === '1' ||
         url.searchParams.get('include_references') === 'true');
     if (referencesOnly && query.length === 1) {
@@ -894,7 +896,7 @@ export async function GET(req: NextRequest) {
         status: 200,
         headers: {
           'Cache-Control':
-            referencesOnly && !hasViewer && !parsedPublicQuery.bounds
+            !mine && !hasViewer
               ? 'public, s-maxage=15, stale-while-revalidate=60'
               : 'private, no-store',
         },
