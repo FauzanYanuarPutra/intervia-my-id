@@ -367,10 +367,11 @@ function SearchGroupSection({
   const [visibleCount, setVisibleCount] = useState(
     compact ? pageSize : group.items.length,
   );
+  const groupItemSetKey = `${groupKey}:${group.items.length}:${group.items[0]?.id || ''}:${group.items[group.items.length - 1]?.id || ''}`;
 
   useEffect(() => {
     setVisibleCount(compact ? pageSize : group.items.length);
-  }, [compact, group.items, groupKey, pageSize]);
+  }, [compact, groupItemSetKey, groupKey, pageSize]);
 
   const items = compact
     ? group.items.slice(0, visibleCount)
