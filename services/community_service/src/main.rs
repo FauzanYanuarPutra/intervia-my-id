@@ -365,6 +365,7 @@ struct ReelsFeedQuery {
     q: Option<String>,
     store: Option<String>,
     city: Option<String>,
+    cursor: Option<i64>,
     limit: Option<i64>,
 }
 
@@ -1003,10 +1004,13 @@ struct ReelFeedItem {
 }
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct ReelsFeedResponse {
     data: Vec<ReelFeedItem>,
     count: usize,
     stores: i64,
+    next_cursor: Option<i64>,
+    has_more: bool,
 }
 
 fn env_u32_bounded(name: &str, default: u32, min: u32, max: u32) -> u32 {
@@ -6041,6 +6045,7 @@ async fn list_reels_feed(
     let viewer_identity_id = actor.as_ref().map(|item| item.user_id.as_str());
     let viewer_forum_id = actor.as_ref().map(forum_user_id);
     let viewer_is_moderator = actor.as_ref().is_some_and(is_moderator);
+    let cursor = query.cursor.unwrap_or(0).max(0);
     let limit = query.limit.unwrap_or(18).clamp(1, MAX_REEL_LIMIT);
     let q = clean_optional(query.q);
     let store = clean_optional(query.store);
@@ -6139,7 +6144,7 @@ async fn list_reels_feed(
             )
           )
         ORDER BY r.published_at DESC, r.id ASC
-        LIMIT $7
+        LIMIT $7 OFFSET $8
         "#,
     )
     .bind(q.as_deref())
@@ -6148,10 +6153,18 @@ async fn list_reels_feed(
     .bind(viewer_identity_id)
     .bind(viewer_forum_id.as_deref())
     .bind(viewer_is_moderator)
-    .bind(limit)
+    .bind(limit + 1)
+    .bind(cursor)
     .fetch_all(&state.db)
     .await
     .map_err(internal_error)?;
+
+    let has_more = rows.len() as i64 > limit;
+    if has_more {
+        rows.truncate(limit as usize);
+    }
+    let item_count = rows.len() as i64;
+    let data = rows.into_iter().map(map_reel_feed_item).collect::<Vec<_>>();
 
     let stores: i64 = sqlx::query_scalar(
         r#"
@@ -6222,11 +6235,16 @@ async fn list_reels_feed(
     .await
     .map_err(internal_error)?;
 
-    let data = rows.into_iter().map(map_reel_feed_item).collect::<Vec<_>>();
     Ok(Json(ReelsFeedResponse {
         count: data.len(),
         data,
         stores,
+        next_cursor: if has_more {
+            Some(cursor + item_count)
+        } else {
+            None
+        },
+        has_more,
     }))
 }
 
