@@ -538,11 +538,7 @@ async fn list_public_store_media(
         }
         Err(error) => {
             tracing::error!("list_public_store_media store lookup error: {:?}", error);
-            return err(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "failed to load store",
-            )
-            .into_response();
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load store").into_response();
         }
     };
 
@@ -850,13 +846,17 @@ async fn list_crm_store_media(
         })
         .collect::<Vec<_>>();
 
-    (StatusCode::OK, Json(json!({
-        "items": items,
-        "count": items.len(),
-        "limit": limit,
-        "offset": offset,
-        "has_more": items.len() as i64 == limit
-    }))).into_response()
+    (
+        StatusCode::OK,
+        Json(json!({
+            "items": items,
+            "count": items.len(),
+            "limit": limit,
+            "offset": offset,
+            "has_more": items.len() as i64 == limit
+        })),
+    )
+        .into_response()
 }
 
 async fn review_crm_store_media(
@@ -1022,7 +1022,7 @@ async fn review_crm_store_media(
             "placement": placement
         })),
     )
-    .into_response()
+        .into_response()
 }
 
 async fn sync_store_public_media_metadata(
