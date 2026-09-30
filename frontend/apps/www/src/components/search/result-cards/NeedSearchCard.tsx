@@ -152,14 +152,14 @@ export function NeedSearchCard({
       icon: WalletCards,
       label: budgetLabel || getListingValueFallback('demand', locale),
     },
+    item.location
+      ? { key: 'location', icon: MapPin, label: item.location }
+      : null,
     quantityLabel
       ? { key: 'quantity', icon: Package, label: quantityLabel }
       : null,
     frequencyLabel
       ? { key: 'frequency', icon: RefreshCw, label: frequencyLabel }
-      : null,
-    item.location
-      ? { key: 'location', icon: MapPin, label: item.location }
       : null,
     deadlineLabel
       ? { key: 'deadline', icon: CalendarClock, label: deadlineLabel }
