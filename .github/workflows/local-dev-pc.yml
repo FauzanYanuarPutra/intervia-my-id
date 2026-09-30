@@ -45,12 +45,11 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
 
-          $tracked = @(git ls-files)
-          if ($tracked.Count -eq 0) {
+          if (-not (git ls-files | Select-Object -First 1)) {
             throw "No tracked files found after checkout."
           }
 
-          $conflicts = git grep -n -I -E '^(<<<<<<<|=======|>>>>>>>)' -- $tracked 2>$null
+          $conflicts = git grep -n -I -E '^(<<<<<<<|=======|>>>>>>>)' 2>$null
           if ($LASTEXITCODE -eq 0 -and $conflicts) {
             $conflicts | Write-Host
             throw "Merge-conflict markers found in tracked source."
