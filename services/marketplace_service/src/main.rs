@@ -218,7 +218,10 @@ struct ListContentQuery {
     sub_sector: Option<String>,
     status: Option<String>,
     owner_id: Option<Uuid>,
-    marketplace_only: Option<bool>,
+    // Query-string booleans arrive from browser/BFF clients in several common forms.
+    // Keep the wire contract tolerant (1/0, true/false, yes/no) and normalize once
+    // inside the handler instead of letting Axum reject the request at extraction time.
+    marketplace_only: Option<String>,
     limit: Option<i64>,
     offset: Option<i64>,
 }
@@ -4682,6 +4685,19 @@ fn canonical_content_type(value: &str) -> String {
 
 fn normalize_content_type(value: Option<String>) -> Option<String> {
     clean_text(value).map(|v| canonical_content_type(&v.to_lowercase()))
+}
+
+
+fn parse_optional_query_bool(value: Option<String>) -> Result<Option<bool>, &'static str> {
+    let Some(value) = clean_text(value) else {
+        return Ok(None);
+    };
+
+    match value.to_ascii_lowercase().as_str() {
+        "1" | "true" | "yes" | "y" | "on" => Ok(Some(true)),
+        "0" | "false" | "no" | "n" | "off" => Ok(Some(false)),
+        _ => Err("boolean query value must be true/false or 1/0"),
+    }
 }
 
 fn normalize_listing_side_filter(value: Option<String>) -> Result<Option<String>, &'static str> {
@@ -11716,6 +11732,10 @@ async fn list_content(
         Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
     };
     let owner_id = query.owner_id;
+    let marketplace_only = match parse_optional_query_bool(query.marketplace_only) {
+        Ok(value) => value,
+        Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
+    };
     let claims = auth_claims_from_headers(&headers, &state.jwt_secret);
     let actor_user_id = claims
         .as_ref()
@@ -12003,7 +12023,7 @@ async fn list_content(
     .bind(min_price)
     .bind(max_price)
     .bind(side)
-    .bind(query.marketplace_only)
+    .bind(marketplace_only)
     .bind(limit + 1)
     .bind(offset)
     .fetch_all(&state.db)
@@ -24434,6 +24454,37 @@ mod tests {
         assert_eq!(
             canonical_content_type("business-transfer"),
             "business_transfer"
+        );
+    }
+
+    #[test]
+    fn marketplace_query_bool_accepts_browser_and_legacy_forms() {
+        assert_eq!(
+            parse_optional_query_bool(None),
+            Ok(None)
+        );
+        assert_eq!(
+            parse_optional_query_bool(Some("true".to_string())),
+            Ok(Some(true))
+        );
+        assert_eq!(
+            parse_optional_query_bool(Some("1".to_string())),
+            Ok(Some(true))
+        );
+        assert_eq!(
+            parse_optional_query_bool(Some("YES".to_string())),
+            Ok(Some(true))
+        );
+        assert_eq!(
+            parse_optional_query_bool(Some("false".to_string())),
+            Ok(Some(false))
+        );
+        assert_eq!(
+            parse_optional_query_bool(Some("0".to_string())),
+            Ok(Some(false))
+        );
+        assert!(
+            parse_optional_query_bool(Some("maybe".to_string())).is_err()
         );
     }
 
