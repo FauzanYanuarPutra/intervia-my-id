@@ -129,7 +129,6 @@ import {
 import { normalizeCommunityMediaItems } from '@/components/community/community-feed-helpers';
 import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 import { buildUmkmMapPlacePath, UMKM_DISCOVERY_PATH } from '@/lib/umkmSurface';
-import { resolveStorefrontBrandMedia } from '@/lib/super-app/storefront-brand-media';
 import { getUmkmPlaceKind } from '@/lib/super-app/umkm-place-ui';
 import {
   LAJUKAN_EXPLORE_CATEGORIES,
@@ -156,8 +155,6 @@ const HOME_CONTENT_REQUEST_TIMEOUT_MS = 12000;
 const HOME_CONTENT_FALLBACK_TIMEOUT_MS = 4500;
 const HOME_CONTENT_TOTAL_TIMEOUT_MS = 18000;
 const HOME_MARKETPLACE_FETCH_LIMIT = 48;
-const HOME_SUPPLY_LISTING_SLOTS = 6;
-const HOME_SUPPLY_STORE_SLOTS = 6;
 
 type Tone =
   | 'emerald'
@@ -247,6 +244,7 @@ type RecommendationItem = {
   contentStatus: string;
   updatedAt?: number;
   sourcePriority: number;
+  sourceKind?: 'lajukan_listing' | 'external';
 };
 
 function recommendationScore(item: RecommendationItem): number {
@@ -304,39 +302,18 @@ function rankRecommendations(items: RecommendationItem[]): RecommendationItem[] 
 
 function buildHomeSupplyItems(
   contentItems: RecommendationItem[],
-  nativeStoreItems: RecommendationItem[],
   maxItems = 12,
 ): RecommendationItem[] {
-  const listingItems = rankRecommendations(
-    contentItems.map(item => ({ ...item, sourcePriority: 1 })),
-  );
-  const storeItems = rankRecommendations(
-    nativeStoreItems.map(item => ({ ...item, sourcePriority: 0 })),
-  );
-
-  // Registered Lajukan businesses are first-party business truth. Put them
-  // first, then fill the remaining slots with first-party marketplace offers.
-  const listingSlots = Math.min(HOME_SUPPLY_LISTING_SLOTS, maxItems);
-  const storeSlots = Math.min(HOME_SUPPLY_STORE_SLOTS, maxItems - listingSlots);
-  // First-party Lajukan businesses are the strongest source of truth for
-  // the Home business recommendation surface. Put them before transactional
-  // listings so a real Lajukan store is not buried behind generic records.
-  const selected = [
-    ...storeItems.slice(0, storeSlots),
-    ...listingItems.slice(0, listingSlots),
-  ];
-
-  if (selected.length < maxItems) {
-    selected.push(...storeItems.slice(storeSlots, maxItems));
-    selected.push(...listingItems.slice(listingSlots, maxItems));
-  }
-
-  const seen = new Set<string>();
-  return selected.filter(item => {
-    if (seen.has(item.id)) return false;
-    seen.add(item.id);
-    return true;
-  }).slice(0, maxItems);
+  return rankRecommendations(
+    contentItems
+      .filter(item => item.side === 'supply')
+      .map(item => ({ ...item, sourcePriority: 0 })),
+  )
+    .filter(
+      (item, index, all) =>
+        all.findIndex(candidate => candidate.id === item.id) === index,
+    )
+    .slice(0, maxItems);
 }
 
 type PublicReferenceItem = {
@@ -372,26 +349,9 @@ type PublicReferenceApiResponse = {
   };
 };
 
-type HomeNativeStoreApiItem = {
-  id?: unknown;
-  slug?: unknown;
-  name?: unknown;
-  city?: unknown;
-  address?: unknown;
-  description?: unknown;
-  lat?: unknown;
-  lng?: unknown;
-  phone?: unknown;
-  metadata?: unknown;
-  updated_at?: unknown;
-  content_status?: unknown;
-};
 
-type HomeNativeStoreApiResponse = {
-  data?: {
-    items?: HomeNativeStoreApiItem[];
-  };
-};
+
+
 
 type CommunityTab = 'for-you' | 'community';
 
@@ -1126,7 +1086,8 @@ function mapContentToRecommendation(
       readText(item.metadata?.contentStatus) ||
       'active',
     updatedAt: item.updated_at ? Date.parse(item.updated_at) || undefined : undefined,
-    sourcePriority: 1,
+    sourcePriority: 0,
+    sourceKind: 'lajukan_listing',
   };
 }
 
@@ -1139,125 +1100,6 @@ const NATIVE_BUSINESS_CATEGORY_ARTWORK: Record<string, string> = {
   workshop: '/images/business-categories/workshop.svg',
   general: '/images/business-categories/general.svg',
 };
-
-function mapNativeStoreToRecommendation(
-  item: HomeNativeStoreApiItem,
-  isId: boolean,
-): RecommendationItem | null {
-  const id = readText(item.id);
-  const slug = readText(item.slug);
-  const title = readText(item.name);
-  if (!id || !slug || !title) return null;
-
-  const metadata =
-    item.metadata &&
-    typeof item.metadata === 'object' &&
-    !Array.isArray(item.metadata)
-      ? (item.metadata as Record<string, unknown>)
-      : {};
-
-  const storefrontMedia = resolveStorefrontBrandMedia(metadata);
-  const placeKind = getUmkmPlaceKind({
-    id,
-    slug,
-    name: title,
-    description: readText(item.description) || null,
-    city: readText(item.city) || null,
-    address: readText(item.address) || null,
-    lat: Number(item.lat) || 0,
-    lng: Number(item.lng) || 0,
-    metadata,
-  });
-  // If the business has no approved/owner media yet, use the same category
-  // artwork used by the map/detail surfaces instead of an empty gray card.
-  const categoryArtwork = NATIVE_BUSINESS_CATEGORY_ARTWORK[placeKind];
-  const coverImage =
-    storefrontMedia.coverUrl ||
-    storefrontMedia.logoUrl ||
-    readText(metadata.cover_image) ||
-    readText(metadata.coverImage) ||
-    readText(metadata.logo_url) ||
-    readText(metadata.logoUrl) ||
-    categoryArtwork;
-  const galleryImages = Array.from(
-    new Set([
-      coverImage,
-      ...storefrontMedia.galleryUrls,
-    ].filter(Boolean)),
-  ).slice(0, 4);
-
-  const categoryLabel =
-    readText(metadata.category_label) ||
-    readText(metadata.segment) ||
-    readText(metadata.business_type) ||
-    (isId ? 'Usaha Lajukan' : 'Lajukan business');
-
-  const ratingValue = Number(metadata.rating);
-  const reviewCount = Number(metadata.review_count);
-  const ownerId =
-    readText(metadata.owner_id) ||
-    readText(metadata.owner_user_id) ||
-    null;
-
-  return {
-    id: `store:${id}`,
-    title,
-    summary:
-      readText(item.description) ||
-      readText(metadata.description) ||
-      (isId
-        ? 'Usaha yang terdaftar langsung di Lajukan.'
-        : 'Business registered directly on Lajukan.'),
-    vendor:
-      readText(metadata.owner_name) ||
-      readText(metadata.owner_full_name) ||
-      (isId ? 'Usaha Lajukan' : 'Lajukan business'),
-    location:
-      readText(item.city) ||
-      readText(item.address) ||
-      readText(metadata.city) ||
-      '',
-    rating:
-      Number.isFinite(ratingValue) && ratingValue > 0
-        ? ratingValue.toFixed(1)
-        : '-',
-    reviews:
-      Number.isFinite(reviewCount) && reviewCount >= 0
-        ? formatCompactCount(reviewCount, '0')
-        : '0',
-    price: '',
-    unit: '',
-    image: coverImage || undefined,
-    images: galleryImages,
-    href: buildUmkmMapPlacePath({
-      slug,
-      metadata: {
-        ...metadata,
-        is_public_reference: false,
-      },
-    }),
-    badge: isId ? 'Data Lajukan' : 'Lajukan data',
-    badgeTone: 'emerald',
-    typeLabel: categoryLabel,
-    createHref: '/usaha',
-    entityType: 'umkm',
-    distanceKm: null,
-    distanceLabel: null,
-    contentType: 'umkm',
-    verified:
-      metadata.verified === true ||
-      metadata.identity_verified === true ||
-      metadata.business_verified === true,
-    side: 'supply',
-    imageAttribution: undefined,
-    ownerId,
-    contentStatus: 'active',
-    updatedAt: readText(item.updated_at)
-      ? Date.parse(readText(item.updated_at))
-      : undefined,
-    sourcePriority: 0,
-  };
-}
 
 function mapContentToPublicReference(
   item: ContentItem,
@@ -2471,21 +2313,21 @@ function HomeListingCarouselSection({
         <h2 className="min-w-0 truncate text-[11px] font-bold leading-5 tracking-tight text-[color:var(--app-text)] sm:text-xs">
           {isDemand
             ? isId
-              ? 'Kebutuhan Pembeli'
-              : 'Buyer needs'
+              ? 'Yang sedang mencari'
+              : 'People are looking'
             : isId
-              ? 'Penawaran'
-              : 'Offers'}
+              ? 'Yang sedang menawarkan'
+              : 'People are offering'}
         </h2>
 
         <span className="hidden shrink-0 text-[9px] font-medium text-zinc-400 sm:inline">
           {isDemand
             ? isId
-              ? 'Pembeli yang membutuhkan produk, jasa, atau penyedia'
-              : 'Buyers who need products, services, or providers'
+              ? 'Orang yang sedang mencari produk, jasa, atau penyedia'
+              : 'People looking for products, services, or providers'
             : isId
-              ? 'Produk, jasa, tempat, dan sewa yang tersedia'
-              : 'Products, services, places, and rentals currently offered'}
+              ? 'Produk, jasa, alat, tempat, dan lainnya yang sedang ditawarkan'
+              : 'Products, services, tools, places, and more currently offered'}
         </span>
 
         <Link
@@ -3150,6 +2992,14 @@ function RecommendationCard({
               )}
             >
               {getListingSideContextLabel(item.side, item.contentType, isId ? 'id' : 'en')}
+            </span>
+          ) : null}
+          {item.sourceKind === 'lajukan_listing' ? (
+            <span
+              className="shrink-0 truncate rounded-full bg-emerald-50 px-2 py-1 text-[8px] font-black leading-none text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-200 sm:text-[9px]"
+              title={isId ? 'Diposting di Lajukan' : 'Posted on Lajukan'}
+            >
+              {isId ? 'Diposting di Lajukan' : 'Posted on Lajukan'}
             </span>
           ) : null}
         </div>
@@ -4135,33 +3985,6 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
       return fetchHomeContent(params, listingController.signal);
     };
 
-    const loadNativeBusinessStores = async () => {
-      const params = new URLSearchParams({
-        limit: '24',
-        map: '1',
-        include_references: '0',
-      });
-      // Home recommendations are not a nearby-only surface. Keep the
-      // first-party Lajukan pool global so registered businesses are not
-      // accidentally hidden just because the viewer is in another city.
-
-      const response = await fetch(
-        `/api/super-app/umkm/stores?${params.toString()}`,
-        {
-          cache: 'no-store',
-          credentials: 'include',
-          signal: listingController.signal,
-        },
-      );
-      const payload = (await response
-        .json()
-        .catch(() => null)) as HomeNativeStoreApiResponse | null;
-
-      if (!response.ok) throw new Error('native_businesses_unavailable');
-
-      return Array.isArray(payload?.data?.items) ? payload.data.items : [];
-    };
-
     const loadDemandListings = async () => {
       const params = new URLSearchParams({
         limit: String(HOME_MARKETPLACE_FETCH_LIMIT),
@@ -4201,14 +4024,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
     const loadHomeListings = async () => {
       setRecommendationsLoading(true);
       try {
-        const [contentItems, nativeStores] = await Promise.all([
-          loadListings().catch(() => []),
-          loadNativeBusinessStores().catch(() => []),
-        ]);
-
-        const nativeBusinessItems = nativeStores
-          .map(item => mapNativeStoreToRecommendation(item, isId))
-          .filter((item): item is RecommendationItem => Boolean(item));
+        const contentItems = await loadListings().catch(() => []);
 
         const transactionalSupplyItems = contentItems
           .filter(isHomeRecommendationEligible)
@@ -4224,7 +4040,6 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
 
         const listingItems = buildHomeSupplyItems(
           transactionalSupplyItems,
-          nativeBusinessItems,
           12,
         );
 
