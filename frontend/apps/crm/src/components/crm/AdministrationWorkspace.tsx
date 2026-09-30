@@ -115,6 +115,12 @@ export function AdministrationWorkspace() {
   };
 
   const transitionGovernance = async (kind: 'privacy' | 'security', id: string, status: string) => {
+    const destructive = ['completed', 'rejected', 'cancelled', 'closed', 'remediated'].includes(status);
+    if (destructive && !window.confirm(
+      kind === 'privacy'
+        ? 'Ubah status privacy request ke "' + status + '"? Pastikan keputusan sudah benar.'
+        : 'Ubah status security incident ke "' + status + '"? Pastikan langkah penanganan sudah benar.'
+    )) return;
     setGovernanceBusy(true);
     setMessage('');
     try {
@@ -155,6 +161,19 @@ export function AdministrationWorkspace() {
 
   const invite = async () => {
     if (!selected || !roles.length) return;
+    const duplicate = invitations.some(
+      invitation =>
+        invitation.invitee_user_id === selected.id &&
+        invitation.application === application &&
+        invitation.status === 'pending',
+    );
+    if (duplicate) {
+      setMessage('Undangan untuk akun dan aplikasi tersebut masih aktif. Jangan kirim ulang.');
+      return;
+    }
+    if (!window.confirm(
+      'Kirim undangan ' + application.toUpperCase() + ' ke @' + (selected.username || selected.email) + '?'
+    )) return;
     setBusy(true); setMessage('');
     try {
       await json('/api/backoffice/invitations', {
