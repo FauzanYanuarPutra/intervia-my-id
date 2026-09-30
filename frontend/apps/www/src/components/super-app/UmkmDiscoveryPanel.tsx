@@ -1086,11 +1086,16 @@ export function UmkmDiscoveryPanel({
   const [storesBackendDegraded, setStoresBackendDegraded] = useState(false);
   const [mapPoints, setMapPoints] = useState<UmkmMapStore[]>([]);
   const activeMapPointsRequestRef = useRef<AbortController | null>(null);
+  const storesRef = useRef<DiscoveryStore[]>([]);
   const mapBoundsDebounceRef = useRef<number | null>(null);
   const mapBoundsRequestKeyRef = useRef('');
   const requestLimit = Math.max(24, Math.min(60, Math.max(limit * 3, 24)));
   const referencePageLimit = 60;
   const MAP_POINT_FETCH_MAX = 1600;
+
+  useEffect(() => {
+    storesRef.current = stores;
+  }, [stores]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1535,7 +1540,7 @@ export function UmkmDiscoveryPanel({
               for (const point of incoming) merged.set(point.id, point);
               const entries = Array.from(merged.values());
               if (entries.length <= MAP_POINT_FETCH_MAX * 5) return entries;
-              const retainedIds = new Set(stores.map(store => store.id));
+              const retainedIds = new Set(storesRef.current.map(store => store.id));
               return entries.filter(
                 (point, index) =>
                   retainedIds.has(point.id) ||
@@ -1562,7 +1567,6 @@ export function UmkmDiscoveryPanel({
       discoveryScope,
       query,
       queryViewerLocation,
-      stores,
     ],
   );
 
