@@ -123,6 +123,10 @@ export function InviteMemberQuickForm({ businessId }: InviteMemberQuickFormProps
       return;
     }
 
+    if (!window.confirm(
+      'Kirim undangan kepada @' + selectedUser.username + ' sebagai ' + role + '?'
+    )) return;
+
     setError('');
     setSuccess('');
     setIsPending(true);
