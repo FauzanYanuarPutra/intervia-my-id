@@ -156,12 +156,6 @@ export function ExploreListingCard({
         <span className="absolute left-2 top-2 inline-flex min-h-7 items-center rounded-full border border-white/70 bg-white/90 px-2.5 text-[10px] font-black text-emerald-800 shadow-sm backdrop-blur">
           {sideLabel}
         </span>
-        <span
-          className="absolute bottom-2 right-2 inline-flex min-h-6 items-center rounded-full border border-emerald-100 bg-white/95 px-2 text-[9px] font-black text-emerald-700 shadow-sm backdrop-blur"
-          title={locale === 'id' ? 'Listing diposting di Lajukan' : 'Listing posted on Lajukan'}
-        >
-          {locale === 'id' ? 'Diposting di Lajukan' : 'Posted on Lajukan'}
-        </span>
         {isOwner && !isPublic ? (
           <span className="absolute right-2 top-2 inline-flex min-h-7 items-center gap-1 rounded-full border border-amber-200 bg-amber-50/95 px-2.5 text-[10px] font-black text-amber-900 shadow-sm backdrop-blur">
             <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
@@ -175,10 +169,7 @@ export function ExploreListingCard({
           <ListingIcon className="h-3.5 w-3.5 shrink-0 text-[color:var(--app-accent)]" aria-hidden="true" />
           <span className="truncate">{typeLabel}</span>
           {item.verified ? (
-            <span className="inline-flex shrink-0 items-center gap-1 text-emerald-700 dark:text-emerald-400">
-              <BadgeCheck className="h-3.5 w-3.5" aria-hidden="true" />
-              {locale === 'id' ? 'Terverifikasi' : 'Verified'}
-            </span>
+            <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-emerald-700 dark:text-emerald-400" aria-label={locale === 'id' ? 'Terverifikasi' : 'Verified'} />
           ) : null}
         </div>
 
@@ -189,36 +180,28 @@ export function ExploreListingCard({
           {item.title}
         </h3>
 
-        <p className="mt-2 truncate text-[15px] font-black leading-5 text-[color:var(--app-text)]">
+        <p className="mt-1.5 truncate text-[15px] font-black leading-5 text-[color:var(--app-text)]">
           {valueLabel}
         </p>
 
-        <div className="mt-2 min-h-9 space-y-1 text-[10px] font-medium text-[color:var(--app-text-soft)] sm:text-[11px]">
-          {item.ownerName ? (
-            <p className="flex min-w-0 items-center gap-1.5">
-              <Store className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-              <span className="truncate">{item.ownerName}</span>
-            </p>
-          ) : null}
-          {item.location ? (
-            <p className="flex min-w-0 items-center gap-1.5">
-              <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-              <span className="truncate">{item.location}</span>
-            </p>
-          ) : null}
-        </div>
+        {(item.location || item.ownerName) ? (
+          <p className="mt-1.5 flex min-w-0 items-center gap-1.5 truncate text-[10px] font-medium text-[color:var(--app-text-soft)] sm:text-[11px]">
+            {item.location ? <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> : <Store className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />}
+            <span className="truncate">{item.location || item.ownerName}</span>
+          </p>
+        ) : null}
 
         {interactive ? (
           <p className={cn(
-            "mt-auto flex items-center gap-1 pt-2 text-[10px] font-black sm:text-[11px]",
+            "mt-auto flex items-center gap-1 pt-2.5 text-[10px] font-black sm:text-[11px]",
             isOwner && !isPublic
               ? "text-amber-700 dark:text-amber-300"
               : "text-[color:var(--app-accent)]",
           )}>
             {isOwner && !isPublic ? <Pencil className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> : null}
-            {actionLabel}
+            <span className="truncate">{actionLabel}</span>
             {destinationHref ? (
-              <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" aria-hidden="true" />
+              <ArrowRight className="h-3.5 w-3.5 shrink-0 transition group-hover:translate-x-0.5" aria-hidden="true" />
             ) : null}
           </p>
         ) : null}

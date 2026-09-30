@@ -214,7 +214,7 @@ export function NeedSearchCard({
       data-testid="need-search-card"
       className={cn(
         'flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border bg-[color:var(--app-surface-strong)] shadow-[0_16px_34px_-30px_rgba(15,23,42,0.4)]',
-        hasImage ? 'min-h-[282px]' : 'min-h-[172px]',
+        hasImage ? 'min-h-[258px]' : 'min-h-[156px]',
         interactive &&
           'cursor-pointer transition duration-200 motion-reduce:transform-none hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:shadow-[0_20px_40px_-30px_rgba(15,23,42,0.32)]',
         searchCardBorderClass('blue'),
@@ -225,7 +225,7 @@ export function NeedSearchCard({
           src={imageSrc}
           alt={item.title}
           fallbackLabel={locale === 'id' ? 'Belum ada foto' : 'No photo yet'}
-          className="aspect-[16/7] w-full sm:aspect-[16/6]"
+          className="aspect-[16/8] w-full sm:aspect-[16/7]"
         />
       ) : null}
 
@@ -237,38 +237,35 @@ export function NeedSearchCard({
             tone="blue"
             sideLabel={sideStatusLabel}
           />
-          <span className="mt-1 inline-flex w-fit items-center rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[9px] font-black text-emerald-700">
-            {locale === 'id' ? 'Diposting di Lajukan' : 'Posted on Lajukan'}
-          </span>
         </div>
 
         <h3
           className={cn(
-            'mt-2 line-clamp-2 min-h-10 text-sm font-bold leading-5 text-[color:var(--app-text)] sm:text-[15px]',
+            'mt-1.5 line-clamp-2 min-h-10 text-sm font-bold leading-5 text-[color:var(--app-text)] sm:text-[15px]',
             interactive && 'group-hover:text-[#1d4ed8]',
           )}
         >
           {item.title}
         </h3>
 
-        <p className="mt-1 line-clamp-2 text-xs leading-5 text-[color:var(--app-text-soft)] sm:line-clamp-1">
+        <p className="mt-1 line-clamp-1 text-xs leading-5 text-[color:var(--app-text-soft)]">
           {item.summary ||
             (locale === 'id'
-              ? 'Pembeli belum menulis detail panjang. Buka brief untuk cek konteks dan tawarkan bantuan yang relevan.'
-              : 'The buyer has not added a long description. Open the brief to review context and offer relevant help.')}
+              ? 'Buka untuk melihat detail kebutuhan.'
+              : 'Open to view the full need details.')}
         </p>
 
         {visibleFactItems.length ? (
           <div
-            className="mt-2.5 flex flex-wrap gap-1.5 border-t border-[color:var(--app-border)] pt-2.5 text-[10px] sm:text-[11px]"
-            aria-label={locale === 'id' ? 'Info kebutuhan' : 'Need info'}
+            className="mt-2 flex min-w-0 items-center gap-1.5 overflow-hidden text-[10px] sm:text-[11px]"
+            aria-label={locale === 'id' ? 'Info utama kebutuhan' : 'Key need info'}
           >
-            {visibleFactItems.map(fact => {
+            {visibleFactItems.slice(0, 2).map(fact => {
               const FactIcon = fact.icon;
               return (
                 <span
                   key={fact.key}
-                  className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-full bg-[#eff6ff] px-2 py-1 font-semibold text-[#1d4ed8]"
+                  className="inline-flex min-w-0 max-w-[50%] items-center gap-1 rounded-full bg-[#eff6ff] px-2 py-1 font-semibold text-[#1d4ed8]"
                 >
                   <FactIcon className="h-3 w-3 shrink-0" aria-hidden="true" />
                   <span className="min-w-0 truncate">{fact.label}</span>
@@ -278,8 +275,8 @@ export function NeedSearchCard({
           </div>
         ) : null}
 
-        <div className="mt-auto pt-2.5">
-          <span className="inline-flex min-h-8 max-w-full items-center gap-1 rounded-lg bg-[#eff6ff] px-2.5 text-[10px] font-black text-[#1d4ed8] sm:text-[11px]">
+        <div className="mt-auto pt-2">
+          <span className="inline-flex min-h-8 max-w-full items-center gap-1 text-[10px] font-black text-[#1d4ed8] sm:text-[11px]">
             <span className="truncate">{action.label}</span>
             <ArrowRight
               className="h-3.5 w-3.5 shrink-0 transition group-hover:translate-x-0.5"

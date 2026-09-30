@@ -104,7 +104,6 @@ import {
 import { resolveContentPriceUnitLabel } from '@/lib/content/priceUnit';
 import { buildContentHref } from '@/lib/content/routes';
 import {
-  getListingSideContextLabel,
   getListingValueFallback,
   resolveListingSide,
 } from '@/lib/content/listingSide';
@@ -2890,7 +2889,7 @@ function RecommendationCard({
       {/* IMAGE */}
       <div
         className={cn(
-          'relative aspect-square w-full shrink-0 overflow-hidden',
+          'relative aspect-[4/3] w-full shrink-0 overflow-hidden',
           isDemand
             ? 'bg-blue-100 dark:bg-blue-950/60'
             : 'bg-zinc-100 dark:bg-zinc-900',
@@ -3014,50 +3013,13 @@ function RecommendationCard({
           </span>
         ) : null}
 
-        {/* VERIFIED */}
         {item.verified ? (
           <span
-            className="
-              absolute
-              bottom-2
-              left-2
-              inline-flex
-              items-center
-              gap-1.5
-              rounded-full
-              border
-              border-white/70
-              bg-white/92
-              px-2
-              py-1.5
-              text-[8px]
-              font-bold
-              leading-none
-              text-emerald-700
-              shadow-sm
-              backdrop-blur-md
-
-              sm:text-[9px]
-
-              dark:border-zinc-700/80
-              dark:bg-zinc-950/90
-              dark:text-emerald-400
-            "
+            className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-full border border-white/70 bg-white/92 px-2 py-1 text-[8px] font-bold leading-none text-emerald-700 shadow-sm backdrop-blur-md sm:text-[9px] dark:border-zinc-700/80 dark:bg-zinc-950/90 dark:text-emerald-400"
+            title={isId ? 'Terverifikasi' : 'Verified'}
           >
-            <span
-              aria-hidden="true"
-              className="
-                h-1.5
-                w-1.5
-                shrink-0
-                rounded-full
-                bg-emerald-500
-              "
-            />
-
-            <span>
-              {isId ? 'Terverifikasi' : 'Verified'}
-            </span>
+            <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+            {isId ? 'Terverifikasi' : 'Verified'}
           </span>
         ) : null}
       </div>
@@ -3124,72 +3086,15 @@ function RecommendationCard({
           />
         )}
 
-        {/* META */}
-        <div
-          className="
-            mt-3
-            flex
-            min-w-0
-            items-center
-            gap-2
-            border-t
-            border-zinc-100
-            pt-2.5
-
-            dark:border-zinc-900
-          "
-        >
-          {/* LOCATION */}
-          {locationLabel ? (
-            <span
-              title={locationLabel}
-              className="
-                min-w-0
-                flex-1
-                truncate
-                text-[9px]
-                font-medium
-                leading-4
-                text-zinc-500
-
-                min-[360px]:text-[10px]
-                sm:text-[11px]
-
-                dark:text-zinc-400
-              "
-            >
-              {locationLabel}
-            </span>
-          ) : (
-            <span
-              aria-hidden="true"
-              className="min-w-0 flex-1"
-            />
-          )}
-
-          {/* SIDE */}
-          {item.side ? (
-            <span
-              title={getListingSideContextLabel(item.side, item.contentType, isId ? 'id' : 'en')}
-              className={cn(
-                'max-w-[42%] shrink-0 truncate rounded-full px-2 py-1 text-[8px] font-bold leading-none sm:max-w-[45%] sm:text-[9px]',
-                isDemand
-                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-950/70 dark:text-blue-200'
-                  : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-900 dark:text-zinc-300',
-              )}
-            >
-              {getListingSideContextLabel(item.side, item.contentType, isId ? 'id' : 'en')}
-            </span>
-          ) : null}
-          {item.sourceKind === 'lajukan_listing' ? (
-            <span
-              className="shrink-0 truncate rounded-full bg-emerald-50 px-2 py-1 text-[8px] font-black leading-none text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-200 sm:text-[9px]"
-              title={isId ? 'Diposting di Lajukan' : 'Posted on Lajukan'}
-            >
-              {isId ? 'Diposting di Lajukan' : 'Posted on Lajukan'}
-            </span>
-          ) : null}
-        </div>
+        {locationLabel ? (
+          <p
+            title={locationLabel}
+            className="mt-2 flex min-w-0 items-center gap-1.5 truncate border-t border-zinc-100 pt-2 text-[9px] font-medium leading-4 text-zinc-500 dark:border-zinc-900 dark:text-zinc-400 min-[360px]:text-[10px] sm:text-[11px]"
+          >
+            <MapPin className="h-3 w-3 shrink-0" aria-hidden="true" />
+            <span className="truncate">{locationLabel}</span>
+          </p>
+        ) : null}
       </div>
     </a>
   );
