@@ -86,7 +86,7 @@ const MARKER_CLICK_FOCUS_ZOOM = 17;
 const MARKER_CLICK_FOCUS_STEP = 2;
 const MARKER_FOCUS_DURATION = 0.45;
 const AUTO_DOT_RENDER_THRESHOLD = 360;
-const VIEWPORT_RENDER_PADDING = 0.28;
+const VIEWPORT_RENDER_PADDING = 0.2;
 const MARKER_CLUSTER_FRAME_WIDTH_RATIO = 0.58;
 const MARKER_CLUSTER_FRAME_HEIGHT_RATIO = 0.5;
 const CLUSTER_POPUP_VISIBLE_LIMIT = 6;
@@ -1010,7 +1010,7 @@ function MapFocusController({
     // valid-point count in the focus key so the map fits again once the
     // real snapshot is available.
     const focusKey = focusMode
-      ? `${focusMode}:${focusNonce}:${validStores.length}`
+      ? `${focusMode}:${focusNonce ?? 0}`
       : null;
     const validSelectedStore = selectedStoreId
       ? validStores.find(store => store.id === selectedStoreId) || null
@@ -1907,7 +1907,7 @@ export function UmkmStoreMapClient({
     <MapContainer
       center={initialMapCenter}
       zoom={initialMapZoom}
-      minZoom={3}
+      minZoom={4}
       maxZoom={18}
       preferCanvas
       scrollWheelZoom={interactive}
