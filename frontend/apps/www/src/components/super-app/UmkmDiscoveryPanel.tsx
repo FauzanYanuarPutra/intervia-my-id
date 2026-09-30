@@ -47,6 +47,7 @@ import {
   getNextUmkmMapTheme,
   getUmkmMapThemeLabel,
   UmkmStoreMap,
+  type UmkmMapBounds,
   type UmkmMapRouteSummary,
   type UmkmMapStore,
   type UmkmMapTheme,
@@ -1085,11 +1086,11 @@ export function UmkmDiscoveryPanel({
   const [storesBackendDegraded, setStoresBackendDegraded] = useState(false);
   const [mapPoints, setMapPoints] = useState<UmkmMapStore[]>([]);
   const activeMapPointsRequestRef = useRef<AbortController | null>(null);
-  // Map points are loaded as a stable geo snapshot. Panning never starts a
-  // network request, so the map remains responsive while the user drags.
+  const mapBoundsDebounceRef = useRef<number | null>(null);
+  const mapBoundsRequestKeyRef = useRef('');
   const requestLimit = Math.max(24, Math.min(60, Math.max(limit * 3, 24)));
   const referencePageLimit = 60;
-  const mapPointLimit = 5000;
+  const MAP_POINT_FETCH_MAX = 1600;
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1414,95 +1415,168 @@ export function UmkmDiscoveryPanel({
       activeReferencesRequestRef.current?.abort();
     };
   }, [loadReferencesPage, query, city, discoveryScope]);
-  useEffect(() => {
-    activeMapPointsRequestRef.current?.abort();
-    const controller = new AbortController();
-    activeMapPointsRequestRef.current = controller;
+  const handleMapBoundsChange = useCallback(
+    (bounds: UmkmMapBounds) => {
+      if (
+        ![
+          bounds.minLat,
+          bounds.maxLat,
+          bounds.minLng,
+          bounds.maxLng,
+        ].every(Number.isFinite) ||
+        bounds.minLat > bounds.maxLat ||
+        bounds.minLng > bounds.maxLng
+      ) {
+        return;
+      }
 
-    // Load a stable nationwide geo-only snapshot once per search/location
-    // context. Panning the map never changes the request, so the user gets
-    // progressive nearest-to-farthest data without loading flashes.
-    const params = new URLSearchParams({
-      limit: String(mapPointLimit),
-    });
-    if (query?.trim()) params.set('q', query.trim());
-    if (city?.trim()) params.set('city', city.trim());
-    if (queryViewerLocation) {
-      params.set('viewer_lat', queryViewerLocation.lat.toFixed(3));
-      params.set('viewer_lng', queryViewerLocation.lng.toFixed(3));
-    }
+      const latSpan = bounds.maxLat - bounds.minLat;
+      const lngSpan = bounds.maxLng - bounds.minLng;
+      const viewportSpan = Math.max(latSpan, lngSpan);
+      const fetchLimit = Math.min(
+        MAP_POINT_FETCH_MAX,
+        viewportSpan >= 30 ? 500 : viewportSpan >= 12 ? 750 : viewportSpan >= 4 ? 1000 : 1400,
+      );
+      const requestKey = [
+        query?.trim().toLowerCase() || '',
+        city?.trim().toLowerCase() || '',
+        category?.trim().toLowerCase() || '',
+        discoveryScope,
+        bounds.minLat.toFixed(3),
+        bounds.maxLat.toFixed(3),
+        bounds.minLng.toFixed(3),
+        bounds.maxLng.toFixed(3),
+        queryViewerLocation?.lat.toFixed(3) || '',
+        queryViewerLocation?.lng.toFixed(3) || '',
+        fetchLimit,
+      ].join('|');
 
-    const timerId = window.setTimeout(() => {
-      void fetch(`/api/super-app/umkm/map-points?${params.toString()}`, {
-        cache: 'default',
-        signal: controller.signal,
-      })
-      .then(async response => {
-        const payload = (await response.json().catch(() => ({}))) as MapPointResponse;
-        if (!response.ok || controller.signal.aborted) return;
-        const points = payload.data?.items || [];
-        setMapPoints(
-          points
-            .filter(point => isCoordinateValid({ lat: point.lat, lng: point.lng }))
-            .map(point => ({
-              id: point.id,
-              slug: point.slug,
-              name: point.name,
-              city: point.city || 'Indonesia',
-              address: point.city || 'Indonesia',
-              lat: point.lat,
-              lng: point.lng,
-              description: null,
-              phone: null,
-              metadata: {
-                ...(point.metadata || {}),
-                marketplace_category_slug:
-                  point.metadata?.marketplace_category_slug || point.category,
-                umkm_category:
-                  point.metadata?.umkm_category,
-                source_kind: point.source_kind,
-                record_kind:
-                  point.source_kind.includes('reference')
-                    ? point.metadata?.record_kind || 'open_data_reference'
-                    : point.metadata?.record_kind || 'registered_store',
-                market_side:
-                  point.source_kind.includes('reference')
-                    ? 'reference'
-                    : point.metadata?.market_side || 'supply',
-                is_transactional:
-                  !point.source_kind.includes('reference'),
-                reference_publication_status:
-                  point.source_kind.includes('reference')
-                    ? 'published'
-                    : point.metadata?.reference_publication_status,
-                claimable: point.source_kind.includes('reference'),
-                source_dataset: point.metadata?.source_dataset || point.source_kind,
-                is_public_reference: point.source_kind.includes('reference'),
-              },
-              online_order_enabled: false,
-              offline_order_enabled: false,
-              reservation_enabled: false,
-              table_count: 0,
-              available_table_count: 0,
-              max_table_capacity: 0,
-            })),
-        );
-      })
-        .catch(error => {
-          if (!controller.signal.aborted) {
-            console.warn('[UMKM_MAP_POINTS_CLIENT_ERROR]', error);
-          }
+      if (mapBoundsRequestKeyRef.current === requestKey) return;
+      mapBoundsRequestKeyRef.current = requestKey;
+      if (mapBoundsDebounceRef.current !== null) {
+        window.clearTimeout(mapBoundsDebounceRef.current);
+      }
+
+      mapBoundsDebounceRef.current = window.setTimeout(() => {
+        mapBoundsDebounceRef.current = null;
+        activeMapPointsRequestRef.current?.abort();
+        const controller = new AbortController();
+        activeMapPointsRequestRef.current = controller;
+
+        const params = new URLSearchParams({
+          limit: String(fetchLimit),
+          min_lat: bounds.minLat.toFixed(5),
+          max_lat: bounds.maxLat.toFixed(5),
+          min_lng: bounds.minLng.toFixed(5),
+          max_lng: bounds.maxLng.toFixed(5),
         });
-    }, 320);
+        if (query?.trim()) params.set('q', query.trim());
+        if (city?.trim()) params.set('city', city.trim());
+        if (category?.trim() && category !== 'all') params.set('category', category.trim());
+        if (queryViewerLocation) {
+          params.set('viewer_lat', queryViewerLocation.lat.toFixed(5));
+          params.set('viewer_lng', queryViewerLocation.lng.toFixed(5));
+        }
 
+        void fetch(`/api/super-app/umkm/map-points?${params.toString()}`, {
+          cache: 'default',
+          signal: controller.signal,
+        })
+          .then(async response => {
+            const payload = (await response.json().catch(() => ({}))) as MapPointResponse;
+            if (!response.ok || controller.signal.aborted) return;
+
+            const incoming = (payload.data?.items || [])
+              .filter(point => isCoordinateValid({ lat: point.lat, lng: point.lng }))
+              .map(
+                point =>
+                  ({
+                    id: point.id,
+                    slug: point.slug,
+                    name: point.name,
+                    city: point.city || 'Indonesia',
+                    address: point.city || 'Indonesia',
+                    lat: point.lat,
+                    lng: point.lng,
+                    description: null,
+                    phone: null,
+                    metadata: {
+                      ...(point.metadata || {}),
+                      marketplace_category_slug:
+                        point.metadata?.marketplace_category_slug || point.category,
+                      umkm_category: point.metadata?.umkm_category,
+                      source_kind: point.source_kind,
+                      record_kind: point.source_kind.includes('reference')
+                        ? point.metadata?.record_kind || 'open_data_reference'
+                        : point.metadata?.record_kind || 'registered_store',
+                      market_side: point.source_kind.includes('reference')
+                        ? 'reference'
+                        : point.metadata?.market_side || 'supply',
+                      is_transactional: !point.source_kind.includes('reference'),
+                      reference_publication_status: point.source_kind.includes('reference')
+                        ? 'published'
+                        : point.metadata?.reference_publication_status,
+                      claimable: point.source_kind.includes('reference'),
+                      source_dataset:
+                        point.metadata?.source_dataset || point.source_kind,
+                      is_public_reference: point.source_kind.includes('reference'),
+                    },
+                    online_order_enabled: false,
+                    offline_order_enabled: false,
+                    reservation_enabled: false,
+                    table_count: 0,
+                    available_table_count: 0,
+                    max_table_capacity: 0,
+                  } satisfies UmkmMapStore),
+              );
+
+            setMapPoints(current => {
+              const merged = new Map(current.map(point => [point.id, point]));
+              for (const point of incoming) merged.set(point.id, point);
+              const entries = Array.from(merged.values());
+              if (entries.length <= MAP_POINT_FETCH_MAX * 5) return entries;
+              const retainedIds = new Set(stores.map(store => store.id));
+              return entries.filter(
+                (point, index) =>
+                  retainedIds.has(point.id) ||
+                  index >= entries.length - MAP_POINT_FETCH_MAX * 5,
+              );
+            });
+          })
+          .catch(error => {
+            if (!controller.signal.aborted) {
+              console.warn('[UMKM_MAP_POINTS_CLIENT_ERROR]', error);
+            }
+          })
+          .finally(() => {
+            if (activeMapPointsRequestRef.current === controller) {
+              activeMapPointsRequestRef.current = null;
+            }
+          });
+      }, 180);
+    },
+    [
+      MAP_POINT_FETCH_MAX,
+      category,
+      city,
+      discoveryScope,
+      query,
+      queryViewerLocation,
+      stores,
+    ],
+  );
+
+  useEffect(() => {
+    mapBoundsRequestKeyRef.current = '';
+    setMapPoints([]);
+    activeMapPointsRequestRef.current?.abort();
     return () => {
-      window.clearTimeout(timerId);
-      controller.abort();
-      if (activeMapPointsRequestRef.current === controller) {
-        activeMapPointsRequestRef.current = null;
+      if (mapBoundsDebounceRef.current !== null) {
+        window.clearTimeout(mapBoundsDebounceRef.current);
+        mapBoundsDebounceRef.current = null;
       }
     };
-  }, [city, mapPointLimit, query, queryViewerLocation]);
+  }, [category, city, discoveryScope, query, queryViewerLocation]);
 
   const preparedStores = useMemo(
     () =>
