@@ -315,6 +315,19 @@ function buildHomeSupplyItems(
     )
     .slice(0, maxItems);
 }
+function rankHomeDemandRecommendations(
+  items: RecommendationItem[],
+): RecommendationItem[] {
+  return [...items].sort((left, right) => {
+    const updatedDelta = (right.updatedAt ?? 0) - (left.updatedAt ?? 0);
+    if (updatedDelta !== 0) return updatedDelta;
+
+    const scoreDelta = recommendationScore(right) - recommendationScore(left);
+    if (scoreDelta !== 0) return scoreDelta;
+
+    return left.id.localeCompare(right.id);
+  });
+}
 
 type PublicReferenceItem = {
   id: string;
@@ -3990,6 +4003,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
         limit: String(HOME_MARKETPLACE_FETCH_LIMIT),
         status: 'active',
         side: 'demand',
+        sort: 'newest',
         include_owner: '1',
         database_only: '1',
         marketplace_only: '1',
@@ -4056,7 +4070,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
     const loadHomeDemandListings = async () => {
       setDemandRecommendationsLoading(true);
       try {
-        const listingItems = rankRecommendations(
+        const listingItems = rankHomeDemandRecommendations(
           (await loadDemandListings())
             .filter(isHomeRecommendationEligible)
             .map(item =>
