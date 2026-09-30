@@ -102,7 +102,7 @@ function readPublicGalleryItems(
     if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
     const item = value as Record<string, unknown>;
     const url = typeof item.url === 'string' ? item.url.trim() : '';
-    if (!url) return [];
+    if (!isRenderablePublicMediaUrl(url)) return [];
     return [{
       id:
         typeof item.id === 'string' && item.id.trim()
@@ -155,7 +155,7 @@ async function getApprovedPublicGalleryItems(
           : typeof item.url === 'string'
             ? item.url.trim()
             : '';
-      if (!url) return [];
+      if (!isRenderablePublicMediaUrl(url)) return [];
       return [{
         id:
           typeof item.id === 'string' && item.id.trim()
@@ -193,6 +193,18 @@ function formatIdr(valueCents: number): string {
 
 function isPlaceholderImage(image: string): boolean {
   return image.includes('/images/placeholders/');
+}
+
+function isRenderablePublicMediaUrl(value: string): boolean {
+  const url = value.trim();
+  if (!url || url.toLowerCase() === 'invalid media url') return false;
+  if (url.startsWith('/')) return true;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
 }
 
 function productImage(product: UmkmProduct): string | null {
