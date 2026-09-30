@@ -23,8 +23,65 @@ jobs:
         uses: actions/checkout@v7
         with:
           ref: main
-          clean: true
+          clean: false
           fetch-depth: 1
+
+      - name: Sync tracked source to origin/main
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          git fetch --no-tags --prune origin main
+          git reset --hard origin/main
+          $local = (git rev-parse HEAD).Trim()
+          $remote = (git rev-parse origin/main).Trim()
+          if ($local -ne $remote) {
+            throw "Runner source mismatch: HEAD=$local origin/main=$remote"
+          }
+          Write-Host "Source revision: $local"
+          git status --short
+
+      - name: Verify tracked source integrity
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          if (-not (git ls-files | Select-Object -First 1)) {
+            throw "No tracked files found after checkout."
+          }
+
+          $conflicts = git grep -n -I -E '^(<<<<<<<|=======|>>>>>>>)' 2>$null
+          if ($LASTEXITCODE -eq 0 -and $conflicts) {
+            $conflicts | Write-Host
+            throw "Merge-conflict markers found in tracked source."
+          }
+
+          git diff --check --cached
+          git diff --check
+
+          $critical = @(
+            "up.ps1",
+            "docker-compose.yml",
+            "frontend/apps/www/src/components/home/HomeBusinessMapSection.tsx",
+            "frontend/apps/crm/src/components/NewsEditorialWorkspace.tsx",
+            "frontend/apps/crm/src/lib/normalizeMultilineText.ts"
+          )
+          foreach ($path in $critical) {
+            if (-not (Test-Path (Join-Path $env:GITHUB_WORKSPACE $path))) {
+              throw "Critical file missing: $path"
+            }
+          }
+
+          $normalizer = Get-Content -Raw (Join-Path $env:GITHUB_WORKSPACE "frontend/apps/crm/src/lib/normalizeMultilineText.ts")
+          if ($normalizer -notmatch "export function normalizeMultilineText") {
+            throw "Multiline normalizer source is missing or malformed."
+          }
+
+          $newsWorkspace = Get-Content -Raw (Join-Path $env:GITHUB_WORKSPACE "frontend/apps/crm/src/components/NewsEditorialWorkspace.tsx")
+          if ($newsWorkspace -match "function normalizeMultilineText\(") {
+            throw "NewsEditorialWorkspace still contains the old inline normalizer; expected shared normalizer."
+          }
+
+          Write-Host "Source integrity checks passed."
 
       - name: Prepare run directories
         shell: pwsh
@@ -102,6 +159,7 @@ jobs:
 
           Write-Host "Checking Personal AI storage..."
           & docker compose @compose exec -T www node -e 'const {Client}=require("pg");(async()=>{const url=process.env.SUPER_APP_POSTGRES_URL;if(!url)throw new Error("SUPER_APP_POSTGRES_URL is missing");const client=new Client({connectionString:url});await client.connect();const result=await client.query("SELECT COUNT(*)::int AS count FROM information_schema.tables WHERE table_schema=$1 AND table_name=ANY($2::text[])",["public",["personal_ai_agents","personal_ai_threads","personal_ai_messages"]]);if(Number(result.rows[0]?.count||0)!==3)throw new Error("Personal AI tables are missing");await client.end();console.log("Personal AI storage: ready");})().catch(error=>{console.error("Personal AI storage:",error.message);process.exit(1)})'
+
       - name: Collect Docker diagnostics
         if: always()
         shell: pwsh
@@ -153,6 +211,7 @@ jobs:
             "Resource / memory / disk" = '(?i)out of memory|cannot allocate memory|no space left on device|ENOSPC|signal: killed'
             "PowerShell / launcher" = '(?i)CommandNotFoundException|ParameterBindingException|At .*\.ps1:\d+'
             "Personal AI storage" = '(?i)SUPER_APP_POSTGRES_URL is missing|Personal AI tables are missing|PERSONAL_AI_STORAGE_UNAVAILABLE'
+            "Source sync / integrity" = '(?i)Runner source mismatch|Merge-conflict markers found|Critical file missing|source is missing or malformed|old inline normalizer'
           }
 
           Add-Content $env:GITHUB_STEP_SUMMARY "## Lajukan local run"
