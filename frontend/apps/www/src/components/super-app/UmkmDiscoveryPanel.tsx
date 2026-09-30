@@ -2192,6 +2192,7 @@ export function UmkmDiscoveryPanel({
             focusMode={mapFocusMode}
             focusNonce={mapFocusNonce}
             focusOffset={viewerFocusOffset}
+            onBoundsChange={handleMapBoundsChange}
             onSelectStore={
               edgeToEdge ? handleEdgeMapSelectStore : handleMapSelectStore
             }
@@ -2274,6 +2275,7 @@ export function UmkmDiscoveryPanel({
       bumpMapFocus,
       cycleMapTheme,
       handleEdgeMapSelectStore,
+      handleMapBoundsChange,
       handleMapSelectStore,
       isId,
       locating,
