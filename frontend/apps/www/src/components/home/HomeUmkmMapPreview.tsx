@@ -185,7 +185,13 @@ export default function HomeUmkmCard({
       ? (metadata.image_credit as Record<string, unknown>)
       : {};
   const imageProvider =
-    typeof imageCredit.provider === 'string' ? imageCredit.provider.trim() : '';
+    typeof imageCredit.provider === 'string'
+      ? imageCredit.provider.trim()
+      : typeof metadata.image_source_provider === 'string'
+        ? metadata.image_source_provider.trim()
+        : typeof metadata.source_provider === 'string'
+          ? metadata.source_provider.trim()
+          : '';
   const href = store.slug ? buildUmkmMapPlacePath(store) : UMKM_DISCOVERY_PATH;
   const distanceLabel = formatDistance(store.distance_km);
   const locationLabel =
