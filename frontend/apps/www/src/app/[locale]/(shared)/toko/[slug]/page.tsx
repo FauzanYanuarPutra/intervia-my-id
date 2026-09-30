@@ -73,7 +73,7 @@ function hasMetaKey(
   return keys.some(key => Object.prototype.hasOwnProperty.call(metadata, key));
 }
 
-function isReferenceLocation(store: Pick<UmkmStore, 'metadata'>): boolean {
+function isReferenceLocation(\n  store: Pick<UmkmStore, 'is_active' | 'metadata'>,\n): boolean {
   return isPublicUmkmReferenceVisible(store);
 }
 
