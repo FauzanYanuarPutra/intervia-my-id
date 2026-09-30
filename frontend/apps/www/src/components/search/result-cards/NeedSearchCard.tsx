@@ -214,7 +214,7 @@ export function NeedSearchCard({
       data-testid="need-search-card"
       className={cn(
         'flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border bg-[color:var(--app-surface-strong)] shadow-[0_16px_34px_-30px_rgba(15,23,42,0.4)]',
-        hasImage ? 'min-h-[258px]' : 'min-h-[156px]',
+        hasImage ? 'min-h-[214px]' : 'min-h-[142px]',
         interactive &&
           'cursor-pointer transition duration-200 motion-reduce:transform-none hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:shadow-[0_20px_40px_-30px_rgba(15,23,42,0.32)]',
         searchCardBorderClass('blue'),
@@ -225,11 +225,11 @@ export function NeedSearchCard({
           src={imageSrc}
           alt={item.title}
           fallbackLabel={locale === 'id' ? 'Belum ada foto' : 'No photo yet'}
-          className="aspect-[16/8] w-full sm:aspect-[16/7]"
+          className="aspect-[16/5.5] w-full sm:aspect-[16/6]"
         />
       ) : null}
 
-      <div className="flex min-w-0 flex-1 flex-col p-3 sm:p-3.5">
+      <div className="flex min-w-0 flex-1 flex-col p-2.5 sm:p-3">
         <div className="min-w-0 w-full">
           <SearchCardEyebrow
             icon={Clock3}
@@ -248,16 +248,15 @@ export function NeedSearchCard({
           {item.title}
         </h3>
 
-        <p className="mt-1 line-clamp-1 text-xs leading-5 text-[color:var(--app-text-soft)]">
-          {item.summary ||
-            (locale === 'id'
-              ? 'Buka untuk melihat detail kebutuhan.'
-              : 'Open to view the full need details.')}
-        </p>
+        {item.summary ? (
+          <p className="mt-1 line-clamp-1 text-[11px] leading-4 text-[color:var(--app-text-soft)]">
+            {item.summary}
+          </p>
+        ) : null}
 
         {visibleFactItems.length ? (
           <div
-            className="mt-2 flex min-w-0 items-center gap-1.5 overflow-hidden text-[10px] sm:text-[11px]"
+            className="mt-1.5 flex min-w-0 items-center gap-1 overflow-hidden text-[9px] sm:text-[10px]"
             aria-label={locale === 'id' ? 'Info utama kebutuhan' : 'Key need info'}
           >
             {visibleFactItems.slice(0, 2).map(fact => {
@@ -276,7 +275,7 @@ export function NeedSearchCard({
         ) : null}
 
         <div className="mt-auto pt-2">
-          <span className="inline-flex min-h-8 max-w-full items-center gap-1 text-[10px] font-black text-[#1d4ed8] sm:text-[11px]">
+          <span className="inline-flex min-h-7 max-w-full items-center gap-1 text-[10px] font-black text-[#1d4ed8]">
             <span className="truncate">{action.label}</span>
             <ArrowRight
               className="h-3.5 w-3.5 shrink-0 transition group-hover:translate-x-0.5"
