@@ -55,7 +55,7 @@ describe('search result card preview mode', () => {
       />,
     );
 
-    expect(html).toContain('Membutuhkan');
+    expect(html).toContain('Kebutuhan Pembeli');
     expect(html).toContain('Budget fleksibel');
     expect(html).not.toContain('LAJUKAN');
     expect(html).not.toContain('Buka brief');
@@ -107,7 +107,7 @@ describe('search result card preview mode', () => {
             requestStatus: 'open',
             quantity: '500',
             unit: 'pcs',
-            need_frequency: 'monthly',
+            need_frequency: undefined,
           },
         }}
         locale="id"
