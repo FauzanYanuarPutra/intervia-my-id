@@ -114,7 +114,7 @@ describe('UMKM public-reference presentation', () => {
     );
 
     expect(html).toContain('data-testid="umkm-public-reference-card"');
-    expect(html).toContain('aria-label="Detail referensi Pasar Uji"');
+    expect(html).toContain('aria-label="Detail lokasi usaha Pasar Uji"');
     expect(html).toContain('Sumber asli');
     expect(html).toContain('Rute');
     expect(html).not.toContain('Baru');
