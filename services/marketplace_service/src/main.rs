@@ -15624,7 +15624,6 @@ async fn request_transaction_correction(
             }),
         )
         .await;
-    }
 
     (
         StatusCode::ACCEPTED,
