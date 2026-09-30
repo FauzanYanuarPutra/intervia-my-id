@@ -49,6 +49,7 @@ mod order_engine;
 mod outbox;
 mod reference_promotion;
 mod runtime_metrics;
+mod umkm_media_contributions;
 mod schema_contract;
 mod wallet_support;
 use auth::{auth_claims_from_headers, user_id_from_auth, user_id_from_token_string, AccessClaims};
@@ -60,6 +61,7 @@ use identity_projection::{
     run_identity_event_consumer, run_identity_inbox_processor, IdentityProjectionConfig,
 };
 use order_engine::{create_order, get_order, list_orders, transition_order};
+use umkm_media_contributions::{create_media_contribution, list_media_contributions};
 use outbox::{run_outbox_publisher, OutboxPublisherConfig};
 use wallet_support::*;
 
@@ -2367,6 +2369,10 @@ async fn main() -> anyhow::Result<()> {
         .route(
             "/v1/umkm/stores/{store_ref}/gallery-likes",
             get(get_umkm_store_gallery_like_state).put(update_umkm_store_gallery_like),
+        )
+        .route(
+            "/v1/umkm/stores/{store_ref}/media/contributions",
+            get(list_media_contributions).post(create_media_contribution),
         )
         .route(
             "/v1/umkm/stores/{store_ref}/products",

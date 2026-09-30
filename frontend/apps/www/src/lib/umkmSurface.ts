@@ -270,15 +270,15 @@ export function getUmkmMapSourceLabel(
   isId: boolean,
 ): string {
   if (kind === 'lajukan') {
-    return isId ? 'Terdaftar di Lajukan' : 'Registered on Lajukan';
+    return isId ? 'Usaha Lajukan' : 'Lajukan business';
   }
   if (kind === 'registered') {
-    return isId ? 'Data usaha luar' : 'External business data';
-  }
-  if (kind === 'reference') {
     return isId ? 'Lokasi usaha' : 'Business location';
   }
-  return isId ? 'Sumber belum jelas' : 'Source unclear';
+  if (kind === 'reference') {
+    return isId ? 'Lokasi publik' : 'Public location';
+  }
+  return isId ? 'Lokasi terdata' : 'Mapped location';
 }
 
 
@@ -323,14 +323,8 @@ export function buildUmkmMapPlacePath(place: UmkmMapLinkTarget): string {
     return slug ? `/content/${encodeURIComponent(slug)}` : '/explore';
   }
 
-  // External/public business locations may still be represented as a store
-  // record. Keep the same detail surface, which also exposes provenance and
-  // community media contributions.
+  // Public references use the storefront-compatible detail surface.
   if (isUmkmMapPublicReference(place)) {
-    const publicPath =
-      readSafePublicPath(place.public_path) ||
-      readSafePublicPath(metadata.public_path);
-    if (publicPath) return publicPath;
     return buildUmkmStorefrontPath(place.slug?.trim() || '');
   }
 

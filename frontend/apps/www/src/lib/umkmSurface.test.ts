@@ -23,7 +23,7 @@ describe('UMKM public route helpers', () => {
     );
   });
 
-  it('routes public map references to their content detail', () => {
+  it('routes public map references to the storefront detail surface', () => {
     const reference = {
       slug: 'osm-node-1',
       public_path: '/content/pasar-uji-reference-id',
@@ -34,9 +34,7 @@ describe('UMKM public route helpers', () => {
     };
 
     expect(isUmkmMapPublicReference(reference)).toBe(true);
-    expect(buildUmkmMapPlacePath(reference)).toBe(
-      '/content/pasar-uji-reference-id',
-    );
+    expect(buildUmkmMapPlacePath(reference)).toBe('/toko/osm-node-1');
   });
 
   it('does not accept an external or protocol-relative reference path', () => {

@@ -122,6 +122,65 @@ function readPublicGalleryItems(
   });
 }
 
+const MARKETPLACE_URL =
+  process.env.INTERNAL_MARKETPLACE_URL ||
+  process.env.MARKETPLACE_URL ||
+  'http://localhost:8081';
+
+async function getApprovedPublicGalleryItems(
+  storeId: string,
+): Promise<PublicGalleryItem[]> {
+  try {
+    const response = await fetch(
+      `${MARKETPLACE_URL}/v1/umkm/stores/${encodeURIComponent(storeId)}/media/contributions`,
+      {
+        cache: 'no-store',
+        signal: AbortSignal.timeout(3000),
+      },
+    );
+    if (!response.ok) return [];
+    const payload = (await response.json().catch(() => ({}))) as {
+      data?: { items?: unknown[] };
+    };
+    if (!Array.isArray(payload.data?.items)) return [];
+
+    return payload.data.items.flatMap((value, itemIndex) => {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
+      const item = value as Record<string, unknown>;
+      const url =
+        typeof item.media_url === 'string'
+          ? item.media_url.trim()
+          : typeof item.url === 'string'
+            ? item.url.trim()
+            : '';
+      if (!url) return [];
+      return [{
+        id:
+          typeof item.id === 'string' && item.id.trim()
+            ? item.id.trim()
+            : `approved-${itemIndex + 1}`,
+        url,
+        mediaType: item.media_type === 'video' ? 'video' : 'image',
+        caption:
+          typeof item.caption === 'string'
+            ? item.caption.trim().slice(0, 240)
+            : '',
+        uploaderName:
+          typeof item.uploader_name === 'string'
+            ? item.uploader_name.trim().slice(0, 120)
+            : '',
+        uploaderUsername:
+          typeof item.uploader_username === 'string'
+            ? item.uploader_username.trim().slice(0, 80)
+            : '',
+      }];
+    });
+  } catch {
+    return [];
+  }
+}
+
+
 function formatIdr(valueCents: number): string {
   return new Intl.NumberFormat('id-ID', {
     style: 'currency',
@@ -160,6 +219,7 @@ function StoreMediaGallery({
   storeName,
   storeSlug,
   metadata,
+  approvedContributions,
   locale,
   isId,
 }: {
@@ -167,10 +227,21 @@ function StoreMediaGallery({
   storeName: string;
   storeSlug: string;
   metadata: Record<string, unknown>;
+  approvedContributions: PublicGalleryItem[];
   locale: string;
   isId: boolean;
 }) {
-  const galleryItems = readPublicGalleryItems(metadata);
+  storeId: string;
+  storeName: string;
+  storeSlug: string;
+  metadata: Record<string, unknown>;
+  locale: string;
+  isId: boolean;
+}) {
+  const galleryItems = [
+    ...approvedContributions,
+    ...readPublicGalleryItems(metadata),
+  ];
   const brandMedia = resolveStorefrontBrandMedia(metadata);
   const imageUrls = Array.from(
     new Set([
@@ -506,6 +577,7 @@ export default async function TokoPage({ params }: PageProps) {
   const publicUrl = `${baseUrl}/${locale}/toko/${store.slug}`;
   const metadata =
     store.metadata && typeof store.metadata === 'object' ? store.metadata : {};
+  const approvedContributions = await getApprovedPublicGalleryItems(store.id);
   const catalog = referenceLocation
     ? { status: 'ready' as const, products: [] as UmkmProduct[] }
     : await getStoreProducts(storedStore);
@@ -845,6 +917,7 @@ export default async function TokoPage({ params }: PageProps) {
             storeName={store.name}
             storeSlug={store.slug}
             metadata={metadata}
+            approvedContributions={approvedContributions}
             locale={locale}
             isId={isId}
           />

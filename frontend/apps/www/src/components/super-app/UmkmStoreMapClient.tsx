@@ -518,8 +518,8 @@ function StorePreviewCard({
   const imageUrl = readStoreImageUrl(store);
   const statusLabel = isReference
     ? isId
-      ? 'Lokasi usaha'
-      : 'Business location'
+      ? 'Lokasi publik'
+      : 'Public location'
     : ui.openNow === true
       ? isId
         ? 'Buka'
