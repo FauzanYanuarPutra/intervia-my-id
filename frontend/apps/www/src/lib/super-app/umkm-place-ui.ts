@@ -486,7 +486,7 @@ function getManagedPresenceStatus(
         : 'Operating hours are not verified',
       openNow: null,
       liveNow: null,
-      statusLabel: isId ? 'Referensi publik' : 'Public reference',
+      statusLabel: isId ? 'Lokasi usaha' : 'Business location',
       statusTone: 'muted',
       locationMode: 'fixed',
       locationModeLabel: isId ? 'Titik referensi' : 'Reference point',
@@ -613,8 +613,8 @@ function getServiceBadges(
 ): string[] {
   if (isUmkmMapPublicReference(place)) {
     return isId
-      ? ['Referensi publik', 'Cek sumber asli']
-      : ['Public reference', 'Check original source'];
+      ? ['Lokasi usaha', 'Cek sumber asli']
+      : ['Business location', 'Check original source'];
   }
 
   const kind = getUmkmPlaceKind(place);
@@ -710,8 +710,8 @@ export function buildUmkmPlacePresentation(
   const presenceStatus = getManagedPresenceStatus(place, isId);
   const categoryLabel = isPublicReference
     ? isId
-      ? 'Referensi publik'
-      : 'Public reference'
+      ? 'Lokasi usaha'
+      : 'Business location'
     : businessCategory
       ? getUmkmBusinessCategoryLabel(businessCategory, isId)
       : kindMeta.kindLabel === 'UMKM'
@@ -797,8 +797,8 @@ export function buildUmkmPlacePresentation(
     categoryLabel,
     kindLabel: isPublicReference
       ? isId
-        ? 'Referensi'
-        : 'Reference'
+        ? 'Lokasi usaha'
+        : 'Business location'
       : kindMeta.kindLabel,
     shortKindLabel: isPublicReference ? 'R' : kindMeta.shortKindLabel,
     markerTone: kindMeta.markerTone,
