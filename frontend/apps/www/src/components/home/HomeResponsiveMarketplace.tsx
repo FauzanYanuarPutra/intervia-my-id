@@ -2629,8 +2629,8 @@ export function PublicReferencesSection({
       data-testid="home-public-references-section"
       aria-label={
         isId
-          ? 'Referensi lokasi usaha dari data publik'
-          : 'Business location references from public data'
+          ? 'Lokasi usaha dari data publik'
+          : 'Business locations from public data'
       }
     >
       {/* HEADER */}
@@ -2638,11 +2638,11 @@ export function PublicReferencesSection({
         <Globe2 className="h-3.5 w-3.5 shrink-0 text-blue-600" />
 
         <h2 className="truncate text-[11px] font-bold leading-none tracking-tight text-[color:var(--app-text)] sm:text-xs">
-          {isId ? 'Referensi usaha sekitar' : 'Nearby references'}
+          {isId ? 'Lokasi usaha sekitar' : 'Nearby business locations'}
         </h2>
 
         <span className="hidden text-[9px] font-medium text-zinc-400 sm:inline">
-          {isId ? 'Data publik' : 'Public data'}
+          {isId ? 'Data lokasi publik' : 'Public location data'}
         </span>
       </div>
 
@@ -2725,7 +2725,7 @@ export function PublicReferencesSection({
                       backdrop-blur
                     "
                   >
-                    {isId ? 'Referensi publik' : 'Public reference'}
+                    {isId ? 'Lokasi usaha' : 'Business location'}
                   </span>
                 </div>
 
@@ -3013,15 +3013,6 @@ function RecommendationCard({
           </span>
         ) : null}
 
-        {item.verified ? (
-          <span
-            className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-full border border-white/70 bg-white/92 px-2 py-1 text-[8px] font-bold leading-none text-emerald-700 shadow-sm backdrop-blur-md sm:text-[9px] dark:border-zinc-700/80 dark:bg-zinc-950/90 dark:text-emerald-400"
-            title={isId ? 'Terverifikasi' : 'Verified'}
-          >
-            <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
-            {isId ? 'Terverifikasi' : 'Verified'}
-          </span>
-        ) : null}
       </div>
 
       {/* CONTENT */}
@@ -3040,20 +3031,15 @@ function RecommendationCard({
           className="
             line-clamp-2
             min-w-0
-            min-h-[32px]
             text-[12px]
             font-semibold
             leading-[16px]
             tracking-[-0.01em]
             text-zinc-800
-
             min-[360px]:text-[13px]
             min-[360px]:leading-[17px]
-
-            sm:min-h-[36px]
             sm:text-sm
             sm:leading-[18px]
-
             dark:text-zinc-100
           "
         >
@@ -3071,7 +3057,7 @@ function RecommendationCard({
           <p
             title={price}
             className={cn(
-              'mt-2 truncate text-[14px] font-black leading-tight tracking-[-0.025em] min-[360px]:text-[15px] sm:text-base',
+              'mt-1.5 truncate text-[14px] font-black leading-tight tracking-[-0.025em] min-[360px]:text-[15px] sm:text-base',
               isDemand
                 ? 'text-blue-700 dark:text-blue-300'
                 : 'text-emerald-700 dark:text-emerald-400',
@@ -3079,17 +3065,12 @@ function RecommendationCard({
           >
             {price}
           </p>
-        ) : (
-          <div
-            aria-hidden="true"
-            className="mt-2 h-[17px] sm:h-[19px]"
-          />
-        )}
+        ) : null}
 
         {locationLabel ? (
           <p
             title={locationLabel}
-            className="mt-2 flex min-w-0 items-center gap-1.5 truncate border-t border-zinc-100 pt-2 text-[9px] font-medium leading-4 text-zinc-500 dark:border-zinc-900 dark:text-zinc-400 min-[360px]:text-[10px] sm:text-[11px]"
+            className="mt-1.5 flex min-w-0 items-center gap-1.5 truncate text-[9px] font-medium leading-4 text-zinc-500 dark:text-zinc-400 min-[360px]:text-[10px] sm:text-[11px]"
           >
             <MapPin className="h-3 w-3 shrink-0" aria-hidden="true" />
             <span className="truncate">{locationLabel}</span>
