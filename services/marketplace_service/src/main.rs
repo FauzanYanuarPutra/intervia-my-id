@@ -4335,16 +4335,11 @@ fn completed_transaction_correction_grace_minutes() -> i64 {
         .clamp(1, 1_440)
 }
 
-fn completed_transaction_correction_deadline(
-    updated_at: DateTime<Utc>,
-) -> DateTime<Utc> {
+fn completed_transaction_correction_deadline(updated_at: DateTime<Utc>) -> DateTime<Utc> {
     updated_at + ChronoDuration::minutes(completed_transaction_correction_grace_minutes())
 }
 
-fn completed_transaction_correction_allowed(
-    updated_at: DateTime<Utc>,
-    now: DateTime<Utc>,
-) -> bool {
+fn completed_transaction_correction_allowed(updated_at: DateTime<Utc>, now: DateTime<Utc>) -> bool {
     now <= completed_transaction_correction_deadline(updated_at)
 }
 
@@ -15526,14 +15521,9 @@ async fn request_transaction_correction(
 
     let txn = match find_transaction_for_user(&state.db, id, user_id).await {
         Ok(Some(row)) => row,
-        Ok(None) => {
-            return err(StatusCode::NOT_FOUND, "transaction not found").into_response()
-        }
+        Ok(None) => return err(StatusCode::NOT_FOUND, "transaction not found").into_response(),
         Err(error) => {
-            tracing::error!(
-                "request_transaction_correction lookup error: {:?}",
-                error
-            );
+            tracing::error!("request_transaction_correction lookup error: {:?}", error);
             return err(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "failed to load transaction",
@@ -15564,7 +15554,8 @@ async fn request_transaction_correction(
         reason_code.as_str(),
         note.as_str(),
     )
-    .await else {
+    .await
+    else {
         return err(
             StatusCode::INTERNAL_SERVER_ERROR,
             "failed to create transaction correction request",
@@ -15646,7 +15637,13 @@ async fn cancel_transaction(
         id,
         user_id,
         "cancelled",
-        &["pending", "accepted", "in_progress", "delivered", "completed"],
+        &[
+            "pending",
+            "accepted",
+            "in_progress",
+            "delivered",
+            "completed",
+        ],
         false,
         false,
         clean_text(payload.response_message),
