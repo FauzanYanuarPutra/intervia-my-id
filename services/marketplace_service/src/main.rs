@@ -1127,6 +1127,7 @@ struct ListMapPlacesQuery {
     max_lng: Option<f64>,
     viewer_lat: Option<f64>,
     viewer_lng: Option<f64>,
+    radius_km: Option<f64>,
 }
 
 #[derive(Debug, Serialize)]
@@ -11367,6 +11368,19 @@ async fn list_map_places(
         (None, None) => None,
         _ => return err(StatusCode::BAD_REQUEST, "invalid viewer coordinates").into_response(),
     };
+    let radius_km = match query.radius_km {
+        Some(value) if value.is_finite() && value > 0.0 && value <= 1000.0 && viewer.is_some() => {
+            Some(value)
+        }
+        Some(_) => {
+            return err(
+                StatusCode::BAD_REQUEST,
+                "radius_km requires valid viewer coordinates and must be between 0 and 1000",
+            )
+            .into_response()
+        }
+        None => None,
+    };
 
     // Geo-only projection: detail payloads stay out of the map request.
     // The browser can render many markers cheaply and fetch full details only
@@ -11627,6 +11641,28 @@ async fn list_map_places(
             .push(" AND ")
             .push_bind(max_lng);
     }
+    if let Some(radius) = radius_km {
+        if let Some((viewer_lat, viewer_lng)) = viewer {
+            statement
+                .push(
+                    " AND (6371.0088 * 2.0 * asin(sqrt(power(sin(radians(lat - ",
+                )
+                .push_bind(viewer_lat)
+                .push(
+                    ") / 2.0), 2) + cos(radians(",
+                )
+                .push_bind(viewer_lat)
+                .push(
+                    ")) * cos(radians(lat)) * power(sin(radians(lng - ",
+                )
+                .push_bind(viewer_lng)
+                .push(
+                    ") / 2.0), 2)))) <= ",
+                )
+                .push_bind(radius);
+        }
+    }
+
     statement.push(" ORDER BY ");
     if let Some((lat, lng)) = viewer {
         statement.push(
