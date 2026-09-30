@@ -136,6 +136,15 @@ export function NeedSearchCard({
     .filter(Boolean)
     .join(' ');
 
+  const frequencyLabel = readMetadataText(
+    item,
+    locale,
+    'need_frequency',
+    'preferred_period',
+    'frequency',
+    'buy_frequency',
+  );
+
   const factItems = [
     {
       key: 'budget',
