@@ -89,6 +89,7 @@ const MAX_DELIVERY_ATTACHMENTS: usize = 10;
 const MAX_DELIVERY_TITLE_LEN: usize = 180;
 const MAX_DELIVERY_ATTACHMENT_LABEL_LEN: usize = 120;
 const MAX_DELIVERY_REFERENCE_LEN: usize = 2_000;
+const TRANSACTION_COMPLETED_CORRECTION_GRACE_MINUTES: i64 = 30;
 const EVIDENCE_HASH_SHA256_LEN: usize = 64;
 const MAX_EVENT_BATCH_SIZE: usize = 25;
 const MAX_EVENT_NAME_LEN: usize = 120;
@@ -4312,9 +4313,35 @@ fn normalize_cancel_reason_code(value: Option<String>) -> Option<String> {
         | "seller_unresponsive"
         | "schedule_issue"
         | "duplicate_order"
+        | "wrong_quantity"
+        | "wrong_price"
+        | "wrong_recipient"
+        | "wrong_listing"
+        | "user_mistake"
         | "other" => Some(normalized),
         _ => None,
     }
+}
+
+fn completed_transaction_correction_grace_minutes() -> i64 {
+    env::var("TRANSACTION_COMPLETED_CORRECTION_GRACE_MINUTES")
+        .ok()
+        .and_then(|value| value.trim().parse::<i64>().ok())
+        .unwrap_or(TRANSACTION_COMPLETED_CORRECTION_GRACE_MINUTES)
+        .clamp(1, 1_440)
+}
+
+fn completed_transaction_correction_deadline(
+    updated_at: DateTime<Utc>,
+) -> DateTime<Utc> {
+    updated_at + ChronoDuration::minutes(completed_transaction_correction_grace_minutes())
+}
+
+fn completed_transaction_correction_allowed(
+    updated_at: DateTime<Utc>,
+    now: DateTime<Utc>,
+) -> bool {
+    now <= completed_transaction_correction_deadline(updated_at)
 }
 
 fn normalize_dispute_reason_code(value: Option<String>) -> Option<String> {
@@ -15491,11 +15518,12 @@ async fn cancel_transaction(
         id,
         user_id,
         "cancelled",
-        &["pending", "accepted", "in_progress"],
+        &["pending", "accepted", "in_progress", "delivered", "completed"],
         false,
         false,
         clean_text(payload.response_message),
         Some(json!({
+            "action": "cancel",
             "reason_code": reason_code,
             "cancelled_by": user_id,
             "cancelled_at": Utc::now(),
@@ -23764,6 +23792,118 @@ async fn delete_banner(
 }
 
 #[allow(clippy::too_many_arguments)]
+async fn reverse_completed_transaction_funds_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    txn: &TransactionRow,
+    environment: &str,
+) -> Result<(), WalletTransitionError> {
+    if txn.buyer_id == txn.seller_id {
+        return Err(WalletTransitionError::InvalidHeldBalance);
+    }
+
+    let buyer_account =
+        lock_wallet_account_tx(tx, txn.buyer_id, environment, txn.currency.as_str()).await?;
+    let seller_account =
+        lock_wallet_account_tx(tx, txn.seller_id, environment, txn.currency.as_str()).await?;
+
+    if seller_account.available_balance_cents < txn.amount_cents {
+        return Err(WalletTransitionError::InsufficientFunds);
+    }
+
+    let next_buyer_available = buyer_account
+        .available_balance_cents
+        .checked_add(txn.amount_cents)
+        .ok_or(WalletTransitionError::InvalidHeldBalance)?;
+    let next_buyer_spend = buyer_account
+        .total_spend_cents
+        .checked_sub(txn.amount_cents)
+        .ok_or(WalletTransitionError::InvalidHeldBalance)?;
+    let next_seller_available = seller_account
+        .available_balance_cents
+        .checked_sub(txn.amount_cents)
+        .ok_or(WalletTransitionError::InsufficientFunds)?;
+
+    let updated_buyer = sqlx::query_as::<_, WalletAccountRow>(
+        r#"
+        UPDATE wallet_accounts
+        SET
+            available_balance_cents = $2,
+            total_spend_cents = $3,
+            updated_at = NOW()
+        WHERE id = $1
+        RETURNING
+            id, user_id, environment, currency, available_balance_cents, held_balance_cents,
+            total_topup_cents, total_spend_cents, status, metadata, created_at, updated_at
+        "#,
+    )
+    .bind(buyer_account.id)
+    .bind(next_buyer_available)
+    .bind(next_buyer_spend)
+    .fetch_one(&mut **tx)
+    .await?;
+
+    let updated_seller = sqlx::query_as::<_, WalletAccountRow>(
+        r#"
+        UPDATE wallet_accounts
+        SET
+            available_balance_cents = $2,
+            updated_at = NOW()
+        WHERE id = $1
+        RETURNING
+            id, user_id, environment, currency, available_balance_cents, held_balance_cents,
+            total_topup_cents, total_spend_cents, status, metadata, created_at, updated_at
+        "#,
+    )
+    .bind(seller_account.id)
+    .bind(next_seller_available)
+    .fetch_one(&mut **tx)
+    .await?;
+
+    insert_wallet_ledger_entry_tx(
+        tx,
+        txn.buyer_id,
+        &updated_buyer,
+        "credit",
+        txn.amount_cents,
+        updated_buyer.available_balance_cents,
+        "transaction_correction_refund",
+        "transaction",
+        txn.id,
+        format!("Correction refund for completed transaction {}", txn.id),
+        json!({
+            "transaction_id": txn.id,
+            "counterparty_user_id": txn.seller_id,
+            "flow": "completed_transaction_correction",
+            "environment": environment,
+            "reason": "human_error"
+        }),
+    )
+    .await?;
+
+    insert_wallet_ledger_entry_tx(
+        tx,
+        txn.seller_id,
+        &updated_seller,
+        "debit",
+        txn.amount_cents,
+        updated_seller.available_balance_cents,
+        "transaction_correction",
+        "transaction",
+        txn.id,
+        format!("Correction reversal for completed transaction {}", txn.id),
+        json!({
+            "transaction_id": txn.id,
+            "counterparty_user_id": txn.buyer_id,
+            "flow": "completed_transaction_correction",
+            "environment": environment,
+            "reason": "human_error"
+        }),
+    )
+    .await?;
+
+    Ok(())
+}
+
 async fn update_transaction_status(
     state: &Arc<AppState>,
     id: Uuid,
@@ -23832,6 +23972,24 @@ async fn update_transaction_status(
         return err(StatusCode::CONFLICT, "invalid transaction state").into_response();
     }
 
+    if next_status == "cancelled" && txn.status == "completed" {
+        let now = Utc::now();
+        let deadline = completed_transaction_correction_deadline(txn.updated_at);
+        if !completed_transaction_correction_allowed(txn.updated_at, now) {
+            return (
+                StatusCode::CONFLICT,
+                Json(json!({
+                    "error": "completed transaction correction window has expired",
+                    "code": "completed_correction_window_expired",
+                    "message": "Transaksi sudah selesai terlalu lama untuk dibatalkan otomatis. Ajukan koreksi melalui bantuan agar saldo dan riwayat tetap aman.",
+                    "correction_window_minutes": completed_transaction_correction_grace_minutes(),
+                    "correction_deadline": deadline
+                })),
+            )
+                .into_response();
+        }
+    }
+
     let wallet_transition_result = match next_status {
         "accepted" => hold_transaction_funds_tx(&mut tx, &txn, wallet_environment.as_str())
             .await
@@ -23839,6 +23997,11 @@ async fn update_transaction_status(
         "completed" => release_transaction_funds_tx(&mut tx, &txn, wallet_environment.as_str())
             .await
             .map(|_| ()),
+        "cancelled" if txn.status == "completed" => {
+            reverse_completed_transaction_funds_tx(&mut tx, &txn, wallet_environment.as_str())
+                .await
+                .map(|_| ())
+        }
         "cancelled"
             if matches!(
                 txn.status.as_str(),
@@ -23854,6 +24017,18 @@ async fn update_transaction_status(
     if let Err(e) = wallet_transition_result {
         match e {
             WalletTransitionError::InsufficientFunds => {
+                if next_status == "cancelled" && txn.status == "completed" {
+                    return (
+                        StatusCode::CONFLICT,
+                        Json(json!({
+                            "error": "completed transaction correction cannot be reversed automatically",
+                            "code": "completed_correction_insufficient_seller_balance",
+                            "message": "Transaksi sudah selesai, tetapi saldo tersedia penjual tidak cukup untuk membalikkan dana secara otomatis. Ajukan koreksi melalui bantuan.",
+                            "next_step": "manual_correction"
+                        })),
+                    )
+                        .into_response();
+                }
                 return err(
                     StatusCode::CONFLICT,
                     "insufficient wallet balance to process transaction",
@@ -23893,6 +24068,18 @@ async fn update_transaction_status(
                 "status_context": {
                     "status": next_status,
                     "data": context
+                }
+            }),
+        );
+    }
+    if txn.status == "completed" && next_status == "cancelled" {
+        merged_transaction_meta = merge_json_objects(
+            merged_transaction_meta,
+            json!({
+                "human_error_correction": {
+                    "from_status": "completed",
+                    "requested_at": Utc::now(),
+                    "grace_minutes": completed_transaction_correction_grace_minutes()
                 }
             }),
         );
@@ -24268,7 +24455,9 @@ async fn update_transaction_status(
                     .await;
                 }
                 "cancelled" => {
-                    let refund_note = if txn.protection_status == "funds_held"
+                    let refund_note = if txn.status == "completed" {
+                        "Dana transaksi dibalikkan ke saldo buyer sebagai koreksi. Saldo seller dikurangi kembali agar pencatatan tetap seimbang."
+                    } else if txn.protection_status == "funds_held"
                         || txn.protection_status == "on_hold"
                     {
                         "Dana otomatis dikembalikan ke saldo buyer jika sebelumnya sudah ditahan."
@@ -24501,6 +24690,49 @@ async fn find_transaction_for_user(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn completed_transaction_correction_window_allows_only_recent_completion() {
+        let completed_at = Utc::now();
+        let grace = completed_transaction_correction_grace_minutes();
+
+        assert!(completed_transaction_correction_allowed(
+            completed_at,
+            completed_at
+        ));
+        assert!(completed_transaction_correction_allowed(
+            completed_at,
+            completed_at + ChronoDuration::minutes(grace)
+        ));
+        assert!(!completed_transaction_correction_allowed(
+            completed_at,
+            completed_at + ChronoDuration::minutes(grace) + ChronoDuration::seconds(1)
+        ));
+    }
+
+    #[test]
+    fn cancel_reason_code_accepts_common_human_error_reasons() {
+        for reason in [
+            "wrong_quantity",
+            "wrong_price",
+            "wrong_recipient",
+            "wrong_listing",
+            "user_mistake",
+        ] {
+            assert_eq!(
+                normalize_cancel_reason_code(Some(reason.to_string())).as_deref(),
+                Some(reason)
+            );
+        }
+    }
+
+    #[test]
+    fn cancel_reason_code_rejects_unknown_values() {
+        assert_eq!(
+            normalize_cancel_reason_code(Some("not-a-real-reason".to_string())),
+            None
+        );
+    }
 
     #[test]
     fn daily_login_reward_amounts_are_deterministic_and_bounded() {
