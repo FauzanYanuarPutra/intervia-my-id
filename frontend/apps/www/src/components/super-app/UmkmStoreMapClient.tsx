@@ -1006,9 +1006,8 @@ function MapFocusController({
 
   useEffect(() => {
     const validStores = stores.filter(hasValidLatLng);
-    // Geo data can arrive after the first render. Include the current
-    // valid-point count in the focus key so the map fits again once the
-    // real snapshot is available.
+    // Focus is user-driven. Marker-count changes must not re-center the map
+    // while the user is panning or zooming.
     const focusKey = focusMode
       ? `${focusMode}:${focusNonce ?? 0}`
       : null;
