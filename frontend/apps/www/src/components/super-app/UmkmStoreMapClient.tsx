@@ -24,6 +24,7 @@ import {
   type LatLngBoundsExpression,
 } from 'leaflet';
 import { isCoordinateValid } from '@/lib/super-app/location-guard';
+import { cn } from '@/lib/utils';
 import {
   OPEN_MAP_TILE_ATTRIBUTION,
   OPEN_MAP_TILE_URL,
