@@ -15607,23 +15607,23 @@ async fn request_transaction_correction(
     .await;
 
     push_notification_best_effort(
-            &state,
-            txn.seller_id,
-            "transaction",
-            "transaction.correction_requested",
-            "Koreksi transaksi diajukan",
-            &format!(
-                "Permintaan koreksi untuk transaksi {} sudah dibuat dan akan ditinjau.",
-                txn.id
-            ),
-            json!({
-                "transaction_id": txn.id,
-                "ticket_id": ticket.id,
-                "reason_code": reason_code,
-                "status": txn.status
-            }),
-        )
-        .await;
+        &state,
+        txn.seller_id,
+        "transaction",
+        "transaction.correction_requested",
+        "Koreksi transaksi diajukan",
+        &format!(
+            "Permintaan koreksi untuk transaksi {} sudah dibuat dan akan ditinjau.",
+            txn.id
+        ),
+        json!({
+            "transaction_id": txn.id,
+            "ticket_id": ticket.id,
+            "reason_code": reason_code,
+            "status": txn.status
+        }),
+    )
+    .await;
 
     (
         StatusCode::ACCEPTED,
