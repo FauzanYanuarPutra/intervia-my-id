@@ -210,6 +210,78 @@ export function isUmkmMapPublicReference(
   );
 }
 
+export type UmkmMapSourceKind =
+  | 'lajukan'
+  | 'registered'
+  | 'reference'
+  | 'unknown';
+
+export function getUmkmMapSourceKind(
+  place: Pick<UmkmMapLinkTarget, 'metadata'>,
+): UmkmMapSourceKind {
+  if (isUmkmMapPublicReference(place)) return 'reference';
+
+  const metadata = place.metadata || {};
+  const sourceKind =
+    typeof metadata.source_kind === 'string'
+      ? metadata.source_kind.trim().toLowerCase()
+      : '';
+  const source =
+    typeof metadata.source === 'string'
+      ? metadata.source.trim().toLowerCase()
+      : '';
+
+  if (
+    [
+      'lajukan_store',
+      'lajukan_content',
+      'lajukan_listing',
+      'usaha_portal',
+    ].includes(sourceKind) ||
+    source === 'usaha_portal' ||
+    metadata.owner_user_id != null ||
+    metadata.owner_id != null
+  ) {
+    return 'lajukan';
+  }
+
+  if (
+    [
+      'registered_store',
+      'external_store',
+      'osm_store',
+      'osm_provider',
+    ].includes(sourceKind) ||
+    Boolean(
+      (typeof metadata.source_dataset === 'string' &&
+        metadata.source_dataset.trim()) ||
+        (typeof metadata.source_url === 'string' &&
+          metadata.source_url.trim()),
+    )
+  ) {
+    return 'registered';
+  }
+
+  return 'unknown';
+}
+
+export function getUmkmMapSourceLabel(
+  kind: UmkmMapSourceKind,
+  isId: boolean,
+): string {
+  if (kind === 'lajukan') {
+    return isId ? 'Terdaftar di Lajukan' : 'Registered on Lajukan';
+  }
+  if (kind === 'registered') {
+    return isId ? 'Data usaha luar' : 'External business data';
+  }
+  if (kind === 'reference') {
+    return isId ? 'Referensi publik' : 'Public reference';
+  }
+  return isId ? 'Sumber belum jelas' : 'Source unclear';
+}
+
+
 export function buildUmkmMapPlacePath(place: UmkmMapLinkTarget): string {
   if (isUmkmMapPublicReference(place)) {
     const metadataPath = place.metadata?.public_path;
