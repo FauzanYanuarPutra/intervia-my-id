@@ -1445,7 +1445,7 @@ export function UmkmDiscoveryPanel({
       }
       activeMapPointsRequestRef.current?.abort();
     };
-  }, [clearMapPointCache, city, discoveryScope, mapRangeKm, query, queryViewerLocation]);
+  }, [category, clearMapPointCache, city, discoveryScope, mapRangeKm, query, queryViewerLocation]);
 
   const handleMapBoundsChange = useCallback(
     (bounds: UmkmMapBounds) => {
@@ -1462,25 +1462,34 @@ export function UmkmDiscoveryPanel({
         bounds.minLat < -90 ||
         bounds.maxLat > 90 ||
         bounds.minLng < -180 ||
-        bounds.maxLng > 180 ||
-        bounds.minLat > bounds.maxLat ||
-        bounds.minLng > bounds.maxLng
+        bounds.maxLng > 180
       ) {
         return;
       }
 
+      const viewportMinLat = Math.min(bounds.minLat, bounds.maxLat);
+      const viewportMaxLat = Math.max(bounds.minLat, bounds.maxLat);
+      const viewportMinLng = Math.min(bounds.minLng, bounds.maxLng);
+      const viewportMaxLng = Math.max(bounds.minLng, bounds.maxLng);
+
       const latPadding = Math.min(
         12,
-        Math.max(0.01, (bounds.maxLat - bounds.minLat) * MAP_VIEWPORT_PADDING),
+        Math.max(
+          0.01,
+          (viewportMaxLat - viewportMinLat) * MAP_VIEWPORT_PADDING,
+        ),
       );
       const lngPadding = Math.min(
         18,
-        Math.max(0.01, (bounds.maxLng - bounds.minLng) * MAP_VIEWPORT_PADDING),
+        Math.max(
+          0.01,
+          (viewportMaxLng - viewportMinLng) * MAP_VIEWPORT_PADDING,
+        ),
       );
-      const minLat = Math.max(-90, bounds.minLat - latPadding);
-      const maxLat = Math.min(90, bounds.maxLat + latPadding);
-      const minLng = Math.max(-180, bounds.minLng - lngPadding);
-      const maxLng = Math.min(180, bounds.maxLng + lngPadding);
+      const minLat = Math.max(-90, viewportMinLat - latPadding);
+      const maxLat = Math.min(90, viewportMaxLat + latPadding);
+      const minLng = Math.max(-180, viewportMinLng - lngPadding);
+      const maxLng = Math.min(180, viewportMaxLng + lngPadding);
 
       const viewportKey = [
         query?.trim() || '',
