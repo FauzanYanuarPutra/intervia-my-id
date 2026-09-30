@@ -4687,7 +4687,6 @@ fn normalize_content_type(value: Option<String>) -> Option<String> {
     clean_text(value).map(|v| canonical_content_type(&v.to_lowercase()))
 }
 
-
 fn parse_optional_query_bool(value: Option<String>) -> Result<Option<bool>, &'static str> {
     let Some(value) = clean_text(value) else {
         return Ok(None);
@@ -24459,10 +24458,7 @@ mod tests {
 
     #[test]
     fn marketplace_query_bool_accepts_browser_and_legacy_forms() {
-        assert_eq!(
-            parse_optional_query_bool(None),
-            Ok(None)
-        );
+        assert_eq!(parse_optional_query_bool(None), Ok(None));
         assert_eq!(
             parse_optional_query_bool(Some("true".to_string())),
             Ok(Some(true))
@@ -24483,9 +24479,7 @@ mod tests {
             parse_optional_query_bool(Some("0".to_string())),
             Ok(Some(false))
         );
-        assert!(
-            parse_optional_query_bool(Some("maybe".to_string())).is_err()
-        );
+        assert!(parse_optional_query_bool(Some("maybe".to_string())).is_err());
     }
 
     #[test]
