@@ -1570,22 +1570,14 @@ function requestedGroupsForState(
   }
 
   if (side === 'supply') {
-    if (
-      [
-        'products',
-        'services',
-        'businesses',
-      ].includes(tab)
-    ) {
-      return new Set([
-        tab as GlobalSearchGroupKey,
-      ]);
+    if (tab === 'products' || tab === 'services') {
+      return new Set([tab]);
     }
 
+    // Businesses/places belong to UMKM discovery, not marketplace supply.
     return new Set([
       'products',
       'services',
-      'businesses',
     ]);
   }
 
@@ -1683,6 +1675,10 @@ export async function GET(
     parseGlobalSearchState(
       req.nextUrl.searchParams,
     );
+
+  if (state.side === 'supply' && state.tab === 'businesses') {
+    state.tab = 'all';
+  }
 
   const activeCategory =
     getExploreCategoryBySlug(
@@ -2673,7 +2669,6 @@ export async function GET(
                 'all',
                 'products',
                 'services',
-                'businesses',
               ],
             )
           : null;
