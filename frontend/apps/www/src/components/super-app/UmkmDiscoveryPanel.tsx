@@ -127,6 +127,9 @@ type StoresResponse = {
 };
 
 const LIST_PAGE_SIZE = 10;
+const MAP_VIEWPORT_FETCH_LIMIT = 2200;
+const MAP_VIEWPORT_PADDING = 0.24;
+const MAP_POINTS_CACHE_LIMIT = 6000;
 const REPORT_EMAIL = 'support@lajukan.com';
 
 function formatDiscoveryPrice(valueCents: number, isId: boolean): string {
@@ -1091,9 +1094,6 @@ export function UmkmDiscoveryPanel({
   const lastMapViewportKeyRef = useRef<string | null>(null);
   const requestLimit = Math.max(24, Math.min(60, Math.max(limit * 3, 24)));
   const referencePageLimit = 60;
-  const MAP_VIEWPORT_FETCH_LIMIT = 2200;
-  const MAP_VIEWPORT_PADDING = 0.24;
-  const MAP_POINTS_CACHE_LIMIT = 6000;
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
