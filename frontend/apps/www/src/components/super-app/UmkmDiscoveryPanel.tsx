@@ -127,9 +127,15 @@ type StoresResponse = {
 };
 
 const LIST_PAGE_SIZE = 10;
-const MAP_VIEWPORT_FETCH_LIMIT = 2200;
 const MAP_VIEWPORT_PADDING = 0.24;
-const MAP_POINTS_CACHE_LIMIT = 6000;
+const MAP_POINTS_CACHE_LIMIT = 4000;
+
+function getMapViewportFetchLimit(zoom: number): number {
+  if (zoom <= 5) return 600;
+  if (zoom <= 8) return 900;
+  if (zoom <= 11) return 1200;
+  return 1800;
+}
 const REPORT_EMAIL = 'support@lajukan.com';
 
 function formatDiscoveryPrice(valueCents: number, isId: boolean): string {
@@ -1443,7 +1449,25 @@ export function UmkmDiscoveryPanel({
 
   const handleMapBoundsChange = useCallback(
     (bounds: UmkmMapBounds) => {
-      if (!Number.isFinite(bounds.zoom)) return;
+      const rawBounds = [
+        bounds.minLat,
+        bounds.maxLat,
+        bounds.minLng,
+        bounds.maxLng,
+        bounds.zoom,
+      ];
+
+      if (
+        !rawBounds.every(Number.isFinite) ||
+        bounds.minLat < -90 ||
+        bounds.maxLat > 90 ||
+        bounds.minLng < -180 ||
+        bounds.maxLng > 180 ||
+        bounds.minLat > bounds.maxLat ||
+        bounds.minLng > bounds.maxLng
+      ) {
+        return;
+      }
 
       const latPadding = Math.min(
         12,
@@ -1484,7 +1508,7 @@ export function UmkmDiscoveryPanel({
         activeMapPointsRequestRef.current = controller;
 
         const params = new URLSearchParams({
-          limit: String(MAP_VIEWPORT_FETCH_LIMIT),
+          limit: String(getMapViewportFetchLimit(bounds.zoom)),
           min_lat: minLat.toFixed(5),
           max_lat: maxLat.toFixed(5),
           min_lng: minLng.toFixed(5),
@@ -1568,7 +1592,7 @@ export function UmkmDiscoveryPanel({
               activeMapPointsRequestRef.current = null;
             }
           });
-      }, 180);
+      }, 320);
     },
     [city, discoveryScope, mapRangeKm, query, queryViewerLocation],
   );
