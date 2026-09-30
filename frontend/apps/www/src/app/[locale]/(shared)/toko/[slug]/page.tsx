@@ -443,11 +443,15 @@ export default async function TokoPage({ params }: PageProps) {
       'live_schedule_start',
       'live_schedule_end',
     );
-  const statusLabel = hasScheduleEvidence
-    ? place.statusLabel
-    : isId
-      ? 'Status belum diperbarui'
-      : 'Status not updated';
+  const statusLabel = referenceLocation
+    ? isId
+      ? 'Lokasi usaha'
+      : 'Business location'
+    : hasScheduleEvidence
+      ? place.statusLabel
+      : isId
+        ? 'Status belum diperbarui'
+        : 'Status not updated';
   const openHoursLabel = explicitOpenHours
     ? explicitOpenHours
     : hasScheduleEvidence &&
@@ -486,7 +490,21 @@ export default async function TokoPage({ params }: PageProps) {
           : 'A map point is not available. Use the address or city as a reference.'
         : '';
 
-  const primaryAction: StoreAction = publicContact.whatsappHref
+  const primaryAction: StoreAction = referenceLocation
+    ? hasFixedLocation
+      ? {
+          href: place.googleMapsDirectionsUrl,
+          label: isId ? 'Buka Maps' : 'Open Maps',
+          kind: 'maps',
+          external: true,
+        }
+      : {
+          href: '#informasi-usaha',
+          label: isId ? 'Info lokasi' : 'Location info',
+          kind: 'information',
+          external: false,
+        }
+    : publicContact.whatsappHref
     ? {
         href: publicContact.whatsappHref,
         label: isId ? 'Chat' : 'Chat',
@@ -663,7 +681,7 @@ export default async function TokoPage({ params }: PageProps) {
 
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <StatusChip label={statusLabel} tone={statusTone} />
-                {hasRating ? (
+                {!referenceLocation && hasRating ? (
                   <span className="inline-flex min-h-6 items-center gap-1 rounded-full bg-slate-100 px-2.5 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
                     <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
                     {place.ratingNumber.toFixed(1)}
