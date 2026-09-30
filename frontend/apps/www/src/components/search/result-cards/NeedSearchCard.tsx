@@ -224,6 +224,9 @@ export function NeedSearchCard({
             tone="blue"
             sideLabel={sideStatusLabel}
           />
+          <span className="mt-1 inline-flex w-fit items-center rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[9px] font-black text-emerald-700">
+            {locale === 'id' ? 'Diposting di Lajukan' : 'Posted on Lajukan'}
+          </span>
         </div>
 
         <h3
