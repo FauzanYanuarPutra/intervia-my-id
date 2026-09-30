@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { newsApi } from '@/lib/api';
+import { normalizeMultilineText } from '@/lib/normalizeMultilineText';
 
 type NewsItem = {
   id: string;
@@ -97,17 +98,6 @@ function record(value: unknown): Record<string, unknown> {
 
 function stringValue(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
-}
-
-function normalizeMultilineText(value: string): string {
-  return value
-    .replaceAll('\r\n', '\n')
-    .replaceAll('\r', '\n')
-    .replaceAll('\\r\\n', '\n')
-    .replaceAll('\\n', '\n')
-    .replaceAll('\\t', '\t')
-    .replaceAll('\u0000', '')
-    .trim();
 }
 
 function formatDate(value?: string | null): string {
