@@ -1301,19 +1301,23 @@ function MapBoundsReporter({
 
     const minLat = bounds.getSouth();
     const maxLat = bounds.getNorth();
-    const minLng = bounds.getWest();
-    const maxLng = bounds.getEast();
+    let minLng = bounds.getWest();
+    let maxLng = bounds.getEast();
 
     if (
       ![minLat, maxLat, minLng, maxLng].every(Number.isFinite) ||
       minLat < -90 ||
       maxLat > 90 ||
-      minLng < -180 ||
-      maxLng > 180 ||
-      minLat > maxLat ||
-      minLng > maxLng
+      minLat > maxLat
     ) {
       return;
+    }
+
+    // Leaflet can expose a wrapped longitude interval at the antimeridian.
+    // Never emit minLng > maxLng; use the full world span for that state.
+    if (minLng < -180 || maxLng > 180 || minLng > maxLng) {
+      minLng = -180;
+      maxLng = 180;
     }
 
     onBoundsChange({
@@ -2014,8 +2018,8 @@ export function UmkmStoreMapClient({
     <MapContainer
       center={initialMapCenter}
       zoom={initialMapZoom}
-      minZoom={2}
-      maxZoom={19}
+      minZoom={3}
+      maxZoom={20}
       preferCanvas
       scrollWheelZoom={interactive}
       dragging={interactive}
