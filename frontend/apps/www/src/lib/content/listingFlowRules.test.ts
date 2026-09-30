@@ -477,6 +477,26 @@ describe('canTransitionContentStatus', () => {
 });
 
 describe('toUpsertListingPayload', () => {
+  it('preserves pricing fields through the upsert contract', () => {
+    expect(
+      toUpsertListingPayload({
+        content_type: 'product',
+        category: 'product',
+        title: 'Cup plastik 16 oz',
+        pricing_mode: 'fixed',
+        price_cents: 1250000,
+        price_unit: 'box',
+      }),
+    ).toEqual({
+      content_type: 'product',
+      category: 'product',
+      title: 'Cup plastik 16 oz',
+      pricing_mode: 'fixed',
+      price_cents: 1250000,
+      price_unit: 'box',
+    });
+  });
+
   it('keeps only supported upsert keys for marketplace payloads', () => {
     expect(
       toUpsertListingPayload({
