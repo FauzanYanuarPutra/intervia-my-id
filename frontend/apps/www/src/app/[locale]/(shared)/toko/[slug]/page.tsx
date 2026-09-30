@@ -27,7 +27,10 @@ import {
   projectPublicUmkmStore,
   type PublicUmkmStore,
 } from '@/lib/super-app/umkm-public-store';
-import { isPublicUmkmStoreVisible } from '@/lib/super-app/umkm-public-discovery';
+import {
+  isPublicUmkmReferenceVisible,
+  isPublicUmkmStoreVisible,
+} from '@/lib/super-app/umkm-public-discovery';
 import { isCoordinateValid } from '@/lib/super-app/location-guard';
 import {
   getStorefrontProductStockStatus,
@@ -39,6 +42,7 @@ import { StorefrontProductOrderAction } from './StorefrontProductOrderAction';
 import { StorefrontOrderCart } from './StorefrontOrderCart';
 import { resolveStorefrontBrandMedia } from '@/lib/super-app/storefront-brand-media';
 import { ReportBusinessButton } from '@/components/umkm/ReportBusinessButton';
+import { UmkmStoreMediaContribution } from '@/components/super-app/UmkmStoreMediaContribution';
 
 type PageProps = {
   params: Promise<{ locale: string; slug: string }>;
@@ -64,9 +68,58 @@ function readMetaText(
 
 function hasMetaKey(
   metadata: Record<string, unknown>,
-  ...keys: string[]
+  ...keys: string[],
 ): boolean {
   return keys.some(key => Object.prototype.hasOwnProperty.call(metadata, key));
+}
+
+function isReferenceLocation(store: Pick<UmkmStore, 'metadata'>): boolean {
+  return isPublicUmkmReferenceVisible(store);
+}
+
+function isPublicStoreSurfaceVisible(store: UmkmStore): boolean {
+  return isPublicUmkmStoreVisible(store) || isPublicUmkmReferenceVisible(store);
+}
+
+type PublicGalleryItem = {
+  id: string;
+  url: string;
+  mediaType: 'image' | 'video';
+  caption: string;
+  uploaderName: string;
+  uploaderUsername: string;
+};
+
+function readPublicGalleryItems(
+  metadata: Record<string, unknown>,
+): PublicGalleryItem[] {
+  const raw = metadata.gallery_media_items;
+  if (!Array.isArray(raw)) return [];
+
+  return raw.flatMap((value, index) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
+    const item = value as Record<string, unknown>;
+    const url = typeof item.url === 'string' ? item.url.trim() : '';
+    if (!url) return [];
+    return [{
+      id:
+        typeof item.id === 'string' && item.id.trim()
+          ? item.id.trim()
+          : `gallery-${index + 1}`,
+      url,
+      mediaType: item.media_type === 'video' ? 'video' : 'image',
+      caption:
+        typeof item.caption === 'string' ? item.caption.trim().slice(0, 240) : '',
+      uploaderName:
+        typeof item.uploader_name === 'string'
+          ? item.uploader_name.trim().slice(0, 120)
+          : '',
+      uploaderUsername:
+        typeof item.uploader_username === 'string'
+          ? item.uploader_username.trim().slice(0, 80)
+          : '',
+    }];
+  });
 }
 
 function formatIdr(valueCents: number): string {
