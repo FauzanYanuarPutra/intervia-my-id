@@ -3989,7 +3989,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
         side: 'supply',
         include_owner: '1',
         database_only: '1',
-        marketplace_only: '1',
+        marketplace_only: 'true',
       });
       addViewerLocation(params);
       if (viewerLocationKey) {
@@ -4006,7 +4006,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
         sort: 'newest',
         include_owner: '1',
         database_only: '1',
-        marketplace_only: '1',
+        marketplace_only: 'true',
       });
       // Demand is a nationwide opportunity board, not a nearby-only feed.
       // Do not let the viewer's location hide valid requests published by
