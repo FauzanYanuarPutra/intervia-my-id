@@ -44,6 +44,7 @@ type PublicStoreListResponse = {
     items?: Array<{
       id?: unknown;
       slug?: unknown;
+      public_path?: unknown;
       name?: unknown;
       city?: unknown;
       address?: unknown;
@@ -83,6 +84,7 @@ const HOME_MAP_REFERENCE_LEGEND = {
 function normalizeMapPointItem(item: {
   id?: unknown;
   slug?: unknown;
+  public_path?: unknown;
   name?: unknown;
   city?: unknown;
   lat?: unknown;
@@ -124,7 +126,12 @@ function normalizeMapPointItem(item: {
   return {
     id: item.id,
     slug: item.slug,
-    public_path: typeof metadata.public_path === 'string' ? metadata.public_path : null,
+    public_path:
+      typeof item.public_path === 'string'
+        ? item.public_path
+        : typeof metadata.public_path === 'string'
+          ? metadata.public_path
+          : null,
     name: item.name,
     city: typeof item.city === 'string' ? item.city : '',
     lat,
