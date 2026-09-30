@@ -1249,13 +1249,55 @@ function useViewportStorePresentations(
     resize: () => setViewportVersion(value => value + 1),
   });
 
+  useEffect(() => {
+    let active = true;
+    const refresh = () => {
+      if (!active) return;
+      setViewportVersion(value => value + 1);
+    };
+
+    const frame = window.requestAnimationFrame(refresh);
+    const timer = window.setTimeout(refresh, 120);
+    map.whenReady(refresh);
+
+    return () => {
+      active = false;
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(timer);
+    };
+  }, [map]);
+
   return useMemo(() => {
     if (!storePresentations.length) return [];
 
-    const paddedBounds = map.getBounds().pad(VIEWPORT_RENDER_PADDING);
-    const visible = storePresentations.filter(({ store }) =>
-      paddedBounds.contains([store.lat, store.lng]),
-    );
+    const mapSize = map.getSize();
+    if (mapSize.x < 32 || mapSize.y < 32) {
+      return storePresentations;
+    }
+
+    const bounds = map.getBounds();
+    const paddedBounds = bounds.isValid()
+      ? bounds.pad(VIEWPORT_RENDER_PADDING)
+      : null;
+
+    const visible = paddedBounds
+      ? storePresentations.filter(({ store }) =>
+          paddedBounds.contains([store.lat, store.lng]),
+        )
+      : [...storePresentations];
+
+    // Leaflet can briefly expose a stale/zero viewport while the container is
+    // settling after mount or a responsive layout change. Never make every
+    // valid coordinate disappear because of that transient snapshot.
+    if (!visible.length && storePresentations.length) {
+      if (selectedStoreId) {
+        const selected = storePresentations.find(
+          ({ store }) => store.id === selectedStoreId,
+        );
+        if (selected) return [selected];
+      }
+      return storePresentations;
+    }
 
     if (
       selectedStoreId &&
