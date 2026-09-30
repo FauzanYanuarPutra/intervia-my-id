@@ -10,23 +10,31 @@ const MARKETPLACE_URL =
   process.env.NEXT_PUBLIC_MARKETPLACE_URL ||
   'http://localhost:8081';
 
+const optionalNumber = (schema: z.ZodTypeAny) =>
+  z.preprocess(
+    value =>
+      typeof value === 'string' && value.trim() === '' ? undefined : value,
+    schema,
+  );
+
 const QuerySchema = z.object({
   q: z.string().trim().max(120).optional(),
   city: z.string().trim().max(80).optional(),
   category: z.string().trim().max(80).optional(),
-  limit: z.coerce.number().finite().int().min(1).max(3000).default(1000),
-  min_lat: z.coerce.number().finite().min(-90).max(90).optional(),
-  max_lat: z.coerce.number().finite().min(-90).max(90).optional(),
-  min_lng: z.coerce.number().finite().min(-180).max(180).optional(),
-  max_lng: z.coerce.number().finite().min(-180).max(180).optional(),
-  viewer_lat: z.coerce.number().finite().min(-90).max(90).optional(),
-  viewer_lng: z.coerce.number().finite().min(-180).max(180).optional(),
-  radius_km: z.coerce.number().finite().positive().max(1000).optional(),
+  limit: z.coerce.number().finite().int().min(1).max(1800).default(600),
+  min_lat: optionalNumber(z.coerce.number().finite().min(-90).max(90).optional()),
+  max_lat: optionalNumber(z.coerce.number().finite().min(-90).max(90).optional()),
+  min_lng: optionalNumber(z.coerce.number().finite().min(-180).max(180).optional()),
+  max_lng: optionalNumber(z.coerce.number().finite().min(-180).max(180).optional()),
+  viewer_lat: optionalNumber(z.coerce.number().finite().min(-90).max(90).optional()),
+  viewer_lng: optionalNumber(z.coerce.number().finite().min(-180).max(180).optional()),
+  radius_km: optionalNumber(z.coerce.number().finite().positive().max(1000).optional()),
 });
 
 type MapPoint = {
   id: string;
   slug: string;
+  public_path?: string | null;
   name: string;
   city: string;
   lat: number;
@@ -130,11 +138,11 @@ export async function GET(req: NextRequest) {
       params.set('radius_km', String(normalizedRadius));
     }
 
-    const response = await fetch(
+      const response = await fetch(
       `${MARKETPLACE_URL}/v1/map/places?${params.toString()}`,
       {
         cache: 'no-store',
-        signal: AbortSignal.timeout(4000),
+        signal: AbortSignal.timeout(6000),
       },
     );
     if (!response.ok) {
