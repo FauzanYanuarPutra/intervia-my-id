@@ -100,6 +100,7 @@ type MapPointResponse = {
     items?: Array<{
       id: string;
       slug: string;
+      public_path?: string | null;
       name: string;
       city: string;
       lat: number;
@@ -137,6 +138,57 @@ function getMapViewportFetchLimit(zoom: number): number {
   return 1800;
 }
 const REPORT_EMAIL = 'support@lajukan.com';
+
+function waitForMapRetryDelay(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal.aborted) {
+      reject(signal.reason);
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      signal.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+
+    const onAbort = () => {
+      window.clearTimeout(timeoutId);
+      signal.removeEventListener('abort', onAbort);
+      reject(signal.reason);
+    };
+
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
+async function fetchMapPointsWithTransientRetry(
+  url: string,
+  signal: AbortSignal,
+): Promise<Response> {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const response = await fetch(url, {
+        cache: 'no-store',
+        signal,
+      });
+
+      if (
+        response.ok ||
+        response.status < 500 ||
+        response.status === 429 ||
+        attempt === 1
+      ) {
+        return response;
+      }
+    } catch (error) {
+      if (signal.aborted || attempt === 1) throw error;
+    }
+
+    await waitForMapRetryDelay(350, signal);
+  }
+
+  throw new Error('map_request_failed');
+}
 
 function formatDiscoveryPrice(valueCents: number, isId: boolean): string {
   const value = Math.max(0, Math.round(valueCents / 100));
@@ -1522,10 +1574,10 @@ export function UmkmDiscoveryPanel({
           params.set('radius_km', String(mapRangeKm));
         }
 
-        void fetch(`/api/super-app/umkm/map-points?${params.toString()}`, {
-          cache: 'no-store',
-          signal: controller.signal,
-        })
+        void fetchMapPointsWithTransientRetry(
+          `/api/super-app/umkm/map-points?${params.toString()}`,
+          controller.signal,
+        )
           .then(async response => {
             const payload = (await response.json().catch(() => ({}))) as MapPointResponse;
             if (!response.ok || controller.signal.aborted) return;
@@ -1535,6 +1587,12 @@ export function UmkmDiscoveryPanel({
               .map(point => ({
                 id: point.id,
                 slug: point.slug,
+                public_path:
+                  typeof point.public_path === 'string'
+                    ? point.public_path
+                    : typeof point.metadata?.public_path === 'string'
+                      ? point.metadata.public_path
+                      : null,
                 name: point.name,
                 city: point.city || 'Indonesia',
                 address: point.city || 'Indonesia',
@@ -1544,6 +1602,12 @@ export function UmkmDiscoveryPanel({
                 phone: null,
                 metadata: {
                   ...(point.metadata || {}),
+                  public_path:
+                    typeof point.public_path === 'string'
+                      ? point.public_path
+                      : typeof point.metadata?.public_path === 'string'
+                        ? point.metadata.public_path
+                        : undefined,
                   marketplace_category_slug:
                     point.metadata?.marketplace_category_slug || point.category,
                   umkm_category: point.metadata?.umkm_category,

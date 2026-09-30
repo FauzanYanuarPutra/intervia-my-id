@@ -41,10 +41,10 @@ describe('GET /api/explore/[category]', () => {
 
     expect(response.status).toBe(200);
     expect(payload.degraded).toBe(false);
-    expect(fetchMock).toHaveBeenCalledOnce();
-    expect(String(fetchMock.mock.calls[0][0])).toMatch(
-      /^http:\/\/www-internal:3000\/api\/search\?/,
-    );
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls.map(([input]) => String(input)).every(url =>
+      url.startsWith('http://www-internal:3000/api/search?'),
+    )).toBe(true);
   });
 
   it('marks sections unavailable instead of pretending they are empty', async () => {

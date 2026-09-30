@@ -24153,6 +24153,7 @@ async fn reverse_completed_transaction_funds_tx(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn update_transaction_status(
     state: &Arc<AppState>,
     id: Uuid,

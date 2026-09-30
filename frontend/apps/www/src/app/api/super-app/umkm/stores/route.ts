@@ -434,14 +434,20 @@ async function listPublicMapReferences(options: {
     .filter((item): item is PublicReferenceMapItem => Boolean(item));
   const nextCursor =
     typeof payload.next_cursor === 'string' ? payload.next_cursor.trim() : '';
-  const nextOffset =
+  const nextOffsetFromPayload =
     typeof payload.next_offset === 'number' &&
     Number.isSafeInteger(payload.next_offset) &&
     payload.next_offset >= 0
       ? payload.next_offset
       : null;
+  const pageItems = items.slice(0, options.limit);
+  const nextOffset =
+    payload.has_more === true
+      ? nextOffsetFromPayload ??
+        ((options.offset ?? 0) + pageItems.length)
+      : null;
   return {
-    items: items.slice(0, options.limit),
+    items: pageItems,
     hasMore: payload.has_more === true,
     nextCursor:
       nextCursor.length <= 96 &&

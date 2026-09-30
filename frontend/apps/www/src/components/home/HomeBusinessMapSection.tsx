@@ -21,6 +21,7 @@ type HomeBusinessMapSectionProps = {
 type MapPointItem = {
   id: string;
   slug: string;
+  public_path?: string | null;
   name: string;
   city: string;
   lat: number;
@@ -43,6 +44,7 @@ type PublicStoreListResponse = {
     items?: Array<{
       id?: unknown;
       slug?: unknown;
+      public_path?: unknown;
       name?: unknown;
       city?: unknown;
       address?: unknown;
@@ -72,8 +74,8 @@ const HOME_MAP_CATEGORY_LEGEND: Array<{
 ];
 
 const HOME_MAP_REFERENCE_LEGEND = {
-  labelId: 'Lokasi publik',
-  labelEn: 'Public locations',
+  labelId: 'Lokasi usaha',
+  labelEn: 'Business locations',
   color: '#94a3b8',
 };
 
@@ -82,6 +84,7 @@ const HOME_MAP_REFERENCE_LEGEND = {
 function normalizeMapPointItem(item: {
   id?: unknown;
   slug?: unknown;
+  public_path?: unknown;
   name?: unknown;
   city?: unknown;
   lat?: unknown;
@@ -123,6 +126,12 @@ function normalizeMapPointItem(item: {
   return {
     id: item.id,
     slug: item.slug,
+    public_path:
+      typeof item.public_path === 'string'
+        ? item.public_path
+        : typeof metadata.public_path === 'string'
+          ? metadata.public_path
+          : null,
     name: item.name,
     city: typeof item.city === 'string' ? item.city : '',
     lat,
@@ -243,7 +252,7 @@ export function HomeBusinessMapSection({
         if (!active || controller.signal.aborted) return;
         setError(null);
         const response = await fetch(
-          '/api/super-app/umkm/map-points?limit=1200&min_lat=-11.5&max_lat=7.5&min_lng=94.5&max_lng=142.5',
+          '/api/super-app/umkm/map-points?limit=360&min_lat=-11.5&max_lat=7.5&min_lng=94.5&max_lng=142.5',
           {
             cache: 'default',
             credentials: 'include',
@@ -276,7 +285,7 @@ export function HomeBusinessMapSection({
           // than hydrating references and guarantees local records are not
           // hidden by a secondary public-reference query.
           const fallbackResponse = await fetch(
-            '/api/super-app/umkm/stores?limit=500&map=1&include_references=1&min_lat=-11&max_lat=6&min_lng=95&max_lng=141',
+            '/api/super-app/umkm/stores?limit=300&map=1&include_references=1&min_lat=-11&max_lat=6&min_lng=95&max_lng=141',
             {
               cache: 'default',
               credentials: 'include',
@@ -307,7 +316,7 @@ export function HomeBusinessMapSection({
             // Native records can legitimately be empty. Public references are
             // a secondary fallback only, so they never displace native data.
             const referenceResponse = await fetch(
-              '/api/super-app/umkm/stores?limit=500&map=1&references_only=1&min_lat=-11&max_lat=6&min_lng=95&max_lng=141',
+              '/api/super-app/umkm/stores?limit=300&map=1&references_only=1&min_lat=-11&max_lat=6&min_lng=95&max_lng=141',
               {
                 cache: 'default',
                 credentials: 'include',
@@ -342,6 +351,7 @@ export function HomeBusinessMapSection({
           uniqueMapItems.map(item => ({
             id: item.id,
             slug: item.slug,
+            public_path: item.public_path || item.metadata?.public_path || null,
             name: item.name,
             city: item.city,
             address: item.city,
@@ -353,6 +363,7 @@ export function HomeBusinessMapSection({
                 item.metadata?.marketplace_category_slug || item.category,
               record_kind: item.metadata?.record_kind,
               source_kind: item.source_kind,
+              public_path: item.public_path || item.metadata?.public_path || undefined,
               is_public_reference: item.source_kind.includes('reference'),
             },
           })),
@@ -406,13 +417,13 @@ export function HomeBusinessMapSection({
       className="overflow-hidden rounded-[18px] border border-slate-200/80 bg-white shadow-[0_14px_32px_-26px_rgba(15,23,42,0.34)]"
       data-testid="home-business-map-section"
       aria-label={
-        isId ? 'Sebaran usaha Indonesia' : 'Indonesia business coverage map'
+        isId ? 'Sebaran lokasi usaha Indonesia' : 'Indonesia business location coverage map'
       }
     >
       <div className="flex items-center justify-between gap-2 px-3 py-2.5 sm:px-3.5">
         <div className="min-w-0">
           <h2 className="truncate text-[12px] font-black tracking-tight text-slate-950 sm:text-[13px]">
-            {isId ? 'Sebaran usaha Lajukan & referensi' : 'Lajukan businesses & public locations'}
+            {isId ? 'Sebaran lokasi usaha' : 'Business locations'}
           </h2>
           <p className="truncate text-[9px] font-medium text-slate-500 sm:text-[10px]">
             {loading

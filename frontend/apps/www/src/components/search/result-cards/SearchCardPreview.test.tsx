@@ -117,8 +117,9 @@ describe('search result card preview mode', () => {
 
     expect(html).toContain('Terbuka');
     expect(html).toContain('Rp 2 juta');
-    expect(html).toContain('Bandung');
-    expect(html).toContain('2026-08-15');
+    expect(html).toContain('500 pcs');
+    expect(html).not.toContain('Bandung');
+    expect(html).not.toContain('2026-08-15');
     expect(html).toContain('reference.jpg');
     expect(html).not.toContain('Bulanan');
     expect(html).not.toContain('Ada gambar referensi');
