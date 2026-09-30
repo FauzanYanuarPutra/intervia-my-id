@@ -158,12 +158,14 @@ function resolvePublicContact(
 function StoreMediaGallery({
   storeId,
   storeName,
+  storeSlug,
   metadata,
   locale,
   isId,
 }: {
   storeId: string;
   storeName: string;
+  storeSlug: string;
   metadata: Record<string, unknown>;
   locale: string;
   isId: boolean;
@@ -178,7 +180,7 @@ function StoreMediaGallery({
   ).slice(0, 12);
   const loginHref =
     '/' + locale + '/login?next=' +
-    encodeURIComponent('/' + locale + '/toko/' + storeName);
+    encodeURIComponent('/' + locale + '/toko/' + storeSlug);
 
   return (
     <section
@@ -840,7 +842,8 @@ export default async function TokoPage({ params }: PageProps) {
 
           <StoreMediaGallery
             storeId={store.id}
-            storeName={store.slug}
+            storeName={store.name}
+            storeSlug={store.slug}
             metadata={metadata}
             locale={locale}
             isId={isId}
