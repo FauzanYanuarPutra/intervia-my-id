@@ -34,14 +34,18 @@ describe('GET /api/explore/[category]', () => {
     searchPayload.groups.products.available = true;
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(Response.json(searchPayload));
+      .mockImplementation(async input => {
+        const url = new URL(String(input));
+        expect(url.pathname).toBe('/api/search');
+        return Response.json(searchPayload);
+      });
 
     const response = await GET(exploreRequest(), context);
     const payload = await response.json();
 
     expect(response.status).toBe(200);
     expect(payload.degraded).toBe(false);
-    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(String(fetchMock.mock.calls[0][0])).toMatch(
       /^http:\/\/www-internal:3000\/api\/search\?/,
     );
