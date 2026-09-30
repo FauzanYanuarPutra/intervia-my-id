@@ -55,6 +55,14 @@ jobs:
             throw "Merge-conflict markers found in tracked source."
           }
 
+          # Patch corruption guard: never allow a literal "\\n" to replace a
+          # real source newline between structural TypeScript tokens.
+          $escapedNewline = git grep -n -I -E '\\n[[:space:]]+(store|const|let|var|return|function|if|for|while|type|interface|class|export|import)' -- '*.ts' '*.tsx' 2>$null
+          if ($LASTEXITCODE -eq 0 -and $escapedNewline) {
+            $escapedNewline | Write-Host
+            throw "Suspicious literal \\n sequence found in TypeScript source; likely malformed patch/newline corruption."
+          }
+
           git diff --check --cached
           git diff --check
 
