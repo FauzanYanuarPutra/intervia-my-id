@@ -300,9 +300,9 @@ export function getListingSideVerbLabel(
   locale: LocaleCode,
 ): string {
   if (locale === 'id') {
-    return side === 'demand' ? 'Membutuhkan' : 'Menawarkan';
+    return side === 'demand' ? 'Mencari' : 'Menyediakan';
   }
-  return side === 'demand' ? 'Needs' : 'Offering';
+  return side === 'demand' ? 'Looking for' : 'Providing';
 }
 
 export function getListingSideObjectLabel(
@@ -381,29 +381,35 @@ export function getListingSideContextLabel(
   const normalizedType = normalizeType(type);
   if (locale === 'id') {
     if (normalizedType === 'company') return 'Profil Perusahaan';
-    if (normalizedType === 'job') return side === 'demand' ? 'Membutuhkan kandidat' : 'Menawarkan posisi';
+    if (normalizedType === 'job')
+      return side === 'demand' ? 'Mencari kandidat' : 'Membuka lowongan';
     if (normalizedType === 'service')
-      return side === 'demand' ? 'Membutuhkan jasa' : 'Menawarkan jasa';
+      return side === 'demand' ? 'Mencari jasa' : 'Menyediakan jasa';
     if (normalizedType === 'property')
-      return side === 'demand' ? 'Membutuhkan properti' : 'Menawarkan properti';
+      return side === 'demand' ? 'Mencari tempat' : 'Menyediakan tempat';
     if (normalizedType === 'tool_rental')
-      return side === 'demand' ? 'Membutuhkan sewa' : 'Menawarkan sewa';
+      return side === 'demand' ? 'Mencari sewa alat' : 'Menyewakan alat';
     if (normalizedType === 'business_transfer')
-      return side === 'demand' ? 'Membutuhkan usaha untuk diambil alih' : 'Menawarkan oper usaha';
-    return side === 'demand' ? 'Membutuhkan produk' : 'Menawarkan produk';
+      return side === 'demand'
+        ? 'Mencari usaha untuk diambil alih'
+        : 'Menawarkan oper usaha';
+    return side === 'demand' ? 'Mencari produk' : 'Menyediakan produk';
   }
 
   if (normalizedType === 'company') return 'Company Profile';
-  if (normalizedType === 'job') return side === 'demand' ? 'Needs candidates' : 'Offering a position';
+  if (normalizedType === 'job')
+    return side === 'demand' ? 'Looking for candidates' : 'Hiring';
   if (normalizedType === 'service')
-    return side === 'demand' ? 'Needs a service' : 'Offering a service';
+    return side === 'demand' ? 'Looking for a service' : 'Providing a service';
   if (normalizedType === 'property')
-    return side === 'demand' ? 'Needs a property' : 'Offering a property';
+    return side === 'demand' ? 'Looking for a place' : 'Providing a place';
   if (normalizedType === 'tool_rental')
-    return side === 'demand' ? 'Needs a rental' : 'Offering a rental';
+    return side === 'demand' ? 'Looking for a rental' : 'Renting out a tool';
   if (normalizedType === 'business_transfer')
-    return side === 'demand' ? 'Needs a business to acquire' : 'Offering a business transfer';
-  return side === 'demand' ? 'Needs a product' : 'Product offer';
+    return side === 'demand'
+      ? 'Looking for a business to acquire'
+      : 'Offering a business transfer';
+  return side === 'demand' ? 'Looking for a product' : 'Providing a product';
 }
 
 export function filterFieldsForListingSide(
