@@ -11396,7 +11396,8 @@ async fn list_map_places(
           lng,
           category,
           source_kind,
-          metadata
+          metadata,
+          sort_updated_at
         FROM (
           SELECT
             s.id::text AS id,
@@ -11405,6 +11406,7 @@ async fn list_map_places(
             s.city,
             s.lat,
             s.lng,
+            s.updated_at AS sort_updated_at,
             COALESCE(
               NULLIF(lower(s.metadata->>'marketplace_category_slug'), ''),
               NULLIF(lower(s.metadata->>'umkm_category'), ''),
@@ -11510,6 +11512,7 @@ async fn list_map_places(
             COALESCE(c.metadata->>'city', c.metadata->>'location', 'Indonesia'),
             public.lajukan_safe_map_coordinate(c.metadata->>'latitude'),
             public.lajukan_safe_map_coordinate(c.metadata->>'longitude'),
+            c.updated_at AS sort_updated_at,
             COALESCE(
               NULLIF(lower(c.metadata->>'marketplace_category_slug'), ''),
               NULLIF(lower(c.metadata->>'umkm_category'), ''),
@@ -11534,10 +11537,15 @@ async fn list_map_places(
               'building', NULLIF(lower(c.metadata->>'building'), ''),
               'place_type', NULLIF(lower(c.metadata->>'place_type'), ''),
               'source_kind', 'reference_content',
-              'public_path', COALESCE(
-                NULLIF(c.metadata->>'public_path', ''),
-                '/content/' || c.id::text
-              ),
+              'record_kind', NULLIF(c.metadata->>'record_kind', ''),
+              'reference_publication_status', NULLIF(c.metadata->>'reference_publication_status', ''),
+              'claimable', COALESCE(c.metadata->>'claimable', 'false') = 'true',
+              'source_dataset', NULLIF(c.metadata->>'source_dataset', ''),
+              'source_url', NULLIF(c.metadata->>'source_url', ''),
+              'source_title', NULLIF(c.metadata->>'source_title', ''),
+              'source_license', NULLIF(c.metadata->>'source_license', ''),
+              'source_license_url', NULLIF(c.metadata->>'source_license_url', ''),
+              'public_path', '/toko/' || COALESCE(NULLIF(c.slug, ''), c.id::text),
               'cover_image', COALESCE(
                 NULLIF(c.cover_image, ''),
                 NULLIF(c.metadata->>'cover_image', ''),
@@ -11587,6 +11595,7 @@ async fn list_map_places(
                 NULLIF(c.metadata->>'lng', '')
               )
             ),
+            c.updated_at AS sort_updated_at,
             COALESCE(
               NULLIF(lower(c.metadata->>'marketplace_category_slug'), ''),
               NULLIF(lower(c.metadata->>'umkm_category'), ''),
@@ -11725,13 +11734,12 @@ async fn list_map_places(
         .push_bind(lng)
         .push(",")
         .push_bind(lat)
-        .push(") ASC");
+        .push(") ASC, sort_updated_at DESC, id ASC");
     } else {
-        // Native Lajukan records are deliberately surfaced first. Within
-        // each source tier, keep a deterministic hash so repeated nationwide
-        // requests remain stable without making references displace local data.
+        // Native Lajukan records are deliberately surfaced first. Newer
+        // records win within each source tier, then id keeps pagination stable.
         statement.push(
-            "CASE WHEN source_kind IN ('lajukan_store', 'lajukan_listing') THEN 0              WHEN source_kind = 'registered_store' THEN 1              ELSE 2 END ASC, md5(id) ASC",
+            "CASE WHEN source_kind IN ('lajukan_store', 'lajukan_listing') THEN 0              WHEN source_kind = 'registered_store' THEN 1              ELSE 2 END ASC, sort_updated_at DESC, id ASC",
         );
     }
     statement.push(" LIMIT ").push_bind(limit);
