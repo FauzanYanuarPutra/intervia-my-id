@@ -10,18 +10,39 @@ const MARKETPLACE_URL =
   process.env.NEXT_PUBLIC_MARKETPLACE_URL ||
   'http://localhost:8081';
 
+function tolerantNumber(
+  min: number,
+  max: number,
+  options: { integer?: boolean; positive?: boolean } = {},
+) {
+  return z.preprocess(
+    value => {
+      if (value === undefined || value === null || value === '') return undefined;
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : undefined;
+    },
+    z
+      .number()
+      .min(min)
+      .max(max)
+      .refine(value => !options.integer || Number.isInteger(value))
+      .refine(value => !options.positive || value > 0)
+      .optional(),
+  );
+}
+
 const QuerySchema = z.object({
   q: z.string().trim().max(120).optional(),
   city: z.string().trim().max(80).optional(),
   category: z.string().trim().max(80).optional(),
-  limit: z.coerce.number().finite().int().min(1).max(3000).default(1000),
-  min_lat: z.coerce.number().finite().min(-90).max(90).optional(),
-  max_lat: z.coerce.number().finite().min(-90).max(90).optional(),
-  min_lng: z.coerce.number().finite().min(-180).max(180).optional(),
-  max_lng: z.coerce.number().finite().min(-180).max(180).optional(),
-  viewer_lat: z.coerce.number().finite().min(-90).max(90).optional(),
-  viewer_lng: z.coerce.number().finite().min(-180).max(180).optional(),
-  radius_km: z.coerce.number().finite().positive().max(1000).optional(),
+  limit: tolerantNumber(1, 3000, { integer: true }),
+  min_lat: tolerantNumber(-90, 90),
+  max_lat: tolerantNumber(-90, 90),
+  min_lng: tolerantNumber(-180, 180),
+  max_lng: tolerantNumber(-180, 180),
+  viewer_lat: tolerantNumber(-90, 90),
+  viewer_lng: tolerantNumber(-180, 180),
+  radius_km: tolerantNumber(0, 1000, { positive: true }),
 });
 
 type MapPoint = {
@@ -61,6 +82,7 @@ export async function GET(req: NextRequest) {
     }
 
     const input = parsed.data;
+    const normalizedLimit = input.limit ?? 1000;
 
     // Map viewport requests are transient and can race with Leaflet resize,
     // world-wrap, and filter updates. Normalize malformed optional values
@@ -112,7 +134,7 @@ export async function GET(req: NextRequest) {
         : undefined;
 
     const params = new URLSearchParams();
-    params.set('limit', String(input.limit));
+    params.set('limit', String(normalizedLimit));
     if (normalizedQ) params.set('q', normalizedQ);
     if (normalizedCity) params.set('city', normalizedCity);
     if (input.category && input.category.trim().length >= 2) {
@@ -130,20 +152,37 @@ export async function GET(req: NextRequest) {
       params.set('radius_km', String(normalizedRadius));
     }
 
-    const response = await fetch(
-      `${MARKETPLACE_URL}/v1/map/places?${params.toString()}`,
-      {
-        cache: 'no-store',
-        signal: AbortSignal.timeout(4000),
-      },
-    );
-    if (!response.ok) {
-      return NextResponse.json({ error: 'Map data source unavailable' }, { status: 502 });
+    let response: Response | null = null;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const candidate = await fetch(
+          `${MARKETPLACE_URL}/v1/map/places?${params.toString()}`,
+          {
+            cache: 'no-store',
+            signal: AbortSignal.timeout(4000),
+          },
+        );
+        response = candidate;
+        if (candidate.ok || ![429, 502, 503, 504].includes(candidate.status)) break;
+        if (attempt < 2) {
+          await new Promise(resolve => setTimeout(resolve, 180 * 2 ** attempt));
+        }
+      } catch (error) {
+        if (attempt === 2) throw error;
+        await new Promise(resolve => setTimeout(resolve, 180 * 2 ** attempt));
+      }
+    }
+    if (!response?.ok) {
+      return NextResponse.json(
+        { data: { items: [], count: 0, total_count: 0, degraded: true } },
+        { status: 200, headers: { 'Cache-Control': 'private, no-store' } },
+      );
     }
 
     const payload = (await response.json()) as {
       items?: MapPoint[];
       total_count?: number;
+      degraded?: boolean;
     };
     const items = Array.isArray(payload.items)
       ? payload.items.filter(
@@ -170,6 +209,7 @@ export async function GET(req: NextRequest) {
           items,
           count: items.length,
           total_count: totalCount,
+          degraded: payload.degraded === true,
         },
       },
       {
