@@ -155,6 +155,96 @@ function resolvePublicContact(
   };
 }
 
+function StoreMediaGallery({
+  storeId,
+  storeName,
+  metadata,
+  locale,
+  isId,
+}: {
+  storeId: string;
+  storeName: string;
+  metadata: Record<string, unknown>;
+  locale: string;
+  isId: boolean;
+}) {
+  const galleryItems = readPublicGalleryItems(metadata);
+  const brandMedia = resolveStorefrontBrandMedia(metadata);
+  const imageUrls = Array.from(
+    new Set([
+      ...galleryItems.filter(item => item.mediaType === 'image').map(item => item.url),
+      ...brandMedia.galleryUrls,
+    ]),
+  ).slice(0, 12);
+  const loginHref =
+    '/' + locale + '/login?next=' +
+    encodeURIComponent('/' + locale + '/toko/' + storeName);
+
+  return (
+    <section
+      id="foto-media"
+      className="mt-1.5 border-y border-slate-100 bg-white dark:border-slate-800 dark:bg-slate-900 sm:mt-3 sm:overflow-hidden sm:rounded-2xl sm:border sm:shadow-sm"
+    >
+      <div className="flex items-center justify-between gap-3 px-4 py-3 sm:px-5 md:px-6">
+        <div className="min-w-0">
+          <h2 className="text-base font-bold">{isId ? 'Foto & media' : 'Photos & media'}</h2>
+          <p className="mt-0.5 text-[11px] leading-4 text-slate-500 dark:text-slate-400">
+            {isId
+              ? 'Foto usaha dari pemilik, sumber publik, dan kontribusi pengguna yang sudah disetujui.'
+              : 'Business media from the owner, public sources, and approved community contributions.'}
+          </p>
+        </div>
+        <UmkmStoreMediaContribution
+          storeId={storeId}
+          isId={isId}
+          loginHref={loginHref}
+        />
+      </div>
+      {imageUrls.length > 0 ? (
+        <div className="grid grid-cols-2 gap-1.5 px-4 pb-4 sm:grid-cols-3 sm:px-5 md:grid-cols-4 md:px-6">
+          {imageUrls.map((url, index) => {
+            const contribution = galleryItems.find(item => item.url === url);
+            const credit =
+              contribution?.uploaderName ||
+              (contribution?.uploaderUsername
+                ? '@' + contribution.uploaderUsername
+                : '');
+            return (
+              <figure
+                key={`${url}-${index}`}
+                className="group relative overflow-hidden rounded-xl bg-slate-100 dark:bg-slate-800"
+              >
+                <div className="relative aspect-square">
+                  <LajukanImage
+                    src={url}
+                    alt={storeName + ' ' + (isId ? 'foto' : 'photo') + ' ' + (index + 1)}
+                    fill
+                    sizes="(min-width: 1024px) 220px, (min-width: 640px) 30vw, 48vw"
+                    className="object-cover transition duration-300 group-hover:scale-[1.025]"
+                  />
+                </div>
+                {contribution?.caption || credit ? (
+                  <figcaption className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/75 to-transparent px-2 pb-2 pt-8 text-[9px] font-semibold text-white">
+                    {credit ? <span className="block truncate">Foto oleh {credit}</span> : null}
+                    {contribution?.caption ? (
+                      <span className="mt-0.5 block line-clamp-2 opacity-90">{contribution.caption}</span>
+                    ) : null}
+                  </figcaption>
+                ) : null}
+              </figure>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="mx-4 mb-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-5 text-center text-xs font-semibold text-slate-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-400 sm:mx-5 md:mx-6">
+          {isId
+            ? 'Belum ada foto. Tambahkan foto untuk membantu orang mengenali lokasi ini.'
+            : 'No photos yet. Add one to help people recognize this location.'}
+        </div>
+      )}
+    </section>
+  );
+}
 function StatusChip({
   label,
   tone,
@@ -718,6 +808,45 @@ export default async function TokoPage({ params }: PageProps) {
             </div>
           </section>
 
+          {referenceLocation ? (
+            <section className="mt-1.5 border-y border-sky-100 bg-sky-50/75 px-4 py-3 dark:border-sky-900/50 dark:bg-sky-950/20 sm:mt-3 sm:rounded-2xl sm:border sm:px-5 md:px-6">
+              <p className="text-[11px] font-bold text-sky-900 dark:text-sky-100">
+                {isId ? 'Lokasi usaha dari data publik' : 'Business location from public data'}
+              </p>
+              <p className="mt-1 text-[11px] leading-5 text-sky-900/78 dark:text-sky-100/78">
+                {isId
+                  ? 'Lokasi ini belum diklaim sebagai toko Lajukan. Informasi dapat berubah; gunakan sumber asli sebagai pembanding.'
+                  : 'This location is not claimed as a Lajukan storefront. Information may change; use the original source as a reference.'}
+              </p>
+              {readMetaText(metadata, 'source_title') ? (
+                <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] font-semibold">
+                  <span className="rounded-full bg-white/80 px-2.5 py-1 text-sky-800 dark:bg-slate-900/70 dark:text-sky-200">
+                    {isId ? 'Sumber' : 'Source'}: {readMetaText(metadata, 'source_title')}
+                  </span>
+                  {readMetaText(metadata, 'source_url') ? (
+                    <a
+                      href={readMetaText(metadata, 'source_url')}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-full bg-white/80 px-2.5 py-1 text-sky-800 underline underline-offset-2 dark:bg-slate-900/70 dark:text-sky-200"
+                    >
+                      {isId ? 'Buka sumber' : 'Open source'}
+                    </a>
+                  ) : null}
+                </div>
+              ) : null}
+            </section>
+          ) : null}
+
+          <StoreMediaGallery
+            storeId={store.id}
+            storeName={store.slug}
+            metadata={metadata}
+            locale={locale}
+            isId={isId}
+          />
+
+          {!referenceLocation ? (
           <section
             id="produk"
             className="mt-1.5 bg-white dark:bg-slate-900 sm:mt-3 sm:overflow-hidden sm:rounded-3xl sm:border sm:border-slate-200 sm:shadow-sm sm:dark:border-slate-800"
@@ -827,6 +956,7 @@ export default async function TokoPage({ params }: PageProps) {
               )}
             </div>
           </section>
+          ) : null}
 
           <details
             id="informasi-usaha"
@@ -890,7 +1020,9 @@ export default async function TokoPage({ params }: PageProps) {
             </div>
           </details>
 
-          <StorefrontOrderCart storeId={store.id} isId={isId} locale={locale} />
+          {!referenceLocation ? (
+            <StorefrontOrderCart storeId={store.id} isId={isId} locale={locale} />
+          ) : null}
         </div>
       </main>
     </>
