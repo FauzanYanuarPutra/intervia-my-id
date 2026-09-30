@@ -27,7 +27,7 @@ describe('compact workspace rail contract', () => {
 
   it('keeps the Embla rail dependency aligned with the workspace', () => {
     const packageJson = JSON.parse(
-      readFileSync(new URL('../../../../../package.json', root), 'utf8'),
+      readFileSync(new URL('../../../package.json', root), 'utf8'),
     ) as { dependencies?: Record<string, string> };
 
     expect(packageJson.dependencies?.['embla-carousel-react']).toBe('^8.6.0');
