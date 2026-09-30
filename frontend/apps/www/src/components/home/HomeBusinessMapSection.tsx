@@ -495,6 +495,11 @@ export function HomeBusinessMapSection({
               </span>
             );
           })}
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-100 bg-white px-2 py-1 text-[8px] font-semibold text-emerald-700 shadow-sm sm:text-[9px]">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" aria-hidden="true" />
+            {isId ? 'Usaha Lajukan' : 'Lajukan businesses'}
+            <span className="font-black text-slate-900">{summary.businessCount.toLocaleString(isId ? 'id-ID' : 'en-US')}</span>
+          </span>
           {summary.referenceCount > 0 ? (
             <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-[8px] font-semibold text-slate-600 shadow-sm sm:text-[9px]">
               <span
