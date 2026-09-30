@@ -36,10 +36,23 @@ export function isHomeRecommendationEligible(item: ContentItem): boolean {
   const status = normalizeToken(item.content_status || item.status);
   if (status && !['active', 'published', 'live'].includes(status)) return false;
 
-  if (isExplicitlyNonTransactional(item)) return false;
+  // Public/reference records must never compete with first-party Lajukan
+  // listings on the Home marketplace surfaces.
   if (readPublicReference(item)) return false;
 
   const metadata = item.metadata || {};
+
+  // A native Lajukan listing can legitimately be marked non-transactional
+  // while it is a buyer request (for example, a user asking for 3 kg of
+  // mangoes per week). Home must not hide such a real, owner-backed request.
+  // Non-transactional records without an owner remain excluded unless they
+  // have already been classified as a public reference above.
+  const hasNativeOwner = Boolean(
+    item.owner_id &&
+      String(item.owner_id).trim() !== '' &&
+      String(item.owner_id).trim() !== '00000000-0000-0000-0000-000000000000',
+  );
+  if (isExplicitlyNonTransactional(item) && !hasNativeOwner) return false;
   if (metadata.news && typeof metadata.news === 'object') return false;
 
   const signals = [
