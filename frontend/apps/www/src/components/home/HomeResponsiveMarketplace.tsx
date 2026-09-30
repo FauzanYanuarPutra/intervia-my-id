@@ -317,7 +317,17 @@ function isNativeLajukanContent(item: ContentItem): boolean {
     metadata.source ||
       metadata.data_source ||
       metadata.source_kind ||
+      metadata.sourceKind ||
       metadata.record_source ||
+      metadata.recordSource ||
+      '',
+  )
+    .trim()
+    .toLowerCase();
+
+  const recordKind = String(
+    metadata.record_kind ||
+      metadata.recordKind ||
       '',
   )
     .trim()
@@ -325,11 +335,18 @@ function isNativeLajukanContent(item: ContentItem): boolean {
 
   return Boolean(
     item.owner_id ||
+      metadata.owner_id ||
+      metadata.user_id ||
+      metadata.ownerId ||
+      metadata.userId ||
       metadata.listing_mode === 'guided_business_create' ||
       source === 'lajukan' ||
       source === 'lajukan_listing' ||
+      source === 'lajukan_content' ||
       source === 'usaha_portal' ||
-      source === 'content',
+      source === 'content' ||
+      recordKind === 'lajukan_listing' ||
+      recordKind === 'lajukan_content',
   );
 }
 
@@ -2477,21 +2494,21 @@ function HomeListingCarouselSection({
         <h2 className="min-w-0 truncate text-[11px] font-bold leading-5 tracking-tight text-[color:var(--app-text)] sm:text-xs">
           {isDemand
             ? isId
-              ? 'Sedang dibutuhkan'
-              : 'Currently needed'
+              ? 'Sedang mencari penyedia'
+              : 'People looking for providers'
             : isId
-              ? 'Sedang ditawarkan'
-              : 'Currently offered'}
+              ? 'Penyedia di Lajukan'
+              : 'Providers on Lajukan'}
         </h2>
 
         <span className="hidden shrink-0 text-[9px] font-medium text-zinc-400 sm:inline">
           {isDemand
             ? isId
-              ? 'Kebutuhan aktif dari pembeli di Lajukan'
-              : 'Active buyer needs on Lajukan'
+              ? 'Orang dan bisnis yang sedang mencari produk atau jasa'
+              : 'People and businesses looking for products or services'
             : isId
-              ? 'Produk, jasa, alat, tempat, dan lainnya yang tersedia'
-              : 'Products, services, tools, places, and more available'}
+              ? 'Produk, jasa, alat, tempat, dan lainnya yang ditawarkan'
+              : 'Products, services, tools, places, and more being offered'}
         </span>
 
         <Link
@@ -2509,11 +2526,11 @@ function HomeListingCarouselSection({
             <p className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400 sm:text-[11px]">
               {isDemand
                 ? isId
-                  ? 'Belum ada kebutuhan aktif saat ini.'
-                  : 'No active requests right now.'
+                  ? 'Belum ada permintaan aktif yang cocok saat ini.'
+                  : 'No active requests match right now.'
                 : isId
-                  ? 'Belum ada penawaran aktif saat ini.'
-                  : 'No active offers right now.'}
+                  ? 'Belum ada penawaran aktif yang cocok saat ini.'
+                  : 'No active offers match right now.'}
             </p>
           </div>
         </div>
