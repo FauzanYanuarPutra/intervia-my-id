@@ -32,6 +32,8 @@ import {
 import { buildUmkmPlacePresentation } from '@/lib/super-app/umkm-place-ui';
 import {
   buildUmkmMapPlacePath,
+  getUmkmMapSourceKind,
+  getUmkmMapSourceLabel,
   isUmkmMapPublicReference,
 } from '@/lib/umkmSurface';
 import type {
@@ -457,9 +459,8 @@ function StorePreviewCard({
     ui.addressLine ||
     (isId ? 'Lokasi belum lengkap' : 'Location unavailable');
   const isReference = isUmkmMapPublicReference(store);
-  const sourceLabel = isReference
-    ? isId ? 'Referensi publik' : 'Public reference'
-    : isId ? 'Terdaftar di Lajukan' : 'Registered on Lajukan';
+  const sourceKind = getUmkmMapSourceKind(store);
+  const sourceLabel = getUmkmMapSourceLabel(sourceKind, isId);
   const isOpen = ui.openNow === true;
   const statusLabel = isReference
     ? isId
@@ -572,9 +573,8 @@ function StorePopupSummary({
     (isId ? 'Lokasi belum lengkap' : 'Location unavailable');
   const distanceLabel = ui.distanceLabel;
   const isReference = isUmkmMapPublicReference(store);
-  const sourceLabel = isReference
-    ? isId ? 'Referensi publik' : 'Public reference'
-    : isId ? 'Terdaftar di Lajukan' : 'Registered on Lajukan';
+  const sourceKind = getUmkmMapSourceKind(store);
+  const sourceLabel = getUmkmMapSourceLabel(sourceKind, isId);
   const statusLabel = isReference
     ? isId
       ? 'Referensi'
@@ -1367,12 +1367,14 @@ function StoreDotsLayer({
     <>
       {visibleStorePresentations.map(({ store, ui }) => {
         const isReference = isUmkmMapPublicReference(store);
-        const palette = isReference
-          ? { badge: '#94a3b8', border: '#cbd5e1', text: '#64748b' }
-          : getMarkerPalette(ui.markerTone);
-        const sourceLabel = isReference
-          ? 'Referensi publik'
-          : 'Terdaftar di Lajukan';
+        const sourceKind = getUmkmMapSourceKind(store);
+        const palette =
+          sourceKind === 'reference'
+            ? { badge: '#94a3b8', border: '#cbd5e1', text: '#64748b' }
+            : sourceKind === 'registered'
+              ? { badge: '#f59e0b', border: '#fcd34d', text: '#92400e' }
+              : getMarkerPalette(ui.markerTone);
+        const sourceLabel = getUmkmMapSourceLabel(sourceKind, isId);
         const selected = store.id === selectedStoreId;
         return (
           <CircleMarker
@@ -1561,18 +1563,26 @@ function StoreMarkersLayer({
         }
 
         const { cluster } = layer;
-        const clusterReferenceCount = cluster.items.filter(
-          ({ store }) => isUmkmMapPublicReference(store),
+        const clusterLajukanCount = cluster.items.filter(
+          ({ store }) => getUmkmMapSourceKind(store) === 'lajukan',
         ).length;
-        const clusterBusinessCount = cluster.items.length - clusterReferenceCount;
-        const clusterSourceLabel =
-          clusterReferenceCount === 0
-            ? (isId ? `${clusterBusinessCount} usaha Lajukan` : `${clusterBusinessCount} Lajukan businesses`)
-            : clusterBusinessCount === 0
-              ? (isId ? `${clusterReferenceCount} referensi publik` : `${clusterReferenceCount} public references`)
-              : (isId
-                ? `${clusterBusinessCount} usaha Lajukan · ${clusterReferenceCount} referensi`
-                : `${clusterBusinessCount} Lajukan businesses · ${clusterReferenceCount} references`);
+        const clusterExternalCount = cluster.items.filter(
+          ({ store }) => getUmkmMapSourceKind(store) === 'registered',
+        ).length;
+        const clusterReferenceCount = cluster.items.filter(
+          ({ store }) => getUmkmMapSourceKind(store) === 'reference',
+        ).length;
+        const clusterSourceLabel = [
+          clusterLajukanCount
+            ? (isId ? `${clusterLajukanCount} Lajukan` : `${clusterLajukanCount} Lajukan`)
+            : '',
+          clusterExternalCount
+            ? (isId ? `${clusterExternalCount} data luar` : `${clusterExternalCount} external`)
+            : '',
+          clusterReferenceCount
+            ? (isId ? `${clusterReferenceCount} referensi` : `${clusterReferenceCount} references`)
+            : '',
+        ].filter(Boolean).join(' · ');
         const allowPicker = cluster.tight || zoom >= MARKER_CLUSTER_PICKER_ZOOM;
         const visibleClusterItems = cluster.items.slice(
           0,
