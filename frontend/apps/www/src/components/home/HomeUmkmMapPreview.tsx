@@ -395,7 +395,10 @@ export function HomeUmkmMapPreview({
       setLoading(true);
       setError(null);
       try {
-        const params = new URLSearchParams({ limit: '18', include_references: '1' });
+        // Keep a wider nearby candidate pool so client-side source/recency ranking
+        // can still surface fresh Lajukan businesses without sacrificing the
+        // backend's indexed nearest-neighbour query.
+        const params = new URLSearchParams({ limit: '60', include_references: '1' });
         if (viewerLocation) {
           params.set('viewer_lat', String(viewerLocation.lat));
           params.set('viewer_lng', String(viewerLocation.lng));
