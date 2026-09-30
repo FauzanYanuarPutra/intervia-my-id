@@ -39,6 +39,7 @@ import { StorefrontProductOrderAction } from './StorefrontProductOrderAction';
 import { StorefrontOrderCart } from './StorefrontOrderCart';
 import { resolveStorefrontBrandMedia } from '@/lib/super-app/storefront-brand-media';
 import { ReportBusinessButton } from '@/components/umkm/ReportBusinessButton';
+import { UmkmStoreMediaContribution } from '@/components/super-app/UmkmStoreMediaContribution';
 
 type PageProps = {
   params: Promise<{ locale: string; slug: string }>;
@@ -636,6 +637,61 @@ export default async function TokoPage({ params }: PageProps) {
                   compact
                 />
               </div>
+            </div>
+          </section>
+
+          <section
+            id="media-usaha"
+            className="mt-1.5 bg-white dark:bg-slate-900 sm:mt-3 sm:overflow-hidden sm:rounded-3xl sm:border sm:border-slate-200 sm:shadow-sm sm:dark:border-slate-800"
+            data-testid="storefront-media-contributions"
+          >
+            <div className="px-4 py-3 sm:px-5 md:px-6">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <h2 className="text-sm font-bold text-slate-950 dark:text-slate-50">
+                    {isId ? 'Media usaha' : 'Business media'}
+                  </h2>
+                  <p className="mt-0.5 text-[11px] leading-4 text-slate-500 dark:text-slate-400">
+                    {isId
+                      ? 'Foto dari pemilik atau komunitas membantu orang mengenali lokasi dan suasana usaha.'
+                      : 'Owner and community photos help people recognize the business and its location.'}
+                  </p>
+                </div>
+                <UmkmStoreMediaContribution
+                  storeId={store.id}
+                  isId={isId}
+                  loginHref={`/${locale}/login?callbackUrl=${encodeURIComponent(`/${locale}/toko/${encodeURIComponent(store.slug)}#media-usaha`)}`}
+                />
+              </div>
+
+              {brandMedia.galleryUrls.length > 0 ? (
+                <div className="mt-3 grid grid-cols-4 gap-1.5">
+                  {brandMedia.galleryUrls.slice(0, 8).map((src, index) => (
+                    <div
+                      key={src + index}
+                      className="relative aspect-square overflow-hidden rounded-xl bg-slate-100 dark:bg-slate-800"
+                    >
+                      <LajukanImage
+                        src={src}
+                        alt={
+                          isId
+                            ? `Media ${store.name} ${index + 1}`
+                            : `${store.name} media ${index + 1}`
+                        }
+                        fill
+                        sizes="(min-width: 768px) 180px, 25vw"
+                        className="object-cover"
+                      />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-3 rounded-xl bg-slate-50 px-3 py-2.5 text-[10px] font-semibold text-slate-500 dark:bg-slate-950 dark:text-slate-400">
+                  {isId
+                    ? 'Belum ada media tambahan. Kamu bisa membantu menambahkan foto.'
+                    : 'No additional media yet. You can help by adding a photo.'}
+                </p>
+              )}
             </div>
           </section>
 
