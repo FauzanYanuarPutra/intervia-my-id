@@ -245,6 +245,7 @@ type RecommendationItem = {
   updatedAt?: number;
   sourcePriority: number;
   sourceKind?: 'lajukan_listing' | 'external';
+  clusterKey?: string;
 };
 
 function recommendationScore(item: RecommendationItem): number {
@@ -300,33 +301,170 @@ function rankRecommendations(items: RecommendationItem[]): RecommendationItem[] 
   });
 }
 
+function normalizeClusterToken(value: unknown): string {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\u00c0-\u024f]+/gi, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
+}
+
+function isNativeLajukanContent(item: ContentItem): boolean {
+  const metadata = item.metadata || {};
+  const source = String(
+    metadata.source ||
+      metadata.data_source ||
+      metadata.source_kind ||
+      metadata.record_source ||
+      '',
+  )
+    .trim()
+    .toLowerCase();
+
+  return Boolean(
+    item.owner_id ||
+      metadata.listing_mode === 'guided_business_create' ||
+      source === 'lajukan' ||
+      source === 'lajukan_listing' ||
+      source === 'usaha_portal' ||
+      source === 'content',
+  );
+}
+
+function recommendationClusterKey(
+  item: ContentItem,
+  type: string | undefined,
+  location: string,
+): string {
+  const category =
+    metadataText(
+      item,
+      'marketplace_category_slug',
+      'marketplace_subcategory_slug',
+      'business_discovery_category',
+      'create_category',
+      'category',
+    ) ||
+    type ||
+    'other';
+
+  const city =
+    metadataText(item, 'city') ||
+    location;
+
+  return (
+    [
+      normalizeClusterToken(category),
+      normalizeClusterToken(city),
+    ]
+      .filter(Boolean)
+      .join(':') || 'other'
+  );
+}
+
+function clusterHomeFeedItems<T extends { clusterKey?: string }>(
+  items: T[],
+  maxItems: number,
+  maxPerCluster = 4,
+): T[] {
+  if (items.length <= maxItems) return items.slice(0, maxItems);
+
+  const groups = new Map<string, T[]>();
+  for (const item of items) {
+    const key = item.clusterKey || 'other';
+    const bucket = groups.get(key);
+    if (bucket) bucket.push(item);
+    else groups.set(key, [item]);
+  }
+
+  const orderedGroups = Array.from(groups.values());
+  const offsets = new Array(orderedGroups.length).fill(0) as number[];
+  const result: T[] = [];
+
+  while (result.length < maxItems) {
+    let added = false;
+
+    for (let index = 0; index < orderedGroups.length; index += 1) {
+      const group = orderedGroups[index];
+      let offset = offsets[index];
+      if (offset >= group.length) continue;
+
+      let emitted = 0;
+      while (
+        offset < group.length &&
+        emitted < maxPerCluster &&
+        result.length < maxItems
+      ) {
+        result.push(group[offset]);
+        offset += 1;
+        emitted += 1;
+      }
+
+      offsets[index] = offset;
+      added = true;
+
+      if (result.length >= maxItems) break;
+    }
+
+    if (!added) break;
+  }
+
+  return result;
+}
+
+function mergeHomeContentSources(
+  ...sources: ContentItem[][]
+): ContentItem[] {
+  const byId = new Map<string, ContentItem>();
+
+  for (const source of sources) {
+    for (const item of source) {
+      const id = String(item.id || '').trim();
+      if (!id) continue;
+
+      const existing = byId.get(id);
+      if (!existing) {
+        byId.set(id, item);
+        continue;
+      }
+
+      const existingScore =
+        Number(Boolean(existing.owner_id)) * 4 +
+        Object.keys(existing.metadata || {}).length +
+        Number(Boolean(existing.owner_profile));
+
+      const incomingScore =
+        Number(Boolean(item.owner_id)) * 4 +
+        Object.keys(item.metadata || {}).length +
+        Number(Boolean(item.owner_profile));
+
+      if (incomingScore > existingScore) {
+        byId.set(id, item);
+      }
+    }
+  }
+
+  return Array.from(byId.values());
+}
+
 function buildHomeSupplyItems(
   contentItems: RecommendationItem[],
   maxItems = 12,
 ): RecommendationItem[] {
-  return rankRecommendations(
-    contentItems
-      .filter(item => item.side === 'supply')
-      .map(item => ({ ...item, sourcePriority: 0 })),
-  )
-    .filter(
-      (item, index, all) =>
-        all.findIndex(candidate => candidate.id === item.id) === index,
-    )
-    .slice(0, maxItems);
+  const ranked = rankRecommendations(
+    contentItems.filter(item => item.side === 'supply'),
+  ).filter(
+    (item, index, all) =>
+      all.findIndex(candidate => candidate.id === item.id) === index,
+  );
+
+  return clusterHomeFeedItems(ranked, maxItems, 4);
 }
 function rankHomeDemandRecommendations(
   items: RecommendationItem[],
 ): RecommendationItem[] {
-  return [...items].sort((left, right) => {
-    const updatedDelta = (right.updatedAt ?? 0) - (left.updatedAt ?? 0);
-    if (updatedDelta !== 0) return updatedDelta;
-
-    const scoreDelta = recommendationScore(right) - recommendationScore(left);
-    if (scoreDelta !== 0) return scoreDelta;
-
-    return left.id.localeCompare(right.id);
-  });
+  return rankRecommendations(items);
 }
 
 type PublicReferenceItem = {
@@ -344,6 +482,7 @@ type PublicReferenceItem = {
   sourceContactUrl: string;
   sourceContactType: 'whatsapp' | 'source';
   imageAttribution: string;
+  clusterKey?: string;
 };
 
 type PublicReferenceApiItem = {
@@ -1099,8 +1238,11 @@ function mapContentToRecommendation(
       readText(item.metadata?.contentStatus) ||
       'active',
     updatedAt: item.updated_at ? Date.parse(item.updated_at) || undefined : undefined,
-    sourcePriority: 0,
-    sourceKind: 'lajukan_listing',
+    sourcePriority: isNativeLajukanContent(item) ? 0 : 1,
+    sourceKind: isNativeLajukanContent(item)
+      ? 'lajukan_listing'
+      : 'external',
+    clusterKey: recommendationClusterKey(item, type, location),
   };
 }
 
@@ -1137,6 +1279,14 @@ function mapContentToPublicReference(
     sourceContactType: reference.sourceContactType,
     imageAttribution:
       reference.imageAttribution || contentImageAttribution(item),
+    clusterKey: [
+      normalizeClusterToken(
+        metadataText(item, 'place_type', 'amenity', 'shop', 'tourism', 'office'),
+      ),
+      normalizeClusterToken(metadataText(item, 'city')),
+    ]
+      .filter(Boolean)
+      .join(':') || 'other',
   };
 }
 
@@ -2309,11 +2459,11 @@ function HomeListingCarouselSection({
       aria-label={
         isDemand
           ? isId
-            ? 'Kebutuhan Pembeli'
-            : 'Buyer needs'
+            ? 'Sedang dibutuhkan'
+            : 'Currently needed'
           : isId
-            ? 'Penawaran'
-            : 'Offers'
+            ? 'Sedang ditawarkan'
+            : 'Currently offered'
       }
     >
       <div className="flex min-w-0 items-center gap-1.5 px-2 sm:px-3 md:px-4 lg:px-6">
@@ -2326,21 +2476,21 @@ function HomeListingCarouselSection({
         <h2 className="min-w-0 truncate text-[11px] font-bold leading-5 tracking-tight text-[color:var(--app-text)] sm:text-xs">
           {isDemand
             ? isId
-              ? 'Yang sedang mencari'
-              : 'People are looking'
+              ? 'Sedang dibutuhkan'
+              : 'Currently needed'
             : isId
-              ? 'Yang sedang menawarkan'
-              : 'People are offering'}
+              ? 'Sedang ditawarkan'
+              : 'Currently offered'}
         </h2>
 
         <span className="hidden shrink-0 text-[9px] font-medium text-zinc-400 sm:inline">
           {isDemand
             ? isId
-              ? 'Orang yang sedang mencari produk, jasa, atau penyedia'
-              : 'People looking for products, services, or providers'
+              ? 'Kebutuhan aktif dari pembeli di Lajukan'
+              : 'Active buyer needs on Lajukan'
             : isId
-              ? 'Produk, jasa, alat, tempat, dan lainnya yang sedang ditawarkan'
-              : 'Products, services, tools, places, and more currently offered'}
+              ? 'Produk, jasa, alat, tempat, dan lainnya yang tersedia'
+              : 'Products, services, tools, places, and more available'}
         </span>
 
         <Link
@@ -2382,7 +2532,7 @@ function HomeListingCarouselSection({
                 [backface-visibility:hidden]
               "
             >
-              {items.map(item => (
+              {clusteredItems.map(item => (
                 <div
                   key={item.id}
                   className="
@@ -2449,6 +2599,7 @@ export function PublicReferencesSection({
   useEmblaWheelGestures(emblaApi);
 
   if (items.length === 0) return null;
+  const clusteredItems = clusterHomeFeedItems(items, 12, 3);
 
   return (
     <section
@@ -3982,37 +4133,88 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
       return extractContentItems(payload);
     };
 
-    const loadListings = async () => {
+    const buildHomeListingParams = (
+      side: 'supply' | 'demand',
+      databaseOnly: boolean,
+    ) => {
       const params = new URLSearchParams({
         limit: String(HOME_MARKETPLACE_FETCH_LIMIT),
         status: 'active',
-        side: 'supply',
+        side,
+        ...(side === 'demand' ? { sort: 'newest' } : {}),
         include_owner: '1',
-        database_only: '1',
         marketplace_only: 'true',
       });
+      if (databaseOnly) params.set('database_only', '1');
+
       addViewerLocation(params);
-      if (viewerLocationKey) {
+      if (side === 'supply' && viewerLocationKey) {
         params.set('nearby', '1');
       }
-      return fetchHomeContent(params, listingController.signal);
+
+      return params;
     };
 
-    const loadDemandListings = async () => {
-      const params = new URLSearchParams({
-        limit: String(HOME_MARKETPLACE_FETCH_LIMIT),
-        status: 'active',
-        side: 'demand',
-        sort: 'newest',
-        include_owner: '1',
-        database_only: '1',
-        marketplace_only: 'true',
-      });
-      // Demand is a nationwide opportunity board, not a nearby-only feed.
-      // Do not let the viewer's location hide valid requests published by
-      // businesses in another city.
-      return fetchHomeContent(params, demandController.signal);
+    const loadMyListings = async () => {
+      if (!isAuthenticated) return [] as ContentItem[];
+
+      try {
+        const response = await fetch(
+          '/api/my-listings?status=active&limit=50',
+          {
+            cache: 'no-store',
+            credentials: 'include',
+            signal: AbortSignal.any([
+              listingController.signal,
+              demandController.signal,
+              AbortSignal.timeout(9000),
+            ]),
+          },
+        );
+        if (!response.ok) return [] as ContentItem[];
+
+        const payload = await response.json().catch(() => null);
+        return extractContentItems(payload);
+      } catch {
+        return [] as ContentItem[];
+      }
     };
+
+    const loadListings = async (
+      side: 'supply' | 'demand',
+      controller: AbortController,
+      mine: ContentItem[],
+    ) => {
+      const nativeParams = buildHomeListingParams(side, true);
+      const broadParams = buildHomeListingParams(side, false);
+
+      const [nativeItems, broadItems] = await Promise.all([
+        fetchHomeContent(nativeParams, controller.signal).catch(() => []),
+        fetchHomeContent(broadParams, controller.signal).catch(() => []),
+      ]);
+
+      const matchingMine = mine.filter(item => {
+        const resolvedSide = resolveListingSide({
+          type: item.content_type || item.category,
+          side: item.side,
+          listing_side: item.listing_side,
+          market_side: item.market_side,
+          listing_intent: item.listing_intent,
+          market_intent: item.market_intent,
+          intent: item.intent,
+          pricing_mode: item.pricing_mode,
+          metadata: item.metadata,
+        });
+        return resolvedSide === side;
+      });
+
+      // Order is intentional: direct Lajukan listings first, then the normal
+      // database feed, then broader imported/discovered candidates.
+      return mergeHomeContentSources(matchingMine, nativeItems, broadItems);
+    };
+
+    const loadDemandListings = async (mine: ContentItem[]) =>
+      loadListings('demand', demandController, mine);
 
     const loadReferences = async () => {
       const params = new URLSearchParams({
@@ -4035,10 +4237,16 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
       return Array.isArray(payload?.data?.items) ? payload.data.items : [];
     };
 
+    const myListingsPromise = loadMyListings();
+
     const loadHomeListings = async () => {
       setRecommendationsLoading(true);
       try {
-        const contentItems = await loadListings().catch(() => []);
+        const contentItems = await loadListings(
+          'supply',
+          listingController,
+          await myListingsPromise,
+        );
 
         const transactionalSupplyItems = contentItems
           .filter(isHomeRecommendationEligible)
@@ -4070,25 +4278,32 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
     const loadHomeDemandListings = async () => {
       setDemandRecommendationsLoading(true);
       try {
-        const listingItems = rankHomeDemandRecommendations(
-          (await loadDemandListings())
-            .filter(isHomeRecommendationEligible)
-            .map(item =>
-              mapContentToRecommendation(
-                item,
-                isId,
-                Boolean(viewerLocationKey),
-              ),
-            )
-            .filter((item): item is RecommendationItem => Boolean(item))
-            .filter(item => item.side === 'demand')
-            .map(item => ({ ...item, sourcePriority: 0 }))
-            .filter(
-              (item, index, allItems) =>
-                allItems.findIndex(candidate => candidate.id === item.id) ===
-                index,
+        const contentItems = await loadDemandListings(
+          await myListingsPromise,
+        );
+
+        const demandItems = contentItems
+          .filter(isHomeRecommendationEligible)
+          .map(item =>
+            mapContentToRecommendation(
+              item,
+              isId,
+              Boolean(viewerLocationKey),
             ),
-        ).slice(0, 12);
+          )
+          .filter((item): item is RecommendationItem => Boolean(item))
+          .filter(item => item.side === 'demand')
+          .filter(
+            (item, index, allItems) =>
+              allItems.findIndex(candidate => candidate.id === item.id) ===
+              index,
+          );
+
+        const listingItems = clusterHomeFeedItems(
+          rankHomeDemandRecommendations(demandItems),
+          12,
+          4,
+        );
 
         if (!active) return;
         setDemandRecommendations(listingItems);
@@ -4139,7 +4354,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
       demandController.abort();
       referenceController.abort();
     };
-  }, [isId, viewerLocationKey]);
+  }, [isId, isAuthenticated, viewerLocationKey]);
 
   const loadCommunityPostsPage = useCallback(async () => {
     const requestSeq = communityRequestSeqRef.current + 1;
