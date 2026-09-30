@@ -276,7 +276,7 @@ export function getUmkmMapSourceLabel(
     return isId ? 'Lokasi usaha' : 'Business location';
   }
   if (kind === 'reference') {
-    return isId ? 'Lokasi publik' : 'Public location';
+    return isId ? 'Lokasi usaha' : 'Business location';
   }
   return isId ? 'Lokasi terdata' : 'Mapped location';
 }
