@@ -626,6 +626,15 @@ export function CommunityComposer({
 
   /* ================= OPEN / CLOSE ================= */
 
+  const hasComposerDraft = Boolean(
+    title.trim() ||
+    body.trim() ||
+    mediaUrls.length ||
+    pollOptions.some(option => option.trim()) ||
+    topicTag.trim() ||
+    feeling.trim(),
+  );
+
   const openComposer = (nextMode: ComposeMode) => {
     rememberReturnFocus();
     setMode(nextMode);
@@ -633,6 +642,14 @@ export function CommunityComposer({
   };
 
   const closeComposer = useCallback(() => {
+    if (open && hasComposerDraft && !saving) {
+      if (!window.confirm(
+        isId
+          ? 'Ada tulisan atau media yang belum dikirim. Tutup dan buang draft ini?'
+          : 'You have unsent text or media. Close and discard this draft?'
+      )) return;
+    }
+
     setOpen(false);
 
     if (!searchParams.has('compose')) {
@@ -656,7 +673,7 @@ export function CommunityComposer({
         ? `${currentPath}?${queryString}`
         : currentPath,
     );
-  }, [pathname, router, searchParams]);
+  }, [hasComposerDraft, isId, open, pathname, router, saving, searchParams]);
 
   useEffect(() => {
     closeComposerRef.current = closeComposer;
@@ -770,6 +787,7 @@ export function CommunityComposer({
     event: FormEvent<HTMLFormElement>,
   ) => {
     event.preventDefault();
+    if (saving) return;
 
     if (!isAuthenticated) {
       router.push(loginHref);
@@ -4544,6 +4562,7 @@ export function CommunityGroupCreateForm({
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (saving) return;
     if (!isAuthenticated) {
       router.push(loginHref);
       return;
@@ -4606,7 +4625,16 @@ export function CommunityGroupCreateForm({
           </h2>
           <button
             type="button"
-            onClick={onCancel}
+            onClick={() => {
+              if (!saving && (name.trim() || description.trim() || avatarUrl || coverUrl || rules.some(rule => rule.trim()))) {
+                if (!window.confirm(
+                  isId
+                    ? 'Ada data grup yang belum disimpan. Kembali dan buang draft ini?'
+                    : 'Group details are not saved. Go back and discard this draft?'
+                )) return;
+              }
+              onCancel();
+            }}
             className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-slate-50"
             aria-label={isId ? 'Kembali' : 'Back'}
           >
