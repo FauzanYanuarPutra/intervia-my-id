@@ -100,6 +100,7 @@ type MapPointResponse = {
     items?: Array<{
       id: string;
       slug: string;
+      public_path?: string | null;
       name: string;
       city: string;
       lat: number;
@@ -1535,6 +1536,7 @@ export function UmkmDiscoveryPanel({
               .map(point => ({
                 id: point.id,
                 slug: point.slug,
+                public_path: point.public_path || point.metadata?.public_path || null,
                 name: point.name,
                 city: point.city || 'Indonesia',
                 address: point.city || 'Indonesia',
@@ -1544,6 +1546,7 @@ export function UmkmDiscoveryPanel({
                 phone: null,
                 metadata: {
                   ...(point.metadata || {}),
+                  public_path: point.public_path || point.metadata?.public_path || undefined,
                   marketplace_category_slug:
                     point.metadata?.marketplace_category_slug || point.category,
                   umkm_category: point.metadata?.umkm_category,
