@@ -46,7 +46,7 @@ describe('UMKM public route helpers', () => {
         public_path: '//example.test/unsafe',
         metadata: { is_public_reference: true },
       }),
-    ).toBe('/toko/osm-node-1');
+    ).toBe('/umkm?store=osm-node-1');
   });
 
   it('opens owner actions directly in the dedicated Usaha workspace', () => {
