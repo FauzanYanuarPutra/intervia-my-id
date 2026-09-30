@@ -273,6 +273,27 @@ function getUmkmPlacePublishServices(place: UmkmPlaceLike): PublishService[] {
 }
 
 export function getUmkmPlaceKind(place: UmkmPlaceLike): UmkmPlaceKind {
+  const metadata = asRecord(place.metadata);
+  const osmKey = readText(metadata.osm_primary_key).toLowerCase();
+  const osmValue = readText(metadata.osm_primary_value).toLowerCase();
+
+  if (osmKey === 'amenity') {
+    if (/(restaurant|cafe|fast_food|bar|pub|food_court|ice_cream)/.test(osmValue)) {
+      return 'food';
+    }
+    if (/(bank|atm|clinic|hospital|school|office|post_office|police)/.test(osmValue)) {
+      return 'service';
+    }
+  }
+
+  if (osmKey === 'shop' && /(mall|supermarket|hypermarket|convenience|department_store|grocery)/.test(osmValue)) {
+    return 'retail';
+  }
+
+  if (osmKey === 'tourism' && /(hotel|hostel|resort|motel)/.test(osmValue)) {
+    return 'service';
+  }
+
   const businessCategory = getUmkmPlaceBusinessCategory(place);
   if (businessCategory) {
     const sector = getUmkmSectorFromBusinessCategory(businessCategory);
