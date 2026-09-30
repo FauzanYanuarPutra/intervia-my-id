@@ -2335,29 +2335,90 @@ export default function TransactionsPage() {
       return;
     }
 
+    const currentStatus = resolveTxnStatus(cancelTxn);
+    const correctionOnly =
+      isTerminalTransactionStatus(currentStatus) && currentStatus !== 'completed';
+    const requestBody = JSON.stringify({
+      response_message: cancelMessage.trim() || undefined,
+      reason_code: cancelReasonCode,
+    });
+
     setCancelSubmitting(true);
     setCancelError(null);
     try {
-      const res = await authFetch(`/api/transactions/${cancelTxn.id}/cancel`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Idempotency-Key': createIdempotencyKey('cancel'),
+      let res = await authFetch(
+        correctionOnly
+          ? `/api/transactions/${cancelTxn.id}/correction`
+          : `/api/transactions/${cancelTxn.id}/cancel`,
+        {
+          method: correctionOnly ? 'POST' : 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Idempotency-Key': createIdempotencyKey(
+              correctionOnly ? 'correction' : 'cancel',
+            ),
+          },
+          body: requestBody,
         },
-        body: JSON.stringify({
-          response_message: cancelMessage.trim() || undefined,
-          reason_code: cancelReasonCode,
-        }),
-      });
-      const payload = await res.json().catch(() => ({}));
+      );
+      let payload = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        code?: string;
+        ticket?: unknown;
+      };
+
+      if (
+        !res.ok &&
+        currentStatus === 'completed' &&
+        (
+          payload.code === 'completed_correction_window_expired' ||
+          payload.code === 'completed_correction_insufficient_seller_balance'
+        )
+      ) {
+        res = await authFetch(`/api/transactions/${cancelTxn.id}/correction`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Idempotency-Key': createIdempotencyKey('correction-fallback'),
+          },
+          body: requestBody,
+        });
+        payload = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          code?: string;
+          ticket?: unknown;
+        };
+      }
 
       if (!res.ok) {
         throw new Error(
-          (payload as { error?: string }).error ||
+          payload.error ||
           (locale === 'id'
-            ? 'Gagal membatalkan transaksi.'
-            : 'Failed to cancel transaction.'),
+            ? correctionOnly || currentStatus === 'completed'
+              ? 'Permintaan koreksi transaksi belum berhasil.'
+              : 'Gagal membatalkan transaksi.'
+            : correctionOnly || currentStatus === 'completed'
+              ? 'The transaction correction request could not be submitted.'
+              : 'Failed to cancel transaction.'),
         );
+      }
+
+      if (correctionOnly || payload.code === 'correction_requested') {
+        notifyTransactionChat(
+          cancelTxn,
+          'correction_requested',
+          cancelMessage.trim() || undefined,
+        ).catch(() => {});
+        setActionNotice(
+          locale === 'id'
+            ? 'Permintaan koreksi sudah dikirim untuk ditinjau.'
+            : 'The correction request was submitted for review.',
+        );
+        setCancelTxn(null);
+        setCancelReasonCode('buyer_changed_mind');
+        setCancelMessage('');
+        setCancelError(null);
+        return;
       }
 
       const updated = payload as Transaction;
@@ -2368,11 +2429,15 @@ export default function TransactionsPage() {
         updated,
         'cancelled',
         cancelMessage.trim() || undefined,
-      ).catch(() => { });
+      ).catch(() => {});
       setActionNotice(
         locale === 'id'
-          ? 'Pembatalan terkirim dan tercatat.'
-          : 'The cancellation was submitted and recorded in transaction history.',
+          ? currentStatus === 'completed'
+            ? 'Koreksi transaksi berhasil. Dana dan riwayat sudah dibalikkan secara tercatat.'
+            : 'Pembatalan terkirim dan tercatat.'
+          : currentStatus === 'completed'
+            ? 'The transaction was corrected and the fund reversal was recorded.'
+            : 'The cancellation was submitted and recorded in transaction history.',
       );
       setCancelTxn(null);
       setCancelReasonCode('buyer_changed_mind');
@@ -2383,14 +2448,13 @@ export default function TransactionsPage() {
         error instanceof Error
           ? error.message
           : locale === 'id'
-            ? 'Gagal membatalkan transaksi.'
-            : 'Failed to cancel transaction.',
+            ? 'Tindakan transaksi belum berhasil.'
+            : 'The transaction action could not be completed.',
       );
     } finally {
       setCancelSubmitting(false);
     }
   };
-
   const openCounterOfferModal = (txn: Transaction) => {
     setActionNotice(null);
     setCounterOfferTxn(txn);
