@@ -200,7 +200,7 @@ export const DISCOVERY_COMPACT_CARD_BASELINE_CLASS =
   'h-[264px] min-h-[264px] max-h-[264px] sm:h-[276px] sm:min-h-[276px] sm:max-h-[276px]';
 
 const RAIL_COMPACT_CARD_FRAME_CLASS =
-  'h-[300px] min-h-[300px] max-h-[300px] self-stretch sm:h-[312px] sm:min-h-[312px] sm:max-h-[312px]';
+  'h-[264px] min-h-[264px] max-h-[264px] self-stretch sm:h-[276px] sm:min-h-[276px] sm:max-h-[276px]';
 const GRID_COMPACT_CARD_FRAME_CLASS = cn(
   'self-stretch',
   DISCOVERY_COMPACT_CARD_BASELINE_CLASS,
