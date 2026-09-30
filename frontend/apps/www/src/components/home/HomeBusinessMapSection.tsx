@@ -243,7 +243,7 @@ export function HomeBusinessMapSection({
         if (!active || controller.signal.aborted) return;
         setError(null);
         const response = await fetch(
-          '/api/super-app/umkm/map-points?limit=5000&min_lat=-11&max_lat=6&min_lng=95&max_lng=141',
+          '/api/super-app/umkm/map-points?limit=1500&min_lat=-11.5&max_lat=7.5&min_lng=94.5&max_lng=142.5',
           {
             cache: 'default',
             credentials: 'include',
@@ -334,8 +334,12 @@ export function HomeBusinessMapSection({
 
         if (!active) return;
         setTotalMappedCount(totalCount);
+        const uniqueMapItems = Array.from(
+          new Map(mapItems.map(item => [item.id, item])).values(),
+        );
+
         setStores(
-          mapItems.map(item => ({
+          uniqueMapItems.map(item => ({
             id: item.id,
             slug: item.slug,
             name: item.name,
