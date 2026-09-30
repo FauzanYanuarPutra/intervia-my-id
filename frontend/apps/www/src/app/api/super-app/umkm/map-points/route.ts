@@ -19,14 +19,14 @@ function tolerantNumber(
     value => {
       if (value === undefined || value === null || value === '') return undefined;
       const parsed = Number(value);
-      return Number.isFinite(parsed) ? parsed : undefined;
+      if (!Number.isFinite(parsed) || parsed < min || parsed > max) return undefined;
+      if (options.integer && !Number.isInteger(parsed)) return undefined;
+      if (options.positive && parsed <= 0) return undefined;
+      return parsed;
     },
     z
       .number()
-      .min(min)
-      .max(max)
-      .refine(value => !options.integer || Number.isInteger(value))
-      .refine(value => !options.positive || value > 0)
+      .number()
       .optional(),
   );
 }
