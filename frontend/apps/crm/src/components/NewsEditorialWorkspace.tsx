@@ -103,6 +103,9 @@ function normalizeMultilineText(value: string): string {
   return value
     .replaceAll('\r\n', '\n')
     .replaceAll('\r', '\n')
+    .replaceAll('\\r\\n', '\n')
+    .replaceAll('\\n', '\n')
+    .replaceAll('\\t', '\t')
     .replaceAll('\u0000', '')
     .trim();
 }
@@ -459,7 +462,12 @@ export default function NewsEditorialWorkspace({
           offset: nextOffset,
         });
         const value = record(payload);
-        const nextItems = Array.isArray(value.items) ? (value.items as NewsItem[]) : [];
+        const rawItems = Array.isArray(value.items) ? (value.items as NewsItem[]) : [];
+        const nextItems = rawItems.map(item => ({
+          ...item,
+          summary: item.summary == null ? item.summary : normalizeMultilineText(item.summary),
+          body: normalizeMultilineText(item.body),
+        }));
         const nextSelected = nextItems.find(item => item.id === preserveId) || nextItems[0] || null;
         setQueueOffset(nextOffset);
         setQueueHasMore(value.has_more === true);
