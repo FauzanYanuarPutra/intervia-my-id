@@ -2468,10 +2468,7 @@ fn validate_task_data(task: AiTask, data: &mut Value) -> Vec<String> {
             return;
         };
 
-        let normalized = raw
-            .trim()
-            .to_ascii_lowercase()
-            .replace(['_', ' '], "-");
+        let normalized = raw.trim().to_ascii_lowercase().replace(['_', ' '], "-");
 
         let canonical = allowed
             .iter()
