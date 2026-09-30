@@ -1211,13 +1211,44 @@ function MapBoundsReporter({
 
   const reportBounds = useCallback(() => {
     if (!onBoundsChange) return;
+
+    const size = map.getSize();
+    if (size.x < 32 || size.y < 32) return;
+
     const bounds = map.getBounds();
+    const zoom = map.getZoom();
+    if (
+      !bounds.isValid() ||
+      !Number.isFinite(zoom) ||
+      zoom < 0 ||
+      zoom > 24
+    ) {
+      return;
+    }
+
+    const minLat = bounds.getSouth();
+    const maxLat = bounds.getNorth();
+    const minLng = bounds.getWest();
+    const maxLng = bounds.getEast();
+
+    if (
+      ![minLat, maxLat, minLng, maxLng].every(Number.isFinite) ||
+      minLat < -90 ||
+      maxLat > 90 ||
+      minLng < -180 ||
+      maxLng > 180 ||
+      minLat > maxLat ||
+      minLng > maxLng
+    ) {
+      return;
+    }
+
     onBoundsChange({
-      minLat: bounds.getSouth(),
-      maxLat: bounds.getNorth(),
-      minLng: bounds.getWest(),
-      maxLng: bounds.getEast(),
-      zoom: map.getZoom(),
+      minLat,
+      maxLat,
+      minLng,
+      maxLng,
+      zoom,
     });
   }, [map, onBoundsChange]);
 
@@ -1228,7 +1259,7 @@ function MapBoundsReporter({
     timerRef.current = window.setTimeout(() => {
       timerRef.current = null;
       reportBounds();
-    }, 120);
+    }, 160);
   }, [reportBounds]);
 
   useMapEvents({
@@ -1248,7 +1279,6 @@ function MapBoundsReporter({
 
   return null;
 }
-
 function ManualMarkerFocusController({
   target,
 }: {
