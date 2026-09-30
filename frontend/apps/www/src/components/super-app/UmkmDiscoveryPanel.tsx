@@ -1541,6 +1541,10 @@ export function UmkmDiscoveryPanel({
           ? right.store.distance_km
           : null;
 
+      const leftNative = !isUmkmMapPublicReference(left.store);
+      const rightNative = !isUmkmMapPublicReference(right.store);
+      if (leftNative !== rightNative) return leftNative ? -1 : 1;
+
       if (leftDistance !== null && rightDistance !== null) {
         const delta = leftDistance - rightDistance;
         if (Math.abs(delta) > 0.001) return delta;
@@ -1549,10 +1553,6 @@ export function UmkmDiscoveryPanel({
       } else if (rightDistance !== null) {
         return 1;
       }
-
-      const leftNative = !isUmkmMapPublicReference(left.store);
-      const rightNative = !isUmkmMapPublicReference(right.store);
-      if (leftNative !== rightNative) return leftNative ? -1 : 1;
 
       return left.store.name.localeCompare(right.store.name, 'id');
     });
