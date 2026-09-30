@@ -197,7 +197,7 @@ function getSideVisual(side: DiscoveryCardSide): {
 }
 
 export const DISCOVERY_COMPACT_CARD_BASELINE_CLASS =
-  'h-[300px] min-h-[300px] max-h-[300px] sm:h-[312px] sm:min-h-[312px] sm:max-h-[312px]';
+  'h-[264px] min-h-[264px] max-h-[264px] sm:h-[276px] sm:min-h-[276px] sm:max-h-[276px]';
 
 const RAIL_COMPACT_CARD_FRAME_CLASS =
   'h-[300px] min-h-[300px] max-h-[300px] self-stretch sm:h-[312px] sm:min-h-[312px] sm:max-h-[312px]';
@@ -563,9 +563,9 @@ function CategoryPreview({
 
   const dense = compact || minimal;
   const heroHeightClass = minimal
-    ? 'h-[104px] sm:h-[112px]'
+    ? 'h-[88px] sm:h-[96px]'
     : compact
-      ? 'h-[108px] sm:h-[116px]'
+      ? 'h-[96px] sm:h-[104px]'
       : simple
         ? 'h-[160px]'
         : 'h-[176px]';
@@ -675,7 +675,7 @@ function CategoryPreview({
           </span>
         )}
 
-        {updatedLabel && (
+        {updatedLabel && !dense && (
           <span className="flex items-center gap-1 text-[10px] bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-full">
             <Clock3 className="h-3 w-3" />
             {updatedLabel}
@@ -688,7 +688,7 @@ function CategoryPreview({
         <div
           className={cn(
             'flex items-center justify-between rounded-[14px] bg-slate-50 px-3 dark:bg-slate-900',
-            dense ? 'py-1.5' : 'py-2',
+            dense ? 'py-1' : 'py-2',
           )}
         >
           <span
@@ -728,7 +728,7 @@ export function MarketplaceDiscoveryCard({
 
   const renderAction = (action: CardAction) => {
     const actionClass = cn(
-      'ui-pressable inline-flex min-h-[40px] w-full min-w-0 items-center justify-center rounded-full px-3.5 text-[12px] font-medium transition',
+      'ui-pressable inline-flex min-h-[36px] w-full min-w-0 items-center justify-center rounded-full px-3 text-[11px] font-medium transition',
       action.tone === 'primary'
         ? 'bg-slate-900 text-white hover:translate-y-[-1px] hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200'
         : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900',
