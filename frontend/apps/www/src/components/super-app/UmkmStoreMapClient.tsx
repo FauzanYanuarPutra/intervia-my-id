@@ -79,13 +79,12 @@ type RoutingResponse = {
 };
 
 const MARKER_CLUSTER_DISTANCE_PX = 72;
-const MARKER_CLUSTER_MAX_ZOOM = 18;
+const MARKER_CLUSTER_MAX_ZOOM = 19;
 const MARKER_CLUSTER_PICKER_ZOOM = 17;
 const MARKER_CLUSTER_TIGHT_DISTANCE_PX = 24;
 const MARKER_CLICK_FOCUS_ZOOM = 17;
 const MARKER_CLICK_FOCUS_STEP = 2;
 const MARKER_FOCUS_DURATION = 0.45;
-const AUTO_DOT_RENDER_THRESHOLD = 360;
 const VIEWPORT_RENDER_PADDING = 0.28;
 const MARKER_CLUSTER_FRAME_WIDTH_RATIO = 0.58;
 const MARKER_CLUSTER_FRAME_HEIGHT_RATIO = 0.5;
@@ -1217,6 +1216,7 @@ function MapBoundsReporter({
       maxLat: bounds.getNorth(),
       minLng: bounds.getWest(),
       maxLng: bounds.getEast(),
+      zoom: map.getZoom(),
     });
   }, [map, onBoundsChange]);
 
@@ -1907,8 +1907,8 @@ export function UmkmStoreMapClient({
     <MapContainer
       center={initialMapCenter}
       zoom={initialMapZoom}
-      minZoom={3}
-      maxZoom={18}
+      minZoom={2}
+      maxZoom={19}
       preferCanvas
       scrollWheelZoom={interactive}
       dragging={interactive}
@@ -1990,8 +1990,7 @@ export function UmkmStoreMapClient({
         </>
       ) : null}
 
-      {markerStyle === 'dots' ||
-      (!showPopups && validStores.length > AUTO_DOT_RENDER_THRESHOLD) ? (
+      {markerStyle === 'dots' ? (
         <StoreDotsLayer
           storePresentations={storePresentations}
           selectedStoreId={selectedStoreId}
