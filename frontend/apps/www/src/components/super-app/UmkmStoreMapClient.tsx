@@ -1369,7 +1369,6 @@ function StoreDotsLayer({
   return (
     <>
       {visibleStorePresentations.map(({ store, ui }) => {
-        const isReference = isUmkmMapPublicReference(store);
         const sourceKind = getUmkmMapSourceKind(store);
         const palette =
           sourceKind === 'reference'
