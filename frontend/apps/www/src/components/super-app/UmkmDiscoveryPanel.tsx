@@ -1445,7 +1445,6 @@ export function UmkmDiscoveryPanel({
       const requestKey = [
         query?.trim().toLowerCase() || '',
         city?.trim().toLowerCase() || '',
-        category?.trim().toLowerCase() || '',
         discoveryScope,
         bounds.minLat.toFixed(3),
         bounds.maxLat.toFixed(3),
@@ -1477,7 +1476,6 @@ export function UmkmDiscoveryPanel({
         });
         if (query?.trim()) params.set('q', query.trim());
         if (city?.trim()) params.set('city', city.trim());
-        if (category?.trim() && category !== 'all') params.set('category', category.trim());
         if (queryViewerLocation) {
           params.set('viewer_lat', queryViewerLocation.lat.toFixed(5));
           params.set('viewer_lng', queryViewerLocation.lng.toFixed(5));
@@ -1562,7 +1560,6 @@ export function UmkmDiscoveryPanel({
     },
     [
       MAP_POINT_FETCH_MAX,
-      category,
       city,
       discoveryScope,
       query,
