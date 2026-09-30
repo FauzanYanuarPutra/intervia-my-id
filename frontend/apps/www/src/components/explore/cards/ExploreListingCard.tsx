@@ -151,7 +151,7 @@ export function ExploreListingCard({
           alt={item.title}
           attribution={imageAttribution}
           fallbackLabel={locale === 'id' ? 'Belum ada foto' : 'No photo yet'}
-          className="aspect-[4/3] w-full sm:aspect-[16/10]"
+          className="aspect-[16/9] w-full sm:aspect-[16/9]"
         />
         <span className="absolute left-2 top-2 inline-flex min-h-7 items-center rounded-full border border-white/70 bg-white/90 px-2.5 text-[10px] font-black text-emerald-800 shadow-sm backdrop-blur">
           {sideLabel}
@@ -164,7 +164,7 @@ export function ExploreListingCard({
         ) : null}
       </div>
 
-      <div className="flex min-w-0 flex-1 flex-col p-2.5 sm:p-3">
+      <div className="flex min-w-0 flex-1 flex-col p-2.5 sm:p-2.5">
         <div className="flex min-w-0 items-center gap-1.5 text-[10px] font-bold text-[color:var(--app-text-soft)] sm:text-[11px]">
           <ListingIcon className="h-3.5 w-3.5 shrink-0 text-[color:var(--app-accent)]" aria-hidden="true" />
           <span className="truncate">{typeLabel}</span>
@@ -174,13 +174,13 @@ export function ExploreListingCard({
         </div>
 
         <h3 className={cn(
-          'mt-1.5 line-clamp-2 min-h-10 text-sm font-bold leading-5 text-[color:var(--app-text)]',
+          'mt-1 line-clamp-2 min-h-10 text-sm font-bold leading-5 text-[color:var(--app-text)]',
           interactive && 'group-hover:text-[color:var(--app-accent)]',
         )}>
           {item.title}
         </h3>
 
-        <p className="mt-1.5 truncate text-[15px] font-black leading-5 text-[color:var(--app-text)]">
+        <p className="mt-1 truncate text-[15px] font-black leading-5 text-[color:var(--app-text)]">
           {valueLabel}
         </p>
 
