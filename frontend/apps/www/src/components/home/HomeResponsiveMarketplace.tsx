@@ -155,6 +155,7 @@ const HOME_CONTENT_REQUEST_TIMEOUT_MS = 12000;
 const HOME_CONTENT_FALLBACK_TIMEOUT_MS = 4500;
 const HOME_CONTENT_TOTAL_TIMEOUT_MS = 18000;
 const HOME_MARKETPLACE_FETCH_LIMIT = 48;
+const HOME_EXTERNAL_FETCH_LIMIT = 24;
 
 type Tone =
   | 'emerald'
@@ -4138,7 +4139,9 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
       databaseOnly: boolean,
     ) => {
       const params = new URLSearchParams({
-        limit: String(HOME_MARKETPLACE_FETCH_LIMIT),
+        limit: String(
+          databaseOnly ? HOME_MARKETPLACE_FETCH_LIMIT : HOME_EXTERNAL_FETCH_LIMIT,
+        ),
         status: 'active',
         side,
         ...(side === 'demand' ? { sort: 'newest' } : {}),
