@@ -495,7 +495,6 @@ pub(crate) fn router() -> Router<Arc<AppState>> {
             "/v1/crm/store-media/{media_id}/review",
             post(review_crm_store_media),
         )
-        
         .route(
             "/v1/crm/appeals/{appeal_id}/review",
             post(review_business_appeal),
