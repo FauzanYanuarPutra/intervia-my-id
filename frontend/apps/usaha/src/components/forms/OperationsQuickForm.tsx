@@ -30,6 +30,16 @@ export function OperationsQuickForm({ business }: OperationsQuickFormProps) {
       return;
     }
 
+    const changed =
+      schedule.trim() !== business.schedule.trim() ||
+      isOpen !== business.isOpen;
+
+    if (changed && !window.confirm(
+      isOpen !== business.isOpen
+        ? (isOpen ? 'Tandai usaha sebagai sedang buka?' : 'Tandai usaha sebagai tutup?')
+        : 'Simpan perubahan jam operasional?'
+    )) return;
+
     setError('');
     setSuccess('');
     setIsPending(true);
