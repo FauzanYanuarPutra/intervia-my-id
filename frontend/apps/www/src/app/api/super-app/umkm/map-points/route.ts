@@ -26,7 +26,6 @@ function tolerantNumber(
     },
     z
       .number()
-      .number()
       .optional(),
   );
 }
