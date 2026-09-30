@@ -10,7 +10,7 @@ const MARKETPLACE_URL =
   process.env.NEXT_PUBLIC_MARKETPLACE_URL ||
   'http://localhost:8081';
 
-const optionalNumber = (schema: z.ZodTypeAny) =>
+const optionalNumber = <T extends z.ZodTypeAny>(schema: T) =>
   z.preprocess(
     value =>
       typeof value === 'string' && value.trim() === '' ? undefined : value,
@@ -21,7 +21,9 @@ const QuerySchema = z.object({
   q: z.string().trim().max(120).optional(),
   city: z.string().trim().max(80).optional(),
   category: z.string().trim().max(80).optional(),
-  limit: z.coerce.number().finite().int().min(1).max(1800).default(600),
+  limit: optionalNumber(
+    z.coerce.number().finite().int().min(1).max(1800),
+  ).default(600),
   min_lat: optionalNumber(z.coerce.number().finite().min(-90).max(90).optional()),
   max_lat: optionalNumber(z.coerce.number().finite().min(-90).max(90).optional()),
   min_lng: optionalNumber(z.coerce.number().finite().min(-180).max(180).optional()),
@@ -138,7 +140,7 @@ export async function GET(req: NextRequest) {
       params.set('radius_km', String(normalizedRadius));
     }
 
-      const response = await fetch(
+    const response = await fetch(
       `${MARKETPLACE_URL}/v1/map/places?${params.toString()}`,
       {
         cache: 'no-store',
