@@ -63,8 +63,60 @@ function formatDistance(distanceKm: number | null | undefined): string | null {
 }
 
 /* ================= SORT ================= */
+function getHomeSourceRank(store: PreviewStore): number {
+  const metadata =
+    store.metadata &&
+    typeof store.metadata === 'object' &&
+    !Array.isArray(store.metadata)
+      ? store.metadata
+      : {};
+  if (isUmkmMapPublicReference(store)) return 2;
+
+  const sourceKind =
+    typeof metadata.source_kind === 'string'
+      ? metadata.source_kind.trim().toLowerCase()
+      : '';
+  const source =
+    typeof metadata.source === 'string'
+      ? metadata.source.trim().toLowerCase()
+      : '';
+
+  if (
+    sourceKind.includes('lajukan') ||
+    source === 'usaha_portal' ||
+    source === 'lajukan_content'
+  ) {
+    return 0;
+  }
+
+  return 1;
+}
+
+function getHomeUpdatedAt(store: PreviewStore): number {
+  const metadata =
+    store.metadata &&
+    typeof store.metadata === 'object' &&
+    !Array.isArray(store.metadata)
+      ? store.metadata
+      : {};
+  const value = metadata.updated_at ?? metadata.updatedAt;
+  if (typeof value === 'string') {
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+}
+
 function sortStores(items: PreparedStore[], preferDistance: boolean) {
   return [...items].sort((a, b) => {
+    const sourceRankDiff =
+      getHomeSourceRank(a.store) - getHomeSourceRank(b.store);
+    if (sourceRankDiff !== 0) return sourceRankDiff;
+
+    const updatedDiff =
+      getHomeUpdatedAt(b.store) - getHomeUpdatedAt(a.store);
+    if (updatedDiff !== 0) return updatedDiff;
+
     if (preferDistance) {
       const leftDistance =
         typeof a.store.distance_km === 'number' &&
@@ -84,6 +136,7 @@ function sortStores(items: PreparedStore[], preferDistance: boolean) {
         return 1;
       }
     }
+
     if (a.ui.openNow !== b.ui.openNow) {
       const openRank = (value: boolean | null) =>
         value === true ? 2 : value === null ? 1 : 0;
