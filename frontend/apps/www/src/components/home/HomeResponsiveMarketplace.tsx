@@ -18,6 +18,7 @@ import {
   useEffect,
   useRef,
   useState,
+  useMemo,
   useSyncExternalStore,
 } from 'react';
 import {
@@ -2554,7 +2555,7 @@ function HomeListingCarouselSection({
                 [backface-visibility:hidden]
               "
             >
-              {clusteredItems.map(item => (
+              {clusteredItems.map((item: RecommendationItem) => (
                 <div
                   key={item.id}
                   className="
