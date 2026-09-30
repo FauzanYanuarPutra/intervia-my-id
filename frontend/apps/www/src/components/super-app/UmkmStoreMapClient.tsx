@@ -982,8 +982,13 @@ function MapFocusController({
   const handledFocusKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
-    const focusKey = focusMode ? `${focusMode}:${focusNonce}` : null;
     const validStores = stores.filter(hasValidLatLng);
+    // Geo data can arrive after the first render. Include the current
+    // valid-point count in the focus key so the map fits again once the
+    // real snapshot is available.
+    const focusKey = focusMode
+      ? `${focusMode}:${focusNonce}:${validStores.length}`
+      : null;
     const validSelectedStore = selectedStoreId
       ? validStores.find(store => store.id === selectedStoreId) || null
       : null;
@@ -1242,6 +1247,7 @@ function useViewportStorePresentations(
 ): StorePresentation[] {
   const map = useMap();
   const [viewportVersion, setViewportVersion] = useState(0);
+  const [viewportReady, setViewportReady] = useState(false);
 
   useMapEvents({
     moveend: () => setViewportVersion(value => value + 1),
@@ -1253,6 +1259,7 @@ function useViewportStorePresentations(
     let active = true;
     const refresh = () => {
       if (!active) return;
+      setViewportReady(true);
       setViewportVersion(value => value + 1);
     };
 
@@ -1271,7 +1278,7 @@ function useViewportStorePresentations(
     if (!storePresentations.length) return [];
 
     const mapSize = map.getSize();
-    if (mapSize.x < 32 || mapSize.y < 32) {
+    if (mapSize.x < 32 || mapSize.y < 32 || !viewportReady) {
       return storePresentations;
     }
 
@@ -1286,18 +1293,8 @@ function useViewportStorePresentations(
         )
       : [...storePresentations];
 
-    // Leaflet can briefly expose a stale/zero viewport while the container is
-    // settling after mount or a responsive layout change. Never make every
-    // valid coordinate disappear because of that transient snapshot.
-    if (!visible.length && storePresentations.length) {
-      if (selectedStoreId) {
-        const selected = storePresentations.find(
-          ({ store }) => store.id === selectedStoreId,
-        );
-        if (selected) return [selected];
-      }
-      return storePresentations;
-    }
+    // A genuinely empty viewport should stay empty. The all-points fallback
+    // is only used while the initial map layout is settling above.
 
     if (
       selectedStoreId &&
@@ -1310,7 +1307,7 @@ function useViewportStorePresentations(
     }
 
     return visible;
-  }, [map, selectedStoreId, storePresentations, viewportVersion]);
+  }, [map, selectedStoreId, storePresentations, viewportReady, viewportVersion]);
 }
 
 function getCompactDotRadius(zoom: number): number {
