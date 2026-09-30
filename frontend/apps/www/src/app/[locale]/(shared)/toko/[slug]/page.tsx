@@ -68,7 +68,7 @@ function readMetaText(
 
 function hasMetaKey(
   metadata: Record<string, unknown>,
-  ...keys: string[],
+  ...keys: string[]
 ): boolean {
   return keys.some(key => Object.prototype.hasOwnProperty.call(metadata, key));
 }
