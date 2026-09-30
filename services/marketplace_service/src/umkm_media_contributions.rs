@@ -154,9 +154,9 @@ fn is_valid_media_url(value: &str) -> bool {
 
     !bucket.is_empty()
         && bucket.len() <= 120
-        && bucket
-            .chars()
-            .all(|character| character.is_ascii_alphanumeric() || matches!(character, '.' | '_' | '-'))
+        && bucket.chars().all(|character| {
+            character.is_ascii_alphanumeric() || matches!(character, '.' | '_' | '-')
+        })
         && namespace == "forum"
         && segments.next().is_none()
         && is_safe_media_filename(filename)
@@ -370,7 +370,6 @@ pub(crate) async fn create_media_contribution(
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::is_valid_media_url;
@@ -389,9 +388,7 @@ mod tests {
 
     #[test]
     fn rejects_remote_media_urls() {
-        assert!(!is_valid_media_url(
-            "https://example.com/abc-123.webp"
-        ));
+        assert!(!is_valid_media_url("https://example.com/abc-123.webp"));
     }
 
     #[test]
