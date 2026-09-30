@@ -66,10 +66,17 @@ RUN set -eux; \
       return 1; \
     }; \
     if [ -f package-lock.json ]; then \
-      retry_npm npm ci --legacy-peer-deps --include=dev --prefer-offline --no-audit --no-fund; \
+      retry_npm npm ci --legacy-peer-deps --include=dev --include=optional --ignore-scripts --prefer-offline --no-audit --no-fund; \
     else \
-      retry_npm npm install --legacy-peer-deps --include=dev --prefer-offline --no-audit --no-fund; \
+      retry_npm npm install --legacy-peer-deps --include=dev --include=optional --ignore-scripts --prefer-offline --no-audit --no-fund; \
     fi; \
+    if ! node -e "require.resolve('@typescript/typescript-linux-x64/package.json')" >/dev/null 2>&1; then \
+      TS_VERSION=$(node -p "require('./node_modules/typescript/package.json').version"); \
+      echo "Installing TypeScript Linux x64 runtime ${TS_VERSION}"; \
+      retry_npm npm install --no-save --legacy-peer-deps --include=optional --prefer-offline --no-audit --no-fund "@typescript/typescript-linux-x64@${TS_VERSION}"; \
+    fi; \
+    node -e "require.resolve('typescript/package.json'); require.resolve('@typescript/typescript-linux-x64/package.json')"; \
+    ./node_modules/.bin/tsc --version; \
     ./node_modules/.bin/tsc -p tsconfig.build.json
 
 COPY apps/usaha/package*.json ./
