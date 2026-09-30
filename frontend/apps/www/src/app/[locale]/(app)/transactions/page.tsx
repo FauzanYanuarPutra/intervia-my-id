@@ -2311,7 +2311,12 @@ export default function TransactionsPage() {
   const openCancelModal = (txn: Transaction) => {
     setActionNotice(null);
     setCancelTxn(txn);
-    setCancelReasonCode('buyer_changed_mind');
+    setCancelReasonCode(
+      resolveTxnStatus(txn) === 'completed' ||
+        ['cancelled', 'rejected', 'expired', 'refunded'].includes(resolveTxnStatus(txn))
+        ? 'user_mistake'
+        : 'buyer_changed_mind',
+    );
     setCancelMessage('');
     setCancelError(null);
   };
