@@ -94,6 +94,7 @@ type DiscoveryCard = {
   updatedAt: number;
   score: number;
   verified: boolean;
+  sourcePriority: number;
 };
 
 type HomeDiscoveryFeedProps = {
@@ -504,6 +505,7 @@ function mapContentItem(
       verified,
       typeKey,
     }),
+    sourcePriority: isNativeLajukanContent(item) ? 0 : 1,
   };
 }
 
@@ -521,6 +523,9 @@ function sortCards(
 ): DiscoveryCard[] {
   const next = [...items];
   next.sort((a, b) => {
+    if (a.sourcePriority !== b.sourcePriority) {
+      return a.sourcePriority - b.sourcePriority;
+    }
     if (mode === 'top' && b.score !== a.score) return b.score - a.score;
     return b.updatedAt - a.updatedAt;
   });
