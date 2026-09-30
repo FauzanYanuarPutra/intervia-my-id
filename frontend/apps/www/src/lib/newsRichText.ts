@@ -30,10 +30,22 @@ function escapeHtmlText(value: string): string {
     .replace(/>/g, '&gt;');
 }
 
+function normalizePlainNewsText(text: string): string {
+  return String(text ?? '')
+    .replaceAll('\r\n', '\n')
+    .replaceAll('\r', '\n')
+    .replaceAll('\\r\\n', '\n')
+    .replaceAll('\\n', '\n')
+    .replaceAll('\\t', '\t')
+    .replaceAll('\u2028', '\n')
+    .replaceAll('\u2029', '\n')
+    .replace(/\u0000/g, '')
+    .replace(/^\uFEFF/, '')
+    .replace(/[\u200B-\u200D]/g, '');
+}
+
 function textToParagraphs(text: string): string {
-  const normalized = text
-    .replace(/\r\n?/g, '\n')
-    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+  const normalized = normalizePlainNewsText(text)
     .replace(/\t/g, '    ')
     .trim();
   if (!normalized) return '';
