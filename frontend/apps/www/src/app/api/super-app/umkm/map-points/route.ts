@@ -14,13 +14,14 @@ const QuerySchema = z.object({
   q: z.string().trim().max(120).optional(),
   city: z.string().trim().max(80).optional(),
   category: z.string().trim().max(80).optional(),
-  limit: z.coerce.number().int().min(1).max(5000).default(1000),
+  limit: z.coerce.number().int().min(1).max(3000).default(1000),
   min_lat: z.coerce.number().min(-90).max(90).optional(),
   max_lat: z.coerce.number().min(-90).max(90).optional(),
   min_lng: z.coerce.number().min(-180).max(180).optional(),
   max_lng: z.coerce.number().min(-180).max(180).optional(),
   viewer_lat: z.coerce.number().min(-90).max(90).optional(),
   viewer_lng: z.coerce.number().min(-180).max(180).optional(),
+  radius_km: z.coerce.number().finite().positive().max(1000).optional(),
 });
 
 type MapPoint = {
@@ -114,6 +115,9 @@ export async function GET(req: NextRequest) {
     if (hasViewer) {
       params.set('viewer_lat', String(input.viewer_lat));
       params.set('viewer_lng', String(input.viewer_lng));
+    }
+    if (input.radius_km !== undefined) {
+      params.set('radius_km', String(input.radius_km));
     }
 
     const response = await fetch(

@@ -47,6 +47,7 @@ import {
   getNextUmkmMapTheme,
   getUmkmMapThemeLabel,
   UmkmStoreMap,
+  type UmkmMapBounds,
   type UmkmMapRouteSummary,
   type UmkmMapStore,
   type UmkmMapTheme,
@@ -126,6 +127,9 @@ type StoresResponse = {
 };
 
 const LIST_PAGE_SIZE = 10;
+const MAP_VIEWPORT_FETCH_LIMIT = 2200;
+const MAP_VIEWPORT_PADDING = 0.24;
+const MAP_POINTS_CACHE_LIMIT = 6000;
 const REPORT_EMAIL = 'support@lajukan.com';
 
 function formatDiscoveryPrice(valueCents: number, isId: boolean): string {
@@ -1085,11 +1089,11 @@ export function UmkmDiscoveryPanel({
   const [storesBackendDegraded, setStoresBackendDegraded] = useState(false);
   const [mapPoints, setMapPoints] = useState<UmkmMapStore[]>([]);
   const activeMapPointsRequestRef = useRef<AbortController | null>(null);
-  // Map points are loaded as a stable geo snapshot. Panning never starts a
-  // network request, so the map remains responsive while the user drags.
+  const mapViewportTimerRef = useRef<number | null>(null);
+  const mapPointsCacheRef = useRef(new Map<string, UmkmMapStore>());
+  const lastMapViewportKeyRef = useRef<string | null>(null);
   const requestLimit = Math.max(24, Math.min(60, Math.max(limit * 3, 24)));
   const referencePageLimit = 60;
-  const mapPointLimit = 5000;
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1414,95 +1418,160 @@ export function UmkmDiscoveryPanel({
       activeReferencesRequestRef.current?.abort();
     };
   }, [loadReferencesPage, query, city, discoveryScope]);
+  const clearMapPointCache = useCallback(() => {
+    mapPointsCacheRef.current.clear();
+    lastMapViewportKeyRef.current = null;
+    setMapPoints([]);
+  }, []);
+
   useEffect(() => {
-    activeMapPointsRequestRef.current?.abort();
-    const controller = new AbortController();
-    activeMapPointsRequestRef.current = controller;
-
-    // Load a stable nationwide geo-only snapshot once per search/location
-    // context. Panning the map never changes the request, so the user gets
-    // progressive nearest-to-farthest data without loading flashes.
-    const params = new URLSearchParams({
-      limit: String(mapPointLimit),
-    });
-    if (query?.trim()) params.set('q', query.trim());
-    if (city?.trim()) params.set('city', city.trim());
-    if (queryViewerLocation) {
-      params.set('viewer_lat', queryViewerLocation.lat.toFixed(3));
-      params.set('viewer_lng', queryViewerLocation.lng.toFixed(3));
+    clearMapPointCache();
+    if (mapViewportTimerRef.current !== null) {
+      window.clearTimeout(mapViewportTimerRef.current);
+      mapViewportTimerRef.current = null;
     }
-
-    const timerId = window.setTimeout(() => {
-      void fetch(`/api/super-app/umkm/map-points?${params.toString()}`, {
-        cache: 'default',
-        signal: controller.signal,
-      })
-      .then(async response => {
-        const payload = (await response.json().catch(() => ({}))) as MapPointResponse;
-        if (!response.ok || controller.signal.aborted) return;
-        const points = payload.data?.items || [];
-        setMapPoints(
-          points
-            .filter(point => isCoordinateValid({ lat: point.lat, lng: point.lng }))
-            .map(point => ({
-              id: point.id,
-              slug: point.slug,
-              name: point.name,
-              city: point.city || 'Indonesia',
-              address: point.city || 'Indonesia',
-              lat: point.lat,
-              lng: point.lng,
-              description: null,
-              phone: null,
-              metadata: {
-                ...(point.metadata || {}),
-                marketplace_category_slug:
-                  point.metadata?.marketplace_category_slug || point.category,
-                umkm_category:
-                  point.metadata?.umkm_category,
-                source_kind: point.source_kind,
-                record_kind:
-                  point.source_kind.includes('reference')
-                    ? point.metadata?.record_kind || 'open_data_reference'
-                    : point.metadata?.record_kind || 'registered_store',
-                market_side:
-                  point.source_kind.includes('reference')
-                    ? 'reference'
-                    : point.metadata?.market_side || 'supply',
-                is_transactional:
-                  !point.source_kind.includes('reference'),
-                reference_publication_status:
-                  point.source_kind.includes('reference')
-                    ? 'published'
-                    : point.metadata?.reference_publication_status,
-                claimable: point.source_kind.includes('reference'),
-                source_dataset: point.metadata?.source_dataset || point.source_kind,
-                is_public_reference: point.source_kind.includes('reference'),
-              },
-              online_order_enabled: false,
-              offline_order_enabled: false,
-              reservation_enabled: false,
-              table_count: 0,
-              available_table_count: 0,
-              max_table_capacity: 0,
-            })),
-        );
-      })
-        .catch(error => {
-          if (!controller.signal.aborted) {
-            console.warn('[UMKM_MAP_POINTS_CLIENT_ERROR]', error);
-          }
-        });
-    }, 320);
+    activeMapPointsRequestRef.current?.abort();
 
     return () => {
-      window.clearTimeout(timerId);
-      controller.abort();
-      if (activeMapPointsRequestRef.current === controller) {
-        activeMapPointsRequestRef.current = null;
+      if (mapViewportTimerRef.current !== null) {
+        window.clearTimeout(mapViewportTimerRef.current);
+        mapViewportTimerRef.current = null;
       }
+      activeMapPointsRequestRef.current?.abort();
     };
-  }, [city, mapPointLimit, query, queryViewerLocation]);
+  }, [clearMapPointCache, city, discoveryScope, mapRangeKm, query, queryViewerLocation]);
+
+  const handleMapBoundsChange = useCallback(
+    (bounds: UmkmMapBounds) => {
+      if (!Number.isFinite(bounds.zoom)) return;
+
+      const latPadding = Math.min(
+        12,
+        Math.max(0.01, (bounds.maxLat - bounds.minLat) * MAP_VIEWPORT_PADDING),
+      );
+      const lngPadding = Math.min(
+        18,
+        Math.max(0.01, (bounds.maxLng - bounds.minLng) * MAP_VIEWPORT_PADDING),
+      );
+      const minLat = Math.max(-90, bounds.minLat - latPadding);
+      const maxLat = Math.min(90, bounds.maxLat + latPadding);
+      const minLng = Math.max(-180, bounds.minLng - lngPadding);
+      const maxLng = Math.min(180, bounds.maxLng + lngPadding);
+
+      const viewportKey = [
+        query?.trim() || '',
+        city?.trim() || '',
+        discoveryScope,
+        mapRangeKm ?? '',
+        Math.round(minLat * 100) / 100,
+        Math.round(maxLat * 100) / 100,
+        Math.round(minLng * 100) / 100,
+        Math.round(maxLng * 100) / 100,
+        Math.min(19, Math.max(2, Math.round(bounds.zoom))),
+      ].join('|');
+
+      if (lastMapViewportKeyRef.current === viewportKey) return;
+      lastMapViewportKeyRef.current = viewportKey;
+
+      if (mapViewportTimerRef.current !== null) {
+        window.clearTimeout(mapViewportTimerRef.current);
+      }
+
+      mapViewportTimerRef.current = window.setTimeout(() => {
+        mapViewportTimerRef.current = null;
+        activeMapPointsRequestRef.current?.abort();
+        const controller = new AbortController();
+        activeMapPointsRequestRef.current = controller;
+
+        const params = new URLSearchParams({
+          limit: String(MAP_VIEWPORT_FETCH_LIMIT),
+          min_lat: minLat.toFixed(5),
+          max_lat: maxLat.toFixed(5),
+          min_lng: minLng.toFixed(5),
+          max_lng: maxLng.toFixed(5),
+        });
+        if (query?.trim()) params.set('q', query.trim());
+        if (city?.trim()) params.set('city', city.trim());
+        if (mapRangeKm !== null && queryViewerLocation) {
+          params.set('viewer_lat', queryViewerLocation.lat.toFixed(3));
+          params.set('viewer_lng', queryViewerLocation.lng.toFixed(3));
+          params.set('radius_km', String(mapRangeKm));
+        }
+
+        void fetch(`/api/super-app/umkm/map-points?${params.toString()}`, {
+          cache: 'no-store',
+          signal: controller.signal,
+        })
+          .then(async response => {
+            const payload = (await response.json().catch(() => ({}))) as MapPointResponse;
+            if (!response.ok || controller.signal.aborted) return;
+
+            const points = (payload.data?.items || [])
+              .filter(point => isCoordinateValid({ lat: point.lat, lng: point.lng }))
+              .map(point => ({
+                id: point.id,
+                slug: point.slug,
+                name: point.name,
+                city: point.city || 'Indonesia',
+                address: point.city || 'Indonesia',
+                lat: point.lat,
+                lng: point.lng,
+                description: null,
+                phone: null,
+                metadata: {
+                  ...(point.metadata || {}),
+                  marketplace_category_slug:
+                    point.metadata?.marketplace_category_slug || point.category,
+                  umkm_category: point.metadata?.umkm_category,
+                  source_kind: point.source_kind,
+                  record_kind: point.source_kind.includes('reference')
+                    ? point.metadata?.record_kind || 'open_data_reference'
+                    : point.metadata?.record_kind || 'registered_store',
+                  market_side: point.source_kind.includes('reference')
+                    ? 'reference'
+                    : point.metadata?.market_side || 'supply',
+                  is_transactional: !point.source_kind.includes('reference'),
+                  reference_publication_status: point.source_kind.includes('reference')
+                    ? 'published'
+                    : point.metadata?.reference_publication_status,
+                  claimable: point.source_kind.includes('reference'),
+                  source_dataset: point.metadata?.source_dataset || point.source_kind,
+                  is_public_reference: point.source_kind.includes('reference'),
+                },
+                online_order_enabled: false,
+                offline_order_enabled: false,
+                reservation_enabled: false,
+                table_count: 0,
+                available_table_count: 0,
+                max_table_capacity: 0,
+              } satisfies UmkmMapStore));
+
+            const cache = mapPointsCacheRef.current;
+            for (const point of points) {
+              cache.delete(point.id);
+              cache.set(point.id, point);
+            }
+            while (cache.size > MAP_POINTS_CACHE_LIMIT) {
+              const oldestId = cache.keys().next().value;
+              if (typeof oldestId !== 'string') break;
+              cache.delete(oldestId);
+            }
+            setMapPoints(Array.from(cache.values()));
+          })
+          .catch(error => {
+            if (!controller.signal.aborted) {
+              console.warn('[UMKM_MAP_POINTS_VIEWPORT_ERROR]', error);
+            }
+          })
+          .finally(() => {
+            if (activeMapPointsRequestRef.current === controller) {
+              activeMapPointsRequestRef.current = null;
+            }
+          });
+      }, 180);
+    },
+    [city, discoveryScope, mapRangeKm, query, queryViewerLocation],
+  );
 
   const preparedStores = useMemo(
     () =>
@@ -1620,7 +1689,7 @@ export function UmkmDiscoveryPanel({
       }
     }
     return Array.from(merged.values());
-  }, [category, discoveryScope, mapPoints, visibleStores]);
+  }, [category, discoveryScope, isId, mapPoints, viewerLocation, visibleStores]);
   const selectedPlace = useMemo(
     () => visibleStores.find(item => item.store.id === selectedStoreId) || null,
     [selectedStoreId, visibleStores],
@@ -2196,6 +2265,7 @@ export function UmkmDiscoveryPanel({
               edgeToEdge ? handleEdgeMapSelectStore : handleMapSelectStore
             }
             showPopups={false}
+            onBoundsChange={handleMapBoundsChange}
             className={className}
           />
           <div
@@ -2293,6 +2363,7 @@ export function UmkmDiscoveryPanel({
       viewerAccuracyMeters,
       viewerLocation,
       mapStores,
+      handleMapBoundsChange,
       handleMapRangeChange,
       mapRangeKm,
     ],
