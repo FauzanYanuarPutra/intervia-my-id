@@ -308,6 +308,14 @@ export function buildUmkmMapPlacePath(place: UmkmMapLinkTarget): string {
     return buildUmkmStorefrontPath(place.slug?.trim() || '');
   }
 
+  // Public business references (Wikidata/OSM/open data) use the same
+  // storefront-compatible detail surface as registered businesses. Some
+  // reference records also carry legacy content/listing source markers, so
+  // this check must happen before the generic content/listing fallback.
+  if (isUmkmMapPublicReference(place)) {
+    return buildUmkmStorefrontPath(place.slug?.trim() || '');
+  }
+
   // Content/listing points are not storefronts. Prefer their explicit public
   // path so map taps do not incorrectly land on /toko/<content-slug>.
   if (
@@ -321,11 +329,6 @@ export function buildUmkmMapPlacePath(place: UmkmMapLinkTarget): string {
     if (publicPath) return publicPath;
     const slug = place.slug?.trim();
     return slug ? `/content/${encodeURIComponent(slug)}` : '/explore';
-  }
-
-  // Public references use the storefront-compatible detail surface.
-  if (isUmkmMapPublicReference(place)) {
-    return buildUmkmStorefrontPath(place.slug?.trim() || '');
   }
 
   return buildUmkmStorefrontPath(place.slug?.trim() || '');
