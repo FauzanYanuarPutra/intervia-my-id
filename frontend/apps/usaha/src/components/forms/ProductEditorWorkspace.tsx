@@ -1,6 +1,6 @@
 'use client';
 
-import { startTransition, useState } from 'react';
+import { startTransition, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Archive, CheckCircle2, Save, X } from 'lucide-react';
 import { ChoiceChips } from '@/components/interaction/ChoiceChips';
@@ -35,6 +35,31 @@ export function ProductEditorWorkspace({ businessId, product, closeHref }: Props
   const [changeReason, setChangeReason] = useState('Pembaruan data produk');
   const [stockReason, setStockReason] = useState('Penyesuaian stok');
   const busy = pendingAction !== null;
+
+  const hasUnsavedChanges =
+    name.trim() !== product.name.trim() ||
+    category.trim() !== product.category.trim() ||
+    (priceRupiah ?? null) !== parseRupiahInput(product.priceLabel) ||
+    status !== product.status ||
+    stockCount.trim() !== (product.stockCount?.toString() ?? '') ||
+    minStockAlert.trim() !== (product.minStockAlert?.toString() ?? '') ||
+    stockUnit.trim() !== (product.stockUnit || 'pcs');
+
+  function confirmClose(): boolean {
+    if (busy) return false;
+    if (!hasUnsavedChanges) return true;
+    return window.confirm('Ada perubahan produk yang belum disimpan. Tutup editor dan buang perubahan tersebut?');
+  }
+
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!hasUnsavedChanges) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
 
   async function request(path: string, body: Record<string, unknown>) {
     const response = await fetch(path, {
@@ -160,7 +185,9 @@ export function ProductEditorWorkspace({ businessId, product, closeHref }: Props
           </div>
           <button
             type="button"
-            onClick={() => !busy && router.push(closeHref)}
+            onClick={() => {
+              if (confirmClose()) router.push(closeHref);
+            }}
             disabled={busy}
             aria-label="Tutup"
             className="portal-button-ghost h-9 w-9 shrink-0 justify-center rounded-full p-0"
