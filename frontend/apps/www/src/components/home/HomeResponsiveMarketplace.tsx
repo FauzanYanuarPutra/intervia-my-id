@@ -104,7 +104,6 @@ import {
 import { resolveContentPriceUnitLabel } from '@/lib/content/priceUnit';
 import { buildContentHref } from '@/lib/content/routes';
 import {
-  getListingSideContextLabel,
   getListingValueFallback,
   resolveListingSide,
 } from '@/lib/content/listingSide';
