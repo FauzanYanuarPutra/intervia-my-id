@@ -1301,20 +1301,25 @@ function MapBoundsReporter({
 
     const minLat = bounds.getSouth();
     const maxLat = bounds.getNorth();
-    const minLng = bounds.getWest();
-    const maxLng = bounds.getEast();
+    const rawMinLng = bounds.getWest();
+    const rawMaxLng = bounds.getEast();
 
     if (
-      ![minLat, maxLat, minLng, maxLng].every(Number.isFinite) ||
+      ![minLat, maxLat, rawMinLng, rawMaxLng].every(Number.isFinite) ||
       minLat < -90 ||
       maxLat > 90 ||
-      minLng < -180 ||
-      maxLng > 180 ||
-      minLat > maxLat ||
-      minLng > maxLng
+      rawMinLng < -180 ||
+      rawMaxLng > 180 ||
+      minLat > maxLat
     ) {
       return;
     }
+
+    // Leaflet can report a wrapped viewport with west > east near the
+    // antimeridian. The map API uses one rectangular bbox, so fall back to
+    // the full longitude range instead of emitting an invalid request.
+    const minLng = rawMinLng <= rawMaxLng ? rawMinLng : -180;
+    const maxLng = rawMinLng <= rawMaxLng ? rawMaxLng : 180;
 
     onBoundsChange({
       minLat,
