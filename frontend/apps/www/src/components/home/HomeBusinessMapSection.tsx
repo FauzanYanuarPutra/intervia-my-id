@@ -392,7 +392,7 @@ export function HomeBusinessMapSection({
       <div className="flex items-center justify-between gap-2 px-3 py-2.5 sm:px-3.5">
         <div className="min-w-0">
           <h2 className="truncate text-[12px] font-black tracking-tight text-slate-950 sm:text-[13px]">
-            {isId ? 'Sebaran usaha Indonesia' : 'Indonesia business map'}
+            {isId ? 'Sebaran usaha Lajukan & referensi' : 'Lajukan businesses & public references'}
           </h2>
           <p className="truncate text-[9px] font-medium text-slate-500 sm:text-[10px]">
             {loading
@@ -495,6 +495,11 @@ export function HomeBusinessMapSection({
               </span>
             );
           })}
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-100 bg-white px-2 py-1 text-[8px] font-semibold text-emerald-700 shadow-sm sm:text-[9px]">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" aria-hidden="true" />
+            {isId ? 'Usaha Lajukan' : 'Lajukan businesses'}
+            <span className="font-black text-slate-900">{summary.businessCount.toLocaleString(isId ? 'id-ID' : 'en-US')}</span>
+          </span>
           <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-100 bg-white px-2 py-1 text-[8px] font-semibold text-emerald-700 shadow-sm sm:text-[9px]">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" aria-hidden="true" />
             {isId ? 'Usaha Lajukan' : 'Lajukan businesses'}
