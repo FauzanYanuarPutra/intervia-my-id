@@ -49,8 +49,8 @@ mod order_engine;
 mod outbox;
 mod reference_promotion;
 mod runtime_metrics;
-mod umkm_media_contributions;
 mod schema_contract;
+mod umkm_media_contributions;
 mod wallet_support;
 use auth::{auth_claims_from_headers, user_id_from_auth, user_id_from_token_string, AccessClaims};
 use content_projection::{
@@ -61,8 +61,8 @@ use identity_projection::{
     run_identity_event_consumer, run_identity_inbox_processor, IdentityProjectionConfig,
 };
 use order_engine::{create_order, get_order, list_orders, transition_order};
-use umkm_media_contributions::{create_media_contribution, list_media_contributions};
 use outbox::{run_outbox_publisher, OutboxPublisherConfig};
+use umkm_media_contributions::{create_media_contribution, list_media_contributions};
 use wallet_support::*;
 
 #[derive(Clone)]

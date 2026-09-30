@@ -150,10 +150,13 @@ pub(crate) async fn list_media_contributions(
 ) -> impl IntoResponse {
     let target = match resolve_media_target(&state.db, &store_ref).await {
         Ok(Some(target)) => target,
-        Ok(None) => return error_response(StatusCode::NOT_FOUND, "location not found").into_response(),
+        Ok(None) => {
+            return error_response(StatusCode::NOT_FOUND, "location not found").into_response()
+        }
         Err(error) => {
             tracing::error!("resolve media target error: {:?}", error);
-            return error_response(StatusCode::INTERNAL_SERVER_ERROR, "failed to load media").into_response();
+            return error_response(StatusCode::INTERNAL_SERVER_ERROR, "failed to load media")
+                .into_response();
         }
     };
 
@@ -200,7 +203,8 @@ pub(crate) async fn list_media_contributions(
             .into_response(),
         Err(error) => {
             tracing::error!("list media contributions error: {:?}", error);
-            error_response(StatusCode::INTERNAL_SERVER_ERROR, "failed to load media").into_response()
+            error_response(StatusCode::INTERNAL_SERVER_ERROR, "failed to load media")
+                .into_response()
         }
     }
 }
@@ -236,10 +240,13 @@ pub(crate) async fn create_media_contribution(
 
     let target = match resolve_media_target(&state.db, &store_ref).await {
         Ok(Some(target)) => target,
-        Ok(None) => return error_response(StatusCode::NOT_FOUND, "location not found").into_response(),
+        Ok(None) => {
+            return error_response(StatusCode::NOT_FOUND, "location not found").into_response()
+        }
         Err(error) => {
             tracing::error!("resolve media target error: {:?}", error);
-            return error_response(StatusCode::INTERNAL_SERVER_ERROR, "failed to save media").into_response();
+            return error_response(StatusCode::INTERNAL_SERVER_ERROR, "failed to save media")
+                .into_response();
         }
     };
 
@@ -265,11 +272,17 @@ pub(crate) async fn create_media_contribution(
     };
 
     match duplicate {
-        Ok(true) => return error_response(StatusCode::CONFLICT, "media already submitted").into_response(),
+        Ok(true) => {
+            return error_response(StatusCode::CONFLICT, "media already submitted").into_response()
+        }
         Ok(false) => {}
         Err(error) => {
             tracing::error!("media duplicate check error: {:?}", error);
-            return error_response(StatusCode::INTERNAL_SERVER_ERROR, "failed to validate media").into_response();
+            return error_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to validate media",
+            )
+            .into_response();
         }
     }
 
@@ -325,7 +338,8 @@ pub(crate) async fn create_media_contribution(
             .into_response(),
         Err(error) => {
             tracing::error!("create media contribution error: {:?}", error);
-            error_response(StatusCode::INTERNAL_SERVER_ERROR, "failed to save media").into_response()
+            error_response(StatusCode::INTERNAL_SERVER_ERROR, "failed to save media")
+                .into_response()
         }
     }
 }
