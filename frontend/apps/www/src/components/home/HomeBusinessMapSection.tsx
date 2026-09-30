@@ -135,15 +135,18 @@ function normalizeMapPointItem(item: {
     source_kind:
       metadata.is_public_reference === true
         ? 'reference_store'
-        : source === 'usaha_portal' ||
-            source === 'lajukan_store' ||
-            source === 'lajukan_content' ||
-            source === 'lajukan_listing'
-          ? 'lajukan_store'
-          : recordKind.includes('reference')
-            ? 'reference_store'
-            : 'registered_store',
-    metadata,
+        : source || recordKind.includes('reference')
+          ? source || (recordKind.includes('reference') ? 'reference_store' : 'registered_store')
+          : 'unknown',
+    metadata: {
+      ...metadata,
+      source_kind:
+        metadata.is_public_reference === true
+          ? 'reference_store'
+          : source || recordKind.includes('reference')
+            ? source || (recordKind.includes('reference') ? 'reference_store' : 'registered_store')
+            : 'unknown',
+    },
   };
 }
 
@@ -164,10 +167,19 @@ function normalizeStores(items: UmkmMapStore[]): UmkmMapStore[] {
 export function summarizeHomeBusinessMapStores(stores: UmkmMapStore[]) {
   const validStores = normalizeStores(stores);
   const references = validStores.filter(
-    store => store.metadata?.is_public_reference === true,
+    store => getUmkmMapSourceKind(store) === 'reference',
+  );
+  const lajukanBusinesses = validStores.filter(
+    store => getUmkmMapSourceKind(store) === 'lajukan',
+  );
+  const externalBusinesses = validStores.filter(
+    store => getUmkmMapSourceKind(store) === 'registered',
+  );
+  const unknownBusinesses = validStores.filter(
+    store => getUmkmMapSourceKind(store) === 'unknown',
   );
   const businesses = validStores.filter(
-    store => store.metadata?.is_public_reference !== true,
+    store => getUmkmMapSourceKind(store) !== 'reference',
   );
   const cities = new Set(
     validStores
@@ -196,6 +208,8 @@ export function summarizeHomeBusinessMapStores(stores: UmkmMapStore[]) {
   return {
     validStores,
     businessCount: businesses.length,
+    lajukanBusinessCount: lajukanBusinesses.length,
+    externalBusinessCount: externalBusinesses.length + unknownBusinesses.length,
     referenceCount: references.length,
     mappedCount: validStores.length,
     cityCount: cities.size,
@@ -330,9 +344,8 @@ export function HomeBusinessMapSection({
               ...(item.metadata || {}),
               marketplace_category_slug:
                 item.metadata?.marketplace_category_slug || item.category,
-              record_kind: item.source_kind.includes('reference')
-                ? item.source_kind
-                : item.metadata?.record_kind,
+              record_kind: item.metadata?.record_kind,
+              source_kind: item.source_kind,
               is_public_reference: item.source_kind.includes('reference'),
             },
           })),
@@ -409,11 +422,14 @@ export function HomeBusinessMapSection({
                         summary.mappedCount.toLocaleString('id-ID'),
                         'titik ditampilkan',
                         '·',
-                        String(summary.businessCount),
+                        String(summary.lajukanBusinessCount),
                         'usaha Lajukan',
                         '·',
                         String(summary.referenceCount),
                         'referensi publik',
+                        '·',
+                        String(summary.externalBusinessCount),
+                        'data usaha luar',
                         '·',
                         String(summary.cityCount),
                         'kota',
@@ -425,11 +441,14 @@ export function HomeBusinessMapSection({
                         summary.mappedCount.toLocaleString('en-US'),
                         'points shown',
                         '·',
-                        String(summary.businessCount),
+                        String(summary.lajukanBusinessCount),
                         'Lajukan businesses',
                         '·',
                         String(summary.referenceCount),
                         'public references',
+                        '·',
+                        String(summary.externalBusinessCount),
+                        'external data',
                         '·',
                         String(summary.cityCount),
                         'cities',
@@ -524,7 +543,7 @@ export function HomeBusinessMapSection({
           <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-100 bg-white px-2 py-1 text-[8px] font-semibold text-emerald-700 shadow-sm sm:text-[9px]">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" aria-hidden="true" />
             {isId ? 'Usaha Lajukan' : 'Lajukan businesses'}
-            <span className="font-black text-slate-900">{summary.businessCount.toLocaleString(isId ? 'id-ID' : 'en-US')}</span>
+            <span className="font-black text-slate-900">{summary.lajukanBusinessCount.toLocaleString(isId ? 'id-ID' : 'en-US')}</span>
           </span>
 
           {summary.referenceCount > 0 ? (
