@@ -23,8 +23,19 @@ jobs:
         uses: actions/checkout@v7
         with:
           ref: main
-          clean: true
+          clean: false
           fetch-depth: 1
+
+      - name: Sync tracked source to origin/main
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          git fetch --no-tags --prune origin main
+          git reset --hard origin/main
+          Write-Host "Checked out revision:"
+          git rev-parse HEAD
+          Write-Host "Working tree:"
+          git status --short
 
       - name: Prepare run directories
         shell: pwsh
