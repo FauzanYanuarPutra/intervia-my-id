@@ -2401,6 +2401,10 @@ async fn main() -> anyhow::Result<()> {
             "/v1/transactions/{id}/resolve",
             put(resolve_transaction_dispute),
         )
+        .route(
+            "/v1/transactions/{id}/correction",
+            post(request_transaction_correction),
+        )
         .route("/v1/transactions/{id}/cancel", put(cancel_transaction))
         .route("/v1/transactions/{id}/complete", put(complete_transaction))
         .route("/v1/transactions/{id}/review", post(create_review))
@@ -15497,6 +15501,130 @@ async fn accept_transaction(
     .await
 }
 
+async fn request_transaction_correction(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<UpdateTransactionRequest>,
+) -> impl IntoResponse {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+
+    let reason_code = match normalize_cancel_reason_code(payload.reason_code) {
+        Some(value) => value,
+        None => {
+            return err(StatusCode::BAD_REQUEST, "invalid reason_code").into_response();
+        }
+    };
+
+    let note = clean_text_limited(payload.response_message, MAX_EVIDENCE_NOTE_LEN)
+        .ok()
+        .flatten()
+        .unwrap_or_else(|| "Pengguna meminta koreksi transaksi karena kemungkinan salah input atau salah konfirmasi.".to_string());
+
+    let txn = match find_transaction_for_user(&state.db, id, user_id).await {
+        Ok(Some(row)) => row,
+        Ok(None) => {
+            return err(StatusCode::NOT_FOUND, "transaction not found").into_response()
+        }
+        Err(error) => {
+            tracing::error!(
+                "request_transaction_correction lookup error: {:?}",
+                error
+            );
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load transaction",
+            )
+            .into_response();
+        }
+    };
+
+    if !matches!(
+        txn.status.as_str(),
+        "completed" | "cancelled" | "rejected" | "expired" | "refunded"
+    ) {
+        return (
+            StatusCode::CONFLICT,
+            Json(json!({
+                "error": "transaction does not need a manual correction request yet",
+                "code": "correction_not_applicable",
+                "message": "Gunakan alur tindakan transaksi saat transaksi masih aktif."
+            })),
+        )
+            .into_response();
+    }
+
+    let Some(ticket) = ensure_support_ticket_for_transaction_correction(
+        &state.db,
+        &txn,
+        user_id,
+        reason_code.as_str(),
+        note.as_str(),
+    )
+    .await else {
+        return err(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to create transaction correction request",
+        )
+        .into_response();
+    };
+
+    push_notification_best_effort(
+        &state,
+        txn.buyer_id,
+        "transaction",
+        "transaction.correction_requested",
+        "Koreksi transaksi diajukan",
+        &format!(
+            "Permintaan koreksi untuk transaksi {} sudah dibuat dan akan ditinjau.",
+            txn.id
+        ),
+        json!({
+            "transaction_id": txn.id,
+            "ticket_id": ticket.id,
+            "reason_code": reason_code,
+            "status": txn.status
+        }),
+    )
+    .await;
+
+    if txn.seller_id != txn.buyer_id {
+        push_notification_best_effort(
+            &state,
+            txn.seller_id,
+            "transaction",
+            "transaction.correction_requested",
+            "Koreksi transaksi diajukan",
+            &format!(
+                "Permintaan koreksi untuk transaksi {} sudah dibuat dan akan ditinjau.",
+                txn.id
+            ),
+            json!({
+                "transaction_id": txn.id,
+                "ticket_id": ticket.id,
+                "reason_code": reason_code,
+                "status": txn.status
+            }),
+        )
+        .await;
+    }
+
+    (
+        StatusCode::ACCEPTED,
+        Json(json!({
+            "code": "correction_requested",
+            "transaction_id": txn.id,
+            "transaction_status": txn.status,
+            "ticket": ticket,
+            "message": "Permintaan koreksi sudah dikirim. Transaksi tidak diubah otomatis sampai ditinjau."
+        })),
+    )
+        .into_response()
+}
+
 async fn cancel_transaction(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -21590,6 +21718,108 @@ async fn record_crm_activity_for_transaction(
         )
         .await;
     }
+}
+
+async fn ensure_support_ticket_for_transaction_correction(
+    db: &PgPool,
+    txn: &TransactionRow,
+    opened_by: Uuid,
+    reason_code: &str,
+    note: &str,
+) -> Option<SupportTicketRow> {
+    let support_room_id = format!("support:txn-correction:{}", txn.id);
+    let existing = sqlx::query_as::<_, SupportTicketRow>(
+        r#"
+        SELECT
+            t.id, t.requester_user_id, t.requester_email, t.requester_name, t.category,
+            t.subject, t.status, t.priority, t.assigned_agent_id, t.support_room_id, t.source,
+            t.created_at, t.updated_at, t.resolved_at, t.first_response_at,
+            latest.body AS latest_message, latest.created_at AS latest_message_at
+        FROM support_tickets t
+        LEFT JOIN LATERAL (
+            SELECT body, created_at
+            FROM support_ticket_replies r
+            WHERE r.ticket_id = t.id AND r.is_internal = false
+            ORDER BY r.created_at DESC
+            LIMIT 1
+        ) latest ON true
+        WHERE t.support_room_id = $1
+        LIMIT 1
+        "#,
+    )
+    .bind(&support_room_id)
+    .fetch_optional(db)
+    .await;
+
+    if let Ok(Some(ticket)) = existing {
+        return Some(ticket);
+    }
+
+    let ticket = match sqlx::query_as::<_, SupportTicketRow>(
+        r#"
+        INSERT INTO support_tickets (
+            id, requester_user_id, requester_email, requester_name, category, subject,
+            status, priority, source, support_room_id
+        )
+        VALUES (
+            $1, $2, $3, $4, 'transaction_correction', $5,
+            'open', 'high', 'transaction_correction', $6
+        )
+        RETURNING
+            id, requester_user_id, requester_email, requester_name, category, subject,
+            status, priority, assigned_agent_id, support_room_id, source, created_at, updated_at,
+            resolved_at, first_response_at, NULL::text AS latest_message, NULL::timestamptz AS latest_message_at
+        "#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(Some(opened_by))
+    .bind(format!("user-{}@lajukan.com", opened_by))
+    .bind(Some(format!("User {}", &opened_by.to_string()[..8])))
+    .bind(format!("Transaction correction {}", txn.id))
+    .bind(&support_room_id)
+    .fetch_optional(db)
+    .await
+    {
+        Ok(Some(row)) => row,
+        Ok(None) => return None,
+        Err(error) => {
+            tracing::warn!(
+                "ensure_support_ticket_for_transaction_correction insert ticket failed: {:?}",
+                error
+            );
+            return None;
+        }
+    };
+
+    if let Err(error) = sqlx::query(
+        r#"
+        INSERT INTO support_ticket_replies (
+            id, ticket_id, author_user_id, author_role, body, is_internal
+        )
+        VALUES ($1, $2, $3, 'customer', $4, false)
+        "#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(ticket.id)
+    .bind(Some(opened_by))
+    .bind(format!(
+        "Permintaan koreksi transaksi otomatis.
+Reason: {}
+Catatan: {}",
+        reason_code,
+        if note.trim().is_empty() { "-" } else { note }
+    ))
+    .execute(db)
+    .await
+    {
+        tracing::warn!(
+            "ensure_support_ticket_for_transaction_correction insert reply failed: {:?}",
+            error
+        );
+        return None;
+    }
+
+    Some(ticket)
 }
 
 async fn ensure_support_ticket_for_dispute(
