@@ -240,7 +240,20 @@ export default function CmsControlCenter() {
     const next = arr(q);
     setNewsItems(next);
     setNewsMetrics(rec(m));
-    if (!selectedId && next[0]?.id) selectNews(next[0]);
+
+    const preserved = selectedId ? next.find(item => str(item.id) === selectedId) : null;
+    if (preserved) return;
+
+    if (next[0]) {
+      selectNews(next[0]);
+      return;
+    }
+
+    setSelectedId('');
+    const emptyForm = initialNews(null);
+    setNewsForm(emptyForm);
+    setSavedNewsFormKey(newsFormKey(emptyForm));
+    setNewsHistory({});
   }, [accessToken, newsStatus, selectedId, selectNews]);
 
   const refreshModeration = useCallback(async () => {
@@ -442,6 +455,16 @@ export default function CmsControlCenter() {
 
   const moderateContent = async (item: R, action: string) => {
     if (!accessToken) return;
+    if (['remove', 'restrict', 'approve', 'escalate'].includes(action)) {
+      const label = action === 'remove'
+        ? 'menghapus'
+        : action === 'restrict'
+          ? 'membatasi'
+          : action === 'approve'
+            ? 'menyetujui'
+            : 'mengeskalasi';
+      if (!window.confirm('Lanjutkan untuk ' + label + ' konten ini? Tindakan akan dicatat di audit moderasi.')) return;
+    }
     setBusy(true); setError('');
     try {
       await moderationApi.moderate(accessToken, str(item.content_id), {
@@ -466,6 +489,18 @@ export default function CmsControlCenter() {
 
   const invite = async (candidate: R) => {
     if (!accessToken || !user?.roles?.includes('super_admin')) return;
+    const duplicate = invitations.some(invitation =>
+      str(invitation.invitee_user_id) === str(candidate.id) &&
+      str(invitation.application) === 'cms' &&
+      str(invitation.status) === 'pending',
+    );
+    if (duplicate) {
+      setError('Undangan CMS untuk akun ini masih pending. Jangan kirim ulang.');
+      return;
+    }
+    if (!window.confirm(
+      'Kirim undangan CMS ke ' + (str(candidate.username) ? '@' + str(candidate.username) : str(candidate.email, 'akun ini')) + '?'
+    )) return;
     setBusy(true); setError('');
     try {
       await backofficeApi.invite(accessToken, {
@@ -523,7 +558,13 @@ export default function CmsControlCenter() {
           </div>
           <nav className="mt-4 flex gap-2 overflow-x-auto pb-1">
             {nav.map(([id, label, desc]) => (
-              <button key={id} onClick={() => setWorkspace(id)} className={id === workspace ? 'min-w-max rounded-2xl border border-[color:var(--color-primary)] bg-[color:var(--color-primary)] px-4 py-3 text-left text-white' : 'min-w-max rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-4 py-3 text-left hover:bg-slate-50'}>
+              <button key={id} onClick={() => {
+                const dirtyNews = workspace === 'news' && selectedId && newsFormKey(newsForm) !== savedNewsFormKey;
+                if (dirtyNews && id !== workspace) {
+                  if (!window.confirm('Ada perubahan berita yang belum disimpan. Pindah workspace akan membuang perubahan tersebut. Lanjutkan?')) return;
+                }
+                setWorkspace(id);
+              }} className={id === workspace ? 'min-w-max rounded-2xl border border-[color:var(--color-primary)] bg-[color:var(--color-primary)] px-4 py-3 text-left text-white' : 'min-w-max rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-4 py-3 text-left hover:bg-slate-50'}>
                 <div className="text-sm font-bold">{label}</div><div className={id === workspace ? 'text-[11px] text-white/75' : 'text-[11px] text-slate-500'}>{desc}</div>
               </button>
             ))}
