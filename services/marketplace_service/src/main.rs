@@ -11861,7 +11861,22 @@ async fn list_content(
                   AND (mc.slug = $9 OR mc.legacy_key = $9 OR mc.metadata->'aliases' ? $9)
               ) OR
               coalesce(metadata->>'marketplace_category_slug', '') = $9 OR
-              coalesce(metadata->>'create_category', '') = $9
+              coalesce(metadata->>'create_category', '') = $9 OR
+              /*
+               * Backward-compatible taxonomy recovery for native Lajukan
+               * listings created before marketplace_category_id/slug was
+               * persisted consistently. "Bahan & Supplier" is intentionally
+               * broad: native product/material/request records belong here
+               * even when an older listing has no explicit category pointer.
+               */
+              (
+                lower($9) = 'materials-suppliers'
+                AND btrim(coalesce(metadata->>'marketplace_category_slug', '')) = ''
+                AND btrim(coalesce(metadata->>'create_category', '')) = ''
+                AND lower(coalesce(content_items.content_type, '')) IN (
+                  'product', 'material', 'request', 'need', 'needs', 'demand'
+                )
+              )
           )
           AND (
               $10::text IS NULL OR
@@ -11976,6 +11991,28 @@ async fn list_content(
               ) = $14
           )
         ORDER BY
+          /*
+           * Provenance precedence is explicit:
+           * 1) native Lajukan listings first
+           * 2) other marketplace records next
+           * 3) public/reference records last
+           *
+           * This is deliberately before query relevance so a real Lajukan
+           * upload cannot be pushed behind a large imported/reference set.
+           */
+          CASE
+            WHEN $14::text = 'reference' THEN 0
+            WHEN content_items.owner_id IS NOT NULL
+              AND NOT (
+                coalesce(metadata->>'is_transactional', 'true') = 'false'
+                AND lower(coalesce(metadata->>'record_kind', '')) LIKE '%reference%'
+              )
+              THEN 0
+            WHEN coalesce(metadata->>'is_transactional', 'true') = 'false'
+              AND lower(coalesce(metadata->>'record_kind', '')) LIKE '%reference%'
+              THEN 2
+            ELSE 1
+          END ASC,
           CASE
             WHEN $14::text IS NULL
               AND coalesce(metadata->>'is_transactional', 'true') = 'false'
