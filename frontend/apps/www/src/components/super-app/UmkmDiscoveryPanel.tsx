@@ -1087,7 +1087,7 @@ export function UmkmDiscoveryPanel({
   // network request, so the map remains responsive while the user drags.
   const requestLimit = Math.max(24, Math.min(60, Math.max(limit * 3, 24)));
   const referencePageLimit = 60;
-  const mapPointLimit = 1800;
+  const mapPointLimit = 5000;
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
