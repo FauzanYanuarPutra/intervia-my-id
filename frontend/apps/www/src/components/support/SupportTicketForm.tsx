@@ -203,6 +203,16 @@ export default function SupportTicketForm() {
   }, [chatRoomId, aiMessages.length]);
 
   useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (loading || (!subject.trim() && !message.trim())) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [loading, message, subject]);
+
+  useEffect(() => {
     if (shouldOpenLiveTools) {
       setLiveToolsOpen(true);
     }
@@ -393,6 +403,7 @@ export default function SupportTicketForm() {
 
   const submitTicket = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     setError('');
     setSuccess('');
 
