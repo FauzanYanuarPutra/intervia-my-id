@@ -613,6 +613,18 @@ function parseProfileReviews(value: unknown): PublicStoreReview[] {
     .slice(0, 4);
 }
 
+function isRenderableStoreMediaUrl(value: string): boolean {
+  const url = value.trim();
+  if (!url || url.toLowerCase() === 'invalid media url') return false;
+  if (url.startsWith('/')) return true;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 function readStoreImageUrls(store: StoreRecord): string[] {
   const metadata = asRecord(store.metadata);
   return uniqueTexts([
@@ -648,7 +660,7 @@ function readStoreGalleryMedia(
         .map((value, index) => {
           const item = asRecord(value);
           const src = readText(item.url || item.media_url);
-          if (!src) return null;
+          if (!isRenderableStoreMediaUrl(src)) return null;
           return {
             id: readText(item.id) || `contributed-${index}`,
             src,

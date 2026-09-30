@@ -24,7 +24,29 @@ async function readStoreId(params: Promise<{ storeId: string }>) {
 
 function normalizeContributionMediaUrl(url: string): string {
   const value = url.trim();
-  if (value.startsWith('/api/content/media/')) return value;
+  if (!value) return '';
+
+  // MinIO/storage adapters can return an absolute URL behind a reverse proxy.
+  // The contribution service deliberately accepts only Lajukan's public media
+  // routes, so normalize same-shape absolute paths to their canonical
+  // application-relative form instead of rejecting an otherwise valid upload.
+  if (/^https?:\/\//i.test(value)) {
+    try {
+      const pathname = new URL(value).pathname;
+      if (
+        pathname.startsWith('/api/content/media/') ||
+        pathname.startsWith('/api/forum/media/')
+      ) {
+        return pathname;
+      }
+    } catch {
+      return value;
+    }
+  }
+
+  if (value.startsWith('/api/content/media/') || value.startsWith('/api/forum/media/')) {
+    return value;
+  }
 
   // Local upload fallback stores forum media under public/uploads/forum.
   // Reuse the existing public forum media route so the persisted URL remains

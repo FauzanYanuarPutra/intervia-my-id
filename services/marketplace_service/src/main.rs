@@ -11428,7 +11428,8 @@ async fn list_map_places(
           lng,
           category,
           source_kind,
-          metadata
+          metadata,
+          updated_at
         FROM (
           SELECT
             s.id::text AS id,
@@ -11437,6 +11438,7 @@ async fn list_map_places(
             s.city,
             s.lat,
             s.lng,
+            s.updated_at AS updated_at,
             COALESCE(
               NULLIF(lower(s.metadata->>'marketplace_category_slug'), ''),
               NULLIF(lower(s.metadata->>'umkm_category'), ''),
@@ -11483,6 +11485,23 @@ async fn list_map_places(
               'gallery_media_primary', s.metadata->'gallery_media_primary',
               'image_attribution', NULLIF(s.metadata->>'image_attribution', ''),
               'image_source_provider', NULLIF(s.metadata->>'image_source_provider', ''),
+              'media_kind', NULLIF(s.metadata->>'media_kind', ''),
+              'media_storage', NULLIF(s.metadata->>'media_storage', ''),
+              'media_is_place_specific', s.metadata->'media_is_place_specific',
+              'record_kind', NULLIF(s.metadata->>'record_kind', ''),
+              'market_side', NULLIF(s.metadata->>'market_side', ''),
+              'is_public_reference', (
+                lower(COALESCE(s.metadata->>'record_kind','')) LIKE '%reference%'
+                OR lower(COALESCE(s.metadata->>'market_side','')) = 'reference'
+              ),
+              'source_title', NULLIF(s.metadata->>'source_title', ''),
+              'source_provider', NULLIF(s.metadata->>'source_provider', ''),
+              'source_license', NULLIF(s.metadata->>'source_license', ''),
+              'source_license_url', NULLIF(s.metadata->>'source_license_url', ''),
+              'source_attribution', NULLIF(s.metadata->>'source_attribution', ''),
+              'public_path', '/toko/' || s.slug,
+              'updated_at', s.updated_at,
+              'created_at', s.created_at,
               'google_maps_uri', NULLIF(s.metadata->>'google_maps_uri', '')
             )) AS metadata,
             CASE
@@ -11542,6 +11561,7 @@ async fn list_map_places(
             COALESCE(c.metadata->>'city', c.metadata->>'location', 'Indonesia'),
             public.lajukan_safe_map_coordinate(c.metadata->>'latitude'),
             public.lajukan_safe_map_coordinate(c.metadata->>'longitude'),
+            c.updated_at AS updated_at,
             COALESCE(
               NULLIF(lower(c.metadata->>'marketplace_category_slug'), ''),
               NULLIF(lower(c.metadata->>'umkm_category'), ''),
@@ -11584,6 +11604,20 @@ async fn list_map_places(
               'gallery_media_primary', c.metadata->'gallery_media_primary',
               'image_attribution', NULLIF(c.metadata->>'image_attribution', ''),
               'image_source_provider', NULLIF(c.metadata->>'image_source_provider', ''),
+              'media_kind', NULLIF(c.metadata->>'media_kind', ''),
+              'media_storage', NULLIF(c.metadata->>'media_storage', ''),
+              'media_is_place_specific', c.metadata->'media_is_place_specific',
+              'record_kind', NULLIF(c.metadata->>'record_kind', ''),
+              'market_side', NULLIF(c.metadata->>'market_side', ''),
+              'is_public_reference', true,
+              'source_title', NULLIF(c.metadata->>'source_title', ''),
+              'source_provider', NULLIF(c.metadata->>'source_provider', ''),
+              'source_license', NULLIF(c.metadata->>'source_license', ''),
+              'source_license_url', NULLIF(c.metadata->>'source_license_url', ''),
+              'source_attribution', NULLIF(c.metadata->>'source_attribution', ''),
+              'public_path', '/toko/' || COALESCE(c.slug, 'reference-' || c.id::text),
+              'updated_at', c.updated_at,
+              'created_at', c.created_at,
               'google_maps_uri', NULLIF(c.metadata->>'google_maps_uri', '')
             )) AS metadata,
             'reference_content' AS source_kind
@@ -11619,6 +11653,7 @@ async fn list_map_places(
                 NULLIF(c.metadata->>'lng', '')
               )
             ),
+            c.updated_at AS updated_at,
             COALESCE(
               NULLIF(lower(c.metadata->>'marketplace_category_slug'), ''),
               NULLIF(lower(c.metadata->>'umkm_category'), ''),
@@ -11659,6 +11694,11 @@ async fn list_map_places(
               'gallery_media_primary', c.metadata->>'gallery_media_primary',
               'image_attribution', NULLIF(c.metadata->>'image_attribution', ''),
               'image_source_provider', NULLIF(c.metadata->>'image_source_provider', ''),
+              'media_kind', NULLIF(c.metadata->>'media_kind', ''),
+              'media_storage', NULLIF(c.metadata->>'media_storage', ''),
+              'media_is_place_specific', c.metadata->'media_is_place_specific',
+              'updated_at', c.updated_at,
+              'created_at', c.created_at,
               'google_maps_uri', NULLIF(c.metadata->>'google_maps_uri', '')
             )) AS metadata,
             'lajukan_listing' AS source_kind
@@ -11752,7 +11792,7 @@ async fn list_map_places(
     statement.push(" ORDER BY ");
     if let Some((lat, lng)) = viewer {
         statement.push(
-            "CASE WHEN source_kind IN ('lajukan_store', 'lajukan_listing') THEN 0              WHEN source_kind = 'registered_store' THEN 1              ELSE 2 END ASC,              point(lng,lat) <-> point(",
+            "CASE WHEN source_kind IN ('lajukan_store', 'lajukan_listing') THEN 0              WHEN source_kind = 'registered_store' THEN 1              ELSE 2 END ASC,              updated_at DESC,              point(lng,lat) <-> point(",
         )
         .push_bind(lng)
         .push(",")
@@ -11763,7 +11803,7 @@ async fn list_map_places(
         // each source tier, keep a deterministic hash so repeated nationwide
         // requests remain stable without making references displace local data.
         statement.push(
-            "CASE WHEN source_kind IN ('lajukan_store', 'lajukan_listing') THEN 0              WHEN source_kind = 'registered_store' THEN 1              ELSE 2 END ASC, md5(id) ASC",
+            "CASE WHEN source_kind IN ('lajukan_store', 'lajukan_listing') THEN 0              WHEN source_kind = 'registered_store' THEN 1              ELSE 2 END ASC, updated_at DESC, id ASC",
         );
     }
     statement.push(" LIMIT ").push_bind(limit);
