@@ -273,6 +273,42 @@ function getUmkmPlacePublishServices(place: UmkmPlaceLike): PublishService[] {
 }
 
 export function getUmkmPlaceKind(place: UmkmPlaceLike): UmkmPlaceKind {
+  if (isUmkmMapPublicReference(place)) {
+    const osmKey = readMetaText(place, 'osm_primary_key').toLowerCase();
+    const osmValue = readMetaText(place, 'osm_primary_value').toLowerCase();
+
+    if (
+      (osmKey === 'amenity' &&
+        ['restaurant', 'cafe', 'fast_food', 'food_court', 'ice_cream', 'bakery'].includes(osmValue)) ||
+      (osmKey === 'shop' && ['bakery', 'food', 'pastry'].includes(osmValue))
+    ) {
+      return 'food';
+    }
+
+    if (
+      (osmKey === 'shop' &&
+        ['mall', 'supermarket', 'hypermarket', 'department_store', 'convenience', 'grocery', 'clothes', 'fashion', 'shoes', 'furniture', 'electronics'].includes(osmValue))
+    ) {
+      return 'retail';
+    }
+
+    if (
+      (osmKey === 'amenity' &&
+        ['bank', 'atm', 'clinic', 'hospital', 'pharmacy', 'school', 'college', 'university', 'office', 'post_office', 'fuel'].includes(osmValue)) ||
+      (osmKey === 'tourism' && ['hotel', 'hostel', 'motel', 'guest_house'].includes(osmValue))
+    ) {
+      return 'service';
+    }
+
+    if (osmKey === 'craft') {
+      return 'craft';
+    }
+
+    if (osmKey === 'man_made' && ['works', 'workshop'].includes(osmValue)) {
+      return 'workshop';
+    }
+  }
+
   const businessCategory = getUmkmPlaceBusinessCategory(place);
   if (businessCategory) {
     const sector = getUmkmSectorFromBusinessCategory(businessCategory);

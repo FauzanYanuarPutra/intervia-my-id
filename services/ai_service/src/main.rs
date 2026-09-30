@@ -2468,16 +2468,12 @@ fn validate_task_data(task: AiTask, data: &mut Value) -> Vec<String> {
             return;
         };
 
-        let normalized = raw
-            .trim()
-            .to_ascii_lowercase()
-            .replace('_', "-")
-            .replace(' ', "-");
+        let normalized = raw.trim().to_ascii_lowercase().replace(['_', ' '], "-");
 
         let canonical = allowed
             .iter()
             .copied()
-            .find(|candidate| candidate.replace('_', "-").replace(' ', "-") == normalized);
+            .find(|candidate| candidate.replace(['_', ' '], "-") == normalized);
 
         if let Some(canonical) = canonical {
             *value = Value::String(canonical.to_string());
