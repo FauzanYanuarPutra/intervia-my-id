@@ -224,7 +224,7 @@ function getOpenStatusProfile(
 } {
   if (isPublicReference) {
     return {
-      label: isId ? 'Referensi publik' : 'Public reference',
+      label: isId ? 'Lokasi usaha' : 'Business locations',
       dotClassName: 'bg-blue-400',
       textClassName: 'text-blue-700 dark:text-blue-300',
     };
@@ -738,7 +738,7 @@ function PublicReferenceBadge({ isId }: { isId: boolean }) {
     <span className="inline-flex min-w-0 items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[9.5px] font-bold text-sky-800 dark:border-sky-900/70 dark:bg-sky-950/44 dark:text-sky-200">
       <MapPinned className="h-3 w-3 shrink-0" />
       <span className="truncate">
-        {isId ? 'Data publik · belum diklaim' : 'Public data · unclaimed'}
+        {isId ? 'Lokasi usaha · belum diklaim' : 'Business location · unclaimed'}
       </span>
     </span>
   );
@@ -772,7 +772,7 @@ export function PublicReferenceNotice({
         )}
       >
         {isId
-          ? 'Referensi lokasi non-transaksi. Belum diklaim pemilik dan belum diverifikasi Lajukan; periksa pembaruan di sumber asli.'
+          ? 'Lokasi usaha dari data publik. Belum diklaim pemilik dan belum diverifikasi Lajukan; periksa pembaruan di sumber asli.'
           : 'A non-transactional location reference. It is unclaimed and not verified by Lajukan; check the original source for updates.'}
       </p>
       {provenance.sourceTitle || provenance.sourceLicense ? (
@@ -840,7 +840,7 @@ export function PublicReferenceResultCard({
       <button
         type="button"
         onClick={onSelect}
-        aria-label={`${isId ? 'Detail referensi' : 'Reference details'} ${place.store.name}`}
+        aria-label={`${isId ? 'Detail lokasi usaha' : 'Business location details'} ${place.store.name}`}
         className={cn(
           'group grid w-full min-w-0 items-center gap-2 text-left transition hover:bg-sky-50/54 dark:hover:bg-sky-950/18',
           compact
@@ -937,7 +937,7 @@ function DiscoveryScopeControl({
     },
     {
       value: 'references',
-      label: isId ? 'Referensi publik' : 'Public references',
+      label: isId ? 'Lokasi usaha' : 'Business locations',
       activeClass:
         'bg-sky-600 text-white shadow-sm shadow-sky-600/20',
     },
