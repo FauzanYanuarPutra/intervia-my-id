@@ -919,13 +919,13 @@ function DiscoveryScopeControl({
     },
     {
       value: 'registered',
-      label: isId ? 'Usaha' : 'Businesses',
+      label: isId ? 'Usaha Lajukan' : 'Lajukan businesses',
       activeClass:
         'bg-emerald-600 text-white shadow-sm shadow-emerald-600/20',
     },
     {
       value: 'references',
-      label: isId ? 'Sumber publik' : 'Public source',
+      label: isId ? 'Referensi publik' : 'Public references',
       activeClass:
         'bg-sky-600 text-white shadow-sm shadow-sky-600/20',
     },
@@ -3309,6 +3309,9 @@ export function UmkmDiscoveryPanel({
                               </h4>
 
                               <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10.5px] font-semibold">
+                                <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[9px] font-black text-emerald-700">
+                                  {isId ? 'Terdaftar di Lajukan' : 'Registered on Lajukan'}
+                                </span>
                                 {item.ui.ratingNumber > 0 ? (
                                   <RatingStars
                                     rating={item.ui.ratingNumber}
