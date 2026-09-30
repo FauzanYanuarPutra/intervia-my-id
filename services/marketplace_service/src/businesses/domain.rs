@@ -508,7 +508,7 @@ fn validate_coordinates(lat: Option<f64>, lng: Option<f64>) -> Result<(), Valida
     }
 }
 
-const PUBLIC_STORE_KEYS: [&str; 46] = [
+const PUBLIC_STORE_KEYS: [&str; 69] = [
     "source",
     "portal_public_url",
     "store_photo_url",
@@ -526,6 +526,14 @@ const PUBLIC_STORE_KEYS: [&str; 46] = [
     "photos",
     "video_urls",
     "business_videos",
+    "gallery_media",
+    "gallery_media_items",
+    "gallery_media_primary",
+    "image_attribution",
+    "image_source_provider",
+    "media_kind",
+    "media_storage",
+    "media_is_place_specific",
     "umkm_category",
     "business_type",
     "store_type",
@@ -555,6 +563,21 @@ const PUBLIC_STORE_KEYS: [&str; 46] = [
     "review_count",
     "recommended_qr",
     "reservation_enabled",
+    "record_kind",
+    "market_side",
+    "is_transactional",
+    "is_public_reference",
+    "reference_publication_status",
+    "claimable",
+    "source_dataset",
+    "source_url",
+    "source_title",
+    "source_provider",
+    "source_license",
+    "source_license_url",
+    "source_attribution",
+    "public_path",
+    "reference_subtype",
 ];
 
 pub(crate) fn project_public_store_details(raw: &Value) -> serde_json::Map<String, Value> {
