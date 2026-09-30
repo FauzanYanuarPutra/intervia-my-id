@@ -107,7 +107,6 @@ describe('search result card preview mode', () => {
             requestStatus: 'open',
             quantity: '500',
             unit: 'pcs',
-            need_frequency: undefined,
           },
         }}
         locale="id"
