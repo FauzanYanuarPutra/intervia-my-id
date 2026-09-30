@@ -128,9 +128,15 @@ export function parseGlobalSearchState(
     users: 'users',
     umkm: 'businesses',
   };
-  const tab = TAB_SET.has(requestedTab)
+  let tab = TAB_SET.has(requestedTab)
     ? (requestedTab as GlobalSearchTab)
     : tabFromLegacyType[legacyType] || 'all';
+
+  const side = parseSide(input.get('side'));
+
+  if (side === 'supply' && tab === 'businesses') {
+    tab = 'all';
+  }
 
   const requestedCategory = cleanText(input.get('category'), 80).toLowerCase();
   const category = getExploreCategoryBySlug(requestedCategory)?.slug || '';
@@ -144,7 +150,7 @@ export function parseGlobalSearchState(
   return {
     query: cleanText(input.get('q'), 160),
     tab,
-    side: parseSide(input.get('side')),
+    side,
     category,
     subcategory: cleanText(input.get('subcategory'), 80).toLowerCase(),
     location: cleanText(input.get('location'), 120),
