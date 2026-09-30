@@ -22,14 +22,29 @@ async function readStoreId(params: Promise<{ storeId: string }>) {
   return storeId.trim();
 }
 
-function normalizeContributionMediaUrl(url: string): string {
-  const value = url.trim();
+function normalizeContributionMediaUrl(
+  url: string,
+  requestUrl?: string,
+): string {
+  let value = url.trim();
+
+  // Storage adapters may return an absolute same-origin URL. Persist only the
+  // canonical relative media path so the Rust service never accepts arbitrary
+  // remote URLs.
+  if (/^https?:\/\//i.test(value)) {
+    try {
+      const parsed = new URL(value);
+      const requestOrigin = requestUrl ? new URL(requestUrl).origin : null;
+      if (requestOrigin && parsed.origin === requestOrigin) {
+        value = parsed.pathname;
+      }
+    } catch {
+      return value;
+    }
+  }
+
   if (value.startsWith('/api/content/media/')) return value;
 
-  // Local upload fallback stores forum media under public/uploads/forum.
-  // Reuse the existing public forum media route so the persisted URL remains
-  // stable and the Rust service can validate it without accepting arbitrary
-  // filesystem paths.
   const prefix = '/uploads/forum/';
   if (value.startsWith(prefix)) {
     const filename = value.slice(prefix.length);
@@ -152,7 +167,7 @@ export async function POST(
           Accept: 'application/json',
         },
         body: JSON.stringify({
-          media_url: normalizeContributionMediaUrl(uploaded.url),
+          media_url: normalizeContributionMediaUrl(uploaded.url, req.url),
           media_type: uploaded.type,
           caption: caption || undefined,
         }),
