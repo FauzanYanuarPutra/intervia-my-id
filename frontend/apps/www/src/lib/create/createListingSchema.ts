@@ -1306,3 +1306,62 @@ export function fieldsForStep(
 ) {
   return fields.filter(field => field.step === step);
 }
+
+
+const MAIN_STEP_PRIORITY_KEYS = new Set([
+  'price_amount',
+  'price_mode',
+  'budget_mode',
+]);
+
+/**
+ * Select the compact set of fields shown in the main listing step.
+ * Pricing is a first-class listing attribute, so optional price/budget fields
+ * must not disappear just because a category has many optional attributes.
+ */
+export function selectMainStepFields(
+  fields: ListingFieldSchema[],
+  limit = 7,
+): ListingFieldSchema[] {
+  if (limit <= 0) return [];
+
+  const required = fields.filter(field => field.required);
+  const selected = [...required];
+  const selectedKeys = new Set(selected.map(field => field.key));
+
+  const priority = fields.filter(
+    field =>
+      !selectedKeys.has(field.key) &&
+      MAIN_STEP_PRIORITY_KEYS.has(field.key),
+  );
+
+  for (const field of priority) {
+    if (selected.length < limit) {
+      selected.push(field);
+      selectedKeys.add(field.key);
+      continue;
+    }
+
+    const replaceIndex = selected.findIndex(
+      selectedField =>
+        !selectedField.required &&
+        !MAIN_STEP_PRIORITY_KEYS.has(selectedField.key),
+    );
+
+    if (replaceIndex >= 0) {
+      selectedKeys.delete(selected[replaceIndex].key);
+      selected[replaceIndex] = field;
+      selectedKeys.add(field.key);
+    }
+  }
+
+  for (const field of fields) {
+    if (selected.length >= limit) break;
+    if (selectedKeys.has(field.key)) continue;
+    selected.push(field);
+    selectedKeys.add(field.key);
+  }
+
+  const selectedKeySet = new Set(selected.map(field => field.key));
+  return fields.filter(field => selectedKeySet.has(field.key));
+}
