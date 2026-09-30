@@ -668,6 +668,14 @@ function getCoverImage(place: UmkmPlaceLike, kind?: UmkmPlaceKind): string {
   const media = resolveStorefrontBrandMedia(asRecord(place.metadata));
   const explicit = media.coverUrl || media.logoUrl;
   if (explicit) return explicit;
+
+  // Never present category artwork as if it were a real photo of a public
+  // reference location. Keep the neutral placeholder until licensed or
+  // user-contributed media is available.
+  if (isUmkmMapPublicReference(place)) {
+    return '/images/placeholders/business-default.svg';
+  }
+
   return CATEGORY_FALLBACK_IMAGES[kind || getUmkmPlaceKind(place)];
 }
 
@@ -710,8 +718,8 @@ export function buildUmkmPlacePresentation(
   const presenceStatus = getManagedPresenceStatus(place, isId);
   const categoryLabel = isPublicReference
     ? isId
-      ? 'Referensi publik'
-      : 'Public reference'
+      ? 'Lokasi usaha'
+      : 'Business location'
     : businessCategory
       ? getUmkmBusinessCategoryLabel(businessCategory, isId)
       : kindMeta.kindLabel === 'UMKM'
