@@ -1230,7 +1230,10 @@ function MapBoundsReporter({
     }, 120);
   }, [reportBounds]);
 
-  useMapEvents({ moveend: scheduleBoundsReport });
+  useMapEvents({
+    moveend: scheduleBoundsReport,
+    zoomend: scheduleBoundsReport,
+  });
 
   useEffect(() => {
     map.whenReady(scheduleBoundsReport);
