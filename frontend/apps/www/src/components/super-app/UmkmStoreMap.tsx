@@ -32,6 +32,7 @@ export type UmkmMapBounds = {
   maxLat: number;
   minLng: number;
   maxLng: number;
+  zoom: number;
 };
 export type UmkmMapFocusOffset = { x: number; y: number };
 
