@@ -207,7 +207,7 @@ export default function HomeUmkmCard({
             </div>
           )}
           <span className="absolute left-2 top-2 inline-flex min-h-6 items-center rounded-full border border-white/70 bg-white/90 px-2 text-[9px] font-black text-emerald-800 shadow-sm backdrop-blur">
-            {isPublicReference ? (isId ? 'Referensi' : 'Reference') : 'UMKM'}
+            {isPublicReference ? (isId ? 'Lokasi usaha' : 'Business location') : 'UMKM'}
           </span>
           {isPublicReference && hasLicensedReferencePhoto && imageProvider ? (
             <span className="absolute bottom-1.5 left-1.5 right-1.5 truncate rounded bg-black/65 px-1.5 py-0.5 text-[8px] font-semibold text-white">
@@ -252,7 +252,7 @@ export default function HomeUmkmCard({
             {store.description ||
               (isPublicReference
                 ? isId
-                  ? 'Referensi peta publik; cek sumber asli.'
+                  ? 'Lokasi usaha dari data publik; cek sumber asli.'
                   : 'Public map reference; check the original source.'
                 : isId
                   ? 'Lihat produk dan informasi usaha.'
