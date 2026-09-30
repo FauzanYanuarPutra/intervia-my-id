@@ -495,10 +495,7 @@ pub(crate) fn router() -> Router<Arc<AppState>> {
             "/v1/crm/store-media/{media_id}/review",
             post(review_crm_store_media),
         )
-        .route(
-            "/v1/umkm/stores/{store_ref}/media/contributions",
-            get(list_public_store_media).post(create_store_media_contribution),
-        )
+        
         .route(
             "/v1/crm/appeals/{appeal_id}/review",
             post(review_business_appeal),
