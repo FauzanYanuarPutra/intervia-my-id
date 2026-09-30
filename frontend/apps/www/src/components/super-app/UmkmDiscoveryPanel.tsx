@@ -139,12 +139,32 @@ function getMapViewportFetchLimit(zoom: number): number {
 }
 const REPORT_EMAIL = 'support@lajukan.com';
 
+function waitForMapRetryDelay(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal.aborted) {
+      reject(signal.reason);
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      signal.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+
+    const onAbort = () => {
+      window.clearTimeout(timeoutId);
+      signal.removeEventListener('abort', onAbort);
+      reject(signal.reason);
+    };
+
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
 async function fetchMapPointsWithTransientRetry(
   url: string,
   signal: AbortSignal,
 ): Promise<Response> {
-  let lastError: unknown = null;
-
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       const response = await fetch(url, {
@@ -157,34 +177,15 @@ async function fetchMapPointsWithTransientRetry(
       if (response.ok || response.status < 500 || response.status === 429 || attempt === 1) {
         return response;
       }
-
-      await new Promise<void>((resolve, reject) => {
-        const timeoutId = window.setTimeout(resolve, 350);
-        const onAbort = () => {
-          window.clearTimeout(timeoutId);
-          reject(signal.reason);
-        };
-        signal.addEventListener('abort', onAbort, { once: true });
-      });
     } catch (error) {
-      if (signal.aborted) throw error;
-      lastError = error;
-      if (attempt === 1) throw error;
-
-      await new Promise<void>((resolve, reject) => {
-        const timeoutId = window.setTimeout(resolve, 350);
-        const onAbort = () => {
-          window.clearTimeout(timeoutId);
-          reject(signal.reason);
-        };
-        signal.addEventListener('abort', onAbort, { once: true });
-      });
+      if (signal.aborted || attempt === 1) throw error;
     }
+
+    await waitForMapRetryDelay(350, signal);
   }
 
-  throw lastError instanceof Error ? lastError : new Error('map_request_failed');
+  throw new Error('map_request_failed');
 }
-
 
 function formatDiscoveryPrice(valueCents: number, isId: boolean): string {
   const value = Math.max(0, Math.round(valueCents / 100));
