@@ -147,7 +147,7 @@ export function UsahaFlowGuide({ business, currentSection }: UsahaFlowGuideProps
               <Link
                 key={step.id}
                 href={step.href ?? '#'}
-                className="group flex min-h-[52px] items-center gap-2 rounded-xl border border-portal-line/70 bg-portal-surface-soft px-2.5 py-2 transition hover:border-portal-forest/25 hover:bg-portal-mist/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-forest/20"
+                className="group flex min-h-[52px] items-center gap-2 rounded-xl border border-portal-line/70 bg-white px-2.5 py-2 transition hover:border-portal-forest/25 hover:bg-portal-mist/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-forest/20"
               >
                 <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-portal-mist text-[10px] font-black text-portal-forest">
                   {index + 1}
