@@ -116,17 +116,11 @@ async fn resolve_media_target(
     Ok(reference_id.map(MediaTarget::Reference))
 }
 
-fn is_valid_media_url(value: &str) -> bool {
-    let value = value.trim();
-    let Some(filename) = value.strip_prefix("/api/forum/media/") else {
-        return false;
-    };
-    if value.len() > MAX_MEDIA_URL_LEN
-        || filename.is_empty()
-        || filename.len() > MAX_MEDIA_FILENAME_LEN
-    {
+fn is_safe_media_filename(filename: &str) -> bool {
+    if filename.is_empty() || filename.len() > MAX_MEDIA_FILENAME_LEN {
         return false;
     }
+
     filename
         .chars()
         .next()
@@ -134,6 +128,38 @@ fn is_valid_media_url(value: &str) -> bool {
         && filename.chars().all(|character| {
             character.is_ascii_alphanumeric() || matches!(character, '.' | '_' | '-')
         })
+}
+
+fn is_valid_media_url(value: &str) -> bool {
+    let value = value.trim();
+    if value.len() > MAX_MEDIA_URL_LEN {
+        return false;
+    }
+
+    // Local fallback media is served through the existing public forum media
+    // endpoint. MinIO-backed uploads use the public content-media endpoint
+    // with the dedicated forum object prefix. Both are public, read-only
+    // media surfaces; arbitrary remote URLs are intentionally rejected.
+    if let Some(filename) = value.strip_prefix("/api/forum/media/") {
+        return is_safe_media_filename(filename);
+    }
+
+    let Some(rest) = value.strip_prefix("/api/content/media/") else {
+        return false;
+    };
+    let mut segments = rest.split('/');
+    let bucket = segments.next().unwrap_or_default();
+    let namespace = segments.next().unwrap_or_default();
+    let filename = segments.next().unwrap_or_default();
+
+    !bucket.is_empty()
+        && bucket.len() <= 120
+        && bucket
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || matches!(character, '.' | '_' | '-'))
+        && namespace == "forum"
+        && segments.next().is_none()
+        && is_safe_media_filename(filename)
 }
 
 fn valid_media_type(value: &str) -> bool {
