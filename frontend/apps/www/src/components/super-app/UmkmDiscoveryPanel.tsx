@@ -108,6 +108,7 @@ type MapPointResponse = {
       source_kind: string;
       metadata?: Record<string, unknown>;
     }>;
+    degraded?: boolean;
   };
   error?: string;
 };
