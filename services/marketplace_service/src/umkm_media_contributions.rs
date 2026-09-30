@@ -2,8 +2,7 @@ use axum::{
     extract::{Path, State},
     http::{HeaderMap, StatusCode},
     response::IntoResponse,
-    routing::{get, post},
-    Json, Router,
+    Json,
 };
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, PgPool};
@@ -37,13 +36,6 @@ struct MediaContributionRow {
     caption: Option<String>,
     uploader_name_snapshot: Option<String>,
     uploader_username_snapshot: Option<String>,
-}
-
-pub(crate) fn router() -> Router<std::sync::Arc<AppState>> {
-    Router::new().route(
-        "/v1/umkm/stores/{store_ref}/media/contributions",
-        get(list_media_contributions).post(create_media_contribution),
-    )
 }
 
 async fn resolve_media_target(

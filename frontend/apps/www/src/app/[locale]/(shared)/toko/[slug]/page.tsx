@@ -231,13 +231,6 @@ function StoreMediaGallery({
   locale: string;
   isId: boolean;
 }) {
-  storeId: string;
-  storeName: string;
-  storeSlug: string;
-  metadata: Record<string, unknown>;
-  locale: string;
-  isId: boolean;
-}) {
   const galleryItems = [
     ...approvedContributions,
     ...readPublicGalleryItems(metadata),
