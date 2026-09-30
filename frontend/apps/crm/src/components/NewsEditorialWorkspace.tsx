@@ -101,8 +101,9 @@ function stringValue(value: unknown): string {
 
 function normalizeMultilineText(value: string): string {
   return value
-    .replace(/\r\n?/g, '\n')
-    .replace(/\u0000/g, '')
+    .replaceAll('\r\n', '\n')
+    .replaceAll('\r', '\n')
+    .replaceAll('\u0000', '')
     .trim();
 }
 
