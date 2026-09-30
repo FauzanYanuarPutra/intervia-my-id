@@ -276,7 +276,7 @@ export function getUmkmMapSourceLabel(
     return isId ? 'Data usaha luar' : 'External business data';
   }
   if (kind === 'reference') {
-    return isId ? 'Referensi publik' : 'Public reference';
+    return isId ? 'Lokasi usaha' : 'Business location';
   }
   return isId ? 'Sumber belum jelas' : 'Source unclear';
 }
@@ -289,6 +289,11 @@ export function buildUmkmMapPlacePath(place: UmkmMapLinkTarget): string {
       readSafePublicPath(place.public_path) ||
       readSafePublicPath(metadataPath);
     if (publicPath) return publicPath;
+
+    const referenceSlug = place.slug?.trim();
+    if (referenceSlug) {
+      return UMKM_DISCOVERY_PATH + '?store=' + encodeURIComponent(referenceSlug);
+    }
   }
 
   return buildUmkmStorefrontPath(place.slug?.trim() || '');
