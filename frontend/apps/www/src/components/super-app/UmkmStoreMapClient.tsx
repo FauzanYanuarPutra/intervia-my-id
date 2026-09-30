@@ -1344,11 +1344,13 @@ function StoreDotsLayer({
   storePresentations,
   selectedStoreId,
   onSelectStore,
+  isId,
   interactive,
 }: {
   storePresentations: StorePresentation[];
   selectedStoreId?: string | null;
   onSelectStore?: (storeId: string) => void;
+  isId: boolean;
   interactive: boolean;
 }) {
   const map = useMap();
@@ -1995,6 +1997,7 @@ export function UmkmStoreMapClient({
           storePresentations={storePresentations}
           selectedStoreId={selectedStoreId}
           onSelectStore={onSelectStore}
+          isId={isId}
           interactive={interactive}
         />
       ) : (
