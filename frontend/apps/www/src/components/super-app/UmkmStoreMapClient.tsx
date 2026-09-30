@@ -457,6 +457,9 @@ function StorePreviewCard({
     ui.addressLine ||
     (isId ? 'Lokasi belum lengkap' : 'Location unavailable');
   const isReference = isUmkmMapPublicReference(store);
+  const sourceLabel = isReference
+    ? isId ? 'Referensi publik' : 'Public reference'
+    : isId ? 'Terdaftar di Lajukan' : 'Registered on Lajukan';
   const isOpen = ui.openNow === true;
   const statusLabel = isReference
     ? isId
@@ -486,6 +489,14 @@ function StorePreviewCard({
           <p className="line-clamp-1 text-[11.5px] font-bold leading-tight text-slate-950">
             {store.name}
           </p>
+          <span className={cn(
+            'mt-1 inline-flex w-fit max-w-full truncate rounded-full border px-1.5 py-0.5 text-[9px] font-black',
+            isReference
+              ? 'border-slate-200 bg-slate-50 text-slate-600'
+              : 'border-emerald-100 bg-emerald-50 text-emerald-700',
+          )}>
+            {sourceLabel}
+          </span>
           <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[10px] font-semibold text-slate-500">
             <StoreKindChip ui={ui} compact />
             <span className="truncate">{locationLabel}</span>
@@ -561,6 +572,9 @@ function StorePopupSummary({
     (isId ? 'Lokasi belum lengkap' : 'Location unavailable');
   const distanceLabel = ui.distanceLabel;
   const isReference = isUmkmMapPublicReference(store);
+  const sourceLabel = isReference
+    ? isId ? 'Referensi publik' : 'Public reference'
+    : isId ? 'Terdaftar di Lajukan' : 'Registered on Lajukan';
   const statusLabel = isReference
     ? isId
       ? 'Referensi'
@@ -590,6 +604,14 @@ function StorePopupSummary({
         <h3 className="mt-1.5 line-clamp-1 text-[14px] font-extrabold leading-tight tracking-tight text-slate-950">
           {store.name}
         </h3>
+        <span className={cn(
+          'mt-1 inline-flex w-fit max-w-full truncate rounded-full border px-1.5 py-0.5 text-[9px] font-black',
+          isReference
+            ? 'border-slate-200 bg-slate-50 text-slate-600'
+            : 'border-emerald-100 bg-emerald-50 text-emerald-700',
+        )}>
+          {sourceLabel}
+        </span>
 
         <div className="mt-1.5 flex min-w-0 items-center gap-1.5 text-[10px] leading-4 text-slate-500">
           <MapPin
@@ -1536,6 +1558,18 @@ function StoreMarkersLayer({
         }
 
         const { cluster } = layer;
+        const clusterReferenceCount = cluster.items.filter(
+          ({ store }) => isUmkmMapPublicReference(store),
+        ).length;
+        const clusterBusinessCount = cluster.items.length - clusterReferenceCount;
+        const clusterSourceLabel =
+          clusterReferenceCount === 0
+            ? (isId ? `${clusterBusinessCount} usaha Lajukan` : `${clusterBusinessCount} Lajukan businesses`)
+            : clusterBusinessCount === 0
+              ? (isId ? `${clusterReferenceCount} referensi publik` : `${clusterReferenceCount} public references`)
+              : (isId
+                ? `${clusterBusinessCount} usaha Lajukan · ${clusterReferenceCount} referensi`
+                : `${clusterBusinessCount} Lajukan businesses · ${clusterReferenceCount} references`);
         const allowPicker = cluster.tight || zoom >= MARKER_CLUSTER_PICKER_ZOOM;
         const visibleClusterItems = cluster.items.slice(
           0,
@@ -1561,11 +1595,9 @@ function StoreMarkersLayer({
           >
             <Tooltip direction="top" offset={[0, -8]}>
               {allowPicker
-                ? isId
-                  ? `${cluster.items.length} usaha di titik ini`
-                  : `${cluster.items.length} businesses here`
+                ? clusterSourceLabel
                 : isId
-                  ? `${cluster.items.length} usaha dekat sini. Klik untuk zoom.`
+                  ? `${cluster.items.length} titik dekat sini. Klik untuk memperbesar.`
                   : `${cluster.items.length} locations nearby. Click to zoom in.`}
             </Tooltip>
 
@@ -1575,12 +1607,10 @@ function StoreMarkersLayer({
                   <div>
                     <p className="text-[12px] font-bold leading-tight text-slate-950">
                       {cluster.tight
-                        ? isId
-                          ? `${cluster.items.length} usaha di titik ini`
-                          : `${cluster.items.length} businesses here`
+                        ? clusterSourceLabel
                         : isId
-                          ? `${cluster.items.length} usaha dekat sini`
-                          : `${cluster.items.length} nearby businesses`}
+                          ? `${cluster.items.length} titik dekat sini`
+                          : `${cluster.items.length} nearby locations`}
                     </p>
                     <p className="mt-0.5 text-[10px] leading-4 text-slate-500">
                       {isId
