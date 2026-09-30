@@ -369,3 +369,35 @@ pub(crate) async fn create_media_contribution(
         }
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::is_valid_media_url;
+
+    #[test]
+    fn accepts_local_forum_media_url() {
+        assert!(is_valid_media_url("/api/forum/media/abc-123.webp"));
+    }
+
+    #[test]
+    fn accepts_minio_backed_public_forum_media_url() {
+        assert!(is_valid_media_url(
+            "/api/content/media/laju-chat/forum/abc-123.webp"
+        ));
+    }
+
+    #[test]
+    fn rejects_remote_media_urls() {
+        assert!(!is_valid_media_url(
+            "https://example.com/abc-123.webp"
+        ));
+    }
+
+    #[test]
+    fn rejects_public_media_from_non_forum_namespace() {
+        assert!(!is_valid_media_url(
+            "/api/content/media/laju-chat/content/abc-123.webp"
+        ));
+    }
+}
