@@ -54,9 +54,9 @@ describe('global search URL state', () => {
     const demand = parseGlobalSearchState(new URLSearchParams('q=kaos&side=seeker'));
     const supply = parseGlobalSearchState(new URLSearchParams('q=kaos&side=offer'));
     expect(demand.side).toBe('demand');
-    expect(serializeGlobalSearchState(demand)).toBe('q=kaos&side=demand');
+    expect(serializeGlobalSearchState(demand)).toBe('q=kaos&tab=all&side=demand');
     expect(supply.side).toBe('supply');
-    expect(serializeGlobalSearchState(supply)).toBe('q=kaos&side=supply');
+    expect(serializeGlobalSearchState(supply)).toBe('q=kaos&tab=all&side=supply');
   });
 
   it('caps invalid distance and rejects unknown tabs', () => {
