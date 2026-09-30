@@ -139,6 +139,53 @@ function getMapViewportFetchLimit(zoom: number): number {
 }
 const REPORT_EMAIL = 'support@lajukan.com';
 
+async function fetchMapPointsWithTransientRetry(
+  url: string,
+  signal: AbortSignal,
+): Promise<Response> {
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const response = await fetch(url, {
+        cache: 'no-store',
+        signal,
+      });
+
+      // Retry backend/transient failures, but never amplify validation or
+      // rate-limit responses into a request storm.
+      if (response.ok || response.status < 500 || response.status === 429 || attempt === 1) {
+        return response;
+      }
+
+      await new Promise<void>((resolve, reject) => {
+        const timeoutId = window.setTimeout(resolve, 350);
+        const onAbort = () => {
+          window.clearTimeout(timeoutId);
+          reject(signal.reason);
+        };
+        signal.addEventListener('abort', onAbort, { once: true });
+      });
+    } catch (error) {
+      if (signal.aborted) throw error;
+      lastError = error;
+      if (attempt === 1) throw error;
+
+      await new Promise<void>((resolve, reject) => {
+        const timeoutId = window.setTimeout(resolve, 350);
+        const onAbort = () => {
+          window.clearTimeout(timeoutId);
+          reject(signal.reason);
+        };
+        signal.addEventListener('abort', onAbort, { once: true });
+      });
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('map_request_failed');
+}
+
+
 function formatDiscoveryPrice(valueCents: number, isId: boolean): string {
   const value = Math.max(0, Math.round(valueCents / 100));
   return new Intl.NumberFormat(isId ? 'id-ID' : 'en-US', {
@@ -1523,10 +1570,10 @@ export function UmkmDiscoveryPanel({
           params.set('radius_km', String(mapRangeKm));
         }
 
-        void fetch(`/api/super-app/umkm/map-points?${params.toString()}`, {
-          cache: 'no-store',
-          signal: controller.signal,
-        })
+        void fetchMapPointsWithTransientRetry(
+          `/api/super-app/umkm/map-points?${params.toString()}`,
+          controller.signal,
+        )
           .then(async response => {
             const payload = (await response.json().catch(() => ({}))) as MapPointResponse;
             if (!response.ok || controller.signal.aborted) return;
