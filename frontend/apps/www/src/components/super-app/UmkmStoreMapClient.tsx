@@ -1370,6 +1370,9 @@ function StoreDotsLayer({
         const palette = isReference
           ? { badge: '#94a3b8', border: '#cbd5e1', text: '#64748b' }
           : getMarkerPalette(ui.markerTone);
+        const sourceLabel = isReference
+          ? 'Referensi publik'
+          : 'Terdaftar di Lajukan';
         const selected = store.id === selectedStoreId;
         return (
           <CircleMarker
@@ -1392,7 +1395,7 @@ function StoreDotsLayer({
           >
             {renderDotTooltips ? (
               <Tooltip direction="top" offset={[0, -4]}>
-                {store.name} · {ui.kindLabel}
+                {store.name} · {ui.kindLabel} · {sourceLabel}
               </Tooltip>
             ) : null}
           </CircleMarker>
