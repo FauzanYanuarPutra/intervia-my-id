@@ -72,8 +72,8 @@ const HOME_MAP_CATEGORY_LEGEND: Array<{
 ];
 
 const HOME_MAP_REFERENCE_LEGEND = {
-  labelId: 'Referensi publik',
-  labelEn: 'Public references',
+  labelId: 'Lokasi publik',
+  labelEn: 'Public locations',
   color: '#94a3b8',
 };
 
@@ -412,7 +412,7 @@ export function HomeBusinessMapSection({
       <div className="flex items-center justify-between gap-2 px-3 py-2.5 sm:px-3.5">
         <div className="min-w-0">
           <h2 className="truncate text-[12px] font-black tracking-tight text-slate-950 sm:text-[13px]">
-            {isId ? 'Sebaran usaha Lajukan & referensi' : 'Lajukan businesses & public references'}
+            {isId ? 'Sebaran usaha Lajukan & referensi' : 'Lajukan businesses & public locations'}
           </h2>
           <p className="truncate text-[9px] font-medium text-slate-500 sm:text-[10px]">
             {loading
@@ -433,7 +433,7 @@ export function HomeBusinessMapSection({
                         'usaha Lajukan',
                         '·',
                         String(summary.referenceCount),
-                        'referensi publik',
+                        'lokasi publik',
                         '·',
                         String(summary.externalBusinessCount),
                         'data usaha luar',
