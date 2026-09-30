@@ -404,13 +404,39 @@ export function HomeBusinessMapSection({
                   ? "Data titik peta belum termuat"
                   : "Map point data unavailable"
                 : totalMappedCount > 0
-                  ? totalMappedCount > summary.mappedCount
-                    ? isId
-                      ? `${summary.mappedCount.toLocaleString("id-ID")} titik ditampilkan · total ${totalMappedCount.toLocaleString("id-ID")}`
-                      : `${summary.mappedCount.toLocaleString("en-US")} points shown · total ${totalMappedCount.toLocaleString("en-US")}`
-                    : isId
-                      ? `${totalMappedCount.toLocaleString("id-ID")} titik · ${summary.businessCount} usaha · ${summary.referenceCount} referensi`
-                      : `${totalMappedCount.toLocaleString("en-US")} points · ${summary.businessCount} businesses · ${summary.referenceCount} references`
+                  ? isId
+                    ? [
+                        summary.mappedCount.toLocaleString('id-ID'),
+                        'titik ditampilkan',
+                        '·',
+                        String(summary.businessCount),
+                        'usaha Lajukan',
+                        '·',
+                        String(summary.referenceCount),
+                        'referensi publik',
+                        '·',
+                        String(summary.cityCount),
+                        'kota',
+                        totalMappedCount > summary.mappedCount
+                          ? ['· total', totalMappedCount.toLocaleString('id-ID')].join(' ')
+                          : '',
+                      ].filter(Boolean).join(' ')
+                    : [
+                        summary.mappedCount.toLocaleString('en-US'),
+                        'points shown',
+                        '·',
+                        String(summary.businessCount),
+                        'Lajukan businesses',
+                        '·',
+                        String(summary.referenceCount),
+                        'public references',
+                        '·',
+                        String(summary.cityCount),
+                        'cities',
+                        totalMappedCount > summary.mappedCount
+                          ? ['· total', totalMappedCount.toLocaleString('en-US')].join(' ')
+                          : '',
+                      ].filter(Boolean).join(' ')
                   : isId
                     ? "Belum ada lokasi terpetakan"
                     : "No mapped locations"}
@@ -500,11 +526,7 @@ export function HomeBusinessMapSection({
             {isId ? 'Usaha Lajukan' : 'Lajukan businesses'}
             <span className="font-black text-slate-900">{summary.businessCount.toLocaleString(isId ? 'id-ID' : 'en-US')}</span>
           </span>
-          <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-100 bg-white px-2 py-1 text-[8px] font-semibold text-emerald-700 shadow-sm sm:text-[9px]">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" aria-hidden="true" />
-            {isId ? 'Usaha Lajukan' : 'Lajukan businesses'}
-            <span className="font-black text-slate-900">{summary.businessCount.toLocaleString(isId ? 'id-ID' : 'en-US')}</span>
-          </span>
+
           {summary.referenceCount > 0 ? (
             <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-[8px] font-semibold text-slate-600 shadow-sm sm:text-[9px]">
               <span
