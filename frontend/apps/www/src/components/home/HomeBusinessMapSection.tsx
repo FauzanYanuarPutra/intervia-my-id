@@ -243,7 +243,7 @@ export function HomeBusinessMapSection({
         if (!active || controller.signal.aborted) return;
         setError(null);
         const response = await fetch(
-          '/api/super-app/umkm/map-points?limit=1500&min_lat=-11.5&max_lat=7.5&min_lng=94.5&max_lng=142.5',
+          '/api/super-app/umkm/map-points?limit=1200&min_lat=-11.5&max_lat=7.5&min_lng=94.5&max_lng=142.5',
           {
             cache: 'default',
             credentials: 'include',
