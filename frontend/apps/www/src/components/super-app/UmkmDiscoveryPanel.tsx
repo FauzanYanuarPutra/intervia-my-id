@@ -131,10 +131,12 @@ const MAP_VIEWPORT_PADDING = 0.24;
 const MAP_POINTS_CACHE_LIMIT = 4000;
 
 function getMapViewportFetchLimit(zoom: number): number {
-  if (zoom <= 5) return 600;
-  if (zoom <= 8) return 900;
-  if (zoom <= 11) return 1200;
-  return 1800;
+  // Keep zoomed-out maps light; clustering handles density. Increase detail
+  // only after the user has actually zoomed in.
+  if (zoom <= 5) return 320;
+  if (zoom <= 8) return 500;
+  if (zoom <= 11) return 800;
+  return 1200;
 }
 const REPORT_EMAIL = 'support@lajukan.com';
 
@@ -1529,6 +1531,11 @@ export function UmkmDiscoveryPanel({
           .then(async response => {
             const payload = (await response.json().catch(() => ({}))) as MapPointResponse;
             if (!response.ok || controller.signal.aborted) return;
+
+            if (payload.data?.degraded === true) {
+              // Never wipe a good viewport because of a transient upstream failure.
+              return;
+            }
 
             const points = (payload.data?.items || [])
               .filter(point => isCoordinateValid({ lat: point.lat, lng: point.lng }))
