@@ -152,14 +152,17 @@ export function NeedSearchCard({
       icon: WalletCards,
       label: budgetLabel || getListingValueFallback('demand', locale),
     },
+    quantityLabel
+      ? { key: 'quantity', icon: Package, label: quantityLabel }
+      : null,
+    frequencyLabel
+      ? { key: 'frequency', icon: RefreshCw, label: frequencyLabel }
+      : null,
     item.location
       ? { key: 'location', icon: MapPin, label: item.location }
       : null,
     deadlineLabel
       ? { key: 'deadline', icon: CalendarClock, label: deadlineLabel }
-      : null,
-    quantityLabel
-      ? { key: 'quantity', icon: Package, label: quantityLabel }
       : null,
   ].filter(Boolean) as Array<{
     key: string;
@@ -167,7 +170,7 @@ export function NeedSearchCard({
     label: string;
   }>;
 
-  const visibleFactItems = factItems.slice(0, 3);
+  const visibleFactItems = factItems.slice(0, 4);
   const statusLabel = requestStatusLabel(item, locale);
   const sideStatusLabel = `${getListingSideObjectLabel('demand', locale)} · ${statusLabel}`;
   const action = getExploreResultAction('needs', locale);
