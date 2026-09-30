@@ -11426,7 +11426,32 @@ async fn list_map_places(
               'tourism', NULLIF(lower(s.metadata->>'tourism'), ''),
               'office', NULLIF(lower(s.metadata->>'office'), ''),
               'building', NULLIF(lower(s.metadata->>'building'), ''),
-              'place_type', NULLIF(lower(s.metadata->>'place_type'), '')
+              'place_type', NULLIF(lower(s.metadata->>'place_type'), ''),
+              'source_kind', CASE
+                WHEN lower(COALESCE(s.metadata->>'record_kind','')) LIKE '%reference%'
+                  OR lower(COALESCE(s.metadata->>'market_side','')) = 'reference'
+                THEN 'reference_store'
+                WHEN lower(COALESCE(s.metadata->>'source','')) = 'usaha_portal'
+                  OR s.owner_user_id IS NOT NULL
+                THEN 'lajukan_store'
+                ELSE 'registered_store'
+              END,
+              'public_path', '/toko/' || s.slug,
+              'cover_image', COALESCE(
+                NULLIF(s.metadata->>'cover_image', ''),
+                NULLIF(s.metadata->>'cover_image_url', ''),
+                NULLIF(s.metadata->>'store_photo_url', ''),
+                NULLIF(s.metadata->>'image_url', ''),
+                NULLIF(s.metadata->>'image', '')
+              ),
+              'logo_url', NULLIF(s.metadata->>'logo_url', ''),
+              'gallery_images', s.metadata->'gallery_images',
+              'gallery_media', s.metadata->'gallery_media',
+              'gallery_media_items', s.metadata->'gallery_media_items',
+              'gallery_media_primary', s.metadata->'gallery_media_primary',
+              'image_attribution', NULLIF(s.metadata->>'image_attribution', ''),
+              'image_source_provider', NULLIF(s.metadata->>'image_source_provider', ''),
+              'google_maps_uri', NULLIF(s.metadata->>'google_maps_uri', '')
             )) AS metadata,
             CASE
               WHEN lower(COALESCE(s.metadata->>'record_kind','')) LIKE '%reference%'
@@ -11507,7 +11532,27 @@ async fn list_map_places(
               'tourism', NULLIF(lower(c.metadata->>'tourism'), ''),
               'office', NULLIF(lower(c.metadata->>'office'), ''),
               'building', NULLIF(lower(c.metadata->>'building'), ''),
-              'place_type', NULLIF(lower(c.metadata->>'place_type'), '')
+              'place_type', NULLIF(lower(c.metadata->>'place_type'), ''),
+              'source_kind', 'reference_content',
+              'public_path', COALESCE(
+                NULLIF(c.metadata->>'public_path', ''),
+                '/content/' || c.id::text
+              ),
+              'cover_image', COALESCE(
+                NULLIF(c.cover_image, ''),
+                NULLIF(c.metadata->>'cover_image', ''),
+                NULLIF(c.metadata->>'cover_image_url', ''),
+                NULLIF(c.metadata->>'image_url', ''),
+                NULLIF(c.metadata->>'image', '')
+              ),
+              'logo_url', NULLIF(c.metadata->>'logo_url', ''),
+              'gallery_images', c.metadata->'gallery_images',
+              'gallery_media', c.metadata->'gallery_media',
+              'gallery_media_items', c.metadata->'gallery_media_items',
+              'gallery_media_primary', c.metadata->'gallery_media_primary',
+              'image_attribution', NULLIF(c.metadata->>'image_attribution', ''),
+              'image_source_provider', NULLIF(c.metadata->>'image_source_provider', ''),
+              'google_maps_uri', NULLIF(c.metadata->>'google_maps_uri', '')
             )) AS metadata,
             'reference_content' AS source_kind
           FROM content_items c
@@ -11563,8 +11608,26 @@ async fn list_map_places(
               'address', NULLIF(c.metadata->>'address', ''),
               'source', 'lajukan_content',
               'record_kind', 'lajukan_listing',
-              'public_path', NULLIF(c.metadata->>'public_path', ''),
-              'cover_image', NULLIF(c.cover_image, '')
+              'source_kind', 'lajukan_listing',
+              'public_path', COALESCE(
+                NULLIF(c.metadata->>'public_path', ''),
+                '/content/' || c.id::text
+              ),
+              'cover_image', COALESCE(
+                NULLIF(c.cover_image, ''),
+                NULLIF(c.metadata->>'cover_image', ''),
+                NULLIF(c.metadata->>'cover_image_url', ''),
+                NULLIF(c.metadata->>'image_url', ''),
+                NULLIF(c.metadata->>'image', '')
+              ),
+              'logo_url', NULLIF(c.metadata->>'logo_url', ''),
+              'gallery_images', c.metadata->'gallery_images',
+              'gallery_media', c.metadata->'gallery_media',
+              'gallery_media_items', c.metadata->'gallery_media_items',
+              'gallery_media_primary', c.metadata->>'gallery_media_primary',
+              'image_attribution', NULLIF(c.metadata->>'image_attribution', ''),
+              'image_source_provider', NULLIF(c.metadata->>'image_source_provider', ''),
+              'google_maps_uri', NULLIF(c.metadata->>'google_maps_uri', '')
             )) AS metadata,
             'lajukan_listing' AS source_kind
           FROM content_items c

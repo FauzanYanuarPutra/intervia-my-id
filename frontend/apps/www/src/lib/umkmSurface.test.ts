@@ -49,6 +49,31 @@ describe('UMKM public route helpers', () => {
     ).toBe('/toko/osm-node-1');
   });
 
+  it('routes a Lajukan store map point to its storefront', () => {
+    expect(
+      buildUmkmMapPlacePath({
+        slug: 'lajukan-juice-31f8206d',
+        metadata: {
+          source_kind: 'lajukan_store',
+          source: 'usaha_portal',
+        },
+      }),
+    ).toBe('/toko/lajukan-juice-31f8206d');
+  });
+
+  it('routes Lajukan listing map points to their content path', () => {
+    expect(
+      buildUmkmMapPlacePath({
+        slug: 'listing-slug',
+        public_path: '/content/123',
+        metadata: {
+          source_kind: 'lajukan_listing',
+          record_kind: 'lajukan_listing',
+        },
+      }),
+    ).toBe('/content/123');
+  });
+
   it('opens owner actions directly in the dedicated Usaha workspace', () => {
     expect(buildUsahaPath('catalog', { storeId: 'store / 1' })).toBe(
       'https://usaha.lajukan.com/businesses/store%20%2F%201/products',

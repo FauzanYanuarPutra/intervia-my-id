@@ -439,6 +439,58 @@ function StoreKindChip({
   );
 }
 
+function readStoreImageUrl(store: UmkmMapStore): string {
+  const metadata = store.metadata || {};
+  const candidates = [
+    metadata.gallery_media_primary,
+    metadata.cover_image,
+    metadata.cover_image_url,
+    metadata.cover_url,
+    metadata.store_photo_url,
+    metadata.logo_url,
+    metadata.image_url,
+    metadata.image,
+  ];
+
+  for (const candidate of candidates) {
+    if (
+      typeof candidate === 'string' &&
+      (/^https?:\/\//i.test(candidate.trim()) || candidate.trim().startsWith('/'))
+    ) {
+      return candidate.trim();
+    }
+  }
+
+  const mediaItems = metadata.gallery_media_items;
+  if (Array.isArray(mediaItems)) {
+    for (const item of mediaItems) {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+      const url =
+        typeof (item as Record<string, unknown>).url === 'string'
+          ? ((item as Record<string, unknown>).url as string).trim()
+          : '';
+      if (
+        /^https?:\/\//i.test(url) ||
+        url.startsWith('/')
+      ) {
+        return url;
+      }
+    }
+  }
+
+  for (const candidate of [metadata.gallery_images, metadata.images, metadata.photos]) {
+    if (!Array.isArray(candidate)) continue;
+    const url = candidate.find(
+      value =>
+        typeof value === 'string' &&
+        (/^https?:\/\//i.test(value.trim()) || value.trim().startsWith('/')),
+    );
+    if (typeof url === 'string') return url.trim();
+  }
+
+  return '';
+}
+
 function StorePreviewCard({
   store,
   ui,
@@ -463,10 +515,11 @@ function StorePreviewCard({
   const sourceKind = getUmkmMapSourceKind(store);
   const sourceLabel = getUmkmMapSourceLabel(sourceKind, isId);
   const isOpen = ui.openNow === true;
+  const imageUrl = readStoreImageUrl(store);
   const statusLabel = isReference
     ? isId
-      ? 'Referensi'
-      : 'Reference'
+      ? 'Lokasi usaha'
+      : 'Business location'
     : ui.openNow === true
       ? isId
         ? 'Buka'
@@ -486,6 +539,26 @@ function StorePreviewCard({
 
   return (
     <div className={cardClass}>
+      {imageUrl ? (
+        <div className="relative mb-1.5 h-20 overflow-hidden rounded-xl bg-slate-100">
+          <img
+            src={imageUrl}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+          <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/45 to-transparent px-2 pb-1 pt-4 text-[9px] font-semibold text-white">
+            {isReference
+              ? isId
+                ? 'Lokasi usaha'
+                : 'Business location'
+              : isId
+                ? 'Usaha'
+                : 'Business'}
+          </span>
+        </div>
+      ) : null}
       <div className="flex min-w-0 items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <p className="line-clamp-1 text-[11.5px] font-bold leading-tight text-slate-950">
@@ -1006,11 +1079,11 @@ function MapFocusController({
 
   useEffect(() => {
     const validStores = stores.filter(hasValidLatLng);
-    // Geo data can arrive after the first render. Include the current
-    // valid-point count in the focus key so the map fits again once the
-    // real snapshot is available.
+    // Focus is an explicit navigation action, not a response to every
+    // marker batch. Keep the focus key stable while the viewport data changes;
+    // otherwise user zoom/pan would be overwritten by every map fetch.
     const focusKey = focusMode
-      ? `${focusMode}:${focusNonce}:${validStores.length}`
+      ? `${focusMode}:${focusNonce ?? 0}`
       : null;
     const validSelectedStore = selectedStoreId
       ? validStores.find(store => store.id === selectedStoreId) || null

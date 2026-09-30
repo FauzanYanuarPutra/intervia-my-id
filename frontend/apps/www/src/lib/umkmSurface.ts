@@ -276,19 +276,62 @@ export function getUmkmMapSourceLabel(
     return isId ? 'Data usaha luar' : 'External business data';
   }
   if (kind === 'reference') {
-    return isId ? 'Referensi publik' : 'Public reference';
+    return isId ? 'Lokasi usaha' : 'Business location';
   }
   return isId ? 'Sumber belum jelas' : 'Source unclear';
 }
 
 
 export function buildUmkmMapPlacePath(place: UmkmMapLinkTarget): string {
-  if (isUmkmMapPublicReference(place)) {
-    const metadataPath = place.metadata?.public_path;
+  const metadata = place.metadata || {};
+  const recordKind =
+    typeof metadata.record_kind === 'string'
+      ? metadata.record_kind.trim().toLowerCase()
+      : '';
+  const sourceKind =
+    typeof metadata.source_kind === 'string'
+      ? metadata.source_kind.trim().toLowerCase()
+      : '';
+  const source =
+    typeof metadata.source === 'string'
+      ? metadata.source.trim().toLowerCase()
+      : '';
+
+  // Native Lajukan stores always open their public storefront.
+  if (
+    sourceKind === 'lajukan_store' ||
+    sourceKind === 'registered_store' ||
+    source === 'usaha_portal' ||
+    metadata.owner_user_id != null ||
+    metadata.owner_id != null
+  ) {
+    return buildUmkmStorefrontPath(place.slug?.trim() || '');
+  }
+
+  // Content/listing points are not storefronts. Prefer their explicit public
+  // path so map taps do not incorrectly land on /toko/<content-slug>.
+  if (
+    sourceKind.includes('listing') ||
+    sourceKind.includes('content') ||
+    recordKind.includes('listing')
+  ) {
     const publicPath =
       readSafePublicPath(place.public_path) ||
-      readSafePublicPath(metadataPath);
+      readSafePublicPath(metadata.public_path);
     if (publicPath) return publicPath;
+    const slug = place.slug?.trim();
+    return slug ? `/content/${encodeURIComponent(slug)}` : '/explore';
+  }
+
+  // External/public business locations may still be represented as a store
+  // record. Keep the same detail surface, which also exposes provenance and
+  // community media contributions.
+  if (isUmkmMapPublicReference(place)) {
+    const publicPath =
+      readSafePublicPath(place.public_path) ||
+      readSafePublicPath(metadata.public_path);
+    if (publicPath) return publicPath;
+    return buildUmkmStorefrontPath(place.slug?.trim() || '');
   }
 
   return buildUmkmStorefrontPath(place.slug?.trim() || '');
