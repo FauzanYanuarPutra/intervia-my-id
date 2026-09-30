@@ -11,8 +11,8 @@ const MARKETPLACE_URL =
   'http://localhost:8081';
 
 const QuerySchema = z.object({
-  q: z.string().trim().max(120).optional(),
-  city: z.string().trim().max(80).optional(),
+  q: z.string().trim().transform(value => value.slice(0, 120)).optional(),
+  city: z.string().trim().transform(value => value.slice(0, 80)).optional(),
   category: z.string().trim().max(80).optional(),
   limit: z.coerce.number().finite().int().min(1).max(3000).default(1000),
   min_lat: z.coerce.number().finite().min(-90).max(90).optional(),
@@ -79,14 +79,18 @@ export async function GET(req: NextRequest) {
       input.max_lat !== undefined &&
       input.min_lat > input.max_lat
     ) {
-      return NextResponse.json({ error: 'Invalid latitude bounds' }, { status: 400 });
+      const swapped = input.min_lat;
+      input.min_lat = input.max_lat;
+      input.max_lat = swapped;
     }
     if (
       input.min_lng !== undefined &&
       input.max_lng !== undefined &&
       input.min_lng > input.max_lng
     ) {
-      return NextResponse.json({ error: 'Invalid longitude bounds' }, { status: 400 });
+      const swapped = input.min_lng;
+      input.min_lng = input.max_lng;
+      input.max_lng = swapped;
     }
 
     const hasViewer =

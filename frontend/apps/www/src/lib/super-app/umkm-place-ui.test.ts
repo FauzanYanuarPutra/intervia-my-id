@@ -243,12 +243,12 @@ describe('umkm place distance presentation', () => {
       null,
     );
 
-    expect(ui.categoryLabel).toBe('Referensi publik');
-    expect(ui.statusLabel).toBe('Referensi publik');
+    expect(ui.categoryLabel).toBe('Lokasi usaha');
+    expect(ui.statusLabel).toBe('Lokasi usaha');
     expect(ui.openNow).toBeNull();
     expect(ui.priceLabel).toBe('Bukan penawaran harga');
     expect(ui.serviceBadges).toEqual([
-      'Referensi publik',
+      'Lokasi usaha',
       'Cek sumber asli',
     ]);
     expect(ui.telHref).toBeNull();

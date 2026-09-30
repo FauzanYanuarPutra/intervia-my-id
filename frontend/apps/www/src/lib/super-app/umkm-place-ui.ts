@@ -273,6 +273,27 @@ function getUmkmPlacePublishServices(place: UmkmPlaceLike): PublishService[] {
 }
 
 export function getUmkmPlaceKind(place: UmkmPlaceLike): UmkmPlaceKind {
+  const metadata = asRecord(place.metadata);
+  const osmKey = readText(metadata.osm_primary_key).toLowerCase();
+  const osmValue = readText(metadata.osm_primary_value).toLowerCase();
+
+  if (osmKey === 'amenity') {
+    if (/(restaurant|cafe|fast_food|bar|pub|food_court|ice_cream)/.test(osmValue)) {
+      return 'food';
+    }
+    if (/(bank|atm|clinic|hospital|school|office|post_office|police)/.test(osmValue)) {
+      return 'service';
+    }
+  }
+
+  if (osmKey === 'shop' && /(mall|supermarket|hypermarket|convenience|department_store|grocery)/.test(osmValue)) {
+    return 'retail';
+  }
+
+  if (osmKey === 'tourism' && /(hotel|hostel|resort|motel)/.test(osmValue)) {
+    return 'service';
+  }
+
   const businessCategory = getUmkmPlaceBusinessCategory(place);
   if (businessCategory) {
     const sector = getUmkmSectorFromBusinessCategory(businessCategory);
@@ -486,7 +507,7 @@ function getManagedPresenceStatus(
         : 'Operating hours are not verified',
       openNow: null,
       liveNow: null,
-      statusLabel: isId ? 'Referensi publik' : 'Public reference',
+      statusLabel: isId ? 'Lokasi usaha' : 'Business location',
       statusTone: 'muted',
       locationMode: 'fixed',
       locationModeLabel: isId ? 'Titik referensi' : 'Reference point',
@@ -613,8 +634,8 @@ function getServiceBadges(
 ): string[] {
   if (isUmkmMapPublicReference(place)) {
     return isId
-      ? ['Referensi publik', 'Cek sumber asli']
-      : ['Public reference', 'Check original source'];
+      ? ['Lokasi usaha', 'Cek sumber asli']
+      : ['Business location', 'Check original source'];
   }
 
   const kind = getUmkmPlaceKind(place);
@@ -710,8 +731,8 @@ export function buildUmkmPlacePresentation(
   const presenceStatus = getManagedPresenceStatus(place, isId);
   const categoryLabel = isPublicReference
     ? isId
-      ? 'Referensi publik'
-      : 'Public reference'
+      ? 'Lokasi usaha'
+      : 'Business location'
     : businessCategory
       ? getUmkmBusinessCategoryLabel(businessCategory, isId)
       : kindMeta.kindLabel === 'UMKM'
@@ -797,8 +818,8 @@ export function buildUmkmPlacePresentation(
     categoryLabel,
     kindLabel: isPublicReference
       ? isId
-        ? 'Referensi'
-        : 'Reference'
+        ? 'Lokasi usaha'
+        : 'Business location'
       : kindMeta.kindLabel,
     shortKindLabel: isPublicReference ? 'R' : kindMeta.shortKindLabel,
     markerTone: kindMeta.markerTone,

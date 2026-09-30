@@ -11347,11 +11347,14 @@ async fn list_map_places(
                 && (-90.0..=90.0).contains(&min_lat)
                 && (-90.0..=90.0).contains(&max_lat)
                 && (-180.0..=180.0).contains(&min_lng)
-                && (-180.0..=180.0).contains(&max_lng)
-                && min_lat <= max_lat
-                && min_lng <= max_lng =>
+                && (-180.0..=180.0).contains(&max_lng) =>
         {
-            Some((min_lat, max_lat, min_lng, max_lng))
+            Some((
+                min_lat.min(max_lat),
+                min_lat.max(max_lat),
+                min_lng.min(max_lng),
+                min_lng.max(max_lng),
+            ))
         }
         (None, None, None, None) => None,
         _ => return err(StatusCode::BAD_REQUEST, "invalid map bounds").into_response(),
@@ -11426,7 +11429,21 @@ async fn list_map_places(
               'tourism', NULLIF(lower(s.metadata->>'tourism'), ''),
               'office', NULLIF(lower(s.metadata->>'office'), ''),
               'building', NULLIF(lower(s.metadata->>'building'), ''),
-              'place_type', NULLIF(lower(s.metadata->>'place_type'), '')
+              'place_type', NULLIF(lower(s.metadata->>'place_type'), ''),
+              'public_path', NULLIF(s.metadata->>'public_path', ''),
+              'cover_image', NULLIF(s.metadata->>'cover_image', ''),
+              'cover_image_url', NULLIF(s.metadata->>'cover_image_url', ''),
+              'image_url', NULLIF(s.metadata->>'image_url', ''),
+              'image_attribution', NULLIF(s.metadata->>'image_attribution', ''),
+              'image_source_url', NULLIF(s.metadata->>'image_source_url', ''),
+              'image_license', NULLIF(s.metadata->>'image_license', ''),
+              'image_license_url', NULLIF(s.metadata->>'image_license_url', ''),
+              'source_title', NULLIF(s.metadata->>'source_title', ''),
+              'source_url', NULLIF(s.metadata->>'source_url', ''),
+              'source_license', NULLIF(s.metadata->>'source_license', ''),
+              'source_license_url', NULLIF(s.metadata->>'source_license_url', ''),
+              'gallery_media', s.metadata->'gallery_media',
+              'gallery_media_items', s.metadata->'gallery_media_items'
             )) AS metadata,
             CASE
               WHEN lower(COALESCE(s.metadata->>'record_kind','')) LIKE '%reference%'
@@ -11507,7 +11524,25 @@ async fn list_map_places(
               'tourism', NULLIF(lower(c.metadata->>'tourism'), ''),
               'office', NULLIF(lower(c.metadata->>'office'), ''),
               'building', NULLIF(lower(c.metadata->>'building'), ''),
-              'place_type', NULLIF(lower(c.metadata->>'place_type'), '')
+              'place_type', NULLIF(lower(c.metadata->>'place_type'), ''),
+              'public_path', COALESCE(
+                NULLIF(c.metadata->>'public_path', ''),
+                '/umkm?store=' || COALESCE(c.slug, 'reference-' || c.id::text)
+              ),
+              'cover_image', NULLIF(c.cover_image, ''),
+              'cover_image_url', NULLIF(c.metadata->>'cover_image_url', ''),
+              'image_url', NULLIF(c.metadata->>'image_url', ''),
+              'image_attribution', NULLIF(c.metadata->>'image_attribution', ''),
+              'image_source_url', NULLIF(c.metadata->>'image_source_url', ''),
+              'image_license', NULLIF(c.metadata->>'image_license', ''),
+              'image_license_url', NULLIF(c.metadata->>'image_license_url', ''),
+              'source_title', NULLIF(c.metadata->>'source_title', ''),
+              'source_url', NULLIF(c.metadata->>'source_url', ''),
+              'source_license', NULLIF(c.metadata->>'source_license', ''),
+              'source_license_url', NULLIF(c.metadata->>'source_license_url', ''),
+              'gallery_images', c.metadata->'gallery_images',
+              'gallery_media', c.metadata->'gallery_media',
+              'gallery_media_items', c.metadata->'gallery_media_items'
             )) AS metadata,
             'reference_content' AS source_kind
           FROM content_items c
@@ -11564,7 +11599,11 @@ async fn list_map_places(
               'source', 'lajukan_content',
               'record_kind', 'lajukan_listing',
               'public_path', NULLIF(c.metadata->>'public_path', ''),
-              'cover_image', NULLIF(c.cover_image, '')
+              'cover_image', NULLIF(c.cover_image, ''),
+              'image_url', NULLIF(c.metadata->>'image_url', ''),
+              'gallery_images', c.metadata->'gallery_images',
+              'gallery_media', c.metadata->'gallery_media',
+              'gallery_media_items', c.metadata->'gallery_media_items'
             )) AS metadata,
             'lajukan_listing' AS source_kind
           FROM content_items c

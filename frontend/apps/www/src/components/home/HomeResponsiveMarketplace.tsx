@@ -2889,7 +2889,7 @@ function RecommendationCard({
       {/* IMAGE */}
       <div
         className={cn(
-          'relative aspect-[4/3] w-full shrink-0 overflow-hidden',
+          'relative aspect-[16/9] w-full shrink-0 overflow-hidden',
           isDemand
             ? 'bg-blue-100 dark:bg-blue-950/60'
             : 'bg-zinc-100 dark:bg-zinc-900',
@@ -3032,7 +3032,7 @@ function RecommendationCard({
           flex-1
           flex-col
           p-2.5
-          sm:p-3
+          sm:p-2.5
         "
       >
         {/* TITLE */}
@@ -3071,7 +3071,7 @@ function RecommendationCard({
           <p
             title={price}
             className={cn(
-              'mt-2 truncate text-[14px] font-black leading-tight tracking-[-0.025em] min-[360px]:text-[15px] sm:text-base',
+              'mt-1.5 truncate text-[14px] font-black leading-tight tracking-[-0.025em] min-[360px]:text-[15px] sm:text-base',
               isDemand
                 ? 'text-blue-700 dark:text-blue-300'
                 : 'text-emerald-700 dark:text-emerald-400',
@@ -3089,7 +3089,7 @@ function RecommendationCard({
         {locationLabel ? (
           <p
             title={locationLabel}
-            className="mt-2 flex min-w-0 items-center gap-1.5 truncate border-t border-zinc-100 pt-2 text-[9px] font-medium leading-4 text-zinc-500 dark:border-zinc-900 dark:text-zinc-400 min-[360px]:text-[10px] sm:text-[11px]"
+            className="mt-1.5 flex min-w-0 items-center gap-1.5 truncate border-t border-zinc-100 pt-2 text-[9px] font-medium leading-4 text-zinc-500 dark:border-zinc-900 dark:text-zinc-400 min-[360px]:text-[10px] sm:text-[11px]"
           >
             <MapPin className="h-3 w-3 shrink-0" aria-hidden="true" />
             <span className="truncate">{locationLabel}</span>

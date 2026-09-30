@@ -224,7 +224,7 @@ function getOpenStatusProfile(
 } {
   if (isPublicReference) {
     return {
-      label: isId ? 'Referensi publik' : 'Public reference',
+      label: isId ? 'Lokasi usaha' : 'Business location',
       dotClassName: 'bg-blue-400',
       textClassName: 'text-blue-700 dark:text-blue-300',
     };
@@ -772,7 +772,7 @@ export function PublicReferenceNotice({
         )}
       >
         {isId
-          ? 'Referensi lokasi non-transaksi. Belum diklaim pemilik dan belum diverifikasi Lajukan; periksa pembaruan di sumber asli.'
+          ? 'Lokasi usaha dari data publik. Belum diklaim pemilik dan belum diverifikasi Lajukan; periksa pembaruan di sumber asli.'
           : 'A non-transactional location reference. It is unclaimed and not verified by Lajukan; check the original source for updates.'}
       </p>
       {provenance.sourceTitle || provenance.sourceLicense ? (
@@ -840,7 +840,7 @@ export function PublicReferenceResultCard({
       <button
         type="button"
         onClick={onSelect}
-        aria-label={`${isId ? 'Detail referensi' : 'Reference details'} ${place.store.name}`}
+        aria-label={`${isId ? 'Detail lokasi usaha' : 'Business location details'} ${place.store.name}`}
         className={cn(
           'group grid w-full min-w-0 items-center gap-2 text-left transition hover:bg-sky-50/54 dark:hover:bg-sky-950/18',
           compact
@@ -937,7 +937,7 @@ function DiscoveryScopeControl({
     },
     {
       value: 'references',
-      label: isId ? 'Referensi publik' : 'Public references',
+      label: isId ? 'Lokasi usaha' : 'Business locations',
       activeClass:
         'bg-sky-600 text-white shadow-sm shadow-sky-600/20',
     },
@@ -1445,7 +1445,7 @@ export function UmkmDiscoveryPanel({
       }
       activeMapPointsRequestRef.current?.abort();
     };
-  }, [clearMapPointCache, city, discoveryScope, mapRangeKm, query, queryViewerLocation]);
+  }, [category, clearMapPointCache, city, discoveryScope, mapRangeKm, query, queryViewerLocation]);
 
   const handleMapBoundsChange = useCallback(
     (bounds: UmkmMapBounds) => {
@@ -1462,25 +1462,34 @@ export function UmkmDiscoveryPanel({
         bounds.minLat < -90 ||
         bounds.maxLat > 90 ||
         bounds.minLng < -180 ||
-        bounds.maxLng > 180 ||
-        bounds.minLat > bounds.maxLat ||
-        bounds.minLng > bounds.maxLng
+        bounds.maxLng > 180
       ) {
         return;
       }
 
+      const viewportMinLat = Math.min(bounds.minLat, bounds.maxLat);
+      const viewportMaxLat = Math.max(bounds.minLat, bounds.maxLat);
+      const viewportMinLng = Math.min(bounds.minLng, bounds.maxLng);
+      const viewportMaxLng = Math.max(bounds.minLng, bounds.maxLng);
+
       const latPadding = Math.min(
         12,
-        Math.max(0.01, (bounds.maxLat - bounds.minLat) * MAP_VIEWPORT_PADDING),
+        Math.max(
+          0.01,
+          (viewportMaxLat - viewportMinLat) * MAP_VIEWPORT_PADDING,
+        ),
       );
       const lngPadding = Math.min(
         18,
-        Math.max(0.01, (bounds.maxLng - bounds.minLng) * MAP_VIEWPORT_PADDING),
+        Math.max(
+          0.01,
+          (viewportMaxLng - viewportMinLng) * MAP_VIEWPORT_PADDING,
+        ),
       );
-      const minLat = Math.max(-90, bounds.minLat - latPadding);
-      const maxLat = Math.min(90, bounds.maxLat + latPadding);
-      const minLng = Math.max(-180, bounds.minLng - lngPadding);
-      const maxLng = Math.min(180, bounds.maxLng + lngPadding);
+      const minLat = Math.max(-90, viewportMinLat - latPadding);
+      const maxLat = Math.min(90, viewportMaxLat + latPadding);
+      const minLng = Math.max(-180, viewportMinLng - lngPadding);
+      const maxLng = Math.min(180, viewportMaxLng + lngPadding);
 
       const viewportKey = [
         query?.trim() || '',
@@ -2516,7 +2525,7 @@ export function UmkmDiscoveryPanel({
                 tabIndex={0}
                 aria-label={
                   selectedIsPublicReference
-                    ? `${isId ? 'Detail referensi' : 'Reference details'} ${selectedPlace.store.name}`
+                    ? `${isId ? 'Detail lokasi usaha' : 'Business location details'} ${selectedPlace.store.name}`
                     : isId
                       ? `Detail usaha ${selectedPlace.store.name}`
                       : `${selectedPlace.store.name} business details`
@@ -2600,7 +2609,7 @@ export function UmkmDiscoveryPanel({
                       href={buildUmkmMapPlacePath(selectedPlace.store)}
                       aria-label={
                         selectedIsPublicReference
-                          ? `${isId ? 'Detail referensi' : 'Reference details'} ${selectedPlace.store.name}`
+                          ? `${isId ? 'Detail lokasi usaha' : 'Business location details'} ${selectedPlace.store.name}`
                           : undefined
                       }
                       className="inline-flex min-h-9 min-w-0 items-center justify-center gap-1.5 rounded-full bg-[color:var(--app-accent)] px-3 text-[11px] font-bold text-white"
@@ -2931,7 +2940,7 @@ export function UmkmDiscoveryPanel({
                   ref={selectedPreviewRef}
                   aria-label={
                     selectedIsPublicReference
-                      ? `${isId ? 'Detail referensi' : 'Reference details'} ${selectedPlace.store.name}`
+                      ? `${isId ? 'Detail lokasi usaha' : 'Business location details'} ${selectedPlace.store.name}`
                       : undefined
                   }
                   className="min-w-0 overflow-hidden rounded-[18px] border border-slate-200/80 bg-white p-2.5 shadow-[0_18px_38px_-28px_rgba(15,23,42,0.12)] dark:border-slate-800 dark:bg-slate-950/82 sm:rounded-[22px] sm:p-3"
@@ -2974,7 +2983,7 @@ export function UmkmDiscoveryPanel({
                           href={buildUmkmMapPlacePath(selectedPlace.store)}
                           aria-label={
                             selectedIsPublicReference
-                              ? `${isId ? 'Detail referensi' : 'Reference details'} ${selectedPlace.store.name}`
+                              ? `${isId ? 'Detail lokasi usaha' : 'Business location details'} ${selectedPlace.store.name}`
                               : undefined
                           }
                         >
@@ -3016,7 +3025,7 @@ export function UmkmDiscoveryPanel({
                           href={buildUmkmMapPlacePath(selectedPlace.store)}
                           aria-label={
                             selectedIsPublicReference
-                              ? `${isId ? 'Detail referensi' : 'Reference details'} ${selectedPlace.store.name}`
+                              ? `${isId ? 'Detail lokasi usaha' : 'Business location details'} ${selectedPlace.store.name}`
                               : undefined
                           }
                           className="inline-flex min-h-[36px] min-w-0 items-center justify-center gap-1.5 rounded-full bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-2.5 text-[12px] font-semibold text-white shadow-[0_16px_28px_-24px_color-mix(in_srgb,var(--app-accent)_40%,transparent)] transition hover:brightness-105 sm:px-3"
@@ -3269,7 +3278,7 @@ export function UmkmDiscoveryPanel({
                               href={buildUmkmMapPlacePath(selectedPlace.store)}
                               aria-label={
                                 selectedIsPublicReference
-                                  ? `${isId ? 'Detail referensi' : 'Reference details'} ${selectedPlace.store.name}`
+                                  ? `${isId ? 'Detail lokasi usaha' : 'Business location details'} ${selectedPlace.store.name}`
                                   : undefined
                               }
                               className="inline-flex min-h-[36px] min-w-0 items-center justify-center gap-1.5 rounded-full bg-[color:var(--app-accent)] px-2 text-[11px] font-bold text-white"

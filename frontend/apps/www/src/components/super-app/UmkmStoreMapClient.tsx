@@ -1010,7 +1010,7 @@ function MapFocusController({
     // valid-point count in the focus key so the map fits again once the
     // real snapshot is available.
     const focusKey = focusMode
-      ? `${focusMode}:${focusNonce}:${validStores.length}`
+      ? `${focusMode}:${focusNonce}`
       : null;
     const validSelectedStore = selectedStoreId
       ? validStores.find(store => store.id === selectedStoreId) || null
