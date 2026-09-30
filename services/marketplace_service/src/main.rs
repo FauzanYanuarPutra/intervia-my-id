@@ -11643,21 +11643,13 @@ async fn list_map_places(
     if let Some(radius) = radius_km {
         if let Some((viewer_lat, viewer_lng)) = viewer {
             statement
-                .push(
-                    " AND (6371.0088 * 2.0 * asin(sqrt(power(sin(radians(lat - ",
-                )
+                .push(" AND (6371.0088 * 2.0 * asin(sqrt(power(sin(radians(lat - ")
                 .push_bind(viewer_lat)
-                .push(
-                    ") / 2.0), 2) + cos(radians(",
-                )
+                .push(") / 2.0), 2) + cos(radians(")
                 .push_bind(viewer_lat)
-                .push(
-                    ")) * cos(radians(lat)) * power(sin(radians(lng - ",
-                )
+                .push(")) * cos(radians(lat)) * power(sin(radians(lng - ")
                 .push_bind(viewer_lng)
-                .push(
-                    ") / 2.0), 2)))) <= ",
-                )
+                .push(") / 2.0), 2)))) <= ")
                 .push_bind(radius);
         }
     }
