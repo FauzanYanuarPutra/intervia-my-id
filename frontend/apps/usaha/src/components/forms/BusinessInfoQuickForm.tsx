@@ -52,6 +52,22 @@ export function BusinessInfoQuickForm({ business }: BusinessInfoQuickFormProps) 
       return;
     }
 
+    const hasChanges =
+      name.trim() !== business.name.trim() ||
+      category.trim() !== business.category.trim() ||
+      city.trim() !== business.city.trim() ||
+      address.trim() !== business.address.trim() ||
+      locationQuery.trim() !== business.locationQuery.trim() ||
+      phone.trim() !== business.phone.trim() ||
+      description.trim() !== business.description.trim() ||
+      schedule.trim() !== business.schedule.trim() ||
+      point?.lat !== business.latitude ||
+      point?.lng !== business.longitude;
+
+    if (hasChanges && !window.confirm('Simpan perubahan informasi usaha? Perubahan akan masuk ke riwayat usaha.')) {
+      return;
+    }
+
     setError('');
     setSuccess('');
     setIsPending(true);
