@@ -15582,8 +15582,31 @@ async fn request_transaction_correction(
     )
     .await;
 
-    if txn.seller_id != txn.buyer_id {
-        push_notification_best_effort(
+    let actor_role = if user_id == txn.seller_id {
+        "seller"
+    } else {
+        "buyer"
+    };
+    record_crm_activity_for_transaction(
+        &state.db,
+        &txn,
+        user_id,
+        actor_role,
+        "transaction.correction_requested",
+        format!(
+            "Permintaan koreksi transaksi {} diajukan dengan alasan {}.",
+            txn.id, reason_code
+        ),
+        json!({
+            "ticket_id": ticket.id,
+            "reason_code": reason_code,
+            "note": note,
+            "transaction_status": txn.status
+        }),
+    )
+    .await;
+
+    push_notification_best_effort(
             &state,
             txn.seller_id,
             "transaction",
