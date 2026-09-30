@@ -89,6 +89,7 @@ const VIEWPORT_RENDER_PADDING = 0.28;
 const MARKER_CLUSTER_FRAME_WIDTH_RATIO = 0.58;
 const MARKER_CLUSTER_FRAME_HEIGHT_RATIO = 0.5;
 const CLUSTER_POPUP_VISIBLE_LIMIT = 6;
+const DOT_TOOLTIP_MAX_ITEMS = 120;
 const STORE_MARKER_ICON_CACHE = new Map<string, DivIcon>();
 const CLUSTER_MARKER_ICON_CACHE = new Map<string, DivIcon>();
 const ROUTE_CACHE_TTL_MS = 30_000;
@@ -1367,7 +1368,7 @@ function StoreDotsLayer({
 
   const radius = getCompactDotRadius(zoom);
   const renderDotTooltips =
-    interactive && storePresentations.length <= AUTO_DOT_RENDER_THRESHOLD;
+    interactive && visibleStorePresentations.length <= DOT_TOOLTIP_MAX_ITEMS;
 
   return (
     <>

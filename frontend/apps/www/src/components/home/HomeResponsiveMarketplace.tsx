@@ -2465,6 +2465,10 @@ function HomeListingCarouselSection({
   useEmblaWheelGestures(emblaApi);
 
   const isDemand = mode === 'demand';
+  const clusteredItems = useMemo(
+    () => clusterHomeFeedItems(items, 12, 3),
+    [items],
+  );
 
   return (
     <section
