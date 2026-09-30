@@ -8,7 +8,10 @@ import {
   getUmkmPlaceKind,
   type UmkmPlaceKind,
 } from '@/lib/super-app/umkm-place-ui';
-import { UMKM_DISCOVERY_PATH } from '@/lib/umkmSurface';
+import {
+  getUmkmMapSourceKind,
+  UMKM_DISCOVERY_PATH,
+} from '@/lib/umkmSurface';
 import { UmkmStoreMap, type UmkmMapStore } from '@/components/super-app/UmkmStoreMap';
 
 type HomeBusinessMapSectionProps = {
