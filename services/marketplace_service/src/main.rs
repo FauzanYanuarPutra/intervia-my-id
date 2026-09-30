@@ -11396,8 +11396,7 @@ async fn list_map_places(
           lng,
           category,
           source_kind,
-          metadata,
-          COUNT(*) OVER() AS total_count
+          metadata
         FROM (
           SELECT
             s.id::text AS id,
@@ -11684,11 +11683,6 @@ async fn list_map_places(
 
     match statement.build().fetch_all(&state.db).await {
         Ok(rows) => {
-            let total_count = rows
-                .first()
-                .and_then(|row| row.try_get::<i64, _>("total_count").ok())
-                .unwrap_or(0);
-
             let items = rows
                 .into_iter()
                 .filter_map(|row| {
@@ -11710,7 +11704,7 @@ async fn list_map_places(
                 Json(json!({
                     "items": items,
                     "count": items.len(),
-                    "total_count": total_count,
+                    "total_count": items.len(),
                 })),
             )
                 .into_response()
