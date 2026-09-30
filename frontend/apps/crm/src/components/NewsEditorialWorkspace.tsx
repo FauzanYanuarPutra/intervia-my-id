@@ -452,8 +452,17 @@ export default function NewsEditorialWorkspace({
           offset: nextOffset,
         });
         const value = record(payload);
-        const nextItems = Array.isArray(value.items) ? (value.items as NewsItem[]) : [];
-        const nextSelected = nextItems.find(item => item.id === preserveId) || nextItems[0] || null;
+        const rawItems = Array.isArray(value.items) ? (value.items as NewsItem[]) : [];
+        const nextItems = rawItems.map(item => ({
+          ...item,
+          summary:
+            item.summary == null
+              ? item.summary
+              : normalizeMultilineText(item.summary),
+          body: normalizeMultilineText(item.body),
+        }));
+        const nextSelected =
+          nextItems.find(item => item.id === preserveId) || nextItems[0] || null;
         setQueueOffset(nextOffset);
         setQueueHasMore(value.has_more === true);
         setItems(nextItems);
