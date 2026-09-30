@@ -26,6 +26,8 @@ import {
 import { Link } from '@/i18n/navigation';
 import {
   buildUmkmMapPlacePath,
+  getUmkmMapSourceKind,
+  getUmkmMapSourceLabel,
   isUmkmMapPublicReference,
 } from '@/lib/umkmSurface';
 import { cn } from '@/lib/utils';
@@ -1458,6 +1460,7 @@ export function UmkmDiscoveryPanel({
                   point.metadata?.marketplace_category_slug || point.category,
                 umkm_category:
                   point.metadata?.umkm_category,
+                source_kind: point.source_kind,
                 record_kind:
                   point.source_kind.includes('reference')
                     ? point.metadata?.record_kind || 'open_data_reference'
@@ -1541,9 +1544,12 @@ export function UmkmDiscoveryPanel({
           ? right.store.distance_km
           : null;
 
-      const leftNative = !isUmkmMapPublicReference(left.store);
-      const rightNative = !isUmkmMapPublicReference(right.store);
-      if (leftNative !== rightNative) return leftNative ? -1 : 1;
+      const sourcePriority = (store: DiscoveryStore) => {
+        const kind = getUmkmMapSourceKind(store);
+        return kind === 'lajukan' ? 0 : kind === 'registered' ? 1 : kind === 'reference' ? 2 : 3;
+      };
+      const sourceDelta = sourcePriority(left.store) - sourcePriority(right.store);
+      if (sourceDelta !== 0) return sourceDelta;
 
       if (leftDistance !== null && rightDistance !== null) {
         const delta = leftDistance - rightDistance;
@@ -3309,8 +3315,13 @@ export function UmkmDiscoveryPanel({
                               </h4>
 
                               <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10.5px] font-semibold">
-                                <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[9px] font-black text-emerald-700">
-                                  {isId ? 'Terdaftar di Lajukan' : 'Registered on Lajukan'}
+                                <span className={cn(
+                                  'rounded-full border px-2 py-0.5 text-[9px] font-black',
+                                  getUmkmMapSourceKind(item.store) === 'lajukan'
+                                    ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
+                                    : 'border-slate-200 bg-slate-50 text-slate-600',
+                                )}>
+                                  {getUmkmMapSourceLabel(getUmkmMapSourceKind(item.store), isId)}
                                 </span>
                                 {item.ui.ratingNumber > 0 ? (
                                   <RatingStars
