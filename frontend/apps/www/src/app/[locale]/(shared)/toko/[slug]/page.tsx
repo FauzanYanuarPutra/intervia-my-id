@@ -345,7 +345,7 @@ export async function generateMetadata({
   const isId = locale === 'id';
   const storedStore = await getPublicStoreBySlugSafe(slug);
 
-  if (!storedStore || !isPublicUmkmStoreVisible(storedStore)) {
+  if (!storedStore || !isPublicStoreSurfaceVisible(storedStore)) {
     return {
       title: isId
         ? 'Toko tidak ditemukan | Lajukan'
@@ -354,6 +354,7 @@ export async function generateMetadata({
     };
   }
 
+  const referenceLocation = isReferenceLocation(storedStore);
   const store = projectPublicUmkmStore(storedStore);
   const baseUrl = await getBaseUrl();
   const publicUrl = `${baseUrl}/${locale}/toko/${store.slug}`;
@@ -362,9 +363,13 @@ export async function generateMetadata({
   const seoImage = resolveStorefrontBrandMedia(storeMetadata).seoImageUrl;
   const description =
     store.description ||
-    (isId
-      ? `${store.name}, UMKM di ${store.city}. Lihat produk dan informasi operasional terbarunya di Lajukan.`
-      : `${store.name}, a local business in ${store.city}. See its products and latest operating information on Lajukan.`);
+    (referenceLocation
+      ? isId
+        ? `${store.name}, lokasi usaha di ${store.city}. Lihat foto, lokasi, sumber data, dan informasi yang tersedia di Lajukan.`
+        : `${store.name}, a business location in ${store.city}. See photos, location, data source, and available information on Lajukan.`
+      : isId
+        ? `${store.name}, UMKM di ${store.city}. Lihat produk dan informasi operasional terbarunya di Lajukan.`
+        : `${store.name}, a local business in ${store.city}. See its products and latest operating information on Lajukan.`);
 
   return {
     title: `${store.name} | Lajukan`,
@@ -399,16 +404,19 @@ export default async function TokoPage({ params }: PageProps) {
   const isId = locale === 'id';
   const storedStore = await getPublicStoreBySlugSafe(slug);
 
-  if (!storedStore || !isPublicUmkmStoreVisible(storedStore)) {
+  if (!storedStore || !isPublicStoreSurfaceVisible(storedStore)) {
     notFound();
   }
 
+  const referenceLocation = isReferenceLocation(storedStore);
   const store = projectPublicUmkmStore(storedStore);
   const baseUrl = await getBaseUrl();
   const publicUrl = `${baseUrl}/${locale}/toko/${store.slug}`;
   const metadata =
     store.metadata && typeof store.metadata === 'object' ? store.metadata : {};
-  const catalog = await getStoreProducts(storedStore);
+  const catalog = referenceLocation
+    ? { status: 'ready' as const, products: [] as UmkmProduct[] }
+    : await getStoreProducts(storedStore);
   const products = catalog.products;
   const availableProductCount = products.filter(
     isStorefrontProductInStock,
