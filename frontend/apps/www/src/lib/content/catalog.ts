@@ -252,6 +252,40 @@ export function asNumber(value: unknown): number | undefined {
   return undefined;
 }
 
+export function resolveContentLocation(item?: Partial<ContentItem> | null): string {
+  if (!item) return '';
+
+  const metadata =
+    item.metadata &&
+    typeof item.metadata === 'object' &&
+    !Array.isArray(item.metadata)
+      ? item.metadata
+      : {};
+
+  const candidates = [
+    metadata.location,
+    metadata.address,
+    metadata.city,
+    metadata.district,
+    metadata.area,
+    metadata.region,
+    metadata.pickup_location,
+    metadata.pickup_address,
+    metadata.store_address,
+    metadata.outlet_address,
+    item.owner_profile?.location,
+  ];
+
+  for (const value of candidates) {
+    if (typeof value === 'string' && value.trim()) return value.trim();
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return String(value);
+    }
+  }
+
+  return '';
+}
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   return value as Record<string, unknown>;
