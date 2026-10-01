@@ -111,6 +111,7 @@ export function DataResetCenter({ business }: Props) {
   function toggleScope(scope: BusinessResetScope) {
     setPreview(null);
     setPreviewFingerprint(null);
+    setLastResult(null);
     setError(null);
     setSelected(current =>
       current.includes(scope)
@@ -122,6 +123,7 @@ export function DataResetCenter({ business }: Props) {
   function selectAll() {
     setPreview(null);
     setPreviewFingerprint(null);
+    setLastResult(null);
     setError(null);
     setSelected(scopes.filter(scope => scope.allowed).map(scope => scope.id));
   }
@@ -129,6 +131,7 @@ export function DataResetCenter({ business }: Props) {
   function clearSelection() {
     setPreview(null);
     setPreviewFingerprint(null);
+    setLastResult(null);
     setError(null);
     setSelected([]);
     setConfirmation('');
@@ -309,6 +312,7 @@ export function DataResetCenter({ business }: Props) {
                 value={reason}
                 onChange={event => {
                   setReason(event.target.value);
+                  setLastResult(null);
                   setPreview(null);
                   setPreviewFingerprint(null);
                 }}
@@ -328,6 +332,7 @@ export function DataResetCenter({ business }: Props) {
                   value={effectiveOn}
                   onChange={event => {
                     setEffectiveOn(event.target.value);
+                    setLastResult(null);
                     setPreview(null);
                     setPreviewFingerprint(null);
                   }}
