@@ -4,8 +4,8 @@ use uuid::Uuid;
 
 use super::{
     domain::{
-        BusinessInput, OrganizationMode, OrganizationSelection,
-        PrimaryLocationInput, ProvisionBusinessRequest, StorefrontInput,
+        BusinessInput, OrganizationMode, OrganizationSelection, PrimaryLocationInput,
+        ProvisionBusinessRequest, StorefrontInput,
     },
     profile::BusinessProfileInput,
     repository::BusinessRepository,
@@ -22,7 +22,10 @@ fn provision_request(organization_id: Uuid) -> ProvisionBusinessRequest {
         business: BusinessInput {
             name: "Reset Integration Test".to_owned(),
             capability_key: "general".to_owned(),
-            profile: Some(BusinessProfileInput { template_key: "general".to_owned(), ..BusinessProfileInput::default() }),
+            profile: Some(BusinessProfileInput {
+                template_key: "general".to_owned(),
+                ..BusinessProfileInput::default()
+            }),
         },
         primary_location: PrimaryLocationInput {
             name: "Lokasi utama".to_owned(),
@@ -71,11 +74,7 @@ async fn provision_business(pool: &PgPool) -> (Uuid, Uuid, Uuid) {
         .await
         .expect("business provision succeeds");
 
-    (
-        actor_id,
-        organization_id,
-        provisioned.aggregate.business.id,
-    )
+    (actor_id, organization_id, provisioned.aggregate.business.id)
 }
 
 #[sqlx::test(migrations = "./migrations")]
@@ -83,11 +82,7 @@ async fn reset_preview_covers_the_complete_storage_contract(pool: PgPool) {
     let (_actor_id, organization_id, business_id) = provision_business(&pool).await;
 
     let preview = DataResetRepository::new(pool.clone())
-        .preview(
-            business_id,
-            organization_id,
-            &reset_request().scopes,
-        )
+        .preview(business_id, organization_id, &reset_request().scopes)
         .await
         .expect("reset preview succeeds against migrated schema");
 

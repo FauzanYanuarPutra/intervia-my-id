@@ -1606,7 +1606,10 @@ async fn list_crm_businesses(
             if candidate.is_empty() || !is_business_media_url(candidate) {
                 continue;
             }
-            if !images.iter().any(|existing| existing.eq_ignore_ascii_case(candidate)) {
+            if !images
+                .iter()
+                .any(|existing| existing.eq_ignore_ascii_case(candidate))
+            {
                 images.push(candidate.to_string());
             }
         }
@@ -1776,7 +1779,10 @@ async fn load_business(state: &AppState, business_id: Uuid) -> Result<CrmBusines
         if candidate.is_empty() || !is_business_media_url(candidate) {
             continue;
         }
-        if !images.iter().any(|existing| existing.eq_ignore_ascii_case(candidate)) {
+        if !images
+            .iter()
+            .any(|existing| existing.eq_ignore_ascii_case(candidate))
+        {
             images.push(candidate.to_string());
         }
     }
