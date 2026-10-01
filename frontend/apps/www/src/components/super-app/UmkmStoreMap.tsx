@@ -24,6 +24,8 @@ export type UmkmMapStore = {
   table_count?: number | null;
   available_table_count?: number | null;
   max_table_capacity?: number | null;
+  updated_at?: string | null;
+  created_at?: string | null;
 };
 
 export type UmkmMapTheme = 'default' | 'light' | 'dark';
