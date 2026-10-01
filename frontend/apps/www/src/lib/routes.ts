@@ -410,7 +410,10 @@ export const routes: RouteConfig[] = [
       description: "Kelola identitas, profil usaha, keahlian, media, dan kepercayaan akun.",
       titleEn: "My Profile",
       descriptionEn: "Manage your identity, business profile, expertise, media, and account trust.",
-      topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+      // The owner profile renders its own identity header. Keep the
+      // shared desktop header, but do not stack a generic mobile topbar
+      // above the profile header after navigation from chat/other pages.
+      topbar: { isVisibleOnWeb: true, isVisibleOnMobile: false },
       navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
       footer: { isVisibleOnWeb: true, isVisibleOnMobile: false },
