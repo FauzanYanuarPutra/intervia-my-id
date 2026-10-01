@@ -58,6 +58,10 @@ import { Skeleton, SkeletonStack } from '@/components/ui/Skeleton';
 import { LajukanImage } from '@/components/common/LajukanImage';
 import { resolveStorefrontBrandMedia } from '@/lib/super-app/storefront-brand-media';
 import { EmblaInlineRail } from '@/components/common/EmblaInlineRail';
+import {
+  UMKM_MAP_MAX_ZOOM,
+  UMKM_MAP_MIN_ZOOM,
+} from '@/lib/super-app/maps';
 
 type UmkmDiscoveryPanelProps = {
   isId: boolean;
@@ -1575,7 +1579,7 @@ export function UmkmDiscoveryPanel({
         Math.round(maxLat * 100) / 100,
         Math.round(minLng * 100) / 100,
         Math.round(maxLng * 100) / 100,
-        Math.min(19, Math.max(2, Math.round(bounds.zoom))),
+        Math.min(UMKM_MAP_MAX_ZOOM, Math.max(UMKM_MAP_MIN_ZOOM, Math.round(bounds.zoom))),
       ].join('|');
 
       if (lastMapViewportKeyRef.current === viewportKey) return;
