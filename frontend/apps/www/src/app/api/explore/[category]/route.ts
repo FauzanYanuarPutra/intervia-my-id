@@ -372,23 +372,36 @@ export async function GET(
       side: 'demand',
       sort: 'latest',
     });
+    const businessParams = new URLSearchParams({
+      category: category.slug,
+      tab: 'businesses',
+      sort: 'latest',
+    });
 
-    const [supplyResult, demandResult] = await Promise.all([
-      fetchInternalJson(
-        req,
-        `/api/search?${supplyParams.toString()}`,
-      ),
-      fetchInternalJson(
-        req,
-        `/api/search?${demandParams.toString()}`,
-      ),
-    ]);
+    const [supplyResult, demandResult, businessResult] =
+      await Promise.all([
+        fetchInternalJson(
+          req,
+          `/api/search?${supplyParams.toString()}`,
+        ),
+        fetchInternalJson(
+          req,
+          `/api/search?${demandParams.toString()}`,
+        ),
+        fetchInternalJson(
+          req,
+          `/api/search?${businessParams.toString()}`,
+        ),
+      ]);
 
     const supplyPayload = supplyResult.ok
       ? (asRecord(supplyResult.payload) as GlobalSearchResponse | null)
       : null;
     const demandPayload = demandResult.ok
       ? (asRecord(demandResult.payload) as GlobalSearchResponse | null)
+      : null;
+    const businessPayload = businessResult.ok
+      ? (asRecord(businessResult.payload) as GlobalSearchResponse | null)
       : null;
 
     groups = {
@@ -397,7 +410,7 @@ export async function GET(
       services:
         supplyPayload?.groups.services || unavailableExploreGroup(),
       businesses:
-        supplyPayload?.groups.businesses || unavailableExploreGroup(),
+        businessPayload?.groups.businesses || unavailableExploreGroup(),
       references:
         unavailableExploreGroup(),
       needs:
