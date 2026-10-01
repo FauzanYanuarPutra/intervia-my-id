@@ -45,7 +45,7 @@ describe('HomeUmkmCard', () => {
 
     expect(html).toContain('data-testid="home-umkm-card"');
     expect(html).toContain('Warung Uji');
-    expect(html).toContain('Jam belum diisi');
+    expect(html).toContain('Jam buka belum diisi');
     expect(html).toContain('/toko/warung-uji');
     expect(html).toContain('/images/business-categories/general.svg');
     expect(html).not.toContain('Buka sekarang');
