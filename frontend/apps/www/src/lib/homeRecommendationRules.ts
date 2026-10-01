@@ -42,6 +42,32 @@ export function isHomeRecommendationEligible(item: ContentItem): boolean {
 
   const metadata = item.metadata || {};
 
+  // A profile/business-directory record can carry a business taxonomy such as
+  // "service" while still not being a marketplace listing. Never surface
+  // those records in Home's offer/need carousels.
+  const publicPath = [
+    metadata.public_path,
+    metadata.publicPath,
+    metadata.profile_path,
+    metadata.profilePath,
+    metadata.href,
+  ]
+    .map(value => (typeof value === 'string' ? value.trim() : ''))
+    .find(Boolean) || '';
+  if (/^\/(?:[a-z]{2}\/)?profile(?:\/|$)/i.test(publicPath)) return false;
+
+  const recordKind = [
+    metadata.record_kind,
+    metadata.recordKind,
+    metadata.entity_type,
+    metadata.entityType,
+  ]
+    .map(normalizeToken)
+    .find(Boolean) || '';
+  if (['profile', 'user profile', 'user', 'public profile'].includes(recordKind)) {
+    return false;
+  }
+
   // A native Lajukan listing can legitimately be marked non-transactional
   // while it is a buyer request (for example, a user asking for 3 kg of
   // mangoes per week). Home must not hide such a real, owner-backed request.
