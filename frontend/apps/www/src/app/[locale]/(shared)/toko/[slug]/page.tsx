@@ -584,10 +584,15 @@ export default async function TokoPage({ params }: PageProps) {
   const publicUrl = `${baseUrl}/${locale}/toko/${store.slug}`;
   const metadata =
     store.metadata && typeof store.metadata === 'object' ? store.metadata : {};
-  const approvedContributions = await getApprovedPublicGalleryItems(store.id);
-  const catalog = referenceLocation
-    ? { status: 'ready' as const, products: [] as UmkmProduct[] }
-    : await getStoreProducts(storedStore);
+  const [approvedContributions, catalog] = await Promise.all([
+    getApprovedPublicGalleryItems(store.id),
+    referenceLocation
+      ? Promise.resolve({
+          status: 'ready' as const,
+          products: [] as UmkmProduct[],
+        })
+      : getStoreProducts(storedStore),
+  ]);
   const products = catalog.products;
   const availableProductCount = products.filter(
     isStorefrontProductInStock,
