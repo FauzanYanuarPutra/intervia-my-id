@@ -71,6 +71,9 @@ const HOME_MAP_CATEGORY_LEGEND: Array<{
   { kind: 'general', labelId: 'Lainnya', labelEn: 'Other', color: '#0f766e' },
 ];
 
+const HOME_MAP_SESSION_CACHE_KEY = 'lajukan-home-map-v2';
+const HOME_MAP_SESSION_CACHE_TTL_MS = 15 * 60_000;
+
 const HOME_MAP_REFERENCE_LEGEND = {
   labelId: 'Lokasi publik',
   labelEn: 'Public locations',
@@ -240,10 +243,62 @@ export function HomeBusinessMapSection({
     async function load() {
       setLoading(true);
       try {
+        if (typeof window !== 'undefined' && stores.length === 0) {
+          const cachedRaw = window.sessionStorage.getItem(
+            HOME_MAP_SESSION_CACHE_KEY,
+          );
+          if (cachedRaw) {
+            try {
+              const cached = JSON.parse(cachedRaw) as {
+                savedAt?: number;
+                totalCount?: number;
+                items?: MapPointItem[];
+              };
+              if (
+                typeof cached.savedAt === 'number' &&
+                Date.now() - cached.savedAt <= HOME_MAP_SESSION_CACHE_TTL_MS &&
+                Array.isArray(cached.items)
+              ) {
+                const cachedItems = cached.items
+                  .map(normalizeMapPointItem)
+                  .filter((item): item is MapPointItem => Boolean(item));
+
+                if (cachedItems.length > 0) {
+                  setStores(
+                    cachedItems.map(item => ({
+                      id: item.id,
+                      slug: item.slug,
+                      name: item.name,
+                      city: item.city,
+                      address: item.city,
+                      lat: item.lat,
+                      lng: item.lng,
+                      metadata: {
+                        ...(item.metadata || {}),
+                        marketplace_category_slug:
+                          item.metadata?.marketplace_category_slug || item.category,
+                        source_kind: item.source_kind,
+                        is_public_reference: item.source_kind.includes('reference'),
+                      },
+                    })),
+                  );
+                  if (
+                    typeof cached.totalCount === 'number' &&
+                    Number.isFinite(cached.totalCount)
+                  ) {
+                    setTotalMappedCount(cached.totalCount);
+                  }
+                }
+              }
+            } catch {
+              window.sessionStorage.removeItem(HOME_MAP_SESSION_CACHE_KEY);
+            }
+          }
+        }
         if (!active || controller.signal.aborted) return;
         setError(null);
         const response = await fetch(
-          '/api/super-app/umkm/map-points?limit=1200&min_lat=-11.5&max_lat=7.5&min_lng=94.5&max_lng=142.5',
+          '/api/super-app/umkm/map-points?limit=600&min_lat=-11.5&max_lat=7.5&min_lng=94.5&max_lng=142.5',
           {
             cache: 'default',
             credentials: 'include',
@@ -276,7 +331,7 @@ export function HomeBusinessMapSection({
           // than hydrating references and guarantees local records are not
           // hidden by a secondary public-reference query.
           const fallbackResponse = await fetch(
-            '/api/super-app/umkm/stores?limit=500&map=1&include_references=1&min_lat=-11&max_lat=6&min_lng=95&max_lng=141',
+            '/api/super-app/umkm/stores?limit=600&map=1&include_references=1&min_lat=-11.5&max_lat=7.5&min_lng=94.5&max_lng=142.5',
             {
               cache: 'default',
               credentials: 'include',
@@ -307,7 +362,7 @@ export function HomeBusinessMapSection({
             // Native records can legitimately be empty. Public references are
             // a secondary fallback only, so they never displace native data.
             const referenceResponse = await fetch(
-              '/api/super-app/umkm/stores?limit=500&map=1&references_only=1&min_lat=-11&max_lat=6&min_lng=95&max_lng=141',
+              '/api/super-app/umkm/stores?limit=600&map=1&references_only=1&min_lat=-11.5&max_lat=7.5&min_lng=94.5&max_lng=142.5',
               {
                 cache: 'default',
                 credentials: 'include',
@@ -338,6 +393,21 @@ export function HomeBusinessMapSection({
           new Map(mapItems.map(item => [item.id, item])).values(),
         );
 
+        if (typeof window !== 'undefined') {
+          try {
+            window.sessionStorage.setItem(
+              HOME_MAP_SESSION_CACHE_KEY,
+              JSON.stringify({
+                savedAt: Date.now(),
+                totalCount,
+                items: uniqueMapItems.slice(0, 600),
+              }),
+            );
+          } catch {
+            // Session storage is a best-effort resiliency cache.
+          }
+        }
+
         setStores(
           uniqueMapItems.map(item => ({
             id: item.id,
@@ -361,12 +431,15 @@ export function HomeBusinessMapSection({
         setLoading(false);
       } catch (loadError) {
         if (!active || controller.signal.aborted) return;
+        // Home should remain useful when a previous snapshot is available.
         setError(
-          loadError instanceof Error
-            ? loadError.message
-            : isId
-              ? 'Peta usaha belum siap.'
-              : 'Business map unavailable.',
+          stores.length > 0
+            ? null
+            : loadError instanceof Error
+              ? loadError.message
+              : isId
+                ? 'Data lokasi sedang disinkronkan.'
+                : 'Location data is syncing.',
         );
       } finally {
         if (active && !controller.signal.aborted) setLoading(false);
@@ -501,6 +574,7 @@ export function HomeBusinessMapSection({
           // Home is a coverage preview: show the actual distribution as
           // lightweight colored dots instead of hiding most points in clusters.
           markerStyle="dots"
+          animateDataDots
           className="leaflet-home-map h-[126px] w-full sm:h-[140px]"
         />
 
@@ -517,10 +591,10 @@ export function HomeBusinessMapSection({
         </div>
 
 
-        {error ? (
-          <div className="absolute inset-x-2 top-2 z-10 flex items-center gap-2 rounded-lg border border-rose-200/80 bg-white/95 px-2 py-1.5 shadow-sm backdrop-blur sm:inset-x-3">
-            <span className="min-w-0 flex-1 text-[8px] font-semibold text-rose-700 sm:text-[9px]">
-              {error}
+        {error && !loading && summary.mappedCount === 0 ? (
+          <div className="absolute inset-x-2 top-2 z-10 flex items-center gap-2 rounded-lg border border-amber-200/85 bg-white/95 px-2 py-1.5 shadow-sm backdrop-blur sm:inset-x-3">
+            <span className="min-w-0 flex-1 text-[8px] font-semibold text-amber-700 sm:text-[9px]">
+              {isId ? 'Data lokasi sedang disinkronkan.' : 'Location data is syncing.'}
             </span>
             <button type="button" onClick={() => setRetryKey(value => value + 1)} className="shrink-0 rounded-full bg-slate-900 px-2 py-1 text-[8px] font-bold text-white">
               {isId ? 'Coba lagi' : 'Retry'}
