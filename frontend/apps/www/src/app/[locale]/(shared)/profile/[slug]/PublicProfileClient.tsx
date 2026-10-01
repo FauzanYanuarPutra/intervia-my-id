@@ -62,6 +62,13 @@ import {
   extractPublicProfileIdFromSlug,
   matchesPublicProfileSlug,
 } from '@/lib/profile/publicProfileLink';
+import {
+  BUSINESS_OPEN_TO_OPTIONS,
+  BUSINESS_ROLE_OPTIONS,
+  businessNetworkHasData,
+  toBusinessNetwork,
+  type BusinessNetwork,
+} from '@/lib/profile/businessNetwork';
 
 type PublicProfileClientProps = {
   locale: string;
@@ -133,6 +140,7 @@ type ProfileDetail = {
   education: string[];
   certifications: string[];
   links: Array<{ label: string; url: string }>;
+  businessNetwork: BusinessNetwork;
 };
 
 type PublicProfileTab = 'posts' | 'about' | 'reviews';
@@ -526,6 +534,7 @@ function buildProfileDetail(
   ]);
 
   const links = collectLinks([freelancer, provider, metadataProfile, metadata]);
+  const businessNetwork = toBusinessNetwork(metadata?.business_network);
 
   return {
     displayName,
@@ -539,6 +548,7 @@ function buildProfileDetail(
     education,
     certifications,
     links,
+    businessNetwork,
   };
 }
 
@@ -2596,6 +2606,88 @@ export default function PublicProfileClient({
                             return <div key={item.key} className="flex gap-3 py-3"><span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[color:var(--app-surface-muted)] text-emerald-600"><Icon className="h-4 w-4" /></span><div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">{item.label}</p><p className="mt-0.5 text-sm font-semibold leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">{item.value}</p></div></div>;
                           })}
                         </div>
+                      </section>
+                    ) : null}
+
+                    {businessNetworkHasData(detail.businessNetwork) ? (
+                      <section className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-4 sm:p-5 dark:border-emerald-500/20 dark:bg-emerald-500/5">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <SectionTitle title={localeCode === 'id' ? 'Partner bisnis' : 'Business network'} />
+                            <p className="mt-1 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
+                              {localeCode === 'id'
+                                ? 'Peran, penawaran, kebutuhan, kapasitas, dan partner yang terbuka untuk diajak kerja sama.'
+                                : 'Roles, offers, needs, capacity, and partner types this profile is open to.'}
+                            </p>
+                          </div>
+                          {isOwnProfile ? (
+                            <Link href="/profile/edit" className="inline-flex min-h-9 shrink-0 items-center gap-1 rounded-full border border-emerald-200 bg-white px-3 text-[10px] font-black text-emerald-700 dark:border-emerald-500/20 dark:bg-transparent dark:text-emerald-300">
+                              <Edit3 className="h-3.5 w-3.5" />
+                              {localeCode === 'id' ? 'Edit' : 'Edit'}
+                            </Link>
+                          ) : null}
+                        </div>
+
+                        {detail.businessNetwork.roles.length > 0 ? (
+                          <div className="mt-4">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">
+                              {localeCode === 'id' ? 'Saya sebagai' : 'I am a'}
+                            </p>
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              {detail.businessNetwork.roles.map(role => {
+                                const option = BUSINESS_ROLE_OPTIONS.find(item => item.id === role);
+                                return (
+                                  <span key={role} className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-black text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300">
+                                    {option ? (localeCode === 'id' ? option.idLabel : option.enLabel) : formatRole(role)}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ) : null}
+
+                        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                          {detail.businessNetwork.offers.length > 0 ? (
+                            <div className="rounded-xl bg-white/80 p-3 dark:bg-white/[0.03]">
+                              <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">{localeCode === 'id' ? 'Saya menawarkan' : 'I offer'}</p>
+                              <p className="mt-1.5 text-sm font-semibold leading-5">{detail.businessNetwork.offers.join(' · ')}</p>
+                            </div>
+                          ) : null}
+                          {detail.businessNetwork.needs.length > 0 ? (
+                            <div className="rounded-xl bg-white/80 p-3 dark:bg-white/[0.03]">
+                              <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">{localeCode === 'id' ? 'Saya membutuhkan' : 'I need'}</p>
+                              <p className="mt-1.5 text-sm font-semibold leading-5">{detail.businessNetwork.needs.join(' · ')}</p>
+                            </div>
+                          ) : null}
+                        </div>
+
+                        {(detail.businessNetwork.capacity || detail.businessNetwork.service_area.length > 0 || detail.businessNetwork.open_to.length > 0) ? (
+                          <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                            {detail.businessNetwork.capacity ? (
+                              <div className="rounded-xl border border-emerald-100 bg-white/80 p-3 dark:border-emerald-500/10 dark:bg-white/[0.03]">
+                                <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">{localeCode === 'id' ? 'Kapasitas' : 'Capacity'}</p>
+                                <p className="mt-1.5 text-sm font-semibold">{detail.businessNetwork.capacity}</p>
+                              </div>
+                            ) : null}
+                            {detail.businessNetwork.service_area.length > 0 ? (
+                              <div className="rounded-xl border border-emerald-100 bg-white/80 p-3 dark:border-emerald-500/10 dark:bg-white/[0.03]">
+                                <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">{localeCode === 'id' ? 'Wilayah' : 'Area'}</p>
+                                <p className="mt-1.5 text-sm font-semibold">{detail.businessNetwork.service_area.join(' · ')}</p>
+                              </div>
+                            ) : null}
+                            {detail.businessNetwork.open_to.length > 0 ? (
+                              <div className="rounded-xl border border-blue-100 bg-white/80 p-3 dark:border-blue-500/10 dark:bg-white/[0.03]">
+                                <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">{localeCode === 'id' ? 'Terbuka untuk' : 'Open to'}</p>
+                                <div className="mt-2 flex flex-wrap gap-1">
+                                  {detail.businessNetwork.open_to.map(openTo => {
+                                    const option = BUSINESS_OPEN_TO_OPTIONS.find(item => item.id === openTo);
+                                    return <span key={openTo} className="rounded-full bg-blue-50 px-2 py-1 text-[9px] font-black text-blue-700 dark:bg-blue-500/10 dark:text-blue-300">{option ? (localeCode === 'id' ? option.idLabel : option.enLabel) : openTo}</span>;
+                                  })}
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : null}
                       </section>
                     ) : null}
 
