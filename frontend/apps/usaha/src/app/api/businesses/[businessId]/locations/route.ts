@@ -50,6 +50,14 @@ export async function PUT(request: Request, context: { params: Promise<{ busines
       if (longitude !== null && (!Number.isFinite(longitude) || longitude < -180 || longitude > 180)) return NextResponse.json({ error: `Longitude pada baris ${index + 1} tidak valid.`, code: 'invalid_business_locations' }, { status: 400 });
       if (typeof item.phone === 'string' && item.phone.length > 50) return NextResponse.json({ error: `Nomor telepon pada baris ${index + 1} terlalu panjang.`, code: 'invalid_business_locations' }, { status: 400 });
       if (typeof item.whatsapp === 'string' && item.whatsapp.length > 50) return NextResponse.json({ error: `WhatsApp pada baris ${index + 1} terlalu panjang.`, code: 'invalid_business_locations' }, { status: 400 });
+      for (const [label, value] of [['telepon', item.phone], ['WhatsApp', item.whatsapp]] as const) {
+        if (typeof value === 'string' && value.trim()) {
+          const digits = value.replace(/\D/g, '');
+          if (digits.length < 8 || digits.length > 15) {
+            return NextResponse.json({ error: `${label} pada baris ${index + 1} harus kosong atau berisi 8–15 angka.`, code: 'invalid_business_locations' }, { status: 400 });
+          }
+        }
+      }
     }
 
     const firstPrimaryIndex = rawLocations.findIndex(item => item.isPrimary === true);
