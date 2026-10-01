@@ -268,10 +268,12 @@ function SelectedStoreMediaPreview({
   store,
   isId,
   onOpenStore,
+  productsLoading,
 }: {
   store: DiscoveryStore;
   isId: boolean;
   onOpenStore: () => void;
+  productsLoading?: boolean;
 }) {
   const media = resolveStorefrontBrandMedia(store.metadata || {});
   const images = Array.from(
@@ -324,7 +326,25 @@ function SelectedStoreMediaPreview({
         </div>
       ) : null}
 
-      {products.length > 0 ? (
+      {productsLoading && products.length === 0 ? (
+        <div className="rounded-[14px] border border-slate-200/90 bg-slate-50/80 p-2 dark:border-slate-800 dark:bg-slate-900/60" aria-busy="true">
+          <div className="flex items-center justify-between gap-2">
+            <Skeleton variant="line" className="h-3 w-24" />
+            <Skeleton variant="chip" className="h-6 w-16" />
+          </div>
+          <div className="mt-1.5 flex gap-2 overflow-hidden">
+            {[0, 1].map(index => (
+              <div key={index} className="flex h-12 w-[138px] shrink-0 items-center gap-2 rounded-[11px] border border-slate-200 bg-white p-1.5 dark:border-slate-800 dark:bg-slate-950">
+                <Skeleton variant="block" className="h-10 w-10 shrink-0 rounded-lg" />
+                <div className="min-w-0 flex-1">
+                  <Skeleton variant="line" className="h-3 w-20" />
+                  <Skeleton variant="line" className="mt-1.5 h-3 w-14" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : products.length > 0 ? (
         <div className="rounded-[14px] border border-slate-200/90 bg-slate-50/80 p-2 dark:border-slate-800 dark:bg-slate-900/60">
           <div className="flex items-center justify-between gap-2">
             <p className="text-[10px] font-black text-slate-700 dark:text-slate-200">
@@ -357,7 +377,7 @@ function SelectedStoreMediaPreview({
         </div>
       ) : null}
 
-      {!hasMedia && !products.length ? (
+      {!hasMedia && !products.length && !productsLoading ? (
         <button type="button" onClick={onOpenStore} className="w-full rounded-[13px] border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-left text-[9.5px] font-semibold text-slate-500 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-400">
           {isId ? 'Belum ada media atau produk yang tampil. Buka usaha untuk melihat detail dan menambahkan foto.' : 'No media or products are shown yet. Open the business for details and photo contributions.'}
         </button>
@@ -2709,9 +2729,12 @@ export function UmkmDiscoveryPanel({
                   <SelectedStoreMediaPreview
                     store={selectedPlace.store}
                     isId={isId}
+                    productsLoading={selectedProductsLoading}
                     onOpenStore={() => {
                       const href = buildUmkmMapPlacePath(selectedPlace.store);
-                      window.location.href = href;
+                      window.location.href = href.startsWith('/')
+                        ? `/${locale}${href}`
+                        : href;
                     }}
                   />
 
