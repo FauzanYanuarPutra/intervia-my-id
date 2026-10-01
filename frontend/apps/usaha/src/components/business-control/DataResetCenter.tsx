@@ -1,10 +1,11 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AlertTriangle, CheckCircle2, DatabaseBackup, LockKeyhole, RotateCcw, ShieldCheck } from 'lucide-react';
 import type { BusinessResetPreview, BusinessResetScope, BusinessResetBatch } from '@/lib/business-reset-types';
 import type { BusinessRecord } from '@/lib/portal-types';
+import { idempotencyFingerprint, resolveIdempotencyAttempt, type ClientIdempotencyAttempt } from '@/lib/client-idempotency';
 
 type Props = {
   business: BusinessRecord;
@@ -55,6 +56,8 @@ export function DataResetCenter({ business }: Props) {
   const [lastResult, setLastResult] = useState<BusinessResetBatch | null>(null);
   const [busy, setBusy] = useState<'preview' | 'apply' | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [previewFingerprint, setPreviewFingerprint] = useState<string | null>(null);
+  const attemptRef = useRef<ClientIdempotencyAttempt | null>(null);
 
   const scopes = useMemo<ScopeCard[]>(
     () => [
@@ -107,6 +110,7 @@ export function DataResetCenter({ business }: Props) {
 
   function toggleScope(scope: BusinessResetScope) {
     setPreview(null);
+    setPreviewFingerprint(null);
     setError(null);
     setSelected(current =>
       current.includes(scope)
@@ -117,23 +121,20 @@ export function DataResetCenter({ business }: Props) {
 
   function selectAll() {
     setPreview(null);
+    setPreviewFingerprint(null);
     setError(null);
     setSelected(scopes.filter(scope => scope.allowed).map(scope => scope.id));
   }
 
   function clearSelection() {
     setPreview(null);
+    setPreviewFingerprint(null);
     setError(null);
     setSelected([]);
     setConfirmation('');
   }
 
-  function buildPayload(): {
-    scopes: BusinessResetScope[];
-    reason: string;
-    confirmation: string;
-    effective_on: string;
-  } {
+  function buildPayload() {
     return {
       scopes: selected,
       reason: reason.trim(),
@@ -142,10 +143,23 @@ export function DataResetCenter({ business }: Props) {
     };
   }
 
+  const resetMaterialFingerprint = idempotencyFingerprint({
+    scopes: selected,
+    reason: reason.trim(),
+    effective_on: effectiveOn || null,
+  });
+
   async function doPreview() {
     setBusy('preview');
     setError(null);
     try {
+      const materialPayload = {
+        scopes: selected,
+        reason: reason.trim(),
+        effective_on: effectiveOn || undefined,
+      };
+      const attempt = resolveIdempotencyAttempt(attemptRef.current, materialPayload);
+      attemptRef.current = attempt;
       const result = await fetch('/api/businesses/' + encodeURIComponent(business.id) + '/reset', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -154,6 +168,7 @@ export function DataResetCenter({ business }: Props) {
       const payload = await result.json().catch(() => ({}));
       if (!result.ok) throw new BusinessResetClientError(payload?.error || 'preview_failed');
       setPreview(payload.data as BusinessResetPreview);
+      setPreviewFingerprint(resetMaterialFingerprint);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Tidak bisa memuat preview reset.');
     } finally {
@@ -163,6 +178,12 @@ export function DataResetCenter({ business }: Props) {
 
   async function applyReset() {
     if (!preview?.can_apply || !selected.length) return;
+    if (previewFingerprint !== resetMaterialFingerprint) {
+      setPreview(null);
+      setPreviewFingerprint(null);
+      setError('Data reset berubah sejak preview terakhir. Tinjau ulang sebelum menjalankan reset.');
+      return;
+    }
     setBusy('apply');
     setError(null);
     try {
@@ -170,7 +191,7 @@ export function DataResetCenter({ business }: Props) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Idempotency-Key': crypto.randomUUID(),
+          'Idempotency-Key': attempt.key,
         },
         body: JSON.stringify({ action: 'apply', ...buildPayload() }),
       });
@@ -178,6 +199,8 @@ export function DataResetCenter({ business }: Props) {
       if (!result.ok) throw new BusinessResetClientError(payload?.error || 'reset_failed');
       setLastResult(payload.data as BusinessResetBatch);
       setPreview(null);
+      setPreviewFingerprint(null);
+      attemptRef.current = null;
       router.refresh();
     } catch (cause) {
       const code = cause instanceof BusinessResetClientError ? cause.code : 'reset_failed';
@@ -198,13 +221,13 @@ export function DataResetCenter({ business }: Props) {
 
   const selectedCount = selected.length;
   const blocked = scopes.filter(scope => selected.includes(scope.id) && !scope.allowed);
-  const isFull = selectedCount === 5;
+  const isFull = scopes.length > 0 && scopes.every(scope => selected.includes(scope.id));
   const fullPhraseRequired = isFull;
   const effectiveReason = reason.trim().length >= 3;
-  const canPreview = selectedCount > 0 && effectiveReason && blocked.length === 0;
+  const canPreview = selectedCount > 0 && effectiveReason && blocked.length === 0 && !(isFull && !fullResetAvailable);
   const requiredConfirmation = fullPhraseRequired ? 'MULAI DARI NOL' : 'RESET';
   const fullResetBlocked = isFull && !fullResetAvailable;
-  const canApply = Boolean(preview?.can_apply) && canPreview && !fullResetBlocked && confirmation.trim() === requiredConfirmation;
+  const canApply = Boolean(preview?.can_apply) && canPreview && !fullResetBlocked && previewFingerprint === resetMaterialFingerprint && confirmation.trim() === requiredConfirmation;
 
   return (
     <div className="space-y-4">
@@ -284,7 +307,11 @@ export function DataResetCenter({ business }: Props) {
               <span className="text-xs font-black text-portal-ink">Kenapa perlu di-reset?</span>
               <textarea
                 value={reason}
-                onChange={event => setReason(event.target.value)}
+                onChange={event => {
+                  setReason(event.target.value);
+                  setPreview(null);
+                  setPreviewFingerprint(null);
+                }}
                 disabled={busy !== null}
                 rows={4}
                 maxLength={2000}
@@ -299,7 +326,11 @@ export function DataResetCenter({ business }: Props) {
                 <input
                   type="date"
                   value={effectiveOn}
-                  onChange={event => setEffectiveOn(event.target.value)}
+                  onChange={event => {
+                    setEffectiveOn(event.target.value);
+                    setPreview(null);
+                    setPreviewFingerprint(null);
+                  }}
                   disabled={busy !== null}
                   className="portal-input mt-2 w-full"
                 />
