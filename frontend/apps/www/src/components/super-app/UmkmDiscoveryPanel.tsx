@@ -1843,6 +1843,54 @@ export function UmkmDiscoveryPanel({
     [selectedStoreId, visibleStores],
   );
 
+  const hydratedStoreIdsRef = useRef(new Set<string>());
+
+  useEffect(() => {
+    if (
+      !selectedPlace?.store.id ||
+      isUmkmMapPublicReference(selectedPlace.store) ||
+      !selectedPlace.store.slug ||
+      hydratedStoreIdsRef.current.has(selectedPlace.store.id)
+    ) {
+      return;
+    }
+
+    hydratedStoreIdsRef.current.add(selectedPlace.store.id);
+    let active = true;
+
+    const hydrateSelectedStore = async () => {
+      try {
+        const response = await fetch(
+          `/api/super-app/umkm/stores?slug=${encodeURIComponent(selectedPlace.store.slug)}&limit=1`,
+          {
+            cache: 'no-store',
+            credentials: 'include',
+          },
+        );
+        const payload = (await response.json().catch(() => ({}))) as {
+          data?: { items?: DiscoveryStore[] };
+        };
+        if (!active || !response.ok || !payload.data?.items?.[0]) return;
+
+        const hydrated = payload.data.items[0];
+        setStores(current =>
+          current.map(store =>
+            store.id === selectedPlace.store.id
+              ? { ...store, ...hydrated }
+              : store,
+          ),
+        );
+      } catch {
+        // Map preview remains usable when the optional detail hydration fails.
+      }
+    };
+
+    void hydrateSelectedStore();
+    return () => {
+      active = false;
+    };
+  }, [selectedPlace?.store.id, selectedPlace?.store.slug]);
+
   useEffect(() => {
     if (!selectedPlace?.store.id || selectedPlace.store.products) {
       setSelectedProductsLoading(false);
