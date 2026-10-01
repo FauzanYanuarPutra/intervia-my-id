@@ -91,8 +91,8 @@ export async function POST(req: NextRequest) {
 
   const prompt =
     locale === 'id'
-      ? 'Buat draft profil Lajukan yang ringkas, natural, mudah dipercaya, dan mudah ditemukan lewat pencarian. Gunakan hanya fakta dari context. Jangan mengarang verifikasi, legalitas, sertifikat, jumlah tahun pengalaman, omzet, pelanggan, atau klaim keahlian yang tidak ada. Utamakan siapa pengguna/usaha ini, apa yang ditawarkan atau dicari, keahlian yang benar-benar terlihat dari data, lokasi, dan CTA yang masuk akal.'
-      : 'Create a concise, natural, searchable Lajukan profile draft. Use only facts from context. Never invent verification, permits, certificates, years of experience, revenue, customers, or unsupported expertise claims. Prioritize identity/business, offers or needs, supported expertise, location, and a realistic CTA.';
+      ? 'Buat draft profil Lajukan yang ringkas, natural, mudah dipercaya, dan mudah ditemukan lewat pencarian. Gunakan hanya fakta dari context. Jangan mengarang verifikasi, legalitas, sertifikat, jumlah tahun pengalaman, omzet, pelanggan, atau klaim keahlian yang tidak ada. Utamakan siapa pengguna/usaha ini, peran bisnisnya, apa yang ditawarkan, apa yang dicari, kapasitas, wilayah, partner yang terbuka untuk diajak, keahlian, lokasi, dan CTA yang masuk akal.'
+      : 'Create a concise, natural, searchable Lajukan profile draft. Use only facts from context. Never invent verification, permits, certificates, years of experience, revenue, customers, or unsupported expertise claims. Prioritize identity/business, business roles, offers, needs, capacity, service area, open-to partner types, expertise, location, and a realistic CTA.';
 
   try {
     const response = await fetch(`${INTERNAL_AI_URL}/v1/profile/generate`, {
