@@ -30,7 +30,14 @@ const useIsomorphicLayoutEffect =
 
 export function recoverStaleBodyScrollLock() {
   if (typeof window === 'undefined' || typeof document === 'undefined') return;
-  if (activeLocks > 0) return;
+  // Recovery is only invoked from a non-immersive route. If an immersive
+  // route leaked its lock during SPA navigation/HMR, the stale counter must
+  // be reset together with the DOM styles or the next scroll lock cycle can
+  // remain permanently offset.
+  const hadActiveLock = activeLocks > 0;
+  if (hadActiveLock && !document.documentElement.dataset.bodyScrollLocked) {
+    return;
+  }
 
   const body = document.body;
   const html = document.documentElement;
@@ -48,6 +55,7 @@ export function recoverStaleBodyScrollLock() {
     top && /^-\d+/.test(top) ? Math.abs(parseInt(top, 10)) : window.scrollY;
 
   snapshot = null;
+  activeLocks = 0;
   body.style.overflow = '';
   body.style.position = '';
   body.style.top = '';
