@@ -68,6 +68,8 @@ jobs:
         run: cargo test --locked --test migration_immutability_contract
       - name: Business control unit tests
         run: cargo test --locked businesses::control::tests
+      - name: Business data reset integration tests
+        run: cargo test --locked businesses::reset_persistence_tests
       - name: Transaction kernel invariant tests
         run: cargo test --locked businesses::transactions
       - name: Identity business access tests
