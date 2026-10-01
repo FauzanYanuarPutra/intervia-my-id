@@ -54,7 +54,7 @@ jobs:
           ditto -c -k --sequesterRsrc --keepParent             build/ios/iphonesimulator/Runner.app             /tmp/Lajukan-iOS-Simulator.zip
 
       - name: Upload iOS simulator artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: lajukan-ios-simulator
           path: /tmp/Lajukan-iOS-Simulator.zip
