@@ -11479,7 +11479,15 @@ async fn list_map_places(
                 THEN 'lajukan_store'
                 ELSE 'registered_store'
               END,
-              'public_path', '/toko/' || s.slug,
+              'public_path', CASE
+                WHEN lower(COALESCE(s.metadata->>'record_kind','')) LIKE '%reference%'
+                  OR lower(COALESCE(s.metadata->>'market_side','')) = 'reference'
+                THEN COALESCE(
+                  NULLIF(s.metadata->>'public_path', ''),
+                  '/content/' || s.slug
+                )
+                ELSE '/toko/' || s.slug
+              END,
               'cover_image', COALESCE(
                 NULLIF(s.metadata->>'cover_image', ''),
                 NULLIF(s.metadata->>'cover_image_url', ''),
@@ -11508,7 +11516,6 @@ async fn list_map_places(
               'source_license', NULLIF(s.metadata->>'source_license', ''),
               'source_license_url', NULLIF(s.metadata->>'source_license_url', ''),
               'source_attribution', NULLIF(s.metadata->>'source_attribution', ''),
-              'public_path', '/toko/' || s.slug,
               'updated_at', s.updated_at,
               'created_at', s.created_at,
               'google_maps_uri', NULLIF(s.metadata->>'google_maps_uri', '')
@@ -11567,7 +11574,7 @@ async fn list_map_places(
             'reference:' || c.id::text AS id,
             COALESCE(c.slug, 'reference-' || c.id::text),
             c.title,
-            COALESCE(c.metadata->>'city', c.metadata->>'location', 'Indonesia'),
+            COALESCE(c.metadata->>'city', c.metadata->>'location', ''),
             public.lajukan_safe_map_coordinate(c.metadata->>'latitude'),
             public.lajukan_safe_map_coordinate(c.metadata->>'longitude'),
             c.updated_at AS updated_at,
@@ -11624,7 +11631,6 @@ async fn list_map_places(
               'source_license', NULLIF(c.metadata->>'source_license', ''),
               'source_license_url', NULLIF(c.metadata->>'source_license_url', ''),
               'source_attribution', NULLIF(c.metadata->>'source_attribution', ''),
-              'public_path', '/toko/' || COALESCE(c.slug, 'reference-' || c.id::text),
               'updated_at', c.updated_at,
               'created_at', c.created_at,
               'google_maps_uri', NULLIF(c.metadata->>'google_maps_uri', '')
