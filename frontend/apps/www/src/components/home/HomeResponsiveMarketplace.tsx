@@ -103,6 +103,7 @@ import {
 } from '@/lib/content/catalog';
 import { resolveContentPriceUnitLabel } from '@/lib/content/priceUnit';
 import { buildContentHref } from '@/lib/content/routes';
+import { resolveListingLocation } from '@/lib/content/listingLocation';
 import {
   getListingValueFallback,
   resolveListingSide,
@@ -1203,9 +1204,7 @@ function mapContentToRecommendation(
   const vendor =
     readText(item.owner_profile?.full_name) ||
     metadataText(item, 'brand', 'company', 'company_name', 'store_name');
-  const location =
-    readText(item.owner_profile?.location) ||
-    metadataText(item, 'city', 'location', 'address');
+  const location = resolveListingLocation(item);
   const price =
     typeof item.price_cents === 'number' && item.price_cents > 0
       ? side === 'demand'
