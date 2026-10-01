@@ -145,6 +145,8 @@ export function NeedSearchCard({
 
   const viewerId = String(user?.id || '').trim().toLowerCase();
   const isOwner = Boolean(viewerId && ownerId && viewerId === ownerId);
+  const action = getExploreResultAction('needs', locale);
+
   const destinationHref = isPublic
     ? item.href
     : isOwner
@@ -215,7 +217,6 @@ export function NeedSearchCard({
   const visibleFactItems = factItems.slice(0, 4);
   const statusLabel = requestStatusLabel(item, locale);
   const sideStatusLabel = `${getListingSideObjectLabel('demand', locale)} · ${statusLabel}`;
-  const action = getExploreResultAction('needs', locale);
 
   const imageCandidates = [
     item.image,
