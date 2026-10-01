@@ -11661,7 +11661,7 @@ async fn list_map_places(
             c.title,
             COALESCE(c.metadata->>'city', c.metadata->>'location', c.metadata->>'address', 'Indonesia') AS city,
             COALESCE(c.metadata->>'address', c.metadata->>'location', c.metadata->>'city', 'Indonesia') AS address,
-            COALESCE(c.summary, NULLIF(c.body, '')) AS description,
+            NULLIF(LEFT(COALESCE(NULLIF(c.summary, ''), NULLIF(c.body, '')), 360), '') AS description,
             public.lajukan_safe_map_coordinate(
               COALESCE(
                 NULLIF(c.metadata->>'latitude', ''),
@@ -11710,13 +11710,10 @@ async fn list_map_places(
                 NULLIF(c.metadata->>'cover_image', ''),
                 NULLIF(c.metadata->>'cover_image_url', ''),
                 NULLIF(c.metadata->>'image_url', ''),
-                NULLIF(c.metadata->>'image', '')
+                NULLIF(c.metadata->>'image', ''),
+                NULLIF(c.metadata->>'gallery_media_primary', '')
               ),
               'logo_url', NULLIF(c.metadata->>'logo_url', ''),
-              'gallery_images', c.metadata->'gallery_images',
-              'gallery_media', c.metadata->'gallery_media',
-              'gallery_media_items', c.metadata->'gallery_media_items',
-              'gallery_media_primary', c.metadata->>'gallery_media_primary',
               'image_attribution', NULLIF(c.metadata->>'image_attribution', ''),
               'image_source_provider', NULLIF(c.metadata->>'image_source_provider', ''),
               'media_kind', NULLIF(c.metadata->>'media_kind', ''),
