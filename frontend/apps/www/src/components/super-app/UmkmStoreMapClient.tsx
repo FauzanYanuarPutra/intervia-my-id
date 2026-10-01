@@ -1360,8 +1360,8 @@ function MapBoundsReporter({
     if (
       !bounds.isValid() ||
       !Number.isFinite(zoom) ||
-      zoom < 0 ||
-      zoom > 24
+      zoom < UMKM_MAP_MIN_ZOOM ||
+      zoom > UMKM_MAP_MAX_ZOOM
     ) {
       return;
     }
