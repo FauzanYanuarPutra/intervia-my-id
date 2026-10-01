@@ -508,6 +508,14 @@ pub(crate) fn router() -> Router<Arc<AppState>> {
             "/v1/crm/notifications/read-all",
             post(mark_all_crm_notifications_read),
         )
+        .route(
+            "/v1/umkm/stores/{store_ref}/media",
+            get(list_public_store_media).post(create_store_media_contribution),
+        )
+        .route(
+            "/v1/umkm/stores/{store_ref}/media/contributions",
+            get(list_public_store_media).post(create_store_media_contribution),
+        )
         .route("/v1/umkm/stores/{store_ref}/report", post(report_business))
         .route(
             "/v1/umkm/stores/{store_ref}/appeal",
@@ -1162,7 +1170,11 @@ fn valid_store_media_url(value: &str) -> bool {
     if value.is_empty() || value.len() > 2048 {
         return false;
     }
-    let Some(filename) = value.strip_prefix("/api/forum/media/") else {
+    let filename = if let Some(filename) = value.strip_prefix("/api/forum/media/") {
+        filename
+    } else if let Some(filename) = value.strip_prefix("/api/content/media/") {
+        filename
+    } else {
         return false;
     };
     !filename.is_empty()
