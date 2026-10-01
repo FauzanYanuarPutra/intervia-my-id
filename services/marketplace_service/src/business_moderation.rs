@@ -279,7 +279,8 @@ fn collect_metadata_images(metadata: &Value) -> Vec<String> {
                     || lower.starts_with("/uploads/")
                     || lower.starts_with("/media/")
                     || lower.starts_with("/images/")
-                    || lower.starts_with("/api/forum/media/");
+                    || lower.starts_with("/api/forum/media/")
+                    || lower.starts_with("/api/content/media/");
                 if likely && seen.insert(candidate.to_string()) {
                     urls.push(candidate.to_string());
                 }
@@ -382,6 +383,7 @@ fn derive_missing_fields(
     lat: f64,
     lng: f64,
     metadata: &Value,
+    has_business_media: bool,
 ) -> Vec<String> {
     let mut missing = Vec::new();
     if name.trim().is_empty() {
@@ -414,7 +416,7 @@ fn derive_missing_fields(
     if !lat.is_finite() || !lng.is_finite() || lat.abs() > 90.0 || lng.abs() > 180.0 {
         missing.push("Lokasi peta".to_string());
     }
-    if collect_metadata_images(metadata).is_empty() {
+    if !has_business_media {
         missing.push("Foto/logo usaha".to_string());
     }
     missing
@@ -1523,7 +1525,13 @@ async fn list_crm_businesses(
             WHERE bv.business_id = s.id
             ORDER BY bv.updated_at DESC
             LIMIT 1
-          ) AS verification_method
+          ) AS verification_method,
+          COALESCE((
+            SELECT ARRAY_AGG(m.media_url ORDER BY m.is_primary DESC, m.created_at DESC, m.id ASC)
+            FROM umkm_store_media_contributions m
+            WHERE m.store_id = s.id
+              AND m.status = 'approved'
+          ), ARRAY[]::TEXT[]) AS contributed_image_urls
         FROM umkm_stores s
         LEFT JOIN LATERAL (
           SELECT l.business_id
@@ -1587,7 +1595,18 @@ async fn list_crm_businesses(
         let phone: Option<String> = row.get("phone");
         let lat: f64 = row.get("lat");
         let lng: f64 = row.get("lng");
-        let images = collect_metadata_images(&metadata);
+        let mut images = collect_metadata_images(&metadata);
+        let contributed_images: Vec<String> = row.get("contributed_image_urls");
+        for image in contributed_images {
+            let candidate = image.trim();
+            if candidate.is_empty() || !is_business_media_url(candidate) {
+                continue;
+            }
+            if !images.iter().any(|existing| existing.eq_ignore_ascii_case(candidate)) {
+                images.push(candidate.to_string());
+            }
+        }
+        images.truncate(12);
         let source_type = public_business_source_type(&metadata);
         let missing = derive_missing_fields(
             &name,
@@ -1598,6 +1617,7 @@ async fn list_crm_businesses(
             lat,
             lng,
             &metadata,
+            !images.is_empty(),
         );
         let current_action: Option<String> = row.get("current_action");
         let moderation_status: Option<String> = row.get("moderation_status");
@@ -1702,7 +1722,13 @@ async fn load_business(state: &AppState, business_id: Uuid) -> Result<CrmBusines
             WHERE bv.business_id = s.id
             ORDER BY bv.updated_at DESC
             LIMIT 1
-          ) AS verification_method
+          ) AS verification_method,
+          COALESCE((
+            SELECT ARRAY_AGG(m.media_url ORDER BY m.is_primary DESC, m.created_at DESC, m.id ASC)
+            FROM umkm_store_media_contributions m
+            WHERE m.store_id = s.id
+              AND m.status = 'approved'
+          ), ARRAY[]::TEXT[]) AS contributed_image_urls
         FROM umkm_stores s
         LEFT JOIN LATERAL (
           SELECT l.business_id
@@ -1739,6 +1765,18 @@ async fn load_business(state: &AppState, business_id: Uuid) -> Result<CrmBusines
     let phone: Option<String> = row.get("phone");
     let lat: f64 = row.get("lat");
     let lng: f64 = row.get("lng");
+    let mut images = collect_metadata_images(&metadata);
+    let contributed_images: Vec<String> = row.get("contributed_image_urls");
+    for image in contributed_images {
+        let candidate = image.trim();
+        if candidate.is_empty() || !is_business_media_url(candidate) {
+            continue;
+        }
+        if !images.iter().any(|existing| existing.eq_ignore_ascii_case(candidate)) {
+            images.push(candidate.to_string());
+        }
+    }
+    images.truncate(12);
     let missing = derive_missing_fields(
         &name,
         description.as_deref(),
@@ -1748,6 +1786,7 @@ async fn load_business(state: &AppState, business_id: Uuid) -> Result<CrmBusines
         lat,
         lng,
         &metadata,
+        !images.is_empty(),
     );
     let current_action: Option<String> = row.get("current_action");
     let moderation_status: Option<String> = row.get("moderation_status");
@@ -1785,7 +1824,7 @@ async fn load_business(state: &AppState, business_id: Uuid) -> Result<CrmBusines
         moderation_severity: row.get("moderation_severity"),
         missing_fields: missing.clone(),
         completeness_percent: completeness_percent(&missing),
-        image_urls: collect_metadata_images(&metadata),
+        image_urls: images,
         source_type,
         report_count: row.get::<i64, _>("report_count"),
         latest_report_reason: row.get::<Option<String>, _>("latest_report_reason"),
@@ -3861,6 +3900,20 @@ mod tests {
             vec![
                 "/api/forum/media/lajukan-juice.webp".to_string(),
                 "/api/forum/media/lajukan-juice-banner.webp".to_string(),
+            ]
+        );
+
+        let content_metadata = json!({
+            "public": {
+                "logo_url": "/api/content/media/laju-chat/content/lajukan-juice.webp",
+                "gallery": ["/api/content/media/laju-chat/content/lajukan-juice-gallery.webp"],
+            }
+        });
+        assert_eq!(
+            collect_metadata_images(&content_metadata),
+            vec![
+                "/api/content/media/laju-chat/content/lajukan-juice.webp".to_string(),
+                "/api/content/media/laju-chat/content/lajukan-juice-gallery.webp".to_string(),
             ]
         );
     }
