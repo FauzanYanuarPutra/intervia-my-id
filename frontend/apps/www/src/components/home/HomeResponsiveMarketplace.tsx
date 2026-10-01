@@ -4669,80 +4669,24 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
 
   return (
     <MarketplacePageFrame>
-      <main className="mx-auto w-full max-w-[720px] min-w-0 space-y-3.5 px-1 sm:space-y-4 sm:px-0 lg:hidden">
-        <HeroVisualStage
-          isId={isId}
-          className="mb-3"
-          query={query}
-          onQueryChange={setQuery}
-          onSubmit={handleSearchSubmit}
-          onOpenFilters={openSearchFilters}
-        />
-        {/* <MobileAppDownloadSection isId={isId} /> */}
-        <QuickCategoriesSection isId={isId} />
-        <HomeErrorBoundary locale={locale} section={isId ? 'Peta usaha' : 'Business map'}>
-          <HomeBusinessMapSection locale={locale} />
-        </HomeErrorBoundary>
-        <DailyLoginRewardCard locale={locale} compact />
-        <TrendingSearchSection isId={isId} />
-        {recommendationsLoading ? (
-          <RecommendationsLoadingSkeleton isId={isId} />
-        ) : (
-          <RecommendationsSection isId={isId} items={recommendations} />
-        )}
-        {demandRecommendationsLoading ? (
-          <RecommendationsLoadingSkeleton isId={isId} demand />
-        ) : (
-          <DemandListingsSection isId={isId} items={demandRecommendations} />
-        )}
-        <PublicReferencesSection isId={isId} items={publicReferences} />
-        <HomeErrorBoundary locale={locale} section={isId ? 'News' : 'News'}>
-          <HomeNewsSection locale={locale} items={homeNewsItems} />
-        </HomeErrorBoundary>
-        <ReelsPanel isId={isId} items={reels} />
-        <HomeCommunityGroupsSection
-          isId={isId}
-          groups={communityGroups}
-          onChanged={() => void loadCommunityPostsPage()}
-        />
-        <CommunityPanel
-          isId={isId}
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          posts={communityPosts}
-          loading={communityLoading}
-          loadError={communityError}
-          onRetry={() => void loadCommunityPostsPage()}
-        />
-        <FeedColumnFooter isId={isId} />
-      </main>
-
-      <div className="lajukan-home-desktop-shell hidden min-h-0 min-w-0 lg:flex lg:flex-1 lg:flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <div className={homeDesktopGridClassName}>
-          <DesktopSidebar
-            pathname={pathname}
-            items={sidebarItems}
-            inviteTitle={text.inviteTitle}
-            inviteDescription={text.inviteDescription}
-            inviteButton={text.inviteButton}
-            inviteHref={primaryCtaHref}
-          />
+          <div className="hidden min-h-0 min-w-0 lg:block">
+            <DesktopSidebar
+              pathname={pathname}
+              items={sidebarItems}
+              inviteTitle={text.inviteTitle}
+              inviteDescription={text.inviteDescription}
+              inviteButton={text.inviteButton}
+              inviteHref={primaryCtaHref}
+            />
+          </div>
+
           <main
-            className="min-h-0 min-w-0 overflow-y-auto pr-1 overscroll-contain pt-2"
+            className="min-h-0 min-w-0 overflow-x-hidden overscroll-contain px-1 pb-2 sm:px-0 lg:overflow-y-auto lg:pr-1 lg:pt-2"
             data-auto-scrollbar
           >
-            <div className="space-y-4 pb-5">
-              {/* <DesktopHeroSection
-                isId={isId}
-                isAuthenticated={isAuthenticated}
-                summary={summary}
-                primaryCtaHref={primaryCtaHref}
-                query={query}
-                onQueryChange={setQuery}
-                onSubmit={handleSearchSubmit}
-                placeholder={text.searchPlaceholder}
-                buttonLabel={text.searchButton}
-              /> */}
+            <div className="mx-auto w-full max-w-[720px] space-y-3.5 pb-5 sm:space-y-4 lg:max-w-none">
               <HeroVisualStage
                 isId={isId}
                 className="mb-3"
@@ -4751,26 +4695,52 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
                 onSubmit={handleSearchSubmit}
                 onOpenFilters={openSearchFilters}
               />
+              {/* <MobileAppDownloadSection isId={isId} /> */}
               <QuickCategoriesSection isId={isId} />
-        <HomeErrorBoundary locale={locale} section={isId ? 'Peta usaha' : 'Business map'}>
-          <HomeBusinessMapSection locale={locale} />
-        </HomeErrorBoundary>
+
+              <HomeErrorBoundary
+                locale={locale}
+                section={isId ? 'Peta usaha' : 'Business map'}
+              >
+                <HomeBusinessMapSection locale={locale} />
+              </HomeErrorBoundary>
+
               <DailyLoginRewardCard locale={locale} compact />
               <TrendingSearchSection isId={isId} />
+
               {recommendationsLoading ? (
                 <RecommendationsLoadingSkeleton isId={isId} />
               ) : (
-                <RecommendationsSection isId={isId} items={recommendations} />
+                <RecommendationsSection
+                  isId={isId}
+                  items={recommendations}
+                />
               )}
+
               {demandRecommendationsLoading ? (
-          <RecommendationsLoadingSkeleton isId={isId} demand />
-        ) : (
-          <DemandListingsSection isId={isId} items={demandRecommendations} />
-        )}
-              <PublicReferencesSection isId={isId} items={publicReferences} />
-        <HomeErrorBoundary locale={locale} section={isId ? 'News' : 'News'}>
-          <HomeNewsSection locale={locale} items={homeNewsItems} />
-        </HomeErrorBoundary>
+                <RecommendationsLoadingSkeleton isId={isId} demand />
+              ) : (
+                <DemandListingsSection
+                  isId={isId}
+                  items={demandRecommendations}
+                />
+              )}
+
+              <PublicReferencesSection
+                isId={isId}
+                items={publicReferences}
+              />
+
+              <HomeErrorBoundary
+                locale={locale}
+                section={isId ? 'News' : 'News'}
+              >
+                <HomeNewsSection
+                  locale={locale}
+                  items={homeNewsItems}
+                />
+              </HomeErrorBoundary>
+
               <div className="grid gap-4">
                 <ReelsPanel isId={isId} items={reels} />
                 <HomeCommunityGroupsSection
@@ -4788,23 +4758,25 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
                   onRetry={() => void loadCommunityPostsPage()}
                 />
               </div>
+
               <FeedColumnFooter isId={isId} />
             </div>
           </main>
-          <RightRail
-            isId={isId}
-            locale={locale}
-            isAuthenticated={isAuthenticated}
-            summary={summary}
-            primaryCtaHref={primaryCtaHref}
-            walletAmountLabel={walletAmountLabel}
-            walletModeLabel={walletModeLabel}
-            walletLoading={walletLoading}
-          />
+
+          <div className="hidden min-h-0 min-w-0 xl:block">
+            <RightRail
+              isId={isId}
+              locale={locale}
+              isAuthenticated={isAuthenticated}
+              summary={summary}
+              primaryCtaHref={primaryCtaHref}
+              walletAmountLabel={walletAmountLabel}
+              walletModeLabel={walletModeLabel}
+              walletLoading={walletLoading}
+            />
+          </div>
         </div>
       </div>
     </MarketplacePageFrame>
   );
 }
-
-
