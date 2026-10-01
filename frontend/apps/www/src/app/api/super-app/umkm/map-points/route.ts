@@ -58,6 +58,79 @@ type MapPoint = {
   metadata?: Record<string, unknown>;
 };
 
+type MapPointsPayload = {
+  items: MapPoint[];
+  total_count: number;
+};
+
+type MapPointsCacheEntry = {
+  freshUntil: number;
+  staleUntil: number;
+  payload: MapPointsPayload;
+};
+
+const MAP_POINTS_FRESH_MS = 45_000;
+const MAP_POINTS_STALE_MS = 5 * 60_000;
+const MAP_POINTS_CACHE = new Map<string, MapPointsCacheEntry>();
+
+function mapPointsCacheKey(params: URLSearchParams): string {
+  return params.toString();
+}
+
+function normalizeMapPointsPayload(payload: {
+  items?: MapPoint[];
+  total_count?: number;
+}): MapPointsPayload {
+  const items = Array.isArray(payload.items) ? payload.items : [];
+  const totalCount =
+    typeof payload.total_count === 'number' &&
+    Number.isFinite(payload.total_count) &&
+    payload.total_count >= 0
+      ? Math.floor(payload.total_count)
+      : items.length;
+
+  return {
+    items,
+    total_count: Math.max(totalCount, items.length),
+  };
+}
+
+function cacheMapPoints(key: string, payload: MapPointsPayload): void {
+  const now = Date.now();
+  MAP_POINTS_CACHE.delete(key);
+  MAP_POINTS_CACHE.set(key, {
+    freshUntil: now + MAP_POINTS_FRESH_MS,
+    staleUntil: now + MAP_POINTS_STALE_MS,
+    payload,
+  });
+
+  while (MAP_POINTS_CACHE.size > 120) {
+    const oldestKey = MAP_POINTS_CACHE.keys().next().value;
+    if (typeof oldestKey !== 'string') break;
+    MAP_POINTS_CACHE.delete(oldestKey);
+  }
+}
+
+function getCachedMapPoints(
+  key: string,
+  allowStale = false,
+): MapPointsCacheEntry | null {
+  const entry = MAP_POINTS_CACHE.get(key);
+  if (!entry) return null;
+  const now = Date.now();
+
+  if (entry.freshUntil > now) {
+    MAP_POINTS_CACHE.delete(key);
+    MAP_POINTS_CACHE.set(key, entry);
+    return entry;
+  }
+
+  if (allowStale && entry.staleUntil > now) return entry;
+
+  MAP_POINTS_CACHE.delete(key);
+  return null;
+}
+
 export async function GET(req: NextRequest) {
   try {
     const security = await enforceAuthRouteSecurity(req, {
@@ -115,11 +188,66 @@ export async function GET(req: NextRequest) {
     if (maxLng !== undefined) params.set('max_lng', String(maxLng));
     if (hasViewer) { params.set('viewer_lat', String(viewerLat)); params.set('viewer_lng', String(viewerLng)); }
     if (normalizedRadius !== undefined) params.set('radius_km', String(normalizedRadius));
-    const response = await fetchMapDataWithRetry(
-      `${MARKETPLACE_URL}/v1/map/places?${params.toString()}`,
-    );
+
+    const cacheKey = mapPointsCacheKey(params);
+    const cached = getCachedMapPoints(cacheKey);
+    if (cached) {
+      return NextResponse.json(
+        { data: cached.payload },
+        {
+          headers: {
+            'Cache-Control': hasViewer
+              ? 'private, no-store'
+              : 'public, s-maxage=45, stale-while-revalidate=180',
+            'X-Lajukan-Map-Cache': 'hit',
+          },
+        },
+      );
+    }
+
+    let response: Response;
+    try {
+      response = await fetchMapDataWithRetry(
+        `${MARKETPLACE_URL}/v1/map/places?${params.toString()}`,
+      );
+    } catch (fetchError) {
+      const stale = getCachedMapPoints(cacheKey, true);
+      if (stale) {
+        console.warn('[UMKM_MAP_POINTS_STALE]', fetchError);
+        return NextResponse.json(
+          { data: stale.payload, transient: true },
+          {
+            headers: {
+              'Cache-Control': hasViewer
+                ? 'private, no-store'
+                : 'public, s-maxage=15, stale-while-revalidate=60',
+              'X-Lajukan-Map-Cache': 'stale',
+            },
+          },
+        );
+      }
+      throw fetchError;
+    }
+
     if (!response.ok) {
-      return NextResponse.json({ error: 'Map data source unavailable' }, { status: 502 });
+      const stale = getCachedMapPoints(cacheKey, true);
+      if (stale) {
+        return NextResponse.json(
+          { data: stale.payload, transient: true },
+          {
+            headers: {
+              'Cache-Control': hasViewer
+                ? 'private, no-store'
+                : 'public, s-maxage=15, stale-while-revalidate=60',
+              'X-Lajukan-Map-Cache': 'stale',
+            },
+          },
+        );
+      }
+      return NextResponse.json(
+        { error: 'Map data source unavailable' },
+        { status: 502 },
+      );
     }
 
     const payload = (await response.json()) as {
@@ -138,19 +266,18 @@ export async function GET(req: NextRequest) {
         )
       : [];
 
-    const totalCount =
-      typeof payload.total_count === 'number' &&
-      Number.isFinite(payload.total_count) &&
-      payload.total_count >= 0
-        ? Math.floor(payload.total_count)
-        : items.length;
+    const normalizedPayload = normalizeMapPointsPayload({
+      items,
+      total_count: payload.total_count,
+    });
+    cacheMapPoints(cacheKey, normalizedPayload);
 
     return NextResponse.json(
       {
         data: {
-          items,
-          count: items.length,
-          total_count: totalCount,
+          items: normalizedPayload.items,
+          count: normalizedPayload.items.length,
+          total_count: normalizedPayload.total_count,
         },
       },
       {
