@@ -132,7 +132,7 @@ export function DataResetCenter({ business }: Props) {
     scopes: BusinessResetScope[];
     reason: string;
     confirmation: string;
-    effective_on: string;
+    effective_on: string | undefined;
   } {
     return {
       scopes: selected,
