@@ -21,7 +21,7 @@ describe('Explore result conversion', () => {
     expect(
       getZeroResultRecovery({ locale: 'id', searchSide: 'supply', activeTab: 'all' }),
     ).toEqual([
-      { label: 'Jelajahi kategori', href: '/explore?side=supply&tab=all', analyticsAction: 'browse_explore' },
+      { label: 'Jelajahi kategori', href: '/id/explore?side=supply&tab=all', analyticsAction: 'browse_explore' },
       { label: 'Pasang kebutuhan', href: '/create?side=demand', analyticsAction: 'post_need' },
     ]);
   });
@@ -35,7 +35,7 @@ describe('Explore result conversion', () => {
 
     expect(actions[0]).toEqual({
       label: 'Jelajahi kategori',
-      href: '/explore?side=demand&tab=all',
+      href: '/id/explore?side=demand&tab=all',
       analyticsAction: 'browse_explore',
     });
   });
