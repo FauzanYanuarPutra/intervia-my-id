@@ -529,6 +529,7 @@ pub(crate) fn router() -> Router<Arc<AppState>> {
 
 async fn list_public_store_media(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Path(store_ref): Path<String>,
 ) -> impl IntoResponse {
     let store = match find_public_umkm_store_row(&state.db, store_ref.trim()).await {
@@ -571,23 +572,122 @@ async fn list_public_store_media(
 
     let items = rows
         .into_iter()
-        .map(|row| PublicStoreMediaRow {
-            id: row.get("id"),
-            store_id: row.get("store_id"),
-            media_url: row.get("media_url"),
-            media_type: row.get("media_type"),
-            caption: row.get("caption"),
-            uploader_user_id: row.get("uploader_user_id"),
-            uploader_name: row.get("uploader_name_snapshot"),
-            uploader_username: row.get("uploader_username_snapshot"),
-            is_primary: row.get("is_primary"),
-            created_at: row.get("created_at"),
+        .map(|row| {
+            json!({
+                "id": row.get::<Uuid, _>("id"),
+                "store_id": row.get::<Uuid, _>("store_id"),
+                "media_url": row.get::<String, _>("media_url"),
+                "media_type": row.get::<String, _>("media_type"),
+                "caption": row.get::<Option<String>, _>("caption"),
+                "uploader_user_id": row.get::<Uuid, _>("uploader_user_id"),
+                "uploader_name": row.get::<Option<String>, _>("uploader_name_snapshot"),
+                "uploader_username": row.get::<Option<String>, _>("uploader_username_snapshot"),
+                "is_primary": row.get::<bool, _>("is_primary"),
+                "created_at": row.get::<DateTime<Utc>, _>("created_at"),
+            })
         })
         .collect::<Vec<_>>();
 
+    let viewer_id = user_id_from_auth(&headers, &state.jwt_secret);
+
+    let my_items = if let Some(viewer_id) = viewer_id {
+        match sqlx::query(
+            r#"
+            SELECT
+              id, media_url, media_type, status, review_note, caption,
+              uploader_name_snapshot, uploader_username_snapshot
+            FROM umkm_store_media_contributions
+            WHERE store_id = $1
+              AND uploader_user_id = $2
+            ORDER BY created_at DESC, id DESC
+            LIMIT 12
+            "#,
+        )
+        .bind(store.id)
+        .bind(viewer_id)
+        .fetch_all(&state.db)
+        .await
+        {
+            Ok(rows) => rows
+                .into_iter()
+                .map(|row| {
+                    json!({
+                        "id": row.get::<Uuid, _>("id"),
+                        "media_url": row.get::<String, _>("media_url"),
+                        "media_type": row.get::<String, _>("media_type"),
+                        "status": row.get::<String, _>("status"),
+                        "review_note": row.get::<Option<String>, _>("review_note"),
+                        "caption": row.get::<Option<String>, _>("caption"),
+                        "uploader_name_snapshot": row.get::<Option<String>, _>("uploader_name_snapshot"),
+                        "uploader_username_snapshot": row.get::<Option<String>, _>("uploader_username_snapshot"),
+                    })
+                })
+                .collect::<Vec<_>>(),
+            Err(error) => {
+                tracing::error!("list_public_store_media viewer query error: {:?}", error);
+                Vec::new()
+            }
+        }
+    } else {
+        Vec::new()
+    };
+
+    let is_store_owner = viewer_id == Some(store.owner_user_id);
+    let queue_items = if is_store_owner {
+        match sqlx::query(
+            r#"
+            SELECT
+              id, media_url, media_type, status, review_note, caption,
+              uploader_name_snapshot, uploader_username_snapshot
+            FROM umkm_store_media_contributions
+            WHERE store_id = $1
+              AND status = 'pending'
+            ORDER BY created_at ASC, id ASC
+            LIMIT 24
+            "#,
+        )
+        .bind(store.id)
+        .fetch_all(&state.db)
+        .await
+        {
+            Ok(rows) => rows
+                .into_iter()
+                .map(|row| {
+                    json!({
+                        "id": row.get::<Uuid, _>("id"),
+                        "media_url": row.get::<String, _>("media_url"),
+                        "media_type": row.get::<String, _>("media_type"),
+                        "status": row.get::<String, _>("status"),
+                        "review_note": row.get::<Option<String>, _>("review_note"),
+                        "caption": row.get::<Option<String>, _>("caption"),
+                        "uploader_name_snapshot": row.get::<Option<String>, _>("uploader_name_snapshot"),
+                        "uploader_username_snapshot": row.get::<Option<String>, _>("uploader_username_snapshot"),
+                    })
+                })
+                .collect::<Vec<_>>(),
+            Err(error) => {
+                tracing::error!("list_public_store_media owner queue query error: {:?}", error);
+                Vec::new()
+            }
+        }
+    } else {
+        Vec::new()
+    };
+
     (
         StatusCode::OK,
-        Json(json!({ "items": items, "count": items.len() })),
+        Json(json!({
+            "data": {
+                "items": items,
+                "count": items.len(),
+                "viewer": {
+                    "is_authenticated": viewer_id.is_some(),
+                    "is_store_owner": is_store_owner,
+                    "my_items": my_items,
+                    "queue_items": queue_items,
+                }
+            }
+        })),
     )
         .into_response()
 }
@@ -732,25 +832,27 @@ async fn create_store_media_contribution(
         }
     };
 
-    let item = PublicStoreMediaRow {
-        id: row.get("id"),
-        store_id: row.get("store_id"),
-        media_url: row.get("media_url"),
-        media_type: row.get("media_type"),
-        caption: row.get("caption"),
-        uploader_user_id: row.get("uploader_user_id"),
-        uploader_name: row.get("uploader_name_snapshot"),
-        uploader_username: row.get("uploader_username_snapshot"),
-        is_primary: row.get("is_primary"),
-        created_at: row.get("created_at"),
-    };
+    let item = json!({
+        "id": row.get::<Uuid, _>("id"),
+        "store_id": row.get::<Uuid, _>("store_id"),
+        "media_url": row.get::<String, _>("media_url"),
+        "media_type": row.get::<String, _>("media_type"),
+        "caption": row.get::<Option<String>, _>("caption"),
+        "uploader_user_id": row.get::<Uuid, _>("uploader_user_id"),
+        "uploader_name": row.get::<Option<String>, _>("uploader_name_snapshot"),
+        "uploader_username": row.get::<Option<String>, _>("uploader_username_snapshot"),
+        "is_primary": row.get::<bool, _>("is_primary"),
+        "created_at": row.get::<DateTime<Utc>, _>("created_at"),
+    });
 
     (
         StatusCode::CREATED,
         Json(json!({
-            "item": item,
-            "status": "pending",
-            "message": "Media submitted for review."
+            "data": {
+                "item": item,
+                "status": "pending",
+                "message": "Media sudah disimpan dan masuk antrean verifikasi Lajukan.",
+            }
         })),
     )
         .into_response()
