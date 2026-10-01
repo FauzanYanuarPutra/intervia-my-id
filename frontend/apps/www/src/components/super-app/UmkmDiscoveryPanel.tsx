@@ -108,6 +108,8 @@ type MapPointResponse = {
       slug: string;
       name: string;
       city: string;
+      address?: string;
+      description?: string | null;
       lat: number;
       lng: number;
       category: string;
@@ -1624,11 +1626,19 @@ export function UmkmDiscoveryPanel({
                 id: point.id,
                 slug: point.slug,
                 name: point.name,
-                city: point.city || 'Indonesia',
-                address: point.city || 'Indonesia',
+                city: point.city || '',
+                address:
+                  point.address ||
+                  point.metadata?.address ||
+                  point.city ||
+                  'Lokasi belum tersedia',
                 lat: point.lat,
                 lng: point.lng,
-                description: null,
+                description:
+                  point.description ||
+                  (typeof point.metadata?.description === 'string'
+                    ? point.metadata.description
+                    : null),
                 phone: null,
                 metadata: {
                   ...(point.metadata || {}),
@@ -1764,7 +1774,11 @@ export function UmkmDiscoveryPanel({
         const pointUi = buildUmkmPlacePresentation(
           {
             ...point,
-            address: point.city || 'Indonesia',
+            address:
+              point.address ||
+              point.metadata?.address ||
+              point.city ||
+              'Lokasi belum tersedia',
             description: point.description ?? null,
             phone: point.phone ?? null,
             metadata: point.metadata ?? {},
@@ -1777,7 +1791,11 @@ export function UmkmDiscoveryPanel({
             kind: pointUi.kind,
             name: point.name,
             description: point.description,
-            address: point.city,
+            address:
+              point.address ||
+              point.metadata?.address ||
+              point.city ||
+              'Lokasi belum tersedia',
             metadata: point.metadata,
           },
           category,
