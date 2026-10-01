@@ -64,6 +64,17 @@ describe('UMKM public route helpers', () => {
     ).toBe('/toko/osm-node-1');
   });
 
+  it('uses a storefront slug from metadata when the map point has no top-level slug', () => {
+    expect(
+      buildUmkmMapPlacePath({
+        metadata: {
+          is_public_reference: true,
+          storefront_slug: 'bank-permata-bintaro',
+        },
+      }),
+    ).toBe('/toko/bank-permata-bintaro');
+  });
+
   it('routes a Lajukan store map point to its storefront', () => {
     expect(
       buildUmkmMapPlacePath({
