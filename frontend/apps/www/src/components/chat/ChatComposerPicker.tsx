@@ -141,14 +141,14 @@ export function ChatComposerPicker({
 
       {mode === 'emoji' ? (
         <>
-          <div className="grid grid-cols-4 gap-1.5 border-b border-black/[0.05] p-2 dark:border-white/[0.06] sm:grid-cols-7">
+          <div className="flex gap-1.5 overflow-x-auto border-b border-black/[0.05] p-2 dark:border-white/[0.06]">
             {categories.map(category => (
               <button
                 key={category.id}
                 type="button"
                 onClick={() => setCategoryId(category.id)}
                 className={[
-                  'min-h-8 rounded-full px-2 text-[10px] font-bold transition',
+                  'min-h-8 shrink-0 rounded-full px-2.5 text-[10px] font-bold transition',
                   category.id === categoryId
                     ? 'bg-[#d9fdd3] text-[#008f72] dark:bg-[#173c31] dark:text-[#25d366]'
                     : 'text-[#667781] hover:bg-[#f0f2f5] dark:text-[#aebac1] dark:hover:bg-[#202c33]',
@@ -158,7 +158,7 @@ export function ChatComposerPicker({
               </button>
             ))}
           </div>
-          <div className="h-[min(42dvh,360px)] min-h-[220px] overflow-y-auto overscroll-contain p-2 sm:h-[300px]">
+          <div className="h-[min(28dvh,270px)] min-h-[170px] overflow-y-auto overscroll-contain p-2">
             <div className="grid grid-cols-7 gap-0.5 sm:grid-cols-10 md:grid-cols-12">
               {(activeCategory?.items || []).map((emoji, index) => (
                 <button
@@ -166,7 +166,7 @@ export function ChatComposerPicker({
                   type="button"
                   disabled={disabled}
                   onClick={() => pickEmoji(emoji)}
-                  className="flex aspect-square min-h-10 items-center justify-center rounded-xl text-[1.55rem] transition hover:bg-[#f0f2f5] hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-[#202c33] sm:text-[1.75rem]"
+                  className="flex aspect-square min-h-9 items-center justify-center rounded-lg text-[1.4rem] transition hover:bg-[#f0f2f5] hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-[#202c33] sm:text-[1.55rem]"
                   aria-label={(locale === 'id' ? 'Pilih ' : 'Choose ') + emoji}
                 >
                   {emoji}
@@ -174,7 +174,7 @@ export function ChatComposerPicker({
               ))}
             </div>
           </div>
-          <div className="border-t border-black/[0.05] px-3 py-2 text-[10px] font-medium text-[#667781] dark:border-white/[0.06] dark:text-[#aebac1]">
+          <div className="border-t border-black/[0.05] px-3 py-1.5 text-[9px] font-medium text-[#667781] dark:border-white/[0.06] dark:text-[#aebac1]">
             {locale === 'id'
               ? 'Pilih emoji berkali-kali, lalu kembali untuk mengetik atau mengirim.'
               : 'Pick multiple emojis, then return to typing or send.'}
@@ -182,19 +182,19 @@ export function ChatComposerPicker({
         </>
       ) : (
         <>
-          <div className="h-[min(42dvh,360px)] min-h-[220px] overflow-y-auto overscroll-contain p-2 sm:h-[300px]">
-            <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-8">
+          <div className="h-[min(28dvh,270px)] min-h-[170px] overflow-y-auto overscroll-contain p-2">
+            <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-6 md:grid-cols-8">
               {STICKERS.map(sticker => (
                 <button
                   key={sticker.id}
                   type="button"
                   disabled={disabled}
                   onClick={() => onStickerSelect(sticker.emoji)}
-                  className="flex min-h-[88px] flex-col items-center justify-center gap-1.5 rounded-[18px] border border-black/[0.04] bg-[#f7f9f8] px-2 py-2 transition hover:-translate-y-0.5 hover:bg-[#eef3f1] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/[0.05] dark:bg-[#202c33] dark:hover:bg-[#2a3942]"
+                  className="flex min-h-[68px] flex-col items-center justify-center gap-1 rounded-[16px] border border-black/[0.04] bg-[#f7f9f8] px-2 py-2 transition hover:-translate-y-0.5 hover:bg-[#eef3f1] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/[0.05] dark:bg-[#202c33] dark:hover:bg-[#2a3942]"
                   aria-label={sticker.label}
                   title={sticker.label}
                 >
-                  <span className="text-[3.15rem] leading-none" aria-hidden="true">{sticker.emoji}</span>
+                  <span className="text-[2.35rem] leading-none" aria-hidden="true">{sticker.emoji}</span>
                   <span className="max-w-full truncate text-[10px] font-bold text-[#54656f] dark:text-[#aebac1]">{sticker.label}</span>
                 </button>
               ))}
