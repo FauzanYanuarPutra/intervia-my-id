@@ -478,7 +478,7 @@ export function ProductModifierEditor({ businessId, productId, onDirtyChange }: 
 
           <div className="flex flex-wrap gap-2">
             <button type="button" className="portal-button-secondary" onClick={() => { setGroups(current => [...current, groupFromTemplate()]); markDirty(); }}><Plus className="h-4 w-4" /> Tambah kelompok</button>
-            <button type="button" className="portal-button-primary" disabled={saving || loading || changeReason.trim().length < 3} onClick={save}><Save className="h-4 w-4" /> {saving ? 'Menyimpan…' : 'Simpan pilihan'}</button>
+            <button type="button" className="portal-button-primary" disabled={saving || loading || !dirty || changeReason.trim().length < 3} onClick={save}><Save className="h-4 w-4" /> {saving ? 'Menyimpan…' : 'Simpan pilihan'}</button>
           </div>
           {error ? <p role="alert" aria-live="assertive" className="text-sm font-semibold text-portal-ember">{error}</p> : null}
           {message ? <p role="status" aria-live="polite" className="text-sm font-semibold text-portal-forest">{message}</p> : null}
