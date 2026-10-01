@@ -36,6 +36,8 @@ struct MediaContributionRow {
     caption: Option<String>,
     uploader_name_snapshot: Option<String>,
     uploader_username_snapshot: Option<String>,
+    status: String,
+    review_note: Option<String>,
 }
 
 async fn resolve_media_target(
@@ -172,8 +174,11 @@ fn error_response(status: StatusCode, message: &'static str) -> impl IntoRespons
 
 pub(crate) async fn list_media_contributions(
     State(state): State<std::sync::Arc<AppState>>,
+    headers: HeaderMap,
     Path(store_ref): Path<String>,
 ) -> impl IntoResponse {
+    let viewer_user_id = user_id_from_auth(&headers, &state.jwt_secret);
+
     let target = match resolve_media_target(&state.db, &store_ref).await {
         Ok(Some(target)) => target,
         Ok(None) => {
@@ -186,12 +191,13 @@ pub(crate) async fn list_media_contributions(
         }
     };
 
-    let result = match target {
+    let public_items = match target {
         MediaTarget::Store(store_id) => {
             sqlx::query_as::<_, MediaContributionRow>(
                 r#"
                 SELECT id, media_url, media_type, caption,
-                       uploader_name_snapshot, uploader_username_snapshot
+                       uploader_name_snapshot, uploader_username_snapshot,
+                       status, review_note
                 FROM umkm_store_media_contributions
                 WHERE store_id = $1 AND status = 'approved'
                 ORDER BY is_primary DESC, created_at DESC
@@ -207,7 +213,8 @@ pub(crate) async fn list_media_contributions(
             sqlx::query_as::<_, MediaContributionRow>(
                 r#"
                 SELECT id, media_url, media_type, caption,
-                       uploader_name_snapshot, uploader_username_snapshot
+                       uploader_name_snapshot, uploader_username_snapshot,
+                       status, review_note
                 FROM umkm_store_media_contributions
                 WHERE reference_content_id = $1 AND status = 'approved'
                 ORDER BY is_primary DESC, created_at DESC
@@ -221,18 +228,133 @@ pub(crate) async fn list_media_contributions(
         }
     };
 
-    match result {
-        Ok(items) => (
+    let Ok(items) = public_items else {
+        tracing::error!("list media contributions error");
+        return error_response(StatusCode::INTERNAL_SERVER_ERROR, "failed to load media")
+            .into_response();
+    };
+
+    let Some(viewer_user_id) = viewer_user_id else {
+        return (
             StatusCode::OK,
-            Json(serde_json::json!({ "data": { "items": items } })),
+            Json(serde_json::json!({
+                "data": {
+                    "items": items,
+                    "viewer": null
+                }
+            })),
         )
-            .into_response(),
-        Err(error) => {
-            tracing::error!("list media contributions error: {:?}", error);
-            error_response(StatusCode::INTERNAL_SERVER_ERROR, "failed to load media")
-                .into_response()
+            .into_response();
+    };
+
+    let mut my_items = Vec::new();
+    let mut queue_items = Vec::new();
+    let mut is_store_owner = false;
+
+    if let MediaTarget::Store(store_id) = target {
+        is_store_owner = sqlx::query_scalar::<_, bool>(
+            "SELECT EXISTS(SELECT 1 FROM umkm_stores WHERE id = $1 AND owner_user_id = $2)",
+        )
+        .bind(store_id)
+        .bind(viewer_user_id)
+        .fetch_one(&state.db)
+        .await
+        .unwrap_or(false);
+
+        match sqlx::query_as::<_, MediaContributionRow>(
+            r#"
+            SELECT id, media_url, media_type, caption,
+                   uploader_name_snapshot, uploader_username_snapshot,
+                   status, review_note
+            FROM umkm_store_media_contributions
+            WHERE store_id = $1
+              AND (
+                uploader_user_id = $2
+                OR ($3 = TRUE AND status IN ('pending','rejected','hidden'))
+              )
+            ORDER BY created_at DESC
+            LIMIT $4
+            "#,
+        )
+        .bind(store_id)
+        .bind(viewer_user_id)
+        .bind(is_store_owner)
+        .bind(MAX_ITEMS)
+        .fetch_all(&state.db)
+        .await
+        {
+            Ok(contributions) => {
+                my_items = contributions
+                    .iter()
+                    .filter(|item| {
+                        !is_store_owner
+                            || item.status == "approved"
+                            || item.status == "rejected"
+                            || item.status == "hidden"
+                            || item.status == "pending"
+                    })
+                    .cloned()
+                    .collect();
+                if is_store_owner {
+                    queue_items = contributions
+                        .into_iter()
+                        .filter(|item| item.status != "approved")
+                        .collect();
+                }
+            }
+            Err(error) => {
+                tracing::error!("load viewer media contributions error: {:?}", error);
+                return error_response(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to load media status",
+                )
+                .into_response();
+            }
+        }
+    } else if let MediaTarget::Reference(reference_id) = target {
+        match sqlx::query_as::<_, MediaContributionRow>(
+            r#"
+            SELECT id, media_url, media_type, caption,
+                   uploader_name_snapshot, uploader_username_snapshot,
+                   status, review_note
+            FROM umkm_store_media_contributions
+            WHERE reference_content_id = $1 AND uploader_user_id = $2
+            ORDER BY created_at DESC
+            LIMIT $3
+            "#,
+        )
+        .bind(reference_id)
+        .bind(viewer_user_id)
+        .bind(MAX_ITEMS)
+        .fetch_all(&state.db)
+        .await
+        {
+            Ok(contributions) => my_items = contributions,
+            Err(error) => {
+                tracing::error!("load viewer reference media contributions error: {:?}", error);
+                return error_response(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to load media status",
+                )
+                .into_response();
+            }
         }
     }
+
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "data": {
+                "items": items,
+                "viewer": {
+                    "is_store_owner": is_store_owner,
+                    "my_items": my_items,
+                    "queue_items": queue_items
+                }
+            }
+        })),
+    )
+        .into_response()
 }
 
 pub(crate) async fn create_media_contribution(
