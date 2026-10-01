@@ -91,7 +91,7 @@ const MARKER_CLUSTER_MAX_ZOOM = UMKM_MAP_MAX_ZOOM;
 const CLUSTER_PICKER_ZOOM = UMKM_MAP_CLUSTER_PICKER_ZOOM;
 const MARKER_CLUSTER_TIGHT_DISTANCE_PX = 24;
 const MARKER_CLICK_FOCUS_ZOOM = 16;
-const MARKER_CLICK_FOCUS_MAX_ZOOM = 17;
+const MARKER_CLICK_FOCUS_MAX_ZOOM = UMKM_MAP_MAX_ZOOM;
 const MARKER_CLICK_FOCUS_STEP = 1;
 const MARKER_FOCUS_DURATION = 0.45;
 const VIEWPORT_RENDER_PADDING = 0.28;
@@ -1178,7 +1178,7 @@ function MapFocusController({
         const currentZoom = map.getZoom();
         const targetZoom = Math.min(
           UMKM_MAP_MAX_ZOOM,
-          Math.max(16, Math.min(currentZoom, MARKER_CLICK_FOCUS_MAX_ZOOM)),
+          Math.max(16, currentZoom),
         );
         map.flyTo(
           [validSelectedStore.lat, validSelectedStore.lng],
@@ -1434,9 +1434,14 @@ function ManualMarkerFocusController({
   useEffect(() => {
     if (!target) return;
 
-    map.flyTo([target.lat, target.lng], Math.max(map.getZoom(), target.zoom), {
-      duration: 0.45,
-    });
+    map.flyTo(
+      [target.lat, target.lng],
+      Math.min(
+        UMKM_MAP_MAX_ZOOM,
+        Math.max(map.getZoom(), target.zoom),
+      ),
+      { duration: 0.45 },
+    );
   }, [map, target]);
 
   return null;
@@ -1685,27 +1690,10 @@ function StoreMarkersLayer({
       // becomes the stable picker for dense/identical coordinates, so users
       // can still choose a specific business instead of getting a stuck
       // cluster at the maximum zoom level.
-      if (zoom >= CLUSTER_PICKER_ZOOM) return;
-
-      if (cluster.tight) {
-        const targetZoom = Math.min(
-          CLUSTER_PICKER_ZOOM,
-          Math.max(zoom + 1, MARKER_CLICK_FOCUS_ZOOM),
-        );
-
-        if (onMarkerFocus) {
-          onMarkerFocus({
-            lat: cluster.lat,
-            lng: cluster.lng,
-            zoom: targetZoom,
-          });
-        } else {
-          map.flyTo([cluster.lat, cluster.lng], targetZoom, {
-            duration: MARKER_FOCUS_DURATION,
-          });
-        }
-        return;
-      }
+      // Dense clusters become the picker immediately. Do not
+      // keep zooming when the points overlap or when the picker zoom has
+      // already been reached; the popup contains the individual places.
+      if (cluster.tight || zoom >= CLUSTER_PICKER_ZOOM) return;
 
       const { x: mapWidth, y: mapHeight } = map.getSize();
       const padding = getClusterFramePadding(mapWidth, mapHeight);
@@ -2129,6 +2117,10 @@ export function UmkmStoreMapClient({
       maxBounds={indonesiaMaxBounds}
       maxBoundsViscosity={0.88}
       worldCopyJump={false}
+      zoomSnap={0.5}
+      zoomDelta={0.5}
+      wheelDebounceTime={45}
+      wheelPxPerZoomLevel={110}
       preferCanvas
       scrollWheelZoom={interactive}
       dragging={interactive}
