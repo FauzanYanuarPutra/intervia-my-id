@@ -24,6 +24,7 @@ import { getExploreResultAction } from '@/lib/discovery/exploreResultConversion'
 import type { GlobalSearchItem } from '@/lib/search/globalSearch';
 import { SearchCardEyebrow, searchCardBorderClass } from './SearchCardParts';
 import { cn } from '@/lib/utils';
+import { useOptionalAuth } from '@/context/AuthContext';
 
 function readMetadataText(
   item: GlobalSearchItem,
@@ -116,6 +117,47 @@ export function NeedSearchCard({
   locale: 'id' | 'en';
   interactive?: boolean;
 }) {
+  const auth = useOptionalAuth();
+  const user = auth?.user ?? null;
+
+  const normalizedStatus = String(
+    item.metadata?.contentStatus ||
+      item.metadata?.content_status ||
+      item.metadata?.status ||
+      'active',
+  )
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
+
+  const isPublic =
+    normalizedStatus === 'active' ||
+    normalizedStatus === 'published' ||
+    normalizedStatus === 'live';
+
+  const ownerId = String(
+    item.metadata?.ownerId ||
+      item.metadata?.owner_id ||
+      '',
+  )
+    .trim()
+    .toLowerCase();
+
+  const viewerId = String(user?.id || '').trim().toLowerCase();
+  const isOwner = Boolean(viewerId && ownerId && viewerId === ownerId);
+  const destinationHref = isPublic
+    ? item.href
+    : isOwner
+      ? '/create?draft=' + encodeURIComponent(item.id)
+      : '';
+
+  const destinationActionLabel =
+    isOwner && !isPublic
+      ? locale === 'id'
+        ? 'Edit & ajukan'
+        : 'Edit & submit'
+      : action.label;
+
   const budgetLabel =
     item.priceLabel ||
     readMetadataText(item, locale, 'budget_label', 'budget', 'capital_range');
@@ -277,7 +319,9 @@ export function NeedSearchCard({
 
         <div className="mt-auto pt-2">
           <span className="inline-flex min-h-8 max-w-full items-center gap-1 text-[10px] font-black text-[#1d4ed8] sm:text-[11px]">
-            <span className="truncate">{action.label}</span>
+            <span className={cn(isOwner && !isPublic ? 'text-amber-700 dark:text-amber-300' : '')}>
+              {destinationActionLabel}
+            </span>
             <ArrowRight
               className="h-3.5 w-3.5 shrink-0 transition group-hover:translate-x-0.5"
               aria-hidden="true"
@@ -288,12 +332,17 @@ export function NeedSearchCard({
     </article>
   );
 
-  if (!interactive) return card;
+  if (!interactive || !destinationHref) return card;
 
   return (
     <Link
-      href={item.href}
+      href={destinationHref}
       className="group block h-full min-w-0 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563eb] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--app-surface-muted)]"
+      aria-label={
+        isOwner && !isPublic
+          ? (locale === 'id' ? 'Edit ' : 'Edit ') + item.title
+          : undefined
+      }
     >
       {card}
     </Link>
