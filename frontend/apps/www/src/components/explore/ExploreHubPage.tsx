@@ -22,7 +22,6 @@ import {
   LAJUKAN_EXPLORE_CATEGORIES,
   MARKETPLACE_EXPLORE_CATEGORIES,
   buildCategorySearchHref,
-  buildExploreCategoryHref,
   type LajukanExploreCategory,
   type LajukanLocale,
 } from '@/lib/discovery/lajukanCategories';
