@@ -36,6 +36,16 @@ export function ProductEditorWorkspace({ businessId, product, closeHref }: Props
   const [stockReason, setStockReason] = useState('Penyesuaian stok');
   const busy = pendingAction !== null;
 
+  const hasDetailChanges =
+    name.trim() !== product.name.trim() ||
+    category.trim() !== product.category.trim() ||
+    (priceRupiah ?? null) !== parseRupiahInput(product.priceLabel) ||
+    minStockAlert.trim() !== (product.minStockAlert?.toString() ?? '') ||
+    stockUnit.trim() !== (product.stockUnit || 'pcs');
+
+  const hasStockChanges =
+    (stockCount.trim() ? Number(stockCount) : null) !== (product.stockCount ?? null);
+
   const hasUnsavedChanges =
     name.trim() !== product.name.trim() ||
     category.trim() !== product.category.trim() ||
@@ -83,6 +93,11 @@ export function ProductEditorWorkspace({ businessId, product, closeHref }: Props
 
   async function saveProduct(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (busy) return;
+    if (!hasDetailChanges) {
+      setError('Belum ada perubahan detail produk yang perlu disimpan.');
+      return;
+    }
     const normalizedPrice = priceRupiah ?? 0;
     const normalizedThreshold = minStockAlert.trim() ? Number(minStockAlert) : null;
 
@@ -124,6 +139,7 @@ export function ProductEditorWorkspace({ businessId, product, closeHref }: Props
   }
 
   async function saveStock() {
+    if (busy) return;
     const normalizedStock = stockCount.trim() ? Number(stockCount) : null;
     if (normalizedStock !== null && (!Number.isFinite(normalizedStock) || normalizedStock < 0)) {
       setError('Jumlah stok harus nol atau lebih.');
@@ -131,6 +147,10 @@ export function ProductEditorWorkspace({ businessId, product, closeHref }: Props
     }
     if (stockReason.trim().length < 3) {
       setError('Tulis alasan perubahan stok minimal 3 karakter.');
+      return;
+    }
+    if (!hasStockChanges) {
+      setError('Jumlah stok belum berubah.');
       return;
     }
 
@@ -151,6 +171,12 @@ export function ProductEditorWorkspace({ businessId, product, closeHref }: Props
   }
 
   async function saveStatus() {
+    if (busy) return;
+    if (status === product.status) {
+      setError('Status produk belum berubah.');
+      setArchiveConfirmOpen(false);
+      return;
+    }
     begin('status');
     try {
       await request(`/api/businesses/${businessId}/products/${product.id}`, {
@@ -262,7 +288,7 @@ export function ProductEditorWorkspace({ businessId, product, closeHref }: Props
             </span>
           </label>
 
-          <button type="submit" disabled={busy || changeReason.trim().length < 3} className="portal-button-primary w-full sm:w-fit">
+          <button type="submit" disabled={busy || !hasDetailChanges || changeReason.trim().length < 3} className="portal-button-primary w-full sm:w-fit">
             <Save className="h-4 w-4" /> {pendingAction === "detail" ? "Menyimpan..." : "Simpan perubahan"}
           </button>
         </form>
@@ -282,7 +308,7 @@ export function ProductEditorWorkspace({ businessId, product, closeHref }: Props
                 className="portal-input"
               />
             </label>
-            <button type="button" onClick={saveStock} disabled={busy || stockReason.trim().length < 3} className="portal-button-secondary sm:mb-0.5">
+            <button type="button" onClick={saveStock} disabled={busy || !hasStockChanges || stockReason.trim().length < 3} className="portal-button-secondary sm:mb-0.5">
               <Save className="h-4 w-4" /> {pendingAction === 'stock' ? 'Menyimpan...' : 'Update stok'}
             </button>
           </div>
