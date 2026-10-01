@@ -49,10 +49,10 @@ export async function PUT(request: Request, context: { params: Promise<{ busines
     const firstPrimaryIndex = rawLocations.findIndex(item => item.isPrimary === true);
     const locations = rawLocations.map((item, index) => ({
       ...item,
-      name: item.name.trim(),
-      address: item.address.trim(),
-      city: item.city.trim(),
-      locationType: item.locationType.trim(),
+      name: typeof item.name === 'string' ? item.name.trim() : '',
+      address: typeof item.address === 'string' ? item.address.trim() : '',
+      city: typeof item.city === 'string' ? item.city.trim() : '',
+      locationType: typeof item.locationType === 'string' ? item.locationType.trim() : '',
       isPrimary: firstPrimaryIndex === -1 ? index === 0 : index === firstPrimaryIndex,
     }));
     const business = await replaceBusinessLocations(businessId, locations, reason);
