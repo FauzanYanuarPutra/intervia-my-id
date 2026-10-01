@@ -2515,20 +2515,20 @@ function HomeListingCarouselSection({
         <h2 className="min-w-0 truncate text-[11px] font-bold leading-5 tracking-tight text-[color:var(--app-text)] sm:text-xs">
           {isDemand
             ? isId
-              ? 'Yang sedang mencari'
+              ? 'Yang sedang mencari penyedia'
               : 'People looking for products or services'
             : isId
-              ? 'Yang menyediakan'
+              ? 'Yang sedang ditawarkan'
               : 'People providing products or services'}
         </h2>
 
         <span className="hidden shrink-0 text-[9px] font-medium text-zinc-400 sm:inline">
           {isDemand
             ? isId
-              ? 'Kebutuhan dari pembeli dan bisnis di Lajukan'
+              ? 'Orang dan bisnis yang sedang mencari produk, jasa, atau penyedia di Lajukan'
               : 'Buyer and business requests on Lajukan'
             : isId
-              ? 'Produk, jasa, alat, tempat, dan kebutuhan usaha yang tersedia'
+              ? 'Produk, jasa, alat, tempat, dan solusi usaha yang sedang ditawarkan'
               : 'Products, services, tools, places, and business resources available'}
         </span>
 
@@ -2547,10 +2547,10 @@ function HomeListingCarouselSection({
             <p className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400 sm:text-[11px]">
               {isDemand
                 ? isId
-                  ? 'Belum ada kebutuhan aktif yang bisa ditampilkan.'
+                  ? 'Belum ada pencarian aktif yang bisa ditampilkan.'
                   : 'No active buyer needs to show right now.'
                 : isId
-                  ? 'Belum ada penyedia aktif yang bisa ditampilkan.'
+                  ? 'Belum ada penawaran aktif yang bisa ditampilkan.'
                   : 'No active providers to show right now.'}
             </p>
           </div>
