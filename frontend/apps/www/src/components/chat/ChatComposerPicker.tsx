@@ -107,7 +107,7 @@ export function ChatComposerPicker({
 
   return (
     <section
-      className="w-full overflow-hidden rounded-[18px] border border-black/[0.06] bg-white shadow-[0_-16px_40px_-28px_rgba(15,23,42,0.5)] dark:border-white/[0.08] dark:bg-[#111b21]"
+      className="w-full shrink-0 overflow-hidden rounded-[18px] border border-black/[0.06] bg-white shadow-[0_-16px_40px_-28px_rgba(15,23,42,0.5)] dark:border-white/[0.08] dark:bg-[#111b21]"
       aria-label={
         locale === 'id'
           ? mode === 'emoji' ? 'Papan emoji' : 'Papan stiker'
@@ -158,7 +158,7 @@ export function ChatComposerPicker({
               </button>
             ))}
           </div>
-          <div className="h-[min(24dvh,220px)] min-h-[150px] overflow-y-auto overscroll-contain p-2">
+          <div className="h-[min(18dvh,176px)] min-h-[118px] overflow-y-auto overscroll-contain p-2">
             <div className="grid grid-cols-8 gap-0.5 min-[420px]:grid-cols-9 sm:grid-cols-10 md:grid-cols-12">
               {(activeCategory?.items || []).map((emoji, index) => (
                 <button
@@ -166,7 +166,7 @@ export function ChatComposerPicker({
                   type="button"
                   disabled={disabled}
                   onClick={() => pickEmoji(emoji)}
-                  className="flex aspect-square min-h-8 items-center justify-center rounded-lg text-[1.22rem] transition hover:bg-[#f0f2f5] hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-[#202c33] sm:text-[1.38rem]"
+                  className="flex aspect-square min-h-7 items-center justify-center rounded-lg text-[1.1rem] transition hover:bg-[#f0f2f5] hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-[#202c33] sm:text-[1.22rem]"
                   aria-label={(locale === 'id' ? 'Pilih ' : 'Choose ') + emoji}
                 >
                   {emoji}
@@ -190,11 +190,11 @@ export function ChatComposerPicker({
                   type="button"
                   disabled={disabled}
                   onClick={() => onStickerSelect(sticker.emoji)}
-                  className="flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-[16px] border border-black/[0.04] bg-[#f7f9f8] px-2 py-2 transition hover:-translate-y-0.5 hover:bg-[#eef3f1] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/[0.05] dark:bg-[#202c33] dark:hover:bg-[#2a3942]"
+                  className="flex min-h-[50px] flex-col items-center justify-center gap-1 rounded-[14px] border border-black/[0.04] bg-[#f7f9f8] px-2 py-2 transition hover:-translate-y-0.5 hover:bg-[#eef3f1] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/[0.05] dark:bg-[#202c33] dark:hover:bg-[#2a3942]"
                   aria-label={sticker.label}
                   title={sticker.label}
                 >
-                  <span className="text-[2rem] leading-none" aria-hidden="true">{sticker.emoji}</span>
+                  <span className="text-[1.65rem] leading-none" aria-hidden="true">{sticker.emoji}</span>
                   <span className="max-w-full truncate text-[10px] font-bold text-[#54656f] dark:text-[#aebac1]">{sticker.label}</span>
                 </button>
               ))}
