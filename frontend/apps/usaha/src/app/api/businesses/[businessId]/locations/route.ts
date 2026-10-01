@@ -14,7 +14,13 @@ export async function GET(_request: Request, context: { params: Promise<{ busine
 export async function PUT(request: Request, context: { params: Promise<{ businessId: string }> }) {
   const { businessId } = await context.params;
   try {
-    const body = (await request.json()) as { locations?: BusinessLocation[]; reason?: string };
+    const body = (await request.json()) as { locations?: BusinessLocation[]; reason?: string; expectedVersion?: unknown };
+    const expectedVersion = body.expectedVersion === undefined || body.expectedVersion === null || body.expectedVersion === ''
+      ? undefined
+      : Number(body.expectedVersion);
+    if (expectedVersion !== undefined && (!Number.isSafeInteger(expectedVersion) || expectedVersion <= 0)) {
+      return NextResponse.json({ error: 'Versi data lokasi tidak valid.', code: 'business_version_invalid' }, { status: 400 });
+    }
     const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
     if (!Array.isArray(body.locations) || body.locations.length === 0 || body.locations.length > 50) {
       return NextResponse.json({ error: 'Usaha harus memiliki 1–50 lokasi.', code: 'invalid_business_locations' }, { status: 400 });
@@ -55,7 +61,7 @@ export async function PUT(request: Request, context: { params: Promise<{ busines
       locationType: typeof item.locationType === 'string' ? item.locationType.trim() : '',
       isPrimary: firstPrimaryIndex === -1 ? index === 0 : index === firstPrimaryIndex,
     }));
-    const business = await replaceBusinessLocations(businessId, locations, reason);
+    const business = await replaceBusinessLocations(businessId, locations, reason, expectedVersion);
     return NextResponse.json({ ok: true, items: business.locations ?? [] });
   } catch (error) {
     const normalized = normalizeBusinessApiError(error, 'Lokasi belum berhasil disimpan.');
