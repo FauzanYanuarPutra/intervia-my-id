@@ -118,6 +118,16 @@ services:
       RUST_LOG: ${RUST_LOG:-info}
       RUN_MIGRATIONS_ON_STARTUP: "false"
 
+  marketplace_migration:
+    build: !reset null
+    image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-marketplace:${IMAGE_TAG:?IMAGE_TAG is required}
+    pull_policy: always
+    environment:
+      ENV: staging
+      APP_ENV: staging
+      RUST_LOG: ${RUST_LOG:-info}
+      JWT_ACCESS_ALG: ${JWT_ACCESS_ALG:-HS256}
+
   marketplace_service:
     build: !reset null
     image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-marketplace:${IMAGE_TAG:?IMAGE_TAG is required}
