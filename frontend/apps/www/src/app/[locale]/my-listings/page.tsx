@@ -496,8 +496,16 @@ export default function MyListingsPage() {
   const { confirm } = useDialog();
   const currentSearch = searchParams?.toString() || '';
   const legacyFilter = (searchParams?.get('filter') || '').toLowerCase();
+  const requestedStatus = searchParams?.get('status') || '';
 
-  const [activeStatus, setActiveStatus] = useState<ListingStatus>('active');
+  const initialStatus: ListingStatus =
+    requestedStatus === 'draft' ||
+    requestedStatus === 'archived' ||
+    requestedStatus === 'active'
+      ? requestedStatus
+      : 'active';
+
+  const [activeStatus, setActiveStatus] = useState<ListingStatus>(initialStatus);
   const [sideFilter, setSideFilter] = useState<ListingSideFilter>('all');
   const [categoryFilter, setCategoryFilter] = useState<ListingCategoryFilter>('all');
   const [query, setQuery] = useState('');
@@ -617,6 +625,16 @@ export default function MyListingsPage() {
       router.replace('/history');
     }
   }, [authLoading, legacyFilter, router]);
+
+  useEffect(() => {
+    if (
+      requestedStatus === 'draft' ||
+      requestedStatus === 'archived' ||
+      requestedStatus === 'active'
+    ) {
+      setActiveStatus(requestedStatus);
+    }
+  }, [requestedStatus]);
 
   useEffect(() => {
     if (authLoading || legacyFilter) return;
