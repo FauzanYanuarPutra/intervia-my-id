@@ -2164,13 +2164,13 @@ function normalizeCommunityBody(body: string): {
   if (!normalized) return { body: '', hashtags: [] };
 
   const tagLinePattern =
-    /^\\s*#[\\p{L}\\p{N}_-]+(?:\\s+#[\\p{L}\\p{N}_-]+)*\\s*$/u;
+    /^\s*#[\p{L}\p{N}_-]+(?:\s+#[\p{L}\p{N}_-]+)*\s*$/u;
   const lines = normalized.split('\n');
   const hashtags: string[] = [];
 
   while (lines.length > 0 && tagLinePattern.test(lines[lines.length - 1])) {
     const tagLine = lines.pop() || '';
-    for (const tag of tagLine.match(/#[\\p{L}\\p{N}_-]+/gu) || []) {
+    for (const tag of tagLine.match(/#[\p{L}\p{N}_-]+/gu) || []) {
       const normalizedTag = tag.slice(1).trim();
       if (normalizedTag) hashtags.push(normalizedTag);
     }
@@ -2345,10 +2345,6 @@ export function CommunityPostCard({
     setLocalVote(item.viewerVote || 0);
     setReactionCount(item.stats.reactions);
   }, [item.id, item.stats.reactions, item.viewerVote]);
-
-  useEffect(() => {
-    setBodyExpanded(false);
-  }, [item.id]);
 
   const {
     bookmarked: saved,
