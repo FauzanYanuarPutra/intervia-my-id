@@ -2939,6 +2939,14 @@ export default function CreateListingWizard({
               },
             };
 
+            const normalizedEditingStatus =
+              editingContentStatus.trim().toLowerCase();
+            const editingLiveContent = [
+              'active',
+              'published',
+              'live',
+            ].includes(normalizedEditingStatus);
+
             const directPayload = {
               content_type:
                 editingContentType ||
@@ -2962,7 +2970,7 @@ export default function CreateListingWizard({
               metadata,
               content_status: options.autosave
                 ? editingContentStatus || 'draft'
-                : editingContentStatus === 'active'
+                : editingLiveContent
                   ? 'draft'
                   : editingContentStatus || 'draft',
             };
@@ -4780,16 +4788,13 @@ export default function CreateListingWizard({
           publishDraftId = draft.id;
 
           if (editingContentId) {
-            const resourceUrl =
-              `/${locale}/content/${encodeURIComponent(
-                editingContentId,
-              )}`;
-
             clearTemporaryCreateDraft(
               draftOwnerId,
             );
-            router.push(
-              resourceUrl,
+            router.replace(
+              `/${locale}/my-listings?status=draft&listing=${encodeURIComponent(
+                editingContentId,
+              )}`,
             );
             return;
           }
