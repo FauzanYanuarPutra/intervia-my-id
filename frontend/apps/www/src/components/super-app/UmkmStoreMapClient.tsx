@@ -24,6 +24,10 @@ import {
   type LatLngBoundsExpression,
 } from 'leaflet';
 import { isCoordinateValid } from '@/lib/super-app/location-guard';
+import {
+  INDONESIA_MAP_BOUNDS,
+  INDONESIA_MAP_CENTER,
+} from '@/lib/super-app/indonesiaMapDemoData';
 import { cn } from '@/lib/utils';
 import {
   OPEN_MAP_TILE_ATTRIBUTION,
@@ -1146,11 +1150,20 @@ function MapFocusController({
     try {
       if (focusMode === 'indonesia') {
         const indonesiaBounds = latLngBounds(
-          [-11.5, 94.5],
-          [7.5, 142.5],
+          [INDONESIA_MAP_BOUNDS.minLat, INDONESIA_MAP_BOUNDS.minLng],
+          [INDONESIA_MAP_BOUNDS.maxLat, INDONESIA_MAP_BOUNDS.maxLng],
+        );
+        const { x: mapWidth, y: mapHeight } = map.getSize();
+        const verticalPadding = Math.max(
+          8,
+          Math.min(24, Math.round(mapHeight * 0.06)),
+        );
+        const horizontalPadding = Math.max(
+          12,
+          Math.min(36, Math.round(mapWidth * 0.018)),
         );
         map.fitBounds(indonesiaBounds, {
-          padding: [18, 18],
+          padding: [verticalPadding, horizontalPadding],
           maxZoom: 5,
         });
         handledFocusKeyRef.current = focusKey;
@@ -2079,8 +2092,16 @@ export function UmkmStoreMapClient({
   }, [onRouteResolved, routeDestination, routeOrigin, showRoute]);
 
   const initialMapCenter: [number, number] =
-    focusMode === 'indonesia' ? [-2.5, 118] : defaultCenter;
+    focusMode === 'indonesia' ? INDONESIA_MAP_CENTER : defaultCenter;
   const initialMapZoom = focusMode === 'indonesia' ? 5 : 12;
+  const indonesiaMaxBounds = useMemo(
+    () =>
+      latLngBounds(
+        [INDONESIA_MAP_BOUNDS.minLat - 1.5, INDONESIA_MAP_BOUNDS.minLng - 1.5],
+        [INDONESIA_MAP_BOUNDS.maxLat + 1.5, INDONESIA_MAP_BOUNDS.maxLng + 1.5],
+      ),
+    [],
+  );
 
   return (
     <>
