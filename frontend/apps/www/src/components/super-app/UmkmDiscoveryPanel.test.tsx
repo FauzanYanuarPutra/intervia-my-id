@@ -54,7 +54,7 @@ describe('UMKM public-reference presentation', () => {
     const html = renderToStaticMarkup(
       <PublicReferenceNotice store={referenceStore} isId />,
     );
-    expect(html).toContain('Data publik · belum diklaim');
+    expect(html).toContain('Lokasi usaha · belum diklaim');
     expect(html).toContain('OpenStreetMap contributors');
     expect(html).toContain('ODbL 1.0');
     expect(html).toContain('belum diverifikasi Lajukan');
