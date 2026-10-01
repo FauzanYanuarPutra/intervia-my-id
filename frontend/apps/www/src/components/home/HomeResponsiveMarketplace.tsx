@@ -1834,7 +1834,7 @@ export function TrendingSearchSection({ isId }: { isId: boolean }) {
                 );
               }}
               className="
-                inline-flex h-7 max-w-[150px] shrink-0
+                group inline-flex h-7 max-w-[150px] shrink-0
                 select-none items-center
                 rounded-full
                 border border-zinc-200/80
@@ -1861,8 +1861,14 @@ export function TrendingSearchSection({ isId }: { isId: boolean }) {
                 backfaceVisibility: 'hidden',
               }}
             >
-              <span className="truncate">
-                {item.label}
+              <span className="flex min-w-0 items-center gap-1.5">
+                <Search
+                  aria-hidden="true"
+                  className="h-3 w-3 shrink-0 text-zinc-400 transition-colors group-hover:text-emerald-600 group-focus-visible:text-emerald-600 sm:h-3.5 sm:w-3.5"
+                />
+                <span className="truncate">
+                  {item.label}
+                </span>
               </span>
             </Link>
           ))}
