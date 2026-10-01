@@ -2044,6 +2044,11 @@ export async function GET(
                 : {}),
               backend_only: '1',
               limit: state.category || state.subcategory ? '48' : '12',
+              ...(state.offset > 0
+                ? {
+                    offset: String(state.offset),
+                  }
+                : {}),
             },
           ).toString()}`,
           'businesses',
@@ -2345,6 +2350,10 @@ export async function GET(
         businessesResult.payload,
       )?.data,
     );
+  const businessNextCursor =
+    nextContentOffsetCursor(
+      businessPayload,
+    );
 
   const referencePayload =
     asRecord(
@@ -2525,6 +2534,8 @@ export async function GET(
         : null,
       relevanceQuery,
     );
+
+  response.groups.businesses.nextCursor = businessNextCursor;
 
   response.groups.communities =
     group(
