@@ -276,7 +276,6 @@ export function getUmkmPlaceKind(place: UmkmPlaceLike): UmkmPlaceKind {
   // OSM/source taxonomy is a stronger classification signal than free-text
   // names. This prevents words inside place names (for example "bar" inside
   // another word) from misclassifying banks, hotels, malls, etc.
-  const metadata = asRecord(place.metadata);
   const osmKey = readMetaText(place, 'osm_primary_key').toLowerCase();
   const osmValue = readMetaText(place, 'osm_primary_value').toLowerCase();
   if (osmKey === 'amenity') {
