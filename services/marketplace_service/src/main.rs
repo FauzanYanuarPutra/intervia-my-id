@@ -26017,17 +26017,17 @@ mod tests {
     
     #[test]
     fn public_media_contribution_route_has_one_canonical_owner() {
-        const ROUTE: &str = "/v1/umkm/stores/{store_ref}/media/contributions";
+        const ROUTE: String = ["/v1/umkm/stores/{store_ref}/media", "contributions"].join("/");
         let main_source = include_str!("main.rs");
         let moderation_source = include_str!("business_moderation.rs");
 
         assert_eq!(
-            main_source.matches(ROUTE).count(),
+            main_source.matches(&ROUTE).count(),
             1,
             "canonical media contribution route must be declared exactly once in main.rs",
         );
         assert_eq!(
-            moderation_source.matches(ROUTE).count(),
+            moderation_source.matches(&ROUTE).count(),
             0,
             "business_moderation.rs must not register the canonical route again",
         );
