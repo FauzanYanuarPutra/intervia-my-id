@@ -1620,11 +1620,22 @@ export function UmkmDiscoveryPanel({
                 id: point.id,
                 slug: point.slug,
                 name: point.name,
-                city: point.city || 'Indonesia',
-                address: point.city || 'Indonesia',
+                city:
+                  typeof point.metadata?.city === 'string' && point.metadata.city.trim()
+                    ? point.metadata.city.trim()
+                    : point.city || 'Indonesia',
+                address:
+                  (typeof point.metadata?.address === 'string' && point.metadata.address.trim()
+                    ? point.metadata.address.trim()
+                    : typeof point.metadata?.listing_location === 'string' && point.metadata.listing_location.trim()
+                      ? point.metadata.listing_location.trim()
+                      : point.city || 'Indonesia'),
                 lat: point.lat,
                 lng: point.lng,
-                description: null,
+                description:
+                  typeof point.metadata?.description === 'string'
+                    ? point.metadata.description.trim() || null
+                    : null,
                 phone: null,
                 metadata: {
                   ...(point.metadata || {}),
