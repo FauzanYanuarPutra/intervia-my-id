@@ -324,7 +324,7 @@ export function HomeBusinessMapSection({
         if (!active || controller.signal.aborted) return;
         setError(null);
         const response = await fetch(
-          '/api/super-app/umkm/map-points?limit=240&min_lat=-11.5&max_lat=7.5&min_lng=94.5&max_lng=142.5',
+          '/api/super-app/umkm/map-points?limit=1200&min_lat=-11.5&max_lat=7.5&min_lng=94.5&max_lng=142.5',
           {
             cache: 'default',
             credentials: 'include',
@@ -357,7 +357,7 @@ export function HomeBusinessMapSection({
           // than hydrating references and guarantees local records are not
           // hidden by a secondary public-reference query.
           const fallbackResponse = await fetch(
-            '/api/super-app/umkm/stores?limit=240&map=1&include_references=1&min_lat=-11.5&max_lat=7.5&min_lng=94.5&max_lng=142.5',
+            '/api/super-app/umkm/stores?limit=1200&map=1&include_references=1&min_lat=-11.5&max_lat=7.5&min_lng=94.5&max_lng=142.5',
             {
               cache: 'default',
               credentials: 'include',
@@ -388,7 +388,7 @@ export function HomeBusinessMapSection({
             // Native records can legitimately be empty. Public references are
             // a secondary fallback only, so they never displace native data.
             const referenceResponse = await fetch(
-              '/api/super-app/umkm/stores?limit=240&map=1&references_only=1&min_lat=-11.5&max_lat=7.5&min_lng=94.5&max_lng=142.5',
+              '/api/super-app/umkm/stores?limit=1200&map=1&references_only=1&min_lat=-11.5&max_lat=7.5&min_lng=94.5&max_lng=142.5',
               {
                 cache: 'default',
                 credentials: 'include',
@@ -426,7 +426,7 @@ export function HomeBusinessMapSection({
               JSON.stringify({
                 savedAt: Date.now(),
                 totalCount,
-                items: uniqueMapItems.slice(0, 240),
+                items: uniqueMapItems.slice(0, 1200),
               }),
             );
           } catch {
