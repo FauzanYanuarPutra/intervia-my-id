@@ -17,7 +17,6 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: "22"
-          cache: npm
       - name: Refresh frontend lockfiles
         shell: bash
         run: |
