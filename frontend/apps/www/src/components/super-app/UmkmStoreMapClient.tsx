@@ -375,6 +375,29 @@ function buildStoreMarkerIcon(input: {
     `,
   });
 }
+function buildAnimatedDataDotIcon(input: {
+  markerTone: ReturnType<typeof buildUmkmPlacePresentation>['markerTone'];
+  sourceKind: string;
+  delayMs: number;
+}): DivIcon {
+  const palette = getMarkerPalette(input.markerTone);
+  const border = input.sourceKind === 'reference' ? '#94a3b8' : '#ffffff';
+
+  return divIcon({
+    className: 'leaflet-superapp-data-pulse-host',
+    iconSize: [12, 12],
+    iconAnchor: [6, 6],
+    html:
+      '<span class="umkm-data-pulse-dot" aria-hidden="true" style="--umkm-data-dot-color:' +
+      palette.badge +
+      ';--umkm-data-dot-border:' +
+      border +
+      ';animation-delay:' +
+      input.delayMs +
+      'ms;"></span>',
+  });
+}
+
 function buildViewerMarkerIcon(isId: boolean): DivIcon {
   const cacheKey = `viewer:${isId ? 'id' : 'en'}`;
   const cached = STORE_MARKER_ICON_CACHE.get(cacheKey);
@@ -401,6 +424,27 @@ function buildViewerMarkerIcon(isId: boolean): DivIcon {
   STORE_MARKER_ICON_CACHE.set(cacheKey, icon);
   return icon;
 }
+
+const UMKM_MAP_DATA_DOT_STYLE = `
+@keyframes lajukan-umkm-data-pulse {
+  0%, 100% { transform: scale(0.82); opacity: 0.62; box-shadow: 0 0 0 0 rgba(255,255,255,0); }
+  50% { transform: scale(1.2); opacity: 1; box-shadow: 0 0 0 5px rgba(255,255,255,0.24); }
+}
+.umkm-data-pulse-dot {
+  display: block;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  border: 2px solid var(--umkm-data-dot-border,#fff);
+  background: var(--umkm-data-dot-color,#0f766e);
+  box-sizing: border-box;
+  animation: lajukan-umkm-data-pulse 2.8s ease-in-out infinite;
+  will-change: transform, opacity, box-shadow;
+}
+@media (prefers-reduced-motion: reduce) {
+  .umkm-data-pulse-dot { animation: none; opacity: 0.86; }
+}
+`;
 
 function StoreKindChip({
   ui,
@@ -1458,12 +1502,14 @@ function StoreDotsLayer({
   onSelectStore,
   isId,
   interactive,
+  animateDataDots,
 }: {
   storePresentations: StorePresentation[];
   selectedStoreId?: string | null;
   onSelectStore?: (storeId: string) => void;
   isId: boolean;
   interactive: boolean;
+  animateDataDots: boolean;
 }) {
   const map = useMap();
   const [zoom, setZoom] = useState(() => map.getZoom());
@@ -1477,17 +1523,22 @@ function StoreDotsLayer({
   const radius = getCompactDotRadius(zoom);
   const renderDotTooltips =
     interactive && visibleStorePresentations.length <= DOT_TOOLTIP_MAX_ITEMS;
+  const animatedDataPoints = useMemo(() => {
+    if (!animateDataDots || visibleStorePresentations.length === 0) return [];
+    const stride = Math.max(
+      1,
+      Math.ceil(visibleStorePresentations.length / 72),
+    );
+    return visibleStorePresentations
+      .filter((_, index) => index % stride === 0)
+      .slice(0, 72);
+  }, [animateDataDots, visibleStorePresentations]);
 
   return (
     <>
       {visibleStorePresentations.map(({ store, ui }) => {
         const sourceKind = getUmkmMapSourceKind(store);
-        const palette =
-          sourceKind === 'reference'
-            ? { badge: '#94a3b8', border: '#cbd5e1', text: '#64748b' }
-            : sourceKind === 'registered'
-              ? { badge: '#f59e0b', border: '#fcd34d', text: '#92400e' }
-              : getMarkerPalette(ui.markerTone);
+        const categoryPalette = getMarkerPalette(ui.markerTone);
         const sourceLabel = getUmkmMapSourceLabel(sourceKind, isId);
         const selected = store.id === selectedStoreId;
         return (
@@ -1497,10 +1548,10 @@ function StoreDotsLayer({
             radius={selected ? Math.max(5, radius + 2) : radius}
             interactive={interactive}
             pathOptions={{
-              color: '#ffffff',
-              weight: selected ? 2 : 1,
+              color: sourceKind === 'reference' ? '#94a3b8' : '#ffffff',
+              weight: selected ? 2 : sourceKind === 'reference' ? 1.5 : 1,
               opacity: 0.95,
-              fillColor: palette.badge,
+              fillColor: categoryPalette.badge,
               fillOpacity: selected ? 1 : 0.94,
             }}
             eventHandlers={
@@ -1517,6 +1568,20 @@ function StoreDotsLayer({
           </CircleMarker>
         );
       })}
+      {animatedDataPoints.map(({ store, ui }, index) => (
+        <Marker
+          key={'pulse-' + store.id}
+          position={[store.lat, store.lng]}
+          icon={buildAnimatedDataDotIcon({
+            markerTone: ui.markerTone,
+            sourceKind: getUmkmMapSourceKind(store),
+            delayMs: index * 90,
+          })}
+          interactive={false}
+          keyboard={false}
+          zIndexOffset={80}
+        />
+      ))}
     </>
   );
 }
@@ -1804,6 +1869,7 @@ export function UmkmStoreMapClient({
   focusOffset,
   onBoundsChange,
   markerStyle = 'default',
+  animateDataDots = false,
   controls = true,
   showPopups = true,
 }: UmkmStoreMapClientProps) {
@@ -2016,8 +2082,10 @@ export function UmkmStoreMapClient({
   const initialMapZoom = focusMode === 'indonesia' ? 5 : 12;
 
   return (
-    <MapContainer
-      center={initialMapCenter}
+    <>
+      <style dangerouslySetInnerHTML={{ __html: UMKM_MAP_DATA_DOT_STYLE }} />
+      <MapContainer
+        center={initialMapCenter}
       zoom={initialMapZoom}
       minZoom={2}
       maxZoom={19}
@@ -2109,6 +2177,7 @@ export function UmkmStoreMapClient({
           onSelectStore={onSelectStore}
           isId={isId}
           interactive={interactive}
+          animateDataDots={animateDataDots}
         />
       ) : (
         <StoreMarkersLayer
@@ -2135,6 +2204,7 @@ export function UmkmStoreMapClient({
           }}
         />
       ) : null}
-    </MapContainer>
+      </MapContainer>
+    </>
   );
 }
