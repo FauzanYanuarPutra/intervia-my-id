@@ -251,8 +251,27 @@ function isBusinessMediaUrl(value: string): boolean {
     lower.startsWith('/uploads/') ||
     lower.startsWith('/media/') ||
     lower.startsWith('/images/') ||
-    lower.startsWith('/api/forum/media/')
+    lower.startsWith('/api/forum/media/') ||
+    lower.startsWith('/api/content/media/')
   );
+}
+
+function readBusinessMediaField(
+  metadata: JsonRecord,
+  keys: readonly string[],
+): string {
+  const sources: Array<JsonRecord | null> = [
+    metadata,
+    ...BUSINESS_MEDIA_CONTAINERS.map(container => record(metadata[container])),
+  ];
+  for (const source of sources) {
+    if (!source) continue;
+    for (const key of keys) {
+      const value = stringValue(source[key]);
+      if (value && isBusinessMediaUrl(value)) return value;
+    }
+  }
+  return '';
 }
 
 function collectBusinessImageUrls(metadata: JsonRecord): string[] {
@@ -501,12 +520,25 @@ function mapStore(
     category: stringValue(metadata.category) || 'Usaha umum',
     phone: stringValue(store.phone),
     description: stringValue(store.description),
-    logoUrl: stringValue(
-      metadata.logo_url ?? metadata.image_url ?? metadata.store_photo_url,
-    ) || undefined,
-    bannerUrl: stringValue(
-      metadata.banner_url ?? metadata.cover_image_url ?? metadata.cover_url,
-    ) || undefined,
+    logoUrl:
+      readBusinessMediaField(metadata, [
+        'logo_url',
+        'logoUrl',
+        'logo',
+        'image_url',
+        'imageUrl',
+        'store_photo_url',
+        'storePhotoUrl',
+      ]) || undefined,
+    bannerUrl:
+      readBusinessMediaField(metadata, [
+        'banner_url',
+        'bannerUrl',
+        'cover_image_url',
+        'coverImageUrl',
+        'cover_url',
+        'coverUrl',
+      ]) || undefined,
     imageUrls,
     schedule: stringValue(metadata.schedule ?? metadata.open_hours) || 'Belum diatur',
     infoComplete: Boolean(name && city && stringValue(store.phone)),
