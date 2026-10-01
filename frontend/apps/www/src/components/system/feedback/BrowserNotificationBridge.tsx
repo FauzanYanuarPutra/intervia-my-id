@@ -3,6 +3,7 @@
 import { readCallAlertPreferences } from '@/lib/callPreferences';
 import { useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/components/system/feedback/ToastProvider';
 import { profileAvatarSrc } from '@/lib/profile/avatar';
 import { soundManager } from '@/lib/soundManager';
 import {
@@ -99,6 +100,7 @@ function runWhenIdle(task: () => void, timeout = 1800) {
 
 export function BrowserNotificationBridge() {
   const { user } = useAuth();
+  const { notify } = useToast();
 
   useEffect(() => {
     if (!user || !isBrowserNotificationSupported()) return;
@@ -109,8 +111,6 @@ export function BrowserNotificationBridge() {
 
   useEffect(() => {
     if (!user || !isBrowserNotificationSupported()) return;
-    const callPreferences = readCallAlertPreferences();
-    if (!callPreferences.enabled || !callPreferences.browserNotifications) return;
     if (Notification.permission !== 'granted') return;
 
     return runWhenIdle(() => {
@@ -190,6 +190,17 @@ export function BrowserNotificationBridge() {
       const detail = (event as CustomEvent<ChatMessageNotificationDetail>)
         .detail;
       if (!detail || shouldSuppressChatNotification(detail.roomId)) return;
+
+      if (document.visibilityState === 'visible') {
+        soundManager.play('messageReceive');
+        notify({
+          title: detail.roomName || 'Pesan baru',
+          description: detail.message || 'Ada pesan baru.',
+          variant: 'info',
+          durationMs: 4200,
+        });
+        return;
+      }
 
       playBackgroundSound('messageReceive');
       void showBrowserNotification({
@@ -296,7 +307,7 @@ export function BrowserNotificationBridge() {
         onCallLifecycle as EventListener,
       );
     };
-  }, [user]);
+  }, [notify, user]);
 
   return null;
 }
