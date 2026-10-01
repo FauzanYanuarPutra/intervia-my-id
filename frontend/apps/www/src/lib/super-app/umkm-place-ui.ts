@@ -273,6 +273,21 @@ function getUmkmPlacePublishServices(place: UmkmPlaceLike): PublishService[] {
 }
 
 export function getUmkmPlaceKind(place: UmkmPlaceLike): UmkmPlaceKind {
+  // OSM/source taxonomy is a stronger classification signal than free-text
+  // names. This prevents words inside place names (for example "bar" inside
+  // another word) from misclassifying banks, hotels, malls, etc.
+  const metadata = asRecord(place.metadata);
+  const osmKey = readMetaText(place, 'osm_primary_key').toLowerCase();
+  const osmValue = readMetaText(place, 'osm_primary_value').toLowerCase();
+  if (osmKey === 'amenity') {
+    if (/^(restaurant|cafe|fast_food|food_court|ice_cream|bar|pub|biergarten)$/.test(osmValue)) return 'food';
+    if (/^(bank|atm|clinic|hospital|pharmacy|school|university|office|post_office|police|fire_station)$/.test(osmValue)) return 'service';
+  }
+  if (osmKey === 'shop' && osmValue) return 'retail';
+  if (osmKey === 'tourism' && /^(hotel|hostel|guest_house|motel|resort)$/.test(osmValue)) return 'service';
+  if (osmKey === 'craft') return 'craft';
+  if (osmKey === 'industrial') return 'workshop';
+
   const businessCategory = getUmkmPlaceBusinessCategory(place);
   if (businessCategory) {
     const sector = getUmkmSectorFromBusinessCategory(businessCategory);
@@ -669,13 +684,9 @@ function getCoverImage(place: UmkmPlaceLike, kind?: UmkmPlaceKind): string {
   const explicit = media.coverUrl || media.logoUrl;
   if (explicit) return explicit;
 
-  // Never present category artwork as if it were a real photo of a public
-  // reference location. Keep the neutral placeholder until licensed or
-  // user-contributed media is available.
-  if (isUmkmMapPublicReference(place)) {
-    return '/images/placeholders/business-default.svg';
-  }
-
+  // Category artwork is an illustration, not a claimed real photo. It is
+  // safe for public references and keeps category identity visible when no
+  // licensed/contributed photo exists.
   return CATEGORY_FALLBACK_IMAGES[kind || getUmkmPlaceKind(place)];
 }
 
