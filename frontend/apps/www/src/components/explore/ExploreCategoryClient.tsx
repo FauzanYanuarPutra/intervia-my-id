@@ -568,7 +568,10 @@ function DataSection({
       return;
     }
 
-    if (!nextCursor || (kind !== 'listing' && kind !== 'video')) {
+    if (
+      !nextCursor ||
+      (kind !== 'listing' && kind !== 'business' && kind !== 'video')
+    ) {
       return;
     }
 
@@ -616,7 +619,12 @@ function DataSection({
       const params = new URLSearchParams({
         category: category.slug,
         side: forcedSide || 'supply',
-        tab: forcedSide === 'demand' ? 'all' : 'all',
+        tab:
+          forcedSide === 'demand'
+            ? 'all'
+            : kind === 'business'
+              ? 'businesses'
+              : 'all',
         sort: 'latest',
         limit: '48',
         offset: nextCursor,
@@ -628,10 +636,13 @@ function DataSection({
       if (!response.ok) throw new Error('explore_pagination_failed');
 
       const payload = (await response.json()) as GlobalSearchResponse;
-      const incoming = [
-        ...(payload.groups.products?.items || []),
-        ...(payload.groups.services?.items || []),
-      ];
+      const incoming =
+        kind === 'business'
+          ? payload.groups.businesses?.items || []
+          : [
+              ...(payload.groups.products?.items || []),
+              ...(payload.groups.services?.items || []),
+            ];
 
       const nextItems =
         forcedSide === 'demand'
@@ -641,7 +652,10 @@ function DataSection({
       const returnedCursor =
         (forcedSide === 'demand'
           ? payload.groups.needs?.nextCursor
-          : payload.groups.products?.nextCursor || payload.groups.services?.nextCursor) || null;
+          : kind === 'business'
+            ? payload.groups.businesses?.nextCursor
+            : payload.groups.products?.nextCursor ||
+              payload.groups.services?.nextCursor) || null;
       setExtraItems(current => [...current, ...nextItems]);
       setNextCursor(
         nextItems.length === 0 || returnedCursor === nextCursor
@@ -671,7 +685,12 @@ function DataSection({
 
   const hasMore =
     visibleCount < mergedItems.length ||
-    Boolean(nextCursor && (kind === 'listing' || kind === 'video'));
+    Boolean(
+      nextCursor &&
+        (kind === 'listing' ||
+          kind === 'business' ||
+          kind === 'video'),
+    );
 
   return (
     <section className="mt-3 rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 sm:p-4">
@@ -2360,6 +2379,7 @@ export function ExploreCategoryClient({
                             category
                           }
                           kind="business"
+                          initialNextCursor={groups?.businesses.nextCursor}
                         />
                       );
                     }

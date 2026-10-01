@@ -59,12 +59,45 @@ type MapPoint = {
   slug: string;
   name: string;
   city: string;
+  address?: string;
+  description?: string | null;
+  public_path?: string | null;
+  updated_at?: string | null;
+  created_at?: string | null;
   lat: number;
   lng: number;
   category: string;
   source_kind: string;
   metadata?: Record<string, unknown>;
 };
+
+function sanitizeMapPointMetadata(
+  value: Record<string, unknown> | undefined,
+): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const output = { ...value };
+  const mediaKeys = ['cover_image', 'logo_url', 'gallery_media_primary'];
+  for (const key of mediaKeys) {
+    const raw = output[key];
+    if (typeof raw !== 'string') continue;
+    const trimmed = raw.trim();
+    if (!trimmed || trimmed.toLowerCase() === 'invalid media url') {
+      delete output[key];
+      continue;
+    }
+    if (trimmed.startsWith('/')) {
+      if (trimmed.startsWith('//')) delete output[key];
+      continue;
+    }
+    try {
+      const parsed = new URL(trimmed);
+      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') delete output[key];
+    } catch {
+      delete output[key];
+    }
+  }
+  return output;
+}
 
 type MapPointsPayload = {
   items: MapPoint[];
@@ -265,15 +298,31 @@ export async function GET(req: NextRequest) {
       total_count?: number;
     };
     const items = Array.isArray(payload.items)
-      ? payload.items.filter(
-          item =>
-            typeof item?.id === 'string' &&
-            typeof item?.slug === 'string' &&
-            typeof item?.name === 'string' &&
-            Number.isFinite(item?.lat) &&
-            Number.isFinite(item?.lng) &&
-            isCoordinateValid({ lat: item.lat, lng: item.lng }),
-        )
+      ? payload.items
+          .filter(
+            item =>
+              typeof item?.id === 'string' &&
+              typeof item?.slug === 'string' &&
+              typeof item?.name === 'string' &&
+              Number.isFinite(item?.lat) &&
+              Number.isFinite(item?.lng) &&
+              isCoordinateValid({ lat: item.lat, lng: item.lng }),
+          )
+          .map(item => ({
+            ...item,
+            city: typeof item.city === 'string' ? item.city.trim() : '',
+            address:
+              typeof item.address === 'string' ? item.address.trim() : '',
+            description:
+              typeof item.description === 'string'
+                ? item.description.trim().slice(0, 360)
+                : null,
+            public_path:
+              typeof item.public_path === 'string' && item.public_path.startsWith('/')
+                ? item.public_path
+                : null,
+            metadata: sanitizeMapPointMetadata(item.metadata),
+          }))
       : [];
 
     const normalizedPayload = normalizeMapPointsPayload({

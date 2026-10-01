@@ -1111,11 +1111,15 @@ struct MapPlacePoint {
     slug: String,
     name: String,
     city: String,
+    address: String,
+    description: Option<String>,
     lat: f64,
     lng: f64,
     category: String,
     source_kind: String,
+    public_path: Option<String>,
     metadata: Value,
+    updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -11433,10 +11437,13 @@ async fn list_map_places(
           slug,
           name,
           city,
+          address,
+          description,
           lat,
           lng,
           category,
           source_kind,
+          public_path,
           metadata,
           updated_at
         FROM (
@@ -11445,6 +11452,8 @@ async fn list_map_places(
             s.slug,
             s.name,
             s.city,
+            s.address,
+            NULLIF(LEFT(COALESCE(s.description, ''), 360), '') AS description,
             s.lat,
             s.lng,
             s.updated_at AS updated_at,
@@ -11454,6 +11463,7 @@ async fn list_map_places(
               NULLIF(lower(s.metadata->>'business_type'), ''),
               'business'
             ) AS category,
+            '/toko/' || s.slug AS public_path,
             jsonb_strip_nulls(jsonb_build_object(
               'marketplace_category_slug', NULLIF(lower(s.metadata->>'marketplace_category_slug'), ''),
               'umkm_category', NULLIF(lower(s.metadata->>'umkm_category'), ''),
@@ -11485,13 +11495,10 @@ async fn list_map_places(
                 NULLIF(s.metadata->>'cover_image_url', ''),
                 NULLIF(s.metadata->>'store_photo_url', ''),
                 NULLIF(s.metadata->>'image_url', ''),
-                NULLIF(s.metadata->>'image', '')
+                NULLIF(s.metadata->>'image', ''),
+                NULLIF(s.metadata->>'gallery_media_primary', '')
               ),
               'logo_url', NULLIF(s.metadata->>'logo_url', ''),
-              'gallery_images', s.metadata->'gallery_images',
-              'gallery_media', s.metadata->'gallery_media',
-              'gallery_media_items', s.metadata->'gallery_media_items',
-              'gallery_media_primary', s.metadata->'gallery_media_primary',
               'image_attribution', NULLIF(s.metadata->>'image_attribution', ''),
               'image_source_provider', NULLIF(s.metadata->>'image_source_provider', ''),
               'media_kind', NULLIF(s.metadata->>'media_kind', ''),
@@ -11567,7 +11574,9 @@ async fn list_map_places(
             'reference:' || c.id::text AS id,
             COALESCE(c.slug, 'reference-' || c.id::text),
             c.title,
-            COALESCE(c.metadata->>'city', c.metadata->>'location', 'Indonesia'),
+            COALESCE(c.metadata->>'city', c.metadata->>'location', 'Indonesia') AS city,
+            COALESCE(c.metadata->>'address', c.metadata->>'location', c.metadata->>'city', 'Indonesia') AS address,
+            NULLIF(LEFT(COALESCE(NULLIF(c.summary, ''), NULLIF(c.body, '')), 360), '') AS description,
             public.lajukan_safe_map_coordinate(c.metadata->>'latitude'),
             public.lajukan_safe_map_coordinate(c.metadata->>'longitude'),
             c.updated_at AS updated_at,
@@ -11578,6 +11587,10 @@ async fn list_map_places(
               NULLIF(lower(c.metadata->>'category'), ''),
               'business'
             ) AS category,
+            COALESCE(
+              NULLIF(c.metadata->>'public_path', ''),
+              '/content/' || c.id::text
+            ) AS public_path,
             jsonb_strip_nulls(jsonb_build_object(
               'marketplace_category_slug', NULLIF(lower(c.metadata->>'marketplace_category_slug'), ''),
               'umkm_category', NULLIF(lower(c.metadata->>'umkm_category'), ''),
@@ -11604,13 +11617,10 @@ async fn list_map_places(
                 NULLIF(c.metadata->>'cover_image', ''),
                 NULLIF(c.metadata->>'cover_image_url', ''),
                 NULLIF(c.metadata->>'image_url', ''),
-                NULLIF(c.metadata->>'image', '')
+                NULLIF(c.metadata->>'image', ''),
+                NULLIF(c.metadata->>'gallery_media_primary', '')
               ),
               'logo_url', NULLIF(c.metadata->>'logo_url', ''),
-              'gallery_images', c.metadata->'gallery_images',
-              'gallery_media', c.metadata->'gallery_media',
-              'gallery_media_items', c.metadata->'gallery_media_items',
-              'gallery_media_primary', c.metadata->'gallery_media_primary',
               'image_attribution', NULLIF(c.metadata->>'image_attribution', ''),
               'image_source_provider', NULLIF(c.metadata->>'image_source_provider', ''),
               'media_kind', NULLIF(c.metadata->>'media_kind', ''),
@@ -11649,7 +11659,9 @@ async fn list_map_places(
             'listing:' || c.id::text AS id,
             COALESCE(c.slug, 'listing-' || c.id::text),
             c.title,
-            COALESCE(c.metadata->>'city', c.metadata->>'location', c.metadata->>'address', 'Indonesia'),
+            COALESCE(c.metadata->>'city', c.metadata->>'location', c.metadata->>'address', 'Indonesia') AS city,
+            COALESCE(c.metadata->>'address', c.metadata->>'location', c.metadata->>'city', 'Indonesia') AS address,
+            NULLIF(LEFT(COALESCE(NULLIF(c.summary, ''), NULLIF(c.body, '')), 360), '') AS description,
             public.lajukan_safe_map_coordinate(
               COALESCE(
                 NULLIF(c.metadata->>'latitude', ''),
@@ -11671,6 +11683,10 @@ async fn list_map_places(
               NULLIF(lower(c.category), ''),
               'business'
             ) AS category,
+            COALESCE(
+              NULLIF(c.metadata->>'public_path', ''),
+              '/content/' || c.id::text
+            ) AS public_path,
             jsonb_strip_nulls(jsonb_build_object(
               'marketplace_category_slug', NULLIF(lower(c.metadata->>'marketplace_category_slug'), ''),
               'marketplace_subcategory_slug', NULLIF(lower(c.metadata->>'marketplace_subcategory_slug'), ''),
@@ -11694,13 +11710,10 @@ async fn list_map_places(
                 NULLIF(c.metadata->>'cover_image', ''),
                 NULLIF(c.metadata->>'cover_image_url', ''),
                 NULLIF(c.metadata->>'image_url', ''),
-                NULLIF(c.metadata->>'image', '')
+                NULLIF(c.metadata->>'image', ''),
+                NULLIF(c.metadata->>'gallery_media_primary', '')
               ),
               'logo_url', NULLIF(c.metadata->>'logo_url', ''),
-              'gallery_images', c.metadata->'gallery_images',
-              'gallery_media', c.metadata->'gallery_media',
-              'gallery_media_items', c.metadata->'gallery_media_items',
-              'gallery_media_primary', c.metadata->>'gallery_media_primary',
               'image_attribution', NULLIF(c.metadata->>'image_attribution', ''),
               'image_source_provider', NULLIF(c.metadata->>'image_source_provider', ''),
               'media_kind', NULLIF(c.metadata->>'media_kind', ''),
@@ -11827,11 +11840,15 @@ async fn list_map_places(
                         slug: row.try_get("slug").ok()?,
                         name: row.try_get("name").ok()?,
                         city: row.try_get("city").ok()?,
+                        address: row.try_get("address").ok()?,
+                        description: row.try_get("description").ok()?,
                         lat: row.try_get("lat").ok()?,
                         lng: row.try_get("lng").ok()?,
                         category: row.try_get("category").ok()?,
                         source_kind: row.try_get("source_kind").ok()?,
+                        public_path: row.try_get("public_path").ok()?,
                         metadata: row.try_get("metadata").ok()?,
+                        updated_at: row.try_get("updated_at").ok()?,
                     })
                 })
                 .collect::<Vec<_>>();

@@ -293,7 +293,11 @@ export function buildUmkmMapPlacePath(place: UmkmMapLinkTarget): string {
     typeof metadata.business_slug === 'string' ? metadata.business_slug.trim() : '';
   const storefrontSlug = place.slug?.trim() || metadataSlug;
 
-  if (isUmkmMapPublicReference(place)) return buildUmkmStorefrontPath(storefrontSlug);
+  if (isUmkmMapPublicReference(place)) {
+    return storefrontSlug
+      ? buildUmkmDiscoveryPath({ store: storefrontSlug })
+      : UMKM_DISCOVERY_PATH;
+  }
 
   if (sourceKind === 'lajukan_store' || sourceKind === 'registered_store' || source === 'usaha_portal' || metadata.owner_user_id != null || metadata.owner_id != null) {
     return buildUmkmStorefrontPath(storefrontSlug);

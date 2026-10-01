@@ -99,7 +99,7 @@ function getHomeUpdatedAt(store: PreviewStore): number {
     !Array.isArray(store.metadata)
       ? store.metadata
       : {};
-  const value = metadata.updated_at ?? metadata.updatedAt;
+  const value = store.updated_at ?? metadata.updated_at ?? metadata.updatedAt;
   if (typeof value === 'string') {
     const parsed = Date.parse(value);
     return Number.isFinite(parsed) ? parsed : 0;
@@ -195,8 +195,8 @@ export default function HomeUmkmCard({
   const href = store.slug ? buildUmkmMapPlacePath(store) : UMKM_DISCOVERY_PATH;
   const distanceLabel = formatDistance(store.distance_km);
   const locationLabel =
-    store.city ||
     store.address ||
+    store.city ||
     (isId ? 'Lokasi belum tersedia' : 'Location unavailable');
   const statusLabel = isPublicReference
     ? isId
@@ -266,7 +266,7 @@ export default function HomeUmkmCard({
             </div>
           )}
           <span className="absolute left-2 top-2 inline-flex min-h-6 items-center rounded-full border border-white/70 bg-white/90 px-2 text-[9px] font-black text-emerald-800 shadow-sm backdrop-blur">
-            {isPublicReference ? (isId ? 'Referensi' : 'Reference') : 'UMKM'}
+            {isPublicReference ? (isId ? 'Lokasi usaha' : 'Business location') : 'UMKM'}
           </span>
           {isPublicReference && hasLicensedReferencePhoto && imageProvider ? (
             <span className="absolute bottom-1.5 left-1.5 right-1.5 truncate rounded bg-black/65 px-1.5 py-0.5 text-[8px] font-semibold text-white">
@@ -311,8 +311,8 @@ export default function HomeUmkmCard({
             {store.description ||
               (isPublicReference
                 ? isId
-                  ? 'Referensi peta publik; cek sumber asli.'
-                  : 'Public map reference; check the original source.'
+                  ? 'Lokasi usaha dari data publik; cek sumber asli.'
+                  : 'Public business location; check the original source.'
                 : isId
                   ? 'Lihat produk dan informasi usaha.'
                   : 'See products and business information.')}
