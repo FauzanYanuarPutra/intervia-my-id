@@ -13,6 +13,12 @@ import {
   ShoppingBag,
   Star,
   Store,
+  Utensils,
+  ShoppingBag as ShoppingBagIcon,
+  BriefcaseBusiness,
+  Hammer,
+  Sprout,
+  Wrench,
 } from 'lucide-react';
 import { LajukanImage } from '@/components/common/LajukanImage';
 import { getBaseUrl } from '@/lib/server/getBaseUrl';
@@ -77,6 +83,29 @@ function isReferenceLocation(
   store: Pick<UmkmStore, 'is_active' | 'metadata'>,
 ): boolean {
   return isPublicUmkmReferenceVisible(store);
+}
+
+function StorefrontCategoryIcon({
+  kind,
+}: {
+  kind: string;
+}) {
+  const Icon =
+    kind === 'food'
+      ? Utensils
+      : kind === 'retail'
+        ? ShoppingBagIcon
+        : kind === 'service'
+          ? BriefcaseBusiness
+          : kind === 'craft'
+            ? Hammer
+            : kind === 'agri'
+              ? Sprout
+              : kind === 'workshop'
+                ? Wrench
+                : Store;
+
+  return <Icon className="h-7 w-7" aria-hidden="true" />;
 }
 
 function isPublicStoreSurfaceVisible(store: UmkmStore): boolean {
@@ -600,6 +629,10 @@ export default async function TokoPage({ params }: PageProps) {
   const place = buildUmkmPlacePresentation(store, isId, null);
   const publicContact = resolvePublicContact(store, place);
   const brandMedia = resolveStorefrontBrandMedia(metadata);
+  const sourceTitle = readMetaText(metadata, 'source_title', 'source_provider', 'source_dataset');
+  const sourceUrl = readMetaText(metadata, 'source_url');
+  const sourceLicense = readMetaText(metadata, 'source_license');
+  const sourceAccessedAt = readMetaText(metadata, 'source_accessed_at');
 
   const hasValidCoordinates = isCoordinateValid({
     lat: store.lat,
@@ -621,8 +654,8 @@ export default async function TokoPage({ params }: PageProps) {
     );
   const statusLabel = referenceLocation
     ? isId
-      ? 'Lokasi usaha'
-      : 'Business location'
+      ? 'Referensi publik'
+      : 'Public reference'
     : hasScheduleEvidence
       ? place.statusLabel
       : isId
@@ -896,27 +929,45 @@ export default async function TokoPage({ params }: PageProps) {
 
           {referenceLocation ? (
             <section className="mt-1.5 border-y border-sky-100 bg-sky-50/75 px-4 py-3 dark:border-sky-900/50 dark:bg-sky-950/20 sm:mt-3 sm:rounded-2xl sm:border sm:px-5 md:px-6">
-              <p className="text-[11px] font-bold text-sky-900 dark:text-sky-100">
-                {isId ? 'Lokasi usaha dari data publik' : 'Business location from public data'}
-              </p>
-              <p className="mt-1 text-[11px] leading-5 text-sky-900/78 dark:text-sky-100/78">
-                {isId
-                  ? 'Lokasi ini belum diklaim sebagai toko Lajukan. Informasi dapat berubah; gunakan sumber asli sebagai pembanding.'
-                  : 'This location is not claimed as a Lajukan storefront. Information may change; use the original source as a reference.'}
-              </p>
-              {readMetaText(metadata, 'source_title') ? (
+              <div className="flex items-start gap-2">
+                <ExternalLink className="mt-0.5 h-4 w-4 shrink-0 text-sky-700 dark:text-sky-300" aria-hidden="true" />
+                <div className="min-w-0">
+                  <p className="text-[11px] font-bold text-sky-900 dark:text-sky-100">
+                    {isId ? 'Referensi publik, bukan toko Lajukan' : 'Public reference, not a Lajukan store'}
+                  </p>
+                  <p className="mt-1 text-[11px] leading-5 text-sky-900/78 dark:text-sky-100/78">
+                    {isId
+                      ? 'Data ini berasal dari sumber luar. Lajukan menampilkannya sebagai referensi; informasi dapat berubah dan belum berarti usaha tersebut terdaftar atau diklaim di Lajukan.'
+                      : 'This data comes from an external source. Lajukan displays it as a reference; information can change and does not mean the business is registered or claimed on Lajukan.'}
+                  </p>
+                </div>
+              </div>
+              {sourceTitle || sourceUrl || sourceLicense || sourceAccessedAt ? (
                 <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] font-semibold">
-                  <span className="rounded-full bg-white/80 px-2.5 py-1 text-sky-800 dark:bg-slate-900/70 dark:text-sky-200">
-                    {isId ? 'Sumber' : 'Source'}: {readMetaText(metadata, 'source_title')}
-                  </span>
-                  {readMetaText(metadata, 'source_url') ? (
+                  {sourceTitle ? (
+                    <span className="rounded-full bg-white/80 px-2.5 py-1 text-sky-800 dark:bg-slate-900/70 dark:text-sky-200">
+                      {isId ? 'Sumber' : 'Source'}: {sourceTitle}
+                    </span>
+                  ) : null}
+                  {sourceLicense ? (
+                    <span className="rounded-full bg-white/80 px-2.5 py-1 text-sky-800 dark:bg-slate-900/70 dark:text-sky-200">
+                      {sourceLicense}
+                    </span>
+                  ) : null}
+                  {sourceAccessedAt ? (
+                    <span className="rounded-full bg-white/80 px-2.5 py-1 text-sky-800 dark:bg-slate-900/70 dark:text-sky-200">
+                      {isId ? 'Diambil' : 'Accessed'}: {sourceAccessedAt}
+                    </span>
+                  ) : null}
+                  {sourceUrl ? (
                     <a
-                      href={readMetaText(metadata, 'source_url')}
+                      href={sourceUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="rounded-full bg-white/80 px-2.5 py-1 text-sky-800 underline underline-offset-2 dark:bg-slate-900/70 dark:text-sky-200"
+                      className="inline-flex min-h-7 items-center gap-1 rounded-full bg-sky-700 px-2.5 py-1 text-white transition hover:bg-sky-800"
                     >
-                      {isId ? 'Buka sumber' : 'Open source'}
+                      <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                      {isId ? 'Buka sumber asli' : 'Open original source'}
                     </a>
                   ) : null}
                 </div>
