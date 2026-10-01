@@ -24,6 +24,33 @@ workflows:
           include: true
       cancel_previous_builds: true
 
+  android-preview-usaha:
+    name: Lajukan Usaha Android Preview
+    max_build_duration: 45
+    working_directory: frontend/apps/mobile/lajukan_usaha_webview
+    environment:
+      flutter: stable
+    scripts:
+      - name: Install dependencies
+        script: flutter pub get
+      - name: Generate Lajukan Usaha app icon
+        script: dart run flutter_launcher_icons
+      - name: Analyze
+        script: flutter analyze
+      - name: Test
+        script: flutter test
+      - name: Build installable APK
+        script: flutter build apk --release --build-number="$BUILD_NUMBER"
+    artifacts:
+      - build/app/outputs/flutter-apk/*.apk
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+      cancel_previous_builds: true
+
   android-play-internal:
     name: Lajukan Android Play Internal
     max_build_duration: 45
