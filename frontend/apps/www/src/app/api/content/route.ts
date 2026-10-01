@@ -278,6 +278,28 @@ function asString(value: unknown): string {
   return '';
 }
 
+function normalizeBooleanQueryParam(
+  searchParams: URLSearchParams,
+  key: string,
+): void {
+  const raw = searchParams.get(key);
+  if (raw === null) return;
+
+  const normalized = raw.trim().toLowerCase();
+  if (['1', 'true', 'yes', 'y', 'on'].includes(normalized)) {
+    searchParams.set(key, 'true');
+    return;
+  }
+
+  if (['0', 'false', 'no', 'n', 'off'].includes(normalized)) {
+    searchParams.set(key, 'false');
+    return;
+  }
+
+  // Leave invalid values untouched so the backend can return the canonical
+  // 400 error instead of silently changing caller intent.
+}
+
 function isEnabledFlag(value: string | null): boolean {
   const normalized = (value || '').trim().toLowerCase();
   return (
@@ -1495,6 +1517,8 @@ export async function GET(req: NextRequest) {
   if (requestedMarketplaceSide) {
     searchParams.set('side', requestedMarketplaceSide);
   }
+  normalizeBooleanQueryParam(searchParams, 'marketplace_only');
+  const marketplaceOnly = isEnabledFlag(searchParams.get('marketplace_only'));
   const requestedLimit = parseSafeInt(searchParams.get('limit'), 20, 1, 100);
   const rawOffsetText = (searchParams.get('offset') || '0').trim();
   const rawOffset = Number(rawOffsetText);
@@ -1583,6 +1607,7 @@ export async function GET(req: NextRequest) {
     resolvedPayload = { ...resolvedPayload, items: resolvedItems };
 
     const shouldIncludeDiscoverCandidates =
+      !marketplaceOnly &&
       !databaseOnly &&
       (requestedType === 'all' ||
         requestedType === 'service' ||

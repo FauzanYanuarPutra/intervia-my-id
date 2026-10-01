@@ -236,6 +236,12 @@ function resolveTxnStatus(txn: Transaction): string {
     .toLowerCase();
 }
 
+function isTerminalTransactionStatus(status: string): boolean {
+  return ['completed', 'cancelled', 'rejected', 'expired', 'refunded'].includes(
+    status,
+  );
+}
+
 function readTransactionMeta(txn: Transaction): Record<string, unknown> {
   if (!txn.transaction_meta || typeof txn.transaction_meta !== 'object')
     return {};
@@ -1808,6 +1814,41 @@ export default function TransactionsPage() {
           : 'Duplicate / accidental order',
     },
     {
+      value: 'wrong_quantity',
+      label:
+        locale === 'id'
+          ? 'Salah jumlah / kuantitas'
+          : 'Wrong quantity',
+    },
+    {
+      value: 'wrong_price',
+      label:
+        locale === 'id'
+          ? 'Salah harga / nominal'
+          : 'Wrong price / amount',
+    },
+    {
+      value: 'wrong_recipient',
+      label:
+        locale === 'id'
+          ? 'Salah orang / penerima'
+          : 'Wrong recipient / counterparty',
+    },
+    {
+      value: 'wrong_listing',
+      label:
+        locale === 'id'
+          ? 'Salah listing / barang / jasa'
+          : 'Wrong listing / item / service',
+    },
+    {
+      value: 'user_mistake',
+      label:
+        locale === 'id'
+          ? 'Salah input / salah konfirmasi'
+          : 'Input or confirmation mistake',
+    },
+    {
       value: 'other',
       label: locale === 'id' ? 'Alasan lain' : 'Other reason',
     },
@@ -2270,7 +2311,12 @@ export default function TransactionsPage() {
   const openCancelModal = (txn: Transaction) => {
     setActionNotice(null);
     setCancelTxn(txn);
-    setCancelReasonCode('buyer_changed_mind');
+    setCancelReasonCode(
+      resolveTxnStatus(txn) === 'completed' ||
+        ['cancelled', 'rejected', 'expired', 'refunded'].includes(resolveTxnStatus(txn))
+        ? 'user_mistake'
+        : 'buyer_changed_mind',
+    );
     setCancelMessage('');
     setCancelError(null);
   };
@@ -2294,29 +2340,90 @@ export default function TransactionsPage() {
       return;
     }
 
+    const currentStatus = resolveTxnStatus(cancelTxn);
+    const correctionOnly =
+      isTerminalTransactionStatus(currentStatus) && currentStatus !== 'completed';
+    const requestBody = JSON.stringify({
+      response_message: cancelMessage.trim() || undefined,
+      reason_code: cancelReasonCode,
+    });
+
     setCancelSubmitting(true);
     setCancelError(null);
     try {
-      const res = await authFetch(`/api/transactions/${cancelTxn.id}/cancel`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Idempotency-Key': createIdempotencyKey('cancel'),
+      let res = await authFetch(
+        correctionOnly
+          ? `/api/transactions/${cancelTxn.id}/correction`
+          : `/api/transactions/${cancelTxn.id}/cancel`,
+        {
+          method: correctionOnly ? 'POST' : 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Idempotency-Key': createIdempotencyKey(
+              correctionOnly ? 'correction' : 'cancel',
+            ),
+          },
+          body: requestBody,
         },
-        body: JSON.stringify({
-          response_message: cancelMessage.trim() || undefined,
-          reason_code: cancelReasonCode,
-        }),
-      });
-      const payload = await res.json().catch(() => ({}));
+      );
+      let payload = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        code?: string;
+        ticket?: unknown;
+      };
+
+      if (
+        !res.ok &&
+        currentStatus === 'completed' &&
+        (
+          payload.code === 'completed_correction_window_expired' ||
+          payload.code === 'completed_correction_insufficient_seller_balance'
+        )
+      ) {
+        res = await authFetch(`/api/transactions/${cancelTxn.id}/correction`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Idempotency-Key': createIdempotencyKey('correction-fallback'),
+          },
+          body: requestBody,
+        });
+        payload = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          code?: string;
+          ticket?: unknown;
+        };
+      }
 
       if (!res.ok) {
         throw new Error(
-          (payload as { error?: string }).error ||
+          payload.error ||
           (locale === 'id'
-            ? 'Gagal membatalkan transaksi.'
-            : 'Failed to cancel transaction.'),
+            ? correctionOnly || currentStatus === 'completed'
+              ? 'Permintaan koreksi transaksi belum berhasil.'
+              : 'Gagal membatalkan transaksi.'
+            : correctionOnly || currentStatus === 'completed'
+              ? 'The transaction correction request could not be submitted.'
+              : 'Failed to cancel transaction.'),
         );
+      }
+
+      if (correctionOnly || payload.code === 'correction_requested') {
+        notifyTransactionChat(
+          cancelTxn,
+          'correction_requested',
+          cancelMessage.trim() || undefined,
+        ).catch(() => {});
+        setActionNotice(
+          locale === 'id'
+            ? 'Permintaan koreksi sudah dikirim untuk ditinjau.'
+            : 'The correction request was submitted for review.',
+        );
+        setCancelTxn(null);
+        setCancelReasonCode('buyer_changed_mind');
+        setCancelMessage('');
+        setCancelError(null);
+        return;
       }
 
       const updated = payload as Transaction;
@@ -2327,11 +2434,15 @@ export default function TransactionsPage() {
         updated,
         'cancelled',
         cancelMessage.trim() || undefined,
-      ).catch(() => { });
+      ).catch(() => {});
       setActionNotice(
         locale === 'id'
-          ? 'Pembatalan terkirim dan tercatat.'
-          : 'The cancellation was submitted and recorded in transaction history.',
+          ? currentStatus === 'completed'
+            ? 'Koreksi transaksi berhasil. Dana dan riwayat sudah dibalikkan secara tercatat.'
+            : 'Pembatalan terkirim dan tercatat.'
+          : currentStatus === 'completed'
+            ? 'The transaction was corrected and the fund reversal was recorded.'
+            : 'The cancellation was submitted and recorded in transaction history.',
       );
       setCancelTxn(null);
       setCancelReasonCode('buyer_changed_mind');
@@ -2342,14 +2453,13 @@ export default function TransactionsPage() {
         error instanceof Error
           ? error.message
           : locale === 'id'
-            ? 'Gagal membatalkan transaksi.'
-            : 'Failed to cancel transaction.',
+            ? 'Tindakan transaksi belum berhasil.'
+            : 'The transaction action could not be completed.',
       );
     } finally {
       setCancelSubmitting(false);
     }
   };
-
   const openCounterOfferModal = (txn: Transaction) => {
     setActionNotice(null);
     setCounterOfferTxn(txn);
@@ -3151,13 +3261,45 @@ export default function TransactionsPage() {
     if (
       (status === 'pending' && !isSeller) ||
       status === 'accepted' ||
-      status === 'in_progress'
+      status === 'in_progress' ||
+      status === 'delivered'
     ) {
       appendUnique(secondary, {
         key: 'cancel',
         label: locale === 'id' ? 'Batalkan' : 'Cancel',
         tone: 'danger',
         Icon: Ban,
+        onClick: () => openCancelModal(txn),
+      });
+    }
+
+    if (
+      isTerminalTransactionStatus(status) &&
+      (isBuyer || isSeller) &&
+      status !== 'cancelled'
+    ) {
+      appendUnique(secondary, {
+        key: 'cancel',
+        label:
+          locale === 'id'
+            ? status === 'completed'
+              ? 'Koreksi transaksi'
+              : 'Ajukan koreksi'
+            : status === 'completed'
+              ? 'Correct transaction'
+              : 'Request correction',
+        tone: 'subtle',
+        Icon: RefreshCcw,
+        onClick: () => openCancelModal(txn),
+      });
+    }
+
+    if (status === 'cancelled' && (isBuyer || isSeller)) {
+      appendUnique(secondary, {
+        key: 'cancel',
+        label: locale === 'id' ? 'Ajukan koreksi' : 'Request correction',
+        tone: 'subtle',
+        Icon: RefreshCcw,
         onClick: () => openCancelModal(txn),
       });
     }
@@ -4207,7 +4349,19 @@ export default function TransactionsPage() {
       <Modal
         open={Boolean(cancelTxn)}
         onClose={closeCancelModal}
-        title={locale === 'id' ? 'Batalkan Order' : 'Cancel Order'}
+        title={
+          cancelTxn && resolveTxnStatus(cancelTxn) === 'completed'
+            ? locale === 'id'
+              ? 'Koreksi Transaksi Selesai'
+              : 'Correct Completed Transaction'
+            : cancelTxn && isTerminalTransactionStatus(resolveTxnStatus(cancelTxn))
+              ? locale === 'id'
+                ? 'Ajukan Koreksi Transaksi'
+                : 'Request Transaction Correction'
+              : locale === 'id'
+                ? 'Batalkan Order'
+                : 'Cancel Order'
+        }
         footer={
           <div className="flex flex-col gap-2 sm:flex-row">
             <button
@@ -4228,9 +4382,17 @@ export default function TransactionsPage() {
                 ? locale === 'id'
                   ? 'Memproses...'
                   : 'Submitting...'
-                : locale === 'id'
-                  ? 'Konfirmasi Batal'
-                  : 'Confirm Cancellation'}
+                : cancelTxn && resolveTxnStatus(cancelTxn) === 'completed'
+                  ? locale === 'id'
+                    ? 'Koreksi transaksi'
+                    : 'Correct transaction'
+                  : cancelTxn && isTerminalTransactionStatus(resolveTxnStatus(cancelTxn))
+                    ? locale === 'id'
+                      ? 'Ajukan koreksi'
+                      : 'Request correction'
+                    : locale === 'id'
+                      ? 'Konfirmasi Batal'
+                      : 'Confirm Cancellation'}
             </button>
           </div>
         }
@@ -4242,9 +4404,17 @@ export default function TransactionsPage() {
                 {resolveSnapshot(cancelTxn).title}
               </p>
               <p className="mt-1 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                {locale === 'id'
-                  ? 'Pilih alasan paling dekat.'
-                  : 'Choose the closest reason so the order timeline stays clear.'}
+                {resolveTxnStatus(cancelTxn) === 'completed'
+                  ? locale === 'id'
+                    ? 'Transaksi sudah selesai. Kalau salah input atau salah konfirmasi, Lajukan akan mencoba membalikkan dana secara aman. Kalau koreksi otomatis tidak bisa dilakukan, permintaan akan diarahkan ke support.'
+                    : 'This transaction is already complete. If something was entered or confirmed by mistake, Lajukan will attempt a safe reversal. If automatic correction is no longer possible, the request goes to support.'
+                  : isTerminalTransactionStatus(resolveTxnStatus(cancelTxn))
+                    ? locale === 'id'
+                      ? 'Status transaksi ini sudah final. Lajukan tidak mengubahnya diam-diam; kamu bisa mengajukan koreksi agar jejak dan saldo tetap ditinjau dengan benar.'
+                      : 'This transaction is already final. Lajukan will not silently rewrite it; submit a correction request so the history and funds can be reviewed safely.'
+                    : locale === 'id'
+                      ? 'Pilih alasan paling dekat.'
+                      : 'Choose the closest reason so the order timeline stays clear.'}
               </p>
             </div>
 
@@ -4275,9 +4445,13 @@ export default function TransactionsPage() {
                 rows={4}
                 className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2 text-sm focus:border-[color:var(--app-accent-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
                 placeholder={
-                  locale === 'id'
-                    ? 'Tulis alasan singkat.'
-                    : 'Add brief context so buyer, seller, and CRM understand the cancellation.'
+                  cancelTxn && resolveTxnStatus(cancelTxn) === 'completed'
+                    ? locale === 'id'
+                      ? 'Contoh: salah jumlah, salah harga, atau salah menekan tombol selesai.'
+                      : 'Example: wrong quantity, wrong price, or the order was completed by mistake.'
+                    : locale === 'id'
+                      ? 'Tulis alasan singkat.'
+                      : 'Add brief context so buyer, seller, and CRM understand the cancellation or correction.'
                 }
               />
             </div>

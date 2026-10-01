@@ -30,6 +30,7 @@ import {
 import { getInternalWwwOrigin } from '@/lib/server/internalWwwOrigin';
 import { buildUmkmStorefrontPath } from '@/lib/umkmSurface';
 import { resolveListingSide } from '@/lib/content/listingSide';
+import { resolveListingLocation } from '@/lib/content/listingLocation';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -495,14 +496,7 @@ function mapContentItem(
       metadata?.partnership_type,
     );
 
-  const location =
-    firstString(
-      metadata?.location,
-      metadata?.city,
-      metadata?.region,
-      item.location,
-      'Indonesia',
-    );
+  const location = resolveListingLocation(item, metadata);
 
   const listingSide =
     firstString(
@@ -1498,6 +1492,16 @@ async function fetchJson(
   }
 }
 
+function nextContentOffsetCursor(payload: JsonRecord | null): string | null {
+  if (!payload || payload.has_more !== true) return null;
+  const offset = readNumber(payload.offset) ?? 0;
+  const limit = readNumber(payload.limit) ?? 0;
+  const nextOffset = Math.round(offset + limit);
+  return Number.isSafeInteger(nextOffset) && nextOffset > offset
+    ? String(nextOffset)
+    : null;
+}
+
 function group(
   items: Array<
     GlobalSearchItem | null
@@ -1560,22 +1564,14 @@ function requestedGroupsForState(
   }
 
   if (side === 'supply') {
-    if (
-      [
-        'products',
-        'services',
-        'businesses',
-      ].includes(tab)
-    ) {
-      return new Set([
-        tab as GlobalSearchGroupKey,
-      ]);
+    if (tab === 'products' || tab === 'services') {
+      return new Set([tab]);
     }
 
+    // Businesses/places belong to UMKM discovery, not marketplace supply.
     return new Set([
       'products',
       'services',
-      'businesses',
     ]);
   }
 
@@ -1674,6 +1670,10 @@ export async function GET(
       req.nextUrl.searchParams,
     );
 
+  if (state.side === 'supply' && state.tab === 'businesses') {
+    state.tab = 'all';
+  }
+
   const activeCategory =
     getExploreCategoryBySlug(
       state.category,
@@ -1767,6 +1767,10 @@ export async function GET(
           ? '24'
           : '48',
     });
+
+  if (state.offset > 0) {
+    params.set('offset', String(state.offset));
+  }
 
   if (effectiveQuery) {
     params.set(
@@ -2333,6 +2337,8 @@ export async function GET(
         return true;
       });
 
+  const contentNextCursor = nextContentOffsetCursor(contentPayload);
+
   const businessPayload =
     asRecord(
       asRecord(
@@ -2391,6 +2397,7 @@ export async function GET(
         : null,
       relevanceQuery,
     );
+  response.groups.products.nextCursor = contentNextCursor;
 
   /**
    * Supply = services.
@@ -2413,6 +2420,7 @@ export async function GET(
         : null,
       relevanceQuery,
     );
+  response.groups.services.nextCursor = contentNextCursor;
 
   /**
    * Demand = needs.
@@ -2435,6 +2443,7 @@ export async function GET(
         : null,
       relevanceQuery,
     );
+  response.groups.needs.nextCursor = contentNextCursor;
 
   response.groups.references =
     group(
@@ -2654,7 +2663,6 @@ export async function GET(
                 'all',
                 'products',
                 'services',
-                'businesses',
               ],
             )
           : null;

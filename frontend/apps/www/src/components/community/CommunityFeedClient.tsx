@@ -8,7 +8,6 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import {
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -16,7 +15,6 @@ import {
   type DragEvent,
   type FormEvent,
   type ReactNode,
-  type RefObject,
 } from 'react';
 import { createPortal } from 'react-dom';
 import {
@@ -626,6 +624,15 @@ export function CommunityComposer({
 
   /* ================= OPEN / CLOSE ================= */
 
+  const hasComposerDraft = Boolean(
+    title.trim() ||
+    body.trim() ||
+    mediaUrls.length ||
+    pollOptions.some(option => option.trim()) ||
+    topicTag.trim() ||
+    feeling.trim(),
+  );
+
   const openComposer = (nextMode: ComposeMode) => {
     rememberReturnFocus();
     setMode(nextMode);
@@ -633,6 +640,14 @@ export function CommunityComposer({
   };
 
   const closeComposer = useCallback(() => {
+    if (open && hasComposerDraft && !saving) {
+      if (!window.confirm(
+        isId
+          ? 'Ada tulisan atau media yang belum dikirim. Tutup dan buang draft ini?'
+          : 'You have unsent text or media. Close and discard this draft?'
+      )) return;
+    }
+
     setOpen(false);
 
     if (!searchParams.has('compose')) {
@@ -656,7 +671,7 @@ export function CommunityComposer({
         ? `${currentPath}?${queryString}`
         : currentPath,
     );
-  }, [pathname, router, searchParams]);
+  }, [hasComposerDraft, isId, open, pathname, router, saving, searchParams]);
 
   useEffect(() => {
     closeComposerRef.current = closeComposer;
@@ -770,6 +785,7 @@ export function CommunityComposer({
     event: FormEvent<HTMLFormElement>,
   ) => {
     event.preventDefault();
+    if (saving) return;
 
     if (!isAuthenticated) {
       router.push(loginHref);
@@ -2136,14 +2152,42 @@ function CommunityReportDialog({
   );
 }
 
+function normalizeCommunityBody(body: string): {
+  body: string;
+  hashtags: string[];
+} {
+  const normalized = String(body || '')
+    .replace(/\r\n?/g, '\n')
+    .replace(/[\t ]+$/gm, '')
+    .trim();
+
+  if (!normalized) return { body: '', hashtags: [] };
+
+  const tagLinePattern =
+    /^\s*#[\p{L}\p{N}_-]+(?:\s+#[\p{L}\p{N}_-]+)*\s*$/u;
+  const lines = normalized.split('\n');
+  const hashtags: string[] = [];
+
+  while (lines.length > 0 && tagLinePattern.test(lines[lines.length - 1])) {
+    const tagLine = lines.pop() || '';
+    for (const tag of tagLine.match(/#[\p{L}\p{N}_-]+/gu) || []) {
+      const normalizedTag = tag.slice(1).trim();
+      if (normalizedTag) hashtags.push(normalizedTag);
+    }
+  }
+
+  return {
+    body: lines.join('\n').trim(),
+    hashtags: [...new Set(hashtags)],
+  };
+}
+
 function CommunityFormattedBody({
   body,
   collapsed = false,
-  contentRef,
 }: {
   body: string;
   collapsed?: boolean;
-  contentRef?: RefObject<HTMLDivElement | null>;
 }) {
   const normalized = String(body || '')
     .replace(/\r\n?/g, '\n')
@@ -2155,24 +2199,16 @@ function CommunityFormattedBody({
 
   return (
     <div
-      ref={contentRef}
       className={cn(
-        'space-y-2 break-words whitespace-pre-line text-sm leading-6 text-[color:var(--app-text)]',
+        'space-y-2 break-words text-sm leading-6 text-[color:var(--app-text)]',
         collapsed
-          ? 'max-h-[9rem] overflow-hidden sm:max-h-[10.5rem]'
+          ? 'max-h-[8.75rem] overflow-hidden [mask-image:linear-gradient(to_bottom,black_82%,transparent_100%)] sm:max-h-[9.5rem]'
           : 'max-h-none',
       )}
     >
       {paragraphs.map((paragraph, index) => (
-        <p key={index} className="m-0">
-          {paragraph.split('\n').map((line, lineIndex) => (
-            <span
-              key={lineIndex}
-              className="block min-h-0"
-            >
-              {line || '\u00a0'}
-            </span>
-          ))}
+        <p key={index} className="m-0 whitespace-pre-line">
+          {paragraph}
         </p>
       ))}
     </div>
@@ -2202,10 +2238,6 @@ export function CommunityPostCard({
   const [commentCount, setCommentCount] = useState(item.stats.comments);
   const [likeSaving, setLikeSaving] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
-  const [bodyExpanded, setBodyExpanded] = useState(false);
-  const [canExpandBody, setCanExpandBody] = useState(false);
-  const bodyContentRef = useRef<HTMLDivElement>(null);
-
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [hidden, setHidden] = useState(false);
@@ -2228,40 +2260,27 @@ export function CommunityPostCard({
     [item.body, item.tags, item.title],
   );
 
-  const displayBody = poll ? poll.body : item.body;
-  const bodyHasPotentialOverflow =
-    displayBody.trim().length > 220 ||
-    displayBody.split(/\r?\n/).length > 4;
+  const rawDisplayBody = poll ? poll.body : item.body;
+  const normalizedCardBody = useMemo(
+    () => normalizeCommunityBody(rawDisplayBody),
+    [rawDisplayBody],
+  );
+  const displayBody = normalizedCardBody.body;
+  const bodyHasMoreContent =
+    displayBody.length > 240 || displayBody.split(/\n/).length > 5;
+  const displayTags = useMemo(() => {
+    const tags = [
+      ...normalizedCardBody.hashtags,
+      ...item.tags.map(tag => tag.slug || tag.name),
+    ]
+      .map(tag => String(tag || '').trim().replace(/^#/, ''))
+      .filter(Boolean);
+
+    return [...new Set(tags)];
+  }, [item.tags, normalizedCardBody.hashtags]);
   const isQuestionPost = item.tags.some(tag =>
     /^(tanya|question|ask|help|support)$/i.test(tag.slug || tag.name),
   );
-  useLayoutEffect(() => {
-    setBodyExpanded(false);
-  }, [item.id]);
-
-  useLayoutEffect(() => {
-    if (bodyExpanded) return;
-
-    const element = bodyContentRef.current;
-    if (!element) {
-      setCanExpandBody(bodyHasPotentialOverflow);
-      return;
-    }
-
-    const measure = () => {
-      setCanExpandBody(
-        element.scrollHeight > element.clientHeight + 2 ||
-          bodyHasPotentialOverflow,
-      );
-    };
-
-    measure();
-
-    if (typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver(measure);
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [bodyExpanded, bodyHasPotentialOverflow, displayBody]);
 
   const feedMediaItems = getFeedMediaItems(item);
   const safeMedia = feedMediaItems[0] || null;
@@ -2326,10 +2345,6 @@ export function CommunityPostCard({
     setLocalVote(item.viewerVote || 0);
     setReactionCount(item.stats.reactions);
   }, [item.id, item.stats.reactions, item.viewerVote]);
-
-  useEffect(() => {
-    setBodyExpanded(false);
-  }, [item.id]);
 
   const {
     bookmarked: saved,
@@ -3071,27 +3086,16 @@ export function CommunityPostCard({
         </h2>
 
         {displayBody ? (
-          <div className="mt-1.5">
-            <CommunityFormattedBody
-              body={displayBody}
-              collapsed={!bodyExpanded}
-              contentRef={bodyContentRef}
-            />
+          <div className="mt-2">
+            <CommunityFormattedBody body={displayBody} collapsed={bodyHasMoreContent} />
 
-            {canExpandBody || bodyHasPotentialOverflow ? (
+            {bodyHasMoreContent ? (
               <button
                 type="button"
-                onClick={() => setBodyExpanded(current => !current)}
-                aria-expanded={bodyExpanded}
-                className="mt-1 inline-flex min-h-8 items-center font-semibold text-[color:var(--app-text-soft)] hover:text-[color:var(--app-text)]"
+                onClick={openDetail}
+                className="mt-2 inline-flex min-h-8 items-center rounded-full bg-slate-50 px-3 text-[11px] font-bold text-[color:var(--app-text-soft)] ring-1 ring-slate-200 transition hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)]"
               >
-                {bodyExpanded
-                  ? isId
-                    ? 'Sembunyikan'
-                    : 'See less'
-                  : isId
-                    ? 'Lihat selengkapnya'
-                    : 'See more'}
+                {isId ? 'Lihat selengkapnya' : 'See more'}
               </button>
             ) : null}
           </div>
@@ -3099,23 +3103,27 @@ export function CommunityPostCard({
 
         {/* TAGS */}
 
-        {item.tags.length > 0 ? (
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            {item.tags.slice(0, 2).map(tag => (
+        {displayTags.length > 0 ? (
+          <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+            {displayTags.slice(0, 4).map(tag => (
               <button
-                key={tag.id}
+                key={tag}
                 type="button"
                 onClick={openDetail}
-                className="text-[11px] font-semibold text-[color:var(--app-text-soft)] transition hover:text-[color:var(--app-accent)]"
+                className="inline-flex min-h-6 items-center rounded-full bg-slate-50 px-2 py-1 text-[10px] font-semibold text-[color:var(--app-text-soft)] transition hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)]"
               >
-                #{tag.slug || tag.name}
+                #{tag}
               </button>
             ))}
 
-            {item.tags.length > 2 ? (
-              <span className="text-[11px] font-semibold text-[color:var(--app-text-muted)]">
-                +{item.tags.length - 2}
-              </span>
+            {displayTags.length > 4 ? (
+              <button
+                type="button"
+                onClick={openDetail}
+                className="inline-flex min-h-6 items-center rounded-full bg-slate-50 px-2 py-1 text-[10px] font-bold text-[color:var(--app-text-muted)] hover:text-[color:var(--app-accent)]"
+              >
+                +{displayTags.length - 4}
+              </button>
             ) : null}
           </div>
         ) : null}
@@ -4544,6 +4552,7 @@ export function CommunityGroupCreateForm({
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (saving) return;
     if (!isAuthenticated) {
       router.push(loginHref);
       return;
@@ -4606,7 +4615,16 @@ export function CommunityGroupCreateForm({
           </h2>
           <button
             type="button"
-            onClick={onCancel}
+            onClick={() => {
+              if (!saving && (name.trim() || description.trim() || avatarUrl || coverUrl || rules.some(rule => rule.trim()))) {
+                if (!window.confirm(
+                  isId
+                    ? 'Ada data grup yang belum disimpan. Kembali dan buang draft ini?'
+                    : 'Group details are not saved. Go back and discard this draft?'
+                )) return;
+              }
+              onCancel();
+            }}
             className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-slate-50"
             aria-label={isId ? 'Kembali' : 'Back'}
           >

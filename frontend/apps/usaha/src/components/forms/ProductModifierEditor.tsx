@@ -46,6 +46,7 @@ type Ingredient = {
 type Props = {
   businessId: string;
   productId: string;
+  onDirtyChange?: (dirty: boolean) => void;
 };
 
 type Template = {
@@ -133,7 +134,7 @@ function invalidEffect(effect: ModifierRecipeEffect) {
   return effect.operation === 'add' && effect.quantity === 0;
 }
 
-export function ProductModifierEditor({ businessId, productId }: Props) {
+export function ProductModifierEditor({ businessId, productId, onDirtyChange }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [groups, setGroups] = useState<ModifierGroup[]>([]);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
@@ -158,6 +159,7 @@ export function ProductModifierEditor({ businessId, productId }: Props) {
       if (!response.ok) throw new Error(businessApiErrorMessage(body, 'Pilihan pelanggan belum bisa dimuat.', response.status));
       setGroups(normalizeGroups(Array.isArray(body.data?.groups) ? body.data.groups : []));
       setDirty(false);
+      onDirtyChange?.(false);
       setLoaded(true);
     } catch (value) {
       setError(value instanceof Error ? value.message : 'Pilihan pelanggan belum bisa dimuat.');
@@ -202,6 +204,7 @@ export function ProductModifierEditor({ businessId, productId }: Props) {
 
   function markDirty() {
     setDirty(true);
+    onDirtyChange?.(true);
     setMessage('');
   }
 
@@ -244,6 +247,11 @@ export function ProductModifierEditor({ businessId, productId }: Props) {
   }
 
   async function save() {
+    if (saving) return;
+    if (!dirty) {
+      setError('Belum ada perubahan pilihan pelanggan yang perlu disimpan.');
+      return;
+    }
     setError('');
     setMessage('');
     if (changeReason.trim().length < 3) {
@@ -278,6 +286,7 @@ export function ProductModifierEditor({ businessId, productId }: Props) {
       if (!response.ok) throw new Error(businessApiErrorMessage(body, 'Pilihan pelanggan belum tersimpan.', response.status));
       if (Array.isArray(body.data?.groups)) setGroups(normalizeGroups(body.data.groups));
       setDirty(false);
+      onDirtyChange?.(false);
       setChangeReason('Pembaruan pilihan pelanggan');
       setMessage('Pilihan pelanggan tersimpan dan siap dipakai di Kasir serta toko.');
     } catch (value) {
@@ -469,7 +478,7 @@ export function ProductModifierEditor({ businessId, productId }: Props) {
 
           <div className="flex flex-wrap gap-2">
             <button type="button" className="portal-button-secondary" onClick={() => { setGroups(current => [...current, groupFromTemplate()]); markDirty(); }}><Plus className="h-4 w-4" /> Tambah kelompok</button>
-            <button type="button" className="portal-button-primary" disabled={saving || loading || changeReason.trim().length < 3} onClick={save}><Save className="h-4 w-4" /> {saving ? 'Menyimpan…' : 'Simpan pilihan'}</button>
+            <button type="button" className="portal-button-primary" disabled={saving || loading || !dirty || changeReason.trim().length < 3} onClick={save}><Save className="h-4 w-4" /> {saving ? 'Menyimpan…' : 'Simpan pilihan'}</button>
           </div>
           {error ? <p role="alert" aria-live="assertive" className="text-sm font-semibold text-portal-ember">{error}</p> : null}
           {message ? <p role="status" aria-live="polite" className="text-sm font-semibold text-portal-forest">{message}</p> : null}

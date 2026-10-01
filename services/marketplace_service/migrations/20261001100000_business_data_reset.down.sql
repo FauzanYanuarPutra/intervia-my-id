@@ -1,0 +1,1 @@
+DROP TABLE IF EXISTS business_data_reset_batches;

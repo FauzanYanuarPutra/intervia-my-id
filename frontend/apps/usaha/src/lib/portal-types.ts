@@ -34,7 +34,8 @@ export type PermissionId =
   | 'manageRoles'
   | 'viewBuyerPage'
   | 'openBusiness'
-  | 'manageSecurity';
+  | 'manageSecurity'
+  | 'manageDataReset';
 
 export type PortalSection =
   | 'home'
@@ -52,7 +53,8 @@ export type PortalSection =
   | 'growth'
   | 'team'
   | 'buyerPage'
-  | 'security';
+  | 'security'
+  | 'dataReset';
 
 export type BusinessLocationType = 'physical' | 'service_area' | 'online';
 

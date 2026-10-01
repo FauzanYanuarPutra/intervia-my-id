@@ -8,7 +8,10 @@ import {
   getUmkmPlaceKind,
   type UmkmPlaceKind,
 } from '@/lib/super-app/umkm-place-ui';
-import { UMKM_DISCOVERY_PATH } from '@/lib/umkmSurface';
+import {
+  getUmkmMapSourceKind,
+  UMKM_DISCOVERY_PATH,
+} from '@/lib/umkmSurface';
 import { UmkmStoreMap, type UmkmMapStore } from '@/components/super-app/UmkmStoreMap';
 
 type HomeBusinessMapSectionProps = {
@@ -68,9 +71,12 @@ const HOME_MAP_CATEGORY_LEGEND: Array<{
   { kind: 'general', labelId: 'Lainnya', labelEn: 'Other', color: '#0f766e' },
 ];
 
+const HOME_MAP_SESSION_CACHE_KEY = 'lajukan-home-map-v2';
+const HOME_MAP_SESSION_CACHE_TTL_MS = 15 * 60_000;
+
 const HOME_MAP_REFERENCE_LEGEND = {
-  labelId: 'Referensi publik',
-  labelEn: 'Public references',
+  labelId: 'Lokasi publik',
+  labelEn: 'Public locations',
   color: '#94a3b8',
 };
 
@@ -135,15 +141,18 @@ function normalizeMapPointItem(item: {
     source_kind:
       metadata.is_public_reference === true
         ? 'reference_store'
-        : source === 'usaha_portal' ||
-            source === 'lajukan_store' ||
-            source === 'lajukan_content' ||
-            source === 'lajukan_listing'
-          ? 'lajukan_store'
-          : recordKind.includes('reference')
-            ? 'reference_store'
-            : 'registered_store',
-    metadata,
+        : source || recordKind.includes('reference')
+          ? source || (recordKind.includes('reference') ? 'reference_store' : 'registered_store')
+          : 'unknown',
+    metadata: {
+      ...metadata,
+      source_kind:
+        metadata.is_public_reference === true
+          ? 'reference_store'
+          : source || recordKind.includes('reference')
+            ? source || (recordKind.includes('reference') ? 'reference_store' : 'registered_store')
+            : 'unknown',
+    },
   };
 }
 
@@ -164,10 +173,19 @@ function normalizeStores(items: UmkmMapStore[]): UmkmMapStore[] {
 export function summarizeHomeBusinessMapStores(stores: UmkmMapStore[]) {
   const validStores = normalizeStores(stores);
   const references = validStores.filter(
-    store => store.metadata?.is_public_reference === true,
+    store => getUmkmMapSourceKind(store) === 'reference',
+  );
+  const lajukanBusinesses = validStores.filter(
+    store => getUmkmMapSourceKind(store) === 'lajukan',
+  );
+  const externalBusinesses = validStores.filter(
+    store => getUmkmMapSourceKind(store) === 'registered',
+  );
+  const unknownBusinesses = validStores.filter(
+    store => getUmkmMapSourceKind(store) === 'unknown',
   );
   const businesses = validStores.filter(
-    store => store.metadata?.is_public_reference !== true,
+    store => getUmkmMapSourceKind(store) !== 'reference',
   );
   const cities = new Set(
     validStores
@@ -196,6 +214,8 @@ export function summarizeHomeBusinessMapStores(stores: UmkmMapStore[]) {
   return {
     validStores,
     businessCount: businesses.length,
+    lajukanBusinessCount: lajukanBusinesses.length,
+    externalBusinessCount: externalBusinesses.length + unknownBusinesses.length,
     referenceCount: references.length,
     mappedCount: validStores.length,
     cityCount: cities.size,
@@ -223,10 +243,62 @@ export function HomeBusinessMapSection({
     async function load() {
       setLoading(true);
       try {
+        if (typeof window !== 'undefined' && stores.length === 0) {
+          const cachedRaw = window.sessionStorage.getItem(
+            HOME_MAP_SESSION_CACHE_KEY,
+          );
+          if (cachedRaw) {
+            try {
+              const cached = JSON.parse(cachedRaw) as {
+                savedAt?: number;
+                totalCount?: number;
+                items?: MapPointItem[];
+              };
+              if (
+                typeof cached.savedAt === 'number' &&
+                Date.now() - cached.savedAt <= HOME_MAP_SESSION_CACHE_TTL_MS &&
+                Array.isArray(cached.items)
+              ) {
+                const cachedItems = cached.items
+                  .map(normalizeMapPointItem)
+                  .filter((item): item is MapPointItem => Boolean(item));
+
+                if (cachedItems.length > 0) {
+                  setStores(
+                    cachedItems.map(item => ({
+                      id: item.id,
+                      slug: item.slug,
+                      name: item.name,
+                      city: item.city,
+                      address: item.city,
+                      lat: item.lat,
+                      lng: item.lng,
+                      metadata: {
+                        ...(item.metadata || {}),
+                        marketplace_category_slug:
+                          item.metadata?.marketplace_category_slug || item.category,
+                        source_kind: item.source_kind,
+                        is_public_reference: item.source_kind.includes('reference'),
+                      },
+                    })),
+                  );
+                  if (
+                    typeof cached.totalCount === 'number' &&
+                    Number.isFinite(cached.totalCount)
+                  ) {
+                    setTotalMappedCount(cached.totalCount);
+                  }
+                }
+              }
+            } catch {
+              window.sessionStorage.removeItem(HOME_MAP_SESSION_CACHE_KEY);
+            }
+          }
+        }
         if (!active || controller.signal.aborted) return;
         setError(null);
         const response = await fetch(
-          '/api/super-app/umkm/map-points?limit=5000&min_lat=-11&max_lat=6&min_lng=95&max_lng=141',
+          '/api/super-app/umkm/map-points?limit=240&min_lat=-11.5&max_lat=7.5&min_lng=94.5&max_lng=142.5',
           {
             cache: 'default',
             credentials: 'include',
@@ -259,7 +331,7 @@ export function HomeBusinessMapSection({
           // than hydrating references and guarantees local records are not
           // hidden by a secondary public-reference query.
           const fallbackResponse = await fetch(
-            '/api/super-app/umkm/stores?limit=500&map=1&include_references=1&min_lat=-11&max_lat=6&min_lng=95&max_lng=141',
+            '/api/super-app/umkm/stores?limit=240&map=1&include_references=1&min_lat=-11.5&max_lat=7.5&min_lng=94.5&max_lng=142.5',
             {
               cache: 'default',
               credentials: 'include',
@@ -290,7 +362,7 @@ export function HomeBusinessMapSection({
             // Native records can legitimately be empty. Public references are
             // a secondary fallback only, so they never displace native data.
             const referenceResponse = await fetch(
-              '/api/super-app/umkm/stores?limit=500&map=1&references_only=1&min_lat=-11&max_lat=6&min_lng=95&max_lng=141',
+              '/api/super-app/umkm/stores?limit=240&map=1&references_only=1&min_lat=-11.5&max_lat=7.5&min_lng=94.5&max_lng=142.5',
               {
                 cache: 'default',
                 credentials: 'include',
@@ -317,8 +389,27 @@ export function HomeBusinessMapSection({
 
         if (!active) return;
         setTotalMappedCount(totalCount);
+        const uniqueMapItems = Array.from(
+          new Map(mapItems.map(item => [item.id, item])).values(),
+        );
+
+        if (typeof window !== 'undefined') {
+          try {
+            window.sessionStorage.setItem(
+              HOME_MAP_SESSION_CACHE_KEY,
+              JSON.stringify({
+                savedAt: Date.now(),
+                totalCount,
+                items: uniqueMapItems.slice(0, 240),
+              }),
+            );
+          } catch {
+            // Session storage is a best-effort resiliency cache.
+          }
+        }
+
         setStores(
-          mapItems.map(item => ({
+          uniqueMapItems.map(item => ({
             id: item.id,
             slug: item.slug,
             name: item.name,
@@ -330,9 +421,8 @@ export function HomeBusinessMapSection({
               ...(item.metadata || {}),
               marketplace_category_slug:
                 item.metadata?.marketplace_category_slug || item.category,
-              record_kind: item.source_kind.includes('reference')
-                ? item.source_kind
-                : item.metadata?.record_kind,
+              record_kind: item.metadata?.record_kind,
+              source_kind: item.source_kind,
               is_public_reference: item.source_kind.includes('reference'),
             },
           })),
@@ -341,12 +431,15 @@ export function HomeBusinessMapSection({
         setLoading(false);
       } catch (loadError) {
         if (!active || controller.signal.aborted) return;
+        // Home should remain useful when a previous snapshot is available.
         setError(
-          loadError instanceof Error
-            ? loadError.message
-            : isId
-              ? 'Peta usaha belum siap.'
-              : 'Business map unavailable.',
+          stores.length > 0
+            ? null
+            : loadError instanceof Error
+              ? loadError.message
+              : isId
+                ? 'Data lokasi sedang disinkronkan.'
+                : 'Location data is syncing.',
         );
       } finally {
         if (active && !controller.signal.aborted) setLoading(false);
@@ -392,7 +485,7 @@ export function HomeBusinessMapSection({
       <div className="flex items-center justify-between gap-2 px-3 py-2.5 sm:px-3.5">
         <div className="min-w-0">
           <h2 className="truncate text-[12px] font-black tracking-tight text-slate-950 sm:text-[13px]">
-            {isId ? 'Sebaran usaha Indonesia' : 'Indonesia business map'}
+            {isId ? 'Sebaran usaha Lajukan & referensi' : 'Lajukan businesses & public locations'}
           </h2>
           <p className="truncate text-[9px] font-medium text-slate-500 sm:text-[10px]">
             {loading
@@ -404,13 +497,45 @@ export function HomeBusinessMapSection({
                   ? "Data titik peta belum termuat"
                   : "Map point data unavailable"
                 : totalMappedCount > 0
-                  ? totalMappedCount > summary.mappedCount
-                    ? isId
-                      ? `${summary.mappedCount.toLocaleString("id-ID")} titik ditampilkan · total ${totalMappedCount.toLocaleString("id-ID")}`
-                      : `${summary.mappedCount.toLocaleString("en-US")} points shown · total ${totalMappedCount.toLocaleString("en-US")}`
-                    : isId
-                      ? `${totalMappedCount.toLocaleString("id-ID")} titik · ${summary.businessCount} usaha · ${summary.referenceCount} referensi`
-                      : `${totalMappedCount.toLocaleString("en-US")} points · ${summary.businessCount} businesses · ${summary.referenceCount} references`
+                  ? isId
+                    ? [
+                        summary.mappedCount.toLocaleString('id-ID'),
+                        'titik ditampilkan',
+                        '·',
+                        String(summary.lajukanBusinessCount),
+                        'usaha Lajukan',
+                        '·',
+                        String(summary.referenceCount),
+                        'lokasi publik',
+                        '·',
+                        String(summary.externalBusinessCount),
+                        'data usaha luar',
+                        '·',
+                        String(summary.cityCount),
+                        'kota',
+                        totalMappedCount > summary.mappedCount
+                          ? ['· total', totalMappedCount.toLocaleString('id-ID')].join(' ')
+                          : '',
+                      ].filter(Boolean).join(' ')
+                    : [
+                        summary.mappedCount.toLocaleString('en-US'),
+                        'points shown',
+                        '·',
+                        String(summary.lajukanBusinessCount),
+                        'Lajukan businesses',
+                        '·',
+                        String(summary.referenceCount),
+                        'public references',
+                        '·',
+                        String(summary.externalBusinessCount),
+                        'external data',
+                        '·',
+                        String(summary.cityCount),
+                        'cities',
+                        totalMappedCount > summary.mappedCount
+                          ? ['· total', totalMappedCount.toLocaleString('en-US')].join(' ')
+                          : '',
+                      ].filter(Boolean).join(' ')
                   : isId
                     ? "Belum ada lokasi terpetakan"
                     : "No mapped locations"}
@@ -447,7 +572,8 @@ export function HomeBusinessMapSection({
           focusMode="indonesia"
           showPopups={false}
           // Home is a coverage preview: show the actual distribution as
-          // lightweight colored dots instead of hiding most points in clusters.
+          // lightweight colored dots. Do not add a second animated Marker
+          // layer; the Canvas-backed dots are already cheap and responsive.
           markerStyle="dots"
           className="leaflet-home-map h-[126px] w-full sm:h-[140px]"
         />
@@ -465,10 +591,10 @@ export function HomeBusinessMapSection({
         </div>
 
 
-        {error ? (
-          <div className="absolute inset-x-2 top-2 z-10 flex items-center gap-2 rounded-lg border border-rose-200/80 bg-white/95 px-2 py-1.5 shadow-sm backdrop-blur sm:inset-x-3">
-            <span className="min-w-0 flex-1 text-[8px] font-semibold text-rose-700 sm:text-[9px]">
-              {error}
+        {error && !loading && summary.mappedCount === 0 ? (
+          <div className="absolute inset-x-2 top-2 z-10 flex items-center gap-2 rounded-lg border border-amber-200/85 bg-white/95 px-2 py-1.5 shadow-sm backdrop-blur sm:inset-x-3">
+            <span className="min-w-0 flex-1 text-[8px] font-semibold text-amber-700 sm:text-[9px]">
+              {isId ? 'Data lokasi sedang disinkronkan.' : 'Location data is syncing.'}
             </span>
             <button type="button" onClick={() => setRetryKey(value => value + 1)} className="shrink-0 rounded-full bg-slate-900 px-2 py-1 text-[8px] font-bold text-white">
               {isId ? 'Coba lagi' : 'Retry'}
@@ -495,6 +621,12 @@ export function HomeBusinessMapSection({
               </span>
             );
           })}
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-100 bg-white px-2 py-1 text-[8px] font-semibold text-emerald-700 shadow-sm sm:text-[9px]">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" aria-hidden="true" />
+            {isId ? 'Usaha Lajukan' : 'Lajukan businesses'}
+            <span className="font-black text-slate-900">{summary.lajukanBusinessCount.toLocaleString(isId ? 'id-ID' : 'en-US')}</span>
+          </span>
+
           {summary.referenceCount > 0 ? (
             <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-[8px] font-semibold text-slate-600 shadow-sm sm:text-[9px]">
               <span

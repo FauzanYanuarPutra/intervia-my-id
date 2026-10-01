@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { MapPin, Plus, Save, Trash2, X } from 'lucide-react';
 import { BusinessLocationField } from '@/components/forms/BusinessLocationField';
 import { SensitiveActionConfirm } from '@/components/interaction/SensitiveActionConfirm';
@@ -12,9 +12,10 @@ type Props = {
   businessId: string;
   businessName: string;
   initialLocations: BusinessLocation[];
+  businessVersion?: number;
 };
 
-export function BusinessLocationsManager({ businessId, businessName, initialLocations }: Props) {
+export function BusinessLocationsManager({ businessId, businessName, initialLocations, businessVersion }: Props) {
   const [locations, setLocations] = useState(initialLocations);
   const [editing, setEditing] = useState<BusinessLocation | null>(null);
   const [pendingDelete, setPendingDelete] = useState<BusinessLocation | null>(null);
@@ -45,6 +46,25 @@ export function BusinessLocationsManager({ businessId, businessName, initialLoca
   }
 
   async function save(next: BusinessLocation[], reason = changeReason.trim()) {
+    if (saving) return false;
+    if (editing && locations.some(item => item.id === editing.id) && !isEditingDirty) {
+      setError('Belum ada perubahan lokasi yang perlu disimpan.');
+      return false;
+    }
+    if (editing) {
+      const validateContact = (value: string) => {
+        const digits = value.replace(/\D/g, '');
+        return !value.trim() || (digits.length >= 8 && digits.length <= 15);
+      };
+      if (editing.address.trim().length < 3 || editing.city.trim().length < 2) {
+        setError('Alamat minimal 3 karakter dan kota minimal 2 karakter.');
+        return false;
+      }
+      if (!validateContact(editing.phone) || !validateContact(editing.whatsapp)) {
+        setError('Nomor telepon dan WhatsApp harus kosong atau berisi 8–15 angka.');
+        return false;
+      }
+    }
     if (reason.length < 3) {
       setError('Tulis alasan perubahan lokasi minimal 3 karakter.');
       return false;
@@ -60,7 +80,7 @@ export function BusinessLocationsManager({ businessId, businessName, initialLoca
       const response = await fetch(`/api/businesses/${encodeURIComponent(businessId)}/locations`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ locations: next, reason }),
+        body: JSON.stringify({ locations: next, reason, expectedVersion: businessVersion }),
       });
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(businessApiErrorMessage(payload, 'Lokasi belum berhasil disimpan.', response.status));
@@ -83,6 +103,66 @@ export function BusinessLocationsManager({ businessId, businessName, initialLoca
     if (ok) setPendingDelete(null);
   }
 
+  const editingBaseline = useMemo(() => {
+    if (!editing) return null;
+    return locations.find(item => item.id === editing.id) ?? null;
+  }, [editing, locations]);
+
+  const isEditingDirty = useMemo(() => {
+    if (!editing) return false;
+    const normalize = (value: BusinessLocation) => JSON.stringify({
+      name: value.name,
+      locationType: value.locationType,
+      address: value.address,
+      city: value.city,
+      province: value.province,
+      district: value.district,
+      postalCode: value.postalCode,
+      latitude: value.latitude,
+      longitude: value.longitude,
+      phone: value.phone,
+      whatsapp: value.whatsapp,
+      timezone: value.timezone,
+      businessHours: value.businessHours,
+      status: value.status,
+      isPrimary: value.isPrimary,
+      publicVisibility: value.publicVisibility,
+    });
+    if (!editingBaseline) {
+      const fresh = newLocation();
+      return normalize(editing) !== normalize(fresh);
+    }
+    return normalize(editing) !== normalize(editingBaseline);
+  }, [editing, editingBaseline, locations]);
+
+  function openEditor(next: BusinessLocation) {
+    if (editing && isEditingDirty) {
+      if (!window.confirm('Ada perubahan lokasi yang belum disimpan. Pindah editor akan membuang perubahan tersebut. Lanjutkan?')) return;
+    }
+    setError('');
+    setChangeReason('Pembaruan lokasi');
+    setEditing(next);
+  }
+
+  function closeEditor() {
+    if (editing && isEditingDirty) {
+      if (!window.confirm('Ada perubahan lokasi yang belum disimpan. Tutup editor dan buang perubahan tersebut?')) return;
+    }
+    setError('');
+    setChangeReason('Pembaruan lokasi');
+    setEditing(null);
+  }
+
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!editing || !isEditingDirty) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [editing, isEditingDirty]);
+
   const point: LatLng | null =
     editing?.latitude != null && editing?.longitude != null
       ? { lat: editing.latitude, lng: editing.longitude }
@@ -98,9 +178,7 @@ export function BusinessLocationsManager({ businessId, businessName, initialLoca
           <p className="text-xs text-portal-soft">Kelola cabang, pin peta, kontak, dan visibilitas publik.</p>
         </div>
         <button type="button" className="portal-button-primary" onClick={() => {
-          setError('');
-          setChangeReason('Pembaruan lokasi');
-          setEditing(newLocation());
+          openEditor(newLocation());
         }}>
           <Plus className="h-4 w-4" /> Tambah lokasi
         </button>
@@ -112,9 +190,7 @@ export function BusinessLocationsManager({ businessId, businessName, initialLoca
             key={location.id}
             type="button"
             onClick={() => {
-              setError('');
-              setChangeReason('Pembaruan lokasi');
-              setEditing(location);
+              openEditor(location);
             }}
             className="rounded-[20px] border border-portal-line/70 bg-white p-4 text-left transition hover:border-portal-forest/40"
           >
@@ -150,11 +226,7 @@ export function BusinessLocationsManager({ businessId, businessName, initialLoca
             <button
               type="button"
               className="portal-button-ghost min-h-9 px-2"
-              onClick={() => {
-                setError('');
-                setChangeReason('Pembaruan lokasi');
-                setEditing(null);
-              }}
+              onClick={closeEditor}
               aria-label="Tutup editor lokasi"
             >
               <X className="h-4 w-4" />
@@ -278,13 +350,13 @@ export function BusinessLocationsManager({ businessId, businessName, initialLoca
                 <Trash2 className="h-4 w-4" /> Hapus lokasi
               </button>
             ) : (
-              <button type="button" className="portal-button-secondary" onClick={() => setEditing(null)}>
+              <button type="button" className="portal-button-secondary" onClick={closeEditor}>
                 <X className="h-4 w-4" /> Buang draft
               </button>
             )}
 
             <div className="flex gap-2">
-              <button type="button" className="portal-button-secondary" onClick={() => setEditing(null)}>
+              <button type="button" className="portal-button-secondary" onClick={closeEditor}>
                 Batal
               </button>
               <button

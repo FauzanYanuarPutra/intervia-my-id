@@ -123,6 +123,9 @@ const PUBLIC_REFERENCE_METADATA_KEYS = [
   'cover_image',
   'image_url',
   'gallery_images',
+  'gallery_media',
+  'gallery_media_primary',
+  'gallery_media_items',
 ] as const;
 
 const PUBLIC_REFERENCE_IMAGE_CREDIT_KEYS = [
@@ -185,10 +188,43 @@ function safeInternalMediaUrl(value: unknown): string {
     : '';
 }
 
+function safePublicMediaUrl(value: unknown): string {
+  const raw = typeof value === 'string' ? value.trim() : '';
+  if (!raw || raw.length > 2048 || raw.toLowerCase() === 'invalid media url') return '';
+  if (raw.startsWith('/')) return raw.startsWith('//') ? '' : raw;
+  return safeHttpUrl(raw);
+}
+
+function projectPublicReferenceMediaItems(value: unknown): JsonRecord[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 24).flatMap(item => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return [];
+    const record = item as JsonRecord;
+    const url = safePublicMediaUrl(record.url ?? record.media_url);
+    if (!url) return [];
+    const mediaType = readText(record.media_type).toLowerCase() === 'video' ? 'video' : 'image';
+    return [{
+      id: readText(record.id).slice(0, 100) || undefined,
+      url,
+      media_url: url,
+      media_type: mediaType,
+      caption: readText(record.caption).slice(0, 500) || undefined,
+      uploader_name: readText(record.uploader_name).slice(0, 160) || undefined,
+      uploader_username: readText(record.uploader_username).slice(0, 80) || undefined,
+      is_primary: record.is_primary === true,
+    }];
+  });
+}
+
 function projectPublicReferenceMetadata(metadata: JsonRecord): JsonRecord {
   const projected: JsonRecord = {};
   for (const key of PUBLIC_REFERENCE_METADATA_KEYS) {
     const value = metadata[key];
+    if (key === 'gallery_media_items') {
+      const mediaItems = projectPublicReferenceMediaItems(value);
+      if (mediaItems.length > 0) projected[key] = mediaItems;
+      continue;
+    }
     if (
       value === null ||
       typeof value === 'boolean' ||
@@ -196,8 +232,14 @@ function projectPublicReferenceMetadata(metadata: JsonRecord): JsonRecord {
     ) {
       projected[key] = value;
     } else if (typeof value === 'string') {
-      if (key === 'source_url' || key === 'source_license_url') {
-        const safeUrl = safeHttpUrl(value);
+      if (
+        key === 'source_url' ||
+        key === 'source_license_url' ||
+        key === 'gallery_media_primary'
+      ) {
+        const safeUrl = key === 'gallery_media_primary'
+          ? safePublicMediaUrl(value)
+          : safeHttpUrl(value);
         if (safeUrl) projected[key] = safeUrl;
       } else {
         projected[key] = value.slice(0, 4096);
@@ -322,16 +364,29 @@ function mapPublicReference(
   const address = readText(metadata.address) || city;
   const categorySlug = readText(metadata.marketplace_category_slug);
   const projectedMetadata = projectPublicReferenceMetadata(metadata);
+  const approvedMediaItems = projectPublicReferenceMediaItems(
+    projectedMetadata.gallery_media_items,
+  );
+  const approvedMediaUrls = approvedMediaItems
+    .filter(item => item.media_type === 'image')
+    .map(item => readText(item.url))
+    .filter(Boolean);
   const coverImage =
     safeInternalMediaUrl(item.cover_image) ||
     safeInternalMediaUrl(projectedMetadata.cover_image) ||
+    safePublicMediaUrl(projectedMetadata.gallery_media_primary) ||
+    approvedMediaUrls[0] ||
     '/images/placeholders/business-default.svg';
-  const projectedGallery = Array.isArray(projectedMetadata.gallery_images)
-    ? projectedMetadata.gallery_images
-        .map(safeInternalMediaUrl)
-        .filter(Boolean)
-        .slice(0, 12)
-    : [];
+  const projectedGallery = Array.from(
+    new Set([
+      ...approvedMediaUrls,
+      ...(Array.isArray(projectedMetadata.gallery_images)
+        ? projectedMetadata.gallery_images
+            .map(safePublicMediaUrl)
+            .filter(Boolean)
+        : []),
+    ]),
+  ).slice(0, 12);
   const publicPath = `/content/${slugifyReferenceTitle(title)}-${encodeURIComponent(id)}`;
   const distanceKm = viewer ? haversineKm(viewer, { lat, lng }) : null;
 
@@ -366,6 +421,8 @@ function mapPublicReference(
       image_url: coverImage,
       gallery_images:
         projectedGallery.length > 0 ? projectedGallery : [coverImage],
+      gallery_media_primary: coverImage,
+      gallery_media_items: approvedMediaItems,
       reference_category_slug: categorySlug || null,
     },
     recommended_qr: null,

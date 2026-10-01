@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { buildListingFieldSchema } from './createListingSchema';
+import {
+  buildListingFieldSchema,
+  fieldsForStep,
+  selectMainStepFields,
+} from './createListingSchema';
 
 describe('create listing schema', () => {
   it('uses different fields for offer and request', () => {
@@ -91,6 +95,37 @@ describe('create listing schema', () => {
     expect(places.find(field => field.key === 'facilities')?.type).toBe(
       'multi-select',
     );
+  });
+
+
+
+  it('keeps price and budget inputs visible in the compact main step', () => {
+    const offerFields = buildListingFieldSchema(
+      'offer',
+      'materials-suppliers',
+      'raw-materials',
+    );
+    const requestFields = buildListingFieldSchema(
+      'request',
+      'materials-suppliers',
+      'raw-materials',
+    );
+
+    const offerMain = selectMainStepFields(
+      fieldsForStep(offerFields, 4),
+      7,
+    ).map(field => field.key);
+    const requestMain = selectMainStepFields(
+      fieldsForStep(requestFields, 4),
+      7,
+    ).map(field => field.key);
+
+    expect(offerMain).toContain('price_amount');
+    expect(offerMain).toContain('price_mode');
+    expect(requestMain).toContain('price_amount');
+    expect(requestMain).toContain('budget_mode');
+    expect(offerMain.length).toBeLessThanOrEqual(7);
+    expect(requestMain.length).toBeLessThanOrEqual(7);
   });
 
   it('uses radio chips for short transaction and contact choices', () => {

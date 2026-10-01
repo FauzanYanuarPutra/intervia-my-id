@@ -42,6 +42,10 @@ const labels: Record<string, string> = {
   'branch.created': 'Cabang dibuat',
   'finance.entry_corrected': 'Catatan keuangan dikoreksi',
   'finance.allocation_moved': 'Alokasi dana dipindahkan',
+  'business.data_reset.completed': 'Reset data usaha selesai',
+  'business.data_reset.partial': 'Reset data usaha sebagian gagal',
+  'business.inventory.reset': 'Stok di-reset',
+  'business.catalog.reset': 'Katalog di-reset',
 };
 
 function eventLabel(eventKey: string) {

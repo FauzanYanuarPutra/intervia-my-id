@@ -70,6 +70,20 @@ describe('business API error normalization', () => {
     )).toBe('Aksi ini bentrok dengan kondisi terbaru. Muat ulang halaman lalu coba lagi.');
   });
 
+  it('maps new profile validation codes to human guidance', () => {
+    expect(businessApiErrorMessage({ error: 'invalid_business_phone' }, 'Operasi belum berhasil.', 400))
+      .toBe('Nomor usaha belum valid.');
+    expect(businessApiErrorMessage({ error: 'invalid_business_coordinates' }, 'Operasi belum berhasil.', 400))
+      .toBe('Koordinat lokasi belum valid atau belum lengkap.');
+    expect(businessApiErrorMessage({ error: 'business_version_invalid' }, 'Operasi belum berhasil.', 400))
+      .toBe('Versi data usaha tidak valid. Muat ulang halaman lalu coba lagi.');
+  });
+
+  it('maps location validation failures without leaking backend codes', () => {
+    expect(businessApiErrorMessage({ error: 'invalid_business_locations' }, 'Lokasi belum berhasil disimpan.', 400))
+      .toBe('Data lokasi belum valid. Periksa nama, alamat, kota, titik peta, dan kontak.');
+  });
+
   it('uses a safe generic message for server failures', () => {
     expect(businessApiErrorMessage(
       { error: 'database_pool_failed' },

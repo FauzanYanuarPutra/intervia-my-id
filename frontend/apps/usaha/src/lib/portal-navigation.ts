@@ -23,6 +23,7 @@ const labels: Record<PortalSection, string> = {
   team: 'Tim & Akses',
   buyerPage: 'Tampilan Toko',
   security: 'Keamanan akun',
+  dataReset: 'Reset Data',
 };
 
 const desktopPrimaryOrder: PortalSection[] = [
@@ -48,6 +49,7 @@ const menuOrder: PortalSection[] = [
   'team',
   'buyerPage',
   'security',
+  'dataReset',
 ];
 
 export function canAccessPortalSection(

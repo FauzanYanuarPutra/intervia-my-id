@@ -1,6 +1,16 @@
 name: Usaha Control Backend Gate
+# Main pushes also run the full Rust control gate for direct-main development.
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'services/marketplace_service/src/businesses/**'
+      - 'services/marketplace_service/migrations/**'
+      - 'services/marketplace_service/tests/**'
+      - 'scripts/ci/check_business_os_migration_immutability.py'
+      - 'scripts/ci/test_business_os_migration_immutability.py'
+      - '.github/workflows/usaha-control-backend-gate.yml'
   pull_request:
     paths:
       - 'services/marketplace_service/src/businesses/**'
@@ -131,3 +141,7 @@ jobs:
           grep -q "state IN ('reserved', 'released', 'consumed')" migrations/20260918173000_business_order_stock_reservations.up.sql
           grep -q 'ON DELETE RESTRICT' migrations/20260918173000_business_order_stock_reservations.up.sql
           grep -q 'refusing to drop business_order_stock_reservations' migrations/20260918173000_business_order_stock_reservations.down.sql
+          test -s migrations/20261001100000_business_data_reset.up.sql
+          test -s migrations/20261001100000_business_data_reset.down.sql
+          grep -q 'business_data_reset_batches' migrations/20261001100000_business_data_reset.up.sql
+          grep -q 'DROP TABLE IF EXISTS business_data_reset_batches' migrations/20261001100000_business_data_reset.down.sql

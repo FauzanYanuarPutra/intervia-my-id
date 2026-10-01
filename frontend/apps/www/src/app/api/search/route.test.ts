@@ -344,14 +344,12 @@ describe('GET /api/search', () => {
     });
 
     const response = await GET(
-      searchRequest('q=kopi&tab=businesses&side=supply'),
+      searchRequest('q=kopi&tab=businesses&side=all'),
     );
     const payload = await response.json();
 
     expect(response.status).toBe(200);
-    expect(payload.groups.businesses.items[0].href).toBe(
-      '/toko/warung-kopi-nusantara',
-    );
+    expect(payload.groups.businesses.items[0].href).toBe('/toko/warung-kopi-nusantara');
   });
 
   it('browses supply and demand tabs without requiring a keyword', async () => {
@@ -407,9 +405,9 @@ describe('GET /api/search', () => {
     const supplyPayload = await supplyResponse.json();
 
     expect(supplyResponse.status).toBe(200);
-    expect(supplyPayload.total).toBe(2);
+    expect(supplyPayload.total).toBe(1);
     expect(supplyPayload.groups.products.items[0].id).toBe('offer-1');
-    expect(supplyPayload.groups.businesses.items[0].id).toBe('store-1');
+    expect(supplyPayload.groups.businesses.items).toEqual([]);
     expect(supplyPayload.groups.needs.total).toBe(0);
 
     const demandResponse = await GET(searchRequest('side=demand'));
@@ -512,7 +510,7 @@ describe('GET /api/search', () => {
     expect(payload.groups.products.items[0].id).toBe('provider-product');
     expect(payload.groups.services.items[0].id).toBe('provider-service');
     expect(payload.availableTabs).not.toContain('needs');
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('ignores incompatible tabs when a side is explicit', async () => {

@@ -210,18 +210,103 @@ export function isUmkmMapPublicReference(
   );
 }
 
-export function buildUmkmMapPlacePath(place: UmkmMapLinkTarget): string {
-  if (isUmkmMapPublicReference(place)) {
-    const metadataPath = place.metadata?.public_path;
-    const publicPath =
-      readSafePublicPath(place.public_path) ||
-      readSafePublicPath(metadataPath);
-    if (publicPath) return publicPath;
+export type UmkmMapSourceKind =
+  | 'lajukan'
+  | 'registered'
+  | 'reference'
+  | 'unknown';
+
+export function getUmkmMapSourceKind(
+  place: Pick<UmkmMapLinkTarget, 'metadata'>,
+): UmkmMapSourceKind {
+  if (isUmkmMapPublicReference(place)) return 'reference';
+
+  const metadata = place.metadata || {};
+  const sourceKind =
+    typeof metadata.source_kind === 'string'
+      ? metadata.source_kind.trim().toLowerCase()
+      : '';
+  const source =
+    typeof metadata.source === 'string'
+      ? metadata.source.trim().toLowerCase()
+      : '';
+
+  if (
+    [
+      'lajukan_store',
+      'lajukan_content',
+      'lajukan_listing',
+      'usaha_portal',
+    ].includes(sourceKind) ||
+    source === 'usaha_portal' ||
+    metadata.owner_user_id != null ||
+    metadata.owner_id != null
+  ) {
+    return 'lajukan';
   }
 
-  return buildUmkmStorefrontPath(place.slug?.trim() || '');
+  if (
+    [
+      'registered_store',
+      'external_store',
+      'osm_store',
+      'osm_provider',
+    ].includes(sourceKind) ||
+    Boolean(
+      (typeof metadata.source_dataset === 'string' &&
+        metadata.source_dataset.trim()) ||
+        (typeof metadata.source_url === 'string' &&
+          metadata.source_url.trim()),
+    )
+  ) {
+    return 'registered';
+  }
+
+  return 'unknown';
 }
 
+export function getUmkmMapSourceLabel(
+  kind: UmkmMapSourceKind,
+  isId: boolean,
+): string {
+  if (kind === 'lajukan') {
+    return isId ? 'Usaha Lajukan' : 'Lajukan business';
+  }
+  if (kind === 'registered') {
+    return isId ? 'Lokasi usaha' : 'Business location';
+  }
+  if (kind === 'reference') {
+    return isId ? 'Lokasi publik' : 'Public location';
+  }
+  return isId ? 'Lokasi terdata' : 'Mapped location';
+}
+
+
+export function buildUmkmMapPlacePath(place: UmkmMapLinkTarget): string {
+  const metadata = place.metadata || {};
+  const recordKind = typeof metadata.record_kind === 'string' ? metadata.record_kind.trim().toLowerCase() : '';
+  const sourceKind = typeof metadata.source_kind === 'string' ? metadata.source_kind.trim().toLowerCase() : '';
+  const source = typeof metadata.source === 'string' ? metadata.source.trim().toLowerCase() : '';
+  const metadataSlug =
+    typeof metadata.storefront_slug === 'string' ? metadata.storefront_slug.trim() :
+    typeof metadata.store_slug === 'string' ? metadata.store_slug.trim() :
+    typeof metadata.business_slug === 'string' ? metadata.business_slug.trim() : '';
+  const storefrontSlug = place.slug?.trim() || metadataSlug;
+
+  if (isUmkmMapPublicReference(place)) return buildUmkmStorefrontPath(storefrontSlug);
+
+  if (sourceKind === 'lajukan_store' || sourceKind === 'registered_store' || source === 'usaha_portal' || metadata.owner_user_id != null || metadata.owner_id != null) {
+    return buildUmkmStorefrontPath(storefrontSlug);
+  }
+
+  if (sourceKind.includes('listing') || sourceKind.includes('content') || recordKind.includes('listing')) {
+    const publicPath = readSafePublicPath(place.public_path) || readSafePublicPath(metadata.public_path);
+    if (publicPath) return publicPath;
+    return storefrontSlug ? `/content/${encodeURIComponent(storefrontSlug)}` : '/explore';
+  }
+
+  return buildUmkmStorefrontPath(storefrontSlug);
+}
 export function buildUmkmScanPath(token?: string | null): string {
   const cleanToken = token?.trim();
   if (!cleanToken) return UMKM_STORE_SCAN_PATH;

@@ -27,6 +27,12 @@ describe('news rich text hardening', () => {
     expect(normalizeNewsRichBody('A\nB\n\nC', '')).toBe('<p>A<br />B</p><p>C</p>');
   });
 
+  it('normalizes escaped Windows line endings, tabs, Unicode separators, and null bytes', () => {
+    expect(
+      normalizeNewsRichBody('A\\r\\nB\\n\\nC\\tD\\u2028E\\u2029F\\u0000', ''),
+    ).toBe('<p>A<br />B</p><p>C&nbsp;&nbsp;&nbsp; D<br />E<br />F</p>');
+  });
+
   it('escapes HTML when normalizing plain rich-body text', () => {
     expect(normalizeNewsRichBody('<script>alert(1)</script> & text', '')).toBe(
       '<p>&lt;script&gt;alert(1)&lt;/script&gt; &amp; text</p>',

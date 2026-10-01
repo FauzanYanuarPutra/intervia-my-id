@@ -26,6 +26,8 @@ import {
 import { Link } from '@/i18n/navigation';
 import {
   buildUmkmMapPlacePath,
+  getUmkmMapSourceKind,
+  getUmkmMapSourceLabel,
   isUmkmMapPublicReference,
 } from '@/lib/umkmSurface';
 import { cn } from '@/lib/utils';
@@ -45,6 +47,7 @@ import {
   getNextUmkmMapTheme,
   getUmkmMapThemeLabel,
   UmkmStoreMap,
+  type UmkmMapBounds,
   type UmkmMapRouteSummary,
   type UmkmMapStore,
   type UmkmMapTheme,
@@ -52,6 +55,8 @@ import {
 import { useViewerLocation } from './useViewerLocation';
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 import { Skeleton, SkeletonStack } from '@/components/ui/Skeleton';
+import { LajukanImage } from '@/components/common/LajukanImage';
+import { resolveStorefrontBrandMedia } from '@/lib/super-app/storefront-brand-media';
 import { EmblaInlineRail } from '@/components/common/EmblaInlineRail';
 
 type UmkmDiscoveryPanelProps = {
@@ -124,6 +129,15 @@ type StoresResponse = {
 };
 
 const LIST_PAGE_SIZE = 10;
+const MAP_VIEWPORT_PADDING = 0.24;
+const MAP_POINTS_CACHE_LIMIT = 4000;
+
+function getMapViewportFetchLimit(zoom: number): number {
+  if (zoom <= 5) return 600;
+  if (zoom <= 8) return 900;
+  if (zoom <= 11) return 1200;
+  return 1800;
+}
 const REPORT_EMAIL = 'support@lajukan.com';
 
 function formatDiscoveryPrice(valueCents: number, isId: boolean): string {
@@ -212,7 +226,7 @@ function getOpenStatusProfile(
 } {
   if (isPublicReference) {
     return {
-      label: isId ? 'Referensi publik' : 'Public reference',
+      label: isId ? 'Lokasi usaha' : 'Business locations',
       dotClassName: 'bg-blue-400',
       textClassName: 'text-blue-700 dark:text-blue-300',
     };
@@ -238,6 +252,87 @@ function getOpenStatusProfile(
   };
 }
 
+function isValidPreviewUrl(value: string): boolean {
+  const url = value.trim();
+  if (!url || url.toLowerCase() === 'invalid media url') return false;
+  if (url.startsWith('/')) return !url.startsWith('//');
+  try {
+    const parsed = new URL(url);
+    return (parsed.protocol === 'http:' || parsed.protocol === 'https:') && !parsed.username && !parsed.password;
+  } catch {
+    return false;
+  }
+}
+
+function SelectedStoreMediaPreview({
+  store,
+  isId,
+  onOpenStore,
+  productsLoading,
+}: {
+  store: DiscoveryStore;
+  isId: boolean;
+  onOpenStore: () => void;
+  productsLoading?: boolean;
+}) {
+  const media = resolveStorefrontBrandMedia(store.metadata || {});
+  const images = Array.from(new Set([media.coverUrl, ...media.galleryUrls].filter((value): value is string => typeof value === 'string' && isValidPreviewUrl(value)))).slice(0, 5);
+  const logo = media.logoUrl && isValidPreviewUrl(media.logoUrl) ? media.logoUrl : null;
+  const products = (store.products || []).slice(0, 4);
+  const hasMedia = Boolean(logo || images.length);
+
+  return (
+    <div className="mt-2 space-y-2">
+      {hasMedia ? (
+        <div className="flex min-w-0 gap-2 overflow-hidden">
+          {logo ? (
+            <button type="button" onClick={onOpenStore} className="relative h-14 w-14 shrink-0 overflow-hidden rounded-[14px] border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900" aria-label={isId ? 'Buka logo usaha' : 'Open business logo'}>
+              <LajukanImage src={logo} alt={isId ? `Logo ${store.name}` : `${store.name} logo`} fill sizes="56px" className="object-contain p-1.5" />
+            </button>
+          ) : null}
+          {images.slice(0, 2).map((url, index) => (
+            <button key={url} type="button" onClick={onOpenStore} className={cn('relative min-w-0 flex-1 overflow-hidden rounded-[14px] border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-900', images.length === 1 && !logo ? 'h-24' : 'h-14')} aria-label={isId ? `Foto usaha ${index + 1}` : `Business photo ${index + 1}`}>
+              <LajukanImage src={url} alt={isId ? `Foto ${store.name} ${index + 1}` : `${store.name} photo ${index + 1}`} fill sizes="(min-width: 1024px) 180px, 45vw" className="object-cover" />
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {productsLoading && products.length === 0 ? (
+        <div className="rounded-[14px] border border-slate-200/90 bg-slate-50/80 p-2 dark:border-slate-800 dark:bg-slate-900/60" aria-busy="true">
+          <div className="flex items-center justify-between gap-2"><Skeleton variant="line" className="h-3 w-24" /><Skeleton variant="chip" className="h-6 w-16" /></div>
+          <div className="mt-1.5 flex gap-2 overflow-hidden">
+            {[0, 1].map(index => (
+              <div key={index} className="flex h-12 w-[138px] shrink-0 items-center gap-2 rounded-[11px] border border-slate-200 bg-white p-1.5 dark:border-slate-800 dark:bg-slate-950">
+                <Skeleton variant="block" className="h-10 w-10 shrink-0 rounded-lg" />
+                <div className="min-w-0 flex-1"><Skeleton variant="line" className="h-3 w-20" /><Skeleton variant="line" className="mt-1.5 h-3 w-14" /></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : products.length > 0 ? (
+        <div className="rounded-[14px] border border-slate-200/90 bg-slate-50/80 p-2 dark:border-slate-800 dark:bg-slate-900/60">
+          <div className="flex items-center justify-between gap-2"><p className="text-[10px] font-black text-slate-700 dark:text-slate-200">{isId ? 'Produk / menu' : 'Products / menu'}</p><button type="button" onClick={onOpenStore} className="text-[9px] font-bold text-emerald-700 hover:underline dark:text-emerald-300">{isId ? 'Lihat semua' : 'View all'}</button></div>
+          <EmblaInlineRail className="mt-1.5" contentClassName="gap-2" itemClassName="w-[138px] shrink-0">
+            {products.map(product => {
+              const image = product.image_url && isValidPreviewUrl(product.image_url) ? product.image_url : null;
+              return (
+                <button key={product.id} type="button" onClick={onOpenStore} className="flex w-full items-center gap-2 rounded-[11px] border border-slate-200 bg-white p-1.5 text-left dark:border-slate-800 dark:bg-slate-950">
+                  {image ? <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-slate-100 dark:bg-slate-800"><LajukanImage src={image} alt="" fill sizes="40px" className="object-cover" /></div> : null}
+                  <span className="min-w-0"><span className="block line-clamp-2 text-[10px] font-bold leading-4 text-slate-800 dark:text-slate-100">{product.name}</span><span className="mt-0.5 block truncate text-[9px] font-semibold text-emerald-700 dark:text-emerald-300">{product.price_cents > 0 ? formatDiscoveryPrice(product.price_cents, isId) : isId ? 'Negosiasi' : 'Negotiable'}</span></span>
+                </button>
+              );
+            })}
+          </EmblaInlineRail>
+        </div>
+      ) : null}
+
+      {!hasMedia && !products.length && !productsLoading ? (
+        <button type="button" onClick={onOpenStore} className="w-full rounded-[13px] border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-left text-[9.5px] font-semibold text-slate-500 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-400">{isId ? 'Belum ada media atau produk yang tampil. Buka usaha untuk melihat detail dan menambahkan foto.' : 'No media or products are shown yet. Open the business for details and photo contributions.'}</button>
+      ) : null}
+    </div>
+  );
+}
 function getPlaceLocationLabel(
   place: {
     store: Pick<DiscoveryStore, 'city'>;
@@ -726,7 +821,7 @@ function PublicReferenceBadge({ isId }: { isId: boolean }) {
     <span className="inline-flex min-w-0 items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[9.5px] font-bold text-sky-800 dark:border-sky-900/70 dark:bg-sky-950/44 dark:text-sky-200">
       <MapPinned className="h-3 w-3 shrink-0" />
       <span className="truncate">
-        {isId ? 'Data publik · belum diklaim' : 'Public data · unclaimed'}
+        {isId ? 'Lokasi usaha · belum diklaim' : 'Business location · unclaimed'}
       </span>
     </span>
   );
@@ -760,7 +855,7 @@ export function PublicReferenceNotice({
         )}
       >
         {isId
-          ? 'Referensi lokasi non-transaksi. Belum diklaim pemilik dan belum diverifikasi Lajukan; periksa pembaruan di sumber asli.'
+          ? 'Lokasi usaha dari data publik. Belum diklaim pemilik dan belum diverifikasi Lajukan; periksa pembaruan di sumber asli.'
           : 'A non-transactional location reference. It is unclaimed and not verified by Lajukan; check the original source for updates.'}
       </p>
       {provenance.sourceTitle || provenance.sourceLicense ? (
@@ -828,7 +923,7 @@ export function PublicReferenceResultCard({
       <button
         type="button"
         onClick={onSelect}
-        aria-label={`${isId ? 'Detail referensi' : 'Reference details'} ${place.store.name}`}
+        aria-label={`${isId ? 'Detail lokasi usaha' : 'Business location details'} ${place.store.name}`}
         className={cn(
           'group grid w-full min-w-0 items-center gap-2 text-left transition hover:bg-sky-50/54 dark:hover:bg-sky-950/18',
           compact
@@ -919,13 +1014,13 @@ function DiscoveryScopeControl({
     },
     {
       value: 'registered',
-      label: isId ? 'Usaha' : 'Businesses',
+      label: isId ? 'Usaha Lajukan' : 'Lajukan businesses',
       activeClass:
         'bg-emerald-600 text-white shadow-sm shadow-emerald-600/20',
     },
     {
       value: 'references',
-      label: isId ? 'Sumber publik' : 'Public source',
+      label: isId ? 'Lokasi usaha' : 'Business locations',
       activeClass:
         'bg-sky-600 text-white shadow-sm shadow-sky-600/20',
     },
@@ -1000,6 +1095,7 @@ export function UmkmDiscoveryPanel({
   initialCount,
 }: UmkmDiscoveryPanelProps) {
   const hasInitialStores = initialStores !== undefined;
+  const locale = isId ? 'id' : 'en';
   const [stores, setStores] = useState<DiscoveryStore[]>(
     () => initialStores || [],
   );
@@ -1083,13 +1179,11 @@ export function UmkmDiscoveryPanel({
   const [storesBackendDegraded, setStoresBackendDegraded] = useState(false);
   const [mapPoints, setMapPoints] = useState<UmkmMapStore[]>([]);
   const activeMapPointsRequestRef = useRef<AbortController | null>(null);
-  const handleMapBoundsChange = useCallback(() => {
-    // Deliberately ignored: map panning must not trigger a network reload.
-    // The geo-only dataset is loaded once and reused client-side.
-  }, []);
+  const mapViewportTimerRef = useRef<number | null>(null);
+  const mapPointsCacheRef = useRef(new Map<string, UmkmMapStore>());
+  const lastMapViewportKeyRef = useRef<string | null>(null);
   const requestLimit = Math.max(24, Math.min(60, Math.max(limit * 3, 24)));
   const referencePageLimit = 60;
-  const mapPointLimit = 1800;
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1414,94 +1508,178 @@ export function UmkmDiscoveryPanel({
       activeReferencesRequestRef.current?.abort();
     };
   }, [loadReferencesPage, query, city, discoveryScope]);
+  const clearMapPointCache = useCallback(() => {
+    mapPointsCacheRef.current.clear();
+    lastMapViewportKeyRef.current = null;
+    setMapPoints([]);
+  }, []);
+
   useEffect(() => {
-    activeMapPointsRequestRef.current?.abort();
-    const controller = new AbortController();
-    activeMapPointsRequestRef.current = controller;
-
-    // Load a stable nationwide geo-only snapshot once per search/location
-    // context. Panning the map never changes the request, so the user gets
-    // progressive nearest-to-farthest data without loading flashes.
-    const params = new URLSearchParams({
-      limit: String(mapPointLimit),
-    });
-    if (query?.trim()) params.set('q', query.trim());
-    if (city?.trim()) params.set('city', city.trim());
-    if (queryViewerLocation) {
-      params.set('viewer_lat', queryViewerLocation.lat.toFixed(3));
-      params.set('viewer_lng', queryViewerLocation.lng.toFixed(3));
+    clearMapPointCache();
+    if (mapViewportTimerRef.current !== null) {
+      window.clearTimeout(mapViewportTimerRef.current);
+      mapViewportTimerRef.current = null;
     }
-
-    const timerId = window.setTimeout(() => {
-      void fetch(`/api/super-app/umkm/map-points?${params.toString()}`, {
-        cache: 'default',
-        signal: controller.signal,
-      })
-      .then(async response => {
-        const payload = (await response.json().catch(() => ({}))) as MapPointResponse;
-        if (!response.ok || controller.signal.aborted) return;
-        const points = payload.data?.items || [];
-        setMapPoints(
-          points
-            .filter(point => isCoordinateValid({ lat: point.lat, lng: point.lng }))
-            .map(point => ({
-              id: point.id,
-              slug: point.slug,
-              name: point.name,
-              city: point.city || 'Indonesia',
-              address: point.city || 'Indonesia',
-              lat: point.lat,
-              lng: point.lng,
-              description: null,
-              phone: null,
-              metadata: {
-                ...(point.metadata || {}),
-                marketplace_category_slug:
-                  point.metadata?.marketplace_category_slug || point.category,
-                umkm_category:
-                  point.metadata?.umkm_category,
-                record_kind:
-                  point.source_kind.includes('reference')
-                    ? point.metadata?.record_kind || 'open_data_reference'
-                    : point.metadata?.record_kind || 'registered_store',
-                market_side:
-                  point.source_kind.includes('reference')
-                    ? 'reference'
-                    : point.metadata?.market_side || 'supply',
-                is_transactional:
-                  !point.source_kind.includes('reference'),
-                reference_publication_status:
-                  point.source_kind.includes('reference')
-                    ? 'published'
-                    : point.metadata?.reference_publication_status,
-                claimable: point.source_kind.includes('reference'),
-                source_dataset: point.metadata?.source_dataset || point.source_kind,
-                is_public_reference: point.source_kind.includes('reference'),
-              },
-              online_order_enabled: false,
-              offline_order_enabled: false,
-              reservation_enabled: false,
-              table_count: 0,
-              available_table_count: 0,
-              max_table_capacity: 0,
-            })),
-        );
-      })
-        .catch(error => {
-          if (!controller.signal.aborted) {
-            console.warn('[UMKM_MAP_POINTS_CLIENT_ERROR]', error);
-          }
-        });
-    }, 320);
+    activeMapPointsRequestRef.current?.abort();
 
     return () => {
-      window.clearTimeout(timerId);
-      controller.abort();
-      if (activeMapPointsRequestRef.current === controller) {
-        activeMapPointsRequestRef.current = null;
+      if (mapViewportTimerRef.current !== null) {
+        window.clearTimeout(mapViewportTimerRef.current);
+        mapViewportTimerRef.current = null;
       }
+      activeMapPointsRequestRef.current?.abort();
     };
-  }, [city, mapPointLimit, query, queryViewerLocation]);
+  }, [clearMapPointCache, city, discoveryScope, mapRangeKm, query, queryViewerLocation]);
+
+  const handleMapBoundsChange = useCallback(
+    (bounds: UmkmMapBounds) => {
+      const rawBounds = [
+        bounds.minLat,
+        bounds.maxLat,
+        bounds.minLng,
+        bounds.maxLng,
+        bounds.zoom,
+      ];
+
+      if (
+        !rawBounds.every(Number.isFinite) ||
+        bounds.minLat < -90 ||
+        bounds.maxLat > 90 ||
+        bounds.minLng < -180 ||
+        bounds.maxLng > 180 ||
+        bounds.minLat > bounds.maxLat ||
+        bounds.minLng > bounds.maxLng
+      ) {
+        return;
+      }
+
+      const latPadding = Math.min(
+        12,
+        Math.max(0.01, (bounds.maxLat - bounds.minLat) * MAP_VIEWPORT_PADDING),
+      );
+      const lngPadding = Math.min(
+        18,
+        Math.max(0.01, (bounds.maxLng - bounds.minLng) * MAP_VIEWPORT_PADDING),
+      );
+      const minLat = Math.max(-90, bounds.minLat - latPadding);
+      const maxLat = Math.min(90, bounds.maxLat + latPadding);
+      const minLng = Math.max(-180, bounds.minLng - lngPadding);
+      const maxLng = Math.min(180, bounds.maxLng + lngPadding);
+
+      const viewportKey = [
+        query?.trim() || '',
+        city?.trim() || '',
+        discoveryScope,
+        mapRangeKm ?? '',
+        Math.round(minLat * 100) / 100,
+        Math.round(maxLat * 100) / 100,
+        Math.round(minLng * 100) / 100,
+        Math.round(maxLng * 100) / 100,
+        Math.min(19, Math.max(2, Math.round(bounds.zoom))),
+      ].join('|');
+
+      if (lastMapViewportKeyRef.current === viewportKey) return;
+      lastMapViewportKeyRef.current = viewportKey;
+
+      if (mapViewportTimerRef.current !== null) {
+        window.clearTimeout(mapViewportTimerRef.current);
+      }
+
+      mapViewportTimerRef.current = window.setTimeout(() => {
+        mapViewportTimerRef.current = null;
+        activeMapPointsRequestRef.current?.abort();
+        const controller = new AbortController();
+        activeMapPointsRequestRef.current = controller;
+
+        const params = new URLSearchParams({
+          limit: String(getMapViewportFetchLimit(bounds.zoom)),
+          min_lat: minLat.toFixed(5),
+          max_lat: maxLat.toFixed(5),
+          min_lng: minLng.toFixed(5),
+          max_lng: maxLng.toFixed(5),
+        });
+        if (query?.trim()) params.set('q', query.trim());
+        if (city?.trim()) params.set('city', city.trim());
+        if (mapRangeKm !== null && queryViewerLocation) {
+          params.set('viewer_lat', queryViewerLocation.lat.toFixed(3));
+          params.set('viewer_lng', queryViewerLocation.lng.toFixed(3));
+          params.set('radius_km', String(mapRangeKm));
+        }
+
+        void fetch(`/api/super-app/umkm/map-points?${params.toString()}`, {
+          cache: 'no-store',
+          signal: controller.signal,
+        })
+          .then(async response => {
+            const payload = (await response.json().catch(() => ({}))) as MapPointResponse;
+            if (!response.ok || controller.signal.aborted) return;
+
+            const points = (payload.data?.items || [])
+              .filter(point => isCoordinateValid({ lat: point.lat, lng: point.lng }))
+              .map(point => ({
+                id: point.id,
+                slug: point.slug,
+                name: point.name,
+                city: point.city || 'Indonesia',
+                address: point.city || 'Indonesia',
+                lat: point.lat,
+                lng: point.lng,
+                description: null,
+                phone: null,
+                metadata: {
+                  ...(point.metadata || {}),
+                  marketplace_category_slug:
+                    point.metadata?.marketplace_category_slug || point.category,
+                  umkm_category: point.metadata?.umkm_category,
+                  source_kind: point.source_kind,
+                  record_kind: point.source_kind.includes('reference')
+                    ? point.metadata?.record_kind || 'open_data_reference'
+                    : point.metadata?.record_kind || 'registered_store',
+                  market_side: point.source_kind.includes('reference')
+                    ? 'reference'
+                    : point.metadata?.market_side || 'supply',
+                  is_transactional: !point.source_kind.includes('reference'),
+                  reference_publication_status: point.source_kind.includes('reference')
+                    ? 'published'
+                    : point.metadata?.reference_publication_status,
+                  claimable: point.source_kind.includes('reference'),
+                  source_dataset: point.metadata?.source_dataset || point.source_kind,
+                  is_public_reference: point.source_kind.includes('reference'),
+                },
+                online_order_enabled: false,
+                offline_order_enabled: false,
+                reservation_enabled: false,
+                table_count: 0,
+                available_table_count: 0,
+                max_table_capacity: 0,
+              } satisfies UmkmMapStore));
+
+            const cache = mapPointsCacheRef.current;
+            for (const point of points) {
+              cache.delete(point.id);
+              cache.set(point.id, point);
+            }
+            while (cache.size > MAP_POINTS_CACHE_LIMIT) {
+              const oldestId = cache.keys().next().value;
+              if (typeof oldestId !== 'string') break;
+              cache.delete(oldestId);
+            }
+            setMapPoints(Array.from(cache.values()));
+          })
+          .catch(error => {
+            if (!controller.signal.aborted) {
+              console.warn('[UMKM_MAP_POINTS_VIEWPORT_ERROR]', error);
+            }
+          })
+          .finally(() => {
+            if (activeMapPointsRequestRef.current === controller) {
+              activeMapPointsRequestRef.current = null;
+            }
+          });
+      }, 320);
+    },
+    [city, discoveryScope, mapRangeKm, query, queryViewerLocation],
+  );
 
   const preparedStores = useMemo(
     () =>
@@ -1543,6 +1721,13 @@ export function UmkmDiscoveryPanel({
           ? right.store.distance_km
           : null;
 
+      const sourcePriority = (store: DiscoveryStore) => {
+        const kind = getUmkmMapSourceKind(store);
+        return kind === 'lajukan' ? 0 : kind === 'registered' ? 1 : kind === 'reference' ? 2 : 3;
+      };
+      const sourceDelta = sourcePriority(left.store) - sourcePriority(right.store);
+      if (sourceDelta !== 0) return sourceDelta;
+
       if (leftDistance !== null && rightDistance !== null) {
         const delta = leftDistance - rightDistance;
         if (Math.abs(delta) > 0.001) return delta;
@@ -1551,10 +1736,6 @@ export function UmkmDiscoveryPanel({
       } else if (rightDistance !== null) {
         return 1;
       }
-
-      const leftNative = !isUmkmMapPublicReference(left.store);
-      const rightNative = !isUmkmMapPublicReference(right.store);
-      if (leftNative !== rightNative) return leftNative ? -1 : 1;
 
       return left.store.name.localeCompare(right.store.name, 'id');
     });
@@ -1616,7 +1797,7 @@ export function UmkmDiscoveryPanel({
       }
     }
     return Array.from(merged.values());
-  }, [category, discoveryScope, mapPoints, visibleStores]);
+  }, [category, discoveryScope, isId, mapPoints, viewerLocation, visibleStores]);
   const selectedPlace = useMemo(
     () => visibleStores.find(item => item.store.id === selectedStoreId) || null,
     [selectedStoreId, visibleStores],
@@ -2188,11 +2369,11 @@ export function UmkmDiscoveryPanel({
             focusMode={mapFocusMode}
             focusNonce={mapFocusNonce}
             focusOffset={viewerFocusOffset}
-            onBoundsChange={handleMapBoundsChange}
             onSelectStore={
               edgeToEdge ? handleEdgeMapSelectStore : handleMapSelectStore
             }
             showPopups={false}
+            onBoundsChange={handleMapBoundsChange}
             className={className}
           />
           <div
@@ -2493,6 +2674,16 @@ export function UmkmDiscoveryPanel({
                     </p>
                   </div>
 
+                  <SelectedStoreMediaPreview
+                    store={selectedPlace.store}
+                    isId={isId}
+                    productsLoading={selectedProductsLoading}
+                    onOpenStore={() => {
+                      const href = buildUmkmMapPlacePath(selectedPlace.store);
+                      window.location.href = href.startsWith('/') ? `/${locale}${href}` : href;
+                    }}
+                  />
+
                   <div
                     className={cn(
                       'mt-2 grid gap-1.5',
@@ -2512,8 +2703,8 @@ export function UmkmDiscoveryPanel({
                       <span className="truncate">
                         {selectedIsPublicReference
                           ? isId
-                            ? 'Lihat sumber'
-                            : 'View source'
+                            ? 'Lihat lokasi'
+                            : 'View location'
                           : isId
                             ? 'Buka usaha'
                             : 'Open business'}
@@ -3313,6 +3504,14 @@ export function UmkmDiscoveryPanel({
                               </h4>
 
                               <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10.5px] font-semibold">
+                                <span className={cn(
+                                  'rounded-full border px-2 py-0.5 text-[9px] font-black',
+                                  getUmkmMapSourceKind(item.store) === 'lajukan'
+                                    ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
+                                    : 'border-slate-200 bg-slate-50 text-slate-600',
+                                )}>
+                                  {getUmkmMapSourceLabel(getUmkmMapSourceKind(item.store), isId)}
+                                </span>
                                 {item.ui.ratingNumber > 0 ? (
                                   <RatingStars
                                     rating={item.ui.ratingNumber}

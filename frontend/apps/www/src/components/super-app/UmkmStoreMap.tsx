@@ -32,6 +32,7 @@ export type UmkmMapBounds = {
   maxLat: number;
   minLng: number;
   maxLng: number;
+  zoom: number;
 };
 export type UmkmMapFocusOffset = { x: number; y: number };
 
@@ -77,6 +78,8 @@ type UmkmStoreMapProps = {
   focusOffset?: UmkmMapFocusOffset;
   onBoundsChange?: (bounds: UmkmMapBounds) => void;
   markerStyle?: 'default' | 'dots';
+  /** Animate a small subset of actual data points; never invents locations. */
+  animateDataDots?: boolean;
 };
 
 const UmkmStoreMapClient = dynamic(

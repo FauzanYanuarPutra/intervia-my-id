@@ -1,6 +1,6 @@
 'use client';
 
-import { startTransition, useState } from 'react';
+import { startTransition, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Save } from 'lucide-react';
 import type { BusinessRecord } from '@/lib/portal-types';
@@ -18,10 +18,29 @@ export function OperationsQuickForm({ business }: OperationsQuickFormProps) {
   const [success, setSuccess] = useState('');
   const [isPending, setIsPending] = useState(false);
 
+  const hasChanges =
+    schedule.trim() !== business.schedule.trim() ||
+    isOpen !== business.isOpen;
+
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!hasChanges || isPending) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasChanges, isPending]);
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (isPending) return;
+    if (!hasChanges) {
+      setError('Belum ada perubahan operasional yang perlu disimpan.');
+      return;
+    }
 
-    if (schedule.trim().length < 5) {
+    if (schedule.trim().length < 5 || schedule.trim().length > 300) {
       setError('Jam buka belum valid.');
       return;
     }
@@ -29,6 +48,16 @@ export function OperationsQuickForm({ business }: OperationsQuickFormProps) {
       setError('Tulis alasan perubahan operasional minimal 3 karakter.');
       return;
     }
+
+    const changed =
+      schedule.trim() !== business.schedule.trim() ||
+      isOpen !== business.isOpen;
+
+    if (changed && !window.confirm(
+      isOpen !== business.isOpen
+        ? (isOpen ? 'Tandai usaha sebagai sedang buka?' : 'Tandai usaha sebagai tutup?')
+        : 'Simpan perubahan jam operasional?'
+    )) return;
 
     setError('');
     setSuccess('');
@@ -44,6 +73,7 @@ export function OperationsQuickForm({ business }: OperationsQuickFormProps) {
           schedule: schedule.trim(),
           isOpen,
           reason: reason.trim(),
+          expectedVersion: business.version ?? 1,
         }),
       });
 
@@ -120,7 +150,7 @@ export function OperationsQuickForm({ business }: OperationsQuickFormProps) {
       {error ? <p role="alert" className="text-sm text-portal-ember">{error}</p> : null}
       {success ? <p role="status" aria-live="polite" className="text-sm text-portal-forest">{success}</p> : null}
 
-      <button type="submit" disabled={isPending || reason.trim().length < 3} className="portal-button-primary">
+      <button type="submit" disabled={isPending || !hasChanges || reason.trim().length < 3} className="portal-button-primary">
         <Save className="h-4 w-4" />
         {isPending ? 'Menyimpan...' : 'Simpan operasional'}
       </button>

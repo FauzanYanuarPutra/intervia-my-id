@@ -43,6 +43,12 @@ function asArray(value: unknown): JsonRecord[] {
     : [];
 }
 
+function readString(value: unknown): string {
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  return '';
+}
+
 function forwardedHeaders(req: NextRequest): Headers {
   const headers = new Headers();
   const cookie = req.headers.get('cookie');
@@ -76,6 +82,7 @@ async function fetchInternalJson(
 function exploreGroup(
   items: Array<GlobalSearchItem | null>,
   available: boolean,
+  nextCursor: string | number | null = null,
 ): GlobalSearchGroup {
   const unique = new Map<string, GlobalSearchItem>();
   for (const item of items) {
@@ -85,7 +92,7 @@ function exploreGroup(
   return {
     items: normalized,
     total: normalized.length,
-    nextCursor: null,
+    nextCursor: nextCursor == null ? null : String(nextCursor),
     available,
     error: available ? null : 'section_unavailable',
   };
@@ -125,6 +132,7 @@ async function loadSocialExploreGroups(req: NextRequest): Promise<{
       videos: exploreGroup(
         asArray(videosPayload?.items).map(mapVideo),
         videosResult.ok,
+        readString(videosPayload?.nextCursor),
       ),
       users: unavailableExploreGroup(),
     },

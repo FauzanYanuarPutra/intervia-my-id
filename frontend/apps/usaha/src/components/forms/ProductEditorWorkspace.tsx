@@ -1,6 +1,6 @@
 'use client';
 
-import { startTransition, useState } from 'react';
+import { startTransition, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Archive, CheckCircle2, Save, X } from 'lucide-react';
 import { ChoiceChips } from '@/components/interaction/ChoiceChips';
@@ -34,7 +34,44 @@ export function ProductEditorWorkspace({ businessId, product, closeHref }: Props
   const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
   const [changeReason, setChangeReason] = useState('Pembaruan data produk');
   const [stockReason, setStockReason] = useState('Penyesuaian stok');
+  const [modifierDirty, setModifierDirty] = useState(false);
   const busy = pendingAction !== null;
+
+  const hasDetailChanges =
+    name.trim() !== product.name.trim() ||
+    category.trim() !== product.category.trim() ||
+    (priceRupiah ?? null) !== parseRupiahInput(product.priceLabel) ||
+    minStockAlert.trim() !== (product.minStockAlert?.toString() ?? '') ||
+    stockUnit.trim() !== (product.stockUnit || 'pcs') ||
+    modifierDirty;
+
+  const hasStockChanges =
+    (stockCount.trim() ? Number(stockCount) : null) !== (product.stockCount ?? null);
+
+  const hasUnsavedChanges =
+    name.trim() !== product.name.trim() ||
+    category.trim() !== product.category.trim() ||
+    (priceRupiah ?? null) !== parseRupiahInput(product.priceLabel) ||
+    status !== product.status ||
+    stockCount.trim() !== (product.stockCount?.toString() ?? '') ||
+    minStockAlert.trim() !== (product.minStockAlert?.toString() ?? '') ||
+    stockUnit.trim() !== (product.stockUnit || 'pcs');
+
+  function confirmClose(): boolean {
+    if (busy) return false;
+    if (!hasUnsavedChanges) return true;
+    return window.confirm('Ada perubahan produk yang belum disimpan. Tutup editor dan buang perubahan tersebut?');
+  }
+
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!hasUnsavedChanges) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
 
   async function request(path: string, body: Record<string, unknown>) {
     const response = await fetch(path, {
@@ -58,6 +95,11 @@ export function ProductEditorWorkspace({ businessId, product, closeHref }: Props
 
   async function saveProduct(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (busy) return;
+    if (!hasDetailChanges) {
+      setError('Belum ada perubahan detail produk yang perlu disimpan.');
+      return;
+    }
     const normalizedPrice = priceRupiah ?? 0;
     const normalizedThreshold = minStockAlert.trim() ? Number(minStockAlert) : null;
 
@@ -99,6 +141,7 @@ export function ProductEditorWorkspace({ businessId, product, closeHref }: Props
   }
 
   async function saveStock() {
+    if (busy) return;
     const normalizedStock = stockCount.trim() ? Number(stockCount) : null;
     if (normalizedStock !== null && (!Number.isFinite(normalizedStock) || normalizedStock < 0)) {
       setError('Jumlah stok harus nol atau lebih.');
@@ -106,6 +149,10 @@ export function ProductEditorWorkspace({ businessId, product, closeHref }: Props
     }
     if (stockReason.trim().length < 3) {
       setError('Tulis alasan perubahan stok minimal 3 karakter.');
+      return;
+    }
+    if (!hasStockChanges) {
+      setError('Jumlah stok belum berubah.');
       return;
     }
 
@@ -126,6 +173,12 @@ export function ProductEditorWorkspace({ businessId, product, closeHref }: Props
   }
 
   async function saveStatus() {
+    if (busy) return;
+    if (status === product.status) {
+      setError('Status produk belum berubah.');
+      setArchiveConfirmOpen(false);
+      return;
+    }
     begin('status');
     try {
       await request(`/api/businesses/${businessId}/products/${product.id}`, {
@@ -160,7 +213,9 @@ export function ProductEditorWorkspace({ businessId, product, closeHref }: Props
           </div>
           <button
             type="button"
-            onClick={() => !busy && router.push(closeHref)}
+            onClick={() => {
+              if (confirmClose()) router.push(closeHref);
+            }}
             disabled={busy}
             aria-label="Tutup"
             className="portal-button-ghost h-9 w-9 shrink-0 justify-center rounded-full p-0"
@@ -235,7 +290,7 @@ export function ProductEditorWorkspace({ businessId, product, closeHref }: Props
             </span>
           </label>
 
-          <button type="submit" disabled={busy || changeReason.trim().length < 3} className="portal-button-primary w-full sm:w-fit">
+          <button type="submit" disabled={busy || !hasDetailChanges || changeReason.trim().length < 3} className="portal-button-primary w-full sm:w-fit">
             <Save className="h-4 w-4" /> {pendingAction === "detail" ? "Menyimpan..." : "Simpan perubahan"}
           </button>
         </form>
@@ -255,13 +310,17 @@ export function ProductEditorWorkspace({ businessId, product, closeHref }: Props
                 className="portal-input"
               />
             </label>
-            <button type="button" onClick={saveStock} disabled={busy || stockReason.trim().length < 3} className="portal-button-secondary sm:mb-0.5">
+            <button type="button" onClick={saveStock} disabled={busy || !hasStockChanges || stockReason.trim().length < 3} className="portal-button-secondary sm:mb-0.5">
               <Save className="h-4 w-4" /> {pendingAction === 'stock' ? 'Menyimpan...' : 'Update stok'}
             </button>
           </div>
         </section>
 
-        <ProductModifierEditor businessId={businessId} productId={product.id} />
+        <ProductModifierEditor
+          businessId={businessId}
+          productId={product.id}
+          onDirtyChange={setModifierDirty}
+        />
 
         <section className="border-t border-portal-line pt-5">
           <div className="rounded-2xl bg-[#fafbf9] p-4">

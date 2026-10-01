@@ -11,7 +11,7 @@ const MAX_NOTE_LEN: usize = 2_000;
 const MAX_REASON_LEN: usize = 2_000;
 const ALLOCATION_BUCKETS: [&str; 5] = ["owner", "team", "reinvest", "operations", "reserve"];
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum FinanceCoreError {
     Validation(&'static str),
     NotFound,

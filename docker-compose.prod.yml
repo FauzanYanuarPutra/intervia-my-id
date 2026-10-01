@@ -285,6 +285,7 @@ services:
       PAYMENTS_ENABLED: ${PAYMENTS_ENABLED:-false}
       WALLET_LIVE_ENABLED: ${WALLET_LIVE_ENABLED:-false}
       INTERNAL_AI_URL: http://ai_service:8080
+      SUPER_APP_POSTGRES_URL: postgres://${DB_USER}:${DB_PASS}@marketplace_db:5432/marketplace_db
       AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:?AI_SERVICE_TOKEN is required in production}
       EMAIL_TRANSPORT: smtp
       SMTP_HOST: ${SMTP_HOST:?SMTP_HOST is required in production}

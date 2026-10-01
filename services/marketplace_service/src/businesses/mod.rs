@@ -67,6 +67,8 @@ mod recipe_sales_versioning_tests;
 mod recipe_versioning_persistence_tests;
 mod recipes;
 mod repository;
+mod reset;
+mod reset_routes;
 mod routes;
 pub(crate) mod sales;
 #[cfg(test)]
@@ -100,6 +102,7 @@ pub(crate) fn router() -> axum::Router<std::sync::Arc<crate::AppState>> {
         .merge(commercial_core_routes::router())
         .merge(document_routes::router())
         .merge(finance_core_routes::router())
+        .merge(reset_routes::router())
         .merge(governance_routes::router())
         .merge(ingredient_management_routes::router())
         .merge(inventory_routes::router())

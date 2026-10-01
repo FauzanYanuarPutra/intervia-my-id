@@ -24,6 +24,7 @@ import {
 } from '@/components/explore/ExploreVisualSystem';
 import { Header } from '@/components/layout/Header';
 import { CompactSeeAllLink } from '@/components/common/CompactSectionAction';
+import { InfiniteScrollTrigger } from '@/components/common/InfiniteScrollTrigger';
 import { EmblaDesktopControls } from '@/components/common/EmblaDesktopControls';
 import { LocalizedAnchor as Link } from '@/components/navigation/LocalizedAnchor';
 import { trackLajukanEvent } from '@/lib/analytics/lajukanEvents';
@@ -49,6 +50,7 @@ import {
   type GlobalSearchResponse,
   type GlobalSearchTab,
 } from '@/lib/search/globalSearch';
+import { mapVideo } from '@/lib/search/socialSearchMappers';
 import { exploreCategoryCopy } from '@/components/explore/ExploreCopy';
 import { Skeleton, SkeletonStack } from '@/components/ui/Skeleton';
 import { cn } from '@/lib/utils';
@@ -452,6 +454,7 @@ function DataSection({
   locale,
   category,
   kind,
+  initialNextCursor = null,
 }: {
   config: ExploreSectionConfig;
   items: GlobalSearchItem[];
@@ -462,13 +465,9 @@ function DataSection({
     | 'business'
     | 'community'
     | 'video';
+  initialNextCursor?: string | null;
 }) {
   const isId = locale === 'id';
-  const sectionRef = useRef<HTMLElement | null>(null);
-  const [page, setPage] = useState(1);
-
-  if (items.length === 0) return null;
-
   const isNeedSection = config.key === 'latest-needs';
   const forcedSide =
     kind === 'listing'
@@ -477,24 +476,42 @@ function DataSection({
         : 'supply'
       : undefined;
 
-  const normalizedItems = items.map(item =>
-    withResolvedSide(item, forcedSide),
+  const pageSize = kind === 'listing' || kind === 'video' ? 8 : 6;
+  const initialKey = useMemo(
+    () => items.map(item => `${item.kind}:${item.id}`).join('|'),
+    [items],
+  );
+  const [extraItems, setExtraItems] = useState<GlobalSearchItem[]>([]);
+  const [visibleCount, setVisibleCount] = useState(pageSize);
+  const [nextCursor, setNextCursor] = useState<string | null>(initialNextCursor);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+
+  useEffect(() => {
+    setExtraItems([]);
+    setVisibleCount(pageSize);
+    setNextCursor(initialNextCursor);
+    setLoadingMore(false);
+    setLoadError(false);
+  }, [initialKey, initialNextCursor, pageSize]);
+
+  const normalizedInitialItems = useMemo(
+    () =>
+      items.map(item => withResolvedSide(item, forcedSide)),
+    [forcedSide, items],
   );
 
-  const pageSize =
-    kind === 'listing' || kind === 'video'
-      ? 8
-      : 6;
-  const totalPages = Math.max(
-    1,
-    Math.ceil(normalizedItems.length / pageSize),
-  );
-  const safePage = Math.min(page, totalPages);
-  const pageStart = (safePage - 1) * pageSize;
-  const pageItems = normalizedItems.slice(
-    pageStart,
-    pageStart + pageSize,
-  );
+  const mergedItems = useMemo(() => {
+    const seen = new Set<string>();
+    return [...normalizedInitialItems, ...extraItems].filter(item => {
+      const key = `${item.kind}:${item.id}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [extraItems, normalizedInitialItems]);
+
+  const visibleItems = mergedItems.slice(0, visibleCount);
 
   const seeAllHref = (() => {
     if (kind === 'community') return '/community';
@@ -543,33 +560,128 @@ function DataSection({
     return <ExploreListingCard item={item} locale={locale} />;
   };
 
-  const changePage = (nextPage: number) => {
-    const clamped = Math.max(1, Math.min(totalPages, nextPage));
-    setPage(clamped);
+  const loadMore = useCallback(async () => {
+    if (loadingMore) return;
 
-    if (typeof window !== 'undefined') {
-      window.requestAnimationFrame(() => {
-        sectionRef.current?.scrollIntoView({
-          behavior: 'smooth',
-          block: 'start',
-        });
-      });
+    if (visibleCount < mergedItems.length) {
+      setVisibleCount(current => Math.min(current + pageSize, mergedItems.length));
+      return;
     }
-  };
+
+    if (!nextCursor || (kind !== 'listing' && kind !== 'video')) {
+      return;
+    }
+
+    setLoadingMore(true);
+    setLoadError(false);
+
+    try {
+      if (kind === 'video') {
+        const params = new URLSearchParams({
+          limit: '12',
+          cursor: nextCursor,
+        });
+        const response = await fetch(`/api/reels?${params.toString()}`, {
+          cache: 'no-store',
+        });
+        if (!response.ok) throw new Error('reels_pagination_failed');
+
+        const payload = (await response.json()) as {
+          items?: Array<Record<string, unknown>>;
+          nextCursor?: string | number | null;
+          hasMore?: boolean;
+        };
+        const incoming = Array.isArray(payload.items)
+          ? payload.items
+              .map(item => mapVideo(item))
+              .filter((item): item is GlobalSearchItem => Boolean(item))
+          : [];
+
+        const returnedCursor =
+          payload.nextCursor != null && payload.hasMore !== false
+            ? String(payload.nextCursor)
+            : null;
+        setExtraItems(current => [...current, ...incoming]);
+        setNextCursor(
+          incoming.length === 0 || returnedCursor === nextCursor
+            ? null
+            : returnedCursor,
+        );
+        if (incoming.length > 0) {
+          setVisibleCount(current => current + Math.min(pageSize, incoming.length));
+        }
+        return;
+      }
+
+      const params = new URLSearchParams({
+        category: category.slug,
+        side: forcedSide || 'supply',
+        tab: forcedSide === 'demand' ? 'all' : 'all',
+        sort: 'latest',
+        limit: '48',
+        offset: nextCursor,
+      });
+
+      const response = await fetch(`/api/search?${params.toString()}`, {
+        cache: 'no-store',
+      });
+      if (!response.ok) throw new Error('explore_pagination_failed');
+
+      const payload = (await response.json()) as GlobalSearchResponse;
+      const incoming = [
+        ...(payload.groups.products?.items || []),
+        ...(payload.groups.services?.items || []),
+      ];
+
+      const nextItems =
+        forcedSide === 'demand'
+          ? payload.groups.needs?.items || []
+          : incoming;
+
+      const returnedCursor =
+        (forcedSide === 'demand'
+          ? payload.groups.needs?.nextCursor
+          : payload.groups.products?.nextCursor || payload.groups.services?.nextCursor) || null;
+      setExtraItems(current => [...current, ...nextItems]);
+      setNextCursor(
+        nextItems.length === 0 || returnedCursor === nextCursor
+          ? null
+          : returnedCursor,
+      );
+      if (nextItems.length > 0) {
+        setVisibleCount(current => current + Math.min(pageSize, nextItems.length));
+      }
+    } catch {
+      setLoadError(true);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [
+    category.slug,
+    forcedSide,
+    kind,
+    loadingMore,
+    mergedItems.length,
+    nextCursor,
+    pageSize,
+    visibleCount,
+  ]);
+
+  if (items.length === 0) return null;
+
+  const hasMore =
+    visibleCount < mergedItems.length ||
+    Boolean(nextCursor && (kind === 'listing' || kind === 'video'));
 
   return (
-    <section
-      ref={sectionRef}
-      className="mt-3 scroll-mt-3 rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 sm:p-4"
-    >
+    <section className="mt-3 rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 sm:p-4">
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
           <h2 className="min-w-0 truncate text-[13px] font-black text-[color:var(--app-text)] sm:text-sm">
             {isId ? config.titleId : config.titleEn}
           </h2>
 
-          {config.key === 'latest-listings' &&
-          kind === 'listing' ? (
+          {config.key === 'latest-listings' && kind === 'listing' ? (
             <p className="mt-0.5 text-[9px] font-medium text-[color:var(--app-text-soft)] sm:text-[10px]">
               {isId
                 ? 'Produk dan jasa yang sedang ditawarkan.'
@@ -601,11 +713,7 @@ function DataSection({
               },
             });
           }}
-          ariaLabel={
-            isId
-              ? `Lihat semua ${config.titleId}`
-              : `View all ${config.titleEn}`
-          }
+          ariaLabel={isId ? `Lihat semua ${config.titleId}` : `View all ${config.titleEn}`}
         />
       </div>
 
@@ -613,51 +721,20 @@ function DataSection({
         className={cn('mt-2.5 grid gap-3', gridClass)}
         aria-label={isId ? config.titleId : config.titleEn}
       >
-        {pageItems.map(item => (
+        {visibleItems.map(item => (
           <div key={`${kind}-${item.id}`} className="min-w-0">
-            <div className="h-full w-full">
-              {renderCard(item)}
-            </div>
+            <div className="h-full w-full">{renderCard(item)}</div>
           </div>
         ))}
       </div>
 
-      {totalPages > 1 ? (
-        <div className="mt-4 flex flex-col gap-2 border-t border-[color:var(--app-border)] pt-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-[10px] font-semibold text-[color:var(--app-text-soft)] sm:text-[11px]">
-            {isId
-              ? `Halaman ${safePage} dari ${totalPages} · ${normalizedItems.length} hasil dimuat`
-              : `Page ${safePage} of ${totalPages} · ${normalizedItems.length} loaded results`}
-          </p>
-
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              disabled={safePage <= 1}
-              onClick={() => changePage(safePage - 1)}
-              className="inline-flex min-h-8 items-center justify-center rounded-[9px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-[10px] font-black text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] disabled:cursor-not-allowed disabled:opacity-35"
-            >
-              {isId ? 'Sebelumnya' : 'Previous'}
-            </button>
-
-            <span
-              aria-live="polite"
-              className="inline-flex min-h-8 min-w-12 items-center justify-center rounded-[9px] bg-[color:var(--app-surface-muted)] px-2 text-[10px] font-black text-[color:var(--app-text-soft)]"
-            >
-              {safePage}/{totalPages}
-            </span>
-
-            <button
-              type="button"
-              disabled={safePage >= totalPages}
-              onClick={() => changePage(safePage + 1)}
-              className="inline-flex min-h-8 items-center justify-center rounded-[9px] bg-[color:var(--app-accent)] px-3 text-[10px] font-black text-white transition hover:bg-[color:var(--app-accent-strong)] disabled:cursor-not-allowed disabled:opacity-35"
-            >
-              {isId ? 'Berikutnya' : 'Next'}
-            </button>
-          </div>
-        </div>
-      ) : null}
+      <InfiniteScrollTrigger
+        hasMore={hasMore}
+        loading={loadingMore}
+        error={loadError}
+        onLoadMore={loadMore}
+        isId={isId}
+      />
     </section>
   );
 }
@@ -932,6 +1009,7 @@ export function ExploreCategoryClient({
     }
 
     params.delete('cursor');
+    params.delete('offset');
 
     const nextHref = appendSearchParams(
       `/${locale}${buildExploreCategoryHref(
@@ -1338,6 +1416,7 @@ export function ExploreCategoryClient({
     }
 
     params.delete('cursor');
+    params.delete('offset');
     params.delete('type');
     params.delete('category');
 
@@ -1385,6 +1464,7 @@ export function ExploreCategoryClient({
     }
 
     params.delete('cursor');
+    params.delete('offset');
 
     router.push(
       appendSearchParams(
@@ -2255,6 +2335,7 @@ export function ExploreCategoryClient({
                             category
                           }
                           kind="listing"
+                          initialNextCursor={groups?.needs.nextCursor}
                         />
                       );
                     }
@@ -2320,6 +2401,14 @@ export function ExploreCategoryClient({
                                 ? 'video'
                                 : 'listing'
                           }
+                          initialNextCursor={
+                            category.id === 'video'
+                              ? groups?.videos.nextCursor
+                              : category.id === 'community'
+                                ? null
+                                : groups?.products.nextCursor ||
+                                  groups?.services.nextCursor
+                          }
                         />
                       );
                     }
@@ -2371,6 +2460,7 @@ export function ExploreCategoryClient({
                             category
                           }
                           kind="video"
+                          initialNextCursor={groups?.videos.nextCursor}
                         />
                       );
                     }

@@ -1,3 +1,5 @@
+import { resolveListingLocation } from './listingLocation';
+
 export type ContentMetadata = Record<string, unknown>;
 export type ContentOwnerProfile = {
   id?: string;
@@ -74,6 +76,16 @@ export type ContentItem = {
     cancel_rate?: number | null;
   } | null;
   owner_profile?: ContentOwnerProfile | null;
+  // Structured location fields may be returned by newer listing payloads.
+  // Keep them optional so legacy records continue to work.
+  location?: string | null;
+  address?: string | null;
+  city?: string | null;
+  district?: string | null;
+  regency?: string | null;
+  province?: string | null;
+  region?: string | null;
+  country?: string | null;
   metadata?: ContentMetadata | null;
   created_at?: string;
   updated_at?: string;
@@ -250,6 +262,25 @@ export function asNumber(value: unknown): number | undefined {
     if (Number.isFinite(parsed)) return parsed;
   }
   return undefined;
+}
+
+export function resolveContentLocation(item?: Partial<ContentItem> | null): string {
+  if (!item) return '';
+
+  const metadata =
+    item.metadata &&
+    typeof item.metadata === 'object' &&
+    !Array.isArray(item.metadata)
+      ? item.metadata
+      : {};
+
+  // Keep Home, Explore, search, and detail pages on the same canonical
+  // listing-location resolver. It reads the location actually published with
+  // the listing form before any compatibility fallback.
+  return resolveListingLocation(
+    item as Record<string, unknown>,
+    metadata as Record<string, unknown>,
+  );
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {

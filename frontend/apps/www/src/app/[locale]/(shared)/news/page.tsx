@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { Search, Send, Store, TrendingUp } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
-import { NewsCard } from '@/components/news/NewsCard';
+import { NewsInfiniteGrid } from '@/components/news/NewsInfiniteGrid';
 import { NewsCarousel } from '@/components/news/NewsCarousel';
 import { NewsCategoryRail } from '@/components/news/NewsCategoryRail';
 import { buildNewsFacetPath, buildNewsUrl, getPublishedNews } from '@/lib/news';
@@ -176,25 +176,30 @@ export default async function NewsIndexPage({ params, searchParams }: PageProps)
               {grid.length} {isId ? 'artikel' : 'stories'}
             </span>
           </div>
-          <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {grid.map(item => (
-              <NewsCard key={item.id} article={item} locale={locale} variant="grid" />
-            ))}
-          </div>
+          <NewsInfiniteGrid
+            initialItems={grid}
+            initialNextCursor={nextCursor}
+            locale={locale}
+            category={category}
+            query={query}
+            fallbackHref={buildNewsIndexHref({ category, query, cursor: nextCursor || undefined })}
+          />
+          {nextCursor ? (
+            <a
+              href={buildNewsIndexHref({
+                category,
+                query,
+                cursor: nextCursor,
+              })}
+              rel="next"
+              className="sr-only"
+            >
+              {isId ? 'Berita berikutnya' : 'Next stories'}
+            </a>
+          ) : null}
         </section>
       ) : null}
 
-      {nextCursor ? (
-        <nav aria-label={isId ? 'Navigasi berita' : 'News navigation'} className="flex justify-center pt-5">
-          <Link
-            href={buildNewsIndexHref({ category, query, cursor: nextCursor })}
-            rel="next"
-            className="inline-flex min-h-10 items-center gap-2 rounded-full border border-slate-200 bg-white px-5 text-xs font-black text-slate-700 transition hover:border-emerald-300 hover:text-emerald-800 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200"
-          >
-            {isId ? 'Berita berikutnya' : 'Next stories'}
-          </Link>
-        </nav>
-      ) : null}
     </main>
   );
 }

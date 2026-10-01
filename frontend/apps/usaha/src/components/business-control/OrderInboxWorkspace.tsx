@@ -142,6 +142,12 @@ export function OrderInboxWorkspace({
       setMessage('Isi alasan minimal 3 karakter untuk menolak atau membatalkan.');
       return false;
     }
+    if (requiresReason) {
+      const label = nextStatus === 'REJECTED' ? 'menolak' : 'membatalkan';
+      if (!window.confirm(
+        'Yakin ' + label + ' pesanan ini? Status pesanan akan berubah dan alasan akan masuk ke riwayat.'
+      )) return false;
+    }
 
     const payload = {
       expected_version: selected.order.version,

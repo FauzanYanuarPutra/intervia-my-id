@@ -23,7 +23,7 @@ describe('UMKM public route helpers', () => {
     );
   });
 
-  it('routes public map references to their content detail', () => {
+  it('routes public map references to the storefront detail surface', () => {
     const reference = {
       slug: 'osm-node-1',
       public_path: '/content/pasar-uji-reference-id',
@@ -34,8 +34,23 @@ describe('UMKM public route helpers', () => {
     };
 
     expect(isUmkmMapPublicReference(reference)).toBe(true);
-    expect(buildUmkmMapPlacePath(reference)).toBe(
-      '/content/pasar-uji-reference-id',
+    expect(buildUmkmMapPlacePath(reference)).toBe('/toko/osm-node-1');
+  });
+
+  it('routes Wikidata references to the storefront even with content-style source metadata', () => {
+    expect(
+      buildUmkmMapPlacePath({
+        slug: 'wikidata-q111754951-mcdonald-s-banjar-baru-6f9f6ab8-ac91-48eb-88af-0b12f1aa9d6e',
+        public_path: '/content/legacy-reference',
+        metadata: {
+          record_kind: 'wikidata_reference',
+          source_kind: 'external_content_reference',
+          market_side: 'reference',
+          is_public_reference: true,
+        },
+      }),
+    ).toBe(
+      '/toko/wikidata-q111754951-mcdonald-s-banjar-baru-6f9f6ab8-ac91-48eb-88af-0b12f1aa9d6e',
     );
   });
 
@@ -47,6 +62,42 @@ describe('UMKM public route helpers', () => {
         metadata: { is_public_reference: true },
       }),
     ).toBe('/toko/osm-node-1');
+  });
+
+  it('uses a storefront slug from metadata when the map point has no top-level slug', () => {
+    expect(
+      buildUmkmMapPlacePath({
+        metadata: {
+          is_public_reference: true,
+          storefront_slug: 'bank-permata-bintaro',
+        },
+      }),
+    ).toBe('/toko/bank-permata-bintaro');
+  });
+
+  it('routes a Lajukan store map point to its storefront', () => {
+    expect(
+      buildUmkmMapPlacePath({
+        slug: 'lajukan-juice-31f8206d',
+        metadata: {
+          source_kind: 'lajukan_store',
+          source: 'usaha_portal',
+        },
+      }),
+    ).toBe('/toko/lajukan-juice-31f8206d');
+  });
+
+  it('routes Lajukan listing map points to their content path', () => {
+    expect(
+      buildUmkmMapPlacePath({
+        slug: 'listing-slug',
+        public_path: '/content/123',
+        metadata: {
+          source_kind: 'lajukan_listing',
+          record_kind: 'lajukan_listing',
+        },
+      }),
+    ).toBe('/content/123');
   });
 
   it('opens owner actions directly in the dedicated Usaha workspace', () => {

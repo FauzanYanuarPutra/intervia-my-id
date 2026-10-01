@@ -51,6 +51,7 @@ import {
 } from '@/lib/content/listingSide';
 import {
   normalizeContentMediaUrl,
+  resolveContentLocation,
   resolveImageGallery,
   type ContentItem as CatalogContentItem,
   type ContentOwnerProfile,
@@ -709,9 +710,21 @@ function formatDetailValue(value: unknown): string {
   return String(value);
 }
 
-function collapseWhitespace(value?: string | null): string {
+function normalizeListingWhitespace(value?: string | null): string {
   if (typeof value !== 'string') return '';
-  return value.replace(/\s+/g, ' ').trim();
+  return value
+    .replace(/\u00A0/g, ' ')
+    .replace(/\u00C2/g, '')
+    .replace(/\r\n?/g, '\n')
+    .split('\n')
+    .map(line => line.replace(/[ \t]+$/g, '').trim())
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function collapseWhitespace(value?: string | null): string {
+  return normalizeListingWhitespace(value).replace(/[ \t]+/g, ' ').trim();
 }
 
 const LISTING_COPY_NOISE_MARKERS = [
@@ -732,29 +745,42 @@ function cleanListingCopyText(
   value?: string | null,
   title?: string | null,
 ): string {
-  const text = collapseWhitespace(value);
+  const text = normalizeListingWhitespace(value);
   if (!text) return '';
 
-  const sentences = text
-    .split(/(?<=[.!?])\s+/)
-    .map(sentence => sentence.trim())
-    .filter(Boolean)
-    .filter(sentence => {
-      const lower = sentence.toLowerCase();
-      return !LISTING_COPY_NOISE_MARKERS.some(marker => lower.includes(marker));
+  const lines = text
+    .split('\n')
+    .map(line => line.replace(/[ \t]+/g, ' ').trim())
+    .map(line => {
+      if (!line) return '';
+      const sentences = line
+        .split(/(?<=[.!?])\s+/)
+        .map(sentence => sentence.trim())
+        .filter(Boolean)
+        .filter(sentence => {
+          const lower = sentence.toLowerCase();
+          return !LISTING_COPY_NOISE_MARKERS.some(marker =>
+            lower.includes(marker),
+          );
+        });
+      return sentences.join(' ').trim();
     });
 
-  let cleaned = sentences.join(' ').trim();
+  let cleaned = lines.join('\n').trim();
   if (!cleaned) cleaned = text;
 
   const cleanTitle = collapseWhitespace(title);
   if (cleanTitle) {
-    const normalizedTitle = cleanTitle.toLowerCase();
-    const normalizedText = cleaned.toLowerCase();
-    if (normalizedText.startsWith(normalizedTitle)) {
-      cleaned = cleaned
+    const firstLine = cleaned.split('\n')[0] || '';
+    if (firstLine.toLowerCase().startsWith(cleanTitle.toLowerCase())) {
+      const remainder = firstLine
         .slice(cleanTitle.length)
         .replace(/^[\s,.;:-]+/, '')
+        .trim();
+      const remainingLines = cleaned.split('\n').slice(1);
+      cleaned = [remainder, ...remainingLines]
+        .filter(Boolean)
+        .join('\n')
         .trim();
     }
   }
@@ -1009,14 +1035,7 @@ export default function ContentDetailClient({
           ? 'Negosiasi'
           : 'Contact';
     const gallery = resolveImageGallery(catalogItem);
-    const location = [
-      metadata.location,
-      metadata.city,
-      metadata.region,
-      metadata.address,
-    ]
-      .map(value => (typeof value === 'string' ? value.trim() : ''))
-      .find(Boolean);
+    const location = resolveContentLocation(catalogItem);
 
     recordListingView({
       id: resolvedContentId,
@@ -3372,12 +3391,13 @@ export default function ContentDetailClient({
           'deadline',
           'preferred_period',
         ) || formatDate(String(meta.available_from || ''));
+  const listingLocation = resolveContentLocation(catalogItem);
   const locationValue =
     (displayType === 'company'
       ? readMetaText(meta, 'headquarters')
       : displayType === 'tool_rental'
         ? readMetaText(meta, 'pickup_location')
-        : '') || readMetaText(meta, 'location', 'city');
+        : '') || listingLocation;
   const quickSpecs = [
     {
       key: 'availability',
@@ -3979,7 +3999,7 @@ export default function ContentDetailClient({
   const detailRowClass =
     'bg-[color:var(--app-surface-muted)] hover:bg-[color:var(--app-accent-soft)]';
   const detailPageShellClass =
-    'lajukan-market-page lajukan-market-detail page-shell max-lg:!px-0 lg:!px-4 xl:!px-6 overflow-x-hidden bg-[color:var(--app-bg)] py-0 pb-[calc(6.25rem+env(safe-area-inset-bottom))] sm:py-2 lg:pb-8';
+    'lajukan-market-page lajukan-market-detail page-shell max-lg:!px-0 lg:!px-4 xl:!px-6 overflow-x-hidden bg-[color:var(--app-bg)] py-0 pb-[calc(12rem+env(safe-area-inset-bottom))] sm:py-2 lg:pb-8';
   const detailShellStackClass =
     'mx-auto flex w-full max-w-[1200px] flex-col gap-2.5 !px-0 sm:gap-3';
   const detailSectionClass =
@@ -5173,9 +5193,9 @@ export default function ContentDetailClient({
 
         {isOwner || canStartChat ? (
           <div
-            className="fixed inset-x-0 bottom-0 z-40 px-2 pt-2 lg:hidden"
+            className="fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-40 px-2 pt-2 lg:hidden"
             style={{
-              paddingBottom: 'max(env(safe-area-inset-bottom), 0.75rem)',
+              paddingBottom: '0.5rem',
             }}
           >
             <div className="mx-auto max-w-md rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)]/96 p-1.5 shadow-[0_18px_44px_-30px_rgba(15,23,42,0.32)] backdrop-blur-xl">

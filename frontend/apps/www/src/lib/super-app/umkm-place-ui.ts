@@ -273,6 +273,20 @@ function getUmkmPlacePublishServices(place: UmkmPlaceLike): PublishService[] {
 }
 
 export function getUmkmPlaceKind(place: UmkmPlaceLike): UmkmPlaceKind {
+  // OSM/source taxonomy is a stronger classification signal than free-text
+  // names. This prevents words inside place names (for example "bar" inside
+  // another word) from misclassifying banks, hotels, malls, etc.
+  const osmKey = readMetaText(place, 'osm_primary_key').toLowerCase();
+  const osmValue = readMetaText(place, 'osm_primary_value').toLowerCase();
+  if (osmKey === 'amenity') {
+    if (/^(restaurant|cafe|fast_food|food_court|ice_cream|bar|pub|biergarten)$/.test(osmValue)) return 'food';
+    if (/^(bank|atm|clinic|hospital|pharmacy|school|university|office|post_office|police|fire_station)$/.test(osmValue)) return 'service';
+  }
+  if (osmKey === 'shop' && osmValue) return 'retail';
+  if (osmKey === 'tourism' && /^(hotel|hostel|guest_house|motel|resort)$/.test(osmValue)) return 'service';
+  if (osmKey === 'craft') return 'craft';
+  if (osmKey === 'industrial') return 'workshop';
+
   const businessCategory = getUmkmPlaceBusinessCategory(place);
   if (businessCategory) {
     const sector = getUmkmSectorFromBusinessCategory(businessCategory);
@@ -668,6 +682,10 @@ function getCoverImage(place: UmkmPlaceLike, kind?: UmkmPlaceKind): string {
   const media = resolveStorefrontBrandMedia(asRecord(place.metadata));
   const explicit = media.coverUrl || media.logoUrl;
   if (explicit) return explicit;
+
+  // Category artwork is an illustration, not a claimed real photo. It is
+  // safe for public references and keeps category identity visible when no
+  // licensed/contributed photo exists.
   return CATEGORY_FALLBACK_IMAGES[kind || getUmkmPlaceKind(place)];
 }
 
@@ -710,8 +728,8 @@ export function buildUmkmPlacePresentation(
   const presenceStatus = getManagedPresenceStatus(place, isId);
   const categoryLabel = isPublicReference
     ? isId
-      ? 'Referensi publik'
-      : 'Public reference'
+      ? 'Lokasi usaha'
+      : 'Business location'
     : businessCategory
       ? getUmkmBusinessCategoryLabel(businessCategory, isId)
       : kindMeta.kindLabel === 'UMKM'
@@ -818,8 +836,8 @@ export function buildUmkmPlacePresentation(
       return !Boolean(media.coverUrl || media.logoUrl);
     })(),
     gallery: getGalleryImages(place, kind)
-      .map(image => image.trim())
-      .filter(Boolean),
+      .filter((image): image is string => typeof image === 'string' && image.trim().length > 0)
+      .map(image => image.trim()),
     distanceLabel,
     priceLabel: inferPriceLabel(place, isId),
     serviceBadges: getServiceBadges(place, isId, presenceStatus),

@@ -50,6 +50,7 @@ mod outbox;
 mod reference_promotion;
 mod runtime_metrics;
 mod schema_contract;
+mod umkm_media_contributions;
 mod wallet_support;
 use auth::{auth_claims_from_headers, user_id_from_auth, user_id_from_token_string, AccessClaims};
 use content_projection::{
@@ -61,6 +62,7 @@ use identity_projection::{
 };
 use order_engine::{create_order, get_order, list_orders, transition_order};
 use outbox::{run_outbox_publisher, OutboxPublisherConfig};
+use umkm_media_contributions::{create_media_contribution, list_media_contributions};
 use wallet_support::*;
 
 #[derive(Clone)]
@@ -87,6 +89,7 @@ const MAX_DELIVERY_ATTACHMENTS: usize = 10;
 const MAX_DELIVERY_TITLE_LEN: usize = 180;
 const MAX_DELIVERY_ATTACHMENT_LABEL_LEN: usize = 120;
 const MAX_DELIVERY_REFERENCE_LEN: usize = 2_000;
+const TRANSACTION_COMPLETED_CORRECTION_GRACE_MINUTES: i64 = 30;
 const EVIDENCE_HASH_SHA256_LEN: usize = 64;
 const MAX_EVENT_BATCH_SIZE: usize = 25;
 const MAX_EVENT_NAME_LEN: usize = 120;
@@ -218,7 +221,10 @@ struct ListContentQuery {
     sub_sector: Option<String>,
     status: Option<String>,
     owner_id: Option<Uuid>,
-    marketplace_only: Option<bool>,
+    // Query-string booleans arrive from browser/BFF clients in several common forms.
+    // Keep the wire contract tolerant (1/0, true/false, yes/no) and normalize once
+    // inside the handler instead of letting Axum reject the request at extraction time.
+    marketplace_only: Option<String>,
     limit: Option<i64>,
     offset: Option<i64>,
 }
@@ -1124,6 +1130,7 @@ struct ListMapPlacesQuery {
     max_lng: Option<f64>,
     viewer_lat: Option<f64>,
     viewer_lng: Option<f64>,
+    radius_km: Option<f64>,
 }
 
 #[derive(Debug, Serialize)]
@@ -2365,6 +2372,10 @@ async fn main() -> anyhow::Result<()> {
             get(get_umkm_store_gallery_like_state).put(update_umkm_store_gallery_like),
         )
         .route(
+            "/v1/umkm/stores/{store_ref}/media/contributions",
+            get(list_media_contributions).post(create_media_contribution),
+        )
+        .route(
             "/v1/umkm/stores/{store_ref}/products",
             get(list_umkm_products).post(create_umkm_product),
         )
@@ -2389,6 +2400,10 @@ async fn main() -> anyhow::Result<()> {
         .route(
             "/v1/transactions/{id}/resolve",
             put(resolve_transaction_dispute),
+        )
+        .route(
+            "/v1/transactions/{id}/correction",
+            post(request_transaction_correction),
         )
         .route("/v1/transactions/{id}/cancel", put(cancel_transaction))
         .route("/v1/transactions/{id}/complete", put(complete_transaction))
@@ -4302,9 +4317,30 @@ fn normalize_cancel_reason_code(value: Option<String>) -> Option<String> {
         | "seller_unresponsive"
         | "schedule_issue"
         | "duplicate_order"
+        | "wrong_quantity"
+        | "wrong_price"
+        | "wrong_recipient"
+        | "wrong_listing"
+        | "user_mistake"
         | "other" => Some(normalized),
         _ => None,
     }
+}
+
+fn completed_transaction_correction_grace_minutes() -> i64 {
+    env::var("TRANSACTION_COMPLETED_CORRECTION_GRACE_MINUTES")
+        .ok()
+        .and_then(|value| value.trim().parse::<i64>().ok())
+        .unwrap_or(TRANSACTION_COMPLETED_CORRECTION_GRACE_MINUTES)
+        .clamp(1, 1_440)
+}
+
+fn completed_transaction_correction_deadline(updated_at: DateTime<Utc>) -> DateTime<Utc> {
+    updated_at + ChronoDuration::minutes(completed_transaction_correction_grace_minutes())
+}
+
+fn completed_transaction_correction_allowed(updated_at: DateTime<Utc>, now: DateTime<Utc>) -> bool {
+    now <= completed_transaction_correction_deadline(updated_at)
 }
 
 fn normalize_dispute_reason_code(value: Option<String>) -> Option<String> {
@@ -4682,6 +4718,18 @@ fn canonical_content_type(value: &str) -> String {
 
 fn normalize_content_type(value: Option<String>) -> Option<String> {
     clean_text(value).map(|v| canonical_content_type(&v.to_lowercase()))
+}
+
+fn parse_optional_query_bool(value: Option<String>) -> Result<Option<bool>, &'static str> {
+    let Some(value) = clean_text(value) else {
+        return Ok(None);
+    };
+
+    match value.to_ascii_lowercase().as_str() {
+        "1" | "true" | "yes" | "y" | "on" => Ok(Some(true)),
+        "0" | "false" | "no" | "n" | "off" => Ok(Some(false)),
+        _ => Err("boolean query value must be true/false or 1/0"),
+    }
 }
 
 fn normalize_listing_side_filter(value: Option<String>) -> Result<Option<String>, &'static str> {
@@ -8560,10 +8608,11 @@ async fn list_umkm_stores(
     "#
     };
     let ranking_order = if use_nearest_index {
-        // Keep KNN distance as the complete ORDER BY expression. Adding
-        // updated_at/id tie-breakers makes PostgreSQL scan and sort every
-        // point in the viewport instead of stopping at LIMIT through GiST.
-        "point(lng, lat) <-> point($11, $10) ASC"
+        // Keep Lajukan-owned businesses first even when the viewer asks for
+        // nearby results. Distance remains the tie-breaker inside each
+        // source tier so native Lajukan businesses are not displaced by
+        // public references.
+        "CASE WHEN metadata->>'source' = 'usaha_portal' OR owner_user_id IS NOT NULL THEN 0 ELSE 1 END ASC, point(lng, lat) <-> point($11, $10) ASC"
     } else if text_query.is_some() {
         r#"
           (
@@ -8577,7 +8626,7 @@ async fn list_umkm_stores(
           id ASC
         "#
     } else {
-        "updated_at DESC, id ASC"
+        "CASE WHEN metadata->>'source' = 'usaha_portal' OR owner_user_id IS NOT NULL THEN 0 ELSE 1 END ASC, updated_at DESC, id ASC"
     };
 
     let store_sql = if nationwide_map {
@@ -8617,7 +8666,15 @@ async fn list_umkm_stores(
                 candidates.*,
                 ROW_NUMBER() OVER (
                   PARTITION BY map_lat_bucket, map_lng_bucket
-                  ORDER BY updated_at DESC, id ASC
+                  ORDER BY
+                    CASE
+                      WHEN metadata->>'source' = 'usaha_portal'
+                        OR owner_user_id IS NOT NULL
+                      THEN 0
+                      ELSE 1
+                    END ASC,
+                    updated_at DESC,
+                    id ASC
                 ) AS map_bucket_rank
               FROM candidates
             )
@@ -11352,6 +11409,19 @@ async fn list_map_places(
         (None, None) => None,
         _ => return err(StatusCode::BAD_REQUEST, "invalid viewer coordinates").into_response(),
     };
+    let radius_km = match query.radius_km {
+        Some(value) if value.is_finite() && value > 0.0 && value <= 1000.0 && viewer.is_some() => {
+            Some(value)
+        }
+        Some(_) => {
+            return err(
+                StatusCode::BAD_REQUEST,
+                "radius_km requires valid viewer coordinates and must be between 0 and 1000",
+            )
+            .into_response()
+        }
+        None => None,
+    };
 
     // Geo-only projection: detail payloads stay out of the map request.
     // The browser can render many markers cheaply and fetch full details only
@@ -11368,7 +11438,7 @@ async fn list_map_places(
           category,
           source_kind,
           metadata,
-          COUNT(*) OVER() AS total_count
+          updated_at
         FROM (
           SELECT
             s.id::text AS id,
@@ -11377,6 +11447,7 @@ async fn list_map_places(
             s.city,
             s.lat,
             s.lng,
+            s.updated_at AS updated_at,
             COALESCE(
               NULLIF(lower(s.metadata->>'marketplace_category_slug'), ''),
               NULLIF(lower(s.metadata->>'umkm_category'), ''),
@@ -11398,7 +11469,49 @@ async fn list_map_places(
               'tourism', NULLIF(lower(s.metadata->>'tourism'), ''),
               'office', NULLIF(lower(s.metadata->>'office'), ''),
               'building', NULLIF(lower(s.metadata->>'building'), ''),
-              'place_type', NULLIF(lower(s.metadata->>'place_type'), '')
+              'place_type', NULLIF(lower(s.metadata->>'place_type'), ''),
+              'source_kind', CASE
+                WHEN lower(COALESCE(s.metadata->>'record_kind','')) LIKE '%reference%'
+                  OR lower(COALESCE(s.metadata->>'market_side','')) = 'reference'
+                THEN 'reference_store'
+                WHEN lower(COALESCE(s.metadata->>'source','')) = 'usaha_portal'
+                  OR s.owner_user_id IS NOT NULL
+                THEN 'lajukan_store'
+                ELSE 'registered_store'
+              END,
+              'public_path', '/toko/' || s.slug,
+              'cover_image', COALESCE(
+                NULLIF(s.metadata->>'cover_image', ''),
+                NULLIF(s.metadata->>'cover_image_url', ''),
+                NULLIF(s.metadata->>'store_photo_url', ''),
+                NULLIF(s.metadata->>'image_url', ''),
+                NULLIF(s.metadata->>'image', '')
+              ),
+              'logo_url', NULLIF(s.metadata->>'logo_url', ''),
+              'gallery_images', s.metadata->'gallery_images',
+              'gallery_media', s.metadata->'gallery_media',
+              'gallery_media_items', s.metadata->'gallery_media_items',
+              'gallery_media_primary', s.metadata->'gallery_media_primary',
+              'image_attribution', NULLIF(s.metadata->>'image_attribution', ''),
+              'image_source_provider', NULLIF(s.metadata->>'image_source_provider', ''),
+              'media_kind', NULLIF(s.metadata->>'media_kind', ''),
+              'media_storage', NULLIF(s.metadata->>'media_storage', ''),
+              'media_is_place_specific', s.metadata->'media_is_place_specific',
+              'record_kind', NULLIF(s.metadata->>'record_kind', ''),
+              'market_side', NULLIF(s.metadata->>'market_side', ''),
+              'is_public_reference', (
+                lower(COALESCE(s.metadata->>'record_kind','')) LIKE '%reference%'
+                OR lower(COALESCE(s.metadata->>'market_side','')) = 'reference'
+              ),
+              'source_title', NULLIF(s.metadata->>'source_title', ''),
+              'source_provider', NULLIF(s.metadata->>'source_provider', ''),
+              'source_license', NULLIF(s.metadata->>'source_license', ''),
+              'source_license_url', NULLIF(s.metadata->>'source_license_url', ''),
+              'source_attribution', NULLIF(s.metadata->>'source_attribution', ''),
+              'public_path', '/toko/' || s.slug,
+              'updated_at', s.updated_at,
+              'created_at', s.created_at,
+              'google_maps_uri', NULLIF(s.metadata->>'google_maps_uri', '')
             )) AS metadata,
             CASE
               WHEN lower(COALESCE(s.metadata->>'record_kind','')) LIKE '%reference%'
@@ -11457,6 +11570,7 @@ async fn list_map_places(
             COALESCE(c.metadata->>'city', c.metadata->>'location', 'Indonesia'),
             public.lajukan_safe_map_coordinate(c.metadata->>'latitude'),
             public.lajukan_safe_map_coordinate(c.metadata->>'longitude'),
+            c.updated_at AS updated_at,
             COALESCE(
               NULLIF(lower(c.metadata->>'marketplace_category_slug'), ''),
               NULLIF(lower(c.metadata->>'umkm_category'), ''),
@@ -11479,7 +11593,41 @@ async fn list_map_places(
               'tourism', NULLIF(lower(c.metadata->>'tourism'), ''),
               'office', NULLIF(lower(c.metadata->>'office'), ''),
               'building', NULLIF(lower(c.metadata->>'building'), ''),
-              'place_type', NULLIF(lower(c.metadata->>'place_type'), '')
+              'place_type', NULLIF(lower(c.metadata->>'place_type'), ''),
+              'source_kind', 'reference_content',
+              'public_path', COALESCE(
+                NULLIF(c.metadata->>'public_path', ''),
+                '/content/' || c.id::text
+              ),
+              'cover_image', COALESCE(
+                NULLIF(c.cover_image, ''),
+                NULLIF(c.metadata->>'cover_image', ''),
+                NULLIF(c.metadata->>'cover_image_url', ''),
+                NULLIF(c.metadata->>'image_url', ''),
+                NULLIF(c.metadata->>'image', '')
+              ),
+              'logo_url', NULLIF(c.metadata->>'logo_url', ''),
+              'gallery_images', c.metadata->'gallery_images',
+              'gallery_media', c.metadata->'gallery_media',
+              'gallery_media_items', c.metadata->'gallery_media_items',
+              'gallery_media_primary', c.metadata->'gallery_media_primary',
+              'image_attribution', NULLIF(c.metadata->>'image_attribution', ''),
+              'image_source_provider', NULLIF(c.metadata->>'image_source_provider', ''),
+              'media_kind', NULLIF(c.metadata->>'media_kind', ''),
+              'media_storage', NULLIF(c.metadata->>'media_storage', ''),
+              'media_is_place_specific', c.metadata->'media_is_place_specific',
+              'record_kind', NULLIF(c.metadata->>'record_kind', ''),
+              'market_side', NULLIF(c.metadata->>'market_side', ''),
+              'is_public_reference', true,
+              'source_title', NULLIF(c.metadata->>'source_title', ''),
+              'source_provider', NULLIF(c.metadata->>'source_provider', ''),
+              'source_license', NULLIF(c.metadata->>'source_license', ''),
+              'source_license_url', NULLIF(c.metadata->>'source_license_url', ''),
+              'source_attribution', NULLIF(c.metadata->>'source_attribution', ''),
+              'public_path', '/toko/' || COALESCE(c.slug, 'reference-' || c.id::text),
+              'updated_at', c.updated_at,
+              'created_at', c.created_at,
+              'google_maps_uri', NULLIF(c.metadata->>'google_maps_uri', '')
             )) AS metadata,
             'reference_content' AS source_kind
           FROM content_items c
@@ -11514,6 +11662,7 @@ async fn list_map_places(
                 NULLIF(c.metadata->>'lng', '')
               )
             ),
+            c.updated_at AS updated_at,
             COALESCE(
               NULLIF(lower(c.metadata->>'marketplace_category_slug'), ''),
               NULLIF(lower(c.metadata->>'umkm_category'), ''),
@@ -11535,8 +11684,31 @@ async fn list_map_places(
               'address', NULLIF(c.metadata->>'address', ''),
               'source', 'lajukan_content',
               'record_kind', 'lajukan_listing',
-              'public_path', NULLIF(c.metadata->>'public_path', ''),
-              'cover_image', NULLIF(c.cover_image, '')
+              'source_kind', 'lajukan_listing',
+              'public_path', COALESCE(
+                NULLIF(c.metadata->>'public_path', ''),
+                '/content/' || c.id::text
+              ),
+              'cover_image', COALESCE(
+                NULLIF(c.cover_image, ''),
+                NULLIF(c.metadata->>'cover_image', ''),
+                NULLIF(c.metadata->>'cover_image_url', ''),
+                NULLIF(c.metadata->>'image_url', ''),
+                NULLIF(c.metadata->>'image', '')
+              ),
+              'logo_url', NULLIF(c.metadata->>'logo_url', ''),
+              'gallery_images', c.metadata->'gallery_images',
+              'gallery_media', c.metadata->'gallery_media',
+              'gallery_media_items', c.metadata->'gallery_media_items',
+              'gallery_media_primary', c.metadata->>'gallery_media_primary',
+              'image_attribution', NULLIF(c.metadata->>'image_attribution', ''),
+              'image_source_provider', NULLIF(c.metadata->>'image_source_provider', ''),
+              'media_kind', NULLIF(c.metadata->>'media_kind', ''),
+              'media_storage', NULLIF(c.metadata->>'media_storage', ''),
+              'media_is_place_specific', c.metadata->'media_is_place_specific',
+              'updated_at', c.updated_at,
+              'created_at', c.created_at,
+              'google_maps_uri', NULLIF(c.metadata->>'google_maps_uri', '')
             )) AS metadata,
             'lajukan_listing' AS source_kind
           FROM content_items c
@@ -11612,10 +11784,24 @@ async fn list_map_places(
             .push(" AND ")
             .push_bind(max_lng);
     }
+    if let Some(radius) = radius_km {
+        if let Some((viewer_lat, viewer_lng)) = viewer {
+            statement
+                .push(" AND (6371.0088 * 2.0 * asin(sqrt(power(sin(radians(lat - ")
+                .push_bind(viewer_lat)
+                .push(") / 2.0), 2) + cos(radians(")
+                .push_bind(viewer_lat)
+                .push(")) * cos(radians(lat)) * power(sin(radians(lng - ")
+                .push_bind(viewer_lng)
+                .push(") / 2.0), 2)))) <= ")
+                .push_bind(radius);
+        }
+    }
+
     statement.push(" ORDER BY ");
     if let Some((lat, lng)) = viewer {
         statement.push(
-            "CASE WHEN source_kind IN ('lajukan_store', 'lajukan_listing') THEN 0              WHEN source_kind = 'registered_store' THEN 1              ELSE 2 END ASC,              point(lng,lat) <-> point(",
+            "CASE WHEN source_kind IN ('lajukan_store', 'lajukan_listing') THEN 0              WHEN source_kind = 'registered_store' THEN 1              ELSE 2 END ASC,              updated_at DESC,              point(lng,lat) <-> point(",
         )
         .push_bind(lng)
         .push(",")
@@ -11626,18 +11812,13 @@ async fn list_map_places(
         // each source tier, keep a deterministic hash so repeated nationwide
         // requests remain stable without making references displace local data.
         statement.push(
-            "CASE WHEN source_kind IN ('lajukan_store', 'lajukan_listing') THEN 0              WHEN source_kind = 'registered_store' THEN 1              ELSE 2 END ASC, md5(id) ASC",
+            "CASE WHEN source_kind IN ('lajukan_store', 'lajukan_listing') THEN 0              WHEN source_kind = 'registered_store' THEN 1              ELSE 2 END ASC, updated_at DESC, id ASC",
         );
     }
     statement.push(" LIMIT ").push_bind(limit);
 
     match statement.build().fetch_all(&state.db).await {
         Ok(rows) => {
-            let total_count = rows
-                .first()
-                .and_then(|row| row.try_get::<i64, _>("total_count").ok())
-                .unwrap_or(0);
-
             let items = rows
                 .into_iter()
                 .filter_map(|row| {
@@ -11659,7 +11840,7 @@ async fn list_map_places(
                 Json(json!({
                     "items": items,
                     "count": items.len(),
-                    "total_count": total_count,
+                    "total_count": items.len(),
                 })),
             )
                 .into_response()
@@ -11716,6 +11897,10 @@ async fn list_content(
         Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
     };
     let owner_id = query.owner_id;
+    let marketplace_only = match parse_optional_query_bool(query.marketplace_only) {
+        Ok(value) => value,
+        Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
+    };
     let claims = auth_claims_from_headers(&headers, &state.jwt_secret);
     let actor_user_id = claims
         .as_ref()
@@ -11842,7 +12027,22 @@ async fn list_content(
                   AND (mc.slug = $9 OR mc.legacy_key = $9 OR mc.metadata->'aliases' ? $9)
               ) OR
               coalesce(metadata->>'marketplace_category_slug', '') = $9 OR
-              coalesce(metadata->>'create_category', '') = $9
+              coalesce(metadata->>'create_category', '') = $9 OR
+              /*
+               * Backward-compatible taxonomy recovery for native Lajukan
+               * listings created before marketplace_category_id/slug was
+               * persisted consistently. "Bahan & Supplier" is intentionally
+               * broad: native product/material/request records belong here
+               * even when an older listing has no explicit category pointer.
+               */
+              (
+                lower($9) = 'materials-suppliers'
+                AND btrim(coalesce(metadata->>'marketplace_category_slug', '')) = ''
+                AND btrim(coalesce(metadata->>'create_category', '')) = ''
+                AND lower(coalesce(content_items.content_type, '')) IN (
+                  'product', 'material', 'request', 'need', 'needs', 'demand'
+                )
+              )
           )
           AND (
               $10::text IS NULL OR
@@ -11957,6 +12157,28 @@ async fn list_content(
               ) = $14
           )
         ORDER BY
+          /*
+           * Provenance precedence is explicit:
+           * 1) native Lajukan listings first
+           * 2) other marketplace records next
+           * 3) public/reference records last
+           *
+           * This is deliberately before query relevance so a real Lajukan
+           * upload cannot be pushed behind a large imported/reference set.
+           */
+          CASE
+            WHEN $14::text = 'reference' THEN 0
+            WHEN content_items.owner_id IS NOT NULL
+              AND NOT (
+                coalesce(metadata->>'is_transactional', 'true') = 'false'
+                AND lower(coalesce(metadata->>'record_kind', '')) LIKE '%reference%'
+              )
+              THEN 0
+            WHEN coalesce(metadata->>'is_transactional', 'true') = 'false'
+              AND lower(coalesce(metadata->>'record_kind', '')) LIKE '%reference%'
+              THEN 2
+            ELSE 1
+          END ASC,
           CASE
             WHEN $14::text IS NULL
               AND coalesce(metadata->>'is_transactional', 'true') = 'false'
@@ -12003,7 +12225,7 @@ async fn list_content(
     .bind(min_price)
     .bind(max_price)
     .bind(side)
-    .bind(query.marketplace_only)
+    .bind(marketplace_only)
     .bind(limit + 1)
     .bind(offset)
     .fetch_all(&state.db)
@@ -15323,6 +15545,148 @@ async fn accept_transaction(
     .await
 }
 
+async fn request_transaction_correction(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<UpdateTransactionRequest>,
+) -> impl IntoResponse {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+
+    let reason_code = match normalize_cancel_reason_code(payload.reason_code) {
+        Some(value) => value,
+        None => {
+            return err(StatusCode::BAD_REQUEST, "invalid reason_code").into_response();
+        }
+    };
+
+    let note = clean_text_limited(payload.response_message, MAX_EVIDENCE_NOTE_LEN)
+        .ok()
+        .flatten()
+        .unwrap_or_else(|| "Pengguna meminta koreksi transaksi karena kemungkinan salah input atau salah konfirmasi.".to_string());
+
+    let txn = match find_transaction_for_user(&state.db, id, user_id).await {
+        Ok(Some(row)) => row,
+        Ok(None) => return err(StatusCode::NOT_FOUND, "transaction not found").into_response(),
+        Err(error) => {
+            tracing::error!("request_transaction_correction lookup error: {:?}", error);
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load transaction",
+            )
+            .into_response();
+        }
+    };
+
+    if !matches!(
+        txn.status.as_str(),
+        "completed" | "cancelled" | "rejected" | "expired" | "refunded"
+    ) {
+        return (
+            StatusCode::CONFLICT,
+            Json(json!({
+                "error": "transaction does not need a manual correction request yet",
+                "code": "correction_not_applicable",
+                "message": "Gunakan alur tindakan transaksi saat transaksi masih aktif."
+            })),
+        )
+            .into_response();
+    }
+
+    let Some(ticket) = ensure_support_ticket_for_transaction_correction(
+        &state.db,
+        &txn,
+        user_id,
+        reason_code.as_str(),
+        note.as_str(),
+    )
+    .await
+    else {
+        return err(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to create transaction correction request",
+        )
+        .into_response();
+    };
+
+    push_notification_best_effort(
+        &state,
+        txn.buyer_id,
+        "transaction",
+        "transaction.correction_requested",
+        "Koreksi transaksi diajukan",
+        &format!(
+            "Permintaan koreksi untuk transaksi {} sudah dibuat dan akan ditinjau.",
+            txn.id
+        ),
+        json!({
+            "transaction_id": txn.id,
+            "ticket_id": ticket.id,
+            "reason_code": reason_code,
+            "status": txn.status
+        }),
+    )
+    .await;
+
+    let actor_role = if user_id == txn.seller_id {
+        "seller"
+    } else {
+        "buyer"
+    };
+    record_crm_activity_for_transaction(
+        &state.db,
+        &txn,
+        user_id,
+        actor_role,
+        "transaction.correction_requested",
+        format!(
+            "Permintaan koreksi transaksi {} diajukan dengan alasan {}.",
+            txn.id, reason_code
+        ),
+        json!({
+            "ticket_id": ticket.id,
+            "reason_code": reason_code,
+            "note": note,
+            "transaction_status": txn.status
+        }),
+    )
+    .await;
+
+    push_notification_best_effort(
+        &state,
+        txn.seller_id,
+        "transaction",
+        "transaction.correction_requested",
+        "Koreksi transaksi diajukan",
+        &format!(
+            "Permintaan koreksi untuk transaksi {} sudah dibuat dan akan ditinjau.",
+            txn.id
+        ),
+        json!({
+            "transaction_id": txn.id,
+            "ticket_id": ticket.id,
+            "reason_code": reason_code,
+            "status": txn.status
+        }),
+    )
+    .await;
+
+    (
+        StatusCode::ACCEPTED,
+        Json(json!({
+            "code": "correction_requested",
+            "transaction_id": txn.id,
+            "transaction_status": txn.status,
+            "ticket": ticket,
+            "message": "Permintaan koreksi sudah dikirim. Transaksi tidak diubah otomatis sampai ditinjau."
+        })),
+    )
+        .into_response()
+}
+
 async fn cancel_transaction(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -15344,11 +15708,18 @@ async fn cancel_transaction(
         id,
         user_id,
         "cancelled",
-        &["pending", "accepted", "in_progress"],
+        &[
+            "pending",
+            "accepted",
+            "in_progress",
+            "delivered",
+            "completed",
+        ],
         false,
         false,
         clean_text(payload.response_message),
         Some(json!({
+            "action": "cancel",
             "reason_code": reason_code,
             "cancelled_by": user_id,
             "cancelled_at": Utc::now(),
@@ -21417,6 +21788,108 @@ async fn record_crm_activity_for_transaction(
     }
 }
 
+async fn ensure_support_ticket_for_transaction_correction(
+    db: &PgPool,
+    txn: &TransactionRow,
+    opened_by: Uuid,
+    reason_code: &str,
+    note: &str,
+) -> Option<SupportTicketRow> {
+    let support_room_id = format!("support:txn-correction:{}", txn.id);
+    let existing = sqlx::query_as::<_, SupportTicketRow>(
+        r#"
+        SELECT
+            t.id, t.requester_user_id, t.requester_email, t.requester_name, t.category,
+            t.subject, t.status, t.priority, t.assigned_agent_id, t.support_room_id, t.source,
+            t.created_at, t.updated_at, t.resolved_at, t.first_response_at,
+            latest.body AS latest_message, latest.created_at AS latest_message_at
+        FROM support_tickets t
+        LEFT JOIN LATERAL (
+            SELECT body, created_at
+            FROM support_ticket_replies r
+            WHERE r.ticket_id = t.id AND r.is_internal = false
+            ORDER BY r.created_at DESC
+            LIMIT 1
+        ) latest ON true
+        WHERE t.support_room_id = $1
+        LIMIT 1
+        "#,
+    )
+    .bind(&support_room_id)
+    .fetch_optional(db)
+    .await;
+
+    if let Ok(Some(ticket)) = existing {
+        return Some(ticket);
+    }
+
+    let ticket = match sqlx::query_as::<_, SupportTicketRow>(
+        r#"
+        INSERT INTO support_tickets (
+            id, requester_user_id, requester_email, requester_name, category, subject,
+            status, priority, source, support_room_id
+        )
+        VALUES (
+            $1, $2, $3, $4, 'transaction_correction', $5,
+            'open', 'high', 'transaction_correction', $6
+        )
+        RETURNING
+            id, requester_user_id, requester_email, requester_name, category, subject,
+            status, priority, assigned_agent_id, support_room_id, source, created_at, updated_at,
+            resolved_at, first_response_at, NULL::text AS latest_message, NULL::timestamptz AS latest_message_at
+        "#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(Some(opened_by))
+    .bind(format!("user-{}@lajukan.com", opened_by))
+    .bind(Some(format!("User {}", &opened_by.to_string()[..8])))
+    .bind(format!("Transaction correction {}", txn.id))
+    .bind(&support_room_id)
+    .fetch_optional(db)
+    .await
+    {
+        Ok(Some(row)) => row,
+        Ok(None) => return None,
+        Err(error) => {
+            tracing::warn!(
+                "ensure_support_ticket_for_transaction_correction insert ticket failed: {:?}",
+                error
+            );
+            return None;
+        }
+    };
+
+    if let Err(error) = sqlx::query(
+        r#"
+        INSERT INTO support_ticket_replies (
+            id, ticket_id, author_user_id, author_role, body, is_internal
+        )
+        VALUES ($1, $2, $3, 'customer', $4, false)
+        "#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(ticket.id)
+    .bind(Some(opened_by))
+    .bind(format!(
+        "Permintaan koreksi transaksi otomatis.
+Reason: {}
+Catatan: {}",
+        reason_code,
+        if note.trim().is_empty() { "-" } else { note }
+    ))
+    .execute(db)
+    .await
+    {
+        tracing::warn!(
+            "ensure_support_ticket_for_transaction_correction insert reply failed: {:?}",
+            error
+        );
+        return None;
+    }
+
+    Some(ticket)
+}
+
 async fn ensure_support_ticket_for_dispute(
     db: &PgPool,
     txn: &TransactionRow,
@@ -23617,6 +24090,118 @@ async fn delete_banner(
 }
 
 #[allow(clippy::too_many_arguments)]
+async fn reverse_completed_transaction_funds_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    txn: &TransactionRow,
+    environment: &str,
+) -> Result<(), WalletTransitionError> {
+    if txn.buyer_id == txn.seller_id {
+        return Err(WalletTransitionError::InvalidHeldBalance);
+    }
+
+    let buyer_account =
+        lock_wallet_account_tx(tx, txn.buyer_id, environment, txn.currency.as_str()).await?;
+    let seller_account =
+        lock_wallet_account_tx(tx, txn.seller_id, environment, txn.currency.as_str()).await?;
+
+    if seller_account.available_balance_cents < txn.amount_cents {
+        return Err(WalletTransitionError::InsufficientFunds);
+    }
+
+    let next_buyer_available = buyer_account
+        .available_balance_cents
+        .checked_add(txn.amount_cents)
+        .ok_or(WalletTransitionError::InvalidHeldBalance)?;
+    let next_buyer_spend = buyer_account
+        .total_spend_cents
+        .checked_sub(txn.amount_cents)
+        .ok_or(WalletTransitionError::InvalidHeldBalance)?;
+    let next_seller_available = seller_account
+        .available_balance_cents
+        .checked_sub(txn.amount_cents)
+        .ok_or(WalletTransitionError::InsufficientFunds)?;
+
+    let updated_buyer = sqlx::query_as::<_, WalletAccountRow>(
+        r#"
+        UPDATE wallet_accounts
+        SET
+            available_balance_cents = $2,
+            total_spend_cents = $3,
+            updated_at = NOW()
+        WHERE id = $1
+        RETURNING
+            id, user_id, environment, currency, available_balance_cents, held_balance_cents,
+            total_topup_cents, total_spend_cents, status, metadata, created_at, updated_at
+        "#,
+    )
+    .bind(buyer_account.id)
+    .bind(next_buyer_available)
+    .bind(next_buyer_spend)
+    .fetch_one(&mut **tx)
+    .await?;
+
+    let updated_seller = sqlx::query_as::<_, WalletAccountRow>(
+        r#"
+        UPDATE wallet_accounts
+        SET
+            available_balance_cents = $2,
+            updated_at = NOW()
+        WHERE id = $1
+        RETURNING
+            id, user_id, environment, currency, available_balance_cents, held_balance_cents,
+            total_topup_cents, total_spend_cents, status, metadata, created_at, updated_at
+        "#,
+    )
+    .bind(seller_account.id)
+    .bind(next_seller_available)
+    .fetch_one(&mut **tx)
+    .await?;
+
+    insert_wallet_ledger_entry_tx(
+        tx,
+        txn.buyer_id,
+        &updated_buyer,
+        "credit",
+        txn.amount_cents,
+        updated_buyer.available_balance_cents,
+        "transaction_correction_refund",
+        "transaction",
+        txn.id,
+        format!("Correction refund for completed transaction {}", txn.id),
+        json!({
+            "transaction_id": txn.id,
+            "counterparty_user_id": txn.seller_id,
+            "flow": "completed_transaction_correction",
+            "environment": environment,
+            "reason": "human_error"
+        }),
+    )
+    .await?;
+
+    insert_wallet_ledger_entry_tx(
+        tx,
+        txn.seller_id,
+        &updated_seller,
+        "debit",
+        txn.amount_cents,
+        updated_seller.available_balance_cents,
+        "transaction_correction",
+        "transaction",
+        txn.id,
+        format!("Correction reversal for completed transaction {}", txn.id),
+        json!({
+            "transaction_id": txn.id,
+            "counterparty_user_id": txn.buyer_id,
+            "flow": "completed_transaction_correction",
+            "environment": environment,
+            "reason": "human_error"
+        }),
+    )
+    .await?;
+
+    Ok(())
+}
+
 async fn update_transaction_status(
     state: &Arc<AppState>,
     id: Uuid,
@@ -23685,6 +24270,24 @@ async fn update_transaction_status(
         return err(StatusCode::CONFLICT, "invalid transaction state").into_response();
     }
 
+    if next_status == "cancelled" && txn.status == "completed" {
+        let now = Utc::now();
+        let deadline = completed_transaction_correction_deadline(txn.updated_at);
+        if !completed_transaction_correction_allowed(txn.updated_at, now) {
+            return (
+                StatusCode::CONFLICT,
+                Json(json!({
+                    "error": "completed transaction correction window has expired",
+                    "code": "completed_correction_window_expired",
+                    "message": "Transaksi sudah selesai terlalu lama untuk dibatalkan otomatis. Ajukan koreksi melalui bantuan agar saldo dan riwayat tetap aman.",
+                    "correction_window_minutes": completed_transaction_correction_grace_minutes(),
+                    "correction_deadline": deadline
+                })),
+            )
+                .into_response();
+        }
+    }
+
     let wallet_transition_result = match next_status {
         "accepted" => hold_transaction_funds_tx(&mut tx, &txn, wallet_environment.as_str())
             .await
@@ -23692,6 +24295,11 @@ async fn update_transaction_status(
         "completed" => release_transaction_funds_tx(&mut tx, &txn, wallet_environment.as_str())
             .await
             .map(|_| ()),
+        "cancelled" if txn.status == "completed" => {
+            reverse_completed_transaction_funds_tx(&mut tx, &txn, wallet_environment.as_str())
+                .await
+                .map(|_| ())
+        }
         "cancelled"
             if matches!(
                 txn.status.as_str(),
@@ -23707,6 +24315,18 @@ async fn update_transaction_status(
     if let Err(e) = wallet_transition_result {
         match e {
             WalletTransitionError::InsufficientFunds => {
+                if next_status == "cancelled" && txn.status == "completed" {
+                    return (
+                        StatusCode::CONFLICT,
+                        Json(json!({
+                            "error": "completed transaction correction cannot be reversed automatically",
+                            "code": "completed_correction_insufficient_seller_balance",
+                            "message": "Transaksi sudah selesai, tetapi saldo tersedia penjual tidak cukup untuk membalikkan dana secara otomatis. Ajukan koreksi melalui bantuan.",
+                            "next_step": "manual_correction"
+                        })),
+                    )
+                        .into_response();
+                }
                 return err(
                     StatusCode::CONFLICT,
                     "insufficient wallet balance to process transaction",
@@ -23746,6 +24366,18 @@ async fn update_transaction_status(
                 "status_context": {
                     "status": next_status,
                     "data": context
+                }
+            }),
+        );
+    }
+    if txn.status == "completed" && next_status == "cancelled" {
+        merged_transaction_meta = merge_json_objects(
+            merged_transaction_meta,
+            json!({
+                "human_error_correction": {
+                    "from_status": "completed",
+                    "requested_at": Utc::now(),
+                    "grace_minutes": completed_transaction_correction_grace_minutes()
                 }
             }),
         );
@@ -24121,7 +24753,9 @@ async fn update_transaction_status(
                     .await;
                 }
                 "cancelled" => {
-                    let refund_note = if txn.protection_status == "funds_held"
+                    let refund_note = if txn.status == "completed" {
+                        "Dana transaksi dibalikkan ke saldo buyer sebagai koreksi. Saldo seller dikurangi kembali agar pencatatan tetap seimbang."
+                    } else if txn.protection_status == "funds_held"
                         || txn.protection_status == "on_hold"
                     {
                         "Dana otomatis dikembalikan ke saldo buyer jika sebelumnya sudah ditahan."
@@ -24356,6 +24990,49 @@ mod tests {
     use super::*;
 
     #[test]
+    fn completed_transaction_correction_window_allows_only_recent_completion() {
+        let completed_at = Utc::now();
+        let grace = completed_transaction_correction_grace_minutes();
+
+        assert!(completed_transaction_correction_allowed(
+            completed_at,
+            completed_at
+        ));
+        assert!(completed_transaction_correction_allowed(
+            completed_at,
+            completed_at + ChronoDuration::minutes(grace)
+        ));
+        assert!(!completed_transaction_correction_allowed(
+            completed_at,
+            completed_at + ChronoDuration::minutes(grace) + ChronoDuration::seconds(1)
+        ));
+    }
+
+    #[test]
+    fn cancel_reason_code_accepts_common_human_error_reasons() {
+        for reason in [
+            "wrong_quantity",
+            "wrong_price",
+            "wrong_recipient",
+            "wrong_listing",
+            "user_mistake",
+        ] {
+            assert_eq!(
+                normalize_cancel_reason_code(Some(reason.to_string())).as_deref(),
+                Some(reason)
+            );
+        }
+    }
+
+    #[test]
+    fn cancel_reason_code_rejects_unknown_values() {
+        assert_eq!(
+            normalize_cancel_reason_code(Some("not-a-real-reason".to_string())),
+            None
+        );
+    }
+
+    #[test]
     fn daily_login_reward_amounts_are_deterministic_and_bounded() {
         let expected_coins = [15, 20, 25, 30, 35, 40, 45];
         let expected_xp = [30, 40, 50, 60, 70, 80, 90];
@@ -24435,6 +25112,32 @@ mod tests {
             canonical_content_type("business-transfer"),
             "business_transfer"
         );
+    }
+
+    #[test]
+    fn marketplace_query_bool_accepts_browser_and_legacy_forms() {
+        assert_eq!(parse_optional_query_bool(None), Ok(None));
+        assert_eq!(
+            parse_optional_query_bool(Some("true".to_string())),
+            Ok(Some(true))
+        );
+        assert_eq!(
+            parse_optional_query_bool(Some("1".to_string())),
+            Ok(Some(true))
+        );
+        assert_eq!(
+            parse_optional_query_bool(Some("YES".to_string())),
+            Ok(Some(true))
+        );
+        assert_eq!(
+            parse_optional_query_bool(Some("false".to_string())),
+            Ok(Some(false))
+        );
+        assert_eq!(
+            parse_optional_query_bool(Some("0".to_string())),
+            Ok(Some(false))
+        );
+        assert!(parse_optional_query_bool(Some("maybe".to_string())).is_err());
     }
 
     #[test]
@@ -25310,5 +26013,23 @@ mod tests {
     fn content_owner_can_review_inactive_detail() {
         let owner_id = Uuid::new_v4();
         assert!(can_view_content_detail("draft", owner_id, Some(owner_id)));
+    }
+
+    #[test]
+    fn public_media_contribution_route_has_one_canonical_owner() {
+        const ROUTE: String = ["/v1/umkm/stores/{store_ref}/media", "contributions"].join("/");
+        let main_source = include_str!("main.rs");
+        let moderation_source = include_str!("business_moderation.rs");
+
+        assert_eq!(
+            main_source.matches(&ROUTE).count(),
+            1,
+            "canonical media contribution route must be declared exactly once in main.rs",
+        );
+        assert_eq!(
+            moderation_source.matches(&ROUTE).count(),
+            0,
+            "business_moderation.rs must not register the canonical route again",
+        );
     }
 }

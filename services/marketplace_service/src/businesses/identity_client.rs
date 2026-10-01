@@ -174,6 +174,38 @@ impl OrganizationSummary {
             "org_admin" | "org_manager" | "manager" | "org_accounting"
         )
     }
+
+    pub(crate) fn can_reset_finance_data(&self) -> bool {
+        matches!(
+            self.current_user_role.as_str(),
+            "org_admin" | "org_manager" | "manager" | "org_accounting" | "accounting" | "owner"
+        )
+    }
+
+    pub(crate) fn can_reset_sales_data(&self) -> bool {
+        matches!(
+            self.current_user_role.as_str(),
+            "org_admin" | "org_manager" | "manager" | "owner"
+        )
+    }
+
+    pub(crate) fn can_reset_inventory_data(&self) -> bool {
+        matches!(
+            self.current_user_role.as_str(),
+            "org_admin" | "org_manager" | "manager" | "org_inventory" | "inventory" | "owner"
+        )
+    }
+
+    pub(crate) fn can_reset_catalog_data(&self) -> bool {
+        matches!(
+            self.current_user_role.as_str(),
+            "org_admin" | "org_manager" | "manager" | "owner"
+        )
+    }
+
+    pub(crate) fn can_start_fresh(&self) -> bool {
+        matches!(self.current_user_role.as_str(), "org_admin" | "owner")
+    }
 }
 
 #[derive(Debug)]
@@ -454,6 +486,25 @@ mod tests {
         assert!(!organization("org_inventory").can_record_purchases());
         assert!(!organization("org_accounting").can_record_purchases());
         assert!(!organization("viewer").can_record_purchases());
+    }
+
+    #[test]
+    fn reset_permissions_are_scope_limited() {
+        assert!(organization("owner").can_reset_finance_data());
+        assert!(organization("accounting").can_reset_finance_data());
+        assert!(organization("inventory").can_reset_inventory_data());
+        assert!(!organization("cashier").can_reset_finance_data());
+        assert!(!organization("cashier").can_reset_sales_data());
+        assert!(!organization("viewer").can_reset_inventory_data());
+        assert!(!organization("inventory").can_reset_catalog_data());
+    }
+
+    #[test]
+    fn full_reset_requires_owner_or_org_admin() {
+        assert!(organization("owner").can_start_fresh());
+        assert!(organization("org_admin").can_start_fresh());
+        assert!(!organization("org_manager").can_start_fresh());
+        assert!(!organization("manager").can_start_fresh());
     }
 
     #[test]

@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod';
 import { enforceAuthRouteSecurity } from '@/lib/authSecurity';
 import { enforceRateLimit } from '@/lib/rateLimit';
 import { isCoordinateValid } from '@/lib/super-app/location-guard';
@@ -10,18 +9,42 @@ const MARKETPLACE_URL =
   process.env.NEXT_PUBLIC_MARKETPLACE_URL ||
   'http://localhost:8081';
 
-const QuerySchema = z.object({
-  q: z.string().trim().max(120).optional(),
-  city: z.string().trim().max(80).optional(),
-  category: z.string().trim().max(80).optional(),
-  limit: z.coerce.number().int().min(1).max(5000).default(1000),
-  min_lat: z.coerce.number().min(-90).max(90).optional(),
-  max_lat: z.coerce.number().min(-90).max(90).optional(),
-  min_lng: z.coerce.number().min(-180).max(180).optional(),
-  max_lng: z.coerce.number().min(-180).max(180).optional(),
-  viewer_lat: z.coerce.number().min(-90).max(90).optional(),
-  viewer_lng: z.coerce.number().min(-180).max(180).optional(),
-});
+function readOptionalNumber(params: URLSearchParams, key: string, min: number, max: number): number | undefined {
+  const raw = params.get(key);
+  if (raw === null || raw.trim() === '') return undefined;
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value < min || value > max) return undefined;
+  return value;
+}
+
+function readOptionalInteger(params: URLSearchParams, key: string, min: number, max: number, fallback: number): number {
+  const value = readOptionalNumber(params, key, min, max);
+  if (value === undefined) return fallback;
+  return Math.min(max, Math.max(min, Math.trunc(value)));
+}
+
+async function fetchMapDataWithRetry(url: string): Promise<Response> {
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 4500);
+    try {
+      const response = await fetch(url, { cache: 'no-store', signal: controller.signal });
+      if (response.ok || (response.status < 500 && response.status !== 429) || attempt === 2) return response;
+      await response.body?.cancel();
+      const retryAfter = Number(response.headers.get('retry-after') || 0);
+      await new Promise(resolve => setTimeout(resolve, retryAfter > 0 && retryAfter <= 2 ? retryAfter * 1000 : 180 * 2 ** attempt));
+    } catch (error) {
+      lastError = error;
+      if (attempt === 2) throw error;
+      await new Promise(resolve => setTimeout(resolve, 180 * 2 ** attempt));
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+  if (lastError instanceof Error) throw lastError;
+  throw new Error('Map upstream request failed');
+}
 
 type MapPoint = {
   id: string;
@@ -34,6 +57,79 @@ type MapPoint = {
   source_kind: string;
   metadata?: Record<string, unknown>;
 };
+
+type MapPointsPayload = {
+  items: MapPoint[];
+  total_count: number;
+};
+
+type MapPointsCacheEntry = {
+  freshUntil: number;
+  staleUntil: number;
+  payload: MapPointsPayload;
+};
+
+const MAP_POINTS_FRESH_MS = 45_000;
+const MAP_POINTS_STALE_MS = 5 * 60_000;
+const MAP_POINTS_CACHE = new Map<string, MapPointsCacheEntry>();
+
+function mapPointsCacheKey(params: URLSearchParams): string {
+  return params.toString();
+}
+
+function normalizeMapPointsPayload(payload: {
+  items?: MapPoint[];
+  total_count?: number;
+}): MapPointsPayload {
+  const items = Array.isArray(payload.items) ? payload.items : [];
+  const totalCount =
+    typeof payload.total_count === 'number' &&
+    Number.isFinite(payload.total_count) &&
+    payload.total_count >= 0
+      ? Math.floor(payload.total_count)
+      : items.length;
+
+  return {
+    items,
+    total_count: Math.max(totalCount, items.length),
+  };
+}
+
+function cacheMapPoints(key: string, payload: MapPointsPayload): void {
+  const now = Date.now();
+  MAP_POINTS_CACHE.delete(key);
+  MAP_POINTS_CACHE.set(key, {
+    freshUntil: now + MAP_POINTS_FRESH_MS,
+    staleUntil: now + MAP_POINTS_STALE_MS,
+    payload,
+  });
+
+  while (MAP_POINTS_CACHE.size > 32) {
+    const oldestKey = MAP_POINTS_CACHE.keys().next().value;
+    if (typeof oldestKey !== 'string') break;
+    MAP_POINTS_CACHE.delete(oldestKey);
+  }
+}
+
+function getCachedMapPoints(
+  key: string,
+  allowStale = false,
+): MapPointsCacheEntry | null {
+  const entry = MAP_POINTS_CACHE.get(key);
+  if (!entry) return null;
+  const now = Date.now();
+
+  if (entry.freshUntil > now) {
+    MAP_POINTS_CACHE.delete(key);
+    MAP_POINTS_CACHE.set(key, entry);
+    return entry;
+  }
+
+  if (allowStale && entry.staleUntil > now) return entry;
+
+  MAP_POINTS_CACHE.delete(key);
+  return null;
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -54,77 +150,109 @@ export async function GET(req: NextRequest) {
     if (!rl.ok) return rl.response;
 
     const url = new URL(req.url);
-    const parsed = QuerySchema.safeParse(Object.fromEntries(url.searchParams.entries()));
-    if (!parsed.success) {
-      return NextResponse.json({ error: 'Invalid map point query' }, { status: 400 });
+    const paramsInput = url.searchParams;
+    const limit = readOptionalInteger(paramsInput, 'limit', 1, 3000, 1000);
+    const minLatInput = readOptionalNumber(paramsInput, 'min_lat', -90, 90);
+    const maxLatInput = readOptionalNumber(paramsInput, 'max_lat', -90, 90);
+    const minLngInput = readOptionalNumber(paramsInput, 'min_lng', -180, 180);
+    const maxLngInput = readOptionalNumber(paramsInput, 'max_lng', -180, 180);
+    const hasAnyBounds = paramsInput.has('min_lat') || paramsInput.has('max_lat') || paramsInput.has('min_lng') || paramsInput.has('max_lng');
+    const hasCompleteBounds = minLatInput !== undefined && maxLatInput !== undefined && minLngInput !== undefined && maxLngInput !== undefined;
+    if (hasAnyBounds && !hasCompleteBounds) {
+      return NextResponse.json({ data: { items: [], count: 0, total_count: 0, transient: true } }, { headers: { 'Cache-Control': 'no-store' } });
     }
-
-    const input = parsed.data;
-    const hasAnyBounds =
-      input.min_lat !== undefined ||
-      input.max_lat !== undefined ||
-      input.min_lng !== undefined ||
-      input.max_lng !== undefined;
-    if (
-      hasAnyBounds &&
-      [input.min_lat, input.max_lat, input.min_lng, input.max_lng].some(
-        value => value === undefined,
-      )
-    ) {
-      return NextResponse.json({ error: 'Complete map bounds are required' }, { status: 400 });
+    let minLat = minLatInput, maxLat = maxLatInput, minLng = minLngInput, maxLng = maxLngInput;
+    if (hasCompleteBounds) {
+      if (minLat! > maxLat!) [minLat, maxLat] = [maxLat!, minLat!];
+      if (minLng! > maxLng!) [minLng, maxLng] = [maxLng!, minLng!];
     }
-    if (
-      input.min_lat !== undefined &&
-      input.max_lat !== undefined &&
-      input.min_lat > input.max_lat
-    ) {
-      return NextResponse.json({ error: 'Invalid latitude bounds' }, { status: 400 });
-    }
-    if (
-      input.min_lng !== undefined &&
-      input.max_lng !== undefined &&
-      input.min_lng > input.max_lng
-    ) {
-      return NextResponse.json({ error: 'Invalid longitude bounds' }, { status: 400 });
-    }
-
-    const hasViewer =
-      input.viewer_lat !== undefined || input.viewer_lng !== undefined;
-    if (
-      hasViewer &&
-      (input.viewer_lat === undefined ||
-        input.viewer_lng === undefined ||
-        !isCoordinateValid({
-          lat: input.viewer_lat,
-          lng: input.viewer_lng,
-        }))
-    ) {
-      return NextResponse.json({ error: 'Invalid viewer coordinates' }, { status: 400 });
-    }
-
+    const rawQ = (paramsInput.get('q') || '').trim();
+    const rawCity = (paramsInput.get('city') || '').trim();
+    const rawCategory = (paramsInput.get('category') || '').trim();
+    const normalizedQ = rawQ.length >= 2 ? rawQ.slice(0, 120) : undefined;
+    const normalizedCity = rawCity.length >= 2 ? rawCity.slice(0, 80) : undefined;
+    const normalizedCategory = rawCategory.length >= 2 ? rawCategory.slice(0, 80) : undefined;
+    const viewerLat = readOptionalNumber(paramsInput, 'viewer_lat', -90, 90);
+    const viewerLng = readOptionalNumber(paramsInput, 'viewer_lng', -180, 180);
+    const radiusInput = readOptionalNumber(paramsInput, 'radius_km', 0.0001, 1000);
+    const hasViewer = viewerLat !== undefined && viewerLng !== undefined && isCoordinateValid({ lat: viewerLat, lng: viewerLng });
+    const normalizedRadius = hasViewer ? radiusInput : undefined;
     const params = new URLSearchParams();
-    params.set('limit', String(input.limit));
-    if (input.q) params.set('q', input.q);
-    if (input.city) params.set('city', input.city);
-    if (input.category) params.set('category', input.category);
-    if (input.min_lat !== undefined) params.set('min_lat', String(input.min_lat));
-    if (input.max_lat !== undefined) params.set('max_lat', String(input.max_lat));
-    if (input.min_lng !== undefined) params.set('min_lng', String(input.min_lng));
-    if (input.max_lng !== undefined) params.set('max_lng', String(input.max_lng));
-    if (hasViewer) {
-      params.set('viewer_lat', String(input.viewer_lat));
-      params.set('viewer_lng', String(input.viewer_lng));
+    params.set('limit', String(limit));
+    if (normalizedQ) params.set('q', normalizedQ);
+    if (normalizedCity) params.set('city', normalizedCity);
+    if (normalizedCategory) params.set('category', normalizedCategory);
+    if (minLat !== undefined) params.set('min_lat', String(minLat));
+    if (maxLat !== undefined) params.set('max_lat', String(maxLat));
+    if (minLng !== undefined) params.set('min_lng', String(minLng));
+    if (maxLng !== undefined) params.set('max_lng', String(maxLng));
+    if (hasViewer) { params.set('viewer_lat', String(viewerLat)); params.set('viewer_lng', String(viewerLng)); }
+    if (normalizedRadius !== undefined) params.set('radius_km', String(normalizedRadius));
+
+    const canUseServerCache = !hasViewer;
+    const cacheKey = mapPointsCacheKey(params);
+    const cached = canUseServerCache ? getCachedMapPoints(cacheKey) : null;
+    if (cached) {
+      return NextResponse.json(
+        { data: cached.payload },
+        {
+          headers: {
+            'Cache-Control': hasViewer
+              ? 'private, no-store'
+              : 'public, s-maxage=45, stale-while-revalidate=180',
+            'X-Lajukan-Map-Cache': 'hit',
+          },
+        },
+      );
     }
 
-    const response = await fetch(
-      `${MARKETPLACE_URL}/v1/map/places?${params.toString()}`,
-      {
-        cache: 'no-store',
-        signal: AbortSignal.timeout(4000),
-      },
-    );
+    let response: Response;
+    try {
+      response = await fetchMapDataWithRetry(
+        `${MARKETPLACE_URL}/v1/map/places?${params.toString()}`,
+      );
+    } catch (fetchError) {
+      const stale = canUseServerCache
+        ? getCachedMapPoints(cacheKey, true)
+        : null;
+      if (stale) {
+        console.warn('[UMKM_MAP_POINTS_STALE]', fetchError);
+        return NextResponse.json(
+          { data: stale.payload, transient: true },
+          {
+            headers: {
+              'Cache-Control': hasViewer
+                ? 'private, no-store'
+                : 'public, s-maxage=15, stale-while-revalidate=60',
+              'X-Lajukan-Map-Cache': 'stale',
+            },
+          },
+        );
+      }
+      throw fetchError;
+    }
+
     if (!response.ok) {
-      return NextResponse.json({ error: 'Map data source unavailable' }, { status: 502 });
+      const stale = canUseServerCache
+        ? getCachedMapPoints(cacheKey, true)
+        : null;
+      if (stale) {
+        return NextResponse.json(
+          { data: stale.payload, transient: true },
+          {
+            headers: {
+              'Cache-Control': hasViewer
+                ? 'private, no-store'
+                : 'public, s-maxage=15, stale-while-revalidate=60',
+              'X-Lajukan-Map-Cache': 'stale',
+            },
+          },
+        );
+      }
+      return NextResponse.json(
+        { error: 'Map data source unavailable' },
+        { status: 502 },
+      );
     }
 
     const payload = (await response.json()) as {
@@ -143,26 +271,27 @@ export async function GET(req: NextRequest) {
         )
       : [];
 
-    const totalCount =
-      typeof payload.total_count === 'number' &&
-      Number.isFinite(payload.total_count) &&
-      payload.total_count >= 0
-        ? Math.floor(payload.total_count)
-        : items.length;
+    const normalizedPayload = normalizeMapPointsPayload({
+      items,
+      total_count: payload.total_count,
+    });
+    if (canUseServerCache) {
+      cacheMapPoints(cacheKey, normalizedPayload);
+    }
 
     return NextResponse.json(
       {
         data: {
-          items,
-          count: items.length,
-          total_count: totalCount,
+          items: normalizedPayload.items,
+          count: normalizedPayload.items.length,
+          total_count: normalizedPayload.total_count,
         },
       },
       {
         headers: {
           'Cache-Control': hasViewer
             ? 'private, no-store'
-            : 'public, s-maxage=15, stale-while-revalidate=60',
+            : 'public, s-maxage=45, stale-while-revalidate=180',
         },
       },
     );

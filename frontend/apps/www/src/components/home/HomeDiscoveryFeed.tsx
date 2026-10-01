@@ -94,6 +94,7 @@ type DiscoveryCard = {
   updatedAt: number;
   score: number;
   verified: boolean;
+  sourcePriority: number;
 };
 
 type HomeDiscoveryFeedProps = {
@@ -160,6 +161,45 @@ function normalizeStatus(value: unknown): string {
   return String(value || 'active')
     .trim()
     .toLowerCase();
+}
+
+function isNativeLajukanContent(item: ContentItem): boolean {
+  const metadata = item.metadata || {};
+  const source = String(
+    metadata.source ||
+      metadata.data_source ||
+      metadata.source_kind ||
+      metadata.sourceKind ||
+      metadata.record_source ||
+      metadata.recordSource ||
+      '',
+  )
+    .trim()
+    .toLowerCase();
+
+  const recordKind = String(
+    metadata.record_kind ||
+      metadata.recordKind ||
+      '',
+  )
+    .trim()
+    .toLowerCase();
+
+  return Boolean(
+    item.owner_id ||
+      metadata.owner_id ||
+      metadata.user_id ||
+      metadata.ownerId ||
+      metadata.userId ||
+      metadata.listing_mode === 'guided_business_create' ||
+      source === 'lajukan' ||
+      source === 'lajukan_listing' ||
+      source === 'lajukan_content' ||
+      source === 'usaha_portal' ||
+      source === 'content' ||
+      recordKind === 'lajukan_listing' ||
+      recordKind === 'lajukan_content',
+  );
 }
 
 function formatShortDate(value: number, locale: 'id' | 'en'): string | null {
@@ -504,6 +544,7 @@ function mapContentItem(
       verified,
       typeKey,
     }),
+    sourcePriority: isNativeLajukanContent(item) ? 0 : 1,
   };
 }
 
@@ -521,6 +562,9 @@ function sortCards(
 ): DiscoveryCard[] {
   const next = [...items];
   next.sort((a, b) => {
+    if (a.sourcePriority !== b.sourcePriority) {
+      return a.sourcePriority - b.sourcePriority;
+    }
     if (mode === 'top' && b.score !== a.score) return b.score - a.score;
     return b.updatedAt - a.updatedAt;
   });

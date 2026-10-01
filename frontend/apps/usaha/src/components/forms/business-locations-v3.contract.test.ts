@@ -13,7 +13,7 @@ describe('business locations UX V3', () => {
   });
 
   it('persists a human reason with location changes', () => {
-    expect(source).toContain('JSON.stringify({ locations: next, reason })');
+    expect(source).toContain('JSON.stringify({ locations: next, reason, expectedVersion: businessVersion })');
     expect(source).toContain('Tulis alasan perubahan lokasi minimal 3 karakter.');
   });
 

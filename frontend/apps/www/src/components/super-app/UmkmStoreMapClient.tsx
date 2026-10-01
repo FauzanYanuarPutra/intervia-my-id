@@ -24,6 +24,7 @@ import {
   type LatLngBoundsExpression,
 } from 'leaflet';
 import { isCoordinateValid } from '@/lib/super-app/location-guard';
+import { cn } from '@/lib/utils';
 import {
   OPEN_MAP_TILE_ATTRIBUTION,
   OPEN_MAP_TILE_URL,
@@ -32,6 +33,8 @@ import {
 import { buildUmkmPlacePresentation } from '@/lib/super-app/umkm-place-ui';
 import {
   buildUmkmMapPlacePath,
+  getUmkmMapSourceKind,
+  getUmkmMapSourceLabel,
   isUmkmMapPublicReference,
 } from '@/lib/umkmSurface';
 import type {
@@ -62,6 +65,7 @@ type UmkmStoreMapClientProps = {
   focusOffset?: UmkmMapFocusOffset;
   onBoundsChange?: (bounds: UmkmMapBounds) => void;
   markerStyle?: 'default' | 'dots';
+  animateDataDots?: boolean;
 };
 
 type RoutingResponse = {
@@ -76,15 +80,17 @@ type RoutingResponse = {
 };
 
 const MARKER_CLUSTER_DISTANCE_PX = 72;
-const MARKER_CLUSTER_MAX_ZOOM = 18;
+const MARKER_CLUSTER_MAX_ZOOM = 19;
 const MARKER_CLUSTER_PICKER_ZOOM = 17;
 const MARKER_CLUSTER_TIGHT_DISTANCE_PX = 24;
 const MARKER_CLICK_FOCUS_ZOOM = 17;
 const MARKER_CLICK_FOCUS_STEP = 2;
 const MARKER_FOCUS_DURATION = 0.45;
+const VIEWPORT_RENDER_PADDING = 0.28;
 const MARKER_CLUSTER_FRAME_WIDTH_RATIO = 0.58;
 const MARKER_CLUSTER_FRAME_HEIGHT_RATIO = 0.5;
 const CLUSTER_POPUP_VISIBLE_LIMIT = 6;
+const DOT_TOOLTIP_MAX_ITEMS = 120;
 const STORE_MARKER_ICON_CACHE = new Map<string, DivIcon>();
 const CLUSTER_MARKER_ICON_CACHE = new Map<string, DivIcon>();
 const ROUTE_CACHE_TTL_MS = 30_000;
@@ -370,6 +376,29 @@ function buildStoreMarkerIcon(input: {
     `,
   });
 }
+function buildAnimatedDataDotIcon(input: {
+  markerTone: ReturnType<typeof buildUmkmPlacePresentation>['markerTone'];
+  sourceKind: string;
+  delayMs: number;
+}): DivIcon {
+  const palette = getMarkerPalette(input.markerTone);
+  const border = input.sourceKind === 'reference' ? '#94a3b8' : '#ffffff';
+
+  return divIcon({
+    className: 'leaflet-superapp-data-pulse-host',
+    iconSize: [12, 12],
+    iconAnchor: [6, 6],
+    html:
+      '<span class="umkm-data-pulse-dot" aria-hidden="true" style="--umkm-data-dot-color:' +
+      palette.badge +
+      ';--umkm-data-dot-border:' +
+      border +
+      ';animation-delay:' +
+      input.delayMs +
+      'ms;"></span>',
+  });
+}
+
 function buildViewerMarkerIcon(isId: boolean): DivIcon {
   const cacheKey = `viewer:${isId ? 'id' : 'en'}`;
   const cached = STORE_MARKER_ICON_CACHE.get(cacheKey);
@@ -396,6 +425,27 @@ function buildViewerMarkerIcon(isId: boolean): DivIcon {
   STORE_MARKER_ICON_CACHE.set(cacheKey, icon);
   return icon;
 }
+
+const UMKM_MAP_DATA_DOT_STYLE = `
+@keyframes lajukan-umkm-data-pulse {
+  0%, 100% { transform: scale(0.82); opacity: 0.62; box-shadow: 0 0 0 0 rgba(255,255,255,0); }
+  50% { transform: scale(1.2); opacity: 1; box-shadow: 0 0 0 5px rgba(255,255,255,0.24); }
+}
+.umkm-data-pulse-dot {
+  display: block;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  border: 2px solid var(--umkm-data-dot-border,#fff);
+  background: var(--umkm-data-dot-color,#0f766e);
+  box-sizing: border-box;
+  animation: lajukan-umkm-data-pulse 2.8s ease-in-out infinite;
+  will-change: transform, opacity, box-shadow;
+}
+@media (prefers-reduced-motion: reduce) {
+  .umkm-data-pulse-dot { animation: none; opacity: 0.86; }
+}
+`;
 
 function StoreKindChip({
   ui,
@@ -434,6 +484,58 @@ function StoreKindChip({
   );
 }
 
+function readStoreImageUrl(store: UmkmMapStore): string {
+  const metadata = store.metadata || {};
+  const candidates = [
+    metadata.gallery_media_primary,
+    metadata.cover_image,
+    metadata.cover_image_url,
+    metadata.cover_url,
+    metadata.store_photo_url,
+    metadata.logo_url,
+    metadata.image_url,
+    metadata.image,
+  ];
+
+  for (const candidate of candidates) {
+    if (
+      typeof candidate === 'string' &&
+      (/^https?:\/\//i.test(candidate.trim()) || candidate.trim().startsWith('/'))
+    ) {
+      return candidate.trim();
+    }
+  }
+
+  const mediaItems = metadata.gallery_media_items;
+  if (Array.isArray(mediaItems)) {
+    for (const item of mediaItems) {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+      const url =
+        typeof (item as Record<string, unknown>).url === 'string'
+          ? ((item as Record<string, unknown>).url as string).trim()
+          : '';
+      if (
+        /^https?:\/\//i.test(url) ||
+        url.startsWith('/')
+      ) {
+        return url;
+      }
+    }
+  }
+
+  for (const candidate of [metadata.gallery_images, metadata.images, metadata.photos]) {
+    if (!Array.isArray(candidate)) continue;
+    const url = candidate.find(
+      value =>
+        typeof value === 'string' &&
+        (/^https?:\/\//i.test(value.trim()) || value.trim().startsWith('/')),
+    );
+    if (typeof url === 'string') return url.trim();
+  }
+
+  return '';
+}
+
 function StorePreviewCard({
   store,
   ui,
@@ -455,11 +557,14 @@ function StorePreviewCard({
     ui.addressLine ||
     (isId ? 'Lokasi belum lengkap' : 'Location unavailable');
   const isReference = isUmkmMapPublicReference(store);
+  const sourceKind = getUmkmMapSourceKind(store);
+  const sourceLabel = getUmkmMapSourceLabel(sourceKind, isId);
   const isOpen = ui.openNow === true;
+  const imageUrl = readStoreImageUrl(store);
   const statusLabel = isReference
     ? isId
-      ? 'Referensi'
-      : 'Reference'
+      ? 'Lokasi publik'
+      : 'Public location'
     : ui.openNow === true
       ? isId
         ? 'Buka'
@@ -479,11 +584,39 @@ function StorePreviewCard({
 
   return (
     <div className={cardClass}>
+      {imageUrl ? (
+        <div className="relative mb-1.5 h-20 overflow-hidden rounded-xl bg-slate-100">
+          <img
+            src={imageUrl}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+          <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/45 to-transparent px-2 pb-1 pt-4 text-[9px] font-semibold text-white">
+            {isReference
+              ? isId
+                ? 'Lokasi usaha'
+                : 'Business location'
+              : isId
+                ? 'Usaha'
+                : 'Business'}
+          </span>
+        </div>
+      ) : null}
       <div className="flex min-w-0 items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <p className="line-clamp-1 text-[11.5px] font-bold leading-tight text-slate-950">
             {store.name}
           </p>
+          <span className={cn(
+            'mt-1 inline-flex w-fit max-w-full truncate rounded-full border px-1.5 py-0.5 text-[9px] font-black',
+            isReference
+              ? 'border-slate-200 bg-slate-50 text-slate-600'
+              : 'border-emerald-100 bg-emerald-50 text-emerald-700',
+          )}>
+            {sourceLabel}
+          </span>
           <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[10px] font-semibold text-slate-500">
             <StoreKindChip ui={ui} compact />
             <span className="truncate">{locationLabel}</span>
@@ -559,6 +692,8 @@ function StorePopupSummary({
     (isId ? 'Lokasi belum lengkap' : 'Location unavailable');
   const distanceLabel = ui.distanceLabel;
   const isReference = isUmkmMapPublicReference(store);
+  const sourceKind = getUmkmMapSourceKind(store);
+  const sourceLabel = getUmkmMapSourceLabel(sourceKind, isId);
   const statusLabel = isReference
     ? isId
       ? 'Referensi'
@@ -588,6 +723,14 @@ function StorePopupSummary({
         <h3 className="mt-1.5 line-clamp-1 text-[14px] font-extrabold leading-tight tracking-tight text-slate-950">
           {store.name}
         </h3>
+        <span className={cn(
+          'mt-1 inline-flex w-fit max-w-full truncate rounded-full border px-1.5 py-0.5 text-[9px] font-black',
+          isReference
+            ? 'border-slate-200 bg-slate-50 text-slate-600'
+            : 'border-emerald-100 bg-emerald-50 text-emerald-700',
+        )}>
+          {sourceLabel}
+        </span>
 
         <div className="mt-1.5 flex min-w-0 items-center gap-1.5 text-[10px] leading-4 text-slate-500">
           <MapPin
@@ -980,8 +1123,13 @@ function MapFocusController({
   const handledFocusKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
-    const focusKey = focusMode ? `${focusMode}:${focusNonce}` : null;
     const validStores = stores.filter(hasValidLatLng);
+    // Focus is an explicit navigation action, not a response to every
+    // marker batch. Keep the focus key stable while the viewport data changes;
+    // otherwise user zoom/pan would be overwritten by every map fetch.
+    const focusKey = focusMode
+      ? `${focusMode}:${focusNonce ?? 0}`
+      : null;
     const validSelectedStore = selectedStoreId
       ? validStores.find(store => store.id === selectedStoreId) || null
       : null;
@@ -1181,12 +1329,49 @@ function MapBoundsReporter({
 
   const reportBounds = useCallback(() => {
     if (!onBoundsChange) return;
+
+    const size = map.getSize();
+    if (size.x < 32 || size.y < 32) return;
+
     const bounds = map.getBounds();
+    const zoom = map.getZoom();
+    if (
+      !bounds.isValid() ||
+      !Number.isFinite(zoom) ||
+      zoom < 0 ||
+      zoom > 24
+    ) {
+      return;
+    }
+
+    const minLat = bounds.getSouth();
+    const maxLat = bounds.getNorth();
+    const rawMinLng = bounds.getWest();
+    const rawMaxLng = bounds.getEast();
+
+    if (
+      ![minLat, maxLat, rawMinLng, rawMaxLng].every(Number.isFinite) ||
+      minLat < -90 ||
+      maxLat > 90 ||
+      rawMinLng < -180 ||
+      rawMaxLng > 180 ||
+      minLat > maxLat
+    ) {
+      return;
+    }
+
+    // Leaflet can report a wrapped viewport with west > east near the
+    // antimeridian. The map API uses one rectangular bbox, so fall back to
+    // the full longitude range instead of emitting an invalid request.
+    const minLng = rawMinLng <= rawMaxLng ? rawMinLng : -180;
+    const maxLng = rawMinLng <= rawMaxLng ? rawMaxLng : 180;
+
     onBoundsChange({
-      minLat: bounds.getSouth(),
-      maxLat: bounds.getNorth(),
-      minLng: bounds.getWest(),
-      maxLng: bounds.getEast(),
+      minLat,
+      maxLat,
+      minLng,
+      maxLng,
+      zoom,
     });
   }, [map, onBoundsChange]);
 
@@ -1197,10 +1382,13 @@ function MapBoundsReporter({
     timerRef.current = window.setTimeout(() => {
       timerRef.current = null;
       reportBounds();
-    }, 120);
+    }, 160);
   }, [reportBounds]);
 
-  useMapEvents({ moveend: scheduleBoundsReport });
+  useMapEvents({
+    moveend: scheduleBoundsReport,
+    zoomend: scheduleBoundsReport,
+  });
 
   useEffect(() => {
     map.whenReady(scheduleBoundsReport);
@@ -1214,7 +1402,6 @@ function MapBoundsReporter({
 
   return null;
 }
-
 function ManualMarkerFocusController({
   target,
 }: {
@@ -1233,6 +1420,76 @@ function ManualMarkerFocusController({
   return null;
 }
 
+
+function useViewportStorePresentations(
+  storePresentations: StorePresentation[],
+  selectedStoreId?: string | null,
+): StorePresentation[] {
+  const map = useMap();
+  const [viewportVersion, setViewportVersion] = useState(0);
+  const [viewportReady, setViewportReady] = useState(false);
+
+  useMapEvents({
+    moveend: () => setViewportVersion(value => value + 1),
+    zoomend: () => setViewportVersion(value => value + 1),
+    resize: () => setViewportVersion(value => value + 1),
+  });
+
+  useEffect(() => {
+    let active = true;
+    const refresh = () => {
+      if (!active) return;
+      setViewportReady(true);
+      setViewportVersion(value => value + 1);
+    };
+
+    const frame = window.requestAnimationFrame(refresh);
+    const timer = window.setTimeout(refresh, 120);
+    map.whenReady(refresh);
+
+    return () => {
+      active = false;
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(timer);
+    };
+  }, [map]);
+
+  return useMemo(() => {
+    if (!storePresentations.length) return [];
+
+    const mapSize = map.getSize();
+    if (mapSize.x < 32 || mapSize.y < 32 || !viewportReady) {
+      return storePresentations;
+    }
+
+    const bounds = map.getBounds();
+    const paddedBounds = bounds.isValid()
+      ? bounds.pad(VIEWPORT_RENDER_PADDING)
+      : null;
+
+    const visible = paddedBounds
+      ? storePresentations.filter(({ store }) =>
+          paddedBounds.contains([store.lat, store.lng]),
+        )
+      : [...storePresentations];
+
+    // A genuinely empty viewport should stay empty. The all-points fallback
+    // is only used while the initial map layout is settling above.
+
+    if (
+      selectedStoreId &&
+      !visible.some(({ store }) => store.id === selectedStoreId)
+    ) {
+      const selected = storePresentations.find(
+        ({ store }) => store.id === selectedStoreId,
+      );
+      if (selected) visible.push(selected);
+    }
+
+    return visible;
+  }, [map, selectedStoreId, storePresentations, viewportReady, viewportVersion]);
+}
+
 function getCompactDotRadius(zoom: number): number {
   if (zoom <= 5) return 2.25;
   if (zoom <= 8) return 2.5;
@@ -1244,27 +1501,46 @@ function StoreDotsLayer({
   storePresentations,
   selectedStoreId,
   onSelectStore,
+  isId,
   interactive,
+  animateDataDots,
 }: {
   storePresentations: StorePresentation[];
   selectedStoreId?: string | null;
   onSelectStore?: (storeId: string) => void;
+  isId: boolean;
   interactive: boolean;
+  animateDataDots: boolean;
 }) {
   const map = useMap();
   const [zoom, setZoom] = useState(() => map.getZoom());
+  const visibleStorePresentations = useViewportStorePresentations(
+    storePresentations,
+    selectedStoreId,
+  );
 
   useMapEvents({ zoomend: () => setZoom(map.getZoom()) });
 
   const radius = getCompactDotRadius(zoom);
+  const renderDotTooltips =
+    interactive && visibleStorePresentations.length <= DOT_TOOLTIP_MAX_ITEMS;
+  const animatedDataPoints = useMemo(() => {
+    if (!animateDataDots || visibleStorePresentations.length === 0) return [];
+    const stride = Math.max(
+      1,
+      Math.ceil(visibleStorePresentations.length / 24),
+    );
+    return visibleStorePresentations
+      .filter((_, index) => index % stride === 0)
+      .slice(0, 24);
+  }, [animateDataDots, visibleStorePresentations]);
 
   return (
     <>
-      {storePresentations.map(({ store, ui }) => {
-        const isReference = isUmkmMapPublicReference(store);
-        const palette = isReference
-          ? { badge: '#94a3b8', border: '#cbd5e1', text: '#64748b' }
-          : getMarkerPalette(ui.markerTone);
+      {visibleStorePresentations.map(({ store, ui }) => {
+        const sourceKind = getUmkmMapSourceKind(store);
+        const categoryPalette = getMarkerPalette(ui.markerTone);
+        const sourceLabel = getUmkmMapSourceLabel(sourceKind, isId);
         const selected = store.id === selectedStoreId;
         return (
           <CircleMarker
@@ -1273,10 +1549,10 @@ function StoreDotsLayer({
             radius={selected ? Math.max(5, radius + 2) : radius}
             interactive={interactive}
             pathOptions={{
-              color: '#ffffff',
-              weight: selected ? 2 : 1,
+              color: sourceKind === 'reference' ? '#94a3b8' : '#ffffff',
+              weight: selected ? 2 : sourceKind === 'reference' ? 1.5 : 1,
               opacity: 0.95,
-              fillColor: palette.badge,
+              fillColor: categoryPalette.badge,
               fillOpacity: selected ? 1 : 0.94,
             }}
             eventHandlers={
@@ -1285,14 +1561,28 @@ function StoreDotsLayer({
                 : undefined
             }
           >
-            {interactive ? (
+            {renderDotTooltips ? (
               <Tooltip direction="top" offset={[0, -4]}>
-                {store.name} · {ui.kindLabel}
+                {store.name} · {ui.kindLabel} · {sourceLabel}
               </Tooltip>
             ) : null}
           </CircleMarker>
         );
       })}
+      {animatedDataPoints.map(({ store, ui }, index) => (
+        <Marker
+          key={'pulse-' + store.id}
+          position={[store.lat, store.lng]}
+          icon={buildAnimatedDataDotIcon({
+            markerTone: ui.markerTone,
+            sourceKind: getUmkmMapSourceKind(store),
+            delayMs: index * 90,
+          })}
+          interactive={false}
+          keyboard={false}
+          zIndexOffset={80}
+        />
+      ))}
     </>
   );
 }
@@ -1322,6 +1612,10 @@ function StoreMarkersLayer({
     showPopups && storePresentations.length <= 120;
   const [zoom, setZoom] = useState(() => map.getZoom());
   const deferredZoom = useDeferredValue(zoom);
+  const visibleStorePresentations = useViewportStorePresentations(
+    storePresentations,
+    selectedStoreId,
+  );
 
   useMapEvents({
     zoomend: () => {
@@ -1332,11 +1626,11 @@ function StoreMarkersLayer({
   const markerLayer = useMemo(
     () =>
       buildStoreMarkerLayer(
-        storePresentations,
+        visibleStorePresentations,
         deferredZoom,
         selectedStoreId,
       ),
-    [deferredZoom, selectedStoreId, storePresentations],
+    [deferredZoom, selectedStoreId, visibleStorePresentations],
   );
 
   const focusMarker = useCallback(
@@ -1346,15 +1640,17 @@ function StoreMarkersLayer({
         Math.max(minZoom, zoom + MARKER_CLICK_FOCUS_STEP),
       );
 
-      onMarkerFocus?.({
-        lat: point.lat,
-        lng: point.lng,
-        zoom: targetZoom,
-      });
-
-      map.flyTo([point.lat, point.lng], targetZoom, {
-        duration: MARKER_FOCUS_DURATION,
-      });
+      if (onMarkerFocus) {
+        onMarkerFocus({
+          lat: point.lat,
+          lng: point.lng,
+          zoom: targetZoom,
+        });
+      } else {
+        map.flyTo([point.lat, point.lng], targetZoom, {
+          duration: MARKER_FOCUS_DURATION,
+        });
+      }
 
       return targetZoom;
     },
@@ -1369,15 +1665,17 @@ function StoreMarkersLayer({
           Math.max(MARKER_CLUSTER_PICKER_ZOOM, zoom + 1),
         );
 
-        onMarkerFocus?.({
-          lat: cluster.lat,
-          lng: cluster.lng,
-          zoom: targetZoom,
-        });
-
-        map.flyTo([cluster.lat, cluster.lng], targetZoom, {
-          duration: MARKER_FOCUS_DURATION,
-        });
+        if (onMarkerFocus) {
+          onMarkerFocus({
+            lat: cluster.lat,
+            lng: cluster.lng,
+            zoom: targetZoom,
+          });
+        } else {
+          map.flyTo([cluster.lat, cluster.lng], targetZoom, {
+            duration: MARKER_FOCUS_DURATION,
+          });
+        }
         return;
       }
 
@@ -1445,6 +1743,26 @@ function StoreMarkersLayer({
         }
 
         const { cluster } = layer;
+        const clusterLajukanCount = cluster.items.filter(
+          ({ store }) => getUmkmMapSourceKind(store) === 'lajukan',
+        ).length;
+        const clusterExternalCount = cluster.items.filter(
+          ({ store }) => getUmkmMapSourceKind(store) === 'registered',
+        ).length;
+        const clusterReferenceCount = cluster.items.filter(
+          ({ store }) => getUmkmMapSourceKind(store) === 'reference',
+        ).length;
+        const clusterSourceLabel = [
+          clusterLajukanCount
+            ? (isId ? `${clusterLajukanCount} Lajukan` : `${clusterLajukanCount} Lajukan`)
+            : '',
+          clusterExternalCount
+            ? (isId ? `${clusterExternalCount} data luar` : `${clusterExternalCount} external`)
+            : '',
+          clusterReferenceCount
+            ? (isId ? `${clusterReferenceCount} referensi` : `${clusterReferenceCount} references`)
+            : '',
+        ].filter(Boolean).join(' · ');
         const allowPicker = cluster.tight || zoom >= MARKER_CLUSTER_PICKER_ZOOM;
         const visibleClusterItems = cluster.items.slice(
           0,
@@ -1470,11 +1788,9 @@ function StoreMarkersLayer({
           >
             <Tooltip direction="top" offset={[0, -8]}>
               {allowPicker
-                ? isId
-                  ? `${cluster.items.length} usaha di titik ini`
-                  : `${cluster.items.length} businesses here`
+                ? clusterSourceLabel
                 : isId
-                  ? `${cluster.items.length} usaha dekat sini. Klik untuk zoom.`
+                  ? `${cluster.items.length} titik dekat sini. Klik untuk memperbesar.`
                   : `${cluster.items.length} locations nearby. Click to zoom in.`}
             </Tooltip>
 
@@ -1484,12 +1800,10 @@ function StoreMarkersLayer({
                   <div>
                     <p className="text-[12px] font-bold leading-tight text-slate-950">
                       {cluster.tight
-                        ? isId
-                          ? `${cluster.items.length} usaha di titik ini`
-                          : `${cluster.items.length} businesses here`
+                        ? clusterSourceLabel
                         : isId
-                          ? `${cluster.items.length} usaha dekat sini`
-                          : `${cluster.items.length} nearby businesses`}
+                          ? `${cluster.items.length} titik dekat sini`
+                          : `${cluster.items.length} nearby locations`}
                     </p>
                     <p className="mt-0.5 text-[10px] leading-4 text-slate-500">
                       {isId
@@ -1556,6 +1870,7 @@ export function UmkmStoreMapClient({
   focusOffset,
   onBoundsChange,
   markerStyle = 'default',
+  animateDataDots = false,
   controls = true,
   showPopups = true,
 }: UmkmStoreMapClientProps) {
@@ -1768,11 +2083,13 @@ export function UmkmStoreMapClient({
   const initialMapZoom = focusMode === 'indonesia' ? 5 : 12;
 
   return (
-    <MapContainer
-      center={initialMapCenter}
+    <>
+      <style dangerouslySetInnerHTML={{ __html: UMKM_MAP_DATA_DOT_STYLE }} />
+      <MapContainer
+        center={initialMapCenter}
       zoom={initialMapZoom}
-      minZoom={3}
-      maxZoom={18}
+      minZoom={2}
+      maxZoom={19}
       preferCanvas
       scrollWheelZoom={interactive}
       dragging={interactive}
@@ -1786,7 +2103,9 @@ export function UmkmStoreMapClient({
     >
       <MapSizeStabilizer />
       <MapInteractivityController interactive={interactive} />
-      <MapBoundsReporter onBoundsChange={onBoundsChange} />
+      {onBoundsChange ? (
+        <MapBoundsReporter onBoundsChange={onBoundsChange} />
+      ) : null}
       <MapFocusController
         stores={validStores}
         selectedStoreId={selectedStoreId}
@@ -1857,7 +2176,9 @@ export function UmkmStoreMapClient({
           storePresentations={storePresentations}
           selectedStoreId={selectedStoreId}
           onSelectStore={onSelectStore}
+          isId={isId}
           interactive={interactive}
+          animateDataDots={animateDataDots}
         />
       ) : (
         <StoreMarkersLayer
@@ -1884,6 +2205,7 @@ export function UmkmStoreMapClient({
           }}
         />
       ) : null}
-    </MapContainer>
+      </MapContainer>
+    </>
   );
 }

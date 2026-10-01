@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { newsApi } from '@/lib/api';
+import { normalizeMultilineText } from '@/lib/normalizeMultilineText';
 
 type NewsItem = {
   id: string;
@@ -420,6 +421,17 @@ export default function NewsEditorialWorkspace({
   }, [loadReviewers, selectedArticleKind, sensitivity]);
 
   useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (note.trim() || businessImpact.trim() || reviewRequestNote.trim()) {
+        event.preventDefault();
+        event.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [businessImpact, note, reviewRequestNote]);
+
+  useEffect(() => {
     if (!selected || sensitivity !== 'high' || selectedArticleKind === 'press_release') return;
     const refresh = () => void loadHistory(selected.id);
     const timer = window.setInterval(refresh, 15_000);
@@ -440,8 +452,17 @@ export default function NewsEditorialWorkspace({
           offset: nextOffset,
         });
         const value = record(payload);
-        const nextItems = Array.isArray(value.items) ? (value.items as NewsItem[]) : [];
-        const nextSelected = nextItems.find(item => item.id === preserveId) || nextItems[0] || null;
+        const rawItems = Array.isArray(value.items) ? (value.items as NewsItem[]) : [];
+        const nextItems = rawItems.map(item => ({
+          ...item,
+          summary:
+            item.summary == null
+              ? item.summary
+              : normalizeMultilineText(item.summary),
+          body: normalizeMultilineText(item.body),
+        }));
+        const nextSelected =
+          nextItems.find(item => item.id === preserveId) || nextItems[0] || null;
         setQueueOffset(nextOffset);
         setQueueHasMore(value.has_more === true);
         setItems(nextItems);
@@ -474,10 +495,18 @@ export default function NewsEditorialWorkspace({
     return () => window.clearInterval(timer);
   }, [loadMetrics]);
 
+  const hasUnsavedReviewDraft = Boolean(note.trim() || businessImpact.trim() || reviewRequestNote.trim());
+
+  const guardReviewDraft = useCallback((message: string) => {
+    if (!hasUnsavedReviewDraft) return true;
+    return window.confirm(message);
+  }, [hasUnsavedReviewDraft]);
+
   const selectNews = useCallback((id: string, mode: 'push' | 'replace' = 'push') => {
+    if (id !== selectedId && !guardReviewDraft('Ada catatan editorial yang belum dikirim. Pindah ke berita lain akan menghapusnya. Lanjutkan?')) return;
     setSelectedId(id);
     writeNewsUrl(id, status, mode);
-  }, [status]);
+  }, [guardReviewDraft, selectedId, status]);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -498,6 +527,11 @@ export default function NewsEditorialWorkspace({
     source: NewsSource,
     verification_status: NewsSource['verification_status'],
   ) => {
+    if (verification_status !== 'verified' && !window.confirm(
+      verification_status === 'rejected'
+        ? 'Tolak sumber ini? Sumber tidak akan dihitung sebagai verified.'
+        : 'Tandai sumber ini broken? Sumber tidak akan dihitung sebagai verified.'
+    )) return;
     setSourceBusy(source.id);
     setError('');
     try {
@@ -530,6 +564,16 @@ export default function NewsEditorialWorkspace({
   ) => {
     if (!selected) return;
     const requiresNote = action !== 'approve';
+    if (['approve', 'correct', 'reject', 'retract'].includes(action)) {
+      const label = action === 'approve'
+        ? 'publish'
+        : action === 'correct'
+          ? 'simpan koreksi'
+          : action === 'reject'
+            ? 'menolak'
+            : 'menarik publikasi';
+      if (!window.confirm('Lanjutkan untuk ' + label + ' item ini? Keputusan akan dicatat di audit editorial.')) return;
+    }
     if (requiresNote && !note.trim()) {
       setError('Catatan editor wajib untuk revisi, penolakan, koreksi, atau penarikan publikasi.');
       return;
@@ -679,7 +723,9 @@ export default function NewsEditorialWorkspace({
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={onBack}
+              onClick={() => {
+                if (guardReviewDraft('Ada catatan editorial yang belum dikirim. Kembali sekarang akan menghapusnya. Lanjutkan?')) onBack();
+              }}
               className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
             >
               Kembali
@@ -693,6 +739,7 @@ export default function NewsEditorialWorkspace({
             <button
               type="button"
               onClick={() => {
+                if (!guardReviewDraft('Ada catatan editorial yang belum dikirim. Refresh antrean dapat mengganti item aktif. Lanjutkan?')) return;
                 void loadQueue(status, selectedId, queueOffset);
                 void loadMetrics();
               }}
@@ -766,6 +813,7 @@ export default function NewsEditorialWorkspace({
               key={value}
               type="button"
               onClick={() => {
+                if (!guardReviewDraft('Ada catatan editorial yang belum dikirim. Ganti antrean dapat mengganti item aktif. Lanjutkan?')) return;
                 setStatus(value);
                 writeNewsUrl('', value, 'push');
               }}
@@ -872,7 +920,10 @@ export default function NewsEditorialWorkspace({
               <button
                 type="button"
                 disabled={loading || acting || queueOffset === 0}
-                onClick={() => void loadQueue(status, '', Math.max(0, queueOffset - 40))}
+                onClick={() => {
+                  if (!guardReviewDraft('Ada catatan editorial yang belum dikirim. Pindah halaman antrean akan mengganti item aktif. Lanjutkan?')) return;
+                  void loadQueue(status, '', Math.max(0, queueOffset - 40));
+                }}
                 className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-black text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 ← Sebelumnya
@@ -880,7 +931,10 @@ export default function NewsEditorialWorkspace({
               <button
                 type="button"
                 disabled={loading || acting || !queueHasMore}
-                onClick={() => void loadQueue(status, '', queueOffset + 40)}
+                onClick={() => {
+                  if (!guardReviewDraft('Ada catatan editorial yang belum dikirim. Pindah halaman antrean akan mengganti item aktif. Lanjutkan?')) return;
+                  void loadQueue(status, '', queueOffset + 40);
+                }}
                 className="rounded-xl bg-slate-950 px-3 py-2 text-[11px] font-black text-white disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Berikutnya →
@@ -941,11 +995,11 @@ export default function NewsEditorialWorkspace({
               <div className="grid gap-4 lg:grid-cols-2">
                 <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <p className="text-xs font-black uppercase tracking-[0.15em] text-slate-400">Ringkasan</p>
-                  <p className="mt-2 text-sm font-semibold leading-6 text-slate-700">{selected.summary || '-'}</p>
+                  <p className="mt-2 whitespace-pre-wrap text-sm font-semibold leading-6 text-slate-700">{selected.summary || '-'}</p>
                 </article>
                 <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <p className="text-xs font-black uppercase tracking-[0.15em] text-slate-400">Isi berita</p>
-                  <div className="mt-2 max-h-[240px] overflow-y-auto whitespace-pre-wrap text-sm leading-7 text-slate-700">
+                  <div className="mt-2 max-h-[240px] overflow-y-auto whitespace-pre-wrap break-words text-sm leading-7 text-slate-700">
                     {selected.body}
                   </div>
                 </article>

@@ -84,8 +84,37 @@ function readTextArrays(
   });
 }
 
-function usableImage(value: string): boolean {
-  return Boolean(value) && !value.includes('/images/placeholders/');
+function usableImage(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  const normalized = value.trim();
+  if (!normalized) return false;
+
+  const lowered = normalized.toLowerCase();
+  if (
+    lowered === 'invalid media url' ||
+    lowered.includes('/images/placeholders/') ||
+    lowered.includes('business-default.svg') ||
+    lowered.includes('placeholder') ||
+    lowered.includes('no-image') ||
+    lowered.includes('noimage')
+  ) {
+    return false;
+  }
+
+  if (normalized.startsWith('/')) {
+    return !normalized.startsWith('//');
+  }
+
+  try {
+    const parsed = new URL(normalized);
+    return (
+      (parsed.protocol === 'https:' || parsed.protocol === 'http:') &&
+      !parsed.username &&
+      !parsed.password
+    );
+  } catch {
+    return false;
+  }
 }
 
 function unique(values: string[]): string[] {

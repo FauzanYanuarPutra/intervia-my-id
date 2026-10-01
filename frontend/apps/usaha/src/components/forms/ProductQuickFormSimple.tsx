@@ -1,6 +1,6 @@
 'use client';
 
-import { startTransition, useState } from 'react';
+import { startTransition, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus } from 'lucide-react';
 import { ProductDetailsModal } from './ProductDetailsModal';
@@ -32,8 +32,38 @@ export function ProductQuickForm({ businessId }: ProductQuickFormProps) {
   const [isPending, setIsPending] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
 
+  useEffect(() => {
+    const hasDraft =
+      name.trim() ||
+      priceRupiah !== null ||
+      ownerLabel.trim() ||
+      stockCount.trim() ||
+      minStockAlert.trim() ||
+      consignmentTerms.trim() ||
+      notes.trim() ||
+      image;
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!hasDraft || isPending) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [
+    consignmentTerms,
+    image,
+    isPending,
+    minStockAlert,
+    name,
+    notes,
+    ownerLabel,
+    priceRupiah,
+    stockCount,
+  ]);
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (isPending) return;
     if (name.trim().length < 2) {
       setError('Isi nama produk minimal 2 huruf.');
       return;
@@ -46,6 +76,11 @@ export function ProductQuickForm({ businessId }: ProductQuickFormProps) {
     const normalizedStock = stockCount.trim() ? Number(stockCount) : null;
     if (normalizedStock !== null && (!Number.isFinite(normalizedStock) || normalizedStock < 0)) {
       setError('Stok tidak boleh kurang dari 0.');
+      return;
+    }
+    const normalizedMinStockAlert = minStockAlert.trim() ? Number(minStockAlert) : null;
+    if (normalizedMinStockAlert !== null && (!Number.isFinite(normalizedMinStockAlert) || normalizedMinStockAlert < 0)) {
+      setError('Batas stok tipis harus berupa angka nol atau lebih.');
       return;
     }
 
@@ -63,7 +98,7 @@ export function ProductQuickForm({ businessId }: ProductQuickFormProps) {
           sourceType,
           ownerLabel: ownerLabel.trim(),
           stockCount: normalizedStock,
-          minStockAlert: minStockAlert.trim() ? Number(minStockAlert) : null,
+          minStockAlert: normalizedMinStockAlert,
           stockUnit: stockUnit.trim() || 'pcs',
           stockMode,
           consignmentTerms: consignmentTerms.trim(),

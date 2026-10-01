@@ -1,11 +1,12 @@
 'use client';
 
-import { startTransition, useEffect, useMemo, useState } from 'react';
+import { startTransition, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check, Search, Send, UserRoundCheck, X } from 'lucide-react';
 import { ChoiceChips } from '@/components/interaction/ChoiceChips';
 import { roleSummaryMap } from '@/lib/portal-access';
 import type { PortalRole } from '@/lib/portal-types';
+import { resolveIdempotencyAttempt, type ClientIdempotencyAttempt } from '@/lib/client-idempotency';
 
 type InviteMemberQuickFormProps = {
   businessId: string;
@@ -68,6 +69,7 @@ export function InviteMemberQuickForm({ businessId }: InviteMemberQuickFormProps
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isPending, setIsPending] = useState(false);
+  const attemptRef = useRef<ClientIdempotencyAttempt | null>(null);
 
   const normalizedUsername = useMemo(
     () => username.trim().replace(/^@/, '').toLowerCase(),
@@ -117,21 +119,30 @@ export function InviteMemberQuickForm({ businessId }: InviteMemberQuickFormProps
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (isPending) return;
 
     if (!selectedUser || selectedUser.username.toLowerCase() !== normalizedUsername) {
       setError('Pilih akun Lajukan dari hasil pencarian username.');
       return;
     }
 
+    if (!window.confirm(
+      'Kirim undangan kepada @' + selectedUser.username + ' sebagai ' + role + '?'
+    )) return;
+
     setError('');
     setSuccess('');
     setIsPending(true);
+    const requestBody = { username: selectedUser.username, role };
+    const attempt = resolveIdempotencyAttempt(attemptRef.current, requestBody);
+    attemptRef.current = attempt;
 
     try {
       const response = await fetch(`/api/businesses/${businessId}/team/invites`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Idempotency-Key': attempt.key,
         },
         body: JSON.stringify({
           username: selectedUser.username,
@@ -149,6 +160,7 @@ export function InviteMemberQuickForm({ businessId }: InviteMemberQuickFormProps
       const invitedUsername = selectedUser.username;
       setUsername('');
       setSelectedUser(null);
+      attemptRef.current = null;
       setSuggestions([]);
       setRole('manager');
       setSuccess(`Undangan untuk @${invitedUsername} terkirim dan menunggu persetujuan.`);

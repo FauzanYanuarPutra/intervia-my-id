@@ -24,6 +24,7 @@ const sectionPermission: Partial<Record<PortalSection, PermissionId>> = {
   team: 'viewTeam',
   buyerPage: 'viewBuyerPage',
   security: 'manageSecurity',
+  dataReset: 'manageDataReset',
 };
 
 const sectionOrder: PortalSection[] = [
@@ -43,6 +44,7 @@ const sectionOrder: PortalSection[] = [
   'buyerPage',
   'team',
   'security',
+  'dataReset',
 ];
 
 export function visiblePortalSections(permissions: PermissionId[]): PortalSection[] {
@@ -80,6 +82,7 @@ export function buildSectionHref(businessId: string, section: PortalSection) {
     case 'team': return `/businesses/${businessId}/team`;
     case 'buyerPage': return `/businesses/${businessId}/buyer-page`;
     case 'security': return `/security?business=${businessId}`;
+    case 'dataReset': return `/businesses/${businessId}/reset`;
     default: return '/';
   }
 }

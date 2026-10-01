@@ -158,6 +158,16 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
   const hasUnsavedChanges = initialSignature !== recipeSignature(recipeName, servings, items);
 
   useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!hasUnsavedChanges || saving || deleting) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges, saving, deleting]);
+
+  useEffect(() => {
     if (!productId) return;
     let cancelled = false;
     async function load() {
@@ -287,7 +297,11 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
   }
 
   async function save() {
-    if (!productId) return;
+    if (!productId || saving) return;
+    if (!hasUnsavedChanges) {
+      setMessage('Belum ada perubahan resep yang perlu disimpan.');
+      return;
+    }
     const validation = validateBeforeSave();
     if (validation) {
       setMessage(validation);
@@ -544,7 +558,7 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
           </label>
           <div className="flex flex-col gap-2 sm:flex-row">
             <button type="button" disabled={deleting || loading || !items.length} onClick={retireActiveRecipe} className="portal-button-secondary justify-center text-red-700 disabled:opacity-60">{deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />} Hapus resep aktif</button>
-            <button type="button" disabled={saving || loading} onClick={save} className="portal-button-primary justify-center disabled:opacity-60">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Simpan resep</button>
+            <button type="button" disabled={saving || loading || !hasUnsavedChanges} onClick={save} className="portal-button-primary justify-center disabled:opacity-60">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Simpan resep</button>
           </div>
         </div>
         {capacity.bottleneck ? <p className="mt-3 flex gap-2 text-xs text-amber-800"><TriangleAlert className="h-4 w-4 shrink-0" /> Stok <strong>{capacity.bottleneck.name}</strong> membatasi produksi sekitar {whole.format(capacity.capacity)} porsi.</p> : null}

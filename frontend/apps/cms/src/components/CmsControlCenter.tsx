@@ -60,6 +60,28 @@ const dateLabel = (v: unknown) => {
   const d = new Date(String(v));
   return Number.isNaN(d.getTime()) ? '-' : d.toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
 };
+function normalizeMultilineText(value: string): string {
+  return value.replace(/\r\n?/g, '\n').replace(/\u0000/g, '').trim();
+}
+
+function newsFormKey(value: NewsForm): string {
+  return JSON.stringify({
+    ...value,
+    title: normalizeMultilineText(value.title),
+    slug: value.slug.trim(),
+    summary: normalizeMultilineText(value.summary),
+    body: normalizeMultilineText(value.body),
+    location: normalizeMultilineText(value.location),
+    topics: normalizeMultilineText(value.topics),
+    source_urls: normalizeMultilineText(value.source_urls),
+    cover_image: value.cover_image.trim(),
+    seo_title: normalizeMultilineText(value.seo_title),
+    seo_description: normalizeMultilineText(value.seo_description),
+    og_image: value.og_image.trim(),
+    note: normalizeMultilineText(value.note),
+  });
+}
+
 const inputDate = (v: unknown) => {
   if (!v) return '';
   const d = new Date(String(v));
@@ -179,6 +201,7 @@ export default function CmsControlCenter() {
   const [newsHistory, setNewsHistory] = useState<R>({});
   const [newsForm, setNewsForm] = useState(initialNews(null));
   const [savedAt, setSavedAt] = useState('');
+  const [savedNewsFormKey, setSavedNewsFormKey] = useState(() => newsFormKey(initialNews(null)));
   const [uploadingCover, setUploadingCover] = useState(false);
 
   const [moderationStatus, setModerationStatus] = useState('open');
@@ -199,10 +222,17 @@ export default function CmsControlCenter() {
 
   const selectNews = useCallback((item: R | null) => {
     const id = item ? str(item.id) : '';
+    const dirty = newsFormKey(newsForm) !== savedNewsFormKey;
+    if (id && id !== selectedId && dirty) {
+      if (!window.confirm('Ada perubahan berita yang belum disimpan. Pindah item akan membuang perubahan tersebut. Lanjutkan?')) return;
+    }
+    const nextForm = initialNews(item);
     setSelectedId(id);
-    setNewsForm(initialNews(item));
+    setNewsForm(nextForm);
+    setSavedNewsFormKey(newsFormKey(nextForm));
+    setSavedAt('');
     if (id) void loadHistory(id);
-  }, [loadHistory]);
+  }, [loadHistory, newsForm, savedNewsFormKey, selectedId]);
 
   const refreshNews = useCallback(async () => {
     if (!accessToken) return;
@@ -210,7 +240,20 @@ export default function CmsControlCenter() {
     const next = arr(q);
     setNewsItems(next);
     setNewsMetrics(rec(m));
-    if (!selectedId && next[0]?.id) selectNews(next[0]);
+
+    const preserved = selectedId ? next.find(item => str(item.id) === selectedId) : null;
+    if (preserved) return;
+
+    if (next[0]) {
+      selectNews(next[0]);
+      return;
+    }
+
+    setSelectedId('');
+    const emptyForm = initialNews(null);
+    setNewsForm(emptyForm);
+    setSavedNewsFormKey(newsFormKey(emptyForm));
+    setNewsHistory({});
   }, [accessToken, newsStatus, selectedId, selectNews]);
 
   const refreshModeration = useCallback(async () => {
@@ -256,6 +299,17 @@ export default function CmsControlCenter() {
     }
   };
 
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (selectedId && newsFormKey(newsForm) !== savedNewsFormKey) {
+        event.preventDefault();
+        event.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [newsForm, savedNewsFormKey, selectedId]);
+
   const refreshAll = async () => {
     setBusy(true); setError('');
     try { await Promise.all([refreshNews(), refreshModeration(), refreshTeam()]); }
@@ -265,17 +319,54 @@ export default function CmsControlCenter() {
 
   const saveNews = async (action: 'edit' | 'correct' = 'edit') => {
     if (!accessToken || !selectedId) return;
+
+    const normalizedForm: NewsForm = {
+      ...newsForm,
+      title: normalizeMultilineText(newsForm.title),
+      slug: newsForm.slug.trim(),
+      summary: normalizeMultilineText(newsForm.summary),
+      body: normalizeMultilineText(newsForm.body),
+      location: normalizeMultilineText(newsForm.location),
+      topics: normalizeMultilineText(newsForm.topics),
+      source_urls: normalizeMultilineText(newsForm.source_urls),
+      cover_image: newsForm.cover_image.trim(),
+      seo_title: normalizeMultilineText(newsForm.seo_title),
+      seo_description: normalizeMultilineText(newsForm.seo_description),
+      og_image: newsForm.og_image.trim(),
+      note: normalizeMultilineText(newsForm.note),
+    };
+
+    if (normalizedForm.title.length < 3) {
+      setError('Judul berita minimal 3 karakter.');
+      return;
+    }
+    if (normalizedForm.body.length < 10) {
+      setError('Isi berita terlalu pendek. Tulis minimal 10 karakter.');
+      return;
+    }
+
+    setNewsForm(normalizedForm);
     setBusy(true); setError('');
     try {
       const result = rec(await newsApi.edit(accessToken, selectedId, {
-        action, title: newsForm.title, slug: newsForm.slug, summary: newsForm.summary, body: newsForm.body,
-        category: newsForm.category, article_kind: newsForm.article_kind, location: newsForm.location,
-        topics: newsForm.topics.split(',').map(x => x.trim()).filter(Boolean),
-        source_urls: newsForm.source_urls.split('\n').map(x => x.trim()).filter(Boolean),
-        cover_image: newsForm.cover_image, seo_title: newsForm.seo_title, seo_description: newsForm.seo_description,
-        og_image: newsForm.og_image, note: newsForm.note || undefined
+        action,
+        title: normalizedForm.title,
+        slug: normalizedForm.slug,
+        summary: normalizedForm.summary,
+        body: normalizedForm.body,
+        category: normalizedForm.category,
+        article_kind: normalizedForm.article_kind,
+        location: normalizedForm.location,
+        topics: normalizedForm.topics.split(',').map(x => x.trim()).filter(Boolean),
+        source_urls: normalizedForm.source_urls.split('\n').map(x => x.trim()).filter(Boolean),
+        cover_image: normalizedForm.cover_image,
+        seo_title: normalizedForm.seo_title,
+        seo_description: normalizedForm.seo_description,
+        og_image: normalizedForm.og_image,
+        note: normalizedForm.note || undefined,
       }));
       setNewsItems(prev => prev.map(x => str(x.id) === selectedId ? result : x));
+      setSavedNewsFormKey(newsFormKey(normalizedForm));
       setSavedAt(new Date().toLocaleTimeString('id-ID'));
       await loadHistory(selectedId);
     } catch (e) { setError(e instanceof Error ? e.message : 'Gagal menyimpan berita'); }
@@ -284,11 +375,63 @@ export default function CmsControlCenter() {
 
   const moderateNews = async (action: 'approve' | 'needs_revision' | 'reject' | 'retract') => {
     if (!accessToken || !selectedId) return;
+
+    const selectedStatus = selectedNews ? statusOf(selectedNews) : '';
+    const dirty = newsFormKey(newsForm) !== savedNewsFormKey;
+
+    if (dirty && !window.confirm('Ada perubahan berita yang belum disimpan. Simpan dan lanjutkan keputusan editorial?')) {
+      return;
+    }
+    if (action === 'approve' && !window.confirm('Publikasikan berita ini sesuai jadwal? Pastikan isi, sumber, dan gate editorial sudah benar.')) return;
+    if (action === 'reject' && !window.confirm('Tolak berita ini? Keputusan ini akan dicatat di audit editorial.')) return;
+    if (action === 'retract' && !window.confirm('Tarik berita yang sedang tayang? Tindakan ini akan memengaruhi publik.')) return;
+
     setBusy(true); setError('');
     try {
+      if (dirty) {
+        const normalizedForm: NewsForm = {
+          ...newsForm,
+          title: normalizeMultilineText(newsForm.title),
+          slug: newsForm.slug.trim(),
+          summary: normalizeMultilineText(newsForm.summary),
+          body: normalizeMultilineText(newsForm.body),
+          location: normalizeMultilineText(newsForm.location),
+          topics: normalizeMultilineText(newsForm.topics),
+          source_urls: normalizeMultilineText(newsForm.source_urls),
+          cover_image: newsForm.cover_image.trim(),
+          seo_title: normalizeMultilineText(newsForm.seo_title),
+          seo_description: normalizeMultilineText(newsForm.seo_description),
+          og_image: newsForm.og_image.trim(),
+          note: normalizeMultilineText(newsForm.note),
+        };
+        if (normalizedForm.title.length < 3 || normalizedForm.body.length < 10) {
+          throw new Error('Simpan dibatalkan: judul minimal 3 karakter dan isi berita minimal 10 karakter.');
+        }
+        const edited = rec(await newsApi.edit(accessToken, selectedId, {
+          action: selectedStatus === 'published' ? 'correct' : 'edit',
+          title: normalizedForm.title,
+          slug: normalizedForm.slug,
+          summary: normalizedForm.summary,
+          body: normalizedForm.body,
+          category: normalizedForm.category,
+          article_kind: normalizedForm.article_kind,
+          location: normalizedForm.location,
+          topics: normalizedForm.topics.split(',').map(x => x.trim()).filter(Boolean),
+          source_urls: normalizedForm.source_urls.split('\n').map(x => x.trim()).filter(Boolean),
+          cover_image: normalizedForm.cover_image,
+          seo_title: normalizedForm.seo_title,
+          seo_description: normalizedForm.seo_description,
+          og_image: normalizedForm.og_image,
+          note: normalizedForm.note || undefined,
+        }));
+        setNewsItems(prev => prev.map(x => str(x.id) === selectedId ? edited : x));
+        setNewsForm(normalizedForm);
+        setSavedNewsFormKey(newsFormKey(normalizedForm));
+      }
+
       await newsApi.moderate(accessToken, selectedId, {
         action,
-        note: newsForm.note || undefined,
+        note: normalizeMultilineText(newsForm.note) || undefined,
         publish_at: isoDate(newsForm.publish_at),
         fact_check_status: newsForm.fact_check_status,
         legal_review_status: newsForm.legal_review_status,
@@ -312,6 +455,16 @@ export default function CmsControlCenter() {
 
   const moderateContent = async (item: R, action: string) => {
     if (!accessToken) return;
+    if (['remove', 'restrict', 'approve', 'escalate'].includes(action)) {
+      const label = action === 'remove'
+        ? 'menghapus'
+        : action === 'restrict'
+          ? 'membatasi'
+          : action === 'approve'
+            ? 'menyetujui'
+            : 'mengeskalasi';
+      if (!window.confirm('Lanjutkan untuk ' + label + ' konten ini? Tindakan akan dicatat di audit moderasi.')) return;
+    }
     setBusy(true); setError('');
     try {
       await moderationApi.moderate(accessToken, str(item.content_id), {
@@ -336,6 +489,18 @@ export default function CmsControlCenter() {
 
   const invite = async (candidate: R) => {
     if (!accessToken || !user?.roles?.includes('super_admin')) return;
+    const duplicate = invitations.some(invitation =>
+      str(invitation.invitee_user_id) === str(candidate.id) &&
+      str(invitation.application) === 'cms' &&
+      str(invitation.status) === 'pending',
+    );
+    if (duplicate) {
+      setError('Undangan CMS untuk akun ini masih pending. Jangan kirim ulang.');
+      return;
+    }
+    if (!window.confirm(
+      'Kirim undangan CMS ke ' + (str(candidate.username) ? '@' + str(candidate.username) : str(candidate.email, 'akun ini')) + '?'
+    )) return;
     setBusy(true); setError('');
     try {
       await backofficeApi.invite(accessToken, {
@@ -393,7 +558,13 @@ export default function CmsControlCenter() {
           </div>
           <nav className="mt-4 flex gap-2 overflow-x-auto pb-1">
             {nav.map(([id, label, desc]) => (
-              <button key={id} onClick={() => setWorkspace(id)} className={id === workspace ? 'min-w-max rounded-2xl border border-[color:var(--color-primary)] bg-[color:var(--color-primary)] px-4 py-3 text-left text-white' : 'min-w-max rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-4 py-3 text-left hover:bg-slate-50'}>
+              <button key={id} onClick={() => {
+                const dirtyNews = workspace === 'news' && selectedId && newsFormKey(newsForm) !== savedNewsFormKey;
+                if (dirtyNews && id !== workspace) {
+                  if (!window.confirm('Ada perubahan berita yang belum disimpan. Pindah workspace akan membuang perubahan tersebut. Lanjutkan?')) return;
+                }
+                setWorkspace(id);
+              }} className={id === workspace ? 'min-w-max rounded-2xl border border-[color:var(--color-primary)] bg-[color:var(--color-primary)] px-4 py-3 text-left text-white' : 'min-w-max rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-4 py-3 text-left hover:bg-slate-50'}>
                 <div className="text-sm font-bold">{label}</div><div className={id === workspace ? 'text-[11px] text-white/75' : 'text-[11px] text-slate-500'}>{desc}</div>
               </button>
             ))}
@@ -463,7 +634,7 @@ export default function CmsControlCenter() {
                       <label><span className="text-xs font-semibold text-slate-500">Kategori</span><SelectField value={newsForm.category} onChange={e => setNewsForm(p => ({ ...p, category: e.target.value }))} className={input}>{CATEGORIES.map(x => <option key={x}>{x}</option>)}</SelectField></label>
                       <label><span className="text-xs font-semibold text-slate-500">Jenis</span><SelectField value={newsForm.article_kind} onChange={e => setNewsForm(p => ({ ...p, article_kind: e.target.value }))} className={input}>{KINDS.map(x => <option key={x[0]} value={x[0]}>{x[1]}</option>)}</SelectField></label>
                       <label className="md:col-span-2"><span className="text-xs font-semibold text-slate-500">Ringkasan</span><textarea value={newsForm.summary} onChange={e => setNewsForm(p => ({ ...p, summary: e.target.value }))} rows={3} className={input} /></label>
-                      <label className="md:col-span-2"><span className="text-xs font-semibold text-slate-500">Isi berita</span><textarea value={newsForm.body} onChange={e => setNewsForm(p => ({ ...p, body: e.target.value }))} rows={16} className={input + ' leading-6'} /></label>
+                      <label className="md:col-span-2"><span className="text-xs font-semibold text-slate-500">Isi berita</span><textarea value={newsForm.body} onChange={e => setNewsForm(p => ({ ...p, body: e.target.value }))} rows={16} className={input + ' whitespace-pre-wrap leading-6'} /></label>
                       <label className="md:col-span-2"><span className="text-xs font-semibold text-slate-500">Topics, pisahkan dengan koma</span><input value={newsForm.topics} onChange={e => setNewsForm(p => ({ ...p, topics: e.target.value }))} className={input} /></label>
                       <label className="md:col-span-2"><span className="text-xs font-semibold text-slate-500">Source URLs, satu per baris</span><textarea value={newsForm.source_urls} onChange={e => setNewsForm(p => ({ ...p, source_urls: e.target.value }))} rows={4} className={input} /></label>
                     </div>
@@ -481,7 +652,7 @@ export default function CmsControlCenter() {
                   <section className={card}><h3 className="font-bold">Version & audit</h3><div className="mt-4 max-h-[420px] space-y-3 overflow-auto">{arr(newsHistory.versions).map(version => <div key={str(version.id)} className="rounded-2xl border border-[color:var(--color-border)] p-3"><div className="flex items-center justify-between gap-3"><b className="text-sm">v{str(version.version_number)}</b><span className="text-[11px] text-slate-500">{dateLabel(version.created_at)}</span></div><div className="mt-1 text-xs text-slate-500">{str(version.action)} · {str(version.actor_role)}</div><div className="mt-2 text-sm">{str(version.title)}</div></div>)}{!arr(newsHistory.versions).length ? <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">Belum ada version history.</div> : null}</div></section>
                 </div>
 
-                <section className={card}><h3 className="font-bold">Live preview</h3><div className="mt-4 overflow-hidden rounded-3xl border border-[color:var(--color-border)] bg-white">{newsForm.cover_image ? <img src={newsForm.cover_image} alt="" className="h-64 w-full object-cover" onError={e => { e.currentTarget.style.display = 'none'; }} /> : null}<div className="p-6"><div className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">{newsForm.category}</div><h3 className="mt-2 text-3xl font-black">{newsForm.title || 'Judul berita'}</h3><p className="mt-3 text-base leading-7 text-slate-600">{newsForm.summary || 'Ringkasan berita.'}</p><div className="mt-5 whitespace-pre-wrap text-sm leading-7 text-slate-800">{newsForm.body || 'Isi berita.'}</div></div></div></section>
+                <section className={card}><h3 className="font-bold">Live preview</h3><div className="mt-4 overflow-hidden rounded-3xl border border-[color:var(--color-border)] bg-white">{newsForm.cover_image ? <img src={newsForm.cover_image} alt="" className="h-64 w-full object-cover" onError={e => { e.currentTarget.style.display = 'none'; }} /> : null}<div className="p-6"><div className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">{newsForm.category}</div><h3 className="mt-2 text-3xl font-black">{newsForm.title || 'Judul berita'}</h3><p className="mt-3 whitespace-pre-wrap text-base leading-7 text-slate-600">{newsForm.summary || 'Ringkasan berita.'}</p><div className="mt-5 whitespace-pre-wrap text-sm leading-7 text-slate-800">{newsForm.body || 'Isi berita.'}</div></div></div></section>
               </> : <div className="rounded-3xl border border-dashed border-[color:var(--color-border)] p-10 text-center text-sm text-slate-500">Pilih berita dari antrean.</div>}
             </div>
           </section>

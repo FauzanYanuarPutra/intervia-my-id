@@ -22,6 +22,51 @@ async function readStoreId(params: Promise<{ storeId: string }>) {
   return storeId.trim();
 }
 
+function normalizeContributionMediaUrl(url: string): string {
+  const value = url.trim();
+  if (!value) return '';
+
+  // MinIO/storage adapters can return an absolute URL behind a reverse proxy.
+  // The contribution service deliberately accepts only Lajukan's public media
+  // routes, so normalize same-shape absolute paths to their canonical
+  // application-relative form instead of rejecting an otherwise valid upload.
+  if (/^https?:\/\//i.test(value)) {
+    try {
+      const pathname = new URL(value).pathname;
+      if (
+        pathname.startsWith('/api/content/media/') ||
+        pathname.startsWith('/api/forum/media/')
+      ) {
+        return pathname;
+      }
+    } catch {
+      return value;
+    }
+  }
+
+  if (value.startsWith('/api/content/media/') || value.startsWith('/api/forum/media/')) {
+    return value;
+  }
+
+  // Local upload fallback stores forum media under public/uploads/forum.
+  // Reuse the existing public forum media route so the persisted URL remains
+  // stable and the Rust service can validate it without accepting arbitrary
+  // filesystem paths.
+  const prefix = '/uploads/forum/';
+  if (value.startsWith(prefix)) {
+    const filename = value.slice(prefix.length);
+    if (
+      filename &&
+      filename.length <= 200 &&
+      /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(filename)
+    ) {
+      return '/api/forum/media/' + filename;
+    }
+  }
+
+  return value;
+}
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ storeId: string }> },
@@ -102,9 +147,9 @@ export async function POST(
     const result = await storeValidatedUploads(files, {
       accept: 'media',
       concurrency: 1,
-      folder: `umkm/stores/${storeId}/contributions`,
+      folder: 'forum',
       maxBytes: IMAGE_UPLOAD_RAW_MAX_BYTES,
-      minioTarget: `umkm/${storeId}/contributions`,
+      minioTarget: 'forum',
       requireMinio: false,
       minioTimeoutMs: 30000,
     });
@@ -129,7 +174,7 @@ export async function POST(
           Accept: 'application/json',
         },
         body: JSON.stringify({
-          media_url: uploaded.url,
+          media_url: normalizeContributionMediaUrl(uploaded.url),
           media_type: uploaded.type,
           caption: caption || undefined,
         }),
@@ -149,7 +194,7 @@ export async function POST(
     return NextResponse.json(
       {
         ...payload,
-        uploaded_url: uploaded.url,
+        uploaded_url: normalizeContributionMediaUrl(uploaded.url),
         rejected: result.rejected,
       },
       { status: 201, headers: { 'Cache-Control': 'no-store' } },

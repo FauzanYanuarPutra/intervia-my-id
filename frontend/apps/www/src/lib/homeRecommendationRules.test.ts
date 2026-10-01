@@ -46,6 +46,38 @@ describe('isHomeRecommendationEligible', () => {
     ).toBe(false);
   });
 
+
+  it('keeps owner-backed buyer requests visible even when marked non-transactional', () => {
+    expect(
+      isHomeRecommendationEligible(
+        item({
+          id: 'mango-request',
+          owner_id: '11111111-1111-4111-8111-111111111111',
+          title: 'Butuh buah mangga 3 kg per minggu',
+          content_type: 'product',
+          pricing_mode: 'request',
+          metadata: {
+            is_transactional: false,
+            listing_intent: 'request',
+          },
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it('rejects ownerless non-transactional records without public-reference metadata', () => {
+    expect(
+      isHomeRecommendationEligible(
+        item({
+          owner_id: undefined,
+          metadata: {
+            is_transactional: false,
+          },
+        }),
+      ),
+    ).toBe(false);
+  });
+
   it('rejects talent and profile records from business recommendations', () => {
     expect(isHomeRecommendationEligible(item({ content_type: 'freelancer' }))).toBe(false);
     expect(isHomeRecommendationEligible(item({ content_type: 'profile' }))).toBe(false);

@@ -1,6 +1,6 @@
 'use client';
 
-import { startTransition, useState } from 'react';
+import { startTransition, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Save } from 'lucide-react';
 import { BusinessLocationField } from '@/components/forms/BusinessLocationField';
@@ -29,11 +29,43 @@ export function BusinessInfoQuickForm({ business }: BusinessInfoQuickFormProps) 
   const [success, setSuccess] = useState('');
   const [isPending, setIsPending] = useState(false);
 
+  const hasChanges =
+    name.trim() !== business.name.trim() ||
+    category.trim() !== business.category.trim() ||
+    city.trim() !== business.city.trim() ||
+    address.trim() !== business.address.trim() ||
+    locationQuery.trim() !== business.locationQuery.trim() ||
+    phone.trim() !== business.phone.trim() ||
+    description.trim() !== business.description.trim() ||
+    schedule.trim() !== business.schedule.trim() ||
+    point?.lat !== business.latitude ||
+    point?.lng !== business.longitude;
+
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!hasChanges || isPending) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasChanges, isPending]);
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (isPending) return;
+    if (!hasChanges) {
+      setError('Belum ada perubahan yang perlu disimpan.');
+      return;
+    }
 
     if (name.trim().length < 2) {
       setError('Nama usaha belum valid.');
+      return;
+    }
+
+    if (category.trim().length < 2) {
+      setError('Kategori usaha belum valid.');
       return;
     }
 
@@ -42,13 +74,30 @@ export function BusinessInfoQuickForm({ business }: BusinessInfoQuickFormProps) 
       return;
     }
 
-    if (phone.replace(/\s+/g, '').trim().length < 9) {
+    const phoneDigits = phone.replace(/\D/g, '');
+    if (phoneDigits.length < 8 || phoneDigits.length > 15) {
       setError('Nomor usaha belum valid.');
       return;
     }
 
+    if (address.trim().length < 3) {
+      setError('Alamat usaha belum valid.');
+      return;
+    }
+    if (description.trim().length > 4000) {
+      setError('Deskripsi usaha terlalu panjang.');
+      return;
+    }
+    if (schedule.trim().length > 300) {
+      setError('Jam operasional terlalu panjang.');
+      return;
+    }
     if (reason.trim().length < 3) {
       setError('Tulis alasan perubahan info usaha minimal 3 karakter.');
+      return;
+    }
+
+    if (hasChanges && !window.confirm('Simpan perubahan informasi usaha? Perubahan akan masuk ke riwayat usaha.')) {
       return;
     }
 
@@ -74,6 +123,7 @@ export function BusinessInfoQuickForm({ business }: BusinessInfoQuickFormProps) 
           description: description.trim(),
           schedule: schedule.trim(),
           reason: reason.trim(),
+          expectedVersion: business.version ?? 1,
         }),
       });
 
@@ -221,7 +271,7 @@ export function BusinessInfoQuickForm({ business }: BusinessInfoQuickFormProps) 
       {error ? <p role="alert" className="text-sm text-portal-ember">{error}</p> : null}
       {success ? <p role="status" aria-live="polite" className="text-sm text-portal-forest">{success}</p> : null}
 
-      <button type="submit" disabled={isPending || reason.trim().length < 3} className="portal-button-primary">
+      <button type="submit" disabled={isPending || !hasChanges || reason.trim().length < 3} className="portal-button-primary">
         <Save className="h-4 w-4" />
         {isPending ? 'Menyimpan...' : 'Simpan info'}
       </button>

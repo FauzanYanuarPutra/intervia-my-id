@@ -66,6 +66,7 @@ import {
   buildListingFieldSchema,
   CREATE_STEPS,
   fieldsForStep,
+  selectMainStepFields,
   type CreateIntent,
   type ListingFieldSchema,
 } from '@/lib/create/createListingSchema';
@@ -5493,16 +5494,6 @@ export default function CreateListingWizard({
       currentStep === 4
         ? orderMainStepFields(allFields)
         : allFields;
-    const required = ordered.filter(field => field.required);
-    const optional = ordered.filter(field => !field.required);
-
-    const visibleOptional =
-      currentStep === 5
-        ? optional.filter(
-            field => showMoreDetails || field.group !== 'additional',
-          )
-        : optional;
-
     const limit =
       currentStep === 5
         ? showMoreDetails
@@ -5512,6 +5503,15 @@ export default function CreateListingWizard({
           ? 7
           : 4;
 
+    if (currentStep === 4) {
+      return selectMainStepFields(ordered, limit);
+    }
+
+    const required = ordered.filter(field => field.required);
+    const optional = ordered.filter(field => !field.required);
+    const visibleOptional = optional.filter(
+      field => showMoreDetails || field.group !== 'additional',
+    );
     const requiredKeys = new Set(required.map(field => field.key));
     const optionalSlots = Math.max(0, limit - required.length);
     const compactOptional = visibleOptional

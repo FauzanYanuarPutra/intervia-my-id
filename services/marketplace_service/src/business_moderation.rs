@@ -496,10 +496,6 @@ pub(crate) fn router() -> Router<Arc<AppState>> {
             post(review_crm_store_media),
         )
         .route(
-            "/v1/umkm/stores/{store_ref}/media/contributions",
-            get(list_public_store_media).post(create_store_media_contribution),
-        )
-        .route(
             "/v1/crm/appeals/{appeal_id}/review",
             post(review_business_appeal),
         )
@@ -511,6 +507,10 @@ pub(crate) fn router() -> Router<Arc<AppState>> {
         .route(
             "/v1/crm/notifications/read-all",
             post(mark_all_crm_notifications_read),
+        )
+        .route(
+            "/v1/umkm/stores/{store_ref}/media",
+            get(list_public_store_media).post(create_store_media_contribution),
         )
         .route("/v1/umkm/stores/{store_ref}/report", post(report_business))
         .route(
@@ -1166,18 +1166,32 @@ fn valid_store_media_url(value: &str) -> bool {
     if value.is_empty() || value.len() > 2048 {
         return false;
     }
-    let Some(filename) = value.strip_prefix("/api/forum/media/") else {
+    let filename = if let Some(filename) = value.strip_prefix("/api/forum/media/") {
+        filename
+    } else if let Some(filename) = value.strip_prefix("/api/content/media/") {
+        filename
+    } else {
         return false;
     };
     !filename.is_empty()
-        && filename.len() <= 200
-        && filename
-            .chars()
-            .next()
-            .is_some_and(|value| value.is_ascii_alphanumeric())
-        && filename
-            .chars()
-            .all(|value| value.is_ascii_alphanumeric() || matches!(value, '.' | '_' | '-'))
+        && filename.len() <= 1024
+        && !filename.starts_with('/')
+        && !filename.ends_with('/')
+        && !filename.contains("//")
+        && !filename.contains("..")
+        && !filename.contains('\\')
+        && !filename.contains('?')
+        && !filename.contains('#')
+        && filename.split('/').all(|segment| {
+            !segment.is_empty()
+                && segment
+                    .chars()
+                    .next()
+                    .is_some_and(|value| value.is_ascii_alphanumeric())
+                && segment
+                    .chars()
+                    .all(|value| value.is_ascii_alphanumeric() || matches!(value, '.' | '_' | '-'))
+        })
 }
 
 async fn list_crm_business_references(

@@ -70,6 +70,15 @@ test.describe('public page quality contract', () => {
             /user-scalable\s*=\s*no|maximum-scale\s*=\s*1/i,
           );
           await expectNoHorizontalOverflow(page, 6);
+
+          if (route === '/id/home') {
+            // Home must render one responsive feed tree. Rendering separate
+            // mobile/desktop copies doubles maps, effects, and DOM work.
+            await expect(
+              page.locator('[data-testid="home-business-map-section"]'),
+            ).toHaveCount(1);
+            await expect(page.getByRole('heading', { name: 'Home sedang dimuat ulang' })).toHaveCount(0);
+          }
         });
       }
 

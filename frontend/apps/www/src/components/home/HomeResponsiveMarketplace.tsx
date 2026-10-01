@@ -18,6 +18,7 @@ import {
   useEffect,
   useRef,
   useState,
+  useMemo,
   useSyncExternalStore,
 } from 'react';
 import {
@@ -97,13 +98,13 @@ import {
 import {
   extractContentItems,
   formatCurrencyFromCents,
+  resolveContentLocation,
   resolveImageGallery,
   type ContentItem,
 } from '@/lib/content/catalog';
 import { resolveContentPriceUnitLabel } from '@/lib/content/priceUnit';
 import { buildContentHref } from '@/lib/content/routes';
 import {
-  getListingSideContextLabel,
   getListingValueFallback,
   resolveListingSide,
 } from '@/lib/content/listingSide';
@@ -115,6 +116,7 @@ import {
 } from '@/components/layout/MarketplacePageFrame';
 import { FeedColumnFooter } from '@/components/layout/FeedColumnFooter';
 import { HomeNewsSection } from '@/components/home/HomeNewsSection';
+import { HomeErrorBoundary } from '@/components/home/HomeErrorBoundary';
 import { useHomeNews } from '@/components/home/HomeNewsContext';
 import type {
   CommunityFeedItem,
@@ -129,7 +131,6 @@ import {
 import { normalizeCommunityMediaItems } from '@/components/community/community-feed-helpers';
 import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 import { buildUmkmMapPlacePath, UMKM_DISCOVERY_PATH } from '@/lib/umkmSurface';
-import { resolveStorefrontBrandMedia } from '@/lib/super-app/storefront-brand-media';
 import { getUmkmPlaceKind } from '@/lib/super-app/umkm-place-ui';
 import {
   LAJUKAN_EXPLORE_CATEGORIES,
@@ -156,8 +157,7 @@ const HOME_CONTENT_REQUEST_TIMEOUT_MS = 12000;
 const HOME_CONTENT_FALLBACK_TIMEOUT_MS = 4500;
 const HOME_CONTENT_TOTAL_TIMEOUT_MS = 18000;
 const HOME_MARKETPLACE_FETCH_LIMIT = 48;
-const HOME_SUPPLY_LISTING_SLOTS = 6;
-const HOME_SUPPLY_STORE_SLOTS = 6;
+const HOME_EXTERNAL_FETCH_LIMIT = 24;
 
 type Tone =
   | 'emerald'
@@ -247,6 +247,8 @@ type RecommendationItem = {
   contentStatus: string;
   updatedAt?: number;
   sourcePriority: number;
+  sourceKind?: 'lajukan_listing' | 'external';
+  clusterKey?: string;
 };
 
 function recommendationScore(item: RecommendationItem): number {
@@ -302,41 +304,187 @@ function rankRecommendations(items: RecommendationItem[]): RecommendationItem[] 
   });
 }
 
-function buildHomeSupplyItems(
-  contentItems: RecommendationItem[],
-  nativeStoreItems: RecommendationItem[],
-  maxItems = 12,
-): RecommendationItem[] {
-  const listingItems = rankRecommendations(
-    contentItems.map(item => ({ ...item, sourcePriority: 1 })),
-  );
-  const storeItems = rankRecommendations(
-    nativeStoreItems.map(item => ({ ...item, sourcePriority: 0 })),
-  );
+function normalizeClusterToken(value: unknown): string {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\u00c0-\u024f]+/gi, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
+}
 
-  // Registered Lajukan businesses are first-party business truth. Put them
-  // first, then fill the remaining slots with first-party marketplace offers.
-  const listingSlots = Math.min(HOME_SUPPLY_LISTING_SLOTS, maxItems);
-  const storeSlots = Math.min(HOME_SUPPLY_STORE_SLOTS, maxItems - listingSlots);
-  // First-party Lajukan businesses are the strongest source of truth for
-  // the Home business recommendation surface. Put them before transactional
-  // listings so a real Lajukan store is not buried behind generic records.
-  const selected = [
-    ...storeItems.slice(0, storeSlots),
-    ...listingItems.slice(0, listingSlots),
-  ];
+function isNativeLajukanContent(item: ContentItem): boolean {
+  const metadata = item.metadata || {};
+  const source = String(
+    metadata.source ||
+      metadata.data_source ||
+      metadata.source_kind ||
+      metadata.sourceKind ||
+      metadata.record_source ||
+      metadata.recordSource ||
+      '',
+  )
+    .trim()
+    .toLowerCase();
 
-  if (selected.length < maxItems) {
-    selected.push(...storeItems.slice(storeSlots, maxItems));
-    selected.push(...listingItems.slice(listingSlots, maxItems));
+  const recordKind = String(
+    metadata.record_kind ||
+      metadata.recordKind ||
+      '',
+  )
+    .trim()
+    .toLowerCase();
+
+  return Boolean(
+    item.owner_id ||
+      metadata.owner_id ||
+      metadata.user_id ||
+      metadata.ownerId ||
+      metadata.userId ||
+      metadata.listing_mode === 'guided_business_create' ||
+      source === 'lajukan' ||
+      source === 'lajukan_listing' ||
+      source === 'lajukan_content' ||
+      source === 'usaha_portal' ||
+      source === 'content' ||
+      recordKind === 'lajukan_listing' ||
+      recordKind === 'lajukan_content',
+  );
+}
+
+function recommendationClusterKey(
+  item: ContentItem,
+  type: string | undefined,
+  location: string,
+): string {
+  const category =
+    metadataText(
+      item,
+      'marketplace_category_slug',
+      'marketplace_subcategory_slug',
+      'business_discovery_category',
+      'create_category',
+      'category',
+    ) ||
+    type ||
+    'other';
+
+  const city =
+    metadataText(item, 'city') ||
+    location;
+
+  return (
+    [
+      normalizeClusterToken(category),
+      normalizeClusterToken(city),
+    ]
+      .filter(Boolean)
+      .join(':') || 'other'
+  );
+}
+
+function clusterHomeFeedItems<T extends { clusterKey?: string }>(
+  items: T[],
+  maxItems: number,
+  maxPerCluster = 4,
+): T[] {
+  if (items.length <= maxItems) return items.slice(0, maxItems);
+
+  const groups = new Map<string, T[]>();
+  for (const item of items) {
+    const key = item.clusterKey || 'other';
+    const bucket = groups.get(key);
+    if (bucket) bucket.push(item);
+    else groups.set(key, [item]);
   }
 
-  const seen = new Set<string>();
-  return selected.filter(item => {
-    if (seen.has(item.id)) return false;
-    seen.add(item.id);
-    return true;
-  }).slice(0, maxItems);
+  const orderedGroups = Array.from(groups.values());
+  const offsets = new Array(orderedGroups.length).fill(0) as number[];
+  const result: T[] = [];
+
+  while (result.length < maxItems) {
+    let added = false;
+
+    for (let index = 0; index < orderedGroups.length; index += 1) {
+      const group = orderedGroups[index];
+      let offset = offsets[index];
+      if (offset >= group.length) continue;
+
+      let emitted = 0;
+      while (
+        offset < group.length &&
+        emitted < maxPerCluster &&
+        result.length < maxItems
+      ) {
+        result.push(group[offset]);
+        offset += 1;
+        emitted += 1;
+      }
+
+      offsets[index] = offset;
+      added = true;
+
+      if (result.length >= maxItems) break;
+    }
+
+    if (!added) break;
+  }
+
+  return result;
+}
+
+function mergeHomeContentSources(
+  ...sources: ContentItem[][]
+): ContentItem[] {
+  const byId = new Map<string, ContentItem>();
+
+  for (const source of sources) {
+    for (const item of source) {
+      const id = String(item.id || '').trim();
+      if (!id) continue;
+
+      const existing = byId.get(id);
+      if (!existing) {
+        byId.set(id, item);
+        continue;
+      }
+
+      const existingScore =
+        Number(Boolean(existing.owner_id)) * 4 +
+        Object.keys(existing.metadata || {}).length +
+        Number(Boolean(existing.owner_profile));
+
+      const incomingScore =
+        Number(Boolean(item.owner_id)) * 4 +
+        Object.keys(item.metadata || {}).length +
+        Number(Boolean(item.owner_profile));
+
+      if (incomingScore > existingScore) {
+        byId.set(id, item);
+      }
+    }
+  }
+
+  return Array.from(byId.values());
+}
+
+function buildHomeSupplyItems(
+  contentItems: RecommendationItem[],
+  maxItems = 12,
+): RecommendationItem[] {
+  const ranked = rankRecommendations(
+    contentItems.filter(item => item.side === 'supply'),
+  ).filter(
+    (item, index, all) =>
+      all.findIndex(candidate => candidate.id === item.id) === index,
+  );
+
+  return clusterHomeFeedItems(ranked, maxItems, 4);
+}
+function rankHomeDemandRecommendations(
+  items: RecommendationItem[],
+): RecommendationItem[] {
+  return rankRecommendations(items);
 }
 
 type PublicReferenceItem = {
@@ -354,6 +502,7 @@ type PublicReferenceItem = {
   sourceContactUrl: string;
   sourceContactType: 'whatsapp' | 'source';
   imageAttribution: string;
+  clusterKey?: string;
 };
 
 type PublicReferenceApiItem = {
@@ -372,26 +521,9 @@ type PublicReferenceApiResponse = {
   };
 };
 
-type HomeNativeStoreApiItem = {
-  id?: unknown;
-  slug?: unknown;
-  name?: unknown;
-  city?: unknown;
-  address?: unknown;
-  description?: unknown;
-  lat?: unknown;
-  lng?: unknown;
-  phone?: unknown;
-  metadata?: unknown;
-  updated_at?: unknown;
-  content_status?: unknown;
-};
 
-type HomeNativeStoreApiResponse = {
-  data?: {
-    items?: HomeNativeStoreApiItem[];
-  };
-};
+
+
 
 type CommunityTab = 'for-you' | 'community';
 
@@ -1073,8 +1205,9 @@ function mapContentToRecommendation(
     readText(item.owner_profile?.full_name) ||
     metadataText(item, 'brand', 'company', 'company_name', 'store_name');
   const location =
+    resolveContentLocation(item) ||
     readText(item.owner_profile?.location) ||
-    metadataText(item, 'city', 'location', 'address');
+    metadataText(item, 'location', 'address', 'city');
   const price =
     typeof item.price_cents === 'number' && item.price_cents > 0
       ? side === 'demand'
@@ -1086,6 +1219,14 @@ function mapContentToRecommendation(
     resolveContentPriceUnitLabel(item, isId ? 'id' : 'en') ||
     metadataText(item, 'unit', 'rate_type', 'min_order_qty', 'lease_term');
   const distanceKm = readContentDistanceKm(item, allowViewerDistance);
+  const publicPath = readText(item.metadata?.public_path);
+  const profileDestination =
+    publicPath && /^\/(?:[a-z]{2}\/)?profile(?:\/|$)/i.test(publicPath);
+
+  // Home marketplace cards represent actual listings, not profile pages. A
+  // profile record may still arrive with a business taxonomy (for example
+  // service) from an upstream join; reject it before it can inherit that label.
+  if (profileDestination) return null;
 
   return {
     id: item.id,
@@ -1126,7 +1267,11 @@ function mapContentToRecommendation(
       readText(item.metadata?.contentStatus) ||
       'active',
     updatedAt: item.updated_at ? Date.parse(item.updated_at) || undefined : undefined,
-    sourcePriority: 1,
+    sourcePriority: isNativeLajukanContent(item) ? 0 : 1,
+    sourceKind: isNativeLajukanContent(item)
+      ? 'lajukan_listing'
+      : 'external',
+    clusterKey: recommendationClusterKey(item, type, location),
   };
 }
 
@@ -1139,125 +1284,6 @@ const NATIVE_BUSINESS_CATEGORY_ARTWORK: Record<string, string> = {
   workshop: '/images/business-categories/workshop.svg',
   general: '/images/business-categories/general.svg',
 };
-
-function mapNativeStoreToRecommendation(
-  item: HomeNativeStoreApiItem,
-  isId: boolean,
-): RecommendationItem | null {
-  const id = readText(item.id);
-  const slug = readText(item.slug);
-  const title = readText(item.name);
-  if (!id || !slug || !title) return null;
-
-  const metadata =
-    item.metadata &&
-    typeof item.metadata === 'object' &&
-    !Array.isArray(item.metadata)
-      ? (item.metadata as Record<string, unknown>)
-      : {};
-
-  const storefrontMedia = resolveStorefrontBrandMedia(metadata);
-  const placeKind = getUmkmPlaceKind({
-    id,
-    slug,
-    name: title,
-    description: readText(item.description) || null,
-    city: readText(item.city) || null,
-    address: readText(item.address) || null,
-    lat: Number(item.lat) || 0,
-    lng: Number(item.lng) || 0,
-    metadata,
-  });
-  // If the business has no approved/owner media yet, use the same category
-  // artwork used by the map/detail surfaces instead of an empty gray card.
-  const categoryArtwork = NATIVE_BUSINESS_CATEGORY_ARTWORK[placeKind];
-  const coverImage =
-    storefrontMedia.coverUrl ||
-    storefrontMedia.logoUrl ||
-    readText(metadata.cover_image) ||
-    readText(metadata.coverImage) ||
-    readText(metadata.logo_url) ||
-    readText(metadata.logoUrl) ||
-    categoryArtwork;
-  const galleryImages = Array.from(
-    new Set([
-      coverImage,
-      ...storefrontMedia.galleryUrls,
-    ].filter(Boolean)),
-  ).slice(0, 4);
-
-  const categoryLabel =
-    readText(metadata.category_label) ||
-    readText(metadata.segment) ||
-    readText(metadata.business_type) ||
-    (isId ? 'Usaha Lajukan' : 'Lajukan business');
-
-  const ratingValue = Number(metadata.rating);
-  const reviewCount = Number(metadata.review_count);
-  const ownerId =
-    readText(metadata.owner_id) ||
-    readText(metadata.owner_user_id) ||
-    null;
-
-  return {
-    id: `store:${id}`,
-    title,
-    summary:
-      readText(item.description) ||
-      readText(metadata.description) ||
-      (isId
-        ? 'Usaha yang terdaftar langsung di Lajukan.'
-        : 'Business registered directly on Lajukan.'),
-    vendor:
-      readText(metadata.owner_name) ||
-      readText(metadata.owner_full_name) ||
-      (isId ? 'Usaha Lajukan' : 'Lajukan business'),
-    location:
-      readText(item.city) ||
-      readText(item.address) ||
-      readText(metadata.city) ||
-      '',
-    rating:
-      Number.isFinite(ratingValue) && ratingValue > 0
-        ? ratingValue.toFixed(1)
-        : '-',
-    reviews:
-      Number.isFinite(reviewCount) && reviewCount >= 0
-        ? formatCompactCount(reviewCount, '0')
-        : '0',
-    price: '',
-    unit: '',
-    image: coverImage || undefined,
-    images: galleryImages,
-    href: buildUmkmMapPlacePath({
-      slug,
-      metadata: {
-        ...metadata,
-        is_public_reference: false,
-      },
-    }),
-    badge: isId ? 'Data Lajukan' : 'Lajukan data',
-    badgeTone: 'emerald',
-    typeLabel: categoryLabel,
-    createHref: '/usaha',
-    entityType: 'umkm',
-    distanceKm: null,
-    distanceLabel: null,
-    contentType: 'umkm',
-    verified:
-      metadata.verified === true ||
-      metadata.identity_verified === true ||
-      metadata.business_verified === true,
-    side: 'supply',
-    imageAttribution: undefined,
-    ownerId,
-    contentStatus: 'active',
-    updatedAt: readText(item.updated_at)
-      ? Date.parse(readText(item.updated_at))
-      : undefined,
-    sourcePriority: 0,
-  };
-}
 
 function mapContentToPublicReference(
   item: ContentItem,
@@ -1282,6 +1308,14 @@ function mapContentToPublicReference(
     sourceContactType: reference.sourceContactType,
     imageAttribution:
       reference.imageAttribution || contentImageAttribution(item),
+    clusterKey: [
+      normalizeClusterToken(
+        metadataText(item, 'place_type', 'amenity', 'shop', 'tourism', 'office'),
+      ),
+      normalizeClusterToken(metadataText(item, 'city')),
+    ]
+      .filter(Boolean)
+      .join(':') || 'other',
   };
 }
 
@@ -1803,7 +1837,7 @@ export function TrendingSearchSection({ isId }: { isId: boolean }) {
                 );
               }}
               className="
-                inline-flex h-7 max-w-[150px] shrink-0
+                group inline-flex h-7 max-w-[150px] shrink-0
                 select-none items-center
                 rounded-full
                 border border-zinc-200/80
@@ -1830,8 +1864,14 @@ export function TrendingSearchSection({ isId }: { isId: boolean }) {
                 backfaceVisibility: 'hidden',
               }}
             >
-              <span className="truncate">
-                {item.label}
+              <span className="flex min-w-0 items-center gap-1.5">
+                <Search
+                  aria-hidden="true"
+                  className="h-3 w-3 shrink-0 text-zinc-400 transition-colors group-hover:text-emerald-600 group-focus-visible:text-emerald-600 sm:h-3.5 sm:w-3.5"
+                />
+                <span className="truncate">
+                  {item.label}
+                </span>
               </span>
             </Link>
           ))}
@@ -2442,6 +2482,10 @@ function HomeListingCarouselSection({
   useEmblaWheelGestures(emblaApi);
 
   const isDemand = mode === 'demand';
+  const clusteredItems = useMemo(
+    () => clusterHomeFeedItems(items, 12, 3),
+    [items],
+  );
 
   return (
     <section
@@ -2454,11 +2498,11 @@ function HomeListingCarouselSection({
       aria-label={
         isDemand
           ? isId
-            ? 'Kebutuhan Pembeli'
-            : 'Buyer needs'
+            ? 'Sedang dibutuhkan'
+            : 'Currently needed'
           : isId
-            ? 'Penawaran'
-            : 'Offers'
+            ? 'Sedang ditawarkan'
+            : 'Currently offered'
       }
     >
       <div className="flex min-w-0 items-center gap-1.5 px-2 sm:px-3 md:px-4 lg:px-6">
@@ -2471,21 +2515,21 @@ function HomeListingCarouselSection({
         <h2 className="min-w-0 truncate text-[11px] font-bold leading-5 tracking-tight text-[color:var(--app-text)] sm:text-xs">
           {isDemand
             ? isId
-              ? 'Kebutuhan Pembeli'
-              : 'Buyer needs'
+              ? 'Yang sedang mencari'
+              : 'People looking for products or services'
             : isId
-              ? 'Penawaran'
-              : 'Offers'}
+              ? 'Yang menyediakan'
+              : 'People providing products or services'}
         </h2>
 
         <span className="hidden shrink-0 text-[9px] font-medium text-zinc-400 sm:inline">
           {isDemand
             ? isId
-              ? 'Pembeli yang membutuhkan produk, jasa, atau penyedia'
-              : 'Buyers who need products, services, or providers'
+              ? 'Kebutuhan dari pembeli dan bisnis di Lajukan'
+              : 'Buyer and business requests on Lajukan'
             : isId
-              ? 'Produk, jasa, tempat, dan sewa yang tersedia'
-              : 'Products, services, places, and rentals currently offered'}
+              ? 'Produk, jasa, alat, tempat, dan kebutuhan usaha yang tersedia'
+              : 'Products, services, tools, places, and business resources available'}
         </span>
 
         <Link
@@ -2503,11 +2547,11 @@ function HomeListingCarouselSection({
             <p className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400 sm:text-[11px]">
               {isDemand
                 ? isId
-                  ? 'Belum ada kebutuhan aktif saat ini.'
-                  : 'No active requests right now.'
+                  ? 'Belum ada kebutuhan aktif yang bisa ditampilkan.'
+                  : 'No active buyer needs to show right now.'
                 : isId
-                  ? 'Belum ada penawaran aktif saat ini.'
-                  : 'No active offers right now.'}
+                  ? 'Belum ada penyedia aktif yang bisa ditampilkan.'
+                  : 'No active providers to show right now.'}
             </p>
           </div>
         </div>
@@ -2527,7 +2571,7 @@ function HomeListingCarouselSection({
                 [backface-visibility:hidden]
               "
             >
-              {items.map(item => (
+              {clusteredItems.map((item: RecommendationItem) => (
                 <div
                   key={item.id}
                   className="
@@ -2594,6 +2638,7 @@ export function PublicReferencesSection({
   useEmblaWheelGestures(emblaApi);
 
   if (items.length === 0) return null;
+  const clusteredItems = clusterHomeFeedItems(items, 12, 3);
 
   return (
     <section
@@ -2601,8 +2646,8 @@ export function PublicReferencesSection({
       data-testid="home-public-references-section"
       aria-label={
         isId
-          ? 'Referensi lokasi usaha dari data publik'
-          : 'Business location references from public data'
+          ? 'Lokasi usaha dari data publik'
+          : 'Business locations from public data'
       }
     >
       {/* HEADER */}
@@ -2610,11 +2655,11 @@ export function PublicReferencesSection({
         <Globe2 className="h-3.5 w-3.5 shrink-0 text-blue-600" />
 
         <h2 className="truncate text-[11px] font-bold leading-none tracking-tight text-[color:var(--app-text)] sm:text-xs">
-          {isId ? 'Referensi usaha sekitar' : 'Nearby references'}
+          {isId ? 'Lokasi usaha sekitar' : 'Nearby business locations'}
         </h2>
 
         <span className="hidden text-[9px] font-medium text-zinc-400 sm:inline">
-          {isId ? 'Data publik' : 'Public data'}
+          {isId ? 'Data lokasi publik' : 'Public location data'}
         </span>
       </div>
 
@@ -2697,7 +2742,7 @@ export function PublicReferencesSection({
                       backdrop-blur
                     "
                   >
-                    {isId ? 'Referensi publik' : 'Public reference'}
+                    {isId ? 'Lokasi usaha' : 'Business location'}
                   </span>
                 </div>
 
@@ -2861,7 +2906,7 @@ function RecommendationCard({
       {/* IMAGE */}
       <div
         className={cn(
-          'relative aspect-square w-full shrink-0 overflow-hidden',
+          'relative aspect-[4/3] w-full shrink-0 overflow-hidden',
           isDemand
             ? 'bg-blue-100 dark:bg-blue-950/60'
             : 'bg-zinc-100 dark:bg-zinc-900',
@@ -2985,52 +3030,6 @@ function RecommendationCard({
           </span>
         ) : null}
 
-        {/* VERIFIED */}
-        {item.verified ? (
-          <span
-            className="
-              absolute
-              bottom-2
-              left-2
-              inline-flex
-              items-center
-              gap-1.5
-              rounded-full
-              border
-              border-white/70
-              bg-white/92
-              px-2
-              py-1.5
-              text-[8px]
-              font-bold
-              leading-none
-              text-emerald-700
-              shadow-sm
-              backdrop-blur-md
-
-              sm:text-[9px]
-
-              dark:border-zinc-700/80
-              dark:bg-zinc-950/90
-              dark:text-emerald-400
-            "
-          >
-            <span
-              aria-hidden="true"
-              className="
-                h-1.5
-                w-1.5
-                shrink-0
-                rounded-full
-                bg-emerald-500
-              "
-            />
-
-            <span>
-              {isId ? 'Terverifikasi' : 'Verified'}
-            </span>
-          </span>
-        ) : null}
       </div>
 
       {/* CONTENT */}
@@ -3049,20 +3048,15 @@ function RecommendationCard({
           className="
             line-clamp-2
             min-w-0
-            min-h-[32px]
             text-[12px]
             font-semibold
             leading-[16px]
             tracking-[-0.01em]
             text-zinc-800
-
             min-[360px]:text-[13px]
             min-[360px]:leading-[17px]
-
-            sm:min-h-[36px]
             sm:text-sm
             sm:leading-[18px]
-
             dark:text-zinc-100
           "
         >
@@ -3080,7 +3074,7 @@ function RecommendationCard({
           <p
             title={price}
             className={cn(
-              'mt-2 truncate text-[14px] font-black leading-tight tracking-[-0.025em] min-[360px]:text-[15px] sm:text-base',
+              'mt-1.5 truncate text-[14px] font-black leading-tight tracking-[-0.025em] min-[360px]:text-[15px] sm:text-base',
               isDemand
                 ? 'text-blue-700 dark:text-blue-300'
                 : 'text-emerald-700 dark:text-emerald-400',
@@ -3088,71 +3082,17 @@ function RecommendationCard({
           >
             {price}
           </p>
-        ) : (
-          <div
-            aria-hidden="true"
-            className="mt-2 h-[17px] sm:h-[19px]"
-          />
-        )}
+        ) : null}
 
-        {/* META */}
-        <div
-          className="
-            mt-3
-            flex
-            min-w-0
-            items-center
-            gap-2
-            border-t
-            border-zinc-100
-            pt-2.5
-
-            dark:border-zinc-900
-          "
-        >
-          {/* LOCATION */}
-          {locationLabel ? (
-            <span
-              title={locationLabel}
-              className="
-                min-w-0
-                flex-1
-                truncate
-                text-[9px]
-                font-medium
-                leading-4
-                text-zinc-500
-
-                min-[360px]:text-[10px]
-                sm:text-[11px]
-
-                dark:text-zinc-400
-              "
-            >
-              {locationLabel}
-            </span>
-          ) : (
-            <span
-              aria-hidden="true"
-              className="min-w-0 flex-1"
-            />
-          )}
-
-          {/* SIDE */}
-          {item.side ? (
-            <span
-              title={getListingSideContextLabel(item.side, item.contentType, isId ? 'id' : 'en')}
-              className={cn(
-                'max-w-[42%] shrink-0 truncate rounded-full px-2 py-1 text-[8px] font-bold leading-none sm:max-w-[45%] sm:text-[9px]',
-                isDemand
-                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-950/70 dark:text-blue-200'
-                  : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-900 dark:text-zinc-300',
-              )}
-            >
-              {getListingSideContextLabel(item.side, item.contentType, isId ? 'id' : 'en')}
-            </span>
-          ) : null}
-        </div>
+        {locationLabel ? (
+          <p
+            title={locationLabel}
+            className="mt-1.5 flex min-w-0 items-center gap-1.5 truncate text-[9px] font-medium leading-4 text-zinc-500 dark:text-zinc-400 min-[360px]:text-[10px] sm:text-[11px]"
+          >
+            <MapPin className="h-3 w-3 shrink-0" aria-hidden="true" />
+            <span className="truncate">{locationLabel}</span>
+          </p>
+        ) : null}
       </div>
     </a>
   );
@@ -4119,63 +4059,90 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
       return extractContentItems(payload);
     };
 
-    const loadListings = async () => {
+    const buildHomeListingParams = (
+      side: 'supply' | 'demand',
+      databaseOnly: boolean,
+    ) => {
       const params = new URLSearchParams({
-        limit: String(HOME_MARKETPLACE_FETCH_LIMIT),
+        limit: String(
+          databaseOnly ? HOME_MARKETPLACE_FETCH_LIMIT : HOME_EXTERNAL_FETCH_LIMIT,
+        ),
         status: 'active',
-        side: 'supply',
+        side,
+        ...(side === 'demand' ? { sort: 'newest' } : {}),
         include_owner: '1',
-        database_only: '1',
-        marketplace_only: '1',
+        marketplace_only: 'true',
       });
+      if (databaseOnly) params.set('database_only', '1');
+
       addViewerLocation(params);
-      if (viewerLocationKey) {
+      if (side === 'supply' && viewerLocationKey) {
         params.set('nearby', '1');
       }
-      return fetchHomeContent(params, listingController.signal);
+
+      return params;
     };
 
-    const loadNativeBusinessStores = async () => {
-      const params = new URLSearchParams({
-        limit: '24',
-        map: '1',
-        include_references: '0',
+    const loadMyListings = async () => {
+      if (!isAuthenticated) return [] as ContentItem[];
+
+      try {
+        const response = await fetch(
+          '/api/my-listings?status=active&limit=50',
+          {
+            cache: 'no-store',
+            credentials: 'include',
+            signal: AbortSignal.any([
+              listingController.signal,
+              demandController.signal,
+              AbortSignal.timeout(9000),
+            ]),
+          },
+        );
+        if (!response.ok) return [] as ContentItem[];
+
+        const payload = await response.json().catch(() => null);
+        return extractContentItems(payload);
+      } catch {
+        return [] as ContentItem[];
+      }
+    };
+
+    const loadListings = async (
+      side: 'supply' | 'demand',
+      controller: AbortController,
+      mine: ContentItem[],
+    ) => {
+      const nativeParams = buildHomeListingParams(side, true);
+      const broadParams = buildHomeListingParams(side, false);
+
+      const [nativeItems, broadItems] = await Promise.all([
+        fetchHomeContent(nativeParams, controller.signal).catch(() => []),
+        fetchHomeContent(broadParams, controller.signal).catch(() => []),
+      ]);
+
+      const matchingMine = mine.filter(item => {
+        const resolvedSide = resolveListingSide({
+          type: item.content_type || item.category,
+          side: item.side,
+          listing_side: item.listing_side,
+          market_side: item.market_side,
+          listing_intent: item.listing_intent,
+          market_intent: item.market_intent,
+          intent: item.intent,
+          pricing_mode: item.pricing_mode,
+          metadata: item.metadata,
+        });
+        return resolvedSide === side;
       });
-      // Home recommendations are not a nearby-only surface. Keep the
-      // first-party Lajukan pool global so registered businesses are not
-      // accidentally hidden just because the viewer is in another city.
 
-      const response = await fetch(
-        `/api/super-app/umkm/stores?${params.toString()}`,
-        {
-          cache: 'no-store',
-          credentials: 'include',
-          signal: listingController.signal,
-        },
-      );
-      const payload = (await response
-        .json()
-        .catch(() => null)) as HomeNativeStoreApiResponse | null;
-
-      if (!response.ok) throw new Error('native_businesses_unavailable');
-
-      return Array.isArray(payload?.data?.items) ? payload.data.items : [];
+      // Order is intentional: direct Lajukan listings first, then the normal
+      // database feed, then broader imported/discovered candidates.
+      return mergeHomeContentSources(matchingMine, nativeItems, broadItems);
     };
 
-    const loadDemandListings = async () => {
-      const params = new URLSearchParams({
-        limit: String(HOME_MARKETPLACE_FETCH_LIMIT),
-        status: 'active',
-        side: 'demand',
-        include_owner: '1',
-        database_only: '1',
-        marketplace_only: '1',
-      });
-      // Demand is a nationwide opportunity board, not a nearby-only feed.
-      // Do not let the viewer's location hide valid requests published by
-      // businesses in another city.
-      return fetchHomeContent(params, demandController.signal);
-    };
+    const loadDemandListings = async (mine: ContentItem[]) =>
+      loadListings('demand', demandController, mine);
 
     const loadReferences = async () => {
       const params = new URLSearchParams({
@@ -4198,17 +4165,16 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
       return Array.isArray(payload?.data?.items) ? payload.data.items : [];
     };
 
+    const myListingsPromise = loadMyListings();
+
     const loadHomeListings = async () => {
       setRecommendationsLoading(true);
       try {
-        const [contentItems, nativeStores] = await Promise.all([
-          loadListings().catch(() => []),
-          loadNativeBusinessStores().catch(() => []),
-        ]);
-
-        const nativeBusinessItems = nativeStores
-          .map(item => mapNativeStoreToRecommendation(item, isId))
-          .filter((item): item is RecommendationItem => Boolean(item));
+        const contentItems = await loadListings(
+          'supply',
+          listingController,
+          await myListingsPromise,
+        );
 
         const transactionalSupplyItems = contentItems
           .filter(isHomeRecommendationEligible)
@@ -4224,7 +4190,6 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
 
         const listingItems = buildHomeSupplyItems(
           transactionalSupplyItems,
-          nativeBusinessItems,
           12,
         );
 
@@ -4241,25 +4206,32 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
     const loadHomeDemandListings = async () => {
       setDemandRecommendationsLoading(true);
       try {
-        const listingItems = rankRecommendations(
-          (await loadDemandListings())
-            .filter(isHomeRecommendationEligible)
-            .map(item =>
-              mapContentToRecommendation(
-                item,
-                isId,
-                Boolean(viewerLocationKey),
-              ),
-            )
-            .filter((item): item is RecommendationItem => Boolean(item))
-            .filter(item => item.side === 'demand')
-            .map(item => ({ ...item, sourcePriority: 0 }))
-            .filter(
-              (item, index, allItems) =>
-                allItems.findIndex(candidate => candidate.id === item.id) ===
-                index,
+        const contentItems = await loadDemandListings(
+          await myListingsPromise,
+        );
+
+        const demandItems = contentItems
+          .filter(isHomeRecommendationEligible)
+          .map(item =>
+            mapContentToRecommendation(
+              item,
+              isId,
+              Boolean(viewerLocationKey),
             ),
-        ).slice(0, 12);
+          )
+          .filter((item): item is RecommendationItem => Boolean(item))
+          .filter(item => item.side === 'demand')
+          .filter(
+            (item, index, allItems) =>
+              allItems.findIndex(candidate => candidate.id === item.id) ===
+              index,
+          );
+
+        const listingItems = clusterHomeFeedItems(
+          rankHomeDemandRecommendations(demandItems),
+          12,
+          4,
+        );
 
         if (!active) return;
         setDemandRecommendations(listingItems);
@@ -4310,7 +4282,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
       demandController.abort();
       referenceController.abort();
     };
-  }, [isId, viewerLocationKey]);
+  }, [isId, isAuthenticated, viewerLocationKey]);
 
   const loadCommunityPostsPage = useCallback(async () => {
     const requestSeq = communityRequestSeqRef.current + 1;
@@ -4699,76 +4671,24 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
 
   return (
     <MarketplacePageFrame>
-      <main className="mx-auto w-full max-w-[720px] min-w-0 space-y-3.5 px-1 sm:space-y-4 sm:px-0 lg:hidden">
-        <HeroVisualStage
-          isId={isId}
-          className="mb-3"
-          query={query}
-          onQueryChange={setQuery}
-          onSubmit={handleSearchSubmit}
-          onOpenFilters={openSearchFilters}
-        />
-        {/* <MobileAppDownloadSection isId={isId} /> */}
-        <QuickCategoriesSection isId={isId} />
-        <HomeBusinessMapSection locale={locale} />
-        <DailyLoginRewardCard locale={locale} compact />
-        <TrendingSearchSection isId={isId} />
-        {recommendationsLoading ? (
-          <RecommendationsLoadingSkeleton isId={isId} />
-        ) : (
-          <RecommendationsSection isId={isId} items={recommendations} />
-        )}
-        {demandRecommendationsLoading ? (
-          <RecommendationsLoadingSkeleton isId={isId} demand />
-        ) : (
-          <DemandListingsSection isId={isId} items={demandRecommendations} />
-        )}
-        <PublicReferencesSection isId={isId} items={publicReferences} />
-        <HomeNewsSection locale={locale} items={homeNewsItems} />
-        <ReelsPanel isId={isId} items={reels} />
-        <HomeCommunityGroupsSection
-          isId={isId}
-          groups={communityGroups}
-          onChanged={() => void loadCommunityPostsPage()}
-        />
-        <CommunityPanel
-          isId={isId}
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          posts={communityPosts}
-          loading={communityLoading}
-          loadError={communityError}
-          onRetry={() => void loadCommunityPostsPage()}
-        />
-        <FeedColumnFooter isId={isId} />
-      </main>
-
-      <div className="lajukan-home-desktop-shell hidden min-h-0 min-w-0 lg:flex lg:flex-1 lg:flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <div className={homeDesktopGridClassName}>
-          <DesktopSidebar
-            pathname={pathname}
-            items={sidebarItems}
-            inviteTitle={text.inviteTitle}
-            inviteDescription={text.inviteDescription}
-            inviteButton={text.inviteButton}
-            inviteHref={primaryCtaHref}
-          />
+          <div className="hidden min-h-0 min-w-0 lg:block">
+            <DesktopSidebar
+              pathname={pathname}
+              items={sidebarItems}
+              inviteTitle={text.inviteTitle}
+              inviteDescription={text.inviteDescription}
+              inviteButton={text.inviteButton}
+              inviteHref={primaryCtaHref}
+            />
+          </div>
+
           <main
-            className="min-h-0 min-w-0 overflow-y-auto pr-1 overscroll-contain pt-2"
+            className="min-h-0 min-w-0 overflow-x-hidden overscroll-contain px-1 pb-2 sm:px-0 lg:overflow-y-auto lg:pr-1 lg:pt-2"
             data-auto-scrollbar
           >
-            <div className="space-y-4 pb-5">
-              {/* <DesktopHeroSection
-                isId={isId}
-                isAuthenticated={isAuthenticated}
-                summary={summary}
-                primaryCtaHref={primaryCtaHref}
-                query={query}
-                onQueryChange={setQuery}
-                onSubmit={handleSearchSubmit}
-                placeholder={text.searchPlaceholder}
-                buttonLabel={text.searchButton}
-              /> */}
+            <div className="mx-auto w-full max-w-[720px] space-y-3.5 pb-5 sm:space-y-4 lg:max-w-none">
               <HeroVisualStage
                 isId={isId}
                 className="mb-3"
@@ -4777,22 +4697,52 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
                 onSubmit={handleSearchSubmit}
                 onOpenFilters={openSearchFilters}
               />
+              {/* <MobileAppDownloadSection isId={isId} /> */}
               <QuickCategoriesSection isId={isId} />
-        <HomeBusinessMapSection locale={locale} />
+
+              <HomeErrorBoundary
+                locale={locale}
+                section={isId ? 'Peta usaha' : 'Business map'}
+              >
+                <HomeBusinessMapSection locale={locale} />
+              </HomeErrorBoundary>
+
               <DailyLoginRewardCard locale={locale} compact />
               <TrendingSearchSection isId={isId} />
+
               {recommendationsLoading ? (
                 <RecommendationsLoadingSkeleton isId={isId} />
               ) : (
-                <RecommendationsSection isId={isId} items={recommendations} />
+                <RecommendationsSection
+                  isId={isId}
+                  items={recommendations}
+                />
               )}
+
               {demandRecommendationsLoading ? (
-          <RecommendationsLoadingSkeleton isId={isId} demand />
-        ) : (
-          <DemandListingsSection isId={isId} items={demandRecommendations} />
-        )}
-              <PublicReferencesSection isId={isId} items={publicReferences} />
-        <HomeNewsSection locale={locale} items={homeNewsItems} />
+                <RecommendationsLoadingSkeleton isId={isId} demand />
+              ) : (
+                <DemandListingsSection
+                  isId={isId}
+                  items={demandRecommendations}
+                />
+              )}
+
+              <PublicReferencesSection
+                isId={isId}
+                items={publicReferences}
+              />
+
+              <HomeErrorBoundary
+                locale={locale}
+                section={isId ? 'News' : 'News'}
+              >
+                <HomeNewsSection
+                  locale={locale}
+                  items={homeNewsItems}
+                />
+              </HomeErrorBoundary>
+
               <div className="grid gap-4">
                 <ReelsPanel isId={isId} items={reels} />
                 <HomeCommunityGroupsSection
@@ -4810,23 +4760,25 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
                   onRetry={() => void loadCommunityPostsPage()}
                 />
               </div>
+
               <FeedColumnFooter isId={isId} />
             </div>
           </main>
-          <RightRail
-            isId={isId}
-            locale={locale}
-            isAuthenticated={isAuthenticated}
-            summary={summary}
-            primaryCtaHref={primaryCtaHref}
-            walletAmountLabel={walletAmountLabel}
-            walletModeLabel={walletModeLabel}
-            walletLoading={walletLoading}
-          />
+
+          <div className="hidden min-h-0 min-w-0 xl:block">
+            <RightRail
+              isId={isId}
+              locale={locale}
+              isAuthenticated={isAuthenticated}
+              summary={summary}
+              primaryCtaHref={primaryCtaHref}
+              walletAmountLabel={walletAmountLabel}
+              walletModeLabel={walletModeLabel}
+              walletLoading={walletLoading}
+            />
+          </div>
         </div>
       </div>
     </MarketplacePageFrame>
   );
 }
-
-

@@ -54,7 +54,7 @@ describe('UMKM public-reference presentation', () => {
     const html = renderToStaticMarkup(
       <PublicReferenceNotice store={referenceStore} isId />,
     );
-    expect(html).toContain('Data publik · belum diklaim');
+    expect(html).toContain('Lokasi usaha · belum diklaim');
     expect(html).toContain('OpenStreetMap contributors');
     expect(html).toContain('ODbL 1.0');
     expect(html).toContain('belum diverifikasi Lajukan');
@@ -114,7 +114,7 @@ describe('UMKM public-reference presentation', () => {
     );
 
     expect(html).toContain('data-testid="umkm-public-reference-card"');
-    expect(html).toContain('aria-label="Detail referensi Pasar Uji"');
+    expect(html).toContain('aria-label="Detail lokasi usaha Pasar Uji"');
     expect(html).toContain('Sumber asli');
     expect(html).toContain('Rute');
     expect(html).not.toContain('Baru');

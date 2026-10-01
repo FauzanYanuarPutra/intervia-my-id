@@ -1,6 +1,7 @@
 'use client';
 
 import { FeedbackNotice, type FeedbackTone } from '@/components/interaction/FeedbackNotice';
+import { SensitiveActionConfirm } from '@/components/interaction/SensitiveActionConfirm';
 import { RupiahInput } from '@/components/forms/RupiahInput';
 import { businessApiErrorMessage } from '@/lib/business-api-error';
 import {
@@ -34,6 +35,7 @@ export function CashShiftWorkspace({ businessId, initialShift }: Props) {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [messageTone, setMessageTone] = useState<FeedbackTone>('info');
+  const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
   const shiftAttemptRef = useRef<ClientIdempotencyAttempt | null>(null);
 
   async function post(input: Record<string, unknown>) {
@@ -78,7 +80,7 @@ export function CashShiftWorkspace({ businessId, initialShift }: Props) {
   }
 
   async function closeShift() {
-    if (!shift) return;
+    if (!shift || saving) return;
     const amount = Math.round(Number(actualCash));
     if (!Number.isFinite(amount) || amount < 0) {
       setMessageTone('error');
@@ -147,7 +149,20 @@ export function CashShiftWorkspace({ businessId, initialShift }: Props) {
             </label>
           </details>
 
-          <button type="button" onClick={closeShift} disabled={saving} className="portal-button-primary mt-4 w-full justify-center py-3 disabled:opacity-50">
+          <button
+            type="button"
+            onClick={() => {
+              const amount = Math.round(Number(actualCash));
+              if (!Number.isFinite(amount) || amount < 0) {
+                setMessageTone('error');
+                setMessage('Isi jumlah uang fisik di laci sebelum menutup kas.');
+                return;
+              }
+              setCloseConfirmOpen(true);
+            }}
+            disabled={saving}
+            className="portal-button-primary mt-4 w-full justify-center py-3 disabled:opacity-50"
+          >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <LockKeyhole className="h-4 w-4" />} Tutup kas
           </button>
         </div>
@@ -184,6 +199,21 @@ export function CashShiftWorkspace({ businessId, initialShift }: Props) {
       ) : null}
 
       {message ? <div className="border-t border-portal-line p-4 sm:p-5"><FeedbackNotice message={message} tone={messageTone} /></div> : null}
+
+      <SensitiveActionConfirm
+        open={closeConfirmOpen}
+        title="Tutup kas shift?"
+        description={shift ? `Kas fisik akan dicatat sebagai hasil penutupan shift. Pastikan jumlah uang di laci sudah dihitung: ${money.format(Math.round(Number(actualCash || 0)))}.` : 'Shift kas sudah tidak aktif.'}
+        confirmLabel="Tutup kas"
+        busy={saving}
+        onCancel={() => {
+          if (!saving) setCloseConfirmOpen(false);
+        }}
+        onConfirm={() => {
+          setCloseConfirmOpen(false);
+          void closeShift();
+        }}
+      />
     </section>
   );
 }
