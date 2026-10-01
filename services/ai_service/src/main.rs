@@ -1673,10 +1673,10 @@ fn task_instructions(task: AiTask, locale: &str) -> &'static str {
             "Audit the provided listing. Preserve original facts, improve clarity/searchability/completeness, and flag unsupported claims and missing fields."
         }
         (AiTask::ProfileDraft, true) => {
-            "Susun profil yang menjelaskan siapa user/usaha, apa yang ditawarkan/dicari, keahlian, lokasi, dan CTA. Jangan menyatakan verified, legal, berpengalaman sekian tahun, atau punya sertifikat jika tidak ada bukti."
+            "Susun profil yang menjelaskan siapa user/usaha, peran bisnis yang dipilih, apa yang ditawarkan, apa yang dibutuhkan, kapasitas, wilayah, partner yang terbuka untuk diajak, keahlian, lokasi, dan CTA. Gunakan hanya fakta dari context. Jangan menyatakan verified, legal, berpengalaman sekian tahun, punya sertifikat, omzet, pelanggan, atau kapasitas yang tidak ada buktinya."
         }
         (AiTask::ProfileDraft, false) => {
-            "Draft a profile explaining identity/business, offers/needs, expertise, location, and CTA. Never invent verification, permits, years of experience, or certificates."
+            "Draft a profile explaining identity/business, selected business roles, offers, needs, capacity, service area, open-to partner types, expertise, location, and CTA. Use only facts from context. Never invent verification, permits, years of experience, certificates, revenue, customers, or unsupported capacity claims."
         }
         (AiTask::SearchIntent, true) => {
             "Ubah bahasa natural menjadi intent pencarian Lajukan. Jangan mengarang hasil. category wajib memakai slug materials-suppliers, services, machines-tools, business-places, business-opportunities, atau unknown. listing_type gunakan product, service, job, property, tool_rental, business_transfer, company, profile, atau unknown. Keluarkan normalized query, side supply/demand, category/subcategory, location, radius, price range, condition, service mode, sort, keywords, variants, dan apakah perlu klarifikasi."
