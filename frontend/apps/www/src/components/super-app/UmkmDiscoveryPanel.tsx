@@ -1620,8 +1620,8 @@ export function UmkmDiscoveryPanel({
                 id: point.id,
                 slug: point.slug,
                 name: point.name,
-                city: point.city || 'Indonesia',
-                address: point.city || 'Indonesia',
+                city: point.city || '',
+                address: point.city || '',
                 lat: point.lat,
                 lng: point.lng,
                 description: null,
@@ -2045,9 +2045,15 @@ export function UmkmDiscoveryPanel({
         return;
       }
 
+      const nextStoreId = matchedStore.store.id;
+      const selectionChanged = selectedStoreId !== nextStoreId;
+
       setSelectedStoreId(current =>
-        current === matchedStore.store.id ? current : matchedStore.store.id,
+        current === nextStoreId ? current : nextStoreId,
       );
+
+      if (!selectionChanged) return;
+
       setShowRoute(false);
       setRouteSummary(null);
       setMapFocusMode('selected');
@@ -2059,7 +2065,7 @@ export function UmkmDiscoveryPanel({
     syncSelectionFromUrl();
     window.addEventListener('popstate', syncSelectionFromUrl);
     return () => window.removeEventListener('popstate', syncSelectionFromUrl);
-  }, [selectedSlug, selectedStoreIdInitial, visibleStores]);
+  }, [selectedSlug, selectedStoreIdInitial, selectedStoreId, visibleStores]);
 
   useEffect(() => {
     setListPage(1);
@@ -2329,10 +2335,10 @@ export function UmkmDiscoveryPanel({
   }, [selectedPlaceId]);
 
   useEffect(() => {
-    if (showRoute && selectedPlace) {
+    if (showRoute && selectedPlace?.store.id) {
       bumpMapFocus('route');
     }
-  }, [bumpMapFocus, selectedPlace, showRoute]);
+  }, [bumpMapFocus, selectedPlace?.store.id, showRoute]);
 
   const renderDiscoveryMap = useCallback(
     (className: string, edgeToEdge = false) => {
