@@ -68,6 +68,23 @@ export function isHomeRecommendationEligible(item: ContentItem): boolean {
     return false;
   }
 
+  const source = [
+    metadata.source,
+    metadata.data_source,
+    metadata.source_kind,
+    metadata.sourceKind,
+    metadata.record_source,
+    metadata.recordSource,
+  ]
+    .map(normalizeToken)
+    .find(Boolean) || '';
+  const entityKind = normalizeToken(
+    metadata.entity_kind ?? metadata.entityKind,
+  );
+  if (source === 'users discover' || source === 'users_discover' || entityKind === 'person') {
+    return false;
+  }
+
   // A native Lajukan listing can legitimately be marked non-transactional
   // while it is a buyer request (for example, a user asking for 3 kg of
   // mangoes per week). Home must not hide such a real, owner-backed request.
