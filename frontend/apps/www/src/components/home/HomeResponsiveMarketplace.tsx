@@ -98,6 +98,7 @@ import {
 import {
   extractContentItems,
   formatCurrencyFromCents,
+  resolveContentLocation,
   resolveImageGallery,
   type ContentItem,
 } from '@/lib/content/catalog';
@@ -1204,8 +1205,9 @@ function mapContentToRecommendation(
     readText(item.owner_profile?.full_name) ||
     metadataText(item, 'brand', 'company', 'company_name', 'store_name');
   const location =
+    resolveContentLocation(item) ||
     readText(item.owner_profile?.location) ||
-    metadataText(item, 'city', 'location', 'address');
+    metadataText(item, 'location', 'address', 'city');
   const price =
     typeof item.price_cents === 'number' && item.price_cents > 0
       ? side === 'demand'
