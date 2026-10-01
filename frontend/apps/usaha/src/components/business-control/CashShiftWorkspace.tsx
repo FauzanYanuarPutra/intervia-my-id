@@ -149,7 +149,20 @@ export function CashShiftWorkspace({ businessId, initialShift }: Props) {
             </label>
           </details>
 
-          <button type="button" onClick={() => setCloseConfirmOpen(true)} disabled={saving} className="portal-button-primary mt-4 w-full justify-center py-3 disabled:opacity-50">
+          <button
+            type="button"
+            onClick={() => {
+              const amount = Math.round(Number(actualCash));
+              if (!Number.isFinite(amount) || amount < 0) {
+                setMessageTone('error');
+                setMessage('Isi jumlah uang fisik di laci sebelum menutup kas.');
+                return;
+              }
+              setCloseConfirmOpen(true);
+            }}
+            disabled={saving}
+            className="portal-button-primary mt-4 w-full justify-center py-3 disabled:opacity-50"
+          >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <LockKeyhole className="h-4 w-4" />} Tutup kas
           </button>
         </div>
