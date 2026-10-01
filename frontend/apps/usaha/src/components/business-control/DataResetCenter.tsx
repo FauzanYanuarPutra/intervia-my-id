@@ -190,6 +190,13 @@ export function DataResetCenter({ business }: Props) {
     setBusy('apply');
     setError(null);
     try {
+      const materialPayload = {
+        scopes: selected,
+        reason: reason.trim(),
+        effective_on: effectiveOn || undefined,
+      };
+      const attempt = resolveIdempotencyAttempt(attemptRef.current, materialPayload);
+      attemptRef.current = attempt;
       const result = await fetch('/api/businesses/' + encodeURIComponent(business.id) + '/reset', {
         method: 'POST',
         headers: {
