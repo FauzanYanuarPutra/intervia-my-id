@@ -1178,14 +1178,24 @@ fn valid_store_media_url(value: &str) -> bool {
         return false;
     };
     !filename.is_empty()
-        && filename.len() <= 200
-        && filename
-            .chars()
-            .next()
-            .is_some_and(|value| value.is_ascii_alphanumeric())
-        && filename
-            .chars()
-            .all(|value| value.is_ascii_alphanumeric() || matches!(value, '.' | '_' | '-'))
+        && filename.len() <= 1024
+        && !filename.starts_with('/')
+        && !filename.ends_with('/')
+        && !filename.contains("//")
+        && !filename.contains("..")
+        && !filename.contains('\\')
+        && !filename.contains('?')
+        && !filename.contains('#')
+        && filename.split('/').all(|segment| {
+            !segment.is_empty()
+                && segment
+                    .chars()
+                    .next()
+                    .is_some_and(|value| value.is_ascii_alphanumeric())
+                && segment.chars().all(|value| {
+                    value.is_ascii_alphanumeric() || matches!(value, '.' | '_' | '-')
+                })
+        })
 }
 
 async fn list_crm_business_references(
