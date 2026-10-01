@@ -344,6 +344,30 @@ services:
       start_period: 30s
     networks: [app, data]
 
+  marketplace_migration:
+    <<: *service-defaults
+    restart: "no"
+    build:
+      context: .
+      dockerfile: services/marketplace_service/Dockerfile
+    environment:
+      ENV: ${ENV:-development}
+      APP_PORT: "8081"
+      RUST_LOG: ${RUST_LOG:-info}
+      LOG_FORMAT: ${LOG_FORMAT:-}
+      MARKETPLACE_DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@marketplace_db:5432/marketplace_db
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ACCESS_ALG: ${JWT_ACCESS_ALG:-HS256}
+      JWT_PUBLIC_KEY_PEM: ${JWT_PUBLIC_KEY_PEM:-}
+      JWT_KEY_ID: ${JWT_KEY_ID:-lajukan-access-v1}
+      JWT_ISSUER: ${JWT_ISSUER:-laju}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-laju_users}
+      MIGRATE_ONLY: "true"
+      RUN_MIGRATIONS_ON_STARTUP: "true"
+    depends_on:
+      marketplace_db: { condition: service_healthy }
+    networks: [data]
+
   marketplace_service:
     <<: *service-defaults
     build:
@@ -356,10 +380,9 @@ services:
       LOG_FORMAT: ${LOG_FORMAT:-}
       HTTP_MAX_IN_FLIGHT: ${MARKETPLACE_HTTP_MAX_IN_FLIGHT:-512}
       MARKETPLACE_SOURCE_BOOTSTRAP: ${MARKETPLACE_SOURCE_BOOTSTRAP:-false}
-      # Keep schema migrations deterministic for the self-contained marketplace deployment.
-      # SQLx migrations are transactional/idempotent, so startup can safely bring a new
-      # release (including business data reset storage) up to the current schema.
-      RUN_MIGRATIONS_ON_STARTUP: ${RUN_MIGRATIONS_ON_STARTUP:-true}
+      # API startup must not own schema migration. A dedicated one-shot migration
+      # service completes the exact same image migration set before the API starts.
+      RUN_MIGRATIONS_ON_STARTUP: "false"
       MARKETPLACE_DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@marketplace_db:5432/marketplace_db
       MARKETPLACE_DB_MAX_CONNECTIONS: ${MARKETPLACE_DB_MAX_CONNECTIONS:-20}
       MARKETPLACE_DB_MIN_CONNECTIONS: ${MARKETPLACE_DB_MIN_CONNECTIONS:-2}
@@ -412,6 +435,7 @@ services:
       WALLET_MIDTRANS_ERROR_REDIRECT_URL: ${WALLET_MIDTRANS_ERROR_REDIRECT_URL:-}
     depends_on:
       marketplace_db: { condition: service_healthy }
+      marketplace_migration: { condition: service_completed_successfully }
     expose: ["8081"]
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8081/ready"]
