@@ -411,6 +411,45 @@ pub(crate) async fn create_media_contribution(
         }
     };
 
+    let store_owner = match target {
+        MediaTarget::Store(store_id) => sqlx::query_scalar::<_, bool>(
+            "SELECT EXISTS(SELECT 1 FROM umkm_stores WHERE id = $1 AND owner_user_id = $2)",
+        )
+        .bind(store_id)
+        .bind(user_id)
+        .fetch_one(&state.db)
+        .await
+        .unwrap_or(false),
+        MediaTarget::Reference(_) => false,
+    };
+
+    let identity = sqlx::query(
+        r#"
+        SELECT full_name, username
+        FROM users_read_model
+        WHERE user_id = $1
+        "#,
+    )
+    .bind(user_id)
+    .fetch_optional(&state.db)
+    .await;
+
+    let (uploader_name, uploader_username) = match identity {
+        Ok(Some(row)) => (
+            row.get::<Option<String>, _>("full_name"),
+            row.get::<Option<String>, _>("username"),
+        ),
+        Ok(None) => (None, None),
+        Err(error) => {
+            tracing::error!("load uploader identity error: {:?}", error);
+            return error_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load contributor",
+            )
+            .into_response();
+        }
+    };
+
     let duplicate = match target {
         MediaTarget::Store(store_id) => {
             sqlx::query_scalar::<_, bool>(
@@ -452,9 +491,16 @@ pub(crate) async fn create_media_contribution(
             sqlx::query(
                 r#"
                 INSERT INTO umkm_store_media_contributions (
-                  store_id, uploader_user_id, media_url, media_type, caption, status
+                  store_id, uploader_user_id, media_url, media_type, caption,
+                  uploader_name_snapshot, uploader_username_snapshot, status,
+                  reviewed_by, reviewed_at
                 )
-                VALUES ($1, $2, $3, $4, $5, 'pending')
+                VALUES (
+                  $1, $2, $3, $4, $5, $6, $7,
+                  CASE WHEN $8 THEN 'approved' ELSE 'pending' END,
+                  CASE WHEN $8 THEN $2 ELSE NULL END,
+                  CASE WHEN $8 THEN NOW() ELSE NULL END
+                )
                 "#,
             )
             .bind(store_id)
@@ -462,6 +508,9 @@ pub(crate) async fn create_media_contribution(
             .bind(&media_url)
             .bind(&media_type)
             .bind(caption.as_deref())
+            .bind(&uploader_name)
+            .bind(&uploader_username)
+            .bind(store_owner)
             .execute(&state.db)
             .await
         }
@@ -469,9 +518,10 @@ pub(crate) async fn create_media_contribution(
             sqlx::query(
                 r#"
                 INSERT INTO umkm_store_media_contributions (
-                  reference_content_id, uploader_user_id, media_url, media_type, caption, status
+                  reference_content_id, uploader_user_id, media_url, media_type, caption,
+                  uploader_name_snapshot, uploader_username_snapshot, status
                 )
-                VALUES ($1, $2, $3, $4, $5, 'pending')
+                VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
                 "#,
             )
             .bind(reference_id)
@@ -479,6 +529,8 @@ pub(crate) async fn create_media_contribution(
             .bind(&media_url)
             .bind(&media_type)
             .bind(caption.as_deref())
+            .bind(&uploader_name)
+            .bind(&uploader_username)
             .execute(&state.db)
             .await
         }
@@ -489,10 +541,11 @@ pub(crate) async fn create_media_contribution(
             StatusCode::CREATED,
             Json(serde_json::json!({
                 "data": {
-                    "status": "pending",
+                    "status": if store_owner { "approved" } else { "pending" },
                     "media_url": media_url,
                     "media_type": media_type,
-                    "caption": caption
+                    "caption": caption,
+                    "is_store_owner": store_owner
                 }
             })),
         )
