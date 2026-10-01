@@ -107,17 +107,17 @@ export function ChatComposerPicker({
 
   return (
     <section
-      className="w-full overflow-hidden rounded-[24px] border border-black/[0.06] bg-white shadow-[0_-16px_40px_-28px_rgba(15,23,42,0.5)] dark:border-white/[0.08] dark:bg-[#111b21]"
+      className="w-full overflow-hidden rounded-[18px] border border-black/[0.06] bg-white shadow-[0_-16px_40px_-28px_rgba(15,23,42,0.5)] dark:border-white/[0.08] dark:bg-[#111b21]"
       aria-label={
         locale === 'id'
           ? mode === 'emoji' ? 'Papan emoji' : 'Papan stiker'
           : mode === 'emoji' ? 'Emoji keyboard' : 'Sticker keyboard'
       }
     >
-      <div className="flex items-center justify-between gap-2 border-b border-black/[0.05] px-3 py-2.5 dark:border-white/[0.06]">
+      <div className="flex items-center justify-between gap-2 border-b border-black/[0.05] px-2.5 py-2 dark:border-white/[0.06]">
         <div className="flex min-w-0 items-center gap-1.5">
-          <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#e9f8f2] text-[#008f72] dark:bg-[#163b31] dark:text-[#25d366]">
-            {mode === 'emoji' ? <Smile className="h-4 w-4" /> : <Sticker className="h-4 w-4" />}
+          <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-[#e9f8f2] text-[#008f72] dark:bg-[#163b31] dark:text-[#25d366]">
+            {mode === 'emoji' ? <Smile className="h-3.5 w-3.5" /> : <Sticker className="h-4 w-4" />}
           </span>
           <div className="min-w-0">
             <p className="truncate text-xs font-extrabold text-[#111b21] dark:text-[#e9edef]">
@@ -131,7 +131,7 @@ export function ChatComposerPicker({
         <button
           type="button"
           onClick={onClose}
-          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#54656f] transition hover:bg-[#f0f2f5] dark:text-[#aebac1] dark:hover:bg-[#202c33]"
+          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[#54656f] transition hover:bg-[#f0f2f5] dark:text-[#aebac1] dark:hover:bg-[#202c33]"
           aria-label={locale === 'id' ? 'Kembali ke keyboard' : 'Back to keyboard'}
           title={locale === 'id' ? 'Kembali mengetik' : 'Back to typing'}
         >
@@ -158,15 +158,15 @@ export function ChatComposerPicker({
               </button>
             ))}
           </div>
-          <div className="h-[min(28dvh,270px)] min-h-[170px] overflow-y-auto overscroll-contain p-2">
-            <div className="grid grid-cols-7 gap-0.5 sm:grid-cols-10 md:grid-cols-12">
+          <div className="h-[min(24dvh,220px)] min-h-[150px] overflow-y-auto overscroll-contain p-2">
+            <div className="grid grid-cols-8 gap-0.5 min-[420px]:grid-cols-9 sm:grid-cols-10 md:grid-cols-12">
               {(activeCategory?.items || []).map((emoji, index) => (
                 <button
                   key={emoji + index}
                   type="button"
                   disabled={disabled}
                   onClick={() => pickEmoji(emoji)}
-                  className="flex aspect-square min-h-9 items-center justify-center rounded-lg text-[1.4rem] transition hover:bg-[#f0f2f5] hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-[#202c33] sm:text-[1.55rem]"
+                  className="flex aspect-square min-h-8 items-center justify-center rounded-lg text-[1.22rem] transition hover:bg-[#f0f2f5] hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-[#202c33] sm:text-[1.38rem]"
                   aria-label={(locale === 'id' ? 'Pilih ' : 'Choose ') + emoji}
                 >
                   {emoji}
@@ -183,24 +183,24 @@ export function ChatComposerPicker({
       ) : (
         <>
           <div className="h-[min(28dvh,270px)] min-h-[170px] overflow-y-auto overscroll-contain p-2">
-            <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-6 md:grid-cols-8">
+            <div className="grid grid-cols-4 gap-1 min-[420px]:grid-cols-5 sm:grid-cols-6 md:grid-cols-8">
               {STICKERS.map(sticker => (
                 <button
                   key={sticker.id}
                   type="button"
                   disabled={disabled}
                   onClick={() => onStickerSelect(sticker.emoji)}
-                  className="flex min-h-[68px] flex-col items-center justify-center gap-1 rounded-[16px] border border-black/[0.04] bg-[#f7f9f8] px-2 py-2 transition hover:-translate-y-0.5 hover:bg-[#eef3f1] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/[0.05] dark:bg-[#202c33] dark:hover:bg-[#2a3942]"
+                  className="flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-[16px] border border-black/[0.04] bg-[#f7f9f8] px-2 py-2 transition hover:-translate-y-0.5 hover:bg-[#eef3f1] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/[0.05] dark:bg-[#202c33] dark:hover:bg-[#2a3942]"
                   aria-label={sticker.label}
                   title={sticker.label}
                 >
-                  <span className="text-[2.35rem] leading-none" aria-hidden="true">{sticker.emoji}</span>
+                  <span className="text-[2rem] leading-none" aria-hidden="true">{sticker.emoji}</span>
                   <span className="max-w-full truncate text-[10px] font-bold text-[#54656f] dark:text-[#aebac1]">{sticker.label}</span>
                 </button>
               ))}
             </div>
           </div>
-          <div className="border-t border-black/[0.05] px-3 py-2 text-[10px] font-medium text-[#667781] dark:border-white/[0.06] dark:text-[#aebac1]">
+          <div className="border-t border-black/[0.05] px-2.5 py-1.5 text-[9px] font-medium text-[#667781] dark:border-white/[0.06] dark:text-[#aebac1]">
             {locale === 'id'
               ? 'Stiker dikirim langsung sebagai pesan stiker.'
               : 'Stickers are sent directly as sticker messages.'}
