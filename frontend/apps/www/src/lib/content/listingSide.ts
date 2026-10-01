@@ -300,7 +300,7 @@ export function getListingSideVerbLabel(
   locale: LocaleCode,
 ): string {
   if (locale === 'id') {
-    return side === 'demand' ? 'Mencari' : 'Menyediakan';
+    return side === 'demand' ? 'Membutuhkan' : 'Menawarkan';
   }
   return side === 'demand' ? 'Looking for' : 'Providing';
 }
