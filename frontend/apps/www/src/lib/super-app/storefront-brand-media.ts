@@ -18,7 +18,7 @@ const LEGACY_IMAGE_KEYS = [
   'image',
   'menu_photo_url',
 ] as const;
-const GALLERY_KEYS = ['gallery_images', 'gallery', 'images', 'photos'] as const;
+const GALLERY_KEYS = ['gallery_media', 'gallery_images', 'gallery', 'images', 'photos'] as const;
 
 function readApprovedContributionImages(metadata: Record<string, unknown>): string[] {
   const primary = typeof metadata.gallery_media_primary === 'string'
@@ -137,7 +137,7 @@ export function resolveStorefrontBrandMedia(
   ]);
   const logoUrl = usableImage(explicitLogo) ? explicitLogo : null;
   const coverUrl =
-    [explicitCover, contributorGallery[0], rawGallery[0], legacyGeneralImage]
+    [explicitCover, metadata.gallery_media_primary, contributorGallery[0], rawGallery[0], legacyGeneralImage]
       .find(usableImage) ?? null;
   const galleryUrls = rawGallery
     .filter(image => image !== logoUrl && image !== coverUrl)
