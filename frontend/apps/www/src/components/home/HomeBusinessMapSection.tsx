@@ -13,9 +13,6 @@ import {
   UMKM_DISCOVERY_PATH,
 } from '@/lib/umkmSurface';
 import { UmkmStoreMap, type UmkmMapStore } from '@/components/super-app/UmkmStoreMap';
-import {
-  INDONESIA_MAP_DEMO_POINTS,
-} from '@/lib/super-app/indonesiaMapDemoData';
 
 type HomeBusinessMapSectionProps = {
   locale: string;
@@ -91,7 +88,7 @@ type HomeMapDataMode = 'synthetic' | 'real';
  * businesses are layered above the demo points so the preview never hides
  * genuine Lajukan records.
  */
-const HOME_MAP_DATA_MODE: HomeMapDataMode = 'synthetic';
+const HOME_MAP_DATA_MODE: HomeMapDataMode = 'real';
 
 
 
@@ -259,7 +256,7 @@ export function HomeBusinessMapSection({
 
   const displayStores = useMemo(() => {
     if (HOME_MAP_DATA_MODE === 'real') return stores;
-    return [...realLajukanStores, ...INDONESIA_MAP_DEMO_POINTS];
+    return [...realLajukanStores];
   }, [realLajukanStores, stores]);
 
   useEffect(() => {
@@ -528,7 +525,7 @@ export function HomeBusinessMapSection({
                   ? isId
                     ? [
                         (HOME_MAP_DATA_MODE === 'synthetic'
-                          ? INDONESIA_MAP_DEMO_POINTS.length
+                          ? summary.mappedCount
                           : summary.mappedCount
                         ).toLocaleString('id-ID'),
                         HOME_MAP_DATA_MODE === 'synthetic'
