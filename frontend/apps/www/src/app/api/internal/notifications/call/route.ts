@@ -41,9 +41,11 @@ export async function POST(req: NextRequest) {
     let sent = 0;
     let expired = 0;
 
+    const pushType = typeof body?.type === 'string' ? body.type : 'incoming_call';
+
     for (const subscription of subscriptions) {
       try {
-        const isCleanup = body?.type === 'call_end';
+        const isCleanup = pushType === 'call_end';
         const result = await sendWebPush(
           subscription,
           isCleanup
@@ -54,6 +56,32 @@ export async function POST(req: NextRequest) {
                   typeof body?.call_id === 'string'
                     ? `incoming-call:${body.call_id}`
                     : 'incoming-call',
+              }
+            : pushType === 'chat_message'
+            ? {
+                type: 'chat_message',
+                room_id: body?.room_id,
+                sender_id: body?.sender_id,
+                sender_username: body?.sender_username,
+                message_type: body?.message_type,
+                title:
+                  typeof body?.sender_username === 'string' &&
+                  body.sender_username.trim()
+                    ? body.sender_username.trim()
+                    : 'Pesan baru',
+                body:
+                  typeof body?.body === 'string' && body.body.trim()
+                    ? body.body.trim().slice(0, 240)
+                    : 'Ada pesan baru di chat Lajukan.',
+                url:
+                  typeof body?.room_id === 'string'
+                    ? '/id/chat/' + encodeURIComponent(body.room_id)
+                    : '/id/chat',
+                tag:
+                  typeof body?.room_id === 'string'
+                    ? 'chat:' + body.room_id
+                    : 'chat-message',
+                renotify: false,
               }
             : {
                 type: 'incoming_call',
