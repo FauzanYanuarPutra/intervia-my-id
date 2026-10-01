@@ -1528,11 +1528,11 @@ function StoreDotsLayer({
     if (!animateDataDots || visibleStorePresentations.length === 0) return [];
     const stride = Math.max(
       1,
-      Math.ceil(visibleStorePresentations.length / 72),
+      Math.ceil(visibleStorePresentations.length / 24),
     );
     return visibleStorePresentations
       .filter((_, index) => index % stride === 0)
-      .slice(0, 72);
+      .slice(0, 24);
   }, [animateDataDots, visibleStorePresentations]);
 
   return (
