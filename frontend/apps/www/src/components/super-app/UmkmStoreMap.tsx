@@ -78,6 +78,8 @@ type UmkmStoreMapProps = {
   focusOffset?: UmkmMapFocusOffset;
   onBoundsChange?: (bounds: UmkmMapBounds) => void;
   markerStyle?: 'default' | 'dots';
+  /** Animate a small subset of actual data points; never invents locations. */
+  animateDataDots?: boolean;
 };
 
 const UmkmStoreMapClient = dynamic(
