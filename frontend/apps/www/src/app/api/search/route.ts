@@ -30,6 +30,7 @@ import {
 import { getInternalWwwOrigin } from '@/lib/server/internalWwwOrigin';
 import { buildUmkmStorefrontPath } from '@/lib/umkmSurface';
 import { resolveListingSide } from '@/lib/content/listingSide';
+import { resolveListingLocation } from '@/lib/content/listingLocation';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -495,14 +496,7 @@ function mapContentItem(
       metadata?.partnership_type,
     );
 
-  const location =
-    firstString(
-      metadata?.location,
-      metadata?.city,
-      metadata?.region,
-      item.location,
-      'Indonesia',
-    );
+  const location = resolveListingLocation(item, metadata);
 
   const listingSide =
     firstString(
