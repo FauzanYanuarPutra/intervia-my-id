@@ -182,7 +182,7 @@ export function ChatComposerPicker({
         </>
       ) : (
         <>
-          <div className="h-[min(24dvh,220px)] min-h-[150px] overflow-y-auto overscroll-contain p-2">
+          <div className="h-[min(18dvh,176px)] min-h-[118px] overflow-y-auto overscroll-contain p-2">
             <div className="grid grid-cols-4 gap-1 min-[420px]:grid-cols-5 sm:grid-cols-6 md:grid-cols-8">
               {STICKERS.map(sticker => (
                 <button
