@@ -1216,6 +1216,14 @@ function mapContentToRecommendation(
     resolveContentPriceUnitLabel(item, isId ? 'id' : 'en') ||
     metadataText(item, 'unit', 'rate_type', 'min_order_qty', 'lease_term');
   const distanceKm = readContentDistanceKm(item, allowViewerDistance);
+  const publicPath = readText(item.metadata?.public_path);
+  const profileDestination =
+    publicPath && /^\/(?:[a-z]{2}\/)?profile(?:\/|$)/i.test(publicPath);
+
+  // Home marketplace cards represent actual listings, not profile pages. A
+  // profile record may still arrive with a business taxonomy (for example
+  // service) from an upstream join; reject it before it can inherit that label.
+  if (profileDestination) return null;
 
   return {
     id: item.id,
