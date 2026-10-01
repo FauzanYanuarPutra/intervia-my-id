@@ -11502,7 +11502,10 @@ async fn list_map_places(
               'public_path', '/toko/' || s.slug,
               'updated_at', s.updated_at,
               'created_at', s.created_at,
-              'google_maps_uri', NULLIF(s.metadata->>'google_maps_uri', '')
+              'google_maps_uri', NULLIF(s.metadata->>'google_maps_uri', ''),
+              'wikidata_id', NULLIF(s.metadata->>'wikidata_id', ''),
+              'commons_file', NULLIF(s.metadata->>'commons_file', ''),
+              'commons_image_url', NULLIF(s.metadata->>'commons_image_url', '')
             )) AS metadata,
             CASE
               WHEN lower(COALESCE(s.metadata->>'record_kind','')) LIKE '%reference%'
@@ -11618,7 +11621,10 @@ async fn list_map_places(
               'public_path', '/toko/' || COALESCE(c.slug, 'reference-' || c.id::text),
               'updated_at', c.updated_at,
               'created_at', c.created_at,
-              'google_maps_uri', NULLIF(c.metadata->>'google_maps_uri', '')
+              'google_maps_uri', NULLIF(c.metadata->>'google_maps_uri', ''),
+              'wikidata_id', NULLIF(c.metadata->>'wikidata_id', ''),
+              'commons_file', NULLIF(c.metadata->>'commons_file', ''),
+              'commons_image_url', NULLIF(c.metadata->>'commons_image_url', '')
             )) AS metadata,
             'reference_content' AS source_kind
           FROM content_items c
@@ -11699,7 +11705,10 @@ async fn list_map_places(
               'media_is_place_specific', c.metadata->'media_is_place_specific',
               'updated_at', c.updated_at,
               'created_at', c.created_at,
-              'google_maps_uri', NULLIF(c.metadata->>'google_maps_uri', '')
+              'google_maps_uri', NULLIF(c.metadata->>'google_maps_uri', ''),
+              'wikidata_id', NULLIF(c.metadata->>'wikidata_id', ''),
+              'commons_file', NULLIF(c.metadata->>'commons_file', ''),
+              'commons_image_url', NULLIF(c.metadata->>'commons_image_url', '')
             )) AS metadata,
             'lajukan_listing' AS source_kind
           FROM content_items c

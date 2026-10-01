@@ -1712,7 +1712,30 @@ export function UmkmDiscoveryPanel({
         });
       }
     }
-    return Array.from(merged.values());
+    const sourcePriority = (store: DiscoveryStore) => {
+      const kind = getUmkmMapSourceKind(store);
+      return kind === 'lajukan'
+        ? 0
+        : kind === 'registered'
+          ? 1
+          : kind === 'reference'
+            ? 2
+            : 3;
+    };
+
+    return Array.from(merged.values()).sort((left, right) => {
+      const priorityDelta = sourcePriority(left) - sourcePriority(right);
+      if (priorityDelta !== 0) return priorityDelta;
+
+      const leftUpdated =
+        typeof left.updated_at === 'string' ? left.updated_at : '';
+      const rightUpdated =
+        typeof right.updated_at === 'string' ? right.updated_at : '';
+      const updatedDelta = rightUpdated.localeCompare(leftUpdated);
+      if (updatedDelta !== 0) return updatedDelta;
+
+      return left.name.localeCompare(right.name, 'id');
+    });
   }, [category, discoveryScope, isId, mapPoints, viewerLocation, visibleStores]);
   const selectedPlace = useMemo(
     () => visibleStores.find(item => item.store.id === selectedStoreId) || null,

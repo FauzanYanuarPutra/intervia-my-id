@@ -31,6 +31,8 @@ import {
   isPublicUmkmReferenceVisible,
   isPublicUmkmStoreVisible,
 } from '@/lib/super-app/umkm-public-discovery';
+import { getPublicContent, isPublicContentActive } from '@/lib/server/publicContent';
+import { projectPublicReferenceContent } from '@/lib/super-app/umkm-public-store';
 import { isCoordinateValid } from '@/lib/super-app/location-guard';
 import {
   getStorefrontProductStockStatus,
@@ -490,7 +492,46 @@ function PrimaryAction({
 
 async function getPublicStoreBySlugSafe(slug: string): Promise<UmkmStore | null> {
   try {
-    return await getUmkmStoreBySlug(slug);
+    const storedStore = await getUmkmStoreBySlug(slug);
+    if (storedStore) return storedStore;
+  } catch {
+    // A public reference may not have a native UMKM store row yet.
+  }
+
+  try {
+    const resolution = await getPublicContent(slug);
+    if (
+      resolution.status !== 'found' ||
+      !isPublicContentActive(resolution.content)
+    ) {
+      return null;
+    }
+
+    const metadata =
+      resolution.content.metadata &&
+      typeof resolution.content.metadata === 'object' &&
+      !Array.isArray(resolution.content.metadata)
+        ? (resolution.content.metadata as Record<string, unknown>)
+        : {};
+
+    const recordKind =
+      typeof metadata.record_kind === 'string'
+        ? metadata.record_kind.trim().toLowerCase()
+        : '';
+    const marketSide =
+      typeof metadata.market_side === 'string'
+        ? metadata.market_side.trim().toLowerCase()
+        : '';
+
+    const isPublicReference =
+      metadata.reference_publication_status === 'published' &&
+      marketSide === 'reference' &&
+      metadata.is_transactional === false &&
+      (recordKind.includes('reference') || metadata.is_public_reference === true);
+
+    if (!isPublicReference) return null;
+
+    return projectPublicReferenceContent(resolution.content);
   } catch {
     return null;
   }

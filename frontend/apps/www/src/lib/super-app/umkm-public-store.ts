@@ -379,6 +379,92 @@ function readNonNegativeInteger(
   return Math.floor(parsed);
 }
 
+export function projectPublicReferenceContent(
+  content: Record<string, unknown>,
+): UmkmStore | null {
+  const metadata =
+    content.metadata &&
+    typeof content.metadata === 'object' &&
+    !Array.isArray(content.metadata)
+      ? (content.metadata as Record<string, unknown>)
+      : {};
+
+  const readText = (value: unknown): string =>
+    typeof value === 'string' ? value.trim() : '';
+
+  const readFiniteNumber = (value: unknown): number | null => {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string' && value.trim()) {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+    return null;
+  };
+
+  const id = readText(content.id);
+  const title = readText(content.title);
+  const lat = readFiniteNumber(metadata.latitude ?? metadata.lat);
+  const lng = readFiniteNumber(
+    metadata.longitude ?? metadata.lng ?? metadata.lon,
+  );
+
+  if (!id || !title || lat === null || lng === null) return null;
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+
+  const sourceDataset = readText(metadata.source_dataset);
+  const sourceUrl = readText(metadata.source_url);
+  const sourceLicense = readText(metadata.source_license);
+  const slug =
+    readText(content.slug) ||
+    readText(metadata.public_slug) ||
+    ('reference-' + id);
+
+  const publicMetadata = {
+    ...projectPublicMetadata(metadata, null),
+    record_kind: readText(metadata.record_kind) || 'open_data_reference',
+    market_side: 'reference',
+    is_transactional: false,
+    is_public_reference: true,
+    reference_publication_status: 'published',
+    claimable: metadata.claimable !== false,
+    source_dataset: sourceDataset || 'lajukan_public_reference',
+    source_url: sourceUrl,
+    source_license: sourceLicense,
+    public_path: '/toko/' + slug,
+  };
+
+  return {
+    id,
+    owner_user_id: '',
+    name: title,
+    slug,
+    description:
+      readText(content.summary) ||
+      readText(content.body) ||
+      null,
+    city:
+      readText(metadata.city) ||
+      readText(metadata.location) ||
+      'Indonesia',
+    address:
+      readText(metadata.address) ||
+      readText(metadata.location) ||
+      readText(metadata.city) ||
+      'Indonesia',
+    lat,
+    lng,
+    phone: null,
+    is_active: true,
+    online_order_enabled: false,
+    offline_order_enabled: false,
+    metadata: publicMetadata,
+    created_at:
+      readText(content.created_at) || readText(content.updated_at) || new Date(0).toISOString(),
+    updated_at:
+      readText(content.updated_at) || readText(content.created_at) || new Date(0).toISOString(),
+  };
+}
+
 export function projectPublicUmkmStore(store: UmkmStore): PublicUmkmStore {
   const publicPhone = resolvePublicPhone(store);
 

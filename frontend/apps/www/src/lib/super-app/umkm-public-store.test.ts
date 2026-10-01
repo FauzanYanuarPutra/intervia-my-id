@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { UmkmStore } from './umkm-commerce.types';
 import {
   getUmkmStoreCollectionSummary,
+  projectPublicReferenceContent,
   projectPublicUmkmStore,
 } from './umkm-public-store';
 
@@ -236,4 +237,70 @@ describe('public UMKM store projection', () => {
       reservation_enabled: null,
     });
   });
+
+  it('projects an active public reference content item into a storefront-compatible location', () => {
+    const projected = projectPublicReferenceContent({
+      id: 'reference-1',
+      slug: 'bank-permata-bintaro',
+      title: 'Bank Permata Bintaro',
+      summary: 'Lokasi usaha publik.',
+      created_at: '2026-09-30T00:00:00.000Z',
+      updated_at: '2026-09-30T01:00:00.000Z',
+      metadata: {
+        latitude: '-6.278',
+        longitude: '106.720',
+        city: 'Tangerang Selatan',
+        address: 'Boulevard Bintaro Jaya',
+        record_kind: 'wikidata_reference',
+        market_side: 'reference',
+        reference_publication_status: 'published',
+        is_transactional: false,
+        source_dataset: 'wikidata',
+        source_url: 'https://www.wikidata.org/wiki/Q1',
+        source_license: 'CC0',
+        cover_image:
+          'https://commons.wikimedia.org/wiki/Special:FilePath/File:Example.jpg',
+        internal_note: 'must-not-leave-server',
+        owner_user_id: 'private-owner',
+      },
+    });
+
+    expect(projected).toMatchObject({
+      id: 'reference-1',
+      slug: 'bank-permata-bintaro',
+      name: 'Bank Permata Bintaro',
+      city: 'Tangerang Selatan',
+      lat: -6.278,
+      lng: 106.72,
+      is_active: true,
+      online_order_enabled: false,
+      offline_order_enabled: false,
+    });
+    expect(projected?.metadata).toMatchObject({
+      record_kind: 'wikidata_reference',
+      market_side: 'reference',
+      is_public_reference: true,
+      reference_publication_status: 'published',
+      cover_image:
+        'https://commons.wikimedia.org/wiki/Special:FilePath/File:Example.jpg',
+    });
+    expect(projected?.metadata).not.toHaveProperty('internal_note');
+    expect(projected?.metadata).not.toHaveProperty('owner_user_id');
+  });
+
+  it('fails closed when a reference has no usable coordinates', () => {
+    expect(
+      projectPublicReferenceContent({
+        id: 'reference-2',
+        title: 'Tanpa Titik',
+        metadata: {
+          record_kind: 'wikidata_reference',
+          market_side: 'reference',
+          reference_publication_status: 'published',
+          is_transactional: false,
+        },
+      }),
+    ).toBeNull();
+  });
+
 });
