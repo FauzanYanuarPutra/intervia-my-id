@@ -2905,17 +2905,20 @@ export default function ChatRoomPage() {
     if (!showEmojiPicker && !showStickerPanel) return;
 
     const frame = window.requestAnimationFrame(() => {
-      const input = messageInputRef.current;
-      if (!input) return;
+      const composer = composerRef.current;
+      if (!composer) return;
 
-      // The picker is rendered after the composer field. When it opens,
-      // keep the actual text field in the scroll viewport instead of
-      // pushing the user to the bottom of the picker.
-      input.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      // The picker lives below the composer row. Scroll the composer shell
+      // itself to the bottom so the input/actions stay visible directly
+      // above the compact emoji/sticker keyboard.
+      composer.scrollTo({
+        top: composer.scrollHeight,
+        behavior: reduceMotion ? 'auto' : 'smooth',
+      });
     });
 
     return () => window.cancelAnimationFrame(frame);
-  }, [showEmojiPicker, showStickerPanel]);
+  }, [reduceMotion, showEmojiPicker, showStickerPanel]);
   const attachmentTouchStartXRef = useRef<number | null>(null);
   const canonicalRoomIdRef = useRef(canonicalRoomId);
   const aiDraftAbortRef = useRef<AbortController | null>(null);
