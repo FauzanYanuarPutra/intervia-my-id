@@ -970,7 +970,7 @@ async fn compensate_finance_entries_tx(
     Ok((finance_count, capital_count))
 }
 
-async fn hash_child_request(batch_id: Uuid, entry_id: Uuid, reason: &str) -> String {
+fn hash_child_request(batch_id: Uuid, entry_id: Uuid, reason: &str) -> String {
     let mut h = Sha256::new();
     h.update(batch_id.as_bytes());
     h.update(entry_id.as_bytes());
