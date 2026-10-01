@@ -115,6 +115,7 @@ import {
 } from '@/components/layout/MarketplacePageFrame';
 import { FeedColumnFooter } from '@/components/layout/FeedColumnFooter';
 import { HomeNewsSection } from '@/components/home/HomeNewsSection';
+import { HomeErrorBoundary } from '@/components/home/HomeErrorBoundary';
 import { useHomeNews } from '@/components/home/HomeNewsContext';
 import type {
   CommunityFeedItem,
@@ -4679,7 +4680,9 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
         />
         {/* <MobileAppDownloadSection isId={isId} /> */}
         <QuickCategoriesSection isId={isId} />
-        <HomeBusinessMapSection locale={locale} />
+        <HomeErrorBoundary locale={locale} section={isId ? 'Peta usaha' : 'Business map'}>
+          <HomeBusinessMapSection locale={locale} />
+        </HomeErrorBoundary>
         <DailyLoginRewardCard locale={locale} compact />
         <TrendingSearchSection isId={isId} />
         {recommendationsLoading ? (
@@ -4693,7 +4696,9 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
           <DemandListingsSection isId={isId} items={demandRecommendations} />
         )}
         <PublicReferencesSection isId={isId} items={publicReferences} />
-        <HomeNewsSection locale={locale} items={homeNewsItems} />
+        <HomeErrorBoundary locale={locale} section={isId ? 'News' : 'News'}>
+          <HomeNewsSection locale={locale} items={homeNewsItems} />
+        </HomeErrorBoundary>
         <ReelsPanel isId={isId} items={reels} />
         <HomeCommunityGroupsSection
           isId={isId}
@@ -4747,7 +4752,9 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
                 onOpenFilters={openSearchFilters}
               />
               <QuickCategoriesSection isId={isId} />
-        <HomeBusinessMapSection locale={locale} />
+        <HomeErrorBoundary locale={locale} section={isId ? 'Peta usaha' : 'Business map'}>
+          <HomeBusinessMapSection locale={locale} />
+        </HomeErrorBoundary>
               <DailyLoginRewardCard locale={locale} compact />
               <TrendingSearchSection isId={isId} />
               {recommendationsLoading ? (
@@ -4761,7 +4768,9 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
           <DemandListingsSection isId={isId} items={demandRecommendations} />
         )}
               <PublicReferencesSection isId={isId} items={publicReferences} />
-        <HomeNewsSection locale={locale} items={homeNewsItems} />
+        <HomeErrorBoundary locale={locale} section={isId ? 'News' : 'News'}>
+          <HomeNewsSection locale={locale} items={homeNewsItems} />
+        </HomeErrorBoundary>
               <div className="grid gap-4">
                 <ReelsPanel isId={isId} items={reels} />
                 <HomeCommunityGroupsSection
