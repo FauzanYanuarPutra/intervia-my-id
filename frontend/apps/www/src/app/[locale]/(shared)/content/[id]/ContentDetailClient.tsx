@@ -3391,7 +3391,7 @@ export default function ContentDetailClient({
           'deadline',
           'preferred_period',
         ) || formatDate(String(meta.available_from || ''));
-  const listingLocation = resolveContentLocation(catalogItem);
+  const listingLocation = resolveContentLocation(item as CatalogContentItem);
   const locationValue =
     (displayType === 'company'
       ? readMetaText(meta, 'headquarters')
