@@ -74,6 +74,16 @@ export type ContentItem = {
     cancel_rate?: number | null;
   } | null;
   owner_profile?: ContentOwnerProfile | null;
+  // Structured location fields may be returned by newer listing payloads.
+  // Keep them optional so legacy records continue to work.
+  location?: string | null;
+  address?: string | null;
+  city?: string | null;
+  district?: string | null;
+  regency?: string | null;
+  province?: string | null;
+  region?: string | null;
+  country?: string | null;
   metadata?: ContentMetadata | null;
   created_at?: string;
   updated_at?: string;
