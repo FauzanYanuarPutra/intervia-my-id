@@ -17,6 +17,14 @@ function readOptionalNumber(params: URLSearchParams, key: string, min: number, m
   return value;
 }
 
+function normalizeMapFilterText(value: string, maxLength: number): string {
+  return value
+    .replace(/\\p{C}/gu, ' ')
+    .replace(/\\s+/g, ' ')
+    .trim()
+    .slice(0, maxLength);
+}
+
 function readOptionalInteger(params: URLSearchParams, key: string, min: number, max: number, fallback: number): number {
   const value = readOptionalNumber(params, key, min, max);
   if (value === undefined) return fallback;
@@ -166,12 +174,12 @@ export async function GET(req: NextRequest) {
       if (minLat! > maxLat!) [minLat, maxLat] = [maxLat!, minLat!];
       if (minLng! > maxLng!) [minLng, maxLng] = [maxLng!, minLng!];
     }
-    const rawQ = (paramsInput.get('q') || '').trim();
-    const rawCity = (paramsInput.get('city') || '').trim();
-    const rawCategory = (paramsInput.get('category') || '').trim();
-    const normalizedQ = rawQ.length >= 2 ? rawQ.slice(0, 120) : undefined;
-    const normalizedCity = rawCity.length >= 2 ? rawCity.slice(0, 80) : undefined;
-    const normalizedCategory = rawCategory.length >= 2 ? rawCategory.slice(0, 80) : undefined;
+    const normalizedQValue = normalizeMapFilterText(paramsInput.get('q') || '', 120);
+    const normalizedCityValue = normalizeMapFilterText(paramsInput.get('city') || '', 80);
+    const normalizedCategoryValue = normalizeMapFilterText(paramsInput.get('category') || '', 80);
+    const normalizedQ = normalizedQValue.length >= 2 ? normalizedQValue : undefined;
+    const normalizedCity = normalizedCityValue.length >= 2 ? normalizedCityValue : undefined;
+    const normalizedCategory = normalizedCategoryValue.length >= 2 ? normalizedCategoryValue : undefined;
     const viewerLat = readOptionalNumber(paramsInput, 'viewer_lat', -90, 90);
     const viewerLng = readOptionalNumber(paramsInput, 'viewer_lng', -180, 180);
     const radiusInput = readOptionalNumber(paramsInput, 'radius_km', 0.0001, 1000);
