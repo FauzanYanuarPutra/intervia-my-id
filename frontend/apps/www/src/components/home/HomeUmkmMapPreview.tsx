@@ -99,7 +99,7 @@ function getHomeUpdatedAt(store: PreviewStore): number {
     !Array.isArray(store.metadata)
       ? store.metadata
       : {};
-  const value = metadata.updated_at ?? metadata.updatedAt;
+  const value = store.updated_at ?? metadata.updated_at ?? metadata.updatedAt;
   if (typeof value === 'string') {
     const parsed = Date.parse(value);
     return Number.isFinite(parsed) ? parsed : 0;
@@ -195,8 +195,8 @@ export default function HomeUmkmCard({
   const href = store.slug ? buildUmkmMapPlacePath(store) : UMKM_DISCOVERY_PATH;
   const distanceLabel = formatDistance(store.distance_km);
   const locationLabel =
-    store.city ||
     store.address ||
+    store.city ||
     (isId ? 'Lokasi belum tersedia' : 'Location unavailable');
   const statusLabel = isPublicReference
     ? isId
