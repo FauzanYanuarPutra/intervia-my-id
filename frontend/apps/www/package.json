@@ -53,7 +53,7 @@
     "@tailwindcss/forms": "^0.5.10",
     "@tailwindcss/typography": "^0.5.19",
     "@types/qrcode": "^1.5.6",
-    "axios": "^1.13.2",
+    "axios": "^1.20.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "crypto-js": "^4.2.0",
@@ -66,9 +66,9 @@
     "lajukan-ui": "file:../../packages",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.32.0",
-    "next": "^16.0.7",
+    "next": "^16.3.6",
     "next-intl": "^4.5.0",
-    "nodemailer": "^9.1.1",
+    "nodemailer": "^10.0.6",
     "pg": "^8.20.0",
     "phoenix": "^1.8.3",
     "qrcode": "^1.5.4",
@@ -97,7 +97,7 @@
     "autoprefixer": "^10.4.22",
     "baseline-browser-mapping": "^2.8.32",
     "eslint": "^9",
-    "eslint-config-next": "16.0.1",
+    "eslint-config-next": "16.3.6",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.4",
     "husky": "^9.1.7",
@@ -108,5 +108,8 @@
     "tailwindcss-animate": "^1.0.7",
     "typescript": "5.9.3",
     "vitest": "^3.2.4"
+  },
+  "overrides": {
+    "brace-expansion": "5.0.11"
   }
 }
