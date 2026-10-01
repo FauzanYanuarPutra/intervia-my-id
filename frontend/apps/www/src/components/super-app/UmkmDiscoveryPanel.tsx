@@ -55,6 +55,8 @@ import {
 import { useViewerLocation } from './useViewerLocation';
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 import { Skeleton, SkeletonStack } from '@/components/ui/Skeleton';
+import { LajukanImage } from '@/components/common/LajukanImage';
+import { resolveStorefrontBrandMedia } from '@/lib/super-app/storefront-brand-media';
 import { EmblaInlineRail } from '@/components/common/EmblaInlineRail';
 
 type UmkmDiscoveryPanelProps = {
@@ -248,6 +250,120 @@ function getOpenStatusProfile(
     dotClassName: 'bg-amber-400',
     textClassName: 'text-amber-700 dark:text-amber-300',
   };
+}
+
+function isValidPreviewUrl(value: string): boolean {
+  const url = value.trim();
+  if (!url || url.toLowerCase() === 'invalid media url') return false;
+  if (url.startsWith('/')) return !url.startsWith('//');
+  try {
+    const parsed = new URL(url);
+    return (parsed.protocol === 'http:' || parsed.protocol === 'https:') && !parsed.username && !parsed.password;
+  } catch {
+    return false;
+  }
+}
+
+function SelectedStoreMediaPreview({
+  store,
+  isId,
+  onOpenStore,
+}: {
+  store: DiscoveryStore;
+  isId: boolean;
+  onOpenStore: () => void;
+}) {
+  const media = resolveStorefrontBrandMedia(store.metadata || {});
+  const images = Array.from(
+    new Set([media.coverUrl, ...media.galleryUrls].filter((value): value is string => Boolean(value) && isValidPreviewUrl(value))),
+  ).slice(0, 5);
+  const logo = media.logoUrl && isValidPreviewUrl(media.logoUrl) ? media.logoUrl : null;
+  const products = (store.products || []).slice(0, 4);
+  const hasMedia = Boolean(logo || images.length);
+
+  return (
+    <div className="mt-2 space-y-2">
+      {hasMedia ? (
+        <div className="flex min-w-0 gap-2 overflow-hidden">
+          {logo ? (
+            <button
+              type="button"
+              onClick={onOpenStore}
+              className="relative h-14 w-14 shrink-0 overflow-hidden rounded-[14px] border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+              aria-label={isId ? 'Buka logo usaha' : 'Open business logo'}
+            >
+              <LajukanImage
+                src={logo}
+                alt={isId ? `Logo ${store.name}` : `${store.name} logo`}
+                fill
+                sizes="56px"
+                className="object-contain p-1.5"
+              />
+            </button>
+          ) : null}
+          {images.slice(0, 2).map((url, index) => (
+            <button
+              key={url}
+              type="button"
+              onClick={onOpenStore}
+              className={cn(
+                'relative min-w-0 flex-1 overflow-hidden rounded-[14px] border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-900',
+                images.length === 1 && !logo ? 'h-24' : 'h-14',
+              )}
+              aria-label={isId ? `Foto usaha ${index + 1}` : `Business photo ${index + 1}`}
+            >
+              <LajukanImage
+                src={url}
+                alt={isId ? `Foto ${store.name} ${index + 1}` : `${store.name} photo ${index + 1}`}
+                fill
+                sizes="(min-width: 1024px) 180px, 45vw"
+                className="object-cover"
+              />
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {products.length > 0 ? (
+        <div className="rounded-[14px] border border-slate-200/90 bg-slate-50/80 p-2 dark:border-slate-800 dark:bg-slate-900/60">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[10px] font-black text-slate-700 dark:text-slate-200">
+              {isId ? 'Produk / menu' : 'Products / menu'}
+            </p>
+            <button type="button" onClick={onOpenStore} className="text-[9px] font-bold text-emerald-700 hover:underline dark:text-emerald-300">
+              {isId ? 'Lihat semua' : 'View all'}
+            </button>
+          </div>
+          <div className="mt-1.5 flex gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {products.map(product => {
+              const image = product.image_url && isValidPreviewUrl(product.image_url) ? product.image_url : null;
+              return (
+                <button key={product.id} type="button" onClick={onOpenStore} className="flex w-[138px] shrink-0 items-center gap-2 rounded-[11px] border border-slate-200 bg-white p-1.5 text-left dark:border-slate-800 dark:bg-slate-950">
+                  {image ? (
+                    <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-slate-100 dark:bg-slate-800">
+                      <LajukanImage src={image} alt="" fill sizes="40px" className="object-cover" />
+                    </div>
+                  ) : null}
+                  <span className="min-w-0">
+                    <span className="block line-clamp-2 text-[10px] font-bold leading-4 text-slate-800 dark:text-slate-100">{product.name}</span>
+                    <span className="mt-0.5 block truncate text-[9px] font-semibold text-emerald-700 dark:text-emerald-300">
+                      {product.price_cents > 0 ? formatDiscoveryPrice(product.price_cents, isId) : isId ? 'Negosiasi' : 'Negotiable'}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+
+      {!hasMedia && !products.length ? (
+        <button type="button" onClick={onOpenStore} className="w-full rounded-[13px] border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-left text-[9.5px] font-semibold text-slate-500 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-400">
+          {isId ? 'Belum ada media atau produk yang tampil. Buka usaha untuk melihat detail dan menambahkan foto.' : 'No media or products are shown yet. Open the business for details and photo contributions.'}
+        </button>
+      ) : null}
+    </div>
+  );
 }
 
 function getPlaceLocationLabel(
@@ -2590,6 +2706,15 @@ export function UmkmDiscoveryPanel({
                     </p>
                   </div>
 
+                  <SelectedStoreMediaPreview
+                    store={selectedPlace.store}
+                    isId={isId}
+                    onOpenStore={() => {
+                      const href = buildUmkmMapPlacePath(selectedPlace.store);
+                      window.location.href = href;
+                    }}
+                  />
+
                   <div
                     className={cn(
                       'mt-2 grid gap-1.5',
@@ -2609,8 +2734,8 @@ export function UmkmDiscoveryPanel({
                       <span className="truncate">
                         {selectedIsPublicReference
                           ? isId
-                            ? 'Lihat sumber'
-                            : 'View source'
+                            ? 'Lihat lokasi'
+                            : 'View location'
                           : isId
                             ? 'Buka usaha'
                             : 'Open business'}
