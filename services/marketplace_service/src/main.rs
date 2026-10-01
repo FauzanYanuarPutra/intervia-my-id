@@ -11455,6 +11455,8 @@ async fn list_map_places(
               'business'
             ) AS category,
             jsonb_strip_nulls(jsonb_build_object(
+              'address', NULLIF(s.address, ''),
+              'description', NULLIF(s.description, ''),
               'marketplace_category_slug', NULLIF(lower(s.metadata->>'marketplace_category_slug'), ''),
               'umkm_category', NULLIF(lower(s.metadata->>'umkm_category'), ''),
               'business_type', NULLIF(lower(s.metadata->>'business_type'), ''),
@@ -11567,7 +11569,12 @@ async fn list_map_places(
             'reference:' || c.id::text AS id,
             COALESCE(c.slug, 'reference-' || c.id::text),
             c.title,
-            COALESCE(c.metadata->>'city', c.metadata->>'location', 'Indonesia'),
+            COALESCE(
+              NULLIF(c.metadata->>'city', ''),
+              NULLIF(c.metadata->>'location', ''),
+              NULLIF(c.metadata->>'address', ''),
+              'Indonesia'
+            ),
             public.lajukan_safe_map_coordinate(c.metadata->>'latitude'),
             public.lajukan_safe_map_coordinate(c.metadata->>'longitude'),
             c.updated_at AS updated_at,
@@ -11649,7 +11656,15 @@ async fn list_map_places(
             'listing:' || c.id::text AS id,
             COALESCE(c.slug, 'listing-' || c.id::text),
             c.title,
-            COALESCE(c.metadata->>'city', c.metadata->>'location', c.metadata->>'address', 'Indonesia'),
+            COALESCE(
+              NULLIF(c.metadata #>> '{location_structured,formattedAddress}', ''),
+              NULLIF(c.metadata #>> '{location_structured,formatted_address}', ''),
+              NULLIF(c.metadata->>'listing_location', ''),
+              NULLIF(c.metadata->>'location', ''),
+              NULLIF(c.metadata->>'address', ''),
+              NULLIF(c.metadata->>'city', ''),
+              'Indonesia'
+            ),
             public.lajukan_safe_map_coordinate(
               COALESCE(
                 NULLIF(c.metadata->>'latitude', ''),
@@ -11682,6 +11697,16 @@ async fn list_map_places(
               'category_label', NULLIF(c.metadata->>'category_label', ''),
               'city', NULLIF(c.metadata->>'city', ''),
               'address', NULLIF(c.metadata->>'address', ''),
+              'listing_location', COALESCE(
+                NULLIF(c.metadata #>> '{location_structured,formattedAddress}', ''),
+                NULLIF(c.metadata #>> '{location_structured,formatted_address}', ''),
+                NULLIF(c.metadata->>'listing_location', ''),
+                NULLIF(c.metadata->>'location', ''),
+                NULLIF(c.metadata->>'address', ''),
+                NULLIF(c.metadata->>'city', '')
+              ),
+              'location_structured', c.metadata->'location_structured',
+              'description', NULLIF(c.summary, ''),
               'source', 'lajukan_content',
               'record_kind', 'lajukan_listing',
               'source_kind', 'lajukan_listing',
