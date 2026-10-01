@@ -92,13 +92,19 @@ pub(crate) enum ResetError {
 }
 
 impl From<sqlx::Error> for ResetError {
-    fn from(_: sqlx::Error) -> Self { Self::Database }
+    fn from(_: sqlx::Error) -> Self {
+        Self::Database
+    }
 }
 impl From<SaleRepositoryError> for ResetError {
-    fn from(error: SaleRepositoryError) -> Self { Self::Sales(error) }
+    fn from(error: SaleRepositoryError) -> Self {
+        Self::Sales(error)
+    }
 }
 impl From<FinanceCoreError> for ResetError {
-    fn from(error: FinanceCoreError) -> Self { Self::Finance(error) }
+    fn from(error: FinanceCoreError) -> Self {
+        Self::Finance(error)
+    }
 }
 
 #[derive(Debug, Clone, FromRow)]
@@ -142,7 +148,9 @@ pub(crate) struct DataResetRepository {
 }
 
 impl DataResetRepository {
-    pub(crate) fn new(db: PgPool) -> Self { Self { db } }
+    pub(crate) fn new(db: PgPool) -> Self {
+        Self { db }
+    }
 
     pub(crate) async fn preview(
         &self,
@@ -155,7 +163,9 @@ impl DataResetRepository {
         let mut counts = ResetCounts::default();
         let mut warnings = Vec::new();
 
-        if scopes.contains(&ResetScope::FinanceActivity) || scopes.contains(&ResetScope::OwnerCapital) {
+        if scopes.contains(&ResetScope::FinanceActivity)
+            || scopes.contains(&ResetScope::OwnerCapital)
+        {
             let (finance, capital): (i64, i64) = sqlx::query_as(
                 r#"
                 SELECT
@@ -290,7 +300,10 @@ impl DataResetRepository {
             warnings.push("Produk akan diarsipkan, bukan dihapus. Histori penjualan, resep versi lama, dan audit tetap aman.".to_owned());
         }
         if scopes.contains(&ResetScope::Inventory) {
-            warnings.push("Stok aktif dikembalikan ke 0. Mutasi stok lama tetap tersimpan sebagai histori.".to_owned());
+            warnings.push(
+                "Stok aktif dikembalikan ke 0. Mutasi stok lama tetap tersimpan sebagai histori."
+                    .to_owned(),
+            );
         }
 
         let labels = scopes.iter().map(|scope| scope.label_id()).collect();
@@ -350,9 +363,19 @@ impl DataResetRepository {
         .execute(&self.db)
         .await?;
 
-        let effective_on = request.effective_on.unwrap_or_else(|| Utc::now().date_naive());
+        let effective_on = request
+            .effective_on
+            .unwrap_or_else(|| Utc::now().date_naive());
         let result = self
-            .run_scopes(actor_id, business_id, organization_id, batch_id, effective_on, request.reason.trim(), &scopes)
+            .run_scopes(
+                actor_id,
+                business_id,
+                organization_id,
+                batch_id,
+                effective_on,
+                request.reason.trim(),
+                &scopes,
+            )
             .await;
 
         match result {
@@ -438,7 +461,9 @@ impl DataResetRepository {
             affected.insert("sales_transactions".to_owned(), json!(count));
         }
 
-        if scopes.contains(&ResetScope::FinanceActivity) || scopes.contains(&ResetScope::OwnerCapital) {
+        if scopes.contains(&ResetScope::FinanceActivity)
+            || scopes.contains(&ResetScope::OwnerCapital)
+        {
             let mut tx = self.db.begin().await?;
             let (finance_count, capital_count) = compensate_finance_entries_tx(
                 &mut tx,
@@ -464,7 +489,10 @@ impl DataResetRepository {
         if scopes.contains(&ResetScope::Inventory) {
             affected.insert(
                 "inventory_records".to_owned(),
-                json!(self.reset_inventory(actor_id, business_id, organization_id, batch_id, reason).await?),
+                json!(
+                    self.reset_inventory(actor_id, business_id, organization_id, batch_id, reason)
+                        .await?
+                ),
             );
         }
 
@@ -655,7 +683,11 @@ impl DataResetRepository {
     }
 }
 
-async fn ensure_business(db: &PgPool, business_id: Uuid, organization_id: Uuid) -> Result<(), ResetError> {
+async fn ensure_business(
+    db: &PgPool,
+    business_id: Uuid,
+    organization_id: Uuid,
+) -> Result<(), ResetError> {
     let exists: bool = sqlx::query_scalar(
         "SELECT EXISTS(SELECT 1 FROM businesses WHERE id=$1 AND organization_id=$2 AND status<>'archived')",
     )
@@ -663,28 +695,46 @@ async fn ensure_business(db: &PgPool, business_id: Uuid, organization_id: Uuid) 
     .bind(organization_id)
     .fetch_one(db)
     .await?;
-    if exists { Ok(()) } else { Err(ResetError::NotFound) }
+    if exists {
+        Ok(())
+    } else {
+        Err(ResetError::NotFound)
+    }
 }
 
 fn normalize_scopes(scopes: &[ResetScope]) -> Result<Vec<ResetScope>, ResetError> {
     let mut out = Vec::new();
     for scope in scopes {
-        if !out.contains(scope) { out.push(*scope); }
+        if !out.contains(scope) {
+            out.push(*scope);
+        }
     }
-    if out.is_empty() { return Err(ResetError::Validation("reset_scope_required")); }
+    if out.is_empty() {
+        return Err(ResetError::Validation("reset_scope_required"));
+    }
     Ok(out)
 }
 
 fn validate_request(request: &ResetRequest) -> Result<(), ResetError> {
     let reason = request.reason.trim();
-    if reason.chars().count() < 3 { return Err(ResetError::Validation("reset_reason_required")); }
-    if reason.chars().count() > MAX_REASON_LEN { return Err(ResetError::Validation("reset_reason_too_long")); }
-    if request.scopes.is_empty() { return Err(ResetError::Validation("reset_scope_required")); }
+    if reason.chars().count() < 3 {
+        return Err(ResetError::Validation("reset_reason_required"));
+    }
+    if reason.chars().count() > MAX_REASON_LEN {
+        return Err(ResetError::Validation("reset_reason_too_long"));
+    }
+    if request.scopes.is_empty() {
+        return Err(ResetError::Validation("reset_scope_required"));
+    }
     let confirmation = request.confirmation.trim();
     if confirmation.is_empty() {
         return Err(ResetError::Validation("reset_confirmation_required"));
     }
-    let unique = request.scopes.iter().collect::<std::collections::HashSet<_>>().len();
+    let unique = request
+        .scopes
+        .iter()
+        .collect::<std::collections::HashSet<_>>()
+        .len();
     if unique >= FULL_SCOPE_COUNT {
         if confirmation != FULL_CONFIRMATION {
             return Err(ResetError::Validation("reset_full_confirmation_required"));
@@ -714,14 +764,18 @@ fn child_uuid(batch_id: Uuid, item_id: Uuid, label: &[u8]) -> Uuid {
     digest.update(item_id.as_bytes());
     digest.update(label);
     let bytes = digest.finalize();
-    let mut value=[0u8;16];
+    let mut value = [0u8; 16];
     value.copy_from_slice(&bytes[..16]);
-    value[6]=(value[6]&0x0f)|0x50;
-    value[8]=(value[8]&0x3f)|0x80;
+    value[6] = (value[6] & 0x0f) | 0x50;
+    value[8] = (value[8] & 0x3f) | 0x80;
     Uuid::from_bytes(value)
 }
 
-async fn load_existing_batch(db: &PgPool, business_id: Uuid, idempotency_key: Uuid) -> Result<Option<ExistingBatch>, ResetError> {
+async fn load_existing_batch(
+    db: &PgPool,
+    business_id: Uuid,
+    idempotency_key: Uuid,
+) -> Result<Option<ExistingBatch>, ResetError> {
     sqlx::query_as::<_, ExistingBatch>(
         "SELECT id,status,request_hash,scopes,reason,affected_counts,error_code,started_at,completed_at FROM business_data_reset_batches WHERE business_id=$1 AND idempotency_key=$2",
     )
@@ -735,14 +789,14 @@ async fn load_existing_batch(db: &PgPool, business_id: Uuid, idempotency_key: Uu
 impl ExistingBatch {
     fn into_record(self) -> ResetBatchRecord {
         ResetBatchRecord {
-            id:self.id,
-            status:self.status,
-            scopes:serde_json::from_value(self.scopes).unwrap_or_default(),
-            affected_counts:self.affected_counts,
-            reason:self.reason,
-            error_code:self.error_code,
-            started_at:self.started_at,
-            completed_at:self.completed_at,
+            id: self.id,
+            status: self.status,
+            scopes: serde_json::from_value(self.scopes).unwrap_or_default(),
+            affected_counts: self.affected_counts,
+            reason: self.reason,
+            error_code: self.error_code,
+            started_at: self.started_at,
+            completed_at: self.completed_at,
         }
     }
 }
@@ -757,7 +811,7 @@ async fn compensate_finance_entries_tx(
     reason: &str,
     reset_finance: bool,
     reset_capital: bool,
-) -> Result<(i64,i64),ResetError> {
+) -> Result<(i64, i64), ResetError> {
     let entries = sqlx::query_as::<_, ResetFinanceEntry>(
         r#"
         SELECT entry.id,entry.entry_type,entry.account_key,entry.amount,entry.occurred_on,
@@ -784,14 +838,14 @@ async fn compensate_finance_entries_tx(
     .fetch_all(&mut **tx)
     .await?;
 
-    let mut finance_count=0_i64;
-    let mut capital_count=0_i64;
+    let mut finance_count = 0_i64;
+    let mut capital_count = 0_i64;
 
     for entry in entries {
-        let reversal_id=Uuid::new_v4();
-        let command_id=Uuid::new_v4();
-        let idempotency_key=child_uuid(batch_id,entry.id,b"finance");
-        let request_hash=hash_child_request(batch_id,entry.id,reason);
+        let reversal_id = Uuid::new_v4();
+        let command_id = Uuid::new_v4();
+        let idempotency_key = child_uuid(batch_id, entry.id, b"finance");
+        let request_hash = hash_child_request(batch_id, entry.id, reason);
 
         sqlx::query(
             r#"
@@ -834,21 +888,28 @@ async fn compensate_finance_entries_tx(
             ON CONFLICT (original_entry_id) DO NOTHING
             "#,
         )
-        .bind(Uuid::new_v4()).bind(business_id).bind(organization_id).bind(command_id)
-        .bind(entry.id).bind(reversal_id).bind(reason.trim())
+        .bind(Uuid::new_v4())
+        .bind(business_id)
+        .bind(organization_id)
+        .bind(command_id)
+        .bind(entry.id)
+        .bind(reversal_id)
+        .bind(reason.trim())
         .bind(json!({
             "entry_type":entry.entry_type,"account_key":entry.account_key,
             "amount":entry.amount,"occurred_on":entry.occurred_on,
             "effect_multiplier":entry.effect_multiplier
         }))
-        .bind(actor_id).execute(&mut **tx).await?;
+        .bind(actor_id)
+        .execute(&mut **tx)
+        .await?;
 
         let allocations=sqlx::query_as::<_,(String,i64)>(
             "SELECT bucket,amount_delta FROM business_allocation_movements WHERE finance_entry_id=$1"
         )
         .bind(entry.id).fetch_all(&mut **tx).await?;
 
-        for (bucket,delta) in allocations {
+        for (bucket, delta) in allocations {
             sqlx::query(
                 r#"
                 INSERT INTO business_allocation_movements (
@@ -857,42 +918,56 @@ async fn compensate_finance_entries_tx(
                 ) VALUES ($1,$2,$3,$4,$5,NULL,$6,'business_data_reset',$7,$8,$9)
                 "#,
             )
-            .bind(Uuid::new_v4()).bind(business_id).bind(organization_id).bind(bucket)
-            .bind(-delta).bind(command_id).bind(reversal_id).bind(format!("Reset data usaha: {reason}"))
-            .bind(actor_id).execute(&mut **tx).await?;
+            .bind(Uuid::new_v4())
+            .bind(business_id)
+            .bind(organization_id)
+            .bind(bucket)
+            .bind(-delta)
+            .bind(command_id)
+            .bind(reversal_id)
+            .bind(format!("Reset data usaha: {reason}"))
+            .bind(actor_id)
+            .execute(&mut **tx)
+            .await?;
         }
 
-        if entry.is_capital() { capital_count+=1; } else { finance_count+=1; }
+        if entry.is_capital() {
+            capital_count += 1;
+        } else {
+            finance_count += 1;
+        }
     }
-    Ok((finance_count,capital_count))
+    Ok((finance_count, capital_count))
 }
 
 async fn hash_child_request(batch_id: Uuid, entry_id: Uuid, reason: &str) -> String {
-    let mut h=Sha256::new();
-    h.update(batch_id.as_bytes()); h.update(entry_id.as_bytes()); h.update(reason.as_bytes());
-    format!("{:x}",h.finalize())
+    let mut h = Sha256::new();
+    h.update(batch_id.as_bytes());
+    h.update(entry_id.as_bytes());
+    h.update(reason.as_bytes());
+    format!("{:x}", h.finalize())
 }
 
-fn reset_error_code(error:&ResetError)->&'static str {
+fn reset_error_code(error: &ResetError) -> &'static str {
     match error {
-        ResetError::Validation(code)|ResetError::Conflict(code)=>code,
-        ResetError::NotFound=>"business_not_found",
-        ResetError::Database=>"business_data_reset_storage_unavailable",
-        ResetError::Sales(error)=>match error {
-            SaleRepositoryError::Validation(code)=>code,
-            SaleRepositoryError::NotFound=>"business_sale_resource_not_found",
-            SaleRepositoryError::IncompleteCosting=>"sale_costing_incomplete",
-            SaleRepositoryError::InsufficientStock=>"sale_inventory_insufficient",
-            SaleRepositoryError::IdempotencyConflict=>"idempotency_conflict",
-            SaleRepositoryError::AlreadyVoided=>"sale_already_voided",
-            SaleRepositoryError::Database=>"business_sale_storage_unavailable",
+        ResetError::Validation(code) | ResetError::Conflict(code) => code,
+        ResetError::NotFound => "business_not_found",
+        ResetError::Database => "business_data_reset_storage_unavailable",
+        ResetError::Sales(error) => match error {
+            SaleRepositoryError::Validation(code) => code,
+            SaleRepositoryError::NotFound => "business_sale_resource_not_found",
+            SaleRepositoryError::IncompleteCosting => "sale_costing_incomplete",
+            SaleRepositoryError::InsufficientStock => "sale_inventory_insufficient",
+            SaleRepositoryError::IdempotencyConflict => "idempotency_conflict",
+            SaleRepositoryError::AlreadyVoided => "sale_already_voided",
+            SaleRepositoryError::Database => "business_sale_storage_unavailable",
         },
-        ResetError::Finance(error)=>match error {
-            FinanceCoreError::Validation(code)=>code,
-            FinanceCoreError::NotFound=>"finance_entry_not_found",
-            FinanceCoreError::Conflict=>"finance_command_conflict",
-            FinanceCoreError::Database=>"finance_core_storage_unavailable",
-        }
+        ResetError::Finance(error) => match error {
+            FinanceCoreError::Validation(code) => code,
+            FinanceCoreError::NotFound => "finance_entry_not_found",
+            FinanceCoreError::Conflict => "finance_command_conflict",
+            FinanceCoreError::Database => "finance_core_storage_unavailable",
+        },
     }
 }
 
@@ -902,18 +977,35 @@ mod tests {
 
     #[test]
     fn child_uuid_is_stable() {
-        let batch=Uuid::parse_str("3d69acb2-aed8-4c48-b62d-30034e0440eb").unwrap();
-        let item=Uuid::parse_str("76b836f4-3032-433f-8ac7-04a88f1a8511").unwrap();
-        assert_eq!(child_uuid(batch,item,b"sales"),child_uuid(batch,item,b"sales"));
-        assert_ne!(child_uuid(batch,item,b"sales"),child_uuid(batch,item,b"finance"));
+        let batch = Uuid::parse_str("3d69acb2-aed8-4c48-b62d-30034e0440eb").unwrap();
+        let item = Uuid::parse_str("76b836f4-3032-433f-8ac7-04a88f1a8511").unwrap();
+        assert_eq!(
+            child_uuid(batch, item, b"sales"),
+            child_uuid(batch, item, b"sales")
+        );
+        assert_ne!(
+            child_uuid(batch, item, b"sales"),
+            child_uuid(batch, item, b"finance")
+        );
     }
 
     #[test]
     fn full_reset_requires_explicit_phrase() {
-        let request=ResetRequest{scopes:vec![
-            ResetScope::FinanceActivity,ResetScope::OwnerCapital,ResetScope::SalesTransactions,
-            ResetScope::Inventory,ResetScope::Products,
-        ],reason:"Mulai ulang".into(),confirmation:"reset".into(),effective_on:None};
-        assert_eq!(validate_request(&request),Err(ResetError::Validation("reset_full_confirmation_required")));
+        let request = ResetRequest {
+            scopes: vec![
+                ResetScope::FinanceActivity,
+                ResetScope::OwnerCapital,
+                ResetScope::SalesTransactions,
+                ResetScope::Inventory,
+                ResetScope::Products,
+            ],
+            reason: "Mulai ulang".into(),
+            confirmation: "reset".into(),
+            effective_on: None,
+        };
+        assert_eq!(
+            validate_request(&request),
+            Err(ResetError::Validation("reset_full_confirmation_required"))
+        );
     }
 }

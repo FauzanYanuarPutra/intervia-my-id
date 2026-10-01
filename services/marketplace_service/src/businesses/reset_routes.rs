@@ -20,7 +20,10 @@ use super::{
 
 pub(crate) fn router() -> Router<Arc<AppState>> {
     Router::new()
-        .route("/v1/businesses/{business_id}/data-reset/preview", post(preview))
+        .route(
+            "/v1/businesses/{business_id}/data-reset/preview",
+            post(preview),
+        )
         .route("/v1/businesses/{business_id}/data-reset/apply", post(apply))
 }
 
@@ -68,7 +71,13 @@ async fn apply(
     };
 
     match DataResetRepository::new(state.db.clone())
-        .apply(access.actor_id, business_id, access.organization_id, idempotency_key, request)
+        .apply(
+            access.actor_id,
+            business_id,
+            access.organization_id,
+            idempotency_key,
+            request,
+        )
         .await
     {
         Ok(value) => (StatusCode::OK, Json(json!({"data":value}))).into_response(),
@@ -96,50 +105,88 @@ async fn access_context(
     let actor_id = user_id_from_auth(headers, &state.jwt_secret)
         .ok_or_else(|| api_error(StatusCode::UNAUTHORIZED, "auth_required"))?;
 
-    let identity = IdentityClient::new(state.http_client.clone(), state.identity_service_url.clone());
-    let organizations = identity.list_organizations(authorization).await.map_err(identity_error_response)?;
+    let identity = IdentityClient::new(
+        state.http_client.clone(),
+        state.identity_service_url.clone(),
+    );
+    let organizations = identity
+        .list_organizations(authorization)
+        .await
+        .map_err(identity_error_response)?;
     let repository = BusinessRepository::new(state.db.clone());
 
     let mut selected = None;
     for organization in organizations {
-        match repository.get_for_organization(business_id, organization.id).await {
-            Ok(Some(_)) => { selected=Some(organization); break; }
+        match repository
+            .get_for_organization(business_id, organization.id)
+            .await
+        {
+            Ok(Some(_)) => {
+                selected = Some(organization);
+                break;
+            }
             Ok(None) => {}
             Err(error) => return Err(repository_error_response(error)),
         }
     }
 
-    let organization = selected.ok_or_else(|| api_error(StatusCode::NOT_FOUND, "business_not_found"))?;
+    let organization =
+        selected.ok_or_else(|| api_error(StatusCode::NOT_FOUND, "business_not_found"))?;
 
-    for scope in scopes.iter().copied().collect::<std::collections::HashSet<_>>() {
+    for scope in scopes
+        .iter()
+        .copied()
+        .collect::<std::collections::HashSet<_>>()
+    {
         let allowed = match scope {
-            ResetScope::FinanceActivity | ResetScope::OwnerCapital => organization.can_reset_finance_data(),
+            ResetScope::FinanceActivity | ResetScope::OwnerCapital => {
+                organization.can_reset_finance_data()
+            }
             ResetScope::SalesTransactions => organization.can_reset_sales_data(),
             ResetScope::Inventory => organization.can_reset_inventory_data(),
             ResetScope::Products => organization.can_reset_catalog_data(),
         };
         if !allowed {
-            return Err(api_error(StatusCode::FORBIDDEN, "business_data_reset_permission_denied"));
+            return Err(api_error(
+                StatusCode::FORBIDDEN,
+                "business_data_reset_permission_denied",
+            ));
         }
     }
 
-    let unique_scope_count = scopes.iter().collect::<std::collections::HashSet<_>>().len();
+    let unique_scope_count = scopes
+        .iter()
+        .collect::<std::collections::HashSet<_>>()
+        .len();
     if unique_scope_count >= 5 && !organization.can_start_fresh() {
-        return Err(api_error(StatusCode::FORBIDDEN, "business_start_fresh_permission_denied"));
+        return Err(api_error(
+            StatusCode::FORBIDDEN,
+            "business_start_fresh_permission_denied",
+        ));
     }
 
-    Ok(ResetAccessContext{actor_id,organization_id:organization.id})
+    Ok(ResetAccessContext {
+        actor_id,
+        organization_id: organization.id,
+    })
 }
 
 fn identity_error_response(error: IdentityClientError) -> Response {
     match error {
-        IdentityClientError::AccessDenied => api_error(StatusCode::FORBIDDEN, "identity_access_denied"),
-        IdentityClientError::Unavailable | IdentityClientError::InvalidResponse => api_error(StatusCode::SERVICE_UNAVAILABLE, "identity_unavailable"),
+        IdentityClientError::AccessDenied => {
+            api_error(StatusCode::FORBIDDEN, "identity_access_denied")
+        }
+        IdentityClientError::Unavailable | IdentityClientError::InvalidResponse => {
+            api_error(StatusCode::SERVICE_UNAVAILABLE, "identity_unavailable")
+        }
     }
 }
 
 fn repository_error_response(_error: RepositoryError) -> Response {
-    api_error(StatusCode::SERVICE_UNAVAILABLE, "business_storage_unavailable")
+    api_error(
+        StatusCode::SERVICE_UNAVAILABLE,
+        "business_storage_unavailable",
+    )
 }
 
 fn reset_error_response(error: ResetError) -> Response {
@@ -148,8 +195,13 @@ fn reset_error_response(error: ResetError) -> Response {
         ResetError::NotFound => api_error(StatusCode::NOT_FOUND, "business_not_found"),
         ResetError::Conflict(code) => api_error(StatusCode::CONFLICT, code),
         ResetError::Sales(_) => api_error(StatusCode::CONFLICT, "business_data_reset_sales_failed"),
-        ResetError::Finance(_) => api_error(StatusCode::CONFLICT, "business_data_reset_finance_failed"),
-        ResetError::Database => api_error(StatusCode::SERVICE_UNAVAILABLE, "business_data_reset_storage_unavailable"),
+        ResetError::Finance(_) => {
+            api_error(StatusCode::CONFLICT, "business_data_reset_finance_failed")
+        }
+        ResetError::Database => api_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "business_data_reset_storage_unavailable",
+        ),
     }
 }
 
