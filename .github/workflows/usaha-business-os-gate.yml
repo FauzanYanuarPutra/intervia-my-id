@@ -102,7 +102,7 @@ jobs:
     name: Usaha business OS gate
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    if: always()
+    if: ${{ always() && !cancelled() }}
     needs: [contract, frontend]
     steps:
       - name: Require contract and frontend validation
