@@ -51,9 +51,10 @@ function categoryHref(
   category: LajukanExploreCategory,
   intent: HubIntent,
 ): string {
-  return intent === 'demand'
-    ? buildCategorySearchHref({ category, side: 'demand' })
-    : buildExploreCategoryHref(category);
+  return buildCategorySearchHref({
+    category,
+    side: intent,
+  });
 }
 
 function CategoryCard({
