@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { AlertTriangle, CheckCircle2, DatabaseBackup, LockKeyhole, RotateCcw, ShieldCheck } from 'lucide-react';
 import type { BusinessResetPreview, BusinessResetScope, BusinessResetBatch } from '@/lib/business-reset-types';
 import type { BusinessRecord } from '@/lib/portal-types';
@@ -16,8 +17,6 @@ type ScopeCard = {
   countKey: keyof BusinessResetPreview['counts'];
   allowed: boolean;
 };
-
-const dateToday = new Date().toISOString().slice(0, 10);
 
 class BusinessResetClientError extends Error {
   readonly code: string;
@@ -50,7 +49,8 @@ export function DataResetCenter({ business }: Props) {
   const [selected, setSelected] = useState<BusinessResetScope[]>([]);
   const [reason, setReason] = useState('');
   const [confirmation, setConfirmation] = useState('');
-  const [effectiveOn, setEffectiveOn] = useState(dateToday);
+  const router = useRouter();
+  const [effectiveOn, setEffectiveOn] = useState('');
   const [preview, setPreview] = useState<BusinessResetPreview | null>(null);
   const [lastResult, setLastResult] = useState<BusinessResetBatch | null>(null);
   const [busy, setBusy] = useState<'preview' | 'apply' | null>(null);
@@ -138,7 +138,7 @@ export function DataResetCenter({ business }: Props) {
       scopes: selected,
       reason: reason.trim(),
       confirmation: confirmation.trim(),
-      effective_on: effectiveOn || dateToday,
+      effective_on: effectiveOn || undefined,
     };
   }
 
@@ -178,6 +178,7 @@ export function DataResetCenter({ business }: Props) {
       if (!result.ok) throw new BusinessResetClientError(payload?.error || 'reset_failed');
       setLastResult(payload.data as BusinessResetBatch);
       setPreview(null);
+      router.refresh();
     } catch (cause) {
       const code = cause instanceof BusinessResetClientError ? cause.code : 'reset_failed';
       const messages: Record<string, string> = {
@@ -186,6 +187,7 @@ export function DataResetCenter({ business }: Props) {
         business_start_fresh_permission_denied: 'Mulai dari nol hanya boleh dilakukan pemilik usaha.',
         reset_full_confirmation_required: 'Untuk reset lengkap, ketik persis: MULAI DARI NOL.',
         reset_confirmation_required: 'Isi konfirmasi sebelum menjalankan reset.',
+        reset_confirmation_invalid: 'Untuk reset sebagian, ketik persis: RESET.',
         reset_idempotency_conflict: 'Permintaan reset dengan kunci yang sama tetapi isi berbeda ditolak.',
       };
       setError(messages[code] ?? (cause instanceof Error ? cause.message : 'Reset gagal.'));
@@ -201,7 +203,8 @@ export function DataResetCenter({ business }: Props) {
   const effectiveReason = reason.trim().length >= 3;
   const canPreview = selectedCount > 0 && effectiveReason && blocked.length === 0;
   const requiredConfirmation = fullPhraseRequired ? 'MULAI DARI NOL' : 'RESET';
-  const canApply = Boolean(preview?.can_apply) && canPreview && confirmation.trim() === requiredConfirmation;
+  const fullResetBlocked = isFull && !fullResetAvailable;
+  const canApply = Boolean(preview?.can_apply) && canPreview && !fullResetBlocked && confirmation.trim() === requiredConfirmation;
 
   return (
     <div className="space-y-4">
@@ -316,7 +319,13 @@ export function DataResetCenter({ business }: Props) {
             </div>
           </div>
 
-          {fullPhraseRequired ? (
+          {fullResetBlocked ? (
+            <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs leading-5 text-rose-800">
+              <strong>Reset semua bagian sekaligus hanya boleh dilakukan Owner.</strong> Kurangi pilihan scope atau minta Owner menjalankan “Mulai dari nol”.
+            </div>
+          ) : null}
+
+          {fullPhraseRequired && fullResetAvailable ? (
             <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
               <div className="flex gap-2">
                 <LockKeyhole className="mt-0.5 h-4 w-4 shrink-0" />
