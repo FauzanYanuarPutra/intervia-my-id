@@ -84,7 +84,8 @@ function readTextArrays(
   });
 }
 
-function usableImage(value: string): boolean {
+function usableImage(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
   const normalized = value.trim();
   if (!normalized) return false;
 
