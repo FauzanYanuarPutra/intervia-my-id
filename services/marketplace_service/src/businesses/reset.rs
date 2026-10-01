@@ -52,6 +52,7 @@ pub(crate) struct ResetCounts {
     pub(crate) finance_activity: i64,
     pub(crate) owner_capital: i64,
     pub(crate) sales_transactions: i64,
+    pub(crate) protected_order_linked_sales: i64,
     pub(crate) inventory_product_records: i64,
     pub(crate) inventory_ingredient_records: i64,
     pub(crate) active_products: i64,
@@ -212,7 +213,15 @@ impl DataResetRepository {
 
         if scopes.contains(&ResetScope::SalesTransactions) {
             counts.sales_transactions = sqlx::query_scalar(
-                "SELECT COUNT(*) FROM business_sales WHERE business_id=$1 AND organization_id=$2 AND status='completed'",
+                "SELECT COUNT(*) FROM business_sales WHERE business_id=$1 AND organization_id=$2 AND status='completed' AND source_order_id IS NULL'",
+            )
+            .bind(business_id)
+            .bind(organization_id)
+            .fetch_one(&self.db)
+            .await?;
+
+            counts.protected_order_linked_sales = sqlx::query_scalar(
+                "SELECT COUNT(*) FROM business_sales WHERE business_id=$1 AND organization_id=$2 AND status='completed' AND source_order_id IS NOT NULL",
             )
             .bind(business_id)
             .bind(organization_id)
@@ -251,6 +260,12 @@ impl DataResetRepository {
                 warnings.push(format!(
                     "{} transaksi berada pada periode/hari yang ditutup. Buka dulu sebelum mereset transaksi.",
                     counts.sales_in_closed_period
+                ));
+            }
+            if counts.protected_order_linked_sales > 0 {
+                warnings.push(format!(
+                    "{} transaksi terhubung ke pesanan/order dan tidak ikut di-void massal; selesaikan lewat flow pesanan.",
+                    counts.protected_order_linked_sales
                 ));
             }
         }
@@ -451,7 +466,7 @@ impl DataResetRepository {
 
         if scopes.contains(&ResetScope::SalesTransactions) {
             let ids = sqlx::query_scalar::<_, Uuid>(
-                "SELECT id FROM business_sales WHERE business_id=$1 AND organization_id=$2 AND status='completed' ORDER BY occurred_on,created_at,id",
+                "SELECT id FROM business_sales WHERE business_id=$1 AND organization_id=$2 AND status='completed' AND source_order_id IS NULL ORDER BY occurred_on,created_at,id",
             )
             .bind(business_id)
             .bind(organization_id)
