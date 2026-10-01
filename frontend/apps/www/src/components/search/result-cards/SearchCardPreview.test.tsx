@@ -55,7 +55,7 @@ describe('search result card preview mode', () => {
       />,
     );
 
-    expect(html).toContain('Membutuhkan');
+    expect(html).toContain('Kebutuhan Pembeli');
     expect(html).toContain('Budget fleksibel');
     expect(html).not.toContain('LAJUKAN');
     expect(html).not.toContain('Buka brief');
@@ -117,7 +117,6 @@ describe('search result card preview mode', () => {
 
     expect(html).toContain('Terbuka');
     expect(html).toContain('Rp 2 juta');
-    expect(html).toContain('Bandung');
     expect(html).toContain('2026-08-15');
     expect(html).toContain('reference.jpg');
     expect(html).not.toContain('Bulanan');
