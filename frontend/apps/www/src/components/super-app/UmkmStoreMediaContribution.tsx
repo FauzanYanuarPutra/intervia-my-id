@@ -31,14 +31,25 @@ export function UmkmStoreMediaContribution({
       uploader_username_snapshot: string | null;
     }>
   >([]);
-  const [queueCount, setQueueCount] = useState(0);
+  const [queueItems, setQueueItems] = useState<
+    Array<{
+      id: string;
+      media_url: string;
+      media_type: string;
+      status: 'pending' | 'approved' | 'rejected' | 'hidden';
+      review_note: string | null;
+      caption: string | null;
+      uploader_name_snapshot: string | null;
+      uploader_username_snapshot: string | null;
+    }>
+  >([]);
   const [isStoreOwner, setIsStoreOwner] = useState(false);
   const [statusLoading, setStatusLoading] = useState(false);
 
   const loadContributionStatus = useCallback(async () => {
     if (!user) {
       setViewerItems([]);
-      setQueueCount(0);
+      setQueueItems([]);
       setIsStoreOwner(false);
       return;
     }
@@ -63,8 +74,8 @@ export function UmkmStoreMediaContribution({
 
       const viewer = payload.data?.viewer;
       setViewerItems(Array.isArray(viewer?.my_items) ? viewer.my_items : []);
-      setQueueCount(
-        Array.isArray(viewer?.queue_items) ? viewer.queue_items.length : 0,
+      setQueueItems(
+        Array.isArray(viewer?.queue_items) ? viewer.queue_items : [],
       );
       setIsStoreOwner(Boolean(viewer?.is_store_owner));
     } catch {
@@ -225,7 +236,7 @@ export function UmkmStoreMediaContribution({
         </div>
       ) : null}
 
-      {user && viewerItems.length > 0 ? (
+      {user && (viewerItems.length > 0 || (isStoreOwner && queueItems.length > 0)) ? (
         <div className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 dark:border-slate-700 dark:bg-slate-800/60">
           <div className="mb-2 flex items-center justify-between gap-2">
             <div className="min-w-0">
@@ -238,9 +249,9 @@ export function UmkmStoreMediaContribution({
                   : 'New photos appear publicly after approval.'}
               </p>
             </div>
-            {isStoreOwner && queueCount > 0 ? (
+            {isStoreOwner && queueItems.length > 0 ? (
               <span className="shrink-0 rounded-full bg-amber-100 px-2 py-1 text-[9px] font-extrabold text-amber-800 dark:bg-amber-500/15 dark:text-amber-200">
-                {queueCount} {isId ? 'menunggu' : 'pending'}
+                {queueItems.length} {isId ? 'di antrean' : 'in review queue'}
               </span>
             ) : null}
           </div>
@@ -279,6 +290,52 @@ export function UmkmStoreMediaContribution({
               </div>
             ))}
           </div>
+
+          {isStoreOwner && queueItems.length > 0 ? (
+            <div className="mt-3 border-t border-slate-200 pt-2.5 dark:border-slate-700">
+              <div className="mb-2">
+                <p className="text-[10px] font-extrabold text-slate-800 dark:text-slate-100">
+                  {isId ? 'Antrean review toko' : 'Store review queue'}
+                </p>
+                <p className="mt-0.5 text-[9px] font-medium text-slate-500 dark:text-slate-400">
+                  {isId
+                    ? 'Kontribusi pengguna menunggu pemeriksaan Lajukan. Pemilik tidak perlu menyetujui manual.'
+                    : 'Community contributions are waiting for Lajukan review. The owner does not need to approve them manually.'}
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                {queueItems.slice(0, 4).map(item => (
+                  <div key={item.id} className="flex min-w-0 items-center gap-2 rounded-lg bg-white p-2 ring-1 ring-black/5 dark:bg-slate-900 dark:ring-white/5">
+                    <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-slate-100 dark:bg-slate-800">
+                      {item.media_url ? (
+                        <img src={item.media_url} alt="" className="h-full w-full object-cover" />
+                      ) : null}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[9px] font-extrabold text-slate-700 dark:text-slate-200">
+                        {item.uploader_name_snapshot ||
+                          (item.uploader_username_snapshot
+                            ? '@' + item.uploader_username_snapshot
+                            : isId
+                              ? 'Pengguna Lajukan'
+                              : 'Lajukan user')}
+                      </p>
+                      <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                        <span className={`inline-flex rounded-full px-2 py-1 text-[9px] font-extrabold ${statusClass(item.status)}`}>
+                          {statusLabel(item.status)}
+                        </span>
+                        {item.review_note ? (
+                          <span className="min-w-0 truncate text-[9px] font-semibold text-slate-500 dark:text-slate-400">
+                            {item.review_note}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>
