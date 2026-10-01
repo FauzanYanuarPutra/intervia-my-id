@@ -219,10 +219,16 @@ services:
       APP_ENV: development
       NODE_ENV: production
       NEXT_PUBLIC_APP_ENV: development
+      # Personal AI data is stored in the marketplace PostgreSQL database.
+      # Keep the same contract as staging/production so the dev WWW container
+      # never falls back to the production-disabled file store.
+      SUPER_APP_POSTGRES_URL: postgres://${DB_USER:-lajukan}:${DB_PASS:-lajukan-dev-postgres}@marketplace_db:5432/marketplace_db
       # Leave callback empty by default so public tunnel requests derive the
       # callback from their trusted www.lajukan.com origin. Explicit local
       # development may still set this variable to a localhost callback.
       WWW_GOOGLE_REDIRECT_URI: ${WWW_GOOGLE_REDIRECT_URI:-}
+    depends_on:
+      marketplace_migration: { condition: service_completed_successfully }
     ports:
       - "127.0.0.1:${PORT_FRONTEND:-3000}:3000"
 
