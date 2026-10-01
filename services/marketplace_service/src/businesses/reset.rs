@@ -15,7 +15,7 @@ const MAX_REASON_LEN: usize = 2_000;
 const FULL_SCOPE_COUNT: usize = 5;
 const FULL_CONFIRMATION: &str = "MULAI DARI NOL";
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum ResetScope {
     FinanceActivity,
