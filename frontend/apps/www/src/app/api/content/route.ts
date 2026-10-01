@@ -1518,6 +1518,7 @@ export async function GET(req: NextRequest) {
     searchParams.set('side', requestedMarketplaceSide);
   }
   normalizeBooleanQueryParam(searchParams, 'marketplace_only');
+  const marketplaceOnly = isEnabledFlag(searchParams.get('marketplace_only'));
   const requestedLimit = parseSafeInt(searchParams.get('limit'), 20, 1, 100);
   const rawOffsetText = (searchParams.get('offset') || '0').trim();
   const rawOffset = Number(rawOffsetText);
@@ -1606,6 +1607,7 @@ export async function GET(req: NextRequest) {
     resolvedPayload = { ...resolvedPayload, items: resolvedItems };
 
     const shouldIncludeDiscoverCandidates =
+      !marketplaceOnly &&
       !databaseOnly &&
       (requestedType === 'all' ||
         requestedType === 'service' ||
