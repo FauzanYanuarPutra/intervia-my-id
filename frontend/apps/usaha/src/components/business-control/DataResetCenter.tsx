@@ -1,0 +1,398 @@
+'use client';
+
+import { useMemo, useState } from 'react';
+import { AlertTriangle, CheckCircle2, DatabaseBackup, LockKeyhole, RotateCcw, ShieldCheck } from 'lucide-react';
+import { BusinessResetHttpError, type BusinessResetPreview, type BusinessResetScope, type BusinessResetBatch } from '@/lib/business-reset-server';
+import type { BusinessRecord } from '@/lib/portal-types';
+
+type Props = {
+  business: BusinessRecord;
+};
+
+type ScopeCard = {
+  id: BusinessResetScope;
+  title: string;
+  description: string;
+  countKey: keyof BusinessResetPreview['counts'];
+  allowed: boolean;
+};
+
+const dateToday = new Date().toISOString().slice(0, 10);
+
+function canByRole(business: BusinessRecord, scope: BusinessResetScope) {
+  switch (scope) {
+    case 'finance_activity':
+    case 'owner_capital':
+      return ['owner', 'manager', 'accounting'].includes(business.currentRole);
+    case 'sales_transactions':
+    case 'products':
+      return ['owner', 'manager'].includes(business.currentRole);
+    case 'inventory':
+      return ['owner', 'manager', 'inventory'].includes(business.currentRole);
+    default:
+      return false;
+  }
+}
+
+function canStartFresh(business: BusinessRecord) {
+  return business.currentRole === 'owner';
+}
+
+export function DataResetCenter({ business }: Props) {
+  const [selected, setSelected] = useState<BusinessResetScope[]>([]);
+  const [reason, setReason] = useState('');
+  const [confirmation, setConfirmation] = useState('');
+  const [effectiveOn, setEffectiveOn] = useState(dateToday);
+  const [preview, setPreview] = useState<BusinessResetPreview | null>(null);
+  const [lastResult, setLastResult] = useState<BusinessResetBatch | null>(null);
+  const [busy, setBusy] = useState<'preview' | 'apply' | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const scopes = useMemo<ScopeCard[]>(
+    () => [
+      {
+        id: 'finance_activity',
+        title: 'Aktivitas uang',
+        description: 'Batalkan dampak catatan pemasukan/pengeluaran manual yang boleh dikoreksi. Histori tetap tersimpan.',
+        countKey: 'finance_activity',
+        allowed: canByRole(business, 'finance_activity'),
+      },
+      {
+        id: 'owner_capital',
+        title: 'Modal pemilik',
+        description: 'Balikkan catatan modal masuk dan pengambilan pemilik. Ini tidak menghapus profil usaha.',
+        countKey: 'owner_capital',
+        allowed: canByRole(business, 'owner_capital'),
+      },
+      {
+        id: 'sales_transactions',
+        title: 'Transaksi penjualan',
+        description: 'Void semua transaksi penjualan yang masih terbuka. Stok dan uang ikut dikoreksi lewat flow transaksi.',
+        countKey: 'sales_transactions',
+        allowed: canByRole(business, 'sales_transactions'),
+      },
+      {
+        id: 'inventory',
+        title: 'Stok & bahan',
+        description: 'Set stok aktif menjadi 0 sambil menulis bukti penyesuaian stok. Histori mutasi tidak dihapus.',
+        countKey: 'inventory_product_records',
+        allowed: canByRole(business, 'inventory'),
+      },
+      {
+        id: 'products',
+        title: 'Produk & resep',
+        description: 'Arsipkan produk aktif dan pensiunkan resep aktif. Histori produk lama tetap aman.',
+        countKey: 'active_products',
+        allowed: canByRole(business, 'products'),
+      },
+    ],
+    [business],
+  );
+
+  const allAvailableSelected =
+    scopes.every(scope => !scope.allowed || selected.includes(scope.id)) &&
+    scopes.some(scope => scope.allowed) &&
+    scopes.filter(scope => scope.allowed).every(scope => selected.includes(scope.id));
+
+  const fullResetAvailable =
+    canStartFresh(business) && scopes.every(scope => scope.allowed);
+
+  function toggleScope(scope: BusinessResetScope) {
+    setPreview(null);
+    setError(null);
+    setSelected(current =>
+      current.includes(scope)
+        ? current.filter(item => item !== scope)
+        : [...current, scope],
+    );
+  }
+
+  function selectAll() {
+    setPreview(null);
+    setError(null);
+    setSelected(scopes.filter(scope => scope.allowed).map(scope => scope.id));
+  }
+
+  function clearSelection() {
+    setPreview(null);
+    setError(null);
+    setSelected([]);
+    setConfirmation('');
+  }
+
+  function buildPayload(): {
+    scopes: BusinessResetScope[];
+    reason: string;
+    confirmation: string;
+    effective_on: string;
+  } {
+    return {
+      scopes: selected,
+      reason: reason.trim(),
+      confirmation: confirmation.trim(),
+      effective_on: effectiveOn || dateToday,
+    };
+  }
+
+  async function doPreview() {
+    setBusy('preview');
+    setError(null);
+    try {
+      const result = await fetch('/api/businesses/' + encodeURIComponent(business.id) + '/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'preview', ...buildPayload() }),
+      });
+      const payload = await result.json().catch(() => ({}));
+      if (!result.ok) throw new BusinessResetHttpError(result.status, payload?.error || 'preview_failed');
+      setPreview(payload.data as BusinessResetPreview);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Tidak bisa memuat preview reset.');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function applyReset() {
+    if (!preview?.can_apply || !selected.length) return;
+    setBusy('apply');
+    setError(null);
+    try {
+      const result = await fetch('/api/businesses/' + encodeURIComponent(business.id) + '/reset', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': crypto.randomUUID(),
+        },
+        body: JSON.stringify({ action: 'apply', ...buildPayload() }),
+      });
+      const payload = await result.json().catch(() => ({}));
+      if (!result.ok) throw new BusinessResetHttpError(result.status, payload?.error || 'reset_failed');
+      setLastResult(payload.data as BusinessResetBatch);
+      setPreview(null);
+    } catch (cause) {
+      const code = cause instanceof BusinessResetHttpError ? cause.code : 'reset_failed';
+      const messages: Record<string, string> = {
+        sales_in_closed_period: 'Ada transaksi pada hari/periode yang sudah ditutup. Buka periode tersebut dulu.',
+        business_data_reset_permission_denied: 'Peranmu tidak punya izin untuk salah satu reset yang dipilih.',
+        business_start_fresh_permission_denied: 'Mulai dari nol hanya boleh dilakukan pemilik usaha.',
+        reset_full_confirmation_required: 'Untuk reset lengkap, ketik persis: MULAI DARI NOL.',
+        reset_confirmation_required: 'Isi konfirmasi sebelum menjalankan reset.',
+        reset_idempotency_conflict: 'Permintaan reset dengan kunci yang sama tetapi isi berbeda ditolak.',
+      };
+      setError(messages[code] ?? (cause instanceof Error ? cause.message : 'Reset gagal.'));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const selectedCount = selected.length;
+  const blocked = scopes.filter(scope => selected.includes(scope.id) && !scope.allowed);
+  const isFull = selectedCount === 5;
+  const fullPhraseRequired = isFull;
+  const effectiveReason = reason.trim().length >= 3;
+  const canPreview = selectedCount > 0 && effectiveReason && blocked.length === 0;
+  const canApply = Boolean(preview?.can_apply) && canPreview && (!fullPhraseRequired || confirmation.trim() === 'MULAI DARI NOL');
+
+  return (
+    <div className="space-y-4">
+      <section className="merchant-surface-bordered overflow-hidden">
+        <div className="border-b border-portal-line/70 bg-[#f8faf7] px-4 py-4 sm:px-5">
+          <div className="flex items-start gap-3">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-50 text-amber-700">
+              <DatabaseBackup className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-[0.12em] text-amber-700">Pemulihan data usaha</p>
+              <h1 className="mt-1 text-lg font-black tracking-tight text-portal-ink sm:text-xl">Reset sebagian atau mulai dari nol</h1>
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-portal-soft">
+                Reset di sini tidak menghapus audit, profil usaha, atau histori. Sistem membuat koreksi/penyesuaian supaya angka operasional kembali bersih.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-3 p-4 sm:p-5">
+          <div className="grid gap-3 lg:grid-cols-2">
+            {scopes.map(scope => {
+              const selectedItem = selected.includes(scope.id);
+              const count = preview?.counts?.[scope.countKey] ?? null;
+              return (
+                <button
+                  key={scope.id}
+                  type="button"
+                  disabled={!scope.allowed || busy !== null}
+                  onClick={() => scope.allowed && toggleScope(scope.id)}
+                  className={[
+                    'text-left rounded-xl border p-4 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-forest/25',
+                    selectedItem ? 'border-portal-forest bg-portal-mist/40' : 'border-portal-line bg-white hover:bg-[#f7f9f6]',
+                    !scope.allowed ? 'cursor-not-allowed opacity-45' : '',
+                  ].join(' ')}
+                >
+                  <div className="flex items-start gap-3">
+                    <span className={'mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-md border ' + (selectedItem ? 'border-portal-forest bg-portal-forest text-white' : 'border-slate-300 bg-white')}>
+                      {selectedItem ? <CheckCircle2 className="h-3.5 w-3.5" /> : null}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="font-black text-portal-ink">{scope.title}</p>
+                        {count !== null ? <span className="text-xs font-black text-portal-forest">{count.toLocaleString('id-ID')}</span> : null}
+                      </div>
+                      <p className="mt-1 text-xs leading-5 text-portal-soft">{scope.description}</p>
+                      {!scope.allowed ? (
+                        <p className="mt-2 text-[11px] font-semibold text-rose-600">Tidak tersedia untuk peran ini.</p>
+                      ) : null}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className="portal-button-secondary" onClick={selectAll} disabled={busy !== null || !scopes.some(scope => scope.allowed)}>
+              {allAvailableSelected ? 'Semua dipilih' : 'Pilih semua yang boleh'}
+            </button>
+            {fullResetAvailable ? (
+              <button type="button" className="portal-button-ghost" onClick={selectAll} disabled={busy !== null}>
+                <RotateCcw className="h-4 w-4" /> Mulai dari nol
+              </button>
+            ) : null}
+            <button type="button" className="portal-button-ghost" onClick={clearSelection} disabled={busy !== null || !selected.length}>
+              Bersihkan pilihan
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {selectedCount ? (
+        <section className="merchant-surface-bordered p-4 sm:p-5">
+          <div className="grid gap-3 lg:grid-cols-[1fr_0.7fr]">
+            <label className="block">
+              <span className="text-xs font-black text-portal-ink">Kenapa perlu di-reset?</span>
+              <textarea
+                value={reason}
+                onChange={event => setReason(event.target.value)}
+                disabled={busy !== null}
+                rows={4}
+                maxLength={2000}
+                placeholder="Contoh: data latihan selesai dan usaha mau mulai pencatatan resmi."
+                className="portal-input mt-2 min-h-28 w-full resize-y"
+              />
+            </label>
+
+            <div className="space-y-3">
+              <label className="block">
+                <span className="text-xs font-black text-portal-ink">Mulai berlaku sejak</span>
+                <input
+                  type="date"
+                  value={effectiveOn}
+                  onChange={event => setEffectiveOn(event.target.value)}
+                  disabled={busy !== null}
+                  className="portal-input mt-2 w-full"
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-black text-portal-ink">
+                  {fullPhraseRequired ? 'Konfirmasi reset lengkap' : 'Konfirmasi reset'}
+                </span>
+                <input
+                  value={confirmation}
+                  onChange={event => setConfirmation(event.target.value)}
+                  disabled={busy !== null}
+                  placeholder={fullPhraseRequired ? 'Ketik: MULAI DARI NOL' : 'Ketik: RESET'}
+                  className="portal-input mt-2 w-full"
+                />
+              </label>
+            </div>
+          </div>
+
+          {fullPhraseRequired ? (
+            <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
+              <div className="flex gap-2">
+                <LockKeyhole className="mt-0.5 h-4 w-4 shrink-0" />
+                <p><strong>Reset lengkap bersifat sensitif.</strong> Hanya Owner yang boleh menjalankan semua lingkup sekaligus. Ketik <strong>MULAI DARI NOL</strong> persis.</p>
+              </div>
+            </div>
+          ) : null}
+
+          {preview ? (
+            <div className="mt-4 rounded-xl border border-portal-line bg-[#f8faf7] p-4">
+              <div className="flex items-start gap-2">
+                <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-portal-forest" />
+                <div>
+                  <p className="font-black text-portal-ink">Preview reset</p>
+                  <p className="mt-0.5 text-xs text-portal-soft">{preview.labels.join(' · ')}</p>
+                </div>
+              </div>
+              {preview.warnings.length ? (
+                <div className="mt-3 space-y-2">
+                  {preview.warnings.map((warning, index) => (
+                    <p key={index} className="flex gap-2 text-xs leading-5 text-amber-800">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                      <span>{warning}</span>
+                    </p>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-3 text-xs text-portal-soft">Tidak ada peringatan tambahan dari data saat ini.</p>
+              )}
+            </div>
+          ) : null}
+
+          {error ? (
+            <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold leading-5 text-rose-700">
+              {error}
+            </div>
+          ) : null}
+
+          {lastResult ? (
+            <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs leading-5 text-emerald-900">
+              <div className="flex gap-2">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+                <div>
+                  <p className="font-black">Reset tercatat</p>
+                  <p className="mt-0.5">ID batch: {lastResult.id}</p>
+                  <p>Status: {lastResult.status}</p>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button type="button" className="portal-button-secondary" disabled={!canPreview || busy !== null} onClick={() => void doPreview()}>
+              {busy === 'preview' ? 'Memeriksa…' : 'Tinjau dulu'}
+            </button>
+            <button type="button" className="portal-button-primary" disabled={!canApply || busy !== null} onClick={() => void applyReset()}>
+              {busy === 'apply' ? 'Menjalankan…' : 'Jalankan reset'}
+            </button>
+          </div>
+          <p className="mt-3 text-[11px] leading-5 text-portal-soft">
+            Reset tidak menghapus histori. Untuk transaksi, sistem memakai flow void/koreksi yang sudah ada agar stok dan uang tidak ikut rusak.
+          </p>
+        </section>
+      ) : (
+        <section className="merchant-surface-bordered p-4 sm:p-5">
+          <p className="text-sm font-black text-portal-ink">Pilih apa yang memang perlu dimulai ulang.</p>
+          <p className="mt-1 text-xs leading-5 text-portal-soft">
+            Kamu bisa mereset hanya modal, hanya stok, hanya transaksi, atau beberapa bagian sekaligus. Tidak perlu mengulang seluruh usaha kalau masalahnya cuma satu area.
+          </p>
+        </section>
+      )}
+
+      <section className="merchant-surface-bordered p-4 sm:p-5">
+        <div className="flex gap-3">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-portal-mist text-portal-forest">
+            <ShieldCheck className="h-4 w-4" />
+          </span>
+          <div>
+            <p className="font-black text-portal-ink">Yang tidak disentuh</p>
+            <p className="mt-1 text-xs leading-5 text-portal-soft">
+              Profil usaha, anggota tim, hak akses, audit trail, histori koreksi, data publik, dan bukti transaksi lama tetap dipertahankan. Tujuannya merapikan keadaan operasional, bukan menghilangkan jejak.
+            </p>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
