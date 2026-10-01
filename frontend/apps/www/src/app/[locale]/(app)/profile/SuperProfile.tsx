@@ -43,6 +43,7 @@ import {
 } from 'lucide-react';
 
 import { ImageCropModal } from '@/components/common/ImageCropModal';
+import { EmblaInlineRail } from '@/components/common/EmblaInlineRail';
 
 import { ProfileFilterStrip } from '@/components/profile/ProfileFilterStrip';
 import { ProfileAiDraftModal } from './ProfileAiDraftModal';
@@ -2405,31 +2406,33 @@ export default function SuperProfile() {
                 </button>
               )}
 
-              <div className="mt-2.5 flex min-w-0 gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {trustSignals
-                  .filter(item => item.active)
-                  .map(item => {
-                    const Icon = item.icon;
-                    return (
-                      <span
-                        key={item.key}
-                        className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300"
-                      >
-                        <Icon className="h-3.5 w-3.5" />
-                        {item.label}
-                      </span>
-                    );
-                  })}
-                {trustSignalCount === 0 ? (
-                  <button
-                    type="button"
-                    onClick={() => openEditModal('trust')}
-                    className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-black text-amber-700 dark:bg-amber-500/10 dark:text-amber-300"
-                  >
-                    <BadgeCheck className="h-3.5 w-3.5" />
-                    {isId ? 'Bangun kepercayaan' : 'Build trust'}
-                  </button>
-                ) : null}
+              <div className="mt-2.5 min-w-0">
+                <EmblaInlineRail contentClassName="items-center gap-1.5 pb-0.5" dragFree>
+                  {trustSignals
+                    .filter(item => item.active)
+                    .map(item => {
+                      const Icon = item.icon;
+                      return (
+                        <span
+                          key={item.key}
+                          className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300"
+                        >
+                          <Icon className="h-3.5 w-3.5" />
+                          {item.label}
+                        </span>
+                      );
+                    })}
+                  {trustSignalCount === 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => openEditModal('trust')}
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-black text-amber-700 dark:bg-amber-500/10 dark:text-amber-300"
+                    >
+                      <BadgeCheck className="h-3.5 w-3.5" />
+                      {isId ? 'Bangun kepercayaan' : 'Build trust'}
+                    </button>
+                  ) : null}
+                </EmblaInlineRail>
               </div>
 
               <div className="mt-3 grid w-full grid-cols-3 divide-x divide-[color:var(--app-border)] overflow-hidden rounded-2xl border border-[color:var(--app-border)] py-2.5 sm:max-w-[560px]">
