@@ -539,6 +539,7 @@ defmodule ChatServiceWeb.RoomChannel do
                   Logger.error("[Scylla] Inbox projection failed: #{inspect(reason)}")
               end
 
+              schedule_message_push(payload, socket.assigns.user_id_bin)
               maybe_reply_as_aida(payload)
             end)
           end
@@ -726,6 +727,42 @@ defmodule ChatServiceWeb.RoomChannel do
   defp media_fallback_text("delivery_update"), do: "Delivery update"
   defp media_fallback_text("job_update"), do: "Job update"
   defp media_fallback_text(_type), do: "Attachment"
+
+  defp schedule_message_push(payload, sender_id_bin) do
+    recipient_ids =
+      payload.room_id
+      |> fetch_room_members()
+      |> Enum.reject(&(&1 == sender_id_bin))
+      |> Enum.map(&Ecto.UUID.cast!/1)
+
+    if recipient_ids != [] do
+      Task.Supervisor.start_child(ChatService.TaskSupervisor, fn ->
+        Enum.each(recipient_ids, fn recipient_id ->
+          push_payload = %{
+            target_user_id: recipient_id,
+            room_id: payload.room_id,
+            sender_id: payload.sender_id,
+            sender_username: Map.get(payload, :sender_username),
+            body: Map.get(payload, :body),
+            message_type: Map.get(payload, :message_type)
+          }
+
+          case PushNotifier.chat_message(push_payload) do
+            :ok ->
+              :ok
+
+            :disabled ->
+              :ok
+
+            {:error, reason} ->
+              Logger.debug("[PushNotifier] chat push skipped: #{inspect(reason)}")
+          end
+        end)
+      end)
+    end
+
+    :ok
+  end
 
   defp update_inbox_and_unread(m, sender_id_bin) do
     with {:ok, members} <- fetch_room_members_result(m.room_id),
