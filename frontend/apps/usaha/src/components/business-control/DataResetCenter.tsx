@@ -27,6 +27,37 @@ class BusinessResetClientError extends Error {
   }
 }
 
+const RESET_ERROR_MESSAGES: Record<string, string> = {
+  auth_required: 'Sesi login tidak tersedia. Masuk lagi lalu coba ulang.',
+  business_not_found: 'Usaha tidak ditemukan atau aksesnya sudah berubah.',
+  identity_unavailable: 'Layanan identitas sedang belum siap. Coba lagi setelah layanan usaha selesai start.',
+  business_storage_unavailable: 'Penyimpanan usaha belum siap. Restart stack agar migrasi marketplace selesai sebelum layanan usaha digunakan.',
+  business_data_reset_storage_unavailable: 'Penyimpanan pemulihan belum siap. Restart stack agar migrasi database marketplace dijalankan lebih dulu. Data tidak dihapus oleh kegagalan ini.',
+  finance_core_storage_unavailable: 'Penyimpanan keuangan belum siap. Tidak ada reset yang dijalankan.',
+  business_data_reset_sales_failed: 'Reset transaksi tidak selesai. Data yang terhubung order atau periode tertutup tetap dilindungi.',
+  business_data_reset_finance_failed: 'Reset keuangan tidak selesai. Histori asli tetap dipertahankan.',
+  business_data_reset_permission_denied: 'Peranmu tidak punya izin untuk salah satu reset yang dipilih.',
+  business_start_fresh_permission_denied: 'Mulai dari nol hanya boleh dilakukan pemilik usaha.',
+  reset_scope_required: 'Pilih setidaknya satu bagian yang ingin dimulai ulang.',
+  reset_reason_required: 'Jelaskan alasan reset minimal 3 karakter.',
+  reset_reason_too_long: 'Alasan reset terlalu panjang. Maksimal 2.000 karakter.',
+  reset_full_confirmation_required: 'Untuk reset lengkap, ketik persis: MULAI DARI NOL.',
+  reset_confirmation_required: 'Isi konfirmasi sebelum menjalankan reset.',
+  reset_confirmation_invalid: 'Untuk reset sebagian, ketik persis: RESET.',
+  reset_idempotency_conflict: 'Permintaan reset yang sama memakai kunci berbeda untuk isi yang berbeda. Tinjau ulang lalu coba lagi.',
+  reset_already_running: 'Reset sebelumnya masih berjalan. Tunggu sampai statusnya selesai sebelum mengulang.',
+  invalid_idempotency_key: 'Kunci permintaan reset tidak valid. Coba ulang dari tombol ini.',
+  missing_idempotency_key: 'Kunci permintaan reset tidak tersedia. Coba ulang dari tombol ini.',
+  sales_in_closed_period: 'Ada transaksi pada hari/periode yang sudah ditutup. Buka periode tersebut dulu.',
+};
+
+function describeResetError(cause: unknown) {
+  if (cause instanceof BusinessResetClientError) {
+    return RESET_ERROR_MESSAGES[cause.code] ?? cause.code;
+  }
+  return cause instanceof Error ? cause.message : 'Reset gagal. Coba lagi.';
+}
+
 function canByRole(business: BusinessRecord, scope: BusinessResetScope) {
   switch (scope) {
     case 'finance_activity':
@@ -173,7 +204,7 @@ export function DataResetCenter({ business }: Props) {
       setPreview(payload.data as BusinessResetPreview);
       setPreviewFingerprint(resetMaterialFingerprint);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Tidak bisa memuat preview reset.');
+      setError(describeResetError(cause));
     } finally {
       setBusy(null);
     }
@@ -213,22 +244,7 @@ export function DataResetCenter({ business }: Props) {
       attemptRef.current = null;
       router.refresh();
     } catch (cause) {
-      const code = cause instanceof BusinessResetClientError ? cause.code : 'reset_failed';
-      const messages: Record<string, string> = {
-        sales_in_closed_period: 'Ada transaksi pada hari/periode yang sudah ditutup. Buka periode tersebut dulu.',
-        business_data_reset_permission_denied: 'Peranmu tidak punya izin untuk salah satu reset yang dipilih.',
-        business_start_fresh_permission_denied: 'Mulai dari nol hanya boleh dilakukan pemilik usaha.',
-        reset_full_confirmation_required: 'Untuk reset lengkap, ketik persis: MULAI DARI NOL.',
-        reset_confirmation_required: 'Isi konfirmasi sebelum menjalankan reset.',
-        reset_confirmation_invalid: 'Untuk reset sebagian, ketik persis: RESET.',
-        reset_idempotency_conflict: 'Permintaan reset dengan kunci yang sama tetapi isi berbeda ditolak.',
-        business_data_reset_storage_unavailable: 'Penyimpanan reset belum siap. Deploy/restart marketplace_service agar migrasi database terbaru terpasang, lalu coba lagi. Data tidak dihapus oleh kegagalan ini.',
-        business_storage_unavailable: 'Penyimpanan usaha sedang belum siap. Coba lagi setelah marketplace_service selesai start.',
-        finance_core_storage_unavailable: 'Penyimpanan keuangan sedang belum siap. Tidak ada reset yang dijalankan.',
-        business_data_reset_sales_failed: 'Reset transaksi tidak selesai. Data yang terhubung order/periode tertutup tetap dilindungi.',
-        business_data_reset_finance_failed: 'Reset keuangan tidak selesai. Histori asli tetap dipertahankan.',
-      };
-      setError(messages[code] ?? (cause instanceof Error ? cause.message : 'Reset gagal.'));
+      setError(describeResetError(cause));
     } finally {
       setBusy(null);
     }
