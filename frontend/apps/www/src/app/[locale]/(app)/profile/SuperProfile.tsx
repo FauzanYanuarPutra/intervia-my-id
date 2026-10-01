@@ -69,6 +69,12 @@ import {
 } from '@/lib/profile/publicProfileLink';
 import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 import { cn } from '@/lib/utils';
+import {
+  BUSINESS_OPEN_TO_OPTIONS,
+  BUSINESS_ROLE_OPTIONS,
+  businessNetworkHasData,
+  toBusinessNetwork,
+} from '@/lib/profile/businessNetwork';
 import { normalizeProfileContentTab } from '@/lib/profile/profileContentTabs';
 import { ProfileSortControl, type ProfileSortMode } from '@/components/profile/ProfileSortControl';
 import { OwnerProfileEditModal, OwnerProfileEditSection } from './OwnerProfileEditModal';
@@ -2183,6 +2189,16 @@ export default function SuperProfile() {
   const providerProfile = asRecord(mergedMetadata.provider_profile) ?? {};
   const freelancerProfile = asRecord(mergedMetadata.freelancer_profile) ?? {};
   const buyerProfile = asRecord(mergedMetadata.buyer_profile) ?? {};
+
+  const businessNetwork = toBusinessNetwork(mergedMetadata.business_network);
+  const businessRoleLabel = (roleId: string) =>
+    BUSINESS_ROLE_OPTIONS.find(option => option.id === roleId)?.[
+      isId ? 'idLabel' : 'enLabel'
+    ] || roleId;
+  const businessOpenToLabel = (openToId: string) =>
+    BUSINESS_OPEN_TO_OPTIONS.find(option => option.id === openToId)?.[
+      isId ? 'idLabel' : 'enLabel'
+    ] || openToId;
   const profileDetailRows = [
     {
       key: 'business',
@@ -2525,6 +2541,113 @@ export default function SuperProfile() {
               <ArrowRight className="h-4 w-4 shrink-0 text-[color:var(--app-text-soft)]" />
             </LocalizedLink>
           ) : null}
+          {businessNetworkHasData(businessNetwork) ? (
+            <section className="overflow-hidden rounded-[22px] border border-emerald-200 bg-[color:var(--app-surface-strong)] dark:border-emerald-500/20">
+              <div className="flex items-center justify-between gap-3 border-b border-emerald-100 px-3 py-3 sm:px-5 dark:border-emerald-500/15">
+                <div className="min-w-0">
+                  <h2 className="text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
+                    {isId ? 'Partner bisnis' : 'Business network'}
+                  </h2>
+                  <p className="mt-0.5 text-[10px] text-[color:var(--app-text-soft)]">
+                    {isId ? 'Apa yang kamu punya, cari, dan terbuka untuk siapa.' : 'What you offer, need, and who you are open to.'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => openEditModal('business')}
+                  className="inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-xs font-black text-emerald-700 transition hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-500/10"
+                >
+                  <PencilLine className="h-3.5 w-3.5" />
+                  {isId ? 'Edit' : 'Edit'}
+                </button>
+              </div>
+
+              <div className="space-y-4 p-3 sm:p-5">
+                {businessNetwork.roles.length > 0 ? (
+                  <div>
+                    <p className="mb-2 text-[10px] font-black uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">
+                      {isId ? 'Saya sebagai' : 'I am a'}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {businessNetwork.roles.map(role => (
+                        <span
+                          key={role}
+                          className="rounded-full bg-emerald-50 px-3 py-1.5 text-[10px] font-black text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300"
+                        >
+                          {businessRoleLabel(role)}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {businessNetwork.offers.length > 0 ? (
+                    <div className="rounded-2xl border border-[color:var(--app-border)] p-3.5">
+                      <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">
+                        {isId ? 'Saya menawarkan' : 'I offer'}
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {businessNetwork.offers.map(item => (
+                          <span key={item} className="rounded-lg bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[11px] font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                            {item}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                  {businessNetwork.needs.length > 0 ? (
+                    <div className="rounded-2xl border border-[color:var(--app-border)] p-3.5">
+                      <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">
+                        {isId ? 'Saya membutuhkan' : 'I need'}
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {businessNetwork.needs.map(item => (
+                          <span key={item} className="rounded-lg bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">
+                            {item}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {businessNetwork.capacity ? (
+                    <div className="rounded-2xl border border-[color:var(--app-border)] p-3.5">
+                      <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">{isId ? 'Kapasitas' : 'Capacity'}</p>
+                      <p className="mt-1.5 text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">{businessNetwork.capacity}</p>
+                    </div>
+                  ) : null}
+                  {businessNetwork.service_area.length > 0 ? (
+                    <div className="rounded-2xl border border-[color:var(--app-border)] p-3.5">
+                      <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">{isId ? 'Wilayah' : 'Area'}</p>
+                      <p className="mt-1.5 text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">{businessNetwork.service_area.join(' · ')}</p>
+                    </div>
+                  ) : null}
+                  {businessNetwork.open_to.length > 0 ? (
+                    <div className="rounded-2xl border border-[color:var(--app-border)] p-3.5 sm:col-span-1">
+                      <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">{isId ? 'Terbuka untuk' : 'Open to'}</p>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {businessNetwork.open_to.map(item => (
+                          <span key={item} className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[10px] font-black text-blue-700 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300">
+                            {businessOpenToLabel(item)}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 px-3.5 py-3 text-[11px] font-semibold leading-5 text-emerald-900 dark:border-emerald-500/15 dark:bg-emerald-500/8 dark:text-emerald-100">
+                  {isId
+                    ? 'Profil ini bukan cuma kartu nama: orang bisa langsung memahami peran, penawaran, kebutuhan, kapasitas, dan partner yang sedang dicari.'
+                    : 'This profile is more than a business card: people can see the role, offer, needs, capacity, and partner types.'}
+                </div>
+              </div>
+            </section>
+          ) : null}
+
           {profileDetailRows.length > 0 ? (
             <section className="overflow-hidden rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)]">
               <div className="flex items-center justify-between gap-3 border-b border-[color:var(--app-border)] px-3 py-3 sm:px-5">
