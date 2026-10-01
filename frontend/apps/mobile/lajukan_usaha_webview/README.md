@@ -1,93 +1,113 @@
 # Lajukan Usaha Mobile
 
-Flutter mobile shell for Lajukan, targeting Android and iOS from the same repository.
+Flutter WebView shell khusus untuk **Lajukan Usaha**.
 
-The app keeps Lajukan's existing web experience at https://usaha.lajukan.com while adding native mobile capabilities such as camera/reels capture, permissions, external app links, system back navigation, and a store-ready packaging pipeline.
+Aplikasi membuka:
 
-## Project
+`https://usaha.lajukan.com`
 
-Path:
+dengan kemampuan native yang sama dengan shell Lajukan utama: WebView JavaScript, upload media, kamera/mikrofon, geolocation, external app links, system back, retry saat halaman gagal, dan mode ringan untuk menjaga WebView tetap responsif.
 
-`frontend/apps/mobile/lajukan_usaha_webview`
+## Identitas
 
-App identifiers:
+- Android package: `com.lajukan.usaha`
+- iOS bundle identifier: `com.lajukan.usaha`
+- Source: `frontend/apps/mobile/lajukan_usaha_webview`
 
-- Android: `com.lajukan.usaha`
-- iOS: `com.lajukan.usaha`
+## Test lokal
 
-## Run locally
-
-From the repository root:
+Dari root repository:
 
 ```bash
 cd frontend/apps/mobile/lajukan_usaha_webview
 flutter pub get
 dart run flutter_launcher_icons
+flutter analyze
+flutter test
+```
+
+Jalankan di Android:
+
+```bash
 flutter run
 ```
 
-Android installable preview:
+Generate APK release:
 
 ```bash
 flutter build apk --release
 ```
 
-The Android release build falls back to the debug key only when no real release keystore is configured. Never ship that fallback to Google Play.
+Hasil:
 
-## Android / Play Store
+```
+build/app/outputs/flutter-apk/app-release.apk
+```
 
-For production, create or keep one upload keystore and protect it permanently. Do not commit the keystore to Git.
+Untuk debug/smoke test perangkat lokal:
 
-Codemagic is configured with the reference:
+```bash
+flutter install
+```
 
-`lajukan_usaha_playstore`
+## GitHub Actions
 
-The signed workflow produces an Android App Bundle:
+Workflow:
 
-`build/app/outputs/bundle/release/*.aab`
+`.github/workflows/mobile-flutter-usaha.yml`
 
-The Play workflow targets the Internal testing track first. Google Play requires an AAB for new app publishing and the same signing key must be preserved for subsequent releases.
+Setiap push/PR yang menyentuh project Usaha akan menjalankan:
 
-Required Codemagic setup:
+1. `flutter pub get`
+2. generate launcher icon
+3. `flutter analyze`
+4. `flutter test`
+5. `flutter build apk --release`
+6. upload artifact `lajukan-usaha-android-release-apk`
 
-1. Upload your Android keystore under Code signing identities and name the reference `lajukan_usaha_playstore`.
-2. Add the Google Play service-account JSON to the secret variable `GOOGLE_PLAY_SERVICE_ACCOUNT_CREDENTIALS` in a variable group named `google_play_credentials`.
-3. Create the Play Console app with package name `com.lajukan.usaha`.
-4. Run `android-play-internal`.
-5. After internal testing is stable, create a separate production release in Play Console or switch the publishing track deliberately.
+Jadi APK preview bisa diambil dari **GitHub Actions → workflow run → Artifacts** lalu dikirim langsung ke tester.
 
-For direct sharing with friends, the Android preview workflow produces an installable APK artifact. You can send that APK privately; Play Console internal testing is cleaner for repeated tester builds.
+## Codemagic
 
-## iOS / App Store / TestFlight
+`codemagic.yaml` memiliki workflow:
 
-You do not need a physical Mac to run the cloud iOS build in this repository. Codemagic performs the iOS build on hosted macOS machines.
+`android-preview-usaha`
 
-Required Apple setup:
+Workflow menghasilkan APK installable untuk dibagikan langsung.
 
-1. Enroll in the Apple Developer Program.
-2. Create an App ID for `com.lajukan.usaha`.
-3. Create an App Store Connect app using the same bundle identifier.
-4. Add an App Store Connect API key to Codemagic under the integration name `lajukan_appstore_connect`.
-5. Configure iOS distribution signing/provisioning for `com.lajukan.usaha` in Codemagic.
-6. Set `APP_STORE_APPLE_ID` to the numeric Apple ID of the App Store Connect app.
-7. Run `ios-testflight` for private tester distribution.
-8. Use `ios-app-store` only when the App Store listing, privacy information, screenshots, age rating, and other required metadata are ready.
+Artifact:
 
-The iOS workflow explicitly checks the Xcode major version before building because current App Store submissions require Xcode 26 or newer.
+`build/app/outputs/flutter-apk/*.apk`
 
-## Store secrets
+Untuk Play Store, gunakan signing key terpisah untuk package `com.lajukan.usaha`. Jangan pernah memasukkan keystore atau password ke Git.
 
-Secrets belong in Codemagic, not in GitHub:
+## Distribusi APK ke HP
 
-- Android keystore + passwords
-- Google Play service-account JSON
-- App Store Connect API key/private key
-- iOS distribution certificate/provisioning profile
+Untuk tester internal, alurnya:
 
-Keep independent backups of the Android keystore and Apple signing credentials. Losing the Android upload key can complicate future Play releases.
+```
+Push perubahan ke main
+        ↓
+GitHub Actions / Codemagic build
+        ↓
+Download app-release.apk
+        ↓
+Kirim APK via WhatsApp / Telegram / Drive
+        ↓
+Tester install
+```
 
-## CI
+Android mungkin meminta izin **Install unknown apps** saat memasang APK dari chat/file manager.
 
-GitHub Actions runs Flutter analyze, tests, launcher-icon generation, and an Android debug build whenever the mobile project changes.
+Untuk rilis publik Google Play, gunakan **AAB signed**, bukan APK preview.
 
-Codemagic handles the signed Android/iOS release path because iOS distribution needs Apple signing and a macOS build environment.
+## Catatan WebView
+
+Shell ini sengaja mempertahankan implementasi native dari Lajukan WebView utama agar:
+
+- upload foto/video dari halaman Usaha tetap bekerja;
+- permission kamera, mikrofon, dan lokasi tetap ditangani native;
+- link `tel:`, `mailto:`, WhatsApp, Telegram, Maps, dan scheme eksternal dapat dibuka oleh aplikasi yang sesuai;
+- tombol Back Android menavigasikan history WebView sebelum menutup aplikasi;
+- kegagalan jaringan menampilkan kontrol muat ulang;
+- animasi/background blur berat dikurangi di dalam WebView agar perangkat kelas menengah tetap ringan.
