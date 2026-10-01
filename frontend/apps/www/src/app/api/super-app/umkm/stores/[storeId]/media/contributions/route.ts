@@ -95,9 +95,9 @@ export async function GET(
     return NextResponse.json(payload, {
       status: upstream.status,
       headers: {
-        'Cache-Control': upstream.ok
-          ? 'public, s-maxage=30, stale-while-revalidate=120'
-          : 'no-store',
+        // This response can contain the authenticated viewer's private contribution
+        // statuses, so it must never be cached as a shared/public response.
+        'Cache-Control': 'no-store',
       },
     });
   } catch {
