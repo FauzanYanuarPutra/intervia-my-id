@@ -58,6 +58,7 @@ import { Skeleton, SkeletonStack } from '@/components/ui/Skeleton';
 import { LajukanImage } from '@/components/common/LajukanImage';
 import { resolveStorefrontBrandMedia } from '@/lib/super-app/storefront-brand-media';
 import { EmblaInlineRail } from '@/components/common/EmblaInlineRail';
+import { UmkmStoreMediaContribution } from '@/components/super-app/UmkmStoreMediaContribution';
 import {
   UMKM_MAP_MAX_ZOOM,
   UMKM_MAP_MIN_ZOOM,
@@ -2771,6 +2772,35 @@ export function UmkmDiscoveryPanel({
                       window.location.href = href.startsWith('/') ? `/${locale}${href}` : href;
                     }}
                   />
+
+                  {!selectedIsPublicReference && isUuidLike(selectedPlace.store.id) ? (
+                    <div className="rounded-[14px] border border-slate-200/90 bg-white p-2.5 dark:border-slate-800 dark:bg-slate-950">
+                      <div className="mb-2 flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-black text-slate-800 dark:text-slate-100">
+                            {isId ? 'Foto & media' : 'Photos & media'}
+                          </p>
+                          <p className="mt-0.5 text-[9px] font-medium leading-4 text-slate-500 dark:text-slate-400">
+                            {isId
+                              ? 'Tambahkan foto usaha atau produk untuk membantu orang mengenali lokasi ini.'
+                              : 'Add a business or product photo to help people recognize this location.'}
+                          </p>
+                        </div>
+                      </div>
+                      <UmkmStoreMediaContribution
+                        storeId={selectedPlace.store.id}
+                        isId={isId}
+                        loginHref={`/${locale}/login?next=${encodeURIComponent(
+                          typeof window === 'undefined'
+                            ? ''
+                            : window.location.pathname + window.location.search,
+                        )}`}
+                        onSubmitted={() => {
+                          setSelectedProductsLoading(false);
+                        }}
+                      />
+                    </div>
+                  ) : null}
 
                   <div
                     className={cn(
