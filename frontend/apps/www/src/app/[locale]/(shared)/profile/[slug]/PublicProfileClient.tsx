@@ -103,6 +103,7 @@ type PublicUserProfile = {
 
 type PublicListing = {
   id: string;
+  owner_id?: string | null;
   slug?: string;
   title?: string;
   summary?: string;
