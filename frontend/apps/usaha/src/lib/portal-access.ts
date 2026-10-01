@@ -35,6 +35,7 @@ export const permissionMap: Record<PortalRole, PermissionId[]> = {
     'viewBuyerPage',
     'openBusiness',
     'manageSecurity',
+    'manageDataReset',
   ],
   manager: [
     'viewInfo',
@@ -64,6 +65,7 @@ export const permissionMap: Record<PortalRole, PermissionId[]> = {
     'inviteMembers',
     'viewBuyerPage',
     'openBusiness',
+    'manageDataReset',
   ],
   cashier: [
     'viewProducts',
@@ -86,6 +88,7 @@ export const permissionMap: Record<PortalRole, PermissionId[]> = {
     'manageFinance',
     'viewReports',
     'viewBuyerPage',
+    'manageDataReset',
   ],
   inventory: [
     'viewProducts',
@@ -93,6 +96,7 @@ export const permissionMap: Record<PortalRole, PermissionId[]> = {
     'viewInventory',
     'manageInventory',
     'viewBuyerPage',
+    'manageDataReset',
   ],
   viewer: [
     'viewInfo',
