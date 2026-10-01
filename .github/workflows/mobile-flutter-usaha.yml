@@ -1,0 +1,56 @@
+name: Mobile Flutter Usaha CI
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "frontend/apps/mobile/lajukan_usaha_webview/**"
+      - ".github/workflows/mobile-flutter-usaha.yml"
+  pull_request:
+    paths:
+      - "frontend/apps/mobile/lajukan_usaha_webview/**"
+      - ".github/workflows/mobile-flutter-usaha.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    name: Lajukan Usaha Flutter analyze + test + release APK
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend/apps/mobile/lajukan_usaha_webview
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Generate launcher icons
+        run: dart run flutter_launcher_icons
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test
+
+      - name: Build release APK
+        run: flutter build apk --release
+
+      - name: Upload shareable APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: lajukan-usaha-android-release-apk
+          path: frontend/apps/mobile/lajukan_usaha_webview/build/app/outputs/flutter-apk/*.apk
+          if-no-files-found: error
+          retention-days: 14
