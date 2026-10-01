@@ -4012,6 +4012,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
     const listingController = new AbortController();
     const demandController = new AbortController();
     const referenceController = new AbortController();
+    const myListingsController = new AbortController();
     const listingTimeoutId = window.setTimeout(
       () => listingController.abort(),
       HOME_CONTENT_TOTAL_TIMEOUT_MS,
@@ -4023,6 +4024,10 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
     const referenceTimeoutId = window.setTimeout(
       () => referenceController.abort(),
       HOME_CONTENT_REQUEST_TIMEOUT_MS,
+    );
+    const myListingsTimeoutId = window.setTimeout(
+      () => myListingsController.abort(),
+      9_000,
     );
 
     const addViewerLocation = (params: URLSearchParams) => {
@@ -4126,9 +4131,8 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
             cache: 'no-store',
             credentials: 'include',
             signal: AbortSignal.any([
-              listingController.signal,
-              demandController.signal,
-              AbortSignal.timeout(9000),
+              myListingsController.signal,
+              AbortSignal.timeout(9_000),
             ]),
           },
         );
@@ -4311,9 +4315,11 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
       window.clearTimeout(listingTimeoutId);
       window.clearTimeout(demandTimeoutId);
       window.clearTimeout(referenceTimeoutId);
+      window.clearTimeout(myListingsTimeoutId);
       listingController.abort();
       demandController.abort();
       referenceController.abort();
+      myListingsController.abort();
     };
   }, [isId, isAuthenticated, viewerLocationKey]);
 
