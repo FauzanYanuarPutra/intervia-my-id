@@ -37,8 +37,8 @@ export async function PUT(request: Request, context: { params: Promise<{ busines
       const locationType = typeof item.locationType === 'string' ? item.locationType.trim() : '';
       const address = typeof item.address === 'string' ? item.address.trim() : '';
       const city = typeof item.city === 'string' ? item.city.trim() : '';
-      const latitude = item.latitude === null || item.latitude === undefined || item.latitude === '' ? null : Number(item.latitude);
-      const longitude = item.longitude === null || item.longitude === undefined || item.longitude === '' ? null : Number(item.longitude);
+      const latitude = item.latitude === null || item.latitude === undefined ? null : Number(item.latitude);
+      const longitude = item.longitude === null || item.longitude === undefined ? null : Number(item.longitude);
       if (!id || idSet.has(id)) return NextResponse.json({ error: `ID lokasi pada baris ${index + 1} tidak valid atau duplikat.`, code: 'invalid_business_locations' }, { status: 400 });
       idSet.add(id);
       if (name.length < 2 || name.length > 120) return NextResponse.json({ error: `Nama lokasi pada baris ${index + 1} belum valid.`, code: 'invalid_business_locations' }, { status: 400 });
