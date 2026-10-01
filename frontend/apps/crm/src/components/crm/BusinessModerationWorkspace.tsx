@@ -7,6 +7,7 @@ import {
   type CrmBusinessModerationEvent,
   type CrmBusinessReference,
 } from "@/lib/api";
+import { resolveCrmMediaUrl } from "@/lib/mediaUrl";
 import { useAuth } from "@/context/AuthContext";
 
 type Action = "approve" | "restore" | "request_completion" | "hide" | "reject" | "escalate";
@@ -470,9 +471,13 @@ export default function BusinessModerationWorkspace() {
               <article key={item.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div className="aspect-[4/3] overflow-hidden bg-slate-100">
                   {item.media_type === "video" ? (
-                    <video src={item.media_url} controls muted className="h-full w-full object-cover" />
+                    <video src={resolveCrmMediaUrl(item.media_url)} controls muted className="h-full w-full object-cover" />
                   ) : (
-                    <img src={item.media_url} alt={item.store_name} className="h-full w-full object-cover" />
+                    <img
+                      src={resolveCrmMediaUrl(item.media_url)}
+                      alt={item.store_name}
+                      className="h-full w-full object-cover"
+                    />
                   )}
                 </div>
                 <div className="space-y-3 p-4">
@@ -691,7 +696,11 @@ export default function BusinessModerationWorkspace() {
               <div className="grid sm:grid-cols-[180px_1fr]">
                 <div className="min-h-44 bg-slate-100">
                   {business.image_urls[0] ? (
-                    <img src={business.image_urls[0]} alt="" className="h-full w-full object-cover" />
+                    <img
+                    src={resolveCrmMediaUrl(business.image_urls[0])}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
                   ) : (
                     <div className="grid h-full min-h-44 place-items-center px-5 text-center text-xs font-bold text-slate-400">
                       Belum ada foto/logo
@@ -1098,8 +1107,18 @@ export default function BusinessModerationWorkspace() {
               {verificationDraft.image_urls.length ? (
                 <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
                   {verificationDraft.image_urls.slice(0, 8).map((url, index) => (
-                    <a key={url + index} href={url} target="_blank" rel="noreferrer" className="group aspect-square overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
-                      <img src={url} alt={verificationDraft.name} className="h-full w-full object-cover transition group-hover:scale-105" />
+                    <a
+                      key={url + index}
+                      href={resolveCrmMediaUrl(url)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="group aspect-square overflow-hidden rounded-2xl border border-slate-200 bg-slate-100"
+                    >
+                      <img
+                        src={resolveCrmMediaUrl(url)}
+                        alt={verificationDraft.name}
+                        className="h-full w-full object-cover transition group-hover:scale-105"
+                      />
                     </a>
                   ))}
                 </div>
