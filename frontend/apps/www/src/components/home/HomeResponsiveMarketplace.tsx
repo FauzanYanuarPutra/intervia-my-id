@@ -313,6 +313,17 @@ function normalizeClusterToken(value: unknown): string {
     .slice(0, 80);
 }
 
+function isRealOwnerId(value: unknown): boolean {
+  const normalized = readText(value)?.toLowerCase();
+  return Boolean(
+    normalized &&
+      normalized !== '00000000-0000-0000-0000-000000000000' &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(
+        normalized,
+      ),
+  );
+}
+
 function isNativeLajukanContent(item: ContentItem): boolean {
   const metadata = item.metadata || {};
   const source = String(
@@ -335,21 +346,43 @@ function isNativeLajukanContent(item: ContentItem): boolean {
     .trim()
     .toLowerCase();
 
-  return Boolean(
-    item.owner_id ||
+  // Upstream public content uses a zero UUID owner sentinel. Treating that
+  // sentinel as a real owner used to make imported records look first-party
+  // and could move them ahead of an actual Lajukan listing.
+  if (!isRealOwnerId(item.owner_id)) {
+    return Boolean(
       metadata.owner_id ||
-      metadata.user_id ||
-      metadata.ownerId ||
-      metadata.userId ||
-      metadata.listing_mode === 'guided_business_create' ||
-      source === 'lajukan' ||
-      source === 'lajukan_listing' ||
-      source === 'lajukan_content' ||
-      source === 'usaha_portal' ||
-      source === 'content' ||
-      recordKind === 'lajukan_listing' ||
-      recordKind === 'lajukan_content',
-  );
+        metadata.user_id ||
+        metadata.ownerId ||
+        metadata.userId ||
+        metadata.listing_mode === 'guided_business_create' ||
+        source === 'lajukan' ||
+        source === 'lajukan_listing' ||
+        source === 'lajukan_content' ||
+        source === 'usaha_portal' ||
+        source === 'content' ||
+        recordKind === 'lajukan_listing' ||
+        recordKind === 'lajukan_content',
+    );
+  }
+
+  // Imported/discovered sources can have an owner-like identity attached.
+  // Prefer their explicit provenance over the mere presence of owner_id.
+  const importedSource =
+    source.includes('reference') ||
+    source.includes('external') ||
+    source.includes('import') ||
+    source.includes('crawl') ||
+    source.includes('discover') ||
+    source.includes('directory') ||
+    source.includes('google') ||
+    source.includes('openstreetmap') ||
+    source.includes('osm') ||
+    source.includes('wikidata');
+
+  if (importedSource || recordKind.includes('reference')) return false;
+
+  return true;
 }
 
 function recommendationClusterKey(
