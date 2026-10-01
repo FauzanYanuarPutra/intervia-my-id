@@ -587,15 +587,6 @@ impl DataResetRepository {
             .fetch_one(&mut *tx)
             .await?;
 
-            if count > 0 {
-                sqlx::query(
-                    "UPDATE business_product_balances SET stock_count=0,version=version+1,updated_at=NOW() WHERE business_id=$1 AND organization_id=$2 AND COALESCE(stock_count,0)<>0",
-                )
-                .bind(business_id)
-                .bind(organization_id)
-                .execute(&mut *tx)
-                .await?;
-            }
             count
         } else {
             0
@@ -615,9 +606,9 @@ impl DataResetRepository {
                   quantity_delta,quantity_before,quantity_after,source_type,source_id,note,created_by_user_id
                 )
                 SELECT organization_id,business_id,location_id,product_id,'adjustment',
-                       0,0,0,'business_data_reset',$3,$4,$5
+                       -stock_count,stock_count,0,'business_data_reset',$3,$4,$5
                 FROM business_product_balances
-                WHERE business_id=$1 AND organization_id=$2
+                WHERE business_id=$1 AND organization_id=$2 AND COALESCE(stock_count,0) > 0
                 "#,
             )
             .bind(business_id)
@@ -625,6 +616,16 @@ impl DataResetRepository {
             .bind(batch_id)
             .bind(reason.trim())
             .bind(actor_id)
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        if product_balances_exist && product_count > 0 {
+            sqlx::query(
+                "UPDATE business_product_balances SET stock_count=0,version=version+1,updated_at=NOW() WHERE business_id=$1 AND organization_id=$2 AND COALESCE(stock_count,0)<>0",
+            )
+            .bind(business_id)
+            .bind(organization_id)
             .execute(&mut *tx)
             .await?;
         }
