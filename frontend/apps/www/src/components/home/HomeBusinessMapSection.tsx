@@ -572,9 +572,9 @@ export function HomeBusinessMapSection({
           focusMode="indonesia"
           showPopups={false}
           // Home is a coverage preview: show the actual distribution as
-          // lightweight colored dots instead of hiding most points in clusters.
+          // lightweight colored dots. Do not add a second animated Marker
+          // layer; the Canvas-backed dots are already cheap and responsive.
           markerStyle="dots"
-          animateDataDots
           className="leaflet-home-map h-[126px] w-full sm:h-[140px]"
         />
 
