@@ -1539,6 +1539,12 @@ export async function GET(req: NextRequest) {
     0,
     10_000,
   );
+
+  // An explicit owner_id turns this into an owner-scoped storefront request.
+  // Never enrich such a request with discovery/profile candidates from other
+  // users, even when the requested type is "all" or "service".
+  const ownerScopeId = searchParams.get('owner_id')?.trim() || '';
+  const ownerScopedRequest = ownerScopeId.length > 0;
   const rateLimit = await enforceRateLimit({
     key: `public-content:${getClientIp(req)}`,
     limit: 240,
@@ -1607,6 +1613,7 @@ export async function GET(req: NextRequest) {
     resolvedPayload = { ...resolvedPayload, items: resolvedItems };
 
     const shouldIncludeDiscoverCandidates =
+      !ownerScopedRequest &&
       !marketplaceOnly &&
       !databaseOnly &&
       (requestedType === 'all' ||
@@ -1648,8 +1655,9 @@ export async function GET(req: NextRequest) {
     if (nearbyRequested && viewerLocation) {
       let candidates = mergeUniqueContent(resolvedItems);
       const shouldExpandCandidates =
-        candidates.length < Math.min(Math.max(requestedLimit * 4, 40), 100) ||
-        requestedOffset > 0;
+        !ownerScopedRequest &&
+        (candidates.length < Math.min(Math.max(requestedLimit * 4, 40), 100) ||
+          requestedOffset > 0);
       if (shouldExpandCandidates) {
         const expanded = filterByRequestedMarketplaceSide(
           await fetchExpandedCandidates(req, searchParams, requestedLimit),
@@ -1682,6 +1690,7 @@ export async function GET(req: NextRequest) {
     } else if (shouldRunFuzzyRerank) {
       let candidates = resolvedItems;
       const shouldExpandCandidates =
+        !ownerScopedRequest &&
         candidates.length < Math.min(Math.max(requestedLimit * 2, 14), 40);
       if (shouldExpandCandidates) {
         const expanded = filterByRequestedMarketplaceSide(
