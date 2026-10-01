@@ -91,7 +91,44 @@ export async function GET(request: NextRequest) {
     // owner filter. This also protects compatibility with older service builds.
     const results = list.filter(item => {
       if (String(item.owner_id ?? '') !== ownerId) return false;
-      return isListingContentType(item.content_type ?? item.type);
+      if (!isListingContentType(item.content_type ?? item.type)) return false;
+
+      const metadata =
+        item.metadata &&
+        typeof item.metadata === 'object' &&
+        !Array.isArray(item.metadata)
+          ? (item.metadata as Record<string, unknown>)
+          : {};
+      const publicPath = [
+        metadata.public_path,
+        metadata.publicPath,
+        metadata.profile_path,
+        metadata.profilePath,
+        metadata.href,
+      ]
+        .map(value => (typeof value === 'string' ? value.trim() : ''))
+        .find(Boolean) || '';
+      const entityKind = String(
+        metadata.entity_kind ?? metadata.entityKind ?? '',
+      )
+        .trim()
+        .toLowerCase()
+        .replace(/[\s-]+/g, '_');
+      const source = String(
+        metadata.source ??
+          metadata.data_source ??
+          metadata.source_kind ??
+          metadata.record_source ??
+          '',
+      )
+        .trim()
+        .toLowerCase()
+        .replace(/[\s-]+/g, '_');
+
+      if (/^\/(?:[a-z]{2}\/)?profile(?:\/|$)/i.test(publicPath)) return false;
+      if (entityKind === 'person' || source === 'users_discover') return false;
+
+      return true;
     });
 
     return NextResponse.json({ results, total: results.length });
