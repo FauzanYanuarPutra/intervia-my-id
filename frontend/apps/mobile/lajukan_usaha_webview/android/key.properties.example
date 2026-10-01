@@ -1,0 +1,6 @@
+# Never commit a real keystore or this file as key.properties.
+# Copy this file to android/key.properties for local release signing.
+storeFile=/absolute/path/to/lajukan-upload-key.jks
+storePassword=REPLACE_ME
+keyAlias=REPLACE_ME
+keyPassword=REPLACE_ME
