@@ -34,6 +34,7 @@ export default async function BusinessLocationsPage({ params }: { params: Promis
           businessId={state.activeBusiness.id}
           businessName={state.activeBusiness.name}
           initialLocations={locations}
+          businessVersion={state.activeBusiness.version}
         />
       </section>
     </PortalShell>
