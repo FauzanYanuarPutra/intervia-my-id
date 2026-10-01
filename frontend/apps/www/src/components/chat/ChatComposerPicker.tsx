@@ -18,7 +18,7 @@ type StickerItem = {
 };
 
 type Props = {
-  locale: 'id' | 'en';
+  locale: string;
   mode: PickerMode;
   disabled?: boolean;
   onClose: () => void;
