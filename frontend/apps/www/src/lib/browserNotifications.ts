@@ -13,7 +13,7 @@ export type BrowserNotificationPayload = {
 };
 
 const NOTIFICATION_SW_URL = '/notification-sw.js';
-const NOTIFICATION_SW_SCOPE = '/notification-worker/';
+const NOTIFICATION_SW_SCOPE = '/';
 
 export function isBrowserNotificationSupported() {
   return (
