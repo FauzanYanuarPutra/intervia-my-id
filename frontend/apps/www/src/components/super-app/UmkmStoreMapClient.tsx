@@ -32,6 +32,9 @@ import { cn } from '@/lib/utils';
 import {
   OPEN_MAP_TILE_ATTRIBUTION,
   OPEN_MAP_TILE_URL,
+  UMKM_MAP_DEFAULT_ZOOM,
+  UMKM_MAP_MAX_ZOOM,
+  UMKM_MAP_MIN_ZOOM,
   type LatLng,
 } from '@/lib/super-app/maps';
 import { buildUmkmPlacePresentation } from '@/lib/super-app/umkm-place-ui';
@@ -84,7 +87,7 @@ type RoutingResponse = {
 };
 
 const MARKER_CLUSTER_DISTANCE_PX = 72;
-const MARKER_CLUSTER_MAX_ZOOM = 19;
+const MARKER_CLUSTER_MAX_ZOOM = UMKM_MAP_MAX_ZOOM;
 const MARKER_CLUSTER_PICKER_ZOOM = 17;
 const MARKER_CLUSTER_TIGHT_DISTANCE_PX = 24;
 const MARKER_CLICK_FOCUS_ZOOM = 17;
@@ -1173,7 +1176,10 @@ function MapFocusController({
       if (focusMode === 'selected' && validSelectedStore) {
         map.flyTo(
           [validSelectedStore.lat, validSelectedStore.lng],
-          Math.max(map.getZoom(), 16),
+          Math.min(
+            UMKM_MAP_MAX_ZOOM,
+            Math.max(map.getZoom(), 16),
+          ),
           { duration: 0.55 },
         );
         handledFocusKeyRef.current = focusKey;
@@ -1181,7 +1187,10 @@ function MapFocusController({
       }
 
       if (focusMode === 'viewer' && validViewerLocation) {
-        const zoom = Math.max(map.getZoom(), 15);
+        const zoom = Math.min(
+          UMKM_MAP_MAX_ZOOM,
+          Math.max(map.getZoom(), 15),
+        );
         const targetPoint = map.project(
           [validViewerLocation.lat, validViewerLocation.lng],
           zoom,
@@ -1351,8 +1360,8 @@ function MapBoundsReporter({
     if (
       !bounds.isValid() ||
       !Number.isFinite(zoom) ||
-      zoom < 0 ||
-      zoom > 24
+      zoom < UMKM_MAP_MIN_ZOOM ||
+      zoom > UMKM_MAP_MAX_ZOOM
     ) {
       return;
     }
@@ -1425,9 +1434,14 @@ function ManualMarkerFocusController({
   useEffect(() => {
     if (!target) return;
 
-    map.flyTo([target.lat, target.lng], Math.max(map.getZoom(), target.zoom), {
-      duration: 0.45,
-    });
+    map.flyTo(
+      [target.lat, target.lng],
+      Math.min(
+        UMKM_MAP_MAX_ZOOM,
+        Math.max(UMKM_MAP_MIN_ZOOM, target.zoom, map.getZoom()),
+      ),
+      { duration: 0.45 },
+    );
   }, [map, target]);
 
   return null;
@@ -1672,23 +1686,11 @@ function StoreMarkersLayer({
 
   const handleClusterClick = useCallback(
     (cluster: StoreCluster) => {
+      // Once the cluster is already tight or the map is at picker zoom,
+      // stop forcing more zoom. The popup becomes the selection surface so
+      // users can choose among nearby businesses even when their points still
+      // overlap at the maximum useful zoom.
       if (cluster.tight || zoom >= MARKER_CLUSTER_PICKER_ZOOM) {
-        const targetZoom = Math.min(
-          MARKER_CLUSTER_MAX_ZOOM,
-          Math.max(MARKER_CLUSTER_PICKER_ZOOM, zoom + 1),
-        );
-
-        if (onMarkerFocus) {
-          onMarkerFocus({
-            lat: cluster.lat,
-            lng: cluster.lng,
-            zoom: targetZoom,
-          });
-        } else {
-          map.flyTo([cluster.lat, cluster.lng], targetZoom, {
-            duration: MARKER_FOCUS_DURATION,
-          });
-        }
         return;
       }
 
@@ -2093,7 +2095,8 @@ export function UmkmStoreMapClient({
 
   const initialMapCenter: [number, number] =
     focusMode === 'indonesia' ? INDONESIA_MAP_CENTER : defaultCenter;
-  const initialMapZoom = focusMode === 'indonesia' ? 5 : 12;
+  const initialMapZoom =
+    focusMode === 'indonesia' ? 5 : UMKM_MAP_DEFAULT_ZOOM;
   const indonesiaMaxBounds = useMemo(
     () =>
       latLngBounds(
@@ -2108,17 +2111,23 @@ export function UmkmStoreMapClient({
       <style dangerouslySetInnerHTML={{ __html: UMKM_MAP_DATA_DOT_STYLE }} />
       <MapContainer
         center={initialMapCenter}
-      zoom={initialMapZoom}
-      minZoom={2}
-      maxZoom={19}
-      preferCanvas
-      scrollWheelZoom={interactive}
-      dragging={interactive}
-      touchZoom={interactive}
-      doubleClickZoom={interactive}
-      boxZoom={interactive}
-      keyboard={interactive}
-      zoomControl={false}
+        zoom={initialMapZoom}
+        minZoom={UMKM_MAP_MIN_ZOOM}
+        maxZoom={UMKM_MAP_MAX_ZOOM}
+        maxBounds={indonesiaMaxBounds}
+        maxBoundsViscosity={0.9}
+        zoomSnap={0.5}
+        zoomDelta={0.5}
+        wheelDebounceTime={45}
+        wheelPxPerZoomLevel={110}
+        preferCanvas
+        scrollWheelZoom={interactive}
+        dragging={interactive}
+        touchZoom={interactive}
+        doubleClickZoom={interactive}
+        boxZoom={interactive}
+        keyboard={interactive}
+        zoomControl={false}
       className={`umkm-leaflet-map ${className || 'h-[360px] w-full rounded-3xl'} max-w-full`}
       attributionControl={false}
     >
