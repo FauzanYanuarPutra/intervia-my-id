@@ -105,7 +105,7 @@ jobs:
     name: KYC runtime gate
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    if: always()
+    if: ${{ always() && !cancelled() }}
     needs: [contract, liveness-runtime]
     steps:
       - name: Require KYC contract and liveness readiness
