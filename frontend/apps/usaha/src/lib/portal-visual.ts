@@ -13,6 +13,7 @@ import {
   ShoppingBag,
   UserRound,
   TrendingUp,
+  RotateCcw,
   UsersRound,
   WalletCards,
   type LucideIcon,
@@ -69,4 +70,5 @@ export const portalSectionVisual: Record<PortalSection, PortalSectionVisual> = {
   buyerPage: { icon: Eye, ...roles.catalog },
   team: { icon: UsersRound, ...roles.system },
   security: { icon: LockKeyhole, ...roles.system },
+  dataReset: { icon: RotateCcw, ...roles.system },
 };
