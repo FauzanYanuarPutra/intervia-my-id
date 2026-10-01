@@ -53,7 +53,7 @@ export function toBusinessNetwork(value: unknown): BusinessNetwork {
     Array.isArray(input)
       ? input.map(item => String(item ?? '').trim()).filter(Boolean).slice(0, 30)
       : typeof input === 'string'
-        ? input.split(/[,\\n;|]/g).map(item => item.trim()).filter(Boolean).slice(0, 30)
+        ? input.split(/[,;\n|]/g).map(item => item.trim()).filter(Boolean).slice(0, 30)
         : [];
 
   return {
