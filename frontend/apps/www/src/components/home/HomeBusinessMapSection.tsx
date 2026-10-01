@@ -511,7 +511,9 @@ export function HomeBusinessMapSection({
       <div className="flex items-center justify-between gap-2 px-3 py-2.5 sm:px-3.5">
         <div className="min-w-0">
           <h2 className="truncate text-[12px] font-black tracking-tight text-slate-950 sm:text-[13px]">
-            {isId ? 'Sebaran usaha Lajukan & referensi' : 'Lajukan businesses & public locations'}
+            {isId
+              ? 'Sebaran lokasi usaha Indonesia'
+              : 'Indonesia business coverage'}
           </h2>
           <p className="truncate text-[9px] font-medium text-slate-500 sm:text-[10px]">
             {loading
@@ -525,7 +527,10 @@ export function HomeBusinessMapSection({
                 : totalMappedCount > 0
                   ? isId
                     ? [
-                        summary.mappedCount.toLocaleString('id-ID'),
+                        (HOME_MAP_DATA_MODE === 'synthetic'
+                          ? INDONESIA_MAP_DEMO_POINTS.length
+                          : summary.mappedCount
+                        ).toLocaleString('id-ID'),
                         HOME_MAP_DATA_MODE === 'synthetic'
                           ? 'titik contoh'
                           : 'titik ditampilkan',
@@ -541,6 +546,7 @@ export function HomeBusinessMapSection({
                         '·',
                         String(summary.cityCount),
                         'kota',
+                        HOME_MAP_DATA_MODE === 'real' &&
                         totalMappedCount > summary.mappedCount
                           ? ['· total', totalMappedCount.toLocaleString('id-ID')].join(' ')
                           : '',
@@ -565,6 +571,7 @@ export function HomeBusinessMapSection({
                         '·',
                         String(summary.cityCount),
                         'cities',
+                        HOME_MAP_DATA_MODE === 'real' &&
                         totalMappedCount > summary.mappedCount
                           ? ['· total', totalMappedCount.toLocaleString('en-US')].join(' ')
                           : '',
