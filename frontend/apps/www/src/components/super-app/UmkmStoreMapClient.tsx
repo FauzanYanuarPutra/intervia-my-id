@@ -614,8 +614,8 @@ function StorePreviewCard({
           <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/45 to-transparent px-2 pb-1 pt-4 text-[9px] font-semibold text-white">
             {isReference
               ? isId
-                ? 'Lokasi usaha'
-                : 'Business location'
+                ? 'Referensi publik'
+                : 'Public reference'
               : isId
                 ? 'Usaha'
                 : 'Business'}
