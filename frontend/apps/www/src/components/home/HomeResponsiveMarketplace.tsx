@@ -3625,7 +3625,7 @@ function RightRail({
   return (
     <aside className="lajukan-home-right-rail hidden min-w-0 xl:flex xl:h-full xl:max-h-full xl:min-h-0 xl:flex-col xl:overflow-hidden xl:pt-2">
       <div
-        className="lajukan-home-right-rail-scroll flex h-full max-h-full min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto overflow-x-hidden px-2.5 py-3 overscroll-contain"
+        className="lajukan-home-right-rail-scroll flex h-full max-h-full min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto overflow-x-clip px-2.5 py-3 overscroll-contain"
         data-auto-scrollbar
       >
         <section className="lajukan-home-pulse-card flex min-w-0 flex-col overflow-hidden rounded-[20px] border border-[color:var(--app-border)] bg-[linear-gradient(180deg,#ffffff_0%,#f8fffb_100%)] p-3 shadow-[0_18px_36px_-32px_rgba(15,23,42,0.14)] dark:bg-[color:var(--app-surface)]">
@@ -4724,7 +4724,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
           </div>
 
           <main
-            className="h-auto min-h-0 min-w-0 overflow-x-hidden overscroll-y-contain px-1 pb-2 sm:px-0 lg:h-full lg:overflow-y-auto lg:overscroll-y-contain lg:touch-pan-y lg:pr-1 lg:pt-2"
+            className="h-auto min-h-0 min-w-0 overflow-x-clip overscroll-y-contain px-1 pb-2 sm:px-0 lg:h-full lg:overflow-y-auto lg:overscroll-y-contain lg:touch-pan-y lg:pr-1 lg:pt-2"
             data-auto-scrollbar
           >
             <div className="mx-auto w-full max-w-[720px] space-y-3.5 pb-5 sm:space-y-4 lg:max-w-none">
