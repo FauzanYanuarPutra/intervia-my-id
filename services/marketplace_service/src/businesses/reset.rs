@@ -680,12 +680,17 @@ fn validate_request(request: &ResetRequest) -> Result<(), ResetError> {
     if reason.chars().count() < 3 { return Err(ResetError::Validation("reset_reason_required")); }
     if reason.chars().count() > MAX_REASON_LEN { return Err(ResetError::Validation("reset_reason_too_long")); }
     if request.scopes.is_empty() { return Err(ResetError::Validation("reset_scope_required")); }
-    if request.confirmation.trim().is_empty() {
+    let confirmation = request.confirmation.trim();
+    if confirmation.is_empty() {
         return Err(ResetError::Validation("reset_confirmation_required"));
     }
     let unique = request.scopes.iter().collect::<std::collections::HashSet<_>>().len();
-    if unique >= FULL_SCOPE_COUNT && request.confirmation.trim() != FULL_CONFIRMATION {
-        return Err(ResetError::Validation("reset_full_confirmation_required"));
+    if unique >= FULL_SCOPE_COUNT {
+        if confirmation != FULL_CONFIRMATION {
+            return Err(ResetError::Validation("reset_full_confirmation_required"));
+        }
+    } else if confirmation != "RESET" {
+        return Err(ResetError::Validation("reset_confirmation_invalid"));
     }
     Ok(())
 }
