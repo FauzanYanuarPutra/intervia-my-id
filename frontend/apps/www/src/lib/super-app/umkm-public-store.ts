@@ -420,7 +420,7 @@ export function projectPublicReferenceContent(
     ('reference-' + id);
 
   const publicMetadata = {
-    ...metadata,
+    ...projectPublicMetadata(metadata, null),
     record_kind: readText(metadata.record_kind) || 'open_data_reference',
     market_side: 'reference',
     is_transactional: false,
