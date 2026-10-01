@@ -203,6 +203,7 @@ defmodule ChatServiceWeb.MessageController do
 
                   ChatServiceWeb.Endpoint.broadcast!(topic, "new_message", socket_payload)
                   broadcast_inbox_updated(room_id)
+                  schedule_message_push(payload)
 
                   maybe_reply_as_aida(%{
                     room_id: room_id,
@@ -431,6 +432,41 @@ defmodule ChatServiceWeb.MessageController do
       {:ok, rows} -> Enum.any?(rows)
       _ -> false
     end
+  end
+
+  defp schedule_message_push(payload) do
+    recipient_ids =
+      payload.room_id
+      |> fetch_room_members()
+      |> Enum.reject(&(&1 == payload.sender_id_bin))
+      |> Enum.map(&Ecto.UUID.cast!/1)
+
+    if recipient_ids != [] do
+      Task.Supervisor.start_child(ChatService.TaskSupervisor, fn ->
+        Enum.each(recipient_ids, fn recipient_id ->
+          push_payload = %{
+            target_user_id: recipient_id,
+            room_id: payload.room_id,
+            sender_id: uuid_to_string(payload.sender_id_bin),
+            body: payload.body,
+            message_type: Map.get(payload, :message_type)
+          }
+
+          case ChatService.PushNotifier.chat_message(push_payload) do
+            :ok ->
+              :ok
+
+            :disabled ->
+              :ok
+
+            {:error, reason} ->
+              Logger.debug("[PushNotifier] chat push skipped: #{inspect(reason)}")
+          end
+        end)
+      end)
+    end
+
+    :ok
   end
 
   defp broadcast_inbox_updated(room_id) do
