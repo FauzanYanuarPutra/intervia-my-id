@@ -442,6 +442,7 @@ export const routes: RouteConfig[] = [
           description: "Lihat profil publik, penawaran, keahlian, dan aktivitas pengguna Lajukan.",
           titleEn: "Public Profile",
           descriptionEn: "View a Lajukan user’s public profile, offers, expertise, and activity.",
+          topbar: { isVisibleOnWeb: true, isVisibleOnMobile: false },
           navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
           bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
           footer: { isVisibleOnWeb: true, isVisibleOnMobile: false },
