@@ -21,8 +21,8 @@ describe('Explore hub routes', () => {
   });
 
   it('keeps hub intent canonical without turning the hub into a search result', () => {
-    expect(buildExploreHubIntentHref('id', 'supply')).toBe('/id/explore');
-    expect(buildExploreHubIntentHref('id', 'demand')).toBe('/id/explore?intent=demand');
+    expect(buildExploreHubIntentHref('id', 'supply')).toBe('/id/explore?side=supply&tab=all');
+    expect(buildExploreHubIntentHref('id', 'demand')).toBe('/id/explore?side=demand&tab=all');
     expect(normalizeExploreHubIntent('demand')).toBe('demand');
     expect(normalizeExploreHubIntent('supply')).toBe('supply');
     expect(normalizeExploreHubIntent('invalid')).toBe('supply');
