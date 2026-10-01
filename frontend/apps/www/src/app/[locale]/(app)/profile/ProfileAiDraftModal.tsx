@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 
 import { useAuth } from '@/context/AuthContext';
+import { toBusinessNetwork } from '@/lib/profile/businessNetwork';
 
 type ProfileDraft = {
   headline: string;
@@ -92,6 +93,7 @@ export function ProfileAiDraftModal({
     const provider = readRecord(detail?.provider_profile);
     const freelancer = readRecord(detail?.freelancer_profile);
     const buyer = readRecord(detail?.buyer_profile);
+    const businessNetwork = toBusinessNetwork(metadata.business_network);
 
     return {
       full_name: readText(detail?.full_name || detail?.fullName, 140),
@@ -125,6 +127,14 @@ export function ProfileAiDraftModal({
           buyer.intent || buyer.buyer_intent || metadata.buyer_intent,
           320,
         ),
+        business_network: {
+          roles: businessNetwork.roles.slice(0, 16),
+          offers: businessNetwork.offers.slice(0, 20),
+          needs: businessNetwork.needs.slice(0, 20),
+          capacity: readText(businessNetwork.capacity, 180),
+          open_to: businessNetwork.open_to.slice(0, 16),
+          service_area: businessNetwork.service_area.slice(0, 20),
+        },
       },
     };
   }, [detail]);
