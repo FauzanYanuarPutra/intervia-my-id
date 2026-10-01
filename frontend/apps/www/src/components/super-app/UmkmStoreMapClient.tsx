@@ -1103,7 +1103,7 @@ function getClusterFocusZoom(
   );
 
   return Math.min(
-    MARKER_CLUSTER_PICKER_ZOOM,
+    CLUSTER_PICKER_ZOOM,
     Math.max(zoom + 1, Math.round(zoom + zoomDelta)),
   );
 }
