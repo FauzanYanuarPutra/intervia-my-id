@@ -11655,7 +11655,7 @@ async fn list_map_places(
             'listing:' || c.id::text AS id,
             COALESCE(c.slug, 'listing-' || c.id::text),
             c.title,
-            COALESCE(c.metadata->>'city', c.metadata->>'location', c.metadata->>'address', 'Indonesia'),
+            COALESCE(c.metadata->>'city', c.metadata->>'location', c.metadata->>'address', ''),
             public.lajukan_safe_map_coordinate(
               COALESCE(
                 NULLIF(c.metadata->>'latitude', ''),
