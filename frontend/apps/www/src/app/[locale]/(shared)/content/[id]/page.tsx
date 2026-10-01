@@ -8,6 +8,8 @@ import {
   isPublicEditorialContent,
 } from '@/lib/server/publicContent';
 import { buildNewsPath } from '@/lib/news';
+import { getUmkmStoreBySlug } from '@/lib/super-app/umkm-commerce';
+import { isPublicUmkmReferenceVisible } from '@/lib/super-app/umkm-public-discovery';
 import ContentDetailClient, { type ContentItem } from './ContentDetailClient';
 
 type PageProps = {
@@ -69,6 +71,24 @@ export default async function ContentDetailPage({ params }: PageProps) {
       permanentRedirect(`/${language}${buildNewsPath(slug)}`);
     }
     notFound();
+  }
+
+  const referenceMetadata =
+    result.content.metadata &&
+    typeof result.content.metadata === 'object' &&
+    !Array.isArray(result.content.metadata)
+      ? (result.content.metadata as Record<string, unknown>)
+      : {};
+  const isPublicReferenceContent =
+    referenceMetadata.is_public_reference === true ||
+    String(referenceMetadata.market_side || '').trim().toLowerCase() === 'reference' ||
+    String(referenceMetadata.record_kind || '').trim().toLowerCase().includes('reference');
+
+  if (isPublicReferenceContent) {
+    const referenceStore = await getUmkmStoreBySlug(id).catch(() => null);
+    if (referenceStore && isPublicUmkmReferenceVisible(referenceStore)) {
+      permanentRedirect('/' + locale + '/toko/' + encodeURIComponent(referenceStore.slug));
+    }
   }
 
   const ownerEditHref = isPublicEditorialContent(result.content)

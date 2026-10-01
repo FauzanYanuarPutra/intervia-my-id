@@ -303,6 +303,23 @@ function projectPublicMetadata(
   return projected;
 }
 
+function isRenderablePublicMediaUrl(value: string): boolean {
+  const normalized = value.trim();
+  if (!normalized || normalized.toLowerCase() === 'invalid media url') return false;
+  if (normalized.startsWith('/')) return !normalized.startsWith('//');
+
+  try {
+    const parsed = new URL(normalized);
+    return (
+      (parsed.protocol === 'https:' || parsed.protocol === 'http:') &&
+      !parsed.username &&
+      !parsed.password
+    );
+  } catch {
+    return false;
+  }
+}
+
 function sanitizePublicGalleryMediaItems(value: unknown): unknown {
   if (!Array.isArray(value)) return undefined;
 
@@ -310,7 +327,7 @@ function sanitizePublicGalleryMediaItems(value: unknown): unknown {
     if (!item || typeof item !== 'object' || Array.isArray(item)) return [];
     const source = item as Record<string, unknown>;
     const url = typeof source.url === 'string' ? source.url.trim() : '';
-    if (!url) return [];
+    if (!isRenderablePublicMediaUrl(url)) return [];
 
     const mediaType =
       source.media_type === 'video' ? 'video' : 'image';
