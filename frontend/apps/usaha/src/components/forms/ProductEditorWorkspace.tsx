@@ -34,6 +34,7 @@ export function ProductEditorWorkspace({ businessId, product, closeHref }: Props
   const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
   const [changeReason, setChangeReason] = useState('Pembaruan data produk');
   const [stockReason, setStockReason] = useState('Penyesuaian stok');
+  const [modifierDirty, setModifierDirty] = useState(false);
   const busy = pendingAction !== null;
 
   const hasDetailChanges =
@@ -41,7 +42,8 @@ export function ProductEditorWorkspace({ businessId, product, closeHref }: Props
     category.trim() !== product.category.trim() ||
     (priceRupiah ?? null) !== parseRupiahInput(product.priceLabel) ||
     minStockAlert.trim() !== (product.minStockAlert?.toString() ?? '') ||
-    stockUnit.trim() !== (product.stockUnit || 'pcs');
+    stockUnit.trim() !== (product.stockUnit || 'pcs') ||
+    modifierDirty;
 
   const hasStockChanges =
     (stockCount.trim() ? Number(stockCount) : null) !== (product.stockCount ?? null);
@@ -314,7 +316,11 @@ export function ProductEditorWorkspace({ businessId, product, closeHref }: Props
           </div>
         </section>
 
-        <ProductModifierEditor businessId={businessId} productId={product.id} />
+        <ProductModifierEditor
+          businessId={businessId}
+          productId={product.id}
+          onDirtyChange={setModifierDirty}
+        />
 
         <section className="border-t border-portal-line pt-5">
           <div className="rounded-2xl bg-[#fafbf9] p-4">
