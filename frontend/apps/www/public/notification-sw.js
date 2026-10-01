@@ -39,7 +39,46 @@ self.addEventListener('push', (event) => {
   }
 
   const isIncomingCall = payload.type === 'incoming_call';
+  const isChatMessage = payload.type === 'chat_message';
   const isCallCleanup = payload.type === 'call_end';
+
+  if (isChatMessage) {
+    event.waitUntil(
+      self.clients
+        .matchAll({ type: 'window', includeUncontrolled: true })
+        .then(clients => {
+          const hasVisibleClient = clients.some(
+            client => client.visibilityState === 'visible',
+          );
+
+          if (!hasVisibleClient) {
+            return self.registration.showNotification(
+              payload.title || fallback.title,
+              {
+                body: payload.body || '',
+                icon: payload.icon || fallback.icon,
+                badge: payload.badge || fallback.badge,
+                tag: payload.tag,
+                renotify: Boolean(payload.renotify),
+                requireInteraction: Boolean(payload.requireInteraction),
+                data: {
+                  ...(payload.data || fallback.data),
+                  url:
+                    typeof payload.url === 'string' && payload.url
+                      ? payload.url
+                      : payload.data?.url || fallback.data.url,
+                  type: payload.type,
+                  room_id: payload.room_id,
+                },
+              },
+            );
+          }
+
+          return undefined;
+        }),
+    );
+    return;
+  }
 
   if (isCallCleanup) {
     const tag =
