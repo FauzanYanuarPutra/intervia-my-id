@@ -104,6 +104,19 @@ export default async function ContentDetailPage({ params }: PageProps) {
     if (referenceStore && isPublicUmkmReferenceVisible(referenceStore)) {
       permanentRedirect('/' + locale + '/toko/' + encodeURIComponent(referenceStore.slug));
     }
+
+    const referenceSlug =
+      typeof (result.content as { slug?: unknown }).slug === 'string' &&
+      String((result.content as { slug?: unknown }).slug).trim()
+        ? String((result.content as { slug?: unknown }).slug).trim()
+        : id;
+
+    permanentRedirect(
+      '/' +
+        locale +
+        '/umkm?view=map&store=' +
+        encodeURIComponent(referenceSlug),
+    );
   }
 
   const ownerEditHref = isPublicEditorialContent(result.content)
