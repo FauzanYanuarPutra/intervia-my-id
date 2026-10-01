@@ -826,8 +826,8 @@ export function buildUmkmPlacePresentation(
       return !Boolean(media.coverUrl || media.logoUrl);
     })(),
     gallery: getGalleryImages(place, kind)
-      .map(image => image.trim())
-      .filter(Boolean),
+      .filter((image): image is string => typeof image === 'string' && image.trim().length > 0)
+      .map(image => image.trim()),
     distanceLabel,
     priceLabel: inferPriceLabel(place, isId),
     serviceBadges: getServiceBadges(place, isId, presenceStatus),
