@@ -68,7 +68,7 @@ function normalizeContributionMediaUrl(url: string): string {
 }
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ storeId: string }> },
 ) {
   const { storeId } = await params;
@@ -76,11 +76,17 @@ export async function GET(
     return NextResponse.json({ error: 'Store tidak valid.' }, { status: 400 });
   }
 
+  const auth = await requireAuth(req);
+  if (!auth.ok) return auth.res;
+
   try {
     const upstream = await fetch(
       `${MARKETPLACE_URL}/v1/umkm/stores/${encodeURIComponent(storeId)}/media/contributions`,
       {
-        headers: { Accept: 'application/json' },
+        headers: {
+          Accept: 'application/json',
+          Authorization: `Bearer ${auth.ctx.token}`,
+        },
         cache: 'no-store',
         signal: AbortSignal.timeout(10000),
       },
