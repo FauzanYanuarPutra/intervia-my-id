@@ -2350,6 +2350,10 @@ export async function GET(
         businessesResult.payload,
       )?.data,
     );
+  const businessNextCursor =
+    nextContentOffsetCursor(
+      businessPayload,
+    );
 
   const referencePayload =
     asRecord(
@@ -2530,6 +2534,8 @@ export async function GET(
         : null,
       relevanceQuery,
     );
+
+  response.groups.businesses.nextCursor = businessNextCursor;
 
   response.groups.communities =
     group(
