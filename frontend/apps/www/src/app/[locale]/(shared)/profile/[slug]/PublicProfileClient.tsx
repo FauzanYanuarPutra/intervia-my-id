@@ -1605,7 +1605,9 @@ export default function PublicProfileClient({
         if (listingResponse.ok) {
           const listingPayload = await listingResponse.json().catch(() => ({}));
 
-          nextListings = extractContentItems(listingPayload).map(item => {
+          nextListings = extractContentItems(listingPayload)
+            .filter(item => String(item.owner_id ?? '').trim() === nextProfile!.id)
+            .map(item => {
             const raw = item as unknown as ProfileRecord;
             const metadata = asRecord(item.metadata) || {};
 
@@ -2521,7 +2523,24 @@ export default function PublicProfileClient({
                             </div>
                           </Link>
 
-                          {!isOwnProfile ? (
+                          {isOwnProfile ? (
+                            <div className="grid grid-cols-2 gap-2 px-2.5 pb-2.5 sm:px-3 sm:pb-3">
+                              <Link
+                                href={`/create?draft=${encodeURIComponent(item.id)}`}
+                                className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-[10px] font-black text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)] dark:text-[color:var(--app-text-inverse)]"
+                              >
+                                <Edit3 className="h-3.5 w-3.5" />
+                                {localeCode === 'id' ? 'Ubah' : 'Edit'}
+                              </Link>
+                              <Link
+                                href={href}
+                                className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl bg-emerald-50 px-3 text-[10px] font-black text-emerald-700 transition hover:bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300"
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                                {localeCode === 'id' ? 'Lihat' : 'View'}
+                              </Link>
+                            </div>
+                          ) : (
                             <div className="px-2.5 pb-2.5 sm:px-3 sm:pb-3">
                               <button
                                 type="button"
@@ -2546,7 +2565,7 @@ export default function PublicProfileClient({
                                 {copy.askDetails}
                               </button>
                             </div>
-                          ) : null}
+                          )}
                         </article>
                       );
                     })}
