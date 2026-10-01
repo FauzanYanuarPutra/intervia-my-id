@@ -1192,9 +1192,9 @@ fn valid_store_media_url(value: &str) -> bool {
                     .chars()
                     .next()
                     .is_some_and(|value| value.is_ascii_alphanumeric())
-                && segment.chars().all(|value| {
-                    value.is_ascii_alphanumeric() || matches!(value, '.' | '_' | '-')
-                })
+                && segment
+                    .chars()
+                    .all(|value| value.is_ascii_alphanumeric() || matches!(value, '.' | '_' | '-'))
         })
 }
 
