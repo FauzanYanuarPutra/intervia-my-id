@@ -1,9 +1,8 @@
 name: Temp Refresh Frontend Lockfiles
 
 on:
-  push:
-    branches:
-      - fix/location-media-map-current
+  pull_request:
+    types: [opened, synchronize]
 
 permissions:
   contents: write
