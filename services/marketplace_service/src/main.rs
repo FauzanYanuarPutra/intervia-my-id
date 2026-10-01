@@ -16,7 +16,11 @@
             existing.content_status.trim().to_ascii_lowercase().as_str(),
             "active" | "published" | "live"
         );
-    if was_live_before_edit && content_status.eq_ignore_ascii_case("active") {
+    let requested_live_status = matches!(
+        content_status.trim().to_ascii_lowercase().as_str(),
+        "active" | "published" | "live"
+    );
+    if was_live_before_edit && requested_live_status {
         content_status = "draft".to_string();
     }
     let owner_revision_pending =
