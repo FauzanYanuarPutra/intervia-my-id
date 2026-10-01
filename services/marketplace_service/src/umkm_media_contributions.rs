@@ -197,7 +197,7 @@ pub(crate) async fn list_media_contributions(
                 r#"
                 SELECT id, media_url, media_type, caption,
                        uploader_name_snapshot, uploader_username_snapshot,
-                       status, review_note
+                       'approved'::text AS status, NULL::text AS review_note
                 FROM umkm_store_media_contributions
                 WHERE store_id = $1 AND status = 'approved'
                 ORDER BY is_primary DESC, created_at DESC
@@ -214,7 +214,7 @@ pub(crate) async fn list_media_contributions(
                 r#"
                 SELECT id, media_url, media_type, caption,
                        uploader_name_snapshot, uploader_username_snapshot,
-                       status, review_note
+                       'approved'::text AS status, NULL::text AS review_note
                 FROM umkm_store_media_contributions
                 WHERE reference_content_id = $1 AND status = 'approved'
                 ORDER BY is_primary DESC, created_at DESC
@@ -299,7 +299,7 @@ pub(crate) async fn list_media_contributions(
                 FROM umkm_store_media_contributions
                 WHERE store_id = $1
                   AND uploader_user_id <> $2
-                  AND status IN ('pending','rejected','hidden')
+                  AND status = 'pending'
                 ORDER BY created_at ASC
                 LIMIT $3
                 "#,
