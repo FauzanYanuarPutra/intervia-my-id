@@ -405,13 +405,28 @@ impl DataResetRepository {
             }
             Err(error) => {
                 let code = reset_error_code(&error);
+                let mut tx = self.db.begin().await?;
                 sqlx::query(
                     "UPDATE business_data_reset_batches SET status='partial',error_code=$2,completed_at=NOW() WHERE id=$1",
                 )
                 .bind(batch_id)
                 .bind(code)
-                .execute(&self.db)
+                .execute(&mut *tx)
                 .await?;
+                audit::record_tx(
+                    &mut tx,
+                    organization_id,
+                    business_id,
+                    None,
+                    Some(actor_id),
+                    "business.data_reset.partial",
+                    "business_data_reset_batch",
+                    Some(batch_id),
+                    Some(request.reason.trim()),
+                    json!({"scopes":scopes,"error_code":code}),
+                )
+                .await?;
+                tx.commit().await?;
                 return Err(error);
             }
         }
