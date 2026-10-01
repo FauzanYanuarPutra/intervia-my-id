@@ -1292,7 +1292,7 @@ function mapContentToRecommendation(
     verified: item.owner_profile?.identity_verified === true,
     side,
     imageAttribution: contentImageAttribution(item) || undefined,
-    ownerId: item.owner_id || null,
+    ownerId: isRealOwnerId(item.owner_id) ? item.owner_id! : null,
     contentStatus:
       readText(item.content_status) ||
       readText(item.status) ||
