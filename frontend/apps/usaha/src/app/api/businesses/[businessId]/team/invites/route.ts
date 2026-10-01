@@ -51,6 +51,7 @@ export async function POST(
       username?: string;
       role?: PortalRole;
     };
+    const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() || '';
     const username = body.username?.trim().replace(/^@/, '') || '';
     const role = organizationRoleByPortalRole[body.role ?? 'cashier'];
 
@@ -69,6 +70,7 @@ export async function POST(
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
           Accept: 'application/json',
+          ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}),
         },
         body: JSON.stringify({ username, role }),
         cache: 'no-store',
