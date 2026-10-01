@@ -220,6 +220,16 @@ function buildMarkerSymbolSvg(input: {
     `;
   }
 
+  if (input.kind === 'retail') {
+    return `
+      <svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M5 8h14l-1 12H6L5 8Z" stroke="#ffffff" stroke-width="${strokeWidth}" stroke-linejoin="round"/>
+        <path d="M8 8V6a4 4 0 0 1 8 0v2" stroke="#ffffff" stroke-width="${strokeWidth}" stroke-linecap="round"/>
+        <path d="M9 12h6" stroke="#ffffff" stroke-width="${strokeWidth}" stroke-linecap="round"/>
+      </svg>
+    `;
+  }
+
   if (input.kind === 'agri') {
     return `
       <svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" aria-hidden="true">
