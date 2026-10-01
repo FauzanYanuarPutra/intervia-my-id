@@ -22,7 +22,7 @@ fn provision_request(organization_id: Uuid) -> ProvisionBusinessRequest {
         business: BusinessInput {
             name: "Reset Integration Test".to_owned(),
             capability_key: "general".to_owned(),
-            profile: Some(BusinessProfileInput::default()),
+            profile: Some(BusinessProfileInput { template_key: "general".to_owned(), ..BusinessProfileInput::default() }),
         },
         primary_location: PrimaryLocationInput {
             name: "Lokasi utama".to_owned(),
