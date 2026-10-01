@@ -150,6 +150,25 @@ function getMapViewportFetchLimit(zoom: number): number {
 }
 const REPORT_EMAIL = 'support@lajukan.com';
 
+function readUmkmAddressText(value: unknown, fallback = ''): string {
+  if (typeof value === 'string' && value.trim()) return value.trim();
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const record = value as Record<string, unknown>;
+    for (const key of ['formatted', 'label', 'street', 'address', 'name', 'city']) {
+      const nested = record[key];
+      if (typeof nested === 'string' && nested.trim()) return nested.trim();
+    }
+  }
+  return fallback;
+}
+
+function isUuidLike(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value.trim(),
+  );
+}
+
 function formatDiscoveryPrice(valueCents: number, isId: boolean): string {
   const value = Math.max(0, Math.round(valueCents / 100));
   return new Intl.NumberFormat(isId ? 'id-ID' : 'en-US', {
@@ -1632,7 +1651,7 @@ export function UmkmDiscoveryPanel({
 
             const points = (payload.data?.items || [])
               .filter(point => isCoordinateValid({ lat: point.lat, lng: point.lng }))
-              .map(point => ({
+              .map<UmkmMapStore>(point => ({
                 id: point.id,
                 slug: point.slug,
                 name: point.name,
@@ -1641,10 +1660,13 @@ export function UmkmDiscoveryPanel({
                 updated_at: point.updated_at || null,
                 created_at: point.created_at || null,
                 address:
-                  point.address ||
-                  point.metadata?.address ||
-                  point.city ||
-                  'Lokasi belum tersedia',
+                  readUmkmAddressText(
+                point.address,
+                readUmkmAddressText(
+                  point.metadata?.address,
+                  point.city || 'Lokasi belum tersedia',
+                ),
+              ),
                 lat: point.lat,
                 lng: point.lng,
                 description:
@@ -1800,10 +1822,13 @@ export function UmkmDiscoveryPanel({
           {
             ...point,
             address:
-              point.address ||
-              point.metadata?.address ||
-              point.city ||
-              'Lokasi belum tersedia',
+              readUmkmAddressText(
+                point.address,
+                readUmkmAddressText(
+                  point.metadata?.address,
+                  point.city || 'Lokasi belum tersedia',
+                ),
+              ),
             description: point.description ?? null,
             phone: point.phone ?? null,
             metadata: point.metadata ?? {},
@@ -1817,10 +1842,13 @@ export function UmkmDiscoveryPanel({
             name: point.name,
             description: point.description,
             address:
-              point.address ||
-              point.metadata?.address ||
-              point.city ||
-              'Lokasi belum tersedia',
+              readUmkmAddressText(
+                point.address,
+                readUmkmAddressText(
+                  point.metadata?.address,
+                  point.city || 'Lokasi belum tersedia',
+                ),
+              ),
             metadata: point.metadata,
           },
           category,
