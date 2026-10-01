@@ -341,7 +341,10 @@ pub(crate) async fn list_media_contributions(
         {
             Ok(contributions) => my_items = contributions,
             Err(error) => {
-                tracing::error!("load viewer reference media contributions error: {:?}", error);
+                tracing::error!(
+                    "load viewer reference media contributions error: {:?}",
+                    error
+                );
                 return error_response(
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "failed to load media status",
