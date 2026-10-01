@@ -356,6 +356,10 @@ services:
       LOG_FORMAT: ${LOG_FORMAT:-}
       HTTP_MAX_IN_FLIGHT: ${MARKETPLACE_HTTP_MAX_IN_FLIGHT:-512}
       MARKETPLACE_SOURCE_BOOTSTRAP: ${MARKETPLACE_SOURCE_BOOTSTRAP:-false}
+      # Keep schema migrations deterministic for the self-contained marketplace deployment.
+      # SQLx migrations are transactional/idempotent, so startup can safely bring a new
+      # release (including business data reset storage) up to the current schema.
+      RUN_MIGRATIONS_ON_STARTUP: ${RUN_MIGRATIONS_ON_STARTUP:-true}
       MARKETPLACE_DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@marketplace_db:5432/marketplace_db
       MARKETPLACE_DB_MAX_CONNECTIONS: ${MARKETPLACE_DB_MAX_CONNECTIONS:-20}
       MARKETPLACE_DB_MIN_CONNECTIONS: ${MARKETPLACE_DB_MIN_CONNECTIONS:-2}
