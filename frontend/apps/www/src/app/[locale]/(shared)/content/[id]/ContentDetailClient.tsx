@@ -1025,7 +1025,7 @@ export default function ContentDetailClient({
       kind: contentType,
       typeLabel,
       actionLabel: locale === 'id' ? 'Buka lagi' : 'Open again',
-      location: location || 'Indonesia',
+      location,
       priceLabel,
       priceCents:
         typeof item.price_cents === 'number' &&
