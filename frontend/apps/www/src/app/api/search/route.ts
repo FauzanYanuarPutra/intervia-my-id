@@ -945,6 +945,23 @@ function mapPublicReferenceItem(
       reference.imageAttribution,
     );
 
+  const referenceSlug = firstString(
+    item.slug,
+    metadata.slug,
+  );
+
+  const referencePublicPath = firstString(
+    item.public_path,
+    metadata.public_path,
+  );
+
+  const referenceHref =
+    referencePublicPath.startsWith('/toko/')
+      ? referencePublicPath
+      : referenceSlug
+        ? buildUmkmStorefrontPath(referenceSlug)
+        : safeContentHref(referencePublicPath, contentId);
+
   return {
     id,
     kind: 'references',
@@ -967,10 +984,7 @@ function mapPublicReferenceItem(
       320,
     ),
 
-    href: safeContentHref(
-      item.public_path,
-      contentId,
-    ),
+    href: referenceHref,
 
     image:
       safeInternalReferenceImage(
