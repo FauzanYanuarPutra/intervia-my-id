@@ -104,7 +104,7 @@ function cacheMapPoints(key: string, payload: MapPointsPayload): void {
     payload,
   });
 
-  while (MAP_POINTS_CACHE.size > 120) {
+  while (MAP_POINTS_CACHE.size > 32) {
     const oldestKey = MAP_POINTS_CACHE.keys().next().value;
     if (typeof oldestKey !== 'string') break;
     MAP_POINTS_CACHE.delete(oldestKey);
@@ -189,8 +189,9 @@ export async function GET(req: NextRequest) {
     if (hasViewer) { params.set('viewer_lat', String(viewerLat)); params.set('viewer_lng', String(viewerLng)); }
     if (normalizedRadius !== undefined) params.set('radius_km', String(normalizedRadius));
 
+    const canUseServerCache = !hasViewer;
     const cacheKey = mapPointsCacheKey(params);
-    const cached = getCachedMapPoints(cacheKey);
+    const cached = canUseServerCache ? getCachedMapPoints(cacheKey) : null;
     if (cached) {
       return NextResponse.json(
         { data: cached.payload },
@@ -211,7 +212,9 @@ export async function GET(req: NextRequest) {
         `${MARKETPLACE_URL}/v1/map/places?${params.toString()}`,
       );
     } catch (fetchError) {
-      const stale = getCachedMapPoints(cacheKey, true);
+      const stale = canUseServerCache
+        ? getCachedMapPoints(cacheKey, true)
+        : null;
       if (stale) {
         console.warn('[UMKM_MAP_POINTS_STALE]', fetchError);
         return NextResponse.json(
@@ -230,7 +233,9 @@ export async function GET(req: NextRequest) {
     }
 
     if (!response.ok) {
-      const stale = getCachedMapPoints(cacheKey, true);
+      const stale = canUseServerCache
+        ? getCachedMapPoints(cacheKey, true)
+        : null;
       if (stale) {
         return NextResponse.json(
           { data: stale.payload, transient: true },
@@ -270,7 +275,9 @@ export async function GET(req: NextRequest) {
       items,
       total_count: payload.total_count,
     });
-    cacheMapPoints(cacheKey, normalizedPayload);
+    if (canUseServerCache) {
+      cacheMapPoints(cacheKey, normalizedPayload);
+    }
 
     return NextResponse.json(
       {
