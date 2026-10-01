@@ -11594,14 +11594,6 @@ async fn list_map_places(
               NULLIF(c.metadata->>'public_path', ''),
               '/content/' || c.id::text
             ) AS public_path,
-            COALESCE(
-              NULLIF(c.metadata->>'public_path', ''),
-              '/content/' || c.id::text
-            ) AS public_path,
-            COALESCE(
-              NULLIF(c.metadata->>'public_path', ''),
-              '/content/' || c.id::text
-            ) AS public_path,
             jsonb_strip_nulls(jsonb_build_object(
               'marketplace_category_slug', NULLIF(lower(c.metadata->>'marketplace_category_slug'), ''),
               'umkm_category', NULLIF(lower(c.metadata->>'umkm_category'), ''),
@@ -11697,6 +11689,10 @@ async fn list_map_places(
               NULLIF(lower(c.category), ''),
               'business'
             ) AS category,
+            COALESCE(
+              NULLIF(c.metadata->>'public_path', ''),
+              '/content/' || c.id::text
+            ) AS public_path,
             jsonb_strip_nulls(jsonb_build_object(
               'marketplace_category_slug', NULLIF(lower(c.metadata->>'marketplace_category_slug'), ''),
               'marketplace_subcategory_slug', NULLIF(lower(c.metadata->>'marketplace_subcategory_slug'), ''),
