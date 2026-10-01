@@ -80,17 +80,6 @@ const HOME_MAP_REFERENCE_LEGEND = {
   color: '#94a3b8',
 };
 
-type HomeMapDataMode = 'synthetic' | 'real';
-
-/**
- * Keep the preview intentionally synthetic until nationwide real coverage is
- * complete. The real dataset is still fetched and preserved, and Lajukan
- * businesses are layered above the demo points so the preview never hides
- * genuine Lajukan records.
- */
-const HOME_MAP_DATA_MODE: HomeMapDataMode = 'real';
-
-
 
 function normalizeMapPointItem(item: {
   id?: unknown;
@@ -246,18 +235,7 @@ export function HomeBusinessMapSection({
 
   const mapHref = `${UMKM_DISCOVERY_PATH}?view=map`;
 
-  const realLajukanStores = useMemo(
-    () =>
-      stores.filter(
-        store => getUmkmMapSourceKind(store) === 'lajukan',
-      ),
-    [stores],
-  );
-
-  const displayStores = useMemo(() => {
-    if (HOME_MAP_DATA_MODE === 'real') return stores;
-    return [...realLajukanStores];
-  }, [realLajukanStores, stores]);
+  const displayStores = stores;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -515,22 +493,17 @@ export function HomeBusinessMapSection({
           <p className="truncate text-[9px] font-medium text-slate-500 sm:text-[10px]">
             {loading
               ? isId
-                ? "Menyiapkan peta…" 
-                : "Preparing the map…" 
+                ? 'Menyiapkan peta…'
+                : 'Preparing the map…'
               : error && summary.mappedCount === 0
                 ? isId
-                  ? "Data titik peta belum termuat"
-                  : "Map point data unavailable"
+                  ? 'Data titik peta belum termuat'
+                  : 'Map point data unavailable'
                 : totalMappedCount > 0
                   ? isId
                     ? [
-                        (HOME_MAP_DATA_MODE === 'synthetic'
-                          ? summary.mappedCount
-                          : summary.mappedCount
-                        ).toLocaleString('id-ID'),
-                        HOME_MAP_DATA_MODE === 'synthetic'
-                          ? 'titik contoh'
-                          : 'titik ditampilkan',
+                        summary.mappedCount.toLocaleString('id-ID'),
+                        'titik ditampilkan',
                         '·',
                         String(summary.lajukanBusinessCount),
                         'usaha Lajukan',
@@ -543,19 +516,13 @@ export function HomeBusinessMapSection({
                         '·',
                         String(summary.cityCount),
                         'kota',
-                        HOME_MAP_DATA_MODE === 'real' &&
                         totalMappedCount > summary.mappedCount
                           ? ['· total', totalMappedCount.toLocaleString('id-ID')].join(' ')
                           : '',
                       ].filter(Boolean).join(' ')
                     : [
-                        (HOME_MAP_DATA_MODE === 'synthetic'
-                          ? INDONESIA_MAP_DEMO_POINTS.length
-                          : summary.mappedCount
-                        ).toLocaleString('en-US'),
-                        HOME_MAP_DATA_MODE === 'synthetic'
-                          ? 'demo points'
-                          : 'points shown',
+                        summary.mappedCount.toLocaleString('en-US'),
+                        'points shown',
                         '·',
                         String(summary.lajukanBusinessCount),
                         'Lajukan businesses',
@@ -568,14 +535,13 @@ export function HomeBusinessMapSection({
                         '·',
                         String(summary.cityCount),
                         'cities',
-                        HOME_MAP_DATA_MODE === 'real' &&
                         totalMappedCount > summary.mappedCount
                           ? ['· total', totalMappedCount.toLocaleString('en-US')].join(' ')
                           : '',
                       ].filter(Boolean).join(' ')
                   : isId
-                    ? "Belum ada lokasi terpetakan"
-                    : "No mapped locations"}
+                    ? 'Belum ada lokasi terpetakan'
+                    : 'No mapped locations'}
           </p>
         </div>
 
@@ -618,11 +584,8 @@ export function HomeBusinessMapSection({
         <div className="pointer-events-none absolute inset-x-2.5 bottom-2.5 z-10 flex items-center justify-between gap-2 sm:inset-x-3 sm:bottom-3">
           <span className="rounded-full border border-white/90 bg-white/92 px-2.5 py-1.5 text-[8px] font-black text-slate-700 shadow-sm backdrop-blur sm:text-[9px]">
             Indonesia
-            {!loading && !error && totalMappedCount > 0
-              ? ` · ${HOME_MAP_DATA_MODE === 'synthetic'
-                  ? INDONESIA_MAP_DEMO_POINTS.length
-                  : totalMappedCount
-                } ${isId && HOME_MAP_DATA_MODE === 'synthetic' ? 'contoh' : 'titik'}`
+            {!loading && !error && summary.mappedCount > 0
+              ? ` · ${summary.mappedCount.toLocaleString(isId ? 'id-ID' : 'en-US')} ${isId ? 'titik' : 'points'}`
               : ''}
           </span>
           <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white shadow-[0_10px_24px_-12px_rgba(5,150,105,0.9)] transition-transform duration-200 group-hover/map:translate-x-0.5 group-hover/map:scale-105">
