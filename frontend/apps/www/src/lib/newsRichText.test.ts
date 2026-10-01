@@ -30,7 +30,7 @@ describe('news rich text hardening', () => {
   it('normalizes escaped Windows line endings, tabs, Unicode separators, and null bytes', () => {
     expect(
       normalizeNewsRichBody('A\\r\\nB\\n\\nC\\tD\\u2028E\\u2029F\\u0000', ''),
-    ).toBe('<p>A<br />B</p><p>C    D<br />E<br />F</p>');
+    ).toBe('<p>A<br />B</p><p>C&nbsp;&nbsp;&nbsp; D<br />E<br />F</p>');
   });
 
   it('escapes HTML when normalizing plain rich-body text', () => {
