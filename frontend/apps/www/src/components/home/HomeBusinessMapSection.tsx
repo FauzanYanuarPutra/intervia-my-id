@@ -13,6 +13,9 @@ import {
   UMKM_DISCOVERY_PATH,
 } from '@/lib/umkmSurface';
 import { UmkmStoreMap, type UmkmMapStore } from '@/components/super-app/UmkmStoreMap';
+import {
+  INDONESIA_MAP_DEMO_POINTS,
+} from '@/lib/super-app/indonesiaMapDemoData';
 
 type HomeBusinessMapSectionProps = {
   locale: string;
@@ -79,6 +82,16 @@ const HOME_MAP_REFERENCE_LEGEND = {
   labelEn: 'Public locations',
   color: '#94a3b8',
 };
+
+type HomeMapDataMode = 'synthetic' | 'real';
+
+/**
+ * Keep the preview intentionally synthetic until nationwide real coverage is
+ * complete. The real dataset is still fetched and preserved, and Lajukan
+ * businesses are layered above the demo points so the preview never hides
+ * genuine Lajukan records.
+ */
+const HOME_MAP_DATA_MODE: HomeMapDataMode = 'synthetic';
 
 
 
@@ -235,6 +248,19 @@ export function HomeBusinessMapSection({
   const [totalMappedCount, setTotalMappedCount] = useState(0);
 
   const mapHref = `${UMKM_DISCOVERY_PATH}?view=map`;
+
+  const realLajukanStores = useMemo(
+    () =>
+      stores.filter(
+        store => getUmkmMapSourceKind(store) === 'lajukan',
+      ),
+    [stores],
+  );
+
+  const displayStores = useMemo(() => {
+    if (HOME_MAP_DATA_MODE === 'real') return stores;
+    return [...realLajukanStores, ...INDONESIA_MAP_DEMO_POINTS];
+  }, [realLajukanStores, stores]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -500,7 +526,9 @@ export function HomeBusinessMapSection({
                   ? isId
                     ? [
                         summary.mappedCount.toLocaleString('id-ID'),
-                        'titik ditampilkan',
+                        HOME_MAP_DATA_MODE === 'synthetic'
+                          ? 'titik contoh'
+                          : 'titik ditampilkan',
                         '·',
                         String(summary.lajukanBusinessCount),
                         'usaha Lajukan',
@@ -518,8 +546,13 @@ export function HomeBusinessMapSection({
                           : '',
                       ].filter(Boolean).join(' ')
                     : [
-                        summary.mappedCount.toLocaleString('en-US'),
-                        'points shown',
+                        (HOME_MAP_DATA_MODE === 'synthetic'
+                          ? INDONESIA_MAP_DEMO_POINTS.length
+                          : summary.mappedCount
+                        ).toLocaleString('en-US'),
+                        HOME_MAP_DATA_MODE === 'synthetic'
+                          ? 'demo points'
+                          : 'points shown',
                         '·',
                         String(summary.lajukanBusinessCount),
                         'Lajukan businesses',
@@ -564,7 +597,7 @@ export function HomeBusinessMapSection({
         onKeyDown={handleMapKeyDown}
       >
         <UmkmStoreMap
-          stores={summary.validStores}
+          stores={displayStores}
           isId={isId}
           interactive={false}
           controls={false}
@@ -582,7 +615,10 @@ export function HomeBusinessMapSection({
           <span className="rounded-full border border-white/90 bg-white/92 px-2.5 py-1.5 text-[8px] font-black text-slate-700 shadow-sm backdrop-blur sm:text-[9px]">
             Indonesia
             {!loading && !error && totalMappedCount > 0
-              ? ` · ${totalMappedCount.toLocaleString('id-ID')} titik`
+              ? ` · ${HOME_MAP_DATA_MODE === 'synthetic'
+                  ? INDONESIA_MAP_DEMO_POINTS.length
+                  : totalMappedCount
+                } ${isId && HOME_MAP_DATA_MODE === 'synthetic' ? 'contoh' : 'titik'}`
               : ''}
           </span>
           <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white shadow-[0_10px_24px_-12px_rgba(5,150,105,0.9)] transition-transform duration-200 group-hover/map:translate-x-0.5 group-hover/map:scale-105">
