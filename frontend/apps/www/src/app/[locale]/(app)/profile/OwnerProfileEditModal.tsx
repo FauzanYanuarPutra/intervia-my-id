@@ -643,8 +643,14 @@ export function OwnerProfileEditModal({
     };
     await updateProfile({
       provider_profile: payload,
+      roles: Array.from(
+        new Set([...toStringList(metadata.roles), ...businessNetwork.roles]),
+      ).slice(0, 16),
       metadata: {
         ...metadata,
+        roles: Array.from(
+          new Set([...toStringList(metadata.roles), ...businessNetwork.roles]),
+        ).slice(0, 16),
         provider_profile: { ...asRecord(metadata.provider_profile), ...payload },
         business_network: businessNetwork,
       },
