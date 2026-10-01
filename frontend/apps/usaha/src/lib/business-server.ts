@@ -854,6 +854,7 @@ export async function updateBusiness(
     longitude?: number | null;
     metadataPatch?: JsonRecord;
     reason?: string;
+    expectedVersion?: number;
     logo?: BusinessImageValue;
     banner?: BusinessImageValue;
   },
@@ -877,7 +878,7 @@ export async function updateBusiness(
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          expected_version: current.version ?? 1,
+          expected_version: input.expectedVersion ?? current.version ?? 1,
           name: input.name ?? current.name,
           capability_key: current.capabilityKey ?? 'general',
           category: input.category ?? current.category,
@@ -918,7 +919,7 @@ export async function updateBusiness(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        expected_version: current.version ?? 1,
+        expected_version: input.expectedVersion ?? current.version ?? 1,
         name: input.name ?? current.name,
         capability_key: current.capabilityKey ?? 'general',
         category,
