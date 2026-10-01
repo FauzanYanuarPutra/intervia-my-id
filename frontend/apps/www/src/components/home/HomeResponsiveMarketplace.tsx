@@ -4724,7 +4724,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
           </div>
 
           <main
-            className="min-h-0 min-w-0 overflow-x-hidden overscroll-contain px-1 pb-2 sm:px-0 lg:overflow-y-auto lg:pr-1 lg:pt-2"
+            className="h-auto min-h-0 min-w-0 overflow-x-hidden overscroll-y-contain px-1 pb-2 sm:px-0 lg:h-full lg:overflow-y-auto lg:overscroll-y-contain lg:touch-pan-y lg:pr-1 lg:pt-2"
             data-auto-scrollbar
           >
             <div className="mx-auto w-full max-w-[720px] space-y-3.5 pb-5 sm:space-y-4 lg:max-w-none">
