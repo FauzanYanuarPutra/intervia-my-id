@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 use super::{
     domain::{
-        BusinessInput, BusinessProfileUpdateRequest, OrganizationMode, OrganizationSelection,
+        BusinessInput, OrganizationMode, OrganizationSelection,
         PrimaryLocationInput, ProvisionBusinessRequest, StorefrontInput,
     },
     profile::BusinessProfileInput,
