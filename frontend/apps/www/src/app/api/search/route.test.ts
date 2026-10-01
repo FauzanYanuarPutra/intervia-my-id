@@ -344,12 +344,12 @@ describe('GET /api/search', () => {
     });
 
     const response = await GET(
-      searchRequest('q=kopi&tab=businesses&side=supply'),
+      searchRequest('q=kopi&tab=businesses&side=all'),
     );
     const payload = await response.json();
 
     expect(response.status).toBe(200);
-    expect(payload.groups.businesses.items).toHaveLength(0);
+    expect(payload.groups.businesses.items[0].href).toBe('/toko/warung-kopi-nusantara');
   });
 
   it('browses supply and demand tabs without requiring a keyword', async () => {
