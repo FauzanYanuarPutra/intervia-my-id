@@ -65,6 +65,7 @@ type UmkmStoreMapClientProps = {
   focusOffset?: UmkmMapFocusOffset;
   onBoundsChange?: (bounds: UmkmMapBounds) => void;
   markerStyle?: 'default' | 'dots';
+  animateDataDots?: boolean;
 };
 
 type RoutingResponse = {
