@@ -342,7 +342,7 @@ impl DataResetRepository {
         .bind(business_id)
         .bind(organization_id)
         .bind(idempotency_key)
-        .bind(request_hash(&request, &scopes)?)
+        .bind(&hash)
         .bind(json!(scopes))
         .bind(request.reason.trim())
         .bind(json!({}))
@@ -769,6 +769,7 @@ async fn compensate_finance_entries_tx(
             ($4 AND lower(entry.entry_type) IN ('capital_income','owner_capital','owner_draw','owner_drawing'))
           )
         ORDER BY entry.created_at,entry.id
+        FOR UPDATE
         "#,
     )
     .bind(business_id)
