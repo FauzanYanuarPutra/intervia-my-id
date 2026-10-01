@@ -261,47 +261,25 @@ pub(crate) async fn list_media_contributions(
         .await
         .unwrap_or(false);
 
-        match sqlx::query_as::<_, MediaContributionRow>(
+        let my_result = sqlx::query_as::<_, MediaContributionRow>(
             r#"
             SELECT id, media_url, media_type, caption,
                    uploader_name_snapshot, uploader_username_snapshot,
                    status, review_note
             FROM umkm_store_media_contributions
-            WHERE store_id = $1
-              AND (
-                uploader_user_id = $2
-                OR ($3 = TRUE AND status IN ('pending','rejected','hidden'))
-              )
+            WHERE store_id = $1 AND uploader_user_id = $2
             ORDER BY created_at DESC
-            LIMIT $4
+            LIMIT $3
             "#,
         )
         .bind(store_id)
         .bind(viewer_user_id)
-        .bind(is_store_owner)
         .bind(MAX_ITEMS)
         .fetch_all(&state.db)
-        .await
-        {
-            Ok(contributions) => {
-                my_items = contributions
-                    .iter()
-                    .filter(|item| {
-                        !is_store_owner
-                            || item.status == "approved"
-                            || item.status == "rejected"
-                            || item.status == "hidden"
-                            || item.status == "pending"
-                    })
-                    .cloned()
-                    .collect();
-                if is_store_owner {
-                    queue_items = contributions
-                        .into_iter()
-                        .filter(|item| item.status != "approved")
-                        .collect();
-                }
-            }
+        .await;
+
+        match my_result {
+            Ok(contributions) => my_items = contributions,
             Err(error) => {
                 tracing::error!("load viewer media contributions error: {:?}", error);
                 return error_response(
@@ -309,6 +287,38 @@ pub(crate) async fn list_media_contributions(
                     "failed to load media status",
                 )
                 .into_response();
+            }
+        }
+
+        if is_store_owner {
+            match sqlx::query_as::<_, MediaContributionRow>(
+                r#"
+                SELECT id, media_url, media_type, caption,
+                       uploader_name_snapshot, uploader_username_snapshot,
+                       status, review_note
+                FROM umkm_store_media_contributions
+                WHERE store_id = $1
+                  AND uploader_user_id <> $2
+                  AND status IN ('pending','rejected','hidden')
+                ORDER BY created_at ASC
+                LIMIT $3
+                "#,
+            )
+            .bind(store_id)
+            .bind(viewer_user_id)
+            .bind(MAX_ITEMS)
+            .fetch_all(&state.db)
+            .await
+            {
+                Ok(contributions) => queue_items = contributions,
+                Err(error) => {
+                    tracing::error!("load store media queue error: {:?}", error);
+                    return error_response(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "failed to load media queue",
+                    )
+                    .into_response();
+                }
             }
         }
     } else if let MediaTarget::Reference(reference_id) = target {
