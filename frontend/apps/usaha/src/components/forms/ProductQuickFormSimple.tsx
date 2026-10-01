@@ -78,6 +78,11 @@ export function ProductQuickForm({ businessId }: ProductQuickFormProps) {
       setError('Stok tidak boleh kurang dari 0.');
       return;
     }
+    const normalizedMinStockAlert = minStockAlert.trim() ? Number(minStockAlert) : null;
+    if (normalizedMinStockAlert !== null && (!Number.isFinite(normalizedMinStockAlert) || normalizedMinStockAlert < 0)) {
+      setError('Batas stok tipis harus berupa angka nol atau lebih.');
+      return;
+    }
 
     setError('');
     setSuccess('');
@@ -93,7 +98,7 @@ export function ProductQuickForm({ businessId }: ProductQuickFormProps) {
           sourceType,
           ownerLabel: ownerLabel.trim(),
           stockCount: normalizedStock,
-          minStockAlert: minStockAlert.trim() ? Number(minStockAlert) : null,
+          minStockAlert: normalizedMinStockAlert,
           stockUnit: stockUnit.trim() || 'pcs',
           stockMode,
           consignmentTerms: consignmentTerms.trim(),
