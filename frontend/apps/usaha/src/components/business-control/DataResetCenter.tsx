@@ -74,8 +74,8 @@ export function DataResetCenter({ business }: Props) {
       },
       {
         id: 'sales_transactions',
-        title: 'Transaksi penjualan',
-        description: 'Void semua transaksi penjualan yang masih terbuka. Stok dan uang ikut dikoreksi lewat flow transaksi.',
+        title: 'Transaksi penjualan manual',
+        description: 'Void transaksi penjualan manual yang masih bisa dikoreksi. Stok dan uang ikut dibalik lewat flow transaksi.',
         countKey: 'sales_transactions',
         allowed: canByRole(business, 'sales_transactions'),
       },
@@ -386,7 +386,7 @@ export function DataResetCenter({ business }: Props) {
             </button>
           </div>
           <p className="mt-3 text-[11px] leading-5 text-portal-soft">
-            Reset tidak menghapus histori. Untuk transaksi, sistem memakai flow void/koreksi yang sudah ada agar stok dan uang tidak ikut rusak.
+            Reset tidak menghapus histori. Transaksi manual memakai flow void/koreksi yang sudah ada; order terhubung dan periode yang sudah ditutup tetap dilindungi.
           </p>
         </section>
       ) : (
@@ -406,7 +406,7 @@ export function DataResetCenter({ business }: Props) {
           <div>
             <p className="font-black text-portal-ink">Yang tidak disentuh</p>
             <p className="mt-1 text-xs leading-5 text-portal-soft">
-              Profil usaha, anggota tim, hak akses, audit trail, histori koreksi, data publik, dan bukti transaksi lama tetap dipertahankan. Tujuannya merapikan keadaan operasional, bukan menghilangkan jejak.
+              Profil usaha, anggota tim, hak akses, audit trail, histori koreksi, data publik, order/pesanan terhubung, settlement, dan bukti transaksi lama tetap dipertahankan. Tujuannya merapikan keadaan operasional, bukan menghilangkan jejak.
             </p>
           </div>
         </div>
