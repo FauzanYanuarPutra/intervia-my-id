@@ -92,6 +92,21 @@ describe('public storefront brand media', () => {
     });
   });
 
+  it('also reads legacy gallery_media URL arrays', () => {
+    expect(
+      resolveStorefrontBrandMedia({
+        gallery_media: [
+          '/api/forum/media/map-photo-1.jpg',
+          '/api/forum/media/map-photo-2.jpg',
+        ],
+      }),
+    ).toMatchObject({
+      coverUrl: '/api/forum/media/map-photo-1.jpg',
+      galleryUrls: ['/api/forum/media/map-photo-2.jpg'],
+      seoImageUrl: '/api/forum/media/map-photo-1.jpg',
+    });
+  });
+
   it('uses an approved contributor photo when no owner image exists', () => {
     expect(
       resolveStorefrontBrandMedia({
