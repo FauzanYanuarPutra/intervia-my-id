@@ -313,17 +313,17 @@ function SelectedStoreMediaPreview({
       ) : products.length > 0 ? (
         <div className="rounded-[14px] border border-slate-200/90 bg-slate-50/80 p-2 dark:border-slate-800 dark:bg-slate-900/60">
           <div className="flex items-center justify-between gap-2"><p className="text-[10px] font-black text-slate-700 dark:text-slate-200">{isId ? 'Produk / menu' : 'Products / menu'}</p><button type="button" onClick={onOpenStore} className="text-[9px] font-bold text-emerald-700 hover:underline dark:text-emerald-300">{isId ? 'Lihat semua' : 'View all'}</button></div>
-          <div className="mt-1.5 flex gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <EmblaInlineRail className="mt-1.5" contentClassName="gap-2" itemClassName="w-[138px] shrink-0">
             {products.map(product => {
               const image = product.image_url && isValidPreviewUrl(product.image_url) ? product.image_url : null;
               return (
-                <button key={product.id} type="button" onClick={onOpenStore} className="flex w-[138px] shrink-0 items-center gap-2 rounded-[11px] border border-slate-200 bg-white p-1.5 text-left dark:border-slate-800 dark:bg-slate-950">
+                <button key={product.id} type="button" onClick={onOpenStore} className="flex w-full items-center gap-2 rounded-[11px] border border-slate-200 bg-white p-1.5 text-left dark:border-slate-800 dark:bg-slate-950">
                   {image ? <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-slate-100 dark:bg-slate-800"><LajukanImage src={image} alt="" fill sizes="40px" className="object-cover" /></div> : null}
                   <span className="min-w-0"><span className="block line-clamp-2 text-[10px] font-bold leading-4 text-slate-800 dark:text-slate-100">{product.name}</span><span className="mt-0.5 block truncate text-[9px] font-semibold text-emerald-700 dark:text-emerald-300">{product.price_cents > 0 ? formatDiscoveryPrice(product.price_cents, isId) : isId ? 'Negosiasi' : 'Negotiable'}</span></span>
                 </button>
               );
             })}
-          </div>
+          </EmblaInlineRail>
         </div>
       ) : null}
 
