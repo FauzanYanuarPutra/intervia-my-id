@@ -873,7 +873,44 @@ function mapContentPayload(payload: unknown): OwnerListing[] {
   const catalogItems = extractContentItems(payload);
 
   if (catalogItems.length > 0) {
-    return catalogItems.map(item => {
+    return catalogItems
+      .filter(item => {
+        const metadata = asRecord(item.metadata);
+        const profilePath = firstString(
+          metadata?.public_path,
+          metadata?.publicPath,
+          metadata?.profile_path,
+          metadata?.profilePath,
+          metadata?.href,
+        );
+        const recordKind = firstString(
+          metadata?.record_kind,
+          metadata?.recordKind,
+          metadata?.entity_type,
+          metadata?.entityType,
+        )
+          .toLowerCase()
+          .trim()
+          .replace(/[\s-]+/g, '_');
+
+        // /api/my-listings is expected to return marketplace listings only.
+        // A profile/business record can carry service taxonomy metadata and
+        // would otherwise appear as a fake JASA item in the owner's storefront.
+        if (/^\/(?:[a-z]{2}\/)?profile(?:\/|$)/i.test(profilePath)) {
+          return false;
+        }
+        if (['profile', 'user_profile', 'public_profile', 'user'].includes(recordKind)) {
+          return false;
+        }
+
+        const type = firstString(item.content_type, item.category, metadata?.type, metadata?.content_type)
+          .toLowerCase()
+          .trim()
+          .replace(/[\s-]+/g, '_');
+
+        return !['profile', 'user_profile', 'public_profile', 'freelancer_profile'].includes(type);
+      })
+      .map(item => {
       const raw = item as unknown as MetaRecord;
       return {
         id: item.id,
