@@ -185,6 +185,35 @@ function safeInternalMediaUrl(value: unknown): string {
     : '';
 }
 
+function safeCommonsMediaUrl(value: unknown): string {
+  const raw = typeof value === 'string' ? value.trim() : '';
+  if (!raw || raw.length > 2048) return '';
+  try {
+    const parsed = new URL(raw);
+    const hostname = parsed.hostname.toLowerCase();
+    if (
+      hostname !== 'commons.wikimedia.org' &&
+      hostname !== 'upload.wikimedia.org'
+    ) {
+      return '';
+    }
+
+    if (
+      hostname === 'commons.wikimedia.org' &&
+      !(
+        parsed.pathname.startsWith('/wiki/Special:FilePath/') ||
+        parsed.pathname.startsWith('/w/index.php')
+      )
+    ) {
+      return '';
+    }
+
+    return parsed.toString();
+  } catch {
+    return '';
+  }
+}
+
 function projectPublicReferenceMetadata(metadata: JsonRecord): JsonRecord {
   const projected: JsonRecord = {};
   for (const key of PUBLIC_REFERENCE_METADATA_KEYS) {
@@ -325,10 +354,16 @@ function mapPublicReference(
   const coverImage =
     safeInternalMediaUrl(item.cover_image) ||
     safeInternalMediaUrl(projectedMetadata.cover_image) ||
+    safeCommonsMediaUrl(item.cover_image) ||
+    safeCommonsMediaUrl(projectedMetadata.cover_image) ||
+    safeCommonsMediaUrl(projectedMetadata.commons_image_url) ||
     '/images/placeholders/business-default.svg';
   const projectedGallery = Array.isArray(projectedMetadata.gallery_images)
     ? projectedMetadata.gallery_images
-        .map(safeInternalMediaUrl)
+        .flatMap(value => [
+          safeInternalMediaUrl(value),
+          safeCommonsMediaUrl(value),
+        ])
         .filter(Boolean)
         .slice(0, 12)
     : [];
