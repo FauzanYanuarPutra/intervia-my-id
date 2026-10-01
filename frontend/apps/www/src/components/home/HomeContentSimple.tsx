@@ -3,6 +3,7 @@
 import type { LajukanNewsArticle } from '@/lib/news';
 import { HomeNewsProvider } from './HomeNewsContext';
 import { HomeResponsiveMarketplace } from './HomeResponsiveMarketplace';
+import { HomeErrorBoundary } from './HomeErrorBoundary';
 
 type HomeContentSimpleProps = {
   locale: string;
@@ -15,7 +16,9 @@ export function HomeContentSimple({
 }: HomeContentSimpleProps) {
   return (
     <HomeNewsProvider items={news}>
-      <HomeResponsiveMarketplace locale={locale} />
+      <HomeErrorBoundary locale={locale} section="Home">
+        <HomeResponsiveMarketplace locale={locale} />
+      </HomeErrorBoundary>
     </HomeNewsProvider>
   );
 }
