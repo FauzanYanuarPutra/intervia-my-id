@@ -12,8 +12,8 @@ export function buildExploreHubIntentHref(
   intent: ExploreHubIntent,
 ): string {
   return intent === 'demand'
-    ? `/${locale}/explore?intent=demand`
-    : `/${locale}/explore`;
+    ? `/${locale}/explore?side=demand&tab=all`
+    : `/${locale}/explore?side=supply&tab=all`;
 }
 
 function normalizeQuery(value: string): string {
