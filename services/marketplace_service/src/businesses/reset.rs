@@ -105,6 +105,7 @@ impl From<FinanceCoreError> for ResetError {
 struct ExistingBatch {
     id: Uuid,
     status: String,
+    request_hash: String,
     scopes: Value,
     reason: String,
     affected_counts: Value,
@@ -312,9 +313,12 @@ impl DataResetRepository {
     ) -> Result<ResetBatchRecord, ResetError> {
         validate_request(&request)?;
         let scopes = normalize_scopes(&request.scopes)?;
-        let _hash = request_hash(&request, &scopes)?;
+        let hash = request_hash(&request, &scopes)?;
 
         if let Some(existing) = load_existing_batch(&self.db, business_id, idempotency_key).await? {
+            if existing.request_hash != hash {
+                return Err(ResetError::Conflict("reset_idempotency_conflict"));
+            }
             if existing.status == "running" {
                 return Err(ResetError::Conflict("reset_already_running"));
             }
@@ -353,15 +357,14 @@ impl DataResetRepository {
 
         match result {
             Ok(affected) => {
+                let mut tx = self.db.begin().await?;
                 sqlx::query(
                     "UPDATE business_data_reset_batches SET status='completed',affected_counts=$2,completed_at=NOW() WHERE id=$1",
                 )
                 .bind(batch_id)
                 .bind(&affected)
-                .execute(&self.db)
+                .execute(&mut *tx)
                 .await?;
-
-                let mut tx = self.db.begin().await?;
                 audit::record_tx(
                     &mut tx,
                     organization_id,
@@ -715,7 +718,7 @@ fn child_uuid(batch_id: Uuid, item_id: Uuid, label: &[u8]) -> Uuid {
 
 async fn load_existing_batch(db: &PgPool, business_id: Uuid, idempotency_key: Uuid) -> Result<Option<ExistingBatch>, ResetError> {
     sqlx::query_as::<_, ExistingBatch>(
-        "SELECT id,status,scopes,reason,affected_counts,error_code,started_at,completed_at FROM business_data_reset_batches WHERE business_id=$1 AND idempotency_key=$2",
+        "SELECT id,status,request_hash,scopes,reason,affected_counts,error_code,started_at,completed_at FROM business_data_reset_batches WHERE business_id=$1 AND idempotency_key=$2",
     )
     .bind(business_id)
     .bind(idempotency_key)
