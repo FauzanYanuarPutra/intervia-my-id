@@ -30,6 +30,7 @@ import {
 import { getInternalWwwOrigin } from '@/lib/server/internalWwwOrigin';
 import { buildUmkmStorefrontPath } from '@/lib/umkmSurface';
 import { resolveListingSide } from '@/lib/content/listingSide';
+import { getListingLocation } from '@/lib/content/listingLocation';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -496,13 +497,7 @@ function mapContentItem(
     );
 
   const location =
-    firstString(
-      metadata?.location,
-      metadata?.city,
-      metadata?.region,
-      item.location,
-      'Indonesia',
-    );
+    getListingLocation(metadata, item.location);
 
   const listingSide =
     firstString(
@@ -551,9 +546,16 @@ function mapContentItem(
       metadata?.description,
     ),
 
-    href: `/content/${encodeURIComponent(
-      id,
-    )}`,
+    href:
+      firstString(
+        metadata?.public_path,
+        metadata?.publicPath,
+      ).startsWith('/')
+        ? firstString(
+            metadata?.public_path,
+            metadata?.publicPath,
+          )
+        : `/content/${encodeURIComponent(id)}`,
 
     image:
       firstImage(
@@ -943,6 +945,23 @@ function mapPublicReferenceItem(
       reference.imageAttribution,
     );
 
+  const referenceSlug = firstString(
+    item.slug,
+    metadata.slug,
+  );
+
+  const referencePublicPath = firstString(
+    item.public_path,
+    metadata.public_path,
+  );
+
+  const referenceHref =
+    referencePublicPath.startsWith('/toko/')
+      ? referencePublicPath
+      : referenceSlug
+        ? buildUmkmStorefrontPath(referenceSlug)
+        : safeContentHref(referencePublicPath, contentId);
+
   return {
     id,
     kind: 'references',
@@ -965,10 +984,7 @@ function mapPublicReferenceItem(
       320,
     ),
 
-    href: safeContentHref(
-      item.public_path,
-      contentId,
-    ),
+    href: referenceHref,
 
     image:
       safeInternalReferenceImage(
