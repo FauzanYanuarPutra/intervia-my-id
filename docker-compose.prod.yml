@@ -149,6 +149,17 @@ services:
       JWT_PUBLIC_KEY_PEM: ${JWT_PUBLIC_KEY_PEM:?JWT_PUBLIC_KEY_PEM is required in production}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
 
+  marketplace_migration:
+    build: !reset null
+    image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-marketplace:${IMAGE_TAG:?IMAGE_TAG is required}
+    pull_policy: always
+    environment:
+      ENV: production
+      APP_ENV: production
+      RUST_LOG: ${RUST_LOG:-warn}
+      JWT_ACCESS_ALG: ${JWT_ACCESS_ALG:?JWT_ACCESS_ALG=RS256 is required in production}
+      JWT_PUBLIC_KEY_PEM: ${JWT_PUBLIC_KEY_PEM:?JWT_PUBLIC_KEY_PEM is required in production}
+
   marketplace_service:
     build: !reset null
     image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-marketplace:${IMAGE_TAG:?IMAGE_TAG is required}
