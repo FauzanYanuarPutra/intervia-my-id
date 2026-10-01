@@ -133,8 +133,8 @@ export function UmkmStoreMediaContribution({
             ? 'Foto langsung tampil di toko.'
             : 'Photo is now live on the store.'
           : isId
-            ? 'Foto sudah tersimpan dan menunggu verifikasi Lajukan. Foto belum tampil untuk publik.'
-            : 'Photo was saved and is waiting for Lajukan review. It is not public yet.',
+            ? 'Foto sudah masuk antrean verifikasi Lajukan/CRM. Foto belum tampil untuk publik sampai disetujui.'
+            : 'Photo is now in Lajukan/CRM review. It will stay private until approved.',
       );
       await loadContributionStatus();
       onSubmitted?.();
@@ -282,8 +282,8 @@ export function UmkmStoreMediaContribution({
                   ) : item.status === 'pending' ? (
                     <p className="mt-1 text-[9px] font-medium text-slate-500 dark:text-slate-400">
                       {isId
-                        ? 'Sedang diperiksa. Tidak perlu upload ulang selama belum ada hasil review.'
-                        : 'Under review. No need to upload again while pending.'}
+                        ? 'Sudah masuk antrean review Lajukan/CRM. Tidak perlu upload ulang selama status masih menunggu.'
+                        : 'It is in the Lajukan/CRM review queue. No need to upload again while it is pending.'}
                     </p>
                   ) : null}
                 </div>
