@@ -60,6 +60,7 @@ import {
   resolveContentPriceUnitLabel,
 } from '@/lib/content/priceUnit';
 import { buildContentHref, extractContentId } from '@/lib/content/routes';
+import { getListingLocation } from '@/lib/content/listingLocation';
 import { readPublicReference } from '@/lib/content/publicReference';
 import { createPromotionSnapshot } from '@/lib/content/promotionPrograms';
 import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
@@ -968,13 +969,7 @@ export default function ContentDetailClient({
   useEffect(() => {
     if (!item) return;
     const meta = (item.metadata as Record<string, unknown> | null) || {};
-    setApplyLocation(
-      prev =>
-        prev ||
-        (typeof meta.location === 'string' ? meta.location : '') ||
-        (typeof meta.city === 'string' ? meta.city : '') ||
-        (typeof meta.region === 'string' ? meta.region : ''),
-    );
+    setApplyLocation(prev => prev || getListingLocation(meta));
     setApplyHeadline(
       prev =>
         prev ||
@@ -1009,14 +1004,7 @@ export default function ContentDetailClient({
           ? 'Negosiasi'
           : 'Contact';
     const gallery = resolveImageGallery(catalogItem);
-    const location = [
-      metadata.location,
-      metadata.city,
-      metadata.region,
-      metadata.address,
-    ]
-      .map(value => (typeof value === 'string' ? value.trim() : ''))
-      .find(Boolean);
+    const location = getListingLocation(metadata);
 
     recordListingView({
       id: resolvedContentId,
@@ -4525,8 +4513,8 @@ export default function ContentDetailClient({
 
   const locationLabel =
     quickSpecs.find(spec => spec.key === 'location')?.value ||
-    readMetaText(meta, 'location', 'city', 'region', 'address') ||
-    (locale === 'id' ? 'Indonesia' : 'Indonesia');
+    getListingLocation(meta) ||
+    (locale === 'id' ? 'Lokasi belum diisi' : 'Location not provided');
   const contentLocationPoint = resolveContentLocationPoint(item, meta);
   const contentLocationAddress = resolveContentLocationAddress(
     meta,
