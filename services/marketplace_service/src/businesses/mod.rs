@@ -68,6 +68,8 @@ mod recipe_versioning_persistence_tests;
 mod recipes;
 mod repository;
 mod reset;
+#[cfg(test)]
+mod reset_persistence_tests;
 mod reset_routes;
 mod routes;
 pub(crate) mod sales;
