@@ -284,56 +284,29 @@ export function getUmkmMapSourceLabel(
 
 export function buildUmkmMapPlacePath(place: UmkmMapLinkTarget): string {
   const metadata = place.metadata || {};
-  const recordKind =
-    typeof metadata.record_kind === 'string'
-      ? metadata.record_kind.trim().toLowerCase()
-      : '';
-  const sourceKind =
-    typeof metadata.source_kind === 'string'
-      ? metadata.source_kind.trim().toLowerCase()
-      : '';
-  const source =
-    typeof metadata.source === 'string'
-      ? metadata.source.trim().toLowerCase()
-      : '';
+  const recordKind = typeof metadata.record_kind === 'string' ? metadata.record_kind.trim().toLowerCase() : '';
+  const sourceKind = typeof metadata.source_kind === 'string' ? metadata.source_kind.trim().toLowerCase() : '';
+  const source = typeof metadata.source === 'string' ? metadata.source.trim().toLowerCase() : '';
+  const metadataSlug =
+    typeof metadata.storefront_slug === 'string' ? metadata.storefront_slug.trim() :
+    typeof metadata.store_slug === 'string' ? metadata.store_slug.trim() :
+    typeof metadata.business_slug === 'string' ? metadata.business_slug.trim() : '';
+  const storefrontSlug = place.slug?.trim() || metadataSlug;
 
-  // Native Lajukan stores always open their public storefront.
-  if (
-    sourceKind === 'lajukan_store' ||
-    sourceKind === 'registered_store' ||
-    source === 'usaha_portal' ||
-    metadata.owner_user_id != null ||
-    metadata.owner_id != null
-  ) {
-    return buildUmkmStorefrontPath(place.slug?.trim() || '');
+  if (isUmkmMapPublicReference(place)) return buildUmkmStorefrontPath(storefrontSlug);
+
+  if (sourceKind === 'lajukan_store' || sourceKind === 'registered_store' || source === 'usaha_portal' || metadata.owner_user_id != null || metadata.owner_id != null) {
+    return buildUmkmStorefrontPath(storefrontSlug);
   }
 
-  // Public business references (Wikidata/OSM/open data) use the same
-  // storefront-compatible detail surface as registered businesses. Some
-  // reference records also carry legacy content/listing source markers, so
-  // this check must happen before the generic content/listing fallback.
-  if (isUmkmMapPublicReference(place)) {
-    return buildUmkmStorefrontPath(place.slug?.trim() || '');
-  }
-
-  // Content/listing points are not storefronts. Prefer their explicit public
-  // path so map taps do not incorrectly land on /toko/<content-slug>.
-  if (
-    sourceKind.includes('listing') ||
-    sourceKind.includes('content') ||
-    recordKind.includes('listing')
-  ) {
-    const publicPath =
-      readSafePublicPath(place.public_path) ||
-      readSafePublicPath(metadata.public_path);
+  if (sourceKind.includes('listing') || sourceKind.includes('content') || recordKind.includes('listing')) {
+    const publicPath = readSafePublicPath(place.public_path) || readSafePublicPath(metadata.public_path);
     if (publicPath) return publicPath;
-    const slug = place.slug?.trim();
-    return slug ? `/content/${encodeURIComponent(slug)}` : '/explore';
+    return storefrontSlug ? `/content/${encodeURIComponent(storefrontSlug)}` : '/explore';
   }
 
-  return buildUmkmStorefrontPath(place.slug?.trim() || '');
+  return buildUmkmStorefrontPath(storefrontSlug);
 }
-
 export function buildUmkmScanPath(token?: string | null): string {
   const cleanToken = token?.trim();
   if (!cleanToken) return UMKM_STORE_SCAN_PATH;

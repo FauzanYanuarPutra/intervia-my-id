@@ -8,7 +8,7 @@ import {
   isPublicEditorialContent,
 } from '@/lib/server/publicContent';
 import { buildNewsPath } from '@/lib/news';
-import { getUmkmStoreBySlug } from '@/lib/super-app/umkm-commerce';
+import { getUmkmStoreById, getUmkmStoreBySlug } from '@/lib/super-app/umkm-commerce';
 import { isPublicUmkmReferenceVisible } from '@/lib/super-app/umkm-public-discovery';
 import ContentDetailClient, { type ContentItem } from './ContentDetailClient';
 
@@ -85,7 +85,22 @@ export default async function ContentDetailPage({ params }: PageProps) {
     String(referenceMetadata.record_kind || '').trim().toLowerCase().includes('reference');
 
   if (isPublicReferenceContent) {
-    const referenceStore = await getUmkmStoreBySlug(id).catch(() => null);
+    const metadataStoreId =
+      typeof referenceMetadata.store_id === 'string'
+        ? referenceMetadata.store_id.trim()
+        : typeof referenceMetadata.umkm_store_id === 'string'
+          ? referenceMetadata.umkm_store_id.trim()
+          : '';
+    const trailingUuidMatch =
+      /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.exec(id);
+    const referenceStore =
+      (metadataStoreId
+        ? await getUmkmStoreById(metadataStoreId).catch(() => null)
+        : null) ||
+      (trailingUuidMatch
+        ? await getUmkmStoreById(trailingUuidMatch[1]).catch(() => null)
+        : null) ||
+      (await getUmkmStoreBySlug(id).catch(() => null));
     if (referenceStore && isPublicUmkmReferenceVisible(referenceStore)) {
       permanentRedirect('/' + locale + '/toko/' + encodeURIComponent(referenceStore.slug));
     }
