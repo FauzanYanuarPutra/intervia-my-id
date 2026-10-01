@@ -2922,6 +2922,16 @@ export default function CreateListingWizard({
               attributes: savePayload.attributes,
               contact_snapshot:
                 savePayload.contact_snapshot,
+              listing_location:
+                valueAsString(savePayload.values.location) ||
+                valueAsString(savePayload.values.address) ||
+                valueAsString(savePayload.values.service_area) ||
+                undefined,
+              listing_location_point:
+                readLatLngFromValues(savePayload.values) || undefined,
+              location_structured:
+                valueAsRecord(savePayload.values.location_structured) ||
+                undefined,
               listing_intent: intent,
               intent,
               market_side:

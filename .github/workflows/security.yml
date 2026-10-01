@@ -51,6 +51,46 @@ jobs:
             --ignore-unfixed \
             --exit-code 1 \
             .
+      - name: Print HIGH/CRITICAL Trivy findings
+        if: always() && hashFiles('trivy-results.sarif') != ''
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path("trivy-results.sarif")
+          data = json.loads(path.read_text())
+          findings = []
+          for run in data.get("runs", []):
+              rules = {
+                  rule.get("id"): rule
+                  for rule in run.get("tool", {}).get("driver", {}).get("rules", [])
+                  if isinstance(rule, dict)
+              }
+              for result in run.get("results", []):
+                  level = str(result.get("level", "")).lower()
+                  if level not in {"error", "warning"}:
+                      continue
+                  rule = rules.get(result.get("ruleId"), {})
+                  message = result.get("message", {}).get("text", "")
+                  for location in result.get("locations", []):
+                      physical = location.get("physicalLocation", {})
+                      artifact = physical.get("artifactLocation", {}).get("uri", "")
+                      line = physical.get("region", {}).get("startLine")
+                      findings.append({
+                          "rule": result.get("ruleId", ""),
+                          "severity": rule.get("helpUri") or rule.get("properties", {}).get("security-severity") or level,
+                          "message": message,
+                          "path": artifact,
+                          "line": line,
+                      })
+          if findings:
+              print(json.dumps(findings, indent=2))
+          else:
+              print("No HIGH/CRITICAL findings were present in SARIF.")
+          PY
+
       - name: Upload SARIF
         if: always() && hashFiles('trivy-results.sarif') != ''
         uses: github/codeql-action/upload-sarif@v3
