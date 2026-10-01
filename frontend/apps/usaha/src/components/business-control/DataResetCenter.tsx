@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { AlertTriangle, CheckCircle2, DatabaseBackup, LockKeyhole, RotateCcw, ShieldCheck } from 'lucide-react';
-import { BusinessResetHttpError, type BusinessResetPreview, type BusinessResetScope, type BusinessResetBatch } from '@/lib/business-reset-server';
+import type { BusinessResetPreview, BusinessResetScope, BusinessResetBatch } from '@/lib/business-reset-types';
 import type { BusinessRecord } from '@/lib/portal-types';
 
 type Props = {
@@ -18,6 +18,14 @@ type ScopeCard = {
 };
 
 const dateToday = new Date().toISOString().slice(0, 10);
+
+class BusinessResetClientError extends Error {
+  readonly code: string;
+  constructor(code: string) {
+    super(code);
+    this.code = code;
+  }
+}
 
 function canByRole(business: BusinessRecord, scope: BusinessResetScope) {
   switch (scope) {
@@ -144,7 +152,7 @@ export function DataResetCenter({ business }: Props) {
         body: JSON.stringify({ action: 'preview', ...buildPayload() }),
       });
       const payload = await result.json().catch(() => ({}));
-      if (!result.ok) throw new BusinessResetHttpError(result.status, payload?.error || 'preview_failed');
+      if (!result.ok) throw new BusinessResetClientError(payload?.error || 'preview_failed');
       setPreview(payload.data as BusinessResetPreview);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Tidak bisa memuat preview reset.');
@@ -167,11 +175,11 @@ export function DataResetCenter({ business }: Props) {
         body: JSON.stringify({ action: 'apply', ...buildPayload() }),
       });
       const payload = await result.json().catch(() => ({}));
-      if (!result.ok) throw new BusinessResetHttpError(result.status, payload?.error || 'reset_failed');
+      if (!result.ok) throw new BusinessResetClientError(payload?.error || 'reset_failed');
       setLastResult(payload.data as BusinessResetBatch);
       setPreview(null);
     } catch (cause) {
-      const code = cause instanceof BusinessResetHttpError ? cause.code : 'reset_failed';
+      const code = cause instanceof BusinessResetClientError ? cause.code : 'reset_failed';
       const messages: Record<string, string> = {
         sales_in_closed_period: 'Ada transaksi pada hari/periode yang sudah ditutup. Buka periode tersebut dulu.',
         business_data_reset_permission_denied: 'Peranmu tidak punya izin untuk salah satu reset yang dipilih.',
@@ -192,7 +200,8 @@ export function DataResetCenter({ business }: Props) {
   const fullPhraseRequired = isFull;
   const effectiveReason = reason.trim().length >= 3;
   const canPreview = selectedCount > 0 && effectiveReason && blocked.length === 0;
-  const canApply = Boolean(preview?.can_apply) && canPreview && (!fullPhraseRequired || confirmation.trim() === 'MULAI DARI NOL');
+  const requiredConfirmation = fullPhraseRequired ? 'MULAI DARI NOL' : 'RESET';
+  const canApply = Boolean(preview?.can_apply) && canPreview && confirmation.trim() === requiredConfirmation;
 
   return (
     <div className="space-y-4">
