@@ -2905,14 +2905,13 @@ export default function ChatRoomPage() {
     if (!showEmojiPicker && !showStickerPanel) return;
 
     const frame = window.requestAnimationFrame(() => {
-      const composer = composerRef.current;
       const input = messageInputRef.current;
-      if (!composer || !input) return;
+      if (!input) return;
 
-      // Keep the actual message field visible when the picker opens.
-      const inputTop = input.offsetTop;
-      const nextScrollTop = Math.max(0, inputTop - composer.clientHeight + input.offsetHeight + 8);
-      composer.scrollTo({ top: Math.min(composer.scrollTop, nextScrollTop), behavior: 'smooth' });
+      // The picker is rendered after the composer field. When it opens,
+      // keep the actual text field in the scroll viewport instead of
+      // pushing the user to the bottom of the picker.
+      input.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     });
 
     return () => window.cancelAnimationFrame(frame);
