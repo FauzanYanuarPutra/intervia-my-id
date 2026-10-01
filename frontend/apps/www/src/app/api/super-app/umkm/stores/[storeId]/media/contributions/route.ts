@@ -39,6 +39,16 @@ function normalizeContributionMediaUrl(url: string): string {
       ) {
         return pathname;
       }
+      if (pathname.startsWith('/uploads/forum/')) {
+        const filename = pathname.slice('/uploads/forum/'.length);
+        if (
+          filename &&
+          filename.length <= 200 &&
+          /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(filename)
+        ) {
+          return '/api/forum/media/' + filename;
+        }
+      }
     } catch {
       return value;
     }
