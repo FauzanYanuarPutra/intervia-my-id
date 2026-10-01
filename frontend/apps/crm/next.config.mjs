@@ -19,6 +19,12 @@ const REQUIRES_EXTERNAL_HTTPS = ['staging', 'production'].includes(DEPLOYMENT_EN
 const CRM_ORIGIN =
   (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '') ||
   'https://crm.lajukan.com';
+const LAJUKAN_WEB_ORIGIN =
+  (
+    process.env.NEXT_PUBLIC_LAJUKAN_WEB_ORIGIN ||
+    process.env.NEXT_PUBLIC_WWW_ORIGIN ||
+    'https://www.lajukan.com'
+  ).replace(/\/$/, '');
 const CHAT_SERVICE_ORIGIN =
   process.env.INTERNAL_CHAT_SERVICE_URL ||
   process.env.INTERNAL_CHAT_URL ||
@@ -38,8 +44,9 @@ const nextConfig = {
   poweredByHeader: false,
   compress: true,
   env: {
-    // Browser code must never address the internal marketplace service directly.
+    // Browser code must never address internal services directly.
     NEXT_PUBLIC_MARKETPLACE_URL: '/api/marketplace',
+    NEXT_PUBLIC_LAJUKAN_WEB_ORIGIN: LAJUKAN_WEB_ORIGIN,
   },
   typescript: {
     ignoreBuildErrors: false,
