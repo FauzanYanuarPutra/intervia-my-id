@@ -1,4 +1,5 @@
 name: Usaha Control Backend Gate
+# Main pushes also run the full Rust control gate for direct-main development.
 
 on:
   push:
