@@ -313,7 +313,8 @@ export function IngredientWorkspace({
   }
 
   function closeCreateDraft() {
-    if (!hasCreateDraft || saving) {
+    if (saving) return;
+    if (!hasCreateDraft) {
       setCreateOpen(false);
       return;
     }
