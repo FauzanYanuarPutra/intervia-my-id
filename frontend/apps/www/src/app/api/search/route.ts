@@ -29,6 +29,7 @@ import {
 } from '@/lib/content/publicReference';
 import { getInternalWwwOrigin } from '@/lib/server/internalWwwOrigin';
 import { buildUmkmStorefrontPath } from '@/lib/umkmSurface';
+import { resolveListingLocation } from '@/lib/content/listingLocation';
 import { resolveListingSide } from '@/lib/content/listingSide';
 
 export const runtime = 'nodejs';
@@ -495,14 +496,12 @@ function mapContentItem(
       metadata?.partnership_type,
     );
 
-  const location =
-    firstString(
-      metadata?.location,
-      metadata?.city,
-      metadata?.region,
-      item.location,
-      'Indonesia',
-    );
+  const location = resolveListingLocation({
+    metadata,
+    location: item.location,
+    city: item.city,
+    address: item.address,
+  });
 
   const listingSide =
     firstString(
@@ -990,7 +989,6 @@ function mapPublicReferenceItem(
         item.address,
         item.city,
         metadata.location,
-        'Indonesia',
       ),
       180,
     ),
@@ -1134,7 +1132,6 @@ function mapBusiness(
     location: firstString(
       item.city,
       item.address,
-      'Indonesia',
     ),
 
     priceLabel: '',

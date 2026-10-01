@@ -276,7 +276,7 @@ export function getUmkmMapSourceLabel(
     return isId ? 'Lokasi usaha' : 'Business location';
   }
   if (kind === 'reference') {
-    return isId ? 'Lokasi publik' : 'Public location';
+    return isId ? 'Lokasi usaha' : 'Business location';
   }
   return isId ? 'Lokasi terdata' : 'Mapped location';
 }
@@ -293,7 +293,14 @@ export function buildUmkmMapPlacePath(place: UmkmMapLinkTarget): string {
     typeof metadata.business_slug === 'string' ? metadata.business_slug.trim() : '';
   const storefrontSlug = place.slug?.trim() || metadataSlug;
 
-  if (isUmkmMapPublicReference(place)) return buildUmkmStorefrontPath(storefrontSlug);
+  if (isUmkmMapPublicReference(place)) {
+    const publicPath =
+      readSafePublicPath(place.public_path) ||
+      readSafePublicPath(metadata.public_path);
+    return publicPath || (storefrontSlug
+      ? buildUmkmStorefrontPath(storefrontSlug)
+      : '/explore');
+  }
 
   if (sourceKind === 'lajukan_store' || sourceKind === 'registered_store' || source === 'usaha_portal' || metadata.owner_user_id != null || metadata.owner_id != null) {
     return buildUmkmStorefrontPath(storefrontSlug);

@@ -360,7 +360,7 @@ function mapPublicReference(
   }
 
   const city =
-    readText(metadata.city) || readText(metadata.location) || 'Indonesia';
+    readText(metadata.city) || readText(metadata.location);
   const address = readText(metadata.address) || city;
   const categorySlug = readText(metadata.marketplace_category_slug);
   const projectedMetadata = projectPublicReferenceMetadata(metadata);
@@ -839,7 +839,8 @@ export async function GET(req: NextRequest) {
           return [] as UmkmStore[];
         });
 
-    const visibleStoreSource = stores;
+    const boundedStores = stores.slice(0, candidateLimit);
+    const visibleStoreSource = boundedStores;
 
     const visibleStores = mine
       ? visibleStoreSource
@@ -912,7 +913,7 @@ export async function GET(req: NextRequest) {
     // other registered records second, public references last.
     const rankedItems = sortedItems;
     const limitedItems = rankedItems.slice(0, limit);
-    const backendRowsConsumed = stores.length;
+    const backendRowsConsumed = Math.min(stores.length, candidateLimit);
     const storesCanContinue =
       !mine &&
       !referencesOnly &&
@@ -941,7 +942,7 @@ export async function GET(req: NextRequest) {
           next_cursor: referencesOnly ? referenceNextCursor : null,
           loaded_count: referencesOnly
             ? offset + limitedItems.length
-            : offset + stores.length,
+            : offset + backendRowsConsumed,
           has_more: hasMore,
           next_offset: nextOffset,
         },

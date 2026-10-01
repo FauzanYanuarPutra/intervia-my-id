@@ -23,7 +23,7 @@ describe('UMKM public route helpers', () => {
     );
   });
 
-  it('routes public map references to the storefront detail surface', () => {
+  it('routes public map references to their explicit public detail path', () => {
     const reference = {
       slug: 'osm-node-1',
       public_path: '/content/pasar-uji-reference-id',
@@ -34,10 +34,12 @@ describe('UMKM public route helpers', () => {
     };
 
     expect(isUmkmMapPublicReference(reference)).toBe(true);
-    expect(buildUmkmMapPlacePath(reference)).toBe('/toko/osm-node-1');
+    expect(buildUmkmMapPlacePath(reference)).toBe(
+      '/content/pasar-uji-reference-id',
+    );
   });
 
-  it('routes Wikidata references to the storefront even with content-style source metadata', () => {
+  it('routes Wikidata references to their content-style public detail path', () => {
     expect(
       buildUmkmMapPlacePath({
         slug: 'wikidata-q111754951-mcdonald-s-banjar-baru-6f9f6ab8-ac91-48eb-88af-0b12f1aa9d6e',
@@ -49,9 +51,7 @@ describe('UMKM public route helpers', () => {
           is_public_reference: true,
         },
       }),
-    ).toBe(
-      '/toko/wikidata-q111754951-mcdonald-s-banjar-baru-6f9f6ab8-ac91-48eb-88af-0b12f1aa9d6e',
-    );
+    ).toBe('/content/legacy-reference');
   });
 
   it('does not accept an external or protocol-relative reference path', () => {
@@ -62,6 +62,17 @@ describe('UMKM public route helpers', () => {
         metadata: { is_public_reference: true },
       }),
     ).toBe('/toko/osm-node-1');
+  });
+
+  it('uses metadata public_path for a public reference when top-level public_path is absent', () => {
+    expect(
+      buildUmkmMapPlacePath({
+        metadata: {
+          is_public_reference: true,
+          public_path: '/content/reference-only',
+        },
+      }),
+    ).toBe('/content/reference-only');
   });
 
   it('uses a storefront slug from metadata when the map point has no top-level slug', () => {

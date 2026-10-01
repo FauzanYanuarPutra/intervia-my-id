@@ -342,6 +342,8 @@ pub fn infer_marketplace_intent(query: &str) -> MarketplaceIntent {
         MarketplaceSide::Demand
     } else if supply {
         MarketplaceSide::Supply
+    } else if search_language && infer_category(&lower) != "unknown" {
+        MarketplaceSide::Supply
     } else {
         MarketplaceSide::Unknown
     };

@@ -60,6 +60,7 @@ import {
   resolveContentPriceUnitLabel,
 } from '@/lib/content/priceUnit';
 import { buildContentHref, extractContentId } from '@/lib/content/routes';
+import { resolveListingLocation } from '@/lib/content/listingLocation';
 import { readPublicReference } from '@/lib/content/publicReference';
 import { createPromotionSnapshot } from '@/lib/content/promotionPrograms';
 import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
@@ -454,6 +455,10 @@ const CONTENT_LONGITUDE_KEYS = [
 
 const CONTENT_NESTED_LOCATION_KEYS = [
   'metadata',
+  'form_values',
+  'formValues',
+  'listing_values',
+  'listingValues',
   'location',
   'geo',
   'geometry',
@@ -1009,14 +1014,7 @@ export default function ContentDetailClient({
           ? 'Negosiasi'
           : 'Contact';
     const gallery = resolveImageGallery(catalogItem);
-    const location = [
-      metadata.location,
-      metadata.city,
-      metadata.region,
-      metadata.address,
-    ]
-      .map(value => (typeof value === 'string' ? value.trim() : ''))
-      .find(Boolean);
+    const location = resolveListingLocation(item);
 
     recordListingView({
       id: resolvedContentId,
@@ -1027,7 +1025,7 @@ export default function ContentDetailClient({
       kind: contentType,
       typeLabel,
       actionLabel: locale === 'id' ? 'Buka lagi' : 'Open again',
-      location: location || 'Indonesia',
+      location,
       priceLabel,
       priceCents:
         typeof item.price_cents === 'number' &&
@@ -4525,8 +4523,7 @@ export default function ContentDetailClient({
 
   const locationLabel =
     quickSpecs.find(spec => spec.key === 'location')?.value ||
-    readMetaText(meta, 'location', 'city', 'region', 'address') ||
-    (locale === 'id' ? 'Indonesia' : 'Indonesia');
+    resolveListingLocation(item);
   const contentLocationPoint = resolveContentLocationPoint(item, meta);
   const contentLocationAddress = resolveContentLocationAddress(
     meta,
