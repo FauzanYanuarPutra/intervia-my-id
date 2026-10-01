@@ -213,7 +213,7 @@ impl DataResetRepository {
 
         if scopes.contains(&ResetScope::SalesTransactions) {
             counts.sales_transactions = sqlx::query_scalar(
-                "SELECT COUNT(*) FROM business_sales WHERE business_id=$1 AND organization_id=$2 AND status='completed' AND source_order_id IS NULL'",
+                "SELECT COUNT(*) FROM business_sales WHERE business_id=$1 AND organization_id=$2 AND status='completed' AND source_order_id IS NULL",
             )
             .bind(business_id)
             .bind(organization_id)
