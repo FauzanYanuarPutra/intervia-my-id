@@ -12,9 +12,10 @@ type Props = {
   businessId: string;
   businessName: string;
   initialLocations: BusinessLocation[];
+  businessVersion?: number;
 };
 
-export function BusinessLocationsManager({ businessId, businessName, initialLocations }: Props) {
+export function BusinessLocationsManager({ businessId, businessName, initialLocations, businessVersion }: Props) {
   const [locations, setLocations] = useState(initialLocations);
   const [editing, setEditing] = useState<BusinessLocation | null>(null);
   const [pendingDelete, setPendingDelete] = useState<BusinessLocation | null>(null);
@@ -60,7 +61,7 @@ export function BusinessLocationsManager({ businessId, businessName, initialLoca
       const response = await fetch(`/api/businesses/${encodeURIComponent(businessId)}/locations`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ locations: next, reason }),
+        body: JSON.stringify({ locations: next, reason, expectedVersion: businessVersion }),
       });
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(businessApiErrorMessage(payload, 'Lokasi belum berhasil disimpan.', response.status));
