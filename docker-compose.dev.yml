@@ -138,6 +138,7 @@ services:
   marketplace_service:
     depends_on:
       rabbitmq: { condition: service_healthy }
+      marketplace_migration: { condition: service_completed_successfully }
     environment:
       ENV: development
       RUST_LOG: ${RUST_LOG:-info}
