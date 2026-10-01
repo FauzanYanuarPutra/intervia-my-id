@@ -258,6 +258,17 @@ fn normalize_severity(raw: Option<&str>) -> &'static str {
     }
 }
 
+fn is_business_media_url(value: &str) -> bool {
+    let lower = value.trim().to_ascii_lowercase();
+    lower.starts_with("http://")
+        || lower.starts_with("https://")
+        || lower.starts_with("/uploads/")
+        || lower.starts_with("/media/")
+        || lower.starts_with("/images/")
+        || lower.starts_with("/api/forum/media/")
+        || lower.starts_with("/api/content/media/")
+}
+
 fn collect_metadata_images(metadata: &Value) -> Vec<String> {
     let mut urls = Vec::new();
     let mut seen = std::collections::HashSet::new();
@@ -273,14 +284,7 @@ fn collect_metadata_images(metadata: &Value) -> Vec<String> {
                 if candidate.is_empty() {
                     return;
                 }
-                let lower = candidate.to_ascii_lowercase();
-                let likely = lower.starts_with("http://")
-                    || lower.starts_with("https://")
-                    || lower.starts_with("/uploads/")
-                    || lower.starts_with("/media/")
-                    || lower.starts_with("/images/")
-                    || lower.starts_with("/api/forum/media/")
-                    || lower.starts_with("/api/content/media/");
+                let likely = is_business_media_url(candidate);
                 if likely && seen.insert(candidate.to_string()) {
                     urls.push(candidate.to_string());
                 }
