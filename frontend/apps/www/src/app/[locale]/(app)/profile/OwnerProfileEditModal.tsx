@@ -46,6 +46,11 @@ import {
   readProfileAvatarUrl,
 } from '@/lib/profile/avatar';
 import { cn } from '@/lib/utils';
+import {
+  BUSINESS_OPEN_TO_OPTIONS,
+  BUSINESS_ROLE_OPTIONS,
+  toBusinessNetwork,
+} from '@/lib/profile/businessNetwork';
 
 type MetaRecord = Record<string, unknown>;
 
@@ -302,6 +307,13 @@ export function OwnerProfileEditModal({
   const [priceMin, setPriceMin] = useState('');
   const [priceMax, setPriceMax] = useState('');
 
+  const [businessNetworkRoles, setBusinessNetworkRoles] = useState<string[]>([]);
+  const [businessOffers, setBusinessOffers] = useState('');
+  const [businessNeeds, setBusinessNeeds] = useState('');
+  const [businessCapacity, setBusinessCapacity] = useState('');
+  const [businessOpenTo, setBusinessOpenTo] = useState<string[]>([]);
+  const [businessArea, setBusinessArea] = useState('');
+
   const [headline, setHeadline] = useState('');
   const [skills, setSkills] = useState('');
   const [languages, setLanguages] = useState('');
@@ -351,6 +363,8 @@ export function OwnerProfileEditModal({
     const freelancer = asRecord(baseMeta.freelancer_profile);
     const provider = asRecord(baseMeta.provider_profile);
     const buyer = asRecord(baseMeta.buyer_profile);
+
+    const businessNetwork = toBusinessNetwork(baseMeta.business_network);
     const profile = asRecord(baseMeta.profile);
     const media = asRecord(baseMeta.media);
     const verification = asRecord(detail.verification);
@@ -362,6 +376,19 @@ export function OwnerProfileEditModal({
     setBio(asString(detail.bio));
     setRoles(joinList(baseMeta.roles));
     setDiscoverable(asBoolean(baseMeta.discoverable, true));
+
+    setBusinessNetworkRoles(
+      businessNetwork.roles.length > 0 ? businessNetwork.roles : toStringList(baseMeta.roles),
+    );
+    setBusinessOffers(businessNetwork.offers.join(', '));
+    setBusinessNeeds(businessNetwork.needs.join(', '));
+    setBusinessCapacity(businessNetwork.capacity);
+    setBusinessOpenTo(businessNetwork.open_to);
+    setBusinessArea(
+      businessNetwork.service_area.length > 0
+        ? businessNetwork.service_area.join(', ')
+        : joinList(provider.service_coverage),
+    );
 
     const nextPhone = asString(detail.phone);
     setPhone(nextPhone);
@@ -606,11 +633,20 @@ export function OwnerProfileEditModal({
       price_min: toInt(priceMin),
       price_max: toInt(priceMax),
     };
+    const businessNetwork = {
+      roles: businessNetworkRoles.slice(0, 16),
+      offers: toStringList(businessOffers).slice(0, 30),
+      needs: toStringList(businessNeeds).slice(0, 30),
+      capacity: businessCapacity.trim().slice(0, 180),
+      open_to: businessOpenTo.slice(0, 16),
+      service_area: toStringList(businessArea).slice(0, 20),
+    };
     await updateProfile({
       provider_profile: payload,
       metadata: {
         ...metadata,
         provider_profile: { ...asRecord(metadata.provider_profile), ...payload },
+        business_network: businessNetwork,
       },
     });
   };
@@ -1195,16 +1231,159 @@ export function OwnerProfileEditModal({
             </div>
           ) : section === 'business' ? (
             <div className="space-y-4 p-4 sm:p-5">
-              <InputLabel label={isId ? 'Nama usaha atau layanan' : 'Business or service name'}><input className={inputClass} value={providerHeadline} onChange={event => setProviderHeadline(event.target.value)} placeholder={isId ? 'Contoh: Sinar Packaging' : 'Example: Sinar Packaging'} /></InputLabel>
-              <InputLabel label={isId ? 'Produk / jenis layanan' : 'Products / service types'} hint={isId ? 'Pisahkan dengan koma.' : 'Separate with commas.'}><input className={inputClass} value={providerSkills} onChange={event => setProviderSkills(event.target.value)} placeholder={isId ? 'Standing pouch, paper cup, custom print' : 'Standing pouch, paper cup, custom print'} /></InputLabel>
-              <InputLabel label={isId ? 'Area layanan' : 'Service area'} hint={isId ? 'Kota atau wilayah yang kamu layani.' : 'Cities or regions you serve.'}><input className={inputClass} value={serviceCoverage} onChange={event => setServiceCoverage(event.target.value)} placeholder="Bandung, Cimahi, Jakarta" /></InputLabel>
+              <section className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)]/45 p-3.5">
+                <div className="mb-3">
+                  <p className="text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                    {isId ? 'Peran bisnis' : 'Business roles'}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-[color:var(--app-text-soft)]">
+                    {isId ? 'Boleh pilih lebih dari satu. Satu orang/usaha bisa punya beberapa peran.' : 'Choose more than one. One person/business can have multiple roles.'}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {BUSINESS_ROLE_OPTIONS.map(option => {
+                    const active = businessNetworkRoles.includes(option.id);
+                    return (
+                      <button
+                        key={option.id}
+                        type="button"
+                        onClick={() =>
+                          setBusinessNetworkRoles(current =>
+                            active
+                              ? current.filter(value => value !== option.id)
+                              : [...current, option.id],
+                          )
+                        }
+                        className={cn(
+                          'min-h-9 rounded-full border px-3 text-[11px] font-black transition',
+                          active
+                            ? 'border-emerald-600 bg-emerald-600 text-white'
+                            : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text-soft)] hover:border-emerald-300 hover:text-emerald-700 dark:hover:text-emerald-300',
+                        )}
+                      >
+                        {isId ? option.idLabel : option.enLabel}
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+
+              <InputLabel
+                label={isId ? 'Saya menawarkan' : 'What I offer'}
+                hint={isId ? 'Barang, jasa, aset, kemampuan, atau akses yang bisa kamu bantu.' : 'Products, services, assets, capabilities, or access you can provide.'}
+              >
+                <textarea
+                  className={textareaClass}
+                  value={businessOffers}
+                  onChange={event => setBusinessOffers(event.target.value)}
+                  placeholder={isId ? 'Cabai, jeruk, gudang, pickup, foto produk' : 'Chili, oranges, warehouse, pickup, product photography'}
+                />
+              </InputLabel>
+
+              <InputLabel
+                label={isId ? 'Saya membutuhkan' : 'What I need'}
+                hint={isId ? 'Buyer, supplier, partner, logistik, tenaga, atau kebutuhan lain.' : 'Buyers, suppliers, partners, logistics, talent, or other needs.'}
+              >
+                <textarea
+                  className={textareaClass}
+                  value={businessNeeds}
+                  onChange={event => setBusinessNeeds(event.target.value)}
+                  placeholder={isId ? 'Buyer grosir, supplier packaging, truck Cianjur–Jakarta' : 'Wholesale buyers, packaging suppliers, Cianjur–Jakarta truck'}
+                />
+              </InputLabel>
+
               <div className="grid gap-4 sm:grid-cols-2">
-                <InputLabel label={isId ? 'Cara melayani' : 'Work mode'}><input className={inputClass} value={workMode} onChange={event => setWorkMode(event.target.value)} placeholder={isId ? 'Online, datang ke lokasi' : 'Online, on-site'} /></InputLabel>
-                <InputLabel label={isId ? 'Estimasi balasan' : 'Response time'}><input className={inputClass} value={responseTime} onChange={event => setResponseTime(event.target.value)} placeholder={isId ? 'Contoh: < 2 jam' : 'Example: < 2 hours'} /></InputLabel>
+                <InputLabel
+                  label={isId ? 'Kapasitas' : 'Capacity'}
+                  hint={isId ? 'Contoh: 2 ton/minggu, 500 toko, 200 m².' : 'Example: 2 tons/week, 500 stores, 200 m².'}
+                >
+                  <input
+                    className={inputClass}
+                    value={businessCapacity}
+                    onChange={event => setBusinessCapacity(event.target.value)}
+                    placeholder={isId ? '2 ton / minggu' : '2 tons / week'}
+                  />
+                </InputLabel>
+                <InputLabel
+                  label={isId ? 'Wilayah jaringan' : 'Network area'}
+                  hint={isId ? 'Pisahkan kota/wilayah dengan koma.' : 'Separate cities/regions with commas.'}
+                >
+                  <input
+                    className={inputClass}
+                    value={businessArea}
+                    onChange={event => setBusinessArea(event.target.value)}
+                    placeholder="Cianjur, Bogor, Tangerang, Jakarta"
+                  />
+                </InputLabel>
+              </div>
+
+              <section className="rounded-2xl border border-[color:var(--app-border)] p-3.5">
+                <div className="mb-3">
+                  <p className="text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                    {isId ? 'Terbuka untuk' : 'Open to'}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-[color:var(--app-text-soft)]">
+                    {isId ? 'Tandai tipe partner yang ingin kamu temui.' : 'Mark the partner types you want to meet.'}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {BUSINESS_OPEN_TO_OPTIONS.map(option => {
+                    const active = businessOpenTo.includes(option.id);
+                    return (
+                      <button
+                        key={option.id}
+                        type="button"
+                        onClick={() =>
+                          setBusinessOpenTo(current =>
+                            active
+                              ? current.filter(value => value !== option.id)
+                              : [...current, option.id],
+                          )
+                        }
+                        className={cn(
+                          'min-h-9 rounded-full border px-3 text-[11px] font-black transition',
+                          active
+                            ? 'border-blue-600 bg-blue-600 text-white'
+                            : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text-soft)] hover:border-blue-300 hover:text-blue-700 dark:hover:text-blue-300',
+                        )}
+                      >
+                        {isId ? option.idLabel : option.enLabel}
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/65 p-3.5 text-[11px] leading-5 text-emerald-900 dark:border-emerald-500/20 dark:bg-emerald-500/8 dark:text-emerald-100">
+                {isId
+                  ? 'Profil Lajukan sekarang bisa menjelaskan siapa kamu, apa yang kamu punya, apa yang kamu cari, kapasitasmu, dan partner seperti apa yang terbuka untukmu.'
+                  : 'Your Lajukan profile can now show who you are, what you offer, what you need, your capacity, and which partners you are open to.'}
+              </div>
+
+              <InputLabel label={isId ? 'Nama usaha atau layanan' : 'Business or service name'}>
+                <input className={inputClass} value={providerHeadline} onChange={event => setProviderHeadline(event.target.value)} placeholder={isId ? 'Contoh: Sinar Packaging' : 'Example: Sinar Packaging'} />
+              </InputLabel>
+              <InputLabel label={isId ? 'Produk / jenis layanan' : 'Products / service types'} hint={isId ? 'Pisahkan dengan koma.' : 'Separate with commas.'}>
+                <input className={inputClass} value={providerSkills} onChange={event => setProviderSkills(event.target.value)} placeholder={isId ? 'Standing pouch, paper cup, custom print' : 'Standing pouch, paper cup, custom print'} />
+              </InputLabel>
+              <InputLabel label={isId ? 'Area layanan' : 'Service area'} hint={isId ? 'Kota atau wilayah yang kamu layani.' : 'Cities or regions you serve.'}>
+                <input className={inputClass} value={serviceCoverage} onChange={event => setServiceCoverage(event.target.value)} placeholder="Bandung, Cimahi, Jakarta" />
+              </InputLabel>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <InputLabel label={isId ? 'Cara melayani' : 'Work mode'}>
+                  <input className={inputClass} value={workMode} onChange={event => setWorkMode(event.target.value)} placeholder={isId ? 'Online, datang ke lokasi' : 'Online, on-site'} />
+                </InputLabel>
+                <InputLabel label={isId ? 'Estimasi balasan' : 'Response time'}>
+                  <input className={inputClass} value={responseTime} onChange={event => setResponseTime(event.target.value)} placeholder={isId ? 'Contoh: < 2 jam' : 'Example: < 2 hours'} />
+                </InputLabel>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
-                <InputLabel label={isId ? 'Harga mulai' : 'Starting price'}><input className={inputClass} inputMode="numeric" value={priceMin} onChange={event => setPriceMin(event.target.value.replace(/\D/g, ''))} placeholder="0" /></InputLabel>
-                <InputLabel label={isId ? 'Harga sampai' : 'Maximum price'}><input className={inputClass} inputMode="numeric" value={priceMax} onChange={event => setPriceMax(event.target.value.replace(/\D/g, ''))} placeholder="0" /></InputLabel>
+                <InputLabel label={isId ? 'Harga mulai' : 'Starting price'}>
+                  <input className={inputClass} inputMode="numeric" value={priceMin} onChange={event => setPriceMin(event.target.value.replace(/\D/g, ''))} placeholder="0" />
+                </InputLabel>
+                <InputLabel label={isId ? 'Harga sampai' : 'Maximum price'}>
+                  <input className={inputClass} inputMode="numeric" value={priceMax} onChange={event => setPriceMax(event.target.value.replace(/\D/g, ''))} placeholder="0" />
+                </InputLabel>
               </div>
             </div>
           ) : section === 'professional' ? (
