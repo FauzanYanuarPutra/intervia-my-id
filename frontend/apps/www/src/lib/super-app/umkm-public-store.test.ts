@@ -260,6 +260,8 @@ describe('public UMKM store projection', () => {
         source_license: 'CC0',
         cover_image:
           'https://commons.wikimedia.org/wiki/Special:FilePath/File:Example.jpg',
+        internal_note: 'must-not-leave-server',
+        owner_user_id: 'private-owner',
       },
     });
 
@@ -282,6 +284,8 @@ describe('public UMKM store projection', () => {
       cover_image:
         'https://commons.wikimedia.org/wiki/Special:FilePath/File:Example.jpg',
     });
+    expect(projected?.metadata).not.toHaveProperty('internal_note');
+    expect(projected?.metadata).not.toHaveProperty('owner_user_id');
   });
 
   it('fails closed when a reference has no usable coordinates', () => {
