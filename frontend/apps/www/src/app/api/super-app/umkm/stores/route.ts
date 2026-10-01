@@ -360,7 +360,7 @@ function mapPublicReference(
   }
 
   const city =
-    readText(metadata.city) || readText(metadata.location) || 'Indonesia';
+    readText(metadata.city) || readText(metadata.location);
   const address = readText(metadata.address) || city;
   const categorySlug = readText(metadata.marketplace_category_slug);
   const projectedMetadata = projectPublicReferenceMetadata(metadata);
