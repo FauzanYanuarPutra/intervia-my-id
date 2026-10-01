@@ -1,7 +1,7 @@
 'use client';
 
 import { RupiahInput } from '@/components/forms/RupiahInput';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Archive,
   History,
@@ -256,6 +256,81 @@ export function IngredientWorkspace({
     () => ingredients.filter(item => needsIngredientPurchase(item)).length,
     [ingredients],
   );
+
+  const hasCreateDraft = Boolean(
+    name.trim() ||
+    purchasePrice.trim() ||
+    purchaseQuantity !== '1' ||
+    purchaseUnit !== 'kg' ||
+    recipeUnit !== 'gram' ||
+    conversionFactor !== '1000' ||
+    hasLoss ||
+    yieldPercent !== '100' ||
+    stockQuantity !== '0' ||
+    minimumStock !== '0' ||
+    supplier.trim(),
+  );
+
+  const activeItem = activePanel
+    ? ingredients.find(item => item.id === activePanel.id) ?? null
+    : null;
+
+  const editDraftDirty = Boolean(
+    editDraft &&
+    activeItem &&
+    (
+      editDraft.name.trim() !== activeItem.name.trim() ||
+      editDraft.kind !== activeItem.kind ||
+      editDraft.purchaseUnit.trim() !== activeItem.purchase_unit.trim() ||
+      editDraft.recipeUnit.trim() !== activeItem.recipe_unit.trim() ||
+      n(editDraft.conversionFactor) !== n(activeItem.conversion_factor) ||
+      Math.round(n(editDraft.purchasePrice)) !== Math.round(n(activeItem.purchase_price_amount)) ||
+      n(editDraft.purchaseQuantity) !== n(activeItem.purchase_quantity) ||
+      n(editDraft.yieldPercent) !== normalizedUsableYield(activeItem) ||
+      n(editDraft.minimumStock) !== n(activeItem.minimum_stock) ||
+      editDraft.supplier.trim() !== (activeItem.supplier_name ?? '').trim()
+    )
+  );
+
+  const hasPanelDraft = Boolean(
+    (activePanel?.mode === 'edit' && editDraftDirty) ||
+    (activePanel?.mode === 'stock' && (stockQuantityInput.trim() || stockNote.trim())) ||
+    (activePanel?.mode === 'archive' && archiveReason.trim())
+  );
+
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!createOpen && !hasPanelDraft) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [createOpen, hasPanelDraft]);
+
+  function confirmDraftLoss(message: string) {
+    return !hasPanelDraft || window.confirm(message);
+  }
+
+  function closeCreateDraft() {
+    if (!hasCreateDraft || saving) {
+      setCreateOpen(false);
+      return;
+    }
+    if (window.confirm('Ada isian bahan yang belum disimpan. Tutup dan buang isian tersebut?')) {
+      setCreateOpen(false);
+      resetCreateForm();
+    }
+  }
+
+  function closeActivePanel() {
+    if (actionSaving) return;
+    if (!confirmDraftLoss('Ada perubahan yang belum disimpan pada panel ini. Tutup dan buang perubahan tersebut?')) {
+      return;
+    }
+    setActivePanel(null);
+    setActionMessage('');
+  }
 
   async function reload() {
     const response = await fetch(`/api/businesses/${businessId}/ingredients`, { cache: 'no-store' });
@@ -592,7 +667,7 @@ export function IngredientWorkspace({
           className="fixed inset-0 z-[70] flex items-end justify-center bg-slate-950/35 p-0 sm:items-center sm:p-4"
           role="presentation"
           onMouseDown={event => {
-            if (event.target === event.currentTarget) setCreateOpen(false);
+            if (event.target === event.currentTarget) closeCreateDraft();
           }}
         >
           <div
@@ -609,7 +684,7 @@ export function IngredientWorkspace({
               </div>
               <button
                 type="button"
-                onClick={() => setCreateOpen(false)}
+                onClick={closeCreateDraft}
                 className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-portal-soft hover:bg-portal-mist hover:text-portal-ink"
                 aria-label="Tutup tambah bahan"
               >
@@ -786,7 +861,7 @@ export function IngredientWorkspace({
                     className="fixed inset-0 z-[70] flex items-end justify-center bg-slate-950/35 p-0 sm:items-center sm:p-4"
                     role="presentation"
                     onMouseDown={event => {
-                      if (event.target === event.currentTarget) setActivePanel(null);
+                      if (event.target === event.currentTarget) closeActivePanel();
                     }}
                   >
                     <div
@@ -802,7 +877,8 @@ export function IngredientWorkspace({
                       </p>
                       <button
                         type="button"
-                        onClick={() => setActivePanel(null)}
+                        onClick={closeActivePanel}
+                        disabled={actionSaving}
                         className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-portal-soft hover:bg-white hover:text-portal-ink"
                         aria-label="Tutup panel"
                       >
