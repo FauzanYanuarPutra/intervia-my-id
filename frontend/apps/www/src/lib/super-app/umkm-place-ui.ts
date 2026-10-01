@@ -627,8 +627,8 @@ function getServiceBadges(
 ): string[] {
   if (isUmkmMapPublicReference(place)) {
     return isId
-      ? ['Referensi publik', 'Cek sumber asli']
-      : ['Public reference', 'Check original source'];
+      ? ['Lokasi usaha publik', 'Cek sumber asli']
+      : ['Public business location', 'Check original source'];
   }
 
   const kind = getUmkmPlaceKind(place);
@@ -815,8 +815,8 @@ export function buildUmkmPlacePresentation(
     categoryLabel,
     kindLabel: isPublicReference
       ? isId
-        ? 'Referensi'
-        : 'Reference'
+        ? 'Lokasi usaha'
+        : 'Business location'
       : kindMeta.kindLabel,
     shortKindLabel: isPublicReference ? 'R' : kindMeta.shortKindLabel,
     markerTone: kindMeta.markerTone,
