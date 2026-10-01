@@ -870,8 +870,15 @@ export default async function TokoPage({ params }: PageProps) {
                       className="object-contain p-1"
                     />
                   ) : (
-                    <div className="absolute inset-0 grid place-items-center bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-300">
-                      <Store className="h-7 w-7" />
+                    <div
+                      className="absolute inset-0 grid place-items-center bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-300"
+                      aria-label={
+                        isId
+                          ? `Ikon kategori ${place.categoryLabel}`
+                          : `Category icon for ${place.categoryLabel}`
+                      }
+                    >
+                      <StorefrontCategoryIcon kind={place.kind} />
                     </div>
                   )}
                 </div>
