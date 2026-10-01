@@ -27,10 +27,23 @@ export async function ensureNotificationServiceWorkerRegistered() {
   if (!isBrowserNotificationSupported()) return null;
 
   try {
+    // Remove the previous scoped registration introduced before the worker
+    // moved to the root scope. This prevents duplicate notification workers
+    // after an app upgrade.
+    const legacyRegistration = await navigator.serviceWorker.getRegistration(
+      '/notification-worker/',
+    );
+    if (
+      legacyRegistration &&
+      legacyRegistration.active?.scriptURL.endsWith(NOTIFICATION_SW_URL)
+    ) {
+      await legacyRegistration.unregister();
+    }
+
     const existing = await navigator.serviceWorker.getRegistration(
       NOTIFICATION_SW_SCOPE,
     );
-    if (existing) {
+    if (existing?.active?.scriptURL.endsWith(NOTIFICATION_SW_URL)) {
       return existing;
     }
 
