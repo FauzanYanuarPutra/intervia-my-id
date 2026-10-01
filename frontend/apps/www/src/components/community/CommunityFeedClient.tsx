@@ -2158,7 +2158,7 @@ function normalizeCommunityBody(body: string): {
 } {
   const normalized = String(body || '')
     .replace(/\r\n?/g, '\n')
-    .replace(/[\\t ]+$/gm, '')
+    .replace(/[\t ]+$/gm, '')
     .trim();
 
   if (!normalized) return { body: '', hashtags: [] };
