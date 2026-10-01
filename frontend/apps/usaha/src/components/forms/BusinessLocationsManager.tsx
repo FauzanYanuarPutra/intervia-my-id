@@ -46,6 +46,25 @@ export function BusinessLocationsManager({ businessId, businessName, initialLoca
   }
 
   async function save(next: BusinessLocation[], reason = changeReason.trim()) {
+    if (saving) return false;
+    if (editing && locations.some(item => item.id === editing.id) && !isEditingDirty) {
+      setError('Belum ada perubahan lokasi yang perlu disimpan.');
+      return false;
+    }
+    if (editing) {
+      const validateContact = (value: string) => {
+        const digits = value.replace(/\D/g, '');
+        return !value.trim() || (digits.length >= 8 && digits.length <= 15);
+      };
+      if (editing.address.trim().length < 3 || editing.city.trim().length < 2) {
+        setError('Alamat minimal 3 karakter dan kota minimal 2 karakter.');
+        return false;
+      }
+      if (!validateContact(editing.phone) || !validateContact(editing.whatsapp)) {
+        setError('Nomor telepon dan WhatsApp harus kosong atau berisi 8–15 angka.');
+        return false;
+      }
+    }
     if (reason.length < 3) {
       setError('Tulis alasan perubahan lokasi minimal 3 karakter.');
       return false;
