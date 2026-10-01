@@ -11,6 +11,10 @@ defmodule ChatService.PushNotifier do
     post(Map.put(payload, :type, "call_end"))
   end
 
+  def chat_message(payload) when is_map(payload) do
+    post(Map.put(payload, :type, "chat_message"))
+  end
+
   defp post(payload) do
     url = System.get_env("INTERNAL_PUSH_URL", "") |> String.trim()
     secret = System.get_env("INTERNAL_PUSH_SECRET", "")
