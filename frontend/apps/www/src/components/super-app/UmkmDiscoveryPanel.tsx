@@ -110,6 +110,9 @@ type MapPointResponse = {
       city: string;
       address?: string;
       description?: string | null;
+      public_path?: string | null;
+      updated_at?: string | null;
+      created_at?: string | null;
       lat: number;
       lng: number;
       category: string;
@@ -1627,6 +1630,9 @@ export function UmkmDiscoveryPanel({
                 slug: point.slug,
                 name: point.name,
                 city: point.city || '',
+                public_path: point.public_path || null,
+                updated_at: point.updated_at || null,
+                created_at: point.created_at || null,
                 address:
                   point.address ||
                   point.metadata?.address ||
@@ -1742,6 +1748,15 @@ export function UmkmDiscoveryPanel({
       const sourceDelta = sourcePriority(left.store) - sourcePriority(right.store);
       if (sourceDelta !== 0) return sourceDelta;
 
+      const leftUpdated = Date.parse(left.store.updated_at || '');
+      const rightUpdated = Date.parse(right.store.updated_at || '');
+      if (Number.isFinite(leftUpdated) || Number.isFinite(rightUpdated)) {
+        const updatedDelta =
+          (Number.isFinite(rightUpdated) ? rightUpdated : 0) -
+          (Number.isFinite(leftUpdated) ? leftUpdated : 0);
+        if (updatedDelta !== 0) return updatedDelta;
+      }
+
       if (leftDistance !== null && rightDistance !== null) {
         const delta = leftDistance - rightDistance;
         if (Math.abs(delta) > 0.001) return delta;
@@ -1806,6 +1821,9 @@ export function UmkmDiscoveryPanel({
       if (!merged.has(point.id)) {
         merged.set(point.id, {
           ...point,
+          public_path: point.public_path ?? null,
+          updated_at: point.updated_at ?? null,
+          created_at: point.created_at ?? null,
           description: point.description ?? null,
           phone: point.phone ?? null,
           metadata: point.metadata ?? {},
