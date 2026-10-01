@@ -39,6 +39,7 @@ const hints: Record<PortalSection, string> = {
   team: 'Anggota usaha, undangan, dan peran akses',
   buyerPage: 'Tampilan toko publik yang dilihat pelanggan',
   security: 'Sesi, keamanan akun, dan aktivitas akses',
+  dataReset: 'Reset data operasional usaha dengan bukti dan perlindungan histori',
 };
 
 function uniqueNavigation(items: PortalNavigationItem[]) {
