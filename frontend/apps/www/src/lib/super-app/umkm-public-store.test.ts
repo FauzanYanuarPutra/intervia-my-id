@@ -211,6 +211,31 @@ describe('public UMKM store projection', () => {
     expect(projected.metadata).not.toHaveProperty('whatsapp_phone');
   });
 
+  it('filters invalid public contribution media while preserving approved internal media', () => {
+    const projected = projectPublicUmkmStore(
+      makeStore({
+        metadata: {
+          gallery_media_primary: 'invalid media url',
+          gallery_media_items: [
+            { url: 'invalid media url', media_type: 'image' },
+            {
+              url: '/api/forum/media/approved-place.jpg',
+              media_type: 'image',
+              is_primary: true,
+            },
+          ],
+        },
+      }),
+    );
+
+    expect(projected.metadata.gallery_media_items).toEqual([
+      expect.objectContaining({
+        url: '/api/forum/media/approved-place.jpg',
+        media_type: 'image',
+      }),
+    ]);
+  });
+
   it('uses stored collection summaries without loading related tables', () => {
     expect(
       getUmkmStoreCollectionSummary(

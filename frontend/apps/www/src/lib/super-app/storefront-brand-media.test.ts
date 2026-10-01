@@ -77,6 +77,21 @@ describe('public storefront brand media', () => {
       }),
     ).toMatchObject({ galleryUrls: ['/api/forum/media/interior.webp'] });
   });
+  it('drops invalid media URL sentinels instead of rendering them', () => {
+    expect(
+      resolveStorefrontBrandMedia({
+        gallery_media_primary: 'invalid media url',
+        gallery_media_items: [
+          { url: 'invalid media url', media_type: 'image' },
+          { url: '/api/forum/media/real-place.jpg', media_type: 'image' },
+        ],
+      }),
+    ).toMatchObject({
+      coverUrl: '/api/forum/media/real-place.jpg',
+      galleryUrls: [],
+    });
+  });
+
   it('uses an approved contributor photo when no owner image exists', () => {
     expect(
       resolveStorefrontBrandMedia({

@@ -14,14 +14,17 @@ const QuerySchema = z.object({
   q: z.string().trim().max(120).optional(),
   city: z.string().trim().max(80).optional(),
   category: z.string().trim().max(80).optional(),
-  limit: z.coerce.number().finite().int().min(1).max(3000).default(1000),
-  min_lat: z.coerce.number().finite().min(-90).max(90).optional(),
-  max_lat: z.coerce.number().finite().min(-90).max(90).optional(),
-  min_lng: z.coerce.number().finite().min(-180).max(180).optional(),
-  max_lng: z.coerce.number().finite().min(-180).max(180).optional(),
-  viewer_lat: z.coerce.number().finite().min(-90).max(90).optional(),
-  viewer_lng: z.coerce.number().finite().min(-180).max(180).optional(),
-  radius_km: z.coerce.number().finite().positive().max(1000).optional(),
+  limit: z.coerce.number().finite().int().min(1).max(3000).catch(1000),
+  // Map movement can briefly produce an incomplete/invalid optional bound
+  // while Leaflet is resizing or wrapping the viewport. Ignore only these
+  // optional transient values; the request itself remains bounded.
+  min_lat: z.coerce.number().finite().min(-90).max(90).optional().catch(undefined),
+  max_lat: z.coerce.number().finite().min(-90).max(90).optional().catch(undefined),
+  min_lng: z.coerce.number().finite().min(-180).max(180).optional().catch(undefined),
+  max_lng: z.coerce.number().finite().min(-180).max(180).optional().catch(undefined),
+  viewer_lat: z.coerce.number().finite().min(-90).max(90).optional().catch(undefined),
+  viewer_lng: z.coerce.number().finite().min(-180).max(180).optional().catch(undefined),
+  radius_km: z.coerce.number().finite().positive().max(1000).optional().catch(undefined),
 });
 
 type MapPoint = {

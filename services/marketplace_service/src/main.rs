@@ -8608,10 +8608,11 @@ async fn list_umkm_stores(
     "#
     };
     let ranking_order = if use_nearest_index {
-        // Keep KNN distance as the complete ORDER BY expression. Adding
-        // updated_at/id tie-breakers makes PostgreSQL scan and sort every
-        // point in the viewport instead of stopping at LIMIT through GiST.
-        "point(lng, lat) <-> point($11, $10) ASC"
+        // Keep Lajukan-owned businesses first even when the viewer asks for
+        // nearby results. Distance remains the tie-breaker inside each
+        // source tier so native Lajukan businesses are not displaced by
+        // public references.
+        "CASE WHEN metadata->>'source' = 'usaha_portal' OR owner_user_id IS NOT NULL THEN 0 ELSE 1 END ASC, point(lng, lat) <-> point($11, $10) ASC"
     } else if text_query.is_some() {
         r#"
           (
@@ -8625,7 +8626,7 @@ async fn list_umkm_stores(
           id ASC
         "#
     } else {
-        "updated_at DESC, id ASC"
+        "CASE WHEN metadata->>'source' = 'usaha_portal' OR owner_user_id IS NOT NULL THEN 0 ELSE 1 END ASC, updated_at DESC, id ASC"
     };
 
     let store_sql = if nationwide_map {
@@ -8665,7 +8666,15 @@ async fn list_umkm_stores(
                 candidates.*,
                 ROW_NUMBER() OVER (
                   PARTITION BY map_lat_bucket, map_lng_bucket
-                  ORDER BY updated_at DESC, id ASC
+                  ORDER BY
+                    CASE
+                      WHEN metadata->>'source' = 'usaha_portal'
+                        OR owner_user_id IS NOT NULL
+                      THEN 0
+                      ELSE 1
+                    END ASC,
+                    updated_at DESC,
+                    id ASC
                 ) AS map_bucket_rank
               FROM candidates
             )
