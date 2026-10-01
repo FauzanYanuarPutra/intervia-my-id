@@ -50,7 +50,7 @@ jobs:
       run:
         working-directory: services/marketplace_service
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - name: Cargo fmt check
         run: cargo fmt --all -- --check
