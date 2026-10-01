@@ -2372,7 +2372,7 @@ export function UmkmDiscoveryPanel({
             onSelectStore={
               edgeToEdge ? handleEdgeMapSelectStore : handleMapSelectStore
             }
-            showPopups={false}
+            showPopups
             onBoundsChange={handleMapBoundsChange}
             className={className}
           />
