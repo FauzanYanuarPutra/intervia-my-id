@@ -222,6 +222,11 @@ export function DataResetCenter({ business }: Props) {
         reset_confirmation_required: 'Isi konfirmasi sebelum menjalankan reset.',
         reset_confirmation_invalid: 'Untuk reset sebagian, ketik persis: RESET.',
         reset_idempotency_conflict: 'Permintaan reset dengan kunci yang sama tetapi isi berbeda ditolak.',
+        business_data_reset_storage_unavailable: 'Penyimpanan reset belum siap. Deploy/restart marketplace_service agar migrasi database terbaru terpasang, lalu coba lagi. Data tidak dihapus oleh kegagalan ini.',
+        business_storage_unavailable: 'Penyimpanan usaha sedang belum siap. Coba lagi setelah marketplace_service selesai start.',
+        finance_core_storage_unavailable: 'Penyimpanan keuangan sedang belum siap. Tidak ada reset yang dijalankan.',
+        business_data_reset_sales_failed: 'Reset transaksi tidak selesai. Data yang terhubung order/periode tertutup tetap dilindungi.',
+        business_data_reset_finance_failed: 'Reset keuangan tidak selesai. Histori asli tetap dipertahankan.',
       };
       setError(messages[code] ?? (cause instanceof Error ? cause.message : 'Reset gagal.'));
     } finally {
