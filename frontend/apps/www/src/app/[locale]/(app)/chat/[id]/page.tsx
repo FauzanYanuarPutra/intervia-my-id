@@ -2906,8 +2906,13 @@ export default function ChatRoomPage() {
 
     const frame = window.requestAnimationFrame(() => {
       const composer = composerRef.current;
-      if (!composer) return;
-      composer.scrollTo({ top: composer.scrollHeight, behavior: 'smooth' });
+      const input = messageInputRef.current;
+      if (!composer || !input) return;
+
+      // Keep the actual message field visible when the picker opens.
+      const inputTop = input.offsetTop;
+      const nextScrollTop = Math.max(0, inputTop - composer.clientHeight + input.offsetHeight + 8);
+      composer.scrollTo({ top: Math.min(composer.scrollTop, nextScrollTop), behavior: 'smooth' });
     });
 
     return () => window.cancelAnimationFrame(frame);
@@ -8894,20 +8899,6 @@ export default function ChatRoomPage() {
             </div>
           ) : null}
 
-          {showEmojiPicker || showStickerPanel ? (
-            <ChatComposerPicker
-              locale={chatLocale}
-              mode={showEmojiPicker ? 'emoji' : 'sticker'}
-              disabled={isPeerBlocked || roomReadOnly}
-              onClose={() => {
-                setShowEmojiPicker(false);
-                setShowStickerPanel(false);
-              }}
-              onEmojiSelect={handleEmojiPick}
-              onStickerSelect={handleStickerSelect}
-            />
-          ) : null}
-
           {showAttachmentActions ? (
             <div
               className="grid grid-cols-2 gap-2 rounded-[20px] border border-black/[0.06] bg-white/95 p-2.5 shadow-[0_14px_34px_-24px_rgba(17,27,33,0.45)] backdrop-blur-sm dark:border-white/[0.08] dark:bg-[#111b21]/96 min-[421px]:hidden"
@@ -9480,6 +9471,20 @@ export default function ChatRoomPage() {
               </div>
             </div>
           )}
+
+          {showEmojiPicker || showStickerPanel ? (
+            <ChatComposerPicker
+              locale={chatLocale}
+              mode={showEmojiPicker ? 'emoji' : 'sticker'}
+              disabled={isPeerBlocked || roomReadOnly}
+              onClose={() => {
+                setShowEmojiPicker(false);
+                setShowStickerPanel(false);
+              }}
+              onEmojiSelect={handleEmojiPick}
+              onStickerSelect={handleStickerSelect}
+            />
+          ) : null}
 
         </div>
       </div>
