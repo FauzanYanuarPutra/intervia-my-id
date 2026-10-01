@@ -2900,6 +2900,18 @@ export default function ChatRoomPage() {
   const sendPointerHandledRef = useRef(false);
   const sendShouldRefocusComposerRef = useRef(false);
   const composerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showEmojiPicker && !showStickerPanel) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      const composer = composerRef.current;
+      if (!composer) return;
+      composer.scrollTo({ top: composer.scrollHeight, behavior: 'smooth' });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [showEmojiPicker, showStickerPanel]);
   const attachmentTouchStartXRef = useRef<number | null>(null);
   const canonicalRoomIdRef = useRef(canonicalRoomId);
   const aiDraftAbortRef = useRef<AbortController | null>(null);
