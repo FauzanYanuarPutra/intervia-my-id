@@ -276,7 +276,7 @@ function SelectedStoreMediaPreview({
   productsLoading?: boolean;
 }) {
   const media = resolveStorefrontBrandMedia(store.metadata || {});
-  const images = Array.from(new Set([media.coverUrl, ...media.galleryUrls].filter((value): value is string => Boolean(value) && isValidPreviewUrl(value)))).slice(0, 5);
+  const images = Array.from(new Set([media.coverUrl, ...media.galleryUrls].filter((value): value is string => typeof value === 'string' && isValidPreviewUrl(value)))).slice(0, 5);
   const logo = media.logoUrl && isValidPreviewUrl(media.logoUrl) ? media.logoUrl : null;
   const products = (store.products || []).slice(0, 4);
   const hasMedia = Boolean(logo || images.length);
@@ -1095,6 +1095,7 @@ export function UmkmDiscoveryPanel({
   initialCount,
 }: UmkmDiscoveryPanelProps) {
   const hasInitialStores = initialStores !== undefined;
+  const locale = isId ? 'id' : 'en';
   const [stores, setStores] = useState<DiscoveryStore[]>(
     () => initialStores || [],
   );
