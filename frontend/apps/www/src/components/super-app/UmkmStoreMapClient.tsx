@@ -1518,10 +1518,13 @@ function useViewportStorePresentations(
 }
 
 function getCompactDotRadius(zoom: number): number {
-  if (zoom <= 5) return 2.25;
-  if (zoom <= 8) return 2.5;
-  if (zoom <= 11) return 2.75;
-  return 3;
+  // At national zoom the points must remain visible on both small and
+  // desktop Home previews. Keep them compact, but never smaller than the
+  // visual resolution of a touch-friendly map.
+  if (zoom <= 5) return 3.75;
+  if (zoom <= 8) return 4;
+  if (zoom <= 11) return 4.25;
+  return 4.5;
 }
 
 function StoreDotsLayer({
@@ -1576,11 +1579,11 @@ function StoreDotsLayer({
             radius={selected ? Math.max(5, radius + 2) : radius}
             interactive={interactive}
             pathOptions={{
-              color: sourceKind === 'reference' ? '#94a3b8' : '#ffffff',
-              weight: selected ? 2 : sourceKind === 'reference' ? 1.5 : 1,
-              opacity: 0.95,
+              color: sourceKind === 'reference' ? '#ffffff' : '#ffffff',
+              weight: selected ? 2 : 1.25,
+              opacity: 0.98,
               fillColor: categoryPalette.badge,
-              fillOpacity: selected ? 1 : 0.94,
+              fillOpacity: selected ? 1 : 0.92,
             }}
             eventHandlers={
               interactive
