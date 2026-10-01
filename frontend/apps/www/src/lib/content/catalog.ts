@@ -1,3 +1,5 @@
+import { resolveListingLocation } from './listingLocation';
+
 export type ContentMetadata = Record<string, unknown>;
 export type ContentOwnerProfile = {
   id?: string;
@@ -272,75 +274,13 @@ export function resolveContentLocation(item?: Partial<ContentItem> | null): stri
       ? item.metadata
       : {};
 
-  const readText = (...values: unknown[]): string[] =>
-    values.flatMap(value => {
-      if (typeof value === 'string' && value.trim()) return [value.trim()];
-      if (typeof value === 'number' && Number.isFinite(value)) return [String(value)];
-      return [];
-    });
-
-  // Prefer explicit structured listing fields over generic metadata.location.
-  // This prevents a stale/free-form location from replacing the city/address
-  // selected in the listing form.
-  const directStructured = [
-    ...readText(item.address),
-    ...readText(item.city),
-    ...readText(item.district),
-    ...readText(item.regency),
-    ...readText(item.province),
-    ...readText(item.region),
-    ...readText(item.location),
-  ];
-  if (directStructured.length > 0) return directStructured[0];
-
-  const address = readText(
-    metadata.address,
-    metadata.full_address,
-    metadata.pickup_address,
-    metadata.store_address,
-    metadata.outlet_address,
-    metadata.service_address,
-  )[0];
-
-  const city = readText(
-    metadata.city,
-    metadata.city_name,
-    metadata.cityName,
-    metadata.kota,
-    metadata.regency,
-    metadata.regency_name,
-    metadata.kabupaten,
-  )[0];
-
-  const district = readText(
-    metadata.district,
-    metadata.district_name,
-    metadata.kecamatan,
-    metadata.subdistrict,
-  )[0];
-
-  const province = readText(
-    metadata.province,
-    metadata.province_name,
-    metadata.provinceName,
-    metadata.region,
-  )[0];
-
-  const structured = [address, district, city, province].filter(
-    (value, index, values) => Boolean(value) && values.indexOf(value) === index,
+  // Keep Home, Explore, search, and detail pages on the same canonical
+  // listing-location resolver. It reads the location actually published with
+  // the listing form before any compatibility fallback.
+  return resolveListingLocation(
+    item as Record<string, unknown>,
+    metadata as Record<string, unknown>,
   );
-  if (structured.length > 0) return structured.join(', ');
-
-  const fallback = readText(
-    metadata.location_name,
-    metadata.locationName,
-    metadata.pickup_location_name,
-    metadata.service_location,
-    metadata.area,
-    metadata.location,
-    item.owner_profile?.location,
-  );
-  return fallback[0] || '';
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
