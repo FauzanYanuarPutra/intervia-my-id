@@ -2,6 +2,10 @@ export const OPEN_MAP_TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png
 export const OPEN_MAP_TILE_ATTRIBUTION = '&copy; OpenStreetMap contributors';
 
 export const UMKM_MAP_MIN_ZOOM = 4;
+export const UMKM_MAP_MAX_ZOOM = 19;
+export const UMKM_MAP_DEFAULT_ZOOM = 12;
+
+export const UMKM_MAP_MIN_ZOOM = 4;
 export const UMKM_MAP_MAX_ZOOM = 18;
 export const UMKM_MAP_CLUSTER_PICKER_ZOOM = 17;
 
