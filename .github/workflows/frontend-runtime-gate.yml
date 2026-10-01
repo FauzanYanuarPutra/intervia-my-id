@@ -51,7 +51,7 @@ jobs:
     name: Frontend runtime gate
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    if: always()
+    if: ${{ always() && !cancelled() }}
     needs: [contract, docker-build]
     steps:
       - name: Require all frontend runtime checks
