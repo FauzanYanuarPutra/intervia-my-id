@@ -54,6 +54,8 @@ import { createIdempotencyKey } from '@/lib/clientIdempotency';
 import { useAppBack } from '@/lib/navigation/useAppBack';
 import { prepareUploadFile } from '@/lib/media/prepareUploadMedia';
 import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
+import { buildPublicProfileHref } from '@/lib/profile/publicProfileLink';
+import { ChatComposerPicker } from '@/components/chat/ChatComposerPicker';
 import { buildAiChatPayload } from '@/lib/aiChat';
 import {
   buildAiRoomCardPayload,
@@ -198,54 +200,6 @@ const CHAT_TEXTAREA_CLASS =
   'mt-1.5 min-h-[96px] w-full resize-y rounded-[12px] border border-slate-300 bg-white px-3 py-2.5 text-[13px] font-medium leading-5 text-[color:var(--app-text)] shadow-none outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-[color:var(--app-accent)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--app-accent)_14%,transparent)] dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-slate-600 dark:focus:border-emerald-400';
 const CHAT_COMPOSER_SHELL_CLASS =
   'flex min-w-0 flex-1 items-end gap-0.5 overflow-visible rounded-[20px] border border-slate-300 bg-white px-0.5 py-0.5 shadow-none transition focus-within:border-[#25d366] focus-within:ring-2 focus-within:ring-[#25d366]/14 dark:border-[#3b4a54] dark:bg-[#2a3942] dark:focus-within:border-[#25d366] sm:gap-1 sm:px-1.5';
-
-const QUICK_EMOJIS = [
-  '\u{1F600}',
-  '\u{1F602}',
-  '\u{1F60D}',
-  '\u{1F44D}',
-  '\u{1F64F}',
-  '\u{1F525}',
-  '\u{2764}\u{FE0F}',
-  '\u{1F389}',
-  '\u{1F60E}',
-  '\u{1F91D}',
-  '\u{1F44F}',
-  '\u{2705}',
-] as const;
-
-const STICKER_PACK = [
-  {
-    id: 'celebrate',
-    label: 'Perayaan',
-    emoji: '\u{1F389}',
-  },
-  {
-    id: 'party',
-    label: 'Pesta',
-    emoji: '\u{1F973}',
-  },
-  {
-    id: 'sparkles',
-    label: 'Berkilau',
-    emoji: '\u{2728}',
-  },
-  {
-    id: 'thumbs',
-    label: 'Jempol',
-    emoji: '\u{1F44D}',
-  },
-  {
-    id: 'heart',
-    label: 'Hati',
-    emoji: '\u{2764}\u{FE0F}',
-  },
-  {
-    id: 'fire',
-    label: 'Semangat',
-    emoji: '\u{1F525}',
-  },
-] as const;
 
 const AI_TEMPLATES = [
   {
@@ -2946,8 +2900,6 @@ export default function ChatRoomPage() {
   const sendPointerHandledRef = useRef(false);
   const sendShouldRefocusComposerRef = useRef(false);
   const composerRef = useRef<HTMLDivElement>(null);
-  const emojiPickerRef = useRef<HTMLDivElement>(null);
-  const stickerPanelRef = useRef<HTMLDivElement>(null);
   const attachmentTouchStartXRef = useRef<number | null>(null);
   const canonicalRoomIdRef = useRef(canonicalRoomId);
   const aiDraftAbortRef = useRef<AbortController | null>(null);
@@ -3112,30 +3064,6 @@ export default function ChatRoomPage() {
       setAiTemplateId('quick-reply');
     }
   }, [aiTemplateId, isSupportRoom]);
-
-  // Click outside emoji/sticker
-  useEffect(() => {
-    if (!showEmojiPicker && !showStickerPanel) return;
-    const handleClick = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (composerRef.current && composerRef.current.contains(target)) return;
-      setShowEmojiPicker(false);
-      setShowStickerPanel(false);
-    };
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [showEmojiPicker, showStickerPanel]);
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setShowEmojiPicker(false);
-        setShowStickerPanel(false);
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, []);
 
   const openAiWorkspace = useCallback(
     (workspace: 'reply' | AiRoomDraftWorkspace) => {
@@ -6739,7 +6667,14 @@ export default function ChatRoomPage() {
 
             {roomKind === 'direct' && peerUserId ? (
               <Link
-                href={`/profile/${encodeURIComponent(peerUserId)}`}
+                href={buildPublicProfileHref({
+                  id: peerUserId,
+                  username:
+                    dmNamesByUserId[peerUserId]?.startsWith('@')
+                      ? dmNamesByUserId[peerUserId].slice(1)
+                      : undefined,
+                  full_name: roomName,
+                })}
                 className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-xl pr-1 transition hover:bg-black/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00a884]/45 dark:hover:bg-white/5"
                 aria-label={
                   chatLocale === 'id'
@@ -8947,6 +8882,20 @@ export default function ChatRoomPage() {
             </div>
           ) : null}
 
+          {showEmojiPicker || showStickerPanel ? (
+            <ChatComposerPicker
+              locale={chatLocale}
+              mode={showEmojiPicker ? 'emoji' : 'sticker'}
+              disabled={isPeerBlocked || roomReadOnly}
+              onClose={() => {
+                setShowEmojiPicker(false);
+                setShowStickerPanel(false);
+              }}
+              onEmojiSelect={handleEmojiPick}
+              onStickerSelect={handleStickerSelect}
+            />
+          ) : null}
+
           {showAttachmentActions ? (
             <div
               className="grid grid-cols-2 gap-2 rounded-[20px] border border-black/[0.06] bg-white/95 p-2.5 shadow-[0_14px_34px_-24px_rgba(17,27,33,0.45)] backdrop-blur-sm dark:border-white/[0.08] dark:bg-[#111b21]/96 min-[421px]:hidden"
@@ -9271,67 +9220,6 @@ export default function ChatRoomPage() {
                 <div className="flex min-w-0 flex-1 items-end gap-1.5 sm:gap-2">
                   {/* INPUT WRAPPER */}
                   <div className="relative min-w-0 flex-1">
-                    {/* EMOJI PICKER */}
-                    {showEmojiPicker && (
-                      <div
-                        ref={emojiPickerRef}
-                        className="
-                          absolute
-                          bottom-[calc(100%+8px)]
-                          left-0
-                          z-50
-                          w-[min(320px,calc(100vw-24px))]
-                          max-w-[calc(100vw-24px)]
-                          overflow-hidden
-                          rounded-2xl
-                          border border-zinc-200/80
-                          bg-white/98
-                          p-2
-                          shadow-[0_12px_40px_rgba(0,0,0,0.14)]
-                          backdrop-blur-xl
-                          dark:border-zinc-700/80
-                          dark:bg-zinc-900/98
-                          sm:bottom-[calc(100%+10px)]
-                          sm:left-0
-                          sm:w-[320px]
-                          sm:max-w-none
-                        "
-                      >
-                        <div className="grid grid-cols-6 gap-0.5 sm:gap-1">
-                          {QUICK_EMOJIS.map(emoji => (
-                            <button
-                              key={emoji}
-                              type="button"
-                              onClick={() => handleEmojiPick(emoji)}
-                              className="
-                                flex
-                                h-10
-                                w-full
-                                items-center
-                                justify-center
-                                rounded-xl
-                                text-lg
-                                transition
-                                hover:bg-zinc-100
-                                hover:scale-105
-                                active:scale-95
-                                dark:hover:bg-zinc-800
-                                sm:h-11
-                                sm:text-xl
-                              "
-                              aria-label={
-                                chatLocale === 'id'
-                                  ? `Pilih emoji ${emoji}`
-                                  : `Choose emoji ${emoji}`
-                              }
-                            >
-                              {emoji}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
                     {/* TEXTAREA */}
                     <textarea
                       ref={messageInputRef}
@@ -9581,29 +9469,6 @@ export default function ChatRoomPage() {
             </div>
           )}
 
-          {showStickerPanel && (
-            <div
-              ref={stickerPanelRef}
-              className="min-w-0 overflow-hidden rounded-2xl border border-black/5 bg-white p-2.5 shadow-2xl dark:border-white/10 dark:bg-[#202c33] sm:p-3"
-            >
-              <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-6 sm:gap-2">
-                {STICKER_PACK.map(sticker => (
-                  <button
-                    key={sticker.id}
-                    type="button"
-                    onClick={() => handleStickerSelect(sticker.emoji)}
-                    className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl p-1.5 transition-colors hover:bg-[#f0f2f5] dark:hover:bg-[#2a3942] sm:p-2"
-                    title={sticker.label}
-                    aria-label={sticker.label}
-                  >
-                    <span aria-hidden="true" className="text-4xl leading-none">
-                      {sticker.emoji}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
