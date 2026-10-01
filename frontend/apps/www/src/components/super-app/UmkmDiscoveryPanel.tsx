@@ -1191,6 +1191,7 @@ export function UmkmDiscoveryPanel({
   const activeMapPointsRequestRef = useRef<AbortController | null>(null);
   const mapViewportTimerRef = useRef<number | null>(null);
   const mapPointsCacheRef = useRef(new Map<string, UmkmMapStore>());
+  const mapPointsRequestIdRef = useRef(0);
   const lastMapViewportKeyRef = useRef<string | null>(null);
   const requestLimit = Math.max(24, Math.min(60, Math.max(limit * 3, 24)));
   const referencePageLimit = 60;
@@ -1599,6 +1600,7 @@ export function UmkmDiscoveryPanel({
         mapViewportTimerRef.current = null;
         activeMapPointsRequestRef.current?.abort();
         const controller = new AbortController();
+        const requestId = ++mapPointsRequestIdRef.current;
         activeMapPointsRequestRef.current = controller;
 
         const params = new URLSearchParams({
@@ -1622,7 +1624,11 @@ export function UmkmDiscoveryPanel({
         })
           .then(async response => {
             const payload = (await response.json().catch(() => ({}))) as MapPointResponse;
-            if (!response.ok || controller.signal.aborted) return;
+            if (
+              !response.ok ||
+              controller.signal.aborted ||
+              requestId !== mapPointsRequestIdRef.current
+            ) return;
 
             const points = (payload.data?.items || [])
               .filter(point => isCoordinateValid({ lat: point.lat, lng: point.lng }))
@@ -1688,7 +1694,10 @@ export function UmkmDiscoveryPanel({
             setMapPoints(Array.from(cache.values()));
           })
           .catch(error => {
-            if (!controller.signal.aborted) {
+            if (
+              !controller.signal.aborted &&
+              requestId === mapPointsRequestIdRef.current
+            ) {
               console.warn('[UMKM_MAP_POINTS_VIEWPORT_ERROR]', error);
             }
           })
