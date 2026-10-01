@@ -1129,6 +1129,11 @@ function MapFocusController({
 }) {
   const map = useMap();
   const handledFocusKeyRef = useRef<string | null>(null);
+  const [mapSizeVersion, setMapSizeVersion] = useState(0);
+
+  useMapEvents({
+    resize: () => setMapSizeVersion(value => value + 1),
+  });
 
   useEffect(() => {
     const validStores = stores.filter(hasValidLatLng);
@@ -1150,6 +1155,13 @@ function MapFocusController({
     const validRoutePoints = routePoints?.filter(isValidRoutePoint) || null;
     if (!focusMode || !focusKey || handledFocusKeyRef.current === focusKey)
       return;
+
+    // Leaflet can mount before its responsive container has a real size.
+    // Never consume the focus key in that state: wait for the resize event
+    // emitted by MapSizeStabilizer so the Indonesia bounds are fitted against
+    // the actual viewport dimensions.
+    const mapSize = map.getSize();
+    if (mapSize.x < 64 || mapSize.y < 64) return;
 
     try {
       if (focusMode === 'indonesia') {
@@ -1272,6 +1284,7 @@ function MapFocusController({
     selectedStoreId,
     stores,
     viewerLocation,
+    mapSizeVersion,
   ]);
 
   return null;
