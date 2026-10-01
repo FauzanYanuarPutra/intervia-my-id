@@ -448,8 +448,11 @@ function readStoreImageUrl(store: UmkmMapStore): string {
     metadata.cover_url,
     metadata.store_photo_url,
     metadata.logo_url,
+    metadata.avatar_url,
+    metadata.profile_image_url,
     metadata.image_url,
     metadata.image,
+    metadata.commons_image_url,
   ];
 
   for (const candidate of candidates) {
@@ -486,6 +489,20 @@ function readStoreImageUrl(store: UmkmMapStore): string {
         (/^https?:\/\//i.test(value.trim()) || value.trim().startsWith('/')),
     );
     if (typeof url === 'string') return url.trim();
+  }
+
+  const commonsFile =
+    typeof metadata.commons_file === 'string'
+      ? metadata.commons_file.trim()
+      : '';
+  if (commonsFile) {
+    const filename = commonsFile.replace(/^File:/i, '').trim();
+    if (filename) {
+      return (
+        'https://commons.wikimedia.org/wiki/Special:FilePath/' +
+        encodeURIComponent(filename)
+      );
+    }
   }
 
   return '';
