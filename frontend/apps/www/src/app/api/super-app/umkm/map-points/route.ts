@@ -9,6 +9,14 @@ const MARKETPLACE_URL =
   process.env.NEXT_PUBLIC_MARKETPLACE_URL ||
   'http://localhost:8081';
 
+function normalizeMapText(value: string | null, maxLength: number): string {
+  return (value || '')
+    .replace(/[\u0000-\u001f\u007f-\u009f]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, maxLength);
+}
+
 function readOptionalNumber(params: URLSearchParams, key: string, min: number, max: number): number | undefined {
   const raw = params.get(key);
   if (raw === null || raw.trim() === '') return undefined;
@@ -166,12 +174,9 @@ export async function GET(req: NextRequest) {
       if (minLat! > maxLat!) [minLat, maxLat] = [maxLat!, minLat!];
       if (minLng! > maxLng!) [minLng, maxLng] = [maxLng!, minLng!];
     }
-    const rawQ = (paramsInput.get('q') || '').trim();
-    const rawCity = (paramsInput.get('city') || '').trim();
-    const rawCategory = (paramsInput.get('category') || '').trim();
-    const normalizedQ = rawQ.length >= 2 ? rawQ.slice(0, 120) : undefined;
-    const normalizedCity = rawCity.length >= 2 ? rawCity.slice(0, 80) : undefined;
-    const normalizedCategory = rawCategory.length >= 2 ? rawCategory.slice(0, 80) : undefined;
+    const normalizedQ = normalizeMapText(paramsInput.get('q'), 120);
+    const normalizedCity = normalizeMapText(paramsInput.get('city'), 80);
+    const normalizedCategory = normalizeMapText(paramsInput.get('category'), 80);
     const viewerLat = readOptionalNumber(paramsInput, 'viewer_lat', -90, 90);
     const viewerLng = readOptionalNumber(paramsInput, 'viewer_lng', -180, 180);
     const radiusInput = readOptionalNumber(paramsInput, 'radius_km', 0.0001, 1000);
@@ -179,9 +184,9 @@ export async function GET(req: NextRequest) {
     const normalizedRadius = hasViewer ? radiusInput : undefined;
     const params = new URLSearchParams();
     params.set('limit', String(limit));
-    if (normalizedQ) params.set('q', normalizedQ);
-    if (normalizedCity) params.set('city', normalizedCity);
-    if (normalizedCategory) params.set('category', normalizedCategory);
+    if (normalizedQ.length >= 2) params.set('q', normalizedQ);
+    if (normalizedCity.length >= 2) params.set('city', normalizedCity);
+    if (normalizedCategory.length >= 2) params.set('category', normalizedCategory);
     if (minLat !== undefined) params.set('min_lat', String(minLat));
     if (maxLat !== undefined) params.set('max_lat', String(maxLat));
     if (minLng !== undefined) params.set('min_lng', String(minLng));

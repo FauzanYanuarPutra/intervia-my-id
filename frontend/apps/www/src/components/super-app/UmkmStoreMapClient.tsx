@@ -32,6 +32,9 @@ import { cn } from '@/lib/utils';
 import {
   OPEN_MAP_TILE_ATTRIBUTION,
   OPEN_MAP_TILE_URL,
+  UMKM_MAP_CLUSTER_PICKER_ZOOM,
+  UMKM_MAP_MAX_ZOOM,
+  UMKM_MAP_MIN_ZOOM,
   type LatLng,
 } from '@/lib/super-app/maps';
 import { buildUmkmPlacePresentation } from '@/lib/super-app/umkm-place-ui';
@@ -84,11 +87,12 @@ type RoutingResponse = {
 };
 
 const MARKER_CLUSTER_DISTANCE_PX = 72;
-const MARKER_CLUSTER_MAX_ZOOM = 19;
-const MARKER_CLUSTER_PICKER_ZOOM = 17;
+const MARKER_CLUSTER_MAX_ZOOM = UMKM_MAP_MAX_ZOOM;
+const CLUSTER_PICKER_ZOOM = UMKM_MAP_CLUSTER_PICKER_ZOOM;
 const MARKER_CLUSTER_TIGHT_DISTANCE_PX = 24;
-const MARKER_CLICK_FOCUS_ZOOM = 17;
-const MARKER_CLICK_FOCUS_STEP = 2;
+const MARKER_CLICK_FOCUS_ZOOM = 16;
+const MARKER_CLICK_FOCUS_MAX_ZOOM = 17;
+const MARKER_CLICK_FOCUS_STEP = 1;
 const MARKER_FOCUS_DURATION = 0.45;
 const VIEWPORT_RENDER_PADDING = 0.28;
 const MARKER_CLUSTER_FRAME_WIDTH_RATIO = 0.58;
@@ -1099,7 +1103,7 @@ function getClusterFocusZoom(
   );
 
   return Math.min(
-    MARKER_CLUSTER_PICKER_ZOOM,
+    CLUSTER_PICKER_ZOOM,
     Math.max(zoom + 1, Math.round(zoom + zoomDelta)),
   );
 }
@@ -1171,9 +1175,14 @@ function MapFocusController({
       }
 
       if (focusMode === 'selected' && validSelectedStore) {
+        const currentZoom = map.getZoom();
+        const targetZoom = Math.min(
+          UMKM_MAP_MAX_ZOOM,
+          Math.max(16, Math.min(currentZoom, MARKER_CLICK_FOCUS_MAX_ZOOM)),
+        );
         map.flyTo(
           [validSelectedStore.lat, validSelectedStore.lng],
-          Math.max(map.getZoom(), 16),
+          targetZoom,
           { duration: 0.55 },
         );
         handledFocusKeyRef.current = focusKey;
@@ -1181,7 +1190,7 @@ function MapFocusController({
       }
 
       if (focusMode === 'viewer' && validViewerLocation) {
-        const zoom = Math.max(map.getZoom(), 15);
+        const zoom = Math.min(UMKM_MAP_MAX_ZOOM, Math.max(map.getZoom(), 15));
         const targetPoint = map.project(
           [validViewerLocation.lat, validViewerLocation.lng],
           zoom,
@@ -1351,8 +1360,8 @@ function MapBoundsReporter({
     if (
       !bounds.isValid() ||
       !Number.isFinite(zoom) ||
-      zoom < 0 ||
-      zoom > 24
+      zoom < UMKM_MAP_MIN_ZOOM ||
+      zoom > UMKM_MAP_MAX_ZOOM
     ) {
       return;
     }
@@ -1649,7 +1658,7 @@ function StoreMarkersLayer({
   const focusMarker = useCallback(
     (point: Pick<LatLng, 'lat' | 'lng'>, minZoom = MARKER_CLICK_FOCUS_ZOOM) => {
       const targetZoom = Math.min(
-        MARKER_CLUSTER_MAX_ZOOM,
+        MARKER_CLICK_FOCUS_MAX_ZOOM,
         Math.max(minZoom, zoom + MARKER_CLICK_FOCUS_STEP),
       );
 
@@ -1672,10 +1681,16 @@ function StoreMarkersLayer({
 
   const handleClusterClick = useCallback(
     (cluster: StoreCluster) => {
-      if (cluster.tight || zoom >= MARKER_CLUSTER_PICKER_ZOOM) {
+      // Once the map is close enough, stop forcing zoom. The cluster popup
+      // becomes the stable picker for dense/identical coordinates, so users
+      // can still choose a specific business instead of getting a stuck
+      // cluster at the maximum zoom level.
+      if (zoom >= CLUSTER_PICKER_ZOOM) return;
+
+      if (cluster.tight) {
         const targetZoom = Math.min(
-          MARKER_CLUSTER_MAX_ZOOM,
-          Math.max(MARKER_CLUSTER_PICKER_ZOOM, zoom + 1),
+          CLUSTER_PICKER_ZOOM,
+          Math.max(zoom + 1, MARKER_CLICK_FOCUS_ZOOM),
         );
 
         if (onMarkerFocus) {
@@ -1776,7 +1791,7 @@ function StoreMarkersLayer({
             ? (isId ? `${clusterReferenceCount} referensi` : `${clusterReferenceCount} references`)
             : '',
         ].filter(Boolean).join(' · ');
-        const allowPicker = cluster.tight || zoom >= MARKER_CLUSTER_PICKER_ZOOM;
+        const allowPicker = cluster.tight || zoom >= CLUSTER_PICKER_ZOOM;
         const visibleClusterItems = cluster.items.slice(
           0,
           CLUSTER_POPUP_VISIBLE_LIMIT,
@@ -2109,8 +2124,11 @@ export function UmkmStoreMapClient({
       <MapContainer
         center={initialMapCenter}
       zoom={initialMapZoom}
-      minZoom={2}
-      maxZoom={19}
+      minZoom={UMKM_MAP_MIN_ZOOM}
+      maxZoom={UMKM_MAP_MAX_ZOOM}
+      maxBounds={indonesiaMaxBounds}
+      maxBoundsViscosity={0.88}
+      worldCopyJump={false}
       preferCanvas
       scrollWheelZoom={interactive}
       dragging={interactive}
@@ -2141,9 +2159,10 @@ export function UmkmStoreMapClient({
       <TileLayer
         url={tileUrl}
         attribution={tileAttribution}
-        keepBuffer={1}
+        keepBuffer={2}
         updateWhenIdle
         updateWhenZooming={false}
+        noWrap
       />
       <AttributionControl position="bottomright" prefix={false} />
       {controls ? <ZoomControl position="bottomright" /> : null}
