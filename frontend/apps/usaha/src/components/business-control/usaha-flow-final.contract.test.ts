@@ -107,7 +107,9 @@ describe('Flow Usaha final contracts', () => {
     expect(reports).toContain("['1', 'Hari ini']");
     expect(reports).toContain("['7', '7 hari']");
     expect(reports).toContain("['30', '30 hari']");
-    expect(reports).toContain('periodFinanceEntries');
+    expect(reports).toContain('getFinanceCoreSummary');
+    expect(reports).toContain('getSalesPeriodSummary');
+    expect(reports).toContain('cash_movement');
   });
 
   it('renders negative storefront price deltas with a minus sign', () => {
