@@ -905,12 +905,13 @@ export async function POST(req: NextRequest) {
       throw new Error('PERSONAL_AI_COMPLETION_MISSING');
     }
 
-    // Never feed a transport/error fallback into durable memory.
+    // Memory is persistence/learning side work. Do not make the user wait for it.
+    // The chat + idempotent response are already durable at this point.
     if (
       (!creationFlow || creationFlow.status === 'ready') &&
       ai.provider !== 'safe-fallback'
     ) {
-      await updatePersonalAiMemory({
+      void updatePersonalAiMemory({
         agent,
         userId: auth.ctx.userId,
         userMessage: message,
