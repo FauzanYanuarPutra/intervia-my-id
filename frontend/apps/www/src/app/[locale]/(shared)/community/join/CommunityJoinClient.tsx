@@ -94,7 +94,7 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
           <div className="mt-5 grid gap-2 sm:grid-cols-3">
             {[
               [LogIn, isId ? '1. Login' : '1. Log in'],
-              [CheckCircle2, isId ? '2. Minimal 1 listing' : '2. At least 1 listing'],
+              [CheckCircle2, isId ? '2. Minimal 1 listing aktif' : '2. At least 1 listing'],
               [Users, isId ? '3. Dikelompokkan' : '3. Get grouped'],
             ].map(([Icon, label]) => {
               const StepIcon = Icon as typeof CheckCircle2;
