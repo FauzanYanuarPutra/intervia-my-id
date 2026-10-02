@@ -11507,6 +11507,24 @@ async fn list_map_places(
             ) AS category,
             '/toko/' || s.slug AS public_path,
             jsonb_strip_nulls(jsonb_build_object(
+              'verification_status', CASE COALESCE((
+                SELECT bv.status
+                FROM internal_moderation.business_verifications bv
+                WHERE bv.business_id = s.id
+                ORDER BY bv.updated_at DESC
+                LIMIT 1
+              ), 'unverified')
+                WHEN 'verified' THEN 'lajukan_verified'
+                WHEN 'pending' THEN 'pending'
+                ELSE 'unverified'
+              END,
+              'lajukan_verified', COALESCE((
+                SELECT bv.status
+                FROM internal_moderation.business_verifications bv
+                WHERE bv.business_id = s.id
+                ORDER BY bv.updated_at DESC
+                LIMIT 1
+              ), 'unverified') = 'verified',
               'marketplace_category_slug', NULLIF(lower(s.metadata->>'marketplace_category_slug'), ''),
               'umkm_category', NULLIF(lower(s.metadata->>'umkm_category'), ''),
               'business_type', NULLIF(lower(s.metadata->>'business_type'), ''),
