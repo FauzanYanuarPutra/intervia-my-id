@@ -15,25 +15,19 @@ const protections = [
     icon: KeyRound,
     title: 'PIN usaha',
     description: 'Lapisan tambahan untuk aksi sensitif.',
-    status: 'Aktif saat perlu',
+    status: 'Dikelola sistem',
   },
   {
     icon: Smartphone,
     title: 'Verifikasi ulang',
-    description: 'Verifikasi tambahan hanya saat risikonya lebih tinggi.',
-    status: 'Sesuai risiko',
+    description: 'Pemeriksaan tambahan dapat diterapkan saat tindakan berisiko.',
+    status: 'Dikelola sistem',
   },
   {
     icon: ShieldCheck,
     title: 'Log aktivitas',
     description: 'Perubahan akses dan aktivitas penting dapat ditelusuri.',
-    status: 'Tercatat',
-  },
-  {
-    icon: UserRoundCheck,
-    title: 'Akses berbasis peran',
-    description: 'Pemilik, manager, kasir, dan viewer mendapat akses sesuai tugasnya.',
-    status: 'Berbasis peran',
+    status: 'Tersedia',
   },
 ] as const;
 
@@ -80,7 +74,7 @@ export default async function SecurityPage({ searchParams }: PageProps) {
                   <p className="text-sm font-black text-portal-ink">{item.title}</p>
                   <p className="mt-0.5 text-xs leading-5 text-portal-soft">{item.description}</p>
                 </div>
-                <StatusBadge tone="success">{item.status}</StatusBadge>
+                <StatusBadge tone="neutral">{item.status}</StatusBadge>
               </article>
             );
           })}
