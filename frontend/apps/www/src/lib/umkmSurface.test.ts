@@ -23,7 +23,7 @@ describe('UMKM public route helpers', () => {
     );
   });
 
-  it('routes public map references to the storefront detail surface', () => {
+  it('keeps public map references on the map surface', () => {
     const reference = {
       slug: 'osm-node-1',
       public_path: '/content/pasar-uji-reference-id',
@@ -34,7 +34,9 @@ describe('UMKM public route helpers', () => {
     };
 
     expect(isUmkmMapPublicReference(reference)).toBe(true);
-    expect(buildUmkmMapPlacePath(reference)).toBe('/toko/osm-node-1');
+    expect(buildUmkmMapPlacePath(reference)).toBe(
+      '/umkm?store=osm-node-1&view=map',
+    );
   });
 
   it('keeps public Wikidata references on the map surface instead of pretending they are stores', () => {
@@ -51,29 +53,32 @@ describe('UMKM public route helpers', () => {
         },
       }),
     ).toBe(
-      '/umkm?view=map&store=wikidata-q111754951-mcdonald-s-banjar-baru-6f9f6ab8-ac91-48eb-88af-0b12f1aa9d6e&storeId=reference%3Awikidata-q111754951',
+      '/umkm?store=wikidata-q111754951-mcdonald-s-banjar-baru-6f9f6ab8-ac91-48eb-88af-0b12f1aa9d6e&storeId=reference%3Awikidata-q111754951&view=map',
     );
   });
 
-  it('does not accept an external or protocol-relative reference path', () => {
+  it('ignores an unsafe reference path and stays on the map surface', () => {
     expect(
       buildUmkmMapPlacePath({
         slug: 'osm-node-1',
         public_path: '//example.test/unsafe',
         metadata: { is_public_reference: true },
       }),
-    ).toBe('/toko/osm-node-1');
+    ).toBe('/umkm?store=osm-node-1&view=map');
   });
 
   it('uses a storefront slug from metadata when the map point has no top-level slug', () => {
     expect(
       buildUmkmMapPlacePath({
+        id: 'reference:bank-permata-bintaro',
         metadata: {
           is_public_reference: true,
           storefront_slug: 'bank-permata-bintaro',
         },
       }),
-    ).toBe('/toko/bank-permata-bintaro');
+    ).toBe(
+      '/umkm?store=bank-permata-bintaro&storeId=reference%3Abank-permata-bintaro&view=map',
+    );
   });
 
   it('routes a Lajukan store map point to its storefront', () => {
@@ -83,6 +88,20 @@ describe('UMKM public route helpers', () => {
         metadata: {
           source_kind: 'lajukan_store',
           source: 'usaha_portal',
+        },
+      }),
+    ).toBe('/toko/lajukan-juice-31f8206d');
+  });
+
+  it('routes an owned Lajukan content projection to its storefront', () => {
+    expect(
+      buildUmkmMapPlacePath({
+        id: 'store-1',
+        slug: 'lajukan-juice-31f8206d',
+        public_path: '/content/legacy-store',
+        metadata: {
+          source_kind: 'lajukan_content',
+          owner_user_id: 'user-1',
         },
       }),
     ).toBe('/toko/lajukan-juice-31f8206d');
