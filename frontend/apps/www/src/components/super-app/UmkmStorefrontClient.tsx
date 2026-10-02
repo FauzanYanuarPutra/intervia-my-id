@@ -33,6 +33,7 @@ import {
   ShoppingBag,
   Sparkles,
   Star,
+  Store,
   Table2,
   Truck,
   Video,
