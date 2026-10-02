@@ -5052,6 +5052,21 @@ export default function ContentDetailClient({
                             : undefined
                     }
                     locale={locale === 'en' ? 'en' : 'id'}
+                    source={{
+                      title: item.title,
+                      summary: item.summary,
+                      body: item.body,
+                      category: item.category,
+                      content_type: item.content_type || item.type,
+                      price_cents: item.price_cents,
+                      price_unit: item.price_unit,
+                      city:
+                        typeof meta.city === 'string'
+                          ? meta.city
+                          : typeof meta.location === 'string'
+                            ? meta.location
+                            : undefined,
+                    }}
                   />
                 ) : null}
 
