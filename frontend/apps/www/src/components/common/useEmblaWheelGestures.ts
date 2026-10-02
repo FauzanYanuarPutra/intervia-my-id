@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import type { EmblaCarouselType } from 'embla-carousel';
 
-type UseEmblaWheelGesturesOptions = {
+export type UseEmblaWheelGesturesOptions = {
   enabled?: boolean;
   desktopOnly?: boolean;
   threshold?: number;
