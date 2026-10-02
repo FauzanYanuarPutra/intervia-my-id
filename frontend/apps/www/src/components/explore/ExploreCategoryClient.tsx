@@ -22,7 +22,6 @@ import {
   ExploreSurface,
   useExploreEmblaRail,
 } from '@/components/explore/ExploreVisualSystem';
-import { Header } from '@/components/layout/Header';
 import { CompactSeeAllLink } from '@/components/common/CompactSectionAction';
 import { InfiniteScrollTrigger } from '@/components/common/InfiniteScrollTrigger';
 import { EmblaDesktopControls } from '@/components/common/EmblaDesktopControls';
@@ -1647,8 +1646,6 @@ export function ExploreCategoryClient({
   return (
     <div className="min-h-[100svh] overflow-x-clip bg-[color:var(--app-surface-muted)] pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-10">
       <div className="lg:hidden">
-        <Header />
-        <div className="h-[calc(52px+env(safe-area-inset-top))]" />
       </div>
 
       <main className="mx-auto w-full min-w-0 max-w-[1080px] px-3 py-2.5 sm:px-5 sm:py-4 lg:px-6 lg:py-5">
