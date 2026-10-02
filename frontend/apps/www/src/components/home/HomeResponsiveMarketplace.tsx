@@ -1980,7 +1980,7 @@ export function TrendingSearchSection({ isId }: { isId: boolean }) {
             [will-change:transform]
           "
         >
-          {items.map(item => (
+          {clusteredItems.map(item => (
             <Link
               key={`${item.label}-${item.href}`}
               href={item.href}
@@ -2640,6 +2640,11 @@ function HomeListingCarouselSection({
     containScroll: 'trimSnaps',
     dragFree: true,
     skipSnaps: true,
+    wheel: {
+      enabled: items.length > 1,
+      desktopOnly: true,
+      threshold: 42,
+    },
   });
 
   const isDemand = mode === 'demand';
@@ -2668,7 +2673,7 @@ function HomeListingCarouselSection({
     >
       <div className="flex min-w-0 items-center gap-1.5 px-2 sm:px-3 md:px-4 lg:px-6">
         {isDemand ? (
-          <Search className="h-3.5 w-3.5 shrink-0 text-blue-600" />
+          <Search className="h-3.5 w-3.5 shrink-0 text-amber-600" />
         ) : (
           <Sparkles className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
         )}
@@ -2794,6 +2799,11 @@ export function PublicReferencesSection({
     containScroll: 'keepSnaps',
     dragFree: true,
     skipSnaps: true,
+    wheel: {
+      enabled: items.length > 1,
+      desktopOnly: true,
+      threshold: 42,
+    },
   });
 
   if (items.length === 0) return null;
@@ -2811,7 +2821,7 @@ export function PublicReferencesSection({
     >
       {/* HEADER */}
       <div className="flex h-6 items-center gap-1.5 px-1 sm:px-3 md:px-6">
-        <Globe2 className="h-3.5 w-3.5 shrink-0 text-blue-600" />
+        <Globe2 className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
 
         <h2 className="truncate text-[11px] font-bold leading-none tracking-tight text-[color:var(--app-text)] sm:text-xs">
           {isId ? 'Usaha sekitar' : 'Nearby businesses'}
@@ -3278,7 +3288,7 @@ function RecommendationCard({
         {locationLabel ? (
           <p
             title={locationLabel}
-            className="mt-1.5 flex min-w-0 items-center gap-1.5 truncate text-[9px] font-medium leading-4 text-zinc-500 dark:text-zinc-400 min-[360px]:text-[10px] sm:text-[11px]"
+            className="mt-1.5 flex min-w-0 items-center gap-1.5 truncate text-[9px] font-semibold leading-4 text-slate-500 dark:text-slate-400 min-[360px]:text-[10px] sm:text-[11px]"
           >
             <MapPin className="h-3 w-3 shrink-0" aria-hidden="true" />
             <span className="truncate">{locationLabel}</span>
