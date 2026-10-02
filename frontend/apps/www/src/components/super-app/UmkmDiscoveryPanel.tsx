@@ -2811,7 +2811,8 @@ export function UmkmDiscoveryPanel({
                     }}
                   />
 
-                  {!selectedIsPublicReference && isUuidLike(selectedPlace.store.id) ? (
+                  {selectedPlace?.store.id &&
+                  (selectedIsPublicReference || isUuidLike(selectedPlace.store.id)) ? (
                     <div className="rounded-[14px] border border-slate-200/90 bg-white p-2.5 dark:border-slate-800 dark:bg-slate-950">
                       <div className="mb-2 flex items-start justify-between gap-2">
                         <div className="min-w-0">
