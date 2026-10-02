@@ -22,6 +22,7 @@ import {
 } from 'react';
 import {
   BarChart3,
+  BadgeCheck,
   BriefcaseBusiness,
   ChevronRight,
   CheckCircle2,
@@ -542,6 +543,7 @@ type PublicReferenceItem = {
   imageAttribution: string;
   clusterKey?: string;
   sourceKind: 'lajukan' | 'registered' | 'reference';
+  verified: boolean;
 };
 
 type PublicReferenceApiItem = {
@@ -1519,6 +1521,11 @@ function mapApiItemToPublicReference(
     sourceFacebookUrl: safeFacebookUrl,
     imageAttribution: readText(metadata.image_attribution),
     sourceKind,
+    verified:
+      sourceKind !== 'reference' &&
+      (metadata.lajukan_verified === true ||
+        String(metadata.verification_status || '').trim().toLowerCase() ===
+          'lajukan_verified'),
   };
 }
 
@@ -2920,7 +2927,18 @@ export function PublicReferencesSection({
                       group-hover:text-blue-700
                     "
                   >
-                    {item.title}
+                    <span className="inline-flex min-w-0 max-w-full items-center gap-1">
+                      <span className="truncate">{item.title}</span>
+                      {item.verified ? (
+                        <span
+                          title={isId ? 'Terverifikasi Lajukan' : 'Lajukan verified'}
+                          aria-label={isId ? 'Terverifikasi Lajukan' : 'Lajukan verified'}
+                          className="inline-flex shrink-0 items-center rounded-full text-emerald-600"
+                        >
+                          <BadgeCheck className="h-3.5 w-3.5" aria-hidden="true" />
+                        </span>
+                      ) : null}
+                    </span>
                   </h3>
 
                   {item.location ? (
