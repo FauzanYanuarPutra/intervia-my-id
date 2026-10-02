@@ -6,9 +6,10 @@ import { useAuth, useRequireAuth } from '@/context/AuthContext';
 import { SelectField } from '@/ui';
 import { backofficeApi, moderationApi, newsApi } from '@/lib/api';
 import CmsDashboard from './CmsDashboard';
+import CommunityManagement from './CommunityManagement';
 
 type R = Record<string, unknown>;
-type Workspace = 'overview' | 'news' | 'moderation' | 'studio' | 'team';
+type Workspace = 'overview' | 'news' | 'moderation' | 'community' | 'studio' | 'team';
 type FactCheckStatus = 'pending' | 'verified' | 'not_required';
 type LegalReviewStatus = 'pending' | 'approved' | 'not_required';
 type EditorialPriority = 'low' | 'normal' | 'high' | 'urgent';
@@ -532,6 +533,7 @@ export default function CmsControlCenter() {
     ['overview', 'Overview', 'Editorial & analytics'],
     ['news', 'News', String(qcount('pending_review')) + ' pending review'],
     ['moderation', 'Moderation', String(moderationItems.length) + ' antrean'],
+    ['community', 'Community', 'Grup + CTA WhatsApp'],
     ['studio', 'Content Studio', 'Konten, sektor, banner'],
     ['team', 'Team & Access', user?.roles?.includes('super_admin') ? 'Kelola akses' : 'Super admin only']
   ];
