@@ -1,12 +1,14 @@
 use std::sync::Arc;
 
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::{header, HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     routing::{get, post},
     Json, Router,
 };
+use chrono::NaiveDate;
+use serde::Deserialize;
 use serde_json::{json, Value};
 use uuid::Uuid;
 
@@ -27,6 +29,10 @@ pub(crate) fn router() -> Router<Arc<AppState>> {
         .route(
             "/v1/businesses/{business_id}/sales/{sale_id}/void",
             post(void_sale),
+        )
+        .route(
+            "/v1/businesses/{business_id}/sales/summary",
+            get(period_summary),
         )
 }
 
@@ -56,6 +62,42 @@ async fn list_sales(
             )
                 .into_response()
         }
+        Err(error) => sale_error_response(error),
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct SalesSummaryQuery {
+    from: Option<NaiveDate>,
+    to: Option<NaiveDate>,
+}
+
+async fn period_summary(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(business_id): Path<Uuid>,
+    Query(query): Query<SalesSummaryQuery>,
+) -> Response {
+    let access =
+        match sales_access_context(&state, &headers, business_id, SalesAccessKind::View).await {
+            Ok(value) => value,
+            Err(response) => return response,
+        };
+
+    match SaleRepository::new(state.db.clone())
+        .period_summary(
+            business_id,
+            access.organization_id,
+            query.from,
+            query.to,
+        )
+        .await
+    {
+        Ok(summary) => (
+            StatusCode::OK,
+            Json(json!({"data": {"summary": summary}})),
+        )
+            .into_response(),
         Err(error) => sale_error_response(error),
     }
 }
