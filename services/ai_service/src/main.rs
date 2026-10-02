@@ -222,6 +222,7 @@ enum AiTask {
     SupportTriage,
     Moderation,
     MarketplaceMatch,
+    SimilarMatch,
     DealAssist,
     AnalyticsInsight,
     DisputeSummary,
@@ -247,6 +248,7 @@ impl AiTask {
             "support" | "support_triage" | "triage" => Self::SupportTriage,
             "moderate" | "moderation" | "content_moderation" => Self::Moderation,
             "match" | "marketplace_match" | "supplier_match" | "rfq" => Self::MarketplaceMatch,
+            "similar" | "similar_match" | "content_similarity" | "match_rerank" => Self::SimilarMatch,
             "deal" | "deal_assist" | "negotiation" | "negotiate" => Self::DealAssist,
             "analytics" | "analytics_insight" | "metric_insight" | "diagnostic" => {
                 Self::AnalyticsInsight
@@ -270,6 +272,7 @@ impl AiTask {
             Self::SupportTriage => "support_triage",
             Self::Moderation => "moderation",
             Self::MarketplaceMatch => "marketplace_match",
+            Self::SimilarMatch => "similar_match",
             Self::DealAssist => "deal_assist",
             Self::AnalyticsInsight => "analytics_insight",
             Self::DisputeSummary => "dispute_summary",
@@ -379,6 +382,7 @@ async fn main() {
         .route("/v1/support/triage", post(handle_support_triage))
         .route("/v1/moderate", post(handle_moderation))
         .route("/v1/match", post(handle_marketplace_match))
+        .route("/v1/match/similar", post(handle_similar_match))
         .route("/v1/deal/assist", post(handle_deal_assist))
         .route("/v1/analytics/insight", post(handle_analytics_insight))
         .route("/v1/dispute/summarize", post(handle_dispute_summary))
@@ -871,6 +875,7 @@ task_handler!(handle_business_advice, AiTask::BusinessAdvisor);
 task_handler!(handle_support_triage, AiTask::SupportTriage);
 task_handler!(handle_moderation, AiTask::Moderation);
 task_handler!(handle_marketplace_match, AiTask::MarketplaceMatch);
+task_handler!(handle_similar_match, AiTask::SimilarMatch);
 task_handler!(handle_deal_assist, AiTask::DealAssist);
 task_handler!(handle_analytics_insight, AiTask::AnalyticsInsight);
 task_handler!(handle_dispute_summary, AiTask::DisputeSummary);
@@ -1765,7 +1770,13 @@ fn task_instructions(task: AiTask, locale: &str) -> &'static str {
         (AiTask::MarketplaceMatch, false) => {
             "Turn buyer needs into an RFQ/search specification. Never invent suppliers. Return must-haves, nice-to-haves, budget, location, delivery, vendor questions, and search query."
         }
-        (AiTask::DealAssist, true) => {
+        (AiTask::SimilarMatch, true) => {
+            "Nilai kandidat yang sudah disediakan di context. Jangan membuat kandidat baru dan jangan mengubah ID. Urutkan dari paling mirip dan paling layak/worth-it ke yang paling lemah. Pertimbangkan kebutuhan utama, kategori/subkategori, lokasi/jarak, harga/budget, ketersediaan, kualitas listing, rating/review, dan kesesuaian konteks. Hasil harus berupa ranked_candidate_ids dari ID yang benar-benar ada di context dan assessment per kandidat. Ini adalah reranking semantic ringan, bukan sumber fakta baru."
+        }
+        (AiTask::SimilarMatch, false) => {
+            "Rank the supplied candidates only. Never invent candidates or change IDs. Order candidates from strongest semantic fit and practical value to weakest. Consider the stated need, category/subcategory, location/distance, price/budget, availability, listing quality, rating/reviews, and context fit. Return ranked_candidate_ids using only IDs present in context plus one assessment per candidate. This is lightweight semantic reranking, not a source of new facts."
+        }
+                (AiTask::DealAssist, true) => {
             "Bantu negosiasi dari fakta chat/konteks yang tersedia. Jangan membuat harga atau janji baru. Keluarkan ringkasan posisi buyer/seller, poin yang sudah sepakat, poin yang belum jelas, risiko, pertanyaan berikutnya, dan draft balasan siap kirim."
         }
         (AiTask::DealAssist, false) => {
@@ -2275,6 +2286,35 @@ fn task_data_schema(task: AiTask) -> Value {
                 "buyer_need", "supplier_requirements", "must_have", "nice_to_have",
                 "budget", "location", "delivery", "vendor_questions", "search_query"
             ]
+        }),
+        AiTask::SimilarMatch => json!({
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "ranked_candidate_ids": {
+                    "type": "array",
+                    "maxItems": 10,
+                    "items": { "type": "string" }
+                },
+                "assessments": {
+                    "type": "array",
+                    "maxItems": 10,
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                            "id": { "type": "string" },
+                            "similarity": { "type": "number", "minimum": 0, "maximum": 100 },
+                            "fit": { "type": "number", "minimum": 0, "maximum": 100 },
+                            "worth_it": { "type": "number", "minimum": 0, "maximum": 100 },
+                            "reason": { "type": "string" },
+                            "caution": { "type": "string" }
+                        },
+                        "required": ["id", "similarity", "fit", "worth_it", "reason", "caution"]
+                    }
+                }
+            },
+            "required": ["ranked_candidate_ids", "assessments"]
         }),
         AiTask::DealAssist => json!({
             "type": "object",
