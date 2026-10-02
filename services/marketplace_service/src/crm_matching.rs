@@ -2113,6 +2113,7 @@ pub async fn public_matches(
         })),
     )
         .into_response()
+}
 
 pub async fn notify_new_listing_matches(
     state: &Arc<AppState>,
