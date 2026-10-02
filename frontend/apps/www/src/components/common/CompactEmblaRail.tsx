@@ -1,10 +1,8 @@
 'use client';
 
 import { Children, type ReactNode } from 'react';
-import useEmblaCarousel from 'embla-carousel-react';
-
+import { useLajukanEmbla } from '@/components/common/useLajukanEmbla';
 import { EmblaDesktopControls } from '@/components/common/EmblaDesktopControls';
-import { useEmblaWheelGestures } from '@/components/common/useEmblaWheelGestures';
 import { cn } from '@/lib/utils';
 
 type CompactEmblaRailProps = {
@@ -32,12 +30,11 @@ export function CompactEmblaRail({
   controlsClassName,
   controls = true,
 }: CompactEmblaRailProps) {
-  const [emblaRef, emblaApi] = useEmblaCarousel({
+  const [emblaRef, emblaApi] = useLajukanEmbla({
     align: 'start',
     containScroll: 'trimSnaps',
     dragFree: true,
   });
-  useEmblaWheelGestures(emblaApi);
   const items = Children.toArray(children).filter(Boolean);
 
   if (items.length === 0) return null;
@@ -47,7 +44,8 @@ export function CompactEmblaRail({
       <div
         ref={emblaRef}
         className={cn(
-          'min-w-0 flex-1 cursor-grab overflow-hidden active:cursor-grabbing',
+          'min-w-0 flex-1 cursor-grab overflow-hidden overscroll-x-contain active:cursor-grabbing',
+
           viewportClassName,
         )}
       >
