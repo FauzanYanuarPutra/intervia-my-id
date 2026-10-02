@@ -3,13 +3,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowRight,
+  BadgeCheck,
   CheckCircle2,
   ClipboardCheck,
   ExternalLink,
   Loader2,
   LogIn,
+  Megaphone,
   ShieldCheck,
   Sparkles,
+  UsersRound,
   X,
 } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
@@ -51,7 +54,7 @@ const COMMUNITY_GROUPS: CommunityGroup[] = [
     nameId: 'Punya, Butuh & Peluang',
     nameEn: 'Have, Need & Opportunities',
     icon: '🔎',
-    descriptionId: 'Cari barang, kebutuhan, dan peluang usaha.',
+    descriptionId: 'Cari barang, kebutuhan, supplier, dan peluang usaha.',
     descriptionEn: 'Find products, needs, and business opportunities.',
     benefitsId: ['Cari kebutuhan', 'Temukan peluang', 'Hubungkan kebutuhan'],
     benefitsEn: ['Find needs', 'Discover opportunities', 'Connect supply and demand'],
@@ -96,7 +99,7 @@ const COMMUNITY_GROUPS: CommunityGroup[] = [
     nameId: 'Petani & Produsen',
     nameEn: 'Farmers & Producers',
     icon: '🌾',
-    descriptionId: 'Hubungkan produsen langsung dengan kebutuhan pasar.',
+    descriptionId: 'Hubungkan produsen langsung dengan pembeli dan kebutuhan pasar.',
     descriptionEn: 'Connect producers directly with market demand.',
     benefitsId: ['Cari pembeli', 'Cari pasar', 'Bangun rantai pasok'],
     benefitsEn: ['Find buyers', 'Find markets', 'Build supply chains'],
@@ -251,15 +254,15 @@ export default function CommunityJoinClient({
             : 'Create 1 listing first';
 
   return (
-    <main className="min-h-[100svh] bg-[color:var(--app-surface-muted)] px-2.5 pb-8 pt-3 sm:px-4 sm:pt-5">
+    <main className="min-h-[100svh] bg-[color:var(--app-surface-muted)] px-2.5 pb-[calc(9.5rem+env(safe-area-inset-bottom))] pt-3 sm:px-4 sm:pb-12 sm:pt-5 lg:pb-10">
       <section className="mx-auto max-w-2xl space-y-2.5">
         <header className="overflow-hidden rounded-[22px] border border-emerald-100 bg-white shadow-[0_18px_38px_-30px_rgba(15,23,42,0.35)]">
-          <div className="bg-[linear-gradient(135deg,#047857_0%,#059669_55%,#0f766e_100%)] px-4 py-4 text-white sm:px-5 sm:py-5">
+          <div className="bg-[linear-gradient(145deg,#064e3b_0%,#047857_52%,#065f46_100%)] px-4 py-4 text-white sm:px-5 sm:py-5">
             <div className="flex items-start gap-3">
               <WhatsAppStepIcon />
 
               <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-extrabold uppercase tracking-[0.11em] text-emerald-50">
+                <p className="text-[10px] font-black uppercase tracking-[0.12em] text-white/90">
                   {isId
                     ? 'Komunitas Rantai Usaha Lokal'
                     : 'Local Business Chain Community'}
@@ -271,7 +274,7 @@ export default function CommunityJoinClient({
                     : 'Explore first, join when you are ready'}
                 </h1>
 
-                <p className="mt-1 max-w-2xl text-[12px] leading-5 text-emerald-50 sm:text-[13px] sm:leading-5">
+                <p className="mt-1 max-w-2xl text-[12px] leading-5 text-white/90 sm:text-[13px] sm:leading-5">
                   {isId
                     ? 'Kamu tidak perlu login untuk melihat grup dan manfaatnya. Login + 1 listing aktif hanya diminta saat kamu benar-benar mau masuk ke WhatsApp.'
                     : 'You can explore the groups without logging in. Login + 1 active listing is only needed when you are ready to enter WhatsApp.'}
@@ -300,13 +303,13 @@ export default function CommunityJoinClient({
               ].map(([value, label]) => (
                 <div
                   key={value}
-                  className="min-w-0 rounded-xl bg-white/12 px-2.5 py-2 ring-1 ring-white/12"
+                  className="min-w-0 rounded-xl bg-black/10 px-2.5 py-2 ring-1 ring-white/15 backdrop-blur-[2px]"
                 >
                   <p className="truncate text-[13px] font-black text-white">
                     {value}
                   </p>
 
-                  <p className="mt-0.5 truncate text-[10px] font-semibold text-emerald-50 sm:text-[11px]">
+                  <p className="mt-0.5 text-[10px] font-semibold text-white/80 sm:text-[11px]">
                     {label}
                   </p>
                 </div>
@@ -322,7 +325,7 @@ export default function CommunityJoinClient({
 
               <p className="min-w-0 flex-1 text-[12px] font-semibold leading-5 text-zinc-700 sm:text-[13px]">
                 {isId
-                  ? 'Tujuannya simpel: bantu kamu masuk ke grup yang paling relevan dan menjaga komunitas tetap rapi dari spam.'
+                  ? 'Kamu bebas melihat dulu. Saat sudah siap bergabung, login membantu kami mengenali akunmu dan mencocokkanmu ke komunitas yang paling relevan.'
                   : 'The goal is simple: match you with the most relevant group and keep the community focused.'}
               </p>
             </div>
@@ -367,11 +370,11 @@ export default function CommunityJoinClient({
                 </span>
 
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[12px] font-extrabold leading-5 text-zinc-900 sm:text-[13px]">
+                  <span className="block whitespace-normal text-[12px] font-extrabold leading-5 text-zinc-900 sm:text-[13px]">
                     {isId ? group.nameId : group.nameEn}
                   </span>
 
-                  <span className="mt-0.5 block truncate text-[10px] leading-4 text-zinc-600 sm:text-[11px]">
+                  <span className="mt-0.5 block whitespace-normal text-[10px] leading-4 text-zinc-600 sm:text-[11px]">
                     {isId
                       ? group.descriptionId
                       : group.descriptionEn}
@@ -384,6 +387,96 @@ export default function CommunityJoinClient({
           </div>
         </section>
 
+        <section className="rounded-[20px] border border-emerald-100 bg-white px-4 py-3.5 shadow-[0_12px_28px_-26px_rgba(15,23,42,0.28)] sm:px-4">
+          <div className="flex items-start gap-2.5">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
+              <BadgeCheck className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-sm font-black text-zinc-950 sm:text-[15px]">
+                {isId ? 'Kenapa ikut komunitas ini?' : 'Why join this community?'}
+              </h2>
+              <p className="mt-0.5 text-[11px] leading-4.5 text-zinc-500">
+                {isId
+                  ? 'Bukan sekadar grup WhatsApp. Tujuannya supaya kebutuhan usaha lebih mudah ditemukan orang yang tepat.'
+                  : 'More than a WhatsApp group: the goal is to make business needs easier to discover by the right people.'}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-3 grid gap-2 sm:grid-cols-3">
+            {[
+              {
+                icon: Search,
+                title: isId ? 'Lebih mudah ditemukan' : 'Easier to discover',
+                body: isId
+                  ? 'Posting kebutuhan atau penawaran membuat konteks usahamu jelas.'
+                  : 'A listing makes your business need or offer easier to understand.',
+              },
+              {
+                icon: UsersRound,
+                title: isId ? 'Temukan koneksi usaha' : 'Find business connections',
+                body: isId
+                  ? 'Buka peluang bertemu supplier, pembeli, partner, atau penawar yang relevan.'
+                  : 'Create opportunities to meet relevant suppliers, buyers, partners, or offers.',
+              },
+              {
+                icon: Megaphone,
+                title: isId ? 'Peluang dibantu promosi' : 'Promotion opportunities',
+                body: isId
+                  ? 'Listing yang jelas lebih siap untuk dibantu ditemukan atau dipromosikan.'
+                  : 'A clear listing is easier to surface or promote when relevant.',
+              },
+            ].map(item => {
+              const Icon = item.icon;
+              return (
+                <div
+                  key={item.title}
+                  className="min-w-0 rounded-[15px] border border-zinc-100 bg-zinc-50 px-3 py-2.5"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white text-emerald-700 ring-1 ring-zinc-100">
+                      <Icon className="h-3.5 w-3.5" />
+                    </span>
+                    <p className="text-[11px] font-black leading-4 text-zinc-900">
+                      {item.title}
+                    </p>
+                  </div>
+                  <p className="mt-1.5 text-[10px] leading-4 text-zinc-600">
+                    {item.body}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="rounded-[20px] border border-zinc-100 bg-white px-4 py-3.5 shadow-[0_12px_28px_-26px_rgba(15,23,42,0.26)] sm:px-4">
+          <div className="flex items-start gap-2.5">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-700">
+              <ClipboardCheck className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-sm font-black text-zinc-950 sm:text-[15px]">
+                {isId ? 'Kenapa perlu 1 listing sebelum gabung?' : 'Why do you need 1 listing before joining?'}
+              </h2>
+              <p className="mt-0.5 text-[11px] leading-4.5 text-zinc-600">
+                {isId
+                  ? 'Supaya komunitas tidak menjadi grup promosi acak. Listing memberi gambaran sederhana tentang apa yang kamu punya atau sedang cari.'
+                  : 'This keeps the community focused. A listing gives a simple picture of what you offer or what you need.'}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-2.5 rounded-[14px] bg-amber-50 px-3 py-2.5">
+            <p className="text-[10.5px] font-semibold leading-4.5 text-amber-950">
+              {isId
+                ? 'Tidak perlu sempurna. Cukup mulai dari 1 hal nyata: produk yang kamu tawarkan, jasa yang kamu punya, atau kebutuhan yang sedang kamu cari.'
+                : 'It does not need to be perfect. Start with one real thing: a product you offer, a service you provide, or a need you are looking for.'}
+            </p>
+          </div>
+        </section>
+
         <section className="rounded-[20px] border border-emerald-100 bg-white px-4 py-3 shadow-[0_12px_28px_-26px_rgba(15,23,42,0.28)] sm:px-4">
           <div className="flex items-start gap-3">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
@@ -393,7 +486,7 @@ export default function CommunityJoinClient({
             <div className="min-w-0 flex-1">
               <h2 className="text-sm font-black text-zinc-950 sm:text-[15px]">
                 {isId
-                  ? 'Saat mau gabung, tinggal 2 langkah ringan'
+                  ? 'Sudah siap? Tinggal 2 langkah ringan'
                   : 'When you join, there are only 2 light steps'}
               </h2>
 
@@ -402,13 +495,13 @@ export default function CommunityJoinClient({
                   [
                     isId ? '1. Login' : '1. Log in',
                     isId
-                      ? 'Agar Lajukan tahu akunmu.'
+                      ? 'Login untuk menghubungkan aktivitas komunitas dengan akunmu.'
                       : 'So Lajukan can identify your account.',
                   ],
                   [
                     isId ? '2. 1 listing aktif' : '2. 1 active listing',
                     isId
-                      ? 'Agar peran usaha bisa dicocokkan.'
+                      ? '1 listing aktif membantu membaca apakah kamu sedang menawarkan atau mencari sesuatu.'
                       : 'So your business role can be matched.',
                   ],
                 ].map(([title, body]) => (
@@ -491,52 +584,51 @@ export default function CommunityJoinClient({
           </section>
         )}
 
-        <div className="sticky bottom-2 z-10">
-          {!isAuthenticated ? (
-            <Link
-              href={loginHref()}
-              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-4 text-[13px] font-extrabold text-white shadow-[0_14px_28px_-18px_rgba(5,150,105,0.85)] transition hover:bg-emerald-700 active:scale-[0.99]"
-            >
-              <LogIn className="h-3.5 w-3.5" />
-              {actionLabel}
-              <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
-          ) : ready ? (
-            <button
-              type="button"
-              onClick={openCommunity}
-              disabled={loading || authLoading}
-              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-4 text-[13px] font-extrabold text-white shadow-[0_14px_28px_-18px_rgba(5,150,105,0.85)] transition hover:bg-emerald-700 active:scale-[0.99] disabled:cursor-wait disabled:opacity-60"
-            >
-              <BrandSocialIcon
-                brand="whatsapp"
-                className="h-4 w-4"
-              />
-              {actionLabel}
-              <ExternalLink className="h-3.5 w-3.5" />
-            </button>
-          ) : (
-            <Link
-              href="/create"
-              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-4 text-[13px] font-extrabold text-white shadow-[0_14px_28px_-18px_rgba(5,150,105,0.85)] transition hover:bg-emerald-700 active:scale-[0.99]"
-            >
-              <ClipboardCheck className="h-3.5 w-3.5" />
-              {actionLabel}
-              <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
-          )}
+        <div className="fixed inset-x-2 bottom-[calc(4.65rem+env(safe-area-inset-bottom))] z-[30] lg:static lg:mt-1 lg:px-0">
+          <div className="mx-auto w-full max-w-2xl rounded-[17px] border border-emerald-100 bg-white/95 p-1.5 shadow-[0_18px_42px_-24px_rgba(15,23,42,0.55)] backdrop-blur-xl lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none lg:backdrop-blur-0">
+            {!isAuthenticated ? (
+              <Link
+                href={loginHref()}
+                className="flex min-h-11 w-full items-center justify-center gap-2 rounded-[13px] bg-emerald-700 px-4 text-[12px] font-black text-white shadow-sm transition hover:bg-emerald-800 active:scale-[0.99] sm:text-[13px]"
+              >
+                <LogIn className="h-3.5 w-3.5" />
+                <span>{isId ? 'Login untuk gabung komunitas' : 'Log in to join the community'}</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            ) : ready ? (
+              <button
+                type="button"
+                onClick={openCommunity}
+                disabled={loading || authLoading}
+                className="flex min-h-11 w-full items-center justify-center gap-2 rounded-[13px] bg-emerald-700 px-4 text-[12px] font-black text-white shadow-sm transition hover:bg-emerald-800 active:scale-[0.99] disabled:cursor-wait disabled:opacity-60 sm:text-[13px]"
+              >
+                <BrandSocialIcon brand="whatsapp" className="h-4 w-4" />
+                <span>{actionLabel}</span>
+                <ExternalLink className="h-3.5 w-3.5" />
+              </button>
+            ) : (
+              <Link
+                href="/create"
+                className="flex min-h-11 w-full items-center justify-center gap-2 rounded-[13px] bg-emerald-700 px-4 text-[12px] font-black text-white shadow-sm transition hover:bg-emerald-800 active:scale-[0.99] sm:text-[13px]"
+              >
+                <ClipboardCheck className="h-3.5 w-3.5" />
+                <span>{actionLabel}</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            )}
+          </div>
         </div>
 
         <p className="px-2 text-center text-[11px] leading-5 text-zinc-500">
           {isId
-            ? 'Lihat bebas dulu. Persyaratan hanya diminta saat kamu benar-benar ingin masuk ke komunitas WhatsApp.'
+            ? 'Lihat dulu tanpa login. Saat kamu benar-benar siap bergabung, login + 1 listing aktif dipakai untuk menjaga komunitas tetap relevan.'
             : 'Browse freely first. Requirements are only requested when you are ready to enter the WhatsApp community.'}
         </p>
       </section>
 
       {selectedGroup ? (
         <div
-          className="fixed inset-0 z-[100] flex items-end justify-center bg-zinc-950/45 p-2 backdrop-blur-[2px] sm:items-center sm:p-4"
+          className="fixed inset-0 z-[100] flex items-end justify-center bg-zinc-950/50 p-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] backdrop-blur-[2px] sm:items-center sm:p-4"
           role="presentation"
           onMouseDown={event => {
             if (event.target === event.currentTarget) {
@@ -548,7 +640,7 @@ export default function CommunityJoinClient({
             role="dialog"
             aria-modal="true"
             aria-labelledby="community-group-title"
-            className="w-full max-w-md overflow-hidden rounded-[24px] bg-white shadow-2xl"
+            className="w-full max-w-md overflow-hidden rounded-[22px] bg-white shadow-2xl max-h-[calc(100svh-1rem)]"
           >
             <div className="flex items-start gap-2.5 border-b border-zinc-100 px-3.5 py-3">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-xl">
@@ -582,7 +674,7 @@ export default function CommunityJoinClient({
               </button>
             </div>
 
-            <div className="max-h-[52svh] overflow-y-auto px-4 py-4">
+            <div className="max-h-[calc(100svh-10.5rem)] overflow-y-auto overscroll-contain px-4 py-4">
               <p className="mb-2 text-[10px] font-extrabold uppercase tracking-[0.12em] text-emerald-700">
                 {isId ? 'Manfaat' : 'Benefits'}
               </p>
