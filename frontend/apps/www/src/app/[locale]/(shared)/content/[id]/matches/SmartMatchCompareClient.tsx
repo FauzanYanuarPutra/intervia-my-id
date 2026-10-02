@@ -15,6 +15,8 @@ type Match = {
   budget_min?: number | null;
   budget_max?: number | null;
   score?: number;
+  similarity_score?: number | null;
+  worth_score?: number | null;
   score_label?: string;
   reasons?: string[];
   warnings?: string[];
@@ -50,7 +52,7 @@ export default function SmartMatchCompareClient() {
   useEffect(() => {
     if (!contentId) return;
     let cancelled = false;
-    fetch(`/api/content/${encodeURIComponent(contentId)}/matches?sort=best&limit=8`, {
+    fetch(`/api/content/${encodeURIComponent(contentId)}/matches?sort=worth&limit=8`, {
       credentials: 'include',
       cache: 'no-store',
     })
@@ -85,7 +87,7 @@ export default function SmartMatchCompareClient() {
             <p className="text-[11px] font-black uppercase tracking-[0.12em] text-emerald-700 dark:text-emerald-300">Smart Match</p>
             <h1 className="mt-1 text-xl font-black text-[color:var(--app-text)] sm:text-2xl">Bandingkan yang paling cocok</h1>
             <p className="mt-1 max-w-2xl text-sm leading-6 text-[color:var(--app-text-soft)]">
-              Lajukan sudah menyaring berdasarkan kecocokan, lokasi, harga, ketersediaan, dan kualitas listing. Kamu tinggal pilih yang paling masuk akal.
+              Lajukan mengurutkan dari kecocokan dan value: kemiripan isi, lokasi, harga/budget, ketersediaan, kualitas listing, dan trust. Urutan ini tetap punya fallback cepat kalau AI tidak tersedia.
             </p>
           </div>
         </div>
@@ -111,7 +113,7 @@ export default function SmartMatchCompareClient() {
                     <h2 className="mt-1 line-clamp-2 text-base font-black text-[color:var(--app-text)]">{match.title}</h2>
                   </div>
                   <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-black text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300">
-                    {Math.round(match.score ?? 0)}%
+                    {Math.round(match.worth_score ?? match.score ?? 0)}% worth
                   </span>
                 </div>
 
@@ -120,6 +122,7 @@ export default function SmartMatchCompareClient() {
                   {match.city ? <div className="flex justify-between gap-3"><span>Lokasi</span><span className="text-right">{match.city}</span></div> : null}
                   {match.distance_km != null ? <div className="flex justify-between gap-3"><span>Jarak</span><span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" />{match.distance_km < 1 ? '<1 km' : `${match.distance_km} km`}</span></div> : null}
                   {match.rating != null ? <div className="flex justify-between gap-3"><span>Rating</span><span>{match.rating.toFixed(1)} ({match.review_count ?? 0})</span></div> : null}
+                  {match.similarity_score != null ? <div className="flex justify-between gap-3"><span>Kemiripan</span><span>{Math.round(match.similarity_score)}%</span></div> : null}
                 </div>
 
                 {match.reasons?.length ? (
