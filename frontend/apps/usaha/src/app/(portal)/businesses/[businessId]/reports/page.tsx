@@ -7,12 +7,11 @@ import { PortalShell } from '@/components/portal/PortalShell';
 import { getBusinessAdvisorSummary } from '@/lib/business-advisor-server';
 import {
   listControlChannels,
-  listControlFinanceEntries,
   listControlIngredients,
-  listControlSales,
 } from '@/lib/business-control-server';
+import { getFinanceCoreSummary } from '@/lib/finance-core-server';
+import { getSalesPeriodSummary } from '@/lib/sales-summary-server';
 import { jakartaDateKey, summarizeControlCenter } from '@/lib/business-control/insights';
-import { summarizeSales } from '@/lib/business-control/sales';
 import { summarizeFinanceEntries } from '@/lib/business-control/ledger';
 import { hasPermission } from '@/lib/portal-logic';
 import { resolvePortalBusinessPageState } from '@/lib/portal-server';
@@ -57,25 +56,57 @@ export default async function BusinessReportsPage({ params, searchParams }: Page
   const days = periodDays(query.range);
   const periodStart = shiftJakartaDate(today, days - 1);
 
-  const [ingredients, financeEntries, channels, sales] = canView
-    ? await Promise.all([
-        canViewCosting ? listControlIngredients(business.id) : Promise.resolve([]),
-        canViewFinance ? listControlFinanceEntries(business.id) : Promise.resolve([]),
-        canViewChannels ? listControlChannels(business.id) : Promise.resolve([]),
-        listControlSales(business.id),
-      ])
-    : [[], [], [], []];
-  const advisor = canView && canViewFinance ? await getBusinessAdvisorSummary(business.id) : null;
-  const summary = summarizeControlCenter({ ingredients, financeEntries, channels, today });
-  const periodSales = sales.filter(item => item.sale.status === 'completed' && item.sale.occurred_on >= periodStart && item.sale.occurred_on <= today);
-  const periodFinanceEntries = financeEntries.filter(entry => entry.occurred_on >= periodStart && entry.occurred_on <= today);
-  const salesSummary = summarizeSales(periodSales.map(item => item.sale));
-  const financeSummary = summarizeFinanceEntries(periodFinanceEntries);
-  const hasSales = periodSales.length > 0;
-  const grossProfit = canViewCosting && hasSales ? salesSummary.grossProfit : null;
-  const recordedOperatingResult = grossProfit !== null && canViewFinance
-    ? grossProfit - financeSummary.operatingExpenses
+  let ingredients: Awaited<ReturnType<typeof listControlIngredients>> = [];
+  let channels: Awaited<ReturnType<typeof listControlChannels>> = [];
+  let financeSummary: Awaited<ReturnType<typeof getFinanceCoreSummary>> | null = null;
+  let salesSummary: Awaited<ReturnType<typeof getSalesPeriodSummary>> | null = null;
+  let criticalDataError = false;
+
+  if (canView) {
+    try {
+      [financeSummary, salesSummary] = await Promise.all([
+        canViewFinance
+          ? getFinanceCoreSummary(business.id, { from: periodStart, to: today })
+          : Promise.resolve(null),
+        getSalesPeriodSummary(business.id, { from: periodStart, to: today }),
+      ]);
+    } catch {
+      criticalDataError = true;
+    }
+
+    [ingredients, channels] = await Promise.all([
+      canViewCosting ? listControlIngredients(business.id) : Promise.resolve([]),
+      canViewChannels ? listControlChannels(business.id) : Promise.resolve([]),
+    ]);
+  }
+
+  const advisor = canView && canViewFinance && !criticalDataError
+    ? await getBusinessAdvisorSummary(business.id)
     : null;
+  const summary = summarizeControlCenter({
+    ingredients,
+    financeEntries: [],
+    channels,
+    today,
+  });
+  const hasSales = Boolean(salesSummary && salesSummary.transaction_count > 0);
+  const costComplete = Boolean(
+    canViewCosting &&
+      salesSummary &&
+      salesSummary.transaction_count > 0 &&
+      salesSummary.incomplete_cost_count === 0,
+  );
+  const grossProfit = costComplete && salesSummary
+    ? salesSummary.revenue - salesSummary.cogs
+    : null;
+  const recordedOperatingResult = grossProfit !== null && financeSummary
+    ? grossProfit - financeSummary.operating_expenses
+    : null;
+  const revenueMismatch = Boolean(
+    salesSummary &&
+      financeSummary &&
+      Math.abs(salesSummary.revenue - financeSummary.sale_revenue) > 0,
+  );
 
   return (
     <PortalShell activeBusiness={business} availableBusinesses={businesses} viewerName={account?.name ?? null} currentSection="reports">
