@@ -1,8 +1,7 @@
 'use client';
 
-import useEmblaCarousel from 'embla-carousel-react';
+import { useLajukanEmbla } from '@/components/common/useLajukanEmbla';
 import { Link } from '@/i18n/navigation';
-import { useEmblaWheelGestures } from '@/components/common/useEmblaWheelGestures';
 
 const CATEGORIES = [
   'Ekonomi',
@@ -22,15 +21,14 @@ export function NewsCategoryRail({
   activeCategory?: string;
   locale: string;
 }) {
-  const [viewportRef, emblaApi] = useEmblaCarousel({
+  const [viewportRef] = useLajukanEmbla({
     align: 'start',
     containScroll: 'trimSnaps',
     dragFree: true,
-  });
-
-  useEmblaWheelGestures(emblaApi, {
-    desktopOnly: true,
-    threshold: 36,
+    wheel: {
+      desktopOnly: true,
+      threshold: 36,
+    },
   });
 
   const isId = locale === 'id';
@@ -40,7 +38,7 @@ export function NewsCategoryRail({
       aria-label={isId ? 'Kategori berita' : 'News categories'}
       className="min-w-0 overflow-hidden py-0.5"
     >
-      <div ref={viewportRef} className="min-w-0 overflow-hidden">
+      <div ref={viewportRef} className="min-w-0 overflow-hidden overscroll-x-contain">
         <div className="-ml-1.5 flex min-w-max touch-pan-y">
           <Link
             href="/news"
