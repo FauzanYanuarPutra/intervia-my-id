@@ -374,9 +374,6 @@ export const LAJUKAN_EXPLORE_CATEGORIES:
           titleId:
             'Kebutuhan pembeli terbaru',
         },
-        'featured-providers': {
-          titleId: 'Supplier terkait',
-        },
         'latest-listings': {
           titleId:
             'Produk dan stok terbaru',
