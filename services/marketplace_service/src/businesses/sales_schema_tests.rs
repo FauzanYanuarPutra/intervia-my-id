@@ -106,6 +106,34 @@ async fn sales_tables_are_available_after_migrations(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "./migrations")]
+async fn sale_void_reversal_movement_types_are_allowed(pool: PgPool) {
+    for (table, constraint) in [
+        (
+            "business_inventory_movements",
+            "ck_business_inventory_movements_type",
+        ),
+        (
+            "business_product_inventory_movements",
+            "ck_business_product_inventory_movements_type",
+        ),
+    ] {
+        let definition: String = sqlx::query_scalar(
+            "SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid=$1::regclass AND conname=$2",
+        )
+        .bind(table)
+        .bind(constraint)
+        .fetch_one(&pool)
+        .await
+        .expect("movement type check constraint exists");
+
+        assert!(
+            definition.contains("sale_void_reversal"),
+            "{table} must allow sale_void_reversal, got: {definition}"
+        );
+    }
+}
+
+#[sqlx::test(migrations = "./migrations")]
 async fn inventory_movement_table_is_available_after_migrations(pool: PgPool) {
     let movement_table: Option<String> =
         sqlx::query_scalar("SELECT to_regclass('public.business_inventory_movements')::text")
