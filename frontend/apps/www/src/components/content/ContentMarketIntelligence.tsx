@@ -23,7 +23,6 @@ type MarketData = {
     price_unit?: string | null;
   } | null;
   insight?: { price_position?: string; headline?: string; action?: string };
-  scope?: { level?: string; city?: string | null; category?: string | null; price_unit?: string | null; currency?: string };
   trend?: {
     summary?: {
       direction?: 'up' | 'down' | 'stable';
