@@ -107,16 +107,12 @@ function listingLabel(item: ContentItem): string {
 export default function CommunityJoinClient({ isId }: { isId: boolean }) {
   const { isAuthenticated } = useAuth();
   const [listings, setListings] = useState<ContentItem[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(isAuthenticated);
   const [error, setError] = useState('');
   const [selectedGroup, setSelectedGroup] = useState<CommunityGroup | null>(null);
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      setListings([]);
-      setLoading(false);
-      return;
-    }
+    if (!isAuthenticated) return;
 
     let alive = true;
     setLoading(true);
@@ -145,9 +141,10 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
     return () => { alive = false; };
   }, [isAuthenticated, isId]);
 
-  const ready = useMemo(() => hasCommunityJoinReadyListing(listings), [listings]);
-  const role = useMemo(() => classifyCommunityJoinRole(listings), [listings]);
-  const listing = listings.find(item => {
+  const visibleListings = isAuthenticated ? listings : [];
+  const ready = useMemo(() => hasCommunityJoinReadyListing(visibleListings), [visibleListings]);
+  const role = useMemo(() => classifyCommunityJoinRole(visibleListings), [visibleListings]);
+  const listing = visibleListings.find(item => {
     const title = String(item.title || '').trim();
     const category = String(item.category || item.content_type || '').trim();
     return title.length >= 3 && category.length >= 2;
