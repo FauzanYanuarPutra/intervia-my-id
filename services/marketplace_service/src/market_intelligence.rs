@@ -485,12 +485,40 @@ async fn build_market_response(
     source_id: Uuid,
     query: MarketQuery,
 ) -> Result<Value, (StatusCode, String)> {
-    let (source, observations) = current_observations(state, source_id, &query)
+    let (source, mut observations) = current_observations(state, source_id, &query)
         .await
         .map_err(|error| {
             tracing::warn!("market intelligence source lookup failed: {:?}", error);
             (StatusCode::NOT_FOUND, "listing not found".to_string())
         })?;
+
+    let mut benchmark_scope = if query.scope.as_deref() == Some("national") {
+        "national"
+    } else {
+        "local"
+    };
+
+    // Auto mode starts with the user's local market. If there is not enough
+    // evidence, widen to the national category market instead of showing a
+    // misleadingly tiny benchmark.
+    if observations.len() < MIN_CONFIDENT_SAMPLE
+        && query.scope.as_deref().unwrap_or("auto") == "auto"
+        && source.category.is_some()
+    {
+        let mut national_query = query.clone();
+        national_query.city = None;
+        national_query.scope = Some("national".to_string());
+        let (_, national_observations) = current_observations(state, source_id, &national_query)
+            .await
+            .map_err(|error| {
+                tracing::warn!("national market fallback failed: {:?}", error);
+                (StatusCode::INTERNAL_SERVER_ERROR, "market benchmark unavailable".to_string())
+            })?;
+        if national_observations.len() > observations.len() {
+            observations = national_observations;
+            benchmark_scope = "national_fallback";
+        }
+    }
 
     if source.price_cents <= 0 {
         return Ok(json!({
@@ -608,7 +636,8 @@ async fn build_market_response(
     Ok(json!({
         "source_id": source.content_id,
         "scope": {
-            "city": city,
+            "level": benchmark_scope,
+            "city": if benchmark_scope == "national" || benchmark_scope == "national_fallback" { None } else { city },
             "category": category,
             "price_unit": unit,
             "currency": source.currency
