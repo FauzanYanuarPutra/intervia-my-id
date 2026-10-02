@@ -1008,6 +1008,53 @@ async fn run_ai_endpoint(
         }
     }
 
+    if task == AiTask::AnalyticsInsight {
+        let content_id = request
+            .context
+            .as_ref()
+            .and_then(Value::as_object)
+            .and_then(|context| context.get("content_id").or_else(|| context.get("listing_id")))
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty());
+
+        if let Some(content_id) = content_id {
+            match state.tools.execute_market_intelligence(content_id).await {
+                Ok(execution) => {
+                    let mut tool_sources = execution
+                        .sources
+                        .into_iter()
+                        .map(|source| GroundingSource {
+                            id: source.id,
+                            title: source.title,
+                            content: source.content,
+                            url: source.url,
+                            kind: source.kind,
+                        })
+                        .collect::<Vec<_>>();
+                    dedupe_sources(&mut sources, &mut tool_sources);
+                    sources.extend(tool_sources);
+                    tool_calls.extend(execution.traces);
+                }
+                Err(error) => {
+                    warnings.push(format!(
+                        "market_intelligence_unavailable: {}",
+                        safe_error(&error, 180)
+                    ));
+                    tool_calls.push(ToolCallTrace {
+                        name: "get_market_intelligence".to_string(),
+                        status: "error".to_string(),
+                        result_count: 0,
+                        query: content_id.to_string(),
+                        side: "unknown".to_string(),
+                        category: "market".to_string(),
+                        location: "listing_scope".to_string(),
+                    });
+                }
+            }
+        }
+    }
+
     if task == AiTask::Chat && marketplace_search_failed {
         let intent = marketplace_search_query.as_ref();
         return json_response_with_request_id(
