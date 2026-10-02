@@ -12,12 +12,15 @@ function errorResponse(error: unknown) {
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ businessId: string }> },
 ) {
   const { businessId } = await context.params;
   try {
-    const summary = await getFinanceCoreSummary(businessId);
+    const url = new URL(request.url);
+    const from = url.searchParams.get('from')?.trim() || undefined;
+    const to = url.searchParams.get('to')?.trim() || undefined;
+    const summary = await getFinanceCoreSummary(businessId, { from, to });
     return NextResponse.json({ data: { summary } });
   } catch (error) {
     return errorResponse(error);
