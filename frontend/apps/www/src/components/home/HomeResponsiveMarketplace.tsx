@@ -1351,6 +1351,7 @@ function mapContentToPublicReference(
     imageAttribution:
       reference.imageAttribution || contentImageAttribution(item),
     sourceKind: 'reference',
+    verified: false,
     clusterKey: [
       normalizeClusterToken(
         metadataText(item, 'place_type', 'amenity', 'shop', 'tourism', 'office'),
