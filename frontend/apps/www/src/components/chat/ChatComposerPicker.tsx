@@ -59,7 +59,7 @@ export function ChatComposerPicker({
   onEmojiSelect,
   onStickerSelect,
 }: Props) {
-  const [categoryId, setCategoryId] = useState(mode === 'emoji' ? 'recent' : 'stickers');
+  const [categoryId, setCategoryId] = useState('recent');
   const [recent, setRecent] = useState<string[]>([]);
 
   useEffect(() => {
@@ -74,11 +74,7 @@ export function ChatComposerPicker({
       setRecent([]);
     }
   }, [mode]);
-
-  useEffect(() => {
-    setCategoryId(mode === 'emoji' ? 'recent' : 'stickers');
-  }, [mode]);
-
+\n
   const categories = useMemo(() => {
     if (mode !== 'emoji' || recent.length === 0) return EMOJI_CATEGORIES;
     return EMOJI_CATEGORIES.map(category =>
