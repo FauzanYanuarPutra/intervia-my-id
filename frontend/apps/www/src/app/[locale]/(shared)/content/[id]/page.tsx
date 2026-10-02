@@ -1,4 +1,5 @@
 import { notFound, permanentRedirect, redirect } from 'next/navigation';
+import type { Metadata } from 'next';
 import {
   getPublicContent,
   getViewerUserId,
@@ -11,10 +12,116 @@ import { buildNewsPath } from '@/lib/news';
 import { getUmkmStoreById, getUmkmStoreBySlug } from '@/lib/super-app/umkm-commerce';
 import { isPublicUmkmReferenceVisible } from '@/lib/super-app/umkm-public-discovery';
 import ContentDetailClient, { type ContentItem } from './ContentDetailClient';
+import {
+  normalizeContentMediaUrl,
+  resolvePrimaryImage,
+  type ContentItem as CatalogContentItem,
+} from '@/lib/content/catalog';
+import { DEFAULT_OG_IMAGE, SITE_URL } from '@/config/siteMetadata';
 
 type PageProps = {
   params: Promise<{ locale: string; id: string }>;
 };
+
+function readMetaText(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function stripMarkup(value: string): string {
+  return value
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/\\s+/g, ' ')
+    .trim();
+}
+
+function buildShareDescription(content: Record<string, unknown>, locale: string): string {
+  const metadata =
+    content.metadata && typeof content.metadata === 'object' && !Array.isArray(content.metadata)
+      ? (content.metadata as Record<string, unknown>)
+      : {};
+  const summary = readMetaText(content.summary) || stripMarkup(readMetaText(content.body));
+  const location =
+    readMetaText(content.location) ||
+    readMetaText(content.city) ||
+    readMetaText(metadata.location) ||
+    readMetaText(metadata.city);
+  const category =
+    readMetaText(content.category) ||
+    readMetaText(content.content_type) ||
+    readMetaText(metadata.category) ||
+    readMetaText(metadata.marketplace_category_name);
+  const side =
+    readMetaText(content.listing_side) ||
+    readMetaText(content.market_side) ||
+    readMetaText(metadata.listing_side) ||
+    readMetaText(metadata.market_side);
+  const parts = [summary, category, side, location].filter(Boolean);
+  const fallback = locale === 'en' ? 'See the complete listing on Lajukan.' : 'Lihat detail lengkapnya di Lajukan.';
+  return (parts.join(' · ') || fallback).slice(0, 300);
+}
+
+function toPublicImageUrl(raw: string): string {
+  const normalized = normalizeContentMediaUrl(raw);
+  if (!normalized) return '';
+  if (/^https?:\\/\\//i.test(normalized)) return normalized;
+  if (normalized.startsWith('//')) return `https:${normalized}`;
+  return `${SITE_URL}${normalized.startsWith('/') ? '' : '/'}${normalized}`;
+}
+
+export async function generateMetadata({
+  params,
+}: PageProps): Promise<Metadata> {
+  const { locale, id } = await params;
+  const result = await getPublicContent(id);
+  if (result.status !== 'found' || !isPublicContentActive(result.content)) {
+    return {};
+  }
+
+  const content = result.content;
+  const title = readMetaText(content.title) || 'Listing di Lajukan';
+  const description = buildShareDescription(content, locale);
+  const canonicalPath = buildContentHref(
+    String(content.id || id),
+    title,
+    readMetaText(content.slug),
+  );
+  const canonicalUrl = `${SITE_URL}/${locale}${canonicalPath}`;
+  const primaryImage = toPublicImageUrl(
+    resolvePrimaryImage(content as CatalogContentItem),
+  );
+  const imageUrls = primaryImage
+    ? [primaryImage, DEFAULT_OG_IMAGE]
+    : [DEFAULT_OG_IMAGE];
+
+  return {
+    title,
+    description,
+    alternates: { canonical: canonicalUrl },
+    openGraph: {
+      title,
+      description,
+      url: canonicalUrl,
+      siteName: 'Lajukan',
+      type: 'website',
+      locale: locale === 'en' ? 'en_US' : 'id_ID',
+      images: imageUrls.map((url, index) => ({
+        url,
+        alt: title,
+        ...(index === imageUrls.length - 1 && url === DEFAULT_OG_IMAGE
+          ? { width: 1200, height: 630 }
+          : {}),
+      })),
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: imageUrls,
+    },
+  };
+}
 
 export default async function ContentDetailPage({ params }: PageProps) {
   const { locale, id } = await params;
