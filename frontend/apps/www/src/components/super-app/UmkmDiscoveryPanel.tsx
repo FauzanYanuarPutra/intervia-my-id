@@ -35,6 +35,8 @@ import {
   MapQuickControls,
   PlaceThumb,
   RatingStars,
+  getPlaceIcon,
+  toneClass,
 } from '@/components/super-app/UmkmPlacesChromePrimitives';
 import {
   buildUmkmPlacePresentation,
@@ -298,11 +300,13 @@ function SelectedStoreMediaPreview({
   isId,
   onOpenStore,
   productsLoading,
+  kind,
 }: {
   store: DiscoveryStore;
   isId: boolean;
   onOpenStore: () => void;
   productsLoading?: boolean;
+  kind?: Parameters<typeof getPlaceIcon>[0];
 }) {
   const media = resolveStorefrontBrandMedia(store.metadata || {});
   const images = Array.from(new Set([media.coverUrl, ...media.galleryUrls].filter((value): value is string => typeof value === 'string' && isValidPreviewUrl(value)))).slice(0, 5);
@@ -357,7 +361,18 @@ function SelectedStoreMediaPreview({
       ) : null}
 
       {!hasMedia && !products.length && !productsLoading ? (
-        <button type="button" onClick={onOpenStore} className="w-full rounded-[13px] border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-left text-[9.5px] font-semibold text-slate-500 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-400">{isId ? 'Belum ada media atau produk yang tampil. Buka usaha untuk melihat detail dan menambahkan foto.' : 'No media or products are shown yet. Open the business for details and photo contributions.'}</button>
+        <button type="button" onClick={onOpenStore} className="flex w-full items-center gap-3 rounded-[14px] border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-left dark:border-slate-700 dark:bg-slate-900/60">
+          <span className={cn('grid h-11 w-11 shrink-0 place-items-center rounded-[13px]', kind ? toneClass(kind) : 'bg-teal-50 text-teal-700')}>
+            {(() => {
+              const Icon = kind ? getPlaceIcon(kind) : Store;
+              return <Icon className="h-5 w-5" aria-hidden="true" />;
+            })()}
+          </span>
+          <span className="min-w-0">
+            <span className="block text-[10px] font-extrabold text-slate-700 dark:text-slate-200">{isId ? 'Foto belum ada' : 'No photo yet'}</span>
+            <span className="mt-0.5 block text-[9.5px] font-semibold leading-4 text-slate-500 dark:text-slate-400">{isId ? 'Ikon kategori tetap ditampilkan. Buka usaha untuk melihat detail atau menambahkan foto.' : 'The category icon stays visible. Open the business to see details or add a photo.'}</span>
+          </span>
+        </button>
       ) : null}
     </div>
   );
@@ -2805,6 +2820,7 @@ export function UmkmDiscoveryPanel({
                     store={selectedPlace.store}
                     isId={isId}
                     productsLoading={selectedProductsLoading}
+                    kind={selectedPlace.ui.kind}
                     onOpenStore={() => {
                       const href = buildUmkmMapPlacePath(selectedPlace.store);
                       window.location.href = href.startsWith('/') ? `/${locale}${href}` : href;
