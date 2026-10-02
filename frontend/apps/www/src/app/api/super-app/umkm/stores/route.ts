@@ -24,6 +24,7 @@ import { sanitizeOwnerWritableUmkmMetadata } from '@/lib/super-app/umkm-owner-me
 import {
   createDurableMarketplaceStore,
 } from '@/lib/super-app/business-workspace';
+import { getUmkmMapSourceKind } from '@/lib/umkmSurface';
 
 const MARKETPLACE_URL =
   process.env.INTERNAL_MARKETPLACE_URL ||
@@ -896,9 +897,10 @@ export async function GET(req: NextRequest) {
     });
 
     const sourcePriority = (item: { id: string; metadata?: JsonRecord }) => {
-      if (item.id.startsWith('reference:')) return 2;
-      const source = readText(item.metadata?.source).toLowerCase();
-      return source === 'usaha_portal' ? 0 : 1;
+      const sourceKind = getUmkmMapSourceKind(item);
+      if (sourceKind === 'reference') return 2;
+      if (sourceKind === 'lajukan') return 0;
+      return 1;
     };
 
     const sortedItems = [...filteredItems].sort((a, b) => {

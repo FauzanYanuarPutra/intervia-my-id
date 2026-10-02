@@ -37,9 +37,10 @@ describe('UMKM public route helpers', () => {
     expect(buildUmkmMapPlacePath(reference)).toBe('/toko/osm-node-1');
   });
 
-  it('routes Wikidata references to the storefront even with content-style source metadata', () => {
+  it('keeps public Wikidata references on the map surface instead of pretending they are stores', () => {
     expect(
       buildUmkmMapPlacePath({
+        id: 'reference:wikidata-q111754951',
         slug: 'wikidata-q111754951-mcdonald-s-banjar-baru-6f9f6ab8-ac91-48eb-88af-0b12f1aa9d6e',
         public_path: '/content/legacy-reference',
         metadata: {
@@ -50,7 +51,7 @@ describe('UMKM public route helpers', () => {
         },
       }),
     ).toBe(
-      '/toko/wikidata-q111754951-mcdonald-s-banjar-baru-6f9f6ab8-ac91-48eb-88af-0b12f1aa9d6e',
+      '/umkm?view=map&store=wikidata-q111754951-mcdonald-s-banjar-baru-6f9f6ab8-ac91-48eb-88af-0b12f1aa9d6e&storeId=reference%3Awikidata-q111754951',
     );
   });
 
