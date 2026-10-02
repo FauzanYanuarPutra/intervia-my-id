@@ -5183,11 +5183,6 @@ export default function ContentDetailClient({
 
                 <div className="lg:hidden">{ownerProfileCard}</div>
 
-                <div
-                  className="h-24 sm:h-28 lg:hidden"
-                  aria-hidden="true"
-                />
-
                 {!isOwner ? (
                   <div className="px-4 pb-1 sm:px-0">
                     <button
