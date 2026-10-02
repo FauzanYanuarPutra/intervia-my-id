@@ -5,6 +5,7 @@ import {
   Earth,
   Lock,
   Loader2,
+  MessageCircle,
   Plus,
   Search,
   ShieldCheck,
@@ -340,6 +341,18 @@ export default function CommunityGroupDirectoryClient({
                     >
                       {isId ? 'Lihat grup' : 'View group'}
                     </Link>
+                    {group.whatsappJoinUrl ? (
+                      <a
+                        href={group.whatsappJoinUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={event => event.stopPropagation()}
+                        className="inline-flex min-h-[38px] items-center justify-center gap-1.5 rounded-[12px] border border-emerald-200 bg-emerald-50 px-3 text-xs font-bold text-emerald-700"
+                      >
+                        <MessageCircle className="h-3.5 w-3.5" />
+                        WhatsApp
+                      </a>
+                    ) : null}
                     {joined ? (
                       <span className="inline-flex min-h-[38px] flex-1 items-center justify-center gap-1.5 rounded-[12px] border border-emerald-200 bg-emerald-50 px-3 text-xs font-bold text-emerald-700">
                         <ShieldCheck className="h-4 w-4" />
