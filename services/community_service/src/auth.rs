@@ -187,7 +187,12 @@ pub(crate) fn is_moderator(actor: &AuthActor) -> bool {
     actor.roles.iter().any(|role| {
         matches!(
             role.to_ascii_lowercase().as_str(),
-            "admin" | "superadmin" | "super_admin" | "moderator" | "forum:moderator" | "forum:admin"
+            "admin"
+                | "superadmin"
+                | "super_admin"
+                | "moderator"
+                | "forum:moderator"
+                | "forum:admin"
         )
     })
 }
