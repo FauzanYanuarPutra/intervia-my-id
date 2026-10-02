@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { CheckCircle2, MapPinned, Store } from 'lucide-react';
+import { ExistingBusinessesPanel } from '@/components/forms/ExistingBusinessesPanel';
 import { NewBusinessQuickForm } from '@/components/forms/NewBusinessQuickForm';
 import { PageHeader } from '@/components/portal/PageHeader';
 import { PortalShell } from '@/components/portal/PortalShell';
@@ -15,13 +16,10 @@ export default async function NewBusinessPage({
   const state = await resolvePortalHomeState({});
   if (!state.isAuthenticated) redirect('/login?callbackUrl=/businesses/new?new=1');
 
-  if (!forceNew) {
-    if (state.businessesProvisioning) {
-      redirect('/');
-    }
-    if (state.activeBusiness) {
-      redirect(`/?business=${encodeURIComponent(state.activeBusiness.id)}`);
-    }
+  if (state.businessesProvisioning) redirect('/');
+
+  if (!forceNew && state.activeBusiness) {
+    redirect(`/?business=${encodeURIComponent(state.activeBusiness.id)}`);
   }
 
   const account = state.account;
@@ -30,13 +28,15 @@ export default async function NewBusinessPage({
   return (
     <PortalShell activeBusiness={null} availableBusinesses={businesses} viewerName={account.name} currentSection="home" pageTitle="Tambah usaha">
       <div className="mx-auto max-w-3xl space-y-4 py-1 sm:py-3">
+        <ExistingBusinessesPanel businesses={businesses} />
+
         <PageHeader
           eyebrow="Mulai"
           title="Tambah usaha"
           description="Isi yang penting dulu. Produk, stok, uang, dan pengaturan lain bisa dilengkapi setelah usaha dibuat."
         />
 
-        <section className="merchant-surface-bordered overflow-hidden">
+        <section id="new-business-form" className="merchant-surface-bordered scroll-mt-24 overflow-hidden">
           <div className="grid grid-cols-3 divide-x divide-portal-line/70 border-b border-portal-line/70 bg-[#fafbf9]">
             <div className="px-3 py-3 text-center"><Store className="mx-auto h-4 w-4 text-portal-forest" /><p className="mt-1 text-[11px] font-bold text-portal-ink">Info usaha</p></div>
             <div className="px-3 py-3 text-center"><MapPinned className="mx-auto h-4 w-4 text-portal-forest" /><p className="mt-1 text-[11px] font-bold text-portal-ink">Lokasi</p></div>
