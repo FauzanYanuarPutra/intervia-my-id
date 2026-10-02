@@ -341,7 +341,10 @@ pub fn infer_marketplace_intent(query: &str) -> MarketplaceIntent {
     let implicit_product_lookup = search_language
         && !demand
         && !supply
-        && !matches!(infer_category(&lower).as_str(), "services" | "business-opportunities")
+        && !matches!(
+            infer_category(&lower).as_str(),
+            "services" | "business-opportunities"
+        )
         && !infer_category(&lower).is_empty();
 
     let side = if demand && !supply {
