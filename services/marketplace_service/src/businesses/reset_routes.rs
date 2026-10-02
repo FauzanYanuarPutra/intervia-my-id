@@ -38,6 +38,10 @@ async fn preview(
         Err(response) => return response,
     };
 
+    if let Err(response) = ensure_reset_schema_ready(&state.db).await {
+        return response;
+    }
+
     match DataResetRepository::new(state.db.clone())
         .preview(business_id, access.organization_id, &request.scopes)
         .await
@@ -69,6 +73,10 @@ async fn apply(
         },
         None => return api_error(StatusCode::BAD_REQUEST, "missing_idempotency_key"),
     };
+
+    if let Err(response) = ensure_reset_schema_ready(&state.db).await {
+        return response;
+    }
 
     match DataResetRepository::new(state.db.clone())
         .apply(
@@ -189,15 +197,118 @@ fn repository_error_response(_error: RepositoryError) -> Response {
     )
 }
 
+async fn ensure_reset_schema_ready(db: &sqlx::PgPool) -> Result<(), Response> {
+    let ready = sqlx::query_scalar::<_, bool>(
+        r#"
+        SELECT
+          EXISTS (
+            SELECT 1
+            FROM information_schema.tables
+            WHERE table_schema='public'
+              AND table_name='business_data_reset_batches'
+          )
+          AND EXISTS (
+            SELECT 1
+            FROM pg_constraint constraint_row
+            JOIN pg_class relation_row
+              ON relation_row.oid=constraint_row.conrelid
+            WHERE relation_row.relname='business_inventory_movements'
+              AND constraint_row.conname='ck_business_inventory_movements_type'
+              AND pg_get_constraintdef(constraint_row.oid) ILIKE '%sale_void_reversal%'
+          )
+          AND EXISTS (
+            SELECT 1
+            FROM pg_constraint constraint_row
+            JOIN pg_class relation_row
+              ON relation_row.oid=constraint_row.conrelid
+            WHERE relation_row.relname='business_product_inventory_movements'
+              AND constraint_row.conname='ck_business_product_inventory_movements_type'
+              AND pg_get_constraintdef(constraint_row.oid) ILIKE '%sale_void_reversal%'
+          )
+        "#,
+    )
+    .fetch_one(db)
+    .await
+    .map_err(|_| api_error(StatusCode::SERVICE_UNAVAILABLE, "business_data_reset_storage_unavailable"))?;
+
+    if ready {
+        return Ok(());
+    }
+
+    sqlx::migrate!("./migrations")
+        .run(db)
+        .await
+        .map_err(|_| api_error(StatusCode::SERVICE_UNAVAILABLE, "business_data_reset_storage_unavailable"))?;
+
+    let ready_after_migration = sqlx::query_scalar::<_, bool>(
+        r#"
+        SELECT
+          EXISTS (
+            SELECT 1
+            FROM information_schema.tables
+            WHERE table_schema='public'
+              AND table_name='business_data_reset_batches'
+          )
+          AND EXISTS (
+            SELECT 1
+            FROM pg_constraint constraint_row
+            JOIN pg_class relation_row
+              ON relation_row.oid=constraint_row.conrelid
+            WHERE relation_row.relname='business_inventory_movements'
+              AND constraint_row.conname='ck_business_inventory_movements_type'
+              AND pg_get_constraintdef(constraint_row.oid) ILIKE '%sale_void_reversal%'
+          )
+          AND EXISTS (
+            SELECT 1
+            FROM pg_constraint constraint_row
+            JOIN pg_class relation_row
+              ON relation_row.oid=constraint_row.conrelid
+            WHERE relation_row.relname='business_product_inventory_movements'
+              AND constraint_row.conname='ck_business_product_inventory_movements_type'
+              AND pg_get_constraintdef(constraint_row.oid) ILIKE '%sale_void_reversal%'
+          )
+        "#,
+    )
+    .fetch_one(db)
+    .await
+    .map_err(|_| api_error(StatusCode::SERVICE_UNAVAILABLE, "business_data_reset_storage_unavailable"))?;
+
+    if ready_after_migration {
+        Ok(())
+    } else {
+        Err(api_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "business_data_reset_storage_unavailable",
+        ))
+    }
+}
+
 fn reset_error_response(error: ResetError) -> Response {
     match error {
         ResetError::Validation(code) => api_error(StatusCode::BAD_REQUEST, code),
         ResetError::NotFound => api_error(StatusCode::NOT_FOUND, "business_not_found"),
         ResetError::Conflict(code) => api_error(StatusCode::CONFLICT, code),
-        ResetError::Sales(_) => api_error(StatusCode::CONFLICT, "business_data_reset_sales_failed"),
-        ResetError::Finance(_) => {
-            api_error(StatusCode::CONFLICT, "business_data_reset_finance_failed")
-        }
+        ResetError::Sales(error) => match error {
+            SaleRepositoryError::Validation("business_period_closed")
+            | SaleRepositoryError::Validation("business_day_closed") => {
+                api_error(StatusCode::CONFLICT, "sales_in_closed_period")
+            }
+            SaleRepositoryError::Database => api_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "business_data_reset_storage_unavailable",
+            ),
+            _ => api_error(
+                StatusCode::CONFLICT,
+                "business_data_reset_sales_failed",
+            ),
+        },
+        ResetError::Finance(error) => match error {
+            FinanceCoreError::Database => api_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "finance_core_storage_unavailable",
+            ),
+            _ => api_error(StatusCode::CONFLICT, "business_data_reset_finance_failed"),
+        },
         ResetError::Database => api_error(
             StatusCode::SERVICE_UNAVAILABLE,
             "business_data_reset_storage_unavailable",
