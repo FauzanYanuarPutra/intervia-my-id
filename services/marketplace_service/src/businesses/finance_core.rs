@@ -338,7 +338,8 @@ impl FinanceCoreRepository {
         business_id: Uuid,
         organization_id: Uuid,
     ) -> Result<FinanceSummary, FinanceCoreError> {
-        self.summary_internal(business_id, organization_id, None, None).await
+        self.summary_internal(business_id, organization_id, None, None)
+            .await
     }
 
     pub(crate) async fn summary_for_period(
@@ -353,7 +354,8 @@ impl FinanceCoreRepository {
                 return Err(FinanceCoreError::Validation("invalid_finance_period"));
             }
         }
-        self.summary_internal(business_id, organization_id, from, to).await
+        self.summary_internal(business_id, organization_id, from, to)
+            .await
     }
 
     async fn summary_internal(
@@ -375,14 +377,9 @@ impl FinanceCoreRepository {
             .await?;
         let totals = match (from, to) {
             (None, None) => finance_totals(&self.db, business_id, organization_id).await?,
-            (from, to) => finance_totals_for_period(
-                &self.db,
-                business_id,
-                organization_id,
-                from,
-                to,
-            )
-            .await?,
+            (from, to) => {
+                finance_totals_for_period(&self.db, business_id, organization_id, from, to).await?
+            }
         };
         Ok(build_summary(accounts, allocations, totals))
     }

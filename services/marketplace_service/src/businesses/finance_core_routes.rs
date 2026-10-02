@@ -98,12 +98,7 @@ async fn summary(
         Err(response) => return response,
     };
     match FinanceCoreRepository::new(state.db.clone())
-        .summary_for_period(
-            business_id,
-            organization_id,
-            query.from,
-            query.to,
-        )
+        .summary_for_period(business_id, organization_id, query.from, query.to)
         .await
     {
         Ok(summary) => {

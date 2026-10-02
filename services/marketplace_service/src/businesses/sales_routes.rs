@@ -85,12 +85,7 @@ async fn period_summary(
         };
 
     match SaleRepository::new(state.db.clone())
-        .period_summary(
-            business_id,
-            access.organization_id,
-            query.from,
-            query.to,
-        )
+        .period_summary(business_id, access.organization_id, query.from, query.to)
         .await
     {
         Ok(mut summary) => {
@@ -98,11 +93,7 @@ async fn period_summary(
                 summary.cogs = 0;
                 summary.incomplete_cost_count = summary.transaction_count;
             }
-            (
-                StatusCode::OK,
-                Json(json!({"data": {"summary": summary}})),
-            )
-                .into_response()
+            (StatusCode::OK, Json(json!({"data": {"summary": summary}}))).into_response()
         }
         Err(error) => sale_error_response(error),
     }
