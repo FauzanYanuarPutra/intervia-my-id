@@ -18,7 +18,9 @@ use sqlx::Row;
 use std::{collections::HashSet, sync::Arc};
 use uuid::Uuid;
 
-use super::{auth_claims_from_headers, has_agent_access, push_notification_best_effort, AppState};
+use super::{
+    auth_claims_from_headers, has_agent_access, push_notification_best_effort, AppState,
+};
 
 const MATCHING_SCHEMA_VERSION: &str = "lajukan-match-schema-v1";
 const MATCHING_SCORE_VERSION: &str = "lajukan-match-score-v1";
