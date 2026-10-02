@@ -127,14 +127,30 @@ export default async function BusinessReportsPage({ params, searchParams }: Page
 
       {canView ? (
         <div className="space-y-4">
-          <MetricStrip items={[
-            { label: 'Penjualan', value: hasSales ? money.format(salesSummary.revenue) : '—', note: hasSales ? `${periodSales.length} transaksi selesai` : 'Belum ada penjualan pada periode ini' },
-            { label: 'Laba kotor', value: canViewCosting ? (grossProfit === null ? 'Belum lengkap' : money.format(grossProfit)) : '—', note: canViewCosting ? (salesSummary.costComplete ? 'HPP lengkap' : 'Ada HPP yang belum lengkap') : 'Sesuai akses' },
-            { label: 'Uang keluar', value: canViewFinance && periodFinanceEntries.length ? money.format(financeSummary.operatingExpenses) : '—', note: canViewFinance ? 'Biaya operasi tercatat pada periode ini' : 'Sesuai akses' },
-            { label: 'Hasil tercatat', value: recordedOperatingResult === null ? 'Belum lengkap' : money.format(recordedOperatingResult), note: 'Laba kotor dikurangi biaya operasi tercatat' },
-          ]} />
+          {criticalDataError ? (
+            <section className="rounded-[18px] border border-rose-200 bg-rose-50 p-4">
+              <p className="font-black text-rose-950">Laporan belum bisa dibaca dengan aman</p>
+              <p className="mt-1 text-xs leading-5 text-rose-800">
+                Data uang atau penjualan sedang tidak tersedia. Angka tidak ditampilkan sebagai Rp0 agar tidak menyesatkan.
+              </p>
+            </section>
+          ) : (
+            <>
+              <MetricStrip items={[
+                { label: 'Penjualan', value: hasSales && salesSummary ? money.format(salesSummary.revenue) : '—', note: hasSales && salesSummary ? `${salesSummary.transaction_count} transaksi selesai` : 'Belum ada penjualan pada periode ini' },
+                { label: 'Laba kotor', value: canViewCosting ? (grossProfit === null ? 'Belum lengkap' : money.format(grossProfit)) : '—', note: canViewCosting ? (salesSummary?.incomplete_cost_count ? 'Ada HPP yang belum lengkap' : 'HPP lengkap') : 'Sesuai akses' },
+                { label: 'Uang keluar', value: canViewFinance && financeSummary ? money.format(financeSummary.operating_expenses) : '—', note: canViewFinance ? 'Biaya operasi tercatat pada periode ini' : 'Sesuai akses' },
+                { label: 'Hasil tercatat', value: recordedOperatingResult === null ? 'Belum lengkap' : money.format(recordedOperatingResult), note: 'Laba kotor dikurangi biaya operasi tercatat' },
+              ]} />
+              {revenueMismatch ? (
+                <section className="mt-3 rounded-[16px] border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
+                  Omzet penjualan dan ledger uang tidak sama pada periode ini. Laporan tetap menampilkan keduanya, tetapi selisihnya perlu diperiksa.
+                </section>
+              ) : null}
+            </>
+          )}
 
-          {!salesSummary.costComplete && hasSales && canViewCosting ? (
+          {(!criticalDataError && salesSummary && salesSummary.incomplete_cost_count > 0 && hasSales && canViewCosting) ? (
             <section className="flex flex-col gap-3 rounded-[18px] bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div><p className="font-black text-amber-950">HPP belum lengkap</p><p className="mt-1 text-xs leading-5 text-amber-800">Lengkapi bahan/resep jika ingin melihat laba kotor yang lengkap.</p></div>
               <Link href={`/businesses/${business.id}/products/hpp`} className="portal-button-secondary shrink-0">Buka HPP</Link>
@@ -152,7 +168,7 @@ export default async function BusinessReportsPage({ params, searchParams }: Page
               <Link href={`/businesses/${business.id}/finance`} className="merchant-surface-bordered p-4 transition hover:border-portal-forest/25">
                 <WalletCards className="h-4 w-4 text-portal-forest" />
                 <p className="mt-3 text-xs font-semibold text-portal-soft">Uang</p>
-                <p className="mt-1 text-lg font-black text-portal-ink">{periodFinanceEntries.length ? money.format(financeSummary.cashMovement) : 'Belum ada gerak kas'}</p>
+                <p className="mt-1 text-lg font-black text-portal-ink">{financeSummary ? money.format(financeSummary.cashMovement) : 'Belum tersedia'}</p>
                 <p className="mt-1 text-xs leading-5 text-portal-soft">Gerak kas yang benar-benar tercatat pada periode ini.</p>
               </Link>
             ) : null}
