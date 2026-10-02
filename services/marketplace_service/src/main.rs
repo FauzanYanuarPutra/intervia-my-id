@@ -13513,7 +13513,9 @@ async fn create_content(
         Ok(row) => {
             if row.content_type == "news" {
                 news::after_submission_created(&state, row.id, row.owner_id).await;
-            } else if row.content_status == "active" && row.listing_status == "published" {
+            } else if row.content_status == "active" {
+                // ContentRow intentionally hydrates content_status rather than listing_status.
+                // An active row is the authoritative publish gate for these asynchronous jobs.
                 // Smart Match is deliberately async: publishing a listing stays fast,
                 // while candidate retrieval and notification fan-out happen separately.
                 let match_state = state.clone();
