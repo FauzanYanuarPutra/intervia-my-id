@@ -582,7 +582,8 @@ async fn build_market_response(
     let price_position = source_alert
         .get("direction")
         .and_then(Value::as_str)
-        .unwrap_or("within");
+        .unwrap_or("within")
+        .to_string();
     if source_alert.get("level").and_then(Value::as_str) != Some("normal") {
         alerts.push(source_alert);
     }
