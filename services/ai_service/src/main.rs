@@ -3863,7 +3863,8 @@ fn default_tokens_for_task(task: AiTask) -> u32 {
         | AiTask::ProfileDraft
         | AiTask::ContentDraft
         | AiTask::MarketplaceMatch
-        | AiTask::DealAssist => 1_300,
+        | AiTask::SimilarMatch
+        | AiTask::DealAssist => 1_100,
         AiTask::BusinessAdvisor | AiTask::AnalyticsInsight | AiTask::DisputeSummary => 1_600,
     }
 }
