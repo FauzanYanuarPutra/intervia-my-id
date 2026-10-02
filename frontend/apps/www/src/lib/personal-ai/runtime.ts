@@ -709,7 +709,7 @@ async function callAiService(input: {
   let response: Response | undefined;
   let lastFetchError: unknown;
 
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
     try {
       const candidate = await fetch(`${trimBaseUrl(INTERNAL_AI_URL)}/v1/chat`, {
         method: 'POST',
@@ -751,8 +751,8 @@ async function callAiService(input: {
       await new Promise(resolve => setTimeout(resolve, 200 * attempt));
     } catch (error) {
       lastFetchError = error;
-      if (attempt >= 3) break;
-      await new Promise(resolve => setTimeout(resolve, 350 * attempt));
+      if (attempt >= 2) break;
+      await new Promise(resolve => setTimeout(resolve, 200 * attempt));
     }
   }
 
