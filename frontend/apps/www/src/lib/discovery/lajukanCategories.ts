@@ -167,15 +167,6 @@ const COMMON_MARKETPLACE_SECTIONS: ExploreSectionConfig[] = [
       'Real requests currently looking for providers.',
   },
   {
-    key: 'featured-providers',
-    titleId: 'Usaha dan penyedia terkait',
-    titleEn: 'Related businesses and providers',
-    descriptionId:
-      'Usaha dan penyedia yang relevan untuk kategori ini.',
-    descriptionEn:
-      'Relevant businesses and providers for this category.',
-  },
-  {
     key: 'latest-listings',
     titleId: 'Penawaran terbaru',
     titleEn: 'Latest offers',
@@ -183,51 +174,6 @@ const COMMON_MARKETPLACE_SECTIONS: ExploreSectionConfig[] = [
       'Produk dan layanan yang baru ditambahkan.',
     descriptionEn:
       'Recently added products and services.',
-  },
-  {
-    key: 'nearby-businesses',
-    titleId: 'Terdekat dari lokasimu',
-    titleEn: 'Near your location',
-    descriptionId:
-      'Temukan mitra usaha yang lebih mudah dijangkau.',
-    descriptionEn:
-      'Find business partners that are easier to reach.',
-  },
-  {
-    key: 'communities',
-    titleId: 'Komunitas terkait',
-    titleEn: 'Related communities',
-    descriptionId:
-      'Diskusi dan grup yang membahas topik ini.',
-    descriptionEn:
-      'Discussions and groups about this topic.',
-  },
-  {
-    key: 'videos',
-    titleId: 'Video terkait',
-    titleEn: 'Related videos',
-    descriptionId:
-      'Tutorial, cerita usaha, dan inspirasi praktis.',
-    descriptionEn:
-      'Tutorials, business stories, and practical inspiration.',
-  },
-  {
-    key: 'guides',
-    titleId: 'Panduan praktis',
-    titleEn: 'Practical guides',
-    descriptionId:
-      'Hal penting sebelum memilih dan menghubungi penyedia.',
-    descriptionEn:
-      'What to know before choosing and contacting a provider.',
-  },
-  {
-    key: 'faq',
-    titleId: 'Pertanyaan umum',
-    titleEn: 'Frequently asked questions',
-    descriptionId:
-      'Jawaban singkat untuk memulai dengan lebih yakin.',
-    descriptionEn:
-      'Short answers to help you get started confidently.',
   },
 ];
 
@@ -480,15 +426,8 @@ export const LAJUKAN_EXPLORE_CATEGORIES:
           titleId:
             'Permintaan jasa terbaru',
         },
-        'featured-providers': {
-          titleId:
-            'Penyedia jasa terkait',
-        },
         'latest-listings': {
           titleId: 'Jasa terbaru',
-        },
-        'nearby-businesses': {
-          titleId: 'Jasa di sekitarmu',
         },
         guides: {
           titleId:
@@ -687,16 +626,8 @@ export const LAJUKAN_EXPLORE_CATEGORIES:
           titleId:
             'Kebutuhan tempat terbaru',
         },
-        'featured-providers': {
-          titleId:
-            'Pengelola dan pemilik terkait',
-        },
         'latest-listings': {
           titleId: 'Tempat tersedia',
-        },
-        'nearby-businesses': {
-          titleId:
-            'Lokasi populer di sekitarmu',
         },
         guides: {
           titleId:
@@ -790,10 +721,6 @@ export const LAJUKAN_EXPLORE_CATEGORIES:
         'latest-needs': {
           titleId:
             'Mitra yang sedang dicari',
-        },
-        'featured-providers': {
-          titleId:
-            'Pemilik peluang terkait',
         },
         'latest-listings': {
           titleId: 'Peluang terbaru',
