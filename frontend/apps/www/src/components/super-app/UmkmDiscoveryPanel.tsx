@@ -963,6 +963,7 @@ export function PublicReferenceResultCard({
         <PlaceThumb
           src={place.ui.gallery[0] || place.ui.coverImage}
           alt={place.store.name}
+          kind={place.ui.kind}
           className={cn(
             'rounded-[14px]',
             compact ? 'h-[56px] w-[56px] sm:h-[60px] sm:w-[60px]' : 'h-[72px] sm:h-[82px] xl:h-[88px]',
@@ -2965,6 +2966,7 @@ export function UmkmDiscoveryPanel({
                           <PlaceThumb
                             src={item.ui.gallery[0] || item.ui.coverImage}
                             alt={item.store.name}
+                            kind={item.ui.kind}
                             className="h-14 w-14 shrink-0 rounded-[14px] sm:h-16 sm:w-16"
                           />
                           <span className="min-w-0">
@@ -3476,6 +3478,7 @@ export function UmkmDiscoveryPanel({
                                 selectedPlace.ui.coverImage
                               }
                               alt={selectedPlace.store.name}
+                              kind={selectedPlace.ui.kind}
                               className="h-12 w-12 rounded-[14px]"
                             />
                             <div className="min-w-0 flex-1">
@@ -3650,6 +3653,7 @@ export function UmkmDiscoveryPanel({
                             <PlaceThumb
                               src={item.ui.gallery[0] || item.ui.coverImage}
                               alt={item.store.name}
+                              kind={item.ui.kind}
                               className="h-[72px] rounded-[14px] sm:h-[82px] xl:h-[88px]"
                             />
 
