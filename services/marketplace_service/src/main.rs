@@ -8639,7 +8639,28 @@ async fn list_umkm_stores(
             WITH candidates AS (
               SELECT
                 id, owner_user_id, organization_id, name, slug, description, city, address, lat, lng, phone,
-                is_active, online_order_enabled, offline_order_enabled, metadata, created_at, updated_at,
+                is_active, online_order_enabled, offline_order_enabled, metadata || jsonb_build_object(
+                  'verification_status',
+                  CASE COALESCE((
+                    SELECT bv.status
+                    FROM internal_moderation.business_verifications bv
+                    WHERE bv.business_id = umkm_stores.id
+                    ORDER BY bv.updated_at DESC
+                    LIMIT 1
+                  ), 'unverified')
+                    WHEN 'verified' THEN 'lajukan_verified'
+                    WHEN 'pending' THEN 'pending'
+                    ELSE 'unverified'
+                  END,
+                  'lajukan_verified',
+                  COALESCE((
+                    SELECT bv.status
+                    FROM internal_moderation.business_verifications bv
+                    WHERE bv.business_id = umkm_stores.id
+                    ORDER BY bv.updated_at DESC
+                    LIMIT 1
+                  ), 'unverified') = 'verified'
+                ) AS metadata, created_at, updated_at,
                 floor((lat + 90.0) / 4.0)::int AS map_lat_bucket,
                 floor((lng + 180.0) / 8.0)::int AS map_lng_bucket
               FROM umkm_stores
@@ -8697,7 +8718,28 @@ async fn list_umkm_stores(
             r#"
             SELECT
               id, owner_user_id, organization_id, name, slug, description, city, address, lat, lng, phone,
-              is_active, online_order_enabled, offline_order_enabled, metadata, created_at, updated_at
+              is_active, online_order_enabled, offline_order_enabled, metadata || jsonb_build_object(
+                  'verification_status',
+                  CASE COALESCE((
+                    SELECT bv.status
+                    FROM internal_moderation.business_verifications bv
+                    WHERE bv.business_id = umkm_stores.id
+                    ORDER BY bv.updated_at DESC
+                    LIMIT 1
+                  ), 'unverified')
+                    WHEN 'verified' THEN 'lajukan_verified'
+                    WHEN 'pending' THEN 'pending'
+                    ELSE 'unverified'
+                  END,
+                  'lajukan_verified',
+                  COALESCE((
+                    SELECT bv.status
+                    FROM internal_moderation.business_verifications bv
+                    WHERE bv.business_id = umkm_stores.id
+                    ORDER BY bv.updated_at DESC
+                    LIMIT 1
+                  ), 'unverified') = 'verified'
+                ) AS metadata, created_at, updated_at
             FROM umkm_stores
             WHERE ($1::uuid IS NULL OR id = $1)
               AND ($2::text IS NULL OR lower(slug) = $2)
