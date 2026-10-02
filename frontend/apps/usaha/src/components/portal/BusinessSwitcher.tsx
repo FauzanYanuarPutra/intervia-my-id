@@ -120,7 +120,7 @@ export function BusinessSwitcher({
         </div>
         <div className="mt-2 border-t border-portal-line pt-2">
           <Link
-            href="/businesses/new"
+            href="/businesses/new?new=1"
             onClick={closeAll}
             className="flex min-h-11 items-center gap-2 rounded-xl px-2.5 text-sm font-semibold text-portal-forest transition hover:bg-portal-mist focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-forest/20"
           >
