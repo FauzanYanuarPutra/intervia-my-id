@@ -12,6 +12,7 @@ import {
   Camera,
   ChevronLeft,
   Earth,
+  ExternalLink,
   ImageIcon,
   Loader2,
   Lock,
@@ -261,6 +262,8 @@ export function CommunityGroupSettingsForm({
   const [membershipPermission, setMembershipPermission] = useState<
     CommunityGroup['membershipPermission']
   >(group.membershipPermission);
+  const [whatsappJoinUrl, setWhatsappJoinUrl] = useState(group.whatsappJoinUrl || '');
+  const [facebookGroupUrl, setFacebookGroupUrl] = useState(group.facebookGroupUrl || '');
   const [rules, setRules] = useState<string[]>(
     group.rules.length ? group.rules : [''],
   );
@@ -287,6 +290,8 @@ export function CommunityGroupSettingsForm({
           privacy,
           postingPermission,
           membershipPermission,
+          whatsappJoinUrl: whatsappJoinUrl.trim() || null,
+          facebookGroupUrl: facebookGroupUrl.trim() || null,
           rules: cleanRules,
         }),
       },
@@ -430,6 +435,40 @@ export function CommunityGroupSettingsForm({
               </select>
             </label>
           </div>
+
+          <section className="rounded-[18px] border border-[color:var(--app-border)] bg-white p-3 sm:p-4">
+            <div className="flex items-start gap-3">
+              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-[12px] bg-emerald-50 text-emerald-700">
+                <ExternalLink className="h-4 w-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-[color:var(--app-text)]">{isId ? 'Link komunitas luar' : 'External community links'}</p>
+                <p className="mt-0.5 text-[11px] leading-5 text-[color:var(--app-text-soft)]">{isId ? 'Atur WhatsApp dan Facebook yang tampil di detail group.' : 'Set the WhatsApp and Facebook links shown on the group detail.'}</p>
+              </div>
+            </div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <label className="block min-w-0">
+                <span className="text-[11px] font-bold text-[color:var(--app-text)]">WhatsApp</span>
+                <input
+                  value={whatsappJoinUrl}
+                  onChange={event => setWhatsappJoinUrl(event.target.value)}
+                  inputMode="url"
+                  placeholder="https://chat.whatsapp.com/..."
+                  className="mt-1 min-h-[40px] w-full rounded-[13px] bg-slate-50 px-3 text-xs outline-none"
+                />
+              </label>
+              <label className="block min-w-0">
+                <span className="text-[11px] font-bold text-[color:var(--app-text)]">Facebook</span>
+                <input
+                  value={facebookGroupUrl}
+                  onChange={event => setFacebookGroupUrl(event.target.value)}
+                  inputMode="url"
+                  placeholder="https://www.facebook.com/share/g/..."
+                  className="mt-1 min-h-[40px] w-full rounded-[13px] bg-slate-50 px-3 text-xs outline-none"
+                />
+              </label>
+            </div>
+          </section>
 
           <div className="rounded-[18px] bg-slate-50 p-3">
             <div className="flex items-center justify-between gap-3">
@@ -1256,6 +1295,18 @@ export default function CommunityGroupDetailClient({
                     </a>
                   ) : null}
 
+                  {group.facebookGroupUrl ? (
+                    <a
+                      href={group.facebookGroupUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[14px] border border-sky-200 bg-sky-50 px-4 text-sm font-extrabold text-sky-700 transition hover:bg-sky-100 active:scale-[0.99] sm:min-w-[150px]"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      Facebook
+                    </a>
+                  ) : null}
+
                   {group.viewerCanManage ? (
                     <button
                       type="button"
@@ -1272,6 +1323,34 @@ export default function CommunityGroupDetailClient({
               </div>
             </div>
           </section>
+
+          {(group.whatsappJoinUrl || group.facebookGroupUrl) ? (
+            <section className="rounded-[18px] border border-[color:var(--app-border)] bg-white p-4 sm:p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-black text-[color:var(--app-text)]">{isId ? 'Gabung di komunitas lain' : 'Join the community elsewhere'}</p>
+                  <p className="mt-1 text-xs leading-5 text-[color:var(--app-text-soft)]">{isId ? 'Kalau ingin lanjut ngobrol di luar Lajukan, pilih platformnya.' : 'Continue the conversation outside Lajukan when needed.'}</p>
+                </div>
+                <ExternalLink className="h-4 w-4 shrink-0 text-[color:var(--app-text-soft)]" />
+              </div>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {group.whatsappJoinUrl ? (
+                  <a href={group.whatsappJoinUrl} target="_blank" rel="noopener noreferrer" className="flex min-w-0 items-center gap-3 rounded-[14px] border border-emerald-100 bg-emerald-50/70 p-3 transition hover:bg-emerald-50 active:scale-[0.99]">
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white text-emerald-700"><MessageCircle className="h-4 w-4" /></span>
+                    <span className="min-w-0 flex-1"><span className="block text-xs font-extrabold text-emerald-800">WhatsApp</span><span className="mt-0.5 block truncate text-[10px] text-emerald-700">{isId ? 'Gabung grup WhatsApp' : 'Join WhatsApp group'}</span></span>
+                    <ExternalLink className="h-3.5 w-3.5 shrink-0 text-emerald-700" />
+                  </a>
+                ) : null}
+                {group.facebookGroupUrl ? (
+                  <a href={group.facebookGroupUrl} target="_blank" rel="noopener noreferrer" className="flex min-w-0 items-center gap-3 rounded-[14px] border border-sky-100 bg-sky-50/70 p-3 transition hover:bg-sky-50 active:scale-[0.99]">
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white text-sky-700"><ExternalLink className="h-4 w-4" /></span>
+                    <span className="min-w-0 flex-1"><span className="block text-xs font-extrabold text-sky-800">Facebook</span><span className="mt-0.5 block truncate text-[10px] text-sky-700">{isId ? 'Gabung grup Facebook' : 'Join Facebook group'}</span></span>
+                    <ExternalLink className="h-3.5 w-3.5 shrink-0 text-sky-700" />
+                  </a>
+                ) : null}
+              </div>
+            </section>
+          ) : null}
 
           <nav
             className="sticky top-[calc(58px+env(safe-area-inset-top))] z-20 -mx-0 border-y border-slate-200 bg-white/96 py-1.5 backdrop-blur lg:top-0"
