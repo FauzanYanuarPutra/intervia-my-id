@@ -10,7 +10,6 @@ import {
 } from '@/components/common/MediaPreviewCarousel';
 import { ExploreListingCard } from '@/components/explore/cards/ExploreListingCard';
 import { EmblaDesktopControls } from '@/components/common/EmblaDesktopControls';
-import { useEmblaWheelGestures } from '@/components/common/useEmblaWheelGestures';
 import { CompactSeeAllLink } from '@/components/common/CompactSectionAction';
 import { usePathname } from 'next/navigation';
 import {
@@ -145,7 +144,7 @@ import { cn } from '@/lib/utils';
 import { BrandSocialIcon } from '@/components/common/BrandSocialIcon';
 import { trackLajukanEvent } from '@/lib/analytics/lajukanEvents';
 import type { GlobalSearchItem } from '@/lib/search/globalSearch';
-import useEmblaCarousel from 'embla-carousel-react';
+import { useLajukanEmbla } from '@/components/common/useLajukanEmbla';
 
 type HomeContentSimpleProps = {
   locale: string;
@@ -1921,14 +1920,12 @@ export function TrendingSearchSection({ isId }: { isId: boolean }) {
     };
   }, []);
 
-  const [emblaRef, emblaApi] = useEmblaCarousel({
+  const [emblaRef, emblaApi] = useLajukanEmbla({
     align: 'start',
     containScroll: 'keepSnaps',
     dragFree: true,
     skipSnaps: true,
   });
-
-  useEmblaWheelGestures(emblaApi);
 
   if (items.length === 0) {
     return null;
@@ -2308,17 +2305,18 @@ function HeroVisualStage({
     'Sobat Bisnis';
 
   const heroCategories = LAJUKAN_EXPLORE_CATEGORIES.slice(0, 5);
-  const [heroCategoryEmblaRef, heroCategoryEmblaApi] = useEmblaCarousel({
+  const [heroCategoryEmblaRef, heroCategoryEmblaApi] = useLajukanEmbla({
     align: 'start',
     containScroll: 'trimSnaps',
     dragFree: true,
     loop: false,
+    wheel: {
+      enabled: heroCategories.length > 1,
+      desktopOnly: true,
+      threshold: 42,
+    },
   });
-  useEmblaWheelGestures(heroCategoryEmblaApi, {
-    enabled: heroCategories.length > 1,
-    desktopOnly: true,
-    threshold: 42,
-  });
+
 
   return (
     <section
@@ -2629,14 +2627,12 @@ function HomeListingCarouselSection({
   items: RecommendationItem[];
   mode: 'supply' | 'demand';
 }) {
-  const [emblaRef, emblaApi] = useEmblaCarousel({
+  const [emblaRef, emblaApi] = useLajukanEmbla({
     align: 'start',
     containScroll: 'trimSnaps',
     dragFree: true,
     skipSnaps: true,
   });
-
-  useEmblaWheelGestures(emblaApi);
 
   const isDemand = mode === 'demand';
   const clusteredItems = useMemo(
@@ -2785,14 +2781,12 @@ export function PublicReferencesSection({
   isId: boolean;
   items: PublicReferenceItem[];
 }) {
-  const [emblaRef, emblaApi] = useEmblaCarousel({
+  const [emblaRef, emblaApi] = useLajukanEmbla({
     align: 'start',
     containScroll: 'keepSnaps',
     dragFree: true,
     skipSnaps: true,
   });
-
-  useEmblaWheelGestures(emblaApi);
 
   if (items.length === 0) return null;
   const clusteredItems = clusterHomeFeedItems(items, 12, 3);
@@ -3368,7 +3362,7 @@ function HomeCommunityGroupsSection({
   groups: CommunityGroup[];
   onChanged?: () => void;
 }) {
-  const [emblaRef, emblaApi] = useEmblaCarousel({
+  const [emblaRef, emblaApi] = useLajukanEmbla({
     align: 'start',
     containScroll: 'trimSnaps',
     dragFree: true,
@@ -3465,17 +3459,19 @@ function CommunityPanel({
   const router = useRouter();
   const tabs = getCommunityTabs(isId);
   const activeTabIndex = tabs.findIndex(tab => tab.id === activeTab);
-  const [communityTabEmblaRef, communityTabEmblaApi] = useEmblaCarousel({
+  const [communityTabEmblaRef, communityTabEmblaApi] = useLajukanEmbla({
     align: 'start',
     containScroll: 'trimSnaps',
     dragFree: false,
     loop: false,
+    skipSnaps: false,
+    wheel: {
+      enabled: tabs.length > 1,
+      desktopOnly: true,
+      threshold: 42,
+    },
   });
-  useEmblaWheelGestures(communityTabEmblaApi, {
-    enabled: tabs.length > 1,
-    desktopOnly: true,
-    threshold: 42,
-  });
+
   useEffect(() => {
     if (!communityTabEmblaApi || activeTabIndex < 0) return;
     communityTabEmblaApi.scrollTo(activeTabIndex);
@@ -3572,14 +3568,12 @@ function CommunityPanel({
 }
 
 export function ReelsPanel({ isId, items }: ReelsPanelProps) {
-  const [emblaRef, emblaApi] = useEmblaCarousel({
+  const [emblaRef, emblaApi] = useLajukanEmbla({
     align: 'start',
     containScroll: 'keepSnaps',
     dragFree: true,
     skipSnaps: true,
   });
-
-  useEmblaWheelGestures(emblaApi);
 
   return (
     <section
