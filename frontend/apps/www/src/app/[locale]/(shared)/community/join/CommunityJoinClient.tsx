@@ -112,7 +112,14 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
             <Sparkles className="h-5 w-5 text-emerald-600" />
             <h2 className="mt-3 text-lg font-black text-zinc-950">{isId ? 'Satu listing dulu' : 'Add one listing first'}</h2>
             <p className="mt-1 text-sm leading-6 text-zinc-600">{isId ? 'Boleh listing barang yang kamu jual, jasa yang kamu tawarkan, atau kebutuhan usaha yang sedang kamu cari. Ini yang dipakai untuk membantu pengelompokan komunitas.' : 'List something you sell, a service you offer, or a business need you are looking for. This is used to help group you correctly.'}</p>
-            <Link href="/create?mode=offer" className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-full bg-emerald-600 px-5 text-sm font-extrabold text-white">{isId ? 'Buat listing sekarang' : 'Create a listing'} <ArrowRight className="h-4 w-4" /></Link>
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+              <Link href="/create?mode=offer" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-emerald-600 px-5 text-sm font-extrabold text-white">
+                {isId ? 'Saya menawarkan' : 'I offer something'} <ArrowRight className="h-4 w-4" />
+              </Link>
+              <Link href="/create?mode=need" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-emerald-200 bg-white px-5 text-sm font-extrabold text-emerald-700">
+                {isId ? 'Saya membutuhkan' : 'I need something'}
+              </Link>
+            </div>
           </section>
         ) : (
           <>
