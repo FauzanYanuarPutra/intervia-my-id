@@ -44,6 +44,7 @@ export type CommunityGroup = {
   membershipPermission: 'open' | 'approval' | 'invite';
   avatarUrl?: string | null;
   coverUrl?: string | null;
+  whatsappJoinUrl?: string | null;
   rules: string[];
   memberCount: number;
   postCount: number;
