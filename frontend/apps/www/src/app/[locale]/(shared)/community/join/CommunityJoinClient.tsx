@@ -1,14 +1,107 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import type { LucideIcon } from 'lucide-react';
-import { ArrowRight, CheckCircle2, ExternalLink, Loader2, LogIn, ShieldCheck, Sparkles, Users } from 'lucide-react';
+import {
+  ArrowRight,
+  Bell,
+  CheckCircle2,
+  ExternalLink,
+  Handshake,
+  Loader2,
+  LogIn,
+  MessageCircle,
+  Package,
+  Search,
+  ShieldCheck,
+  Sparkles,
+  Store,
+  Truck,
+  Users,
+  Wheat,
+  X,
+} from 'lucide-react';
 import { Link, useRouter } from '@/i18n/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { extractContentItems, type ContentItem } from '@/lib/content/catalog';
 import { classifyCommunityJoinRole, hasCommunityJoinReadyListing } from '@/lib/community/communityJoin';
 
 const COMMUNITY_DESTINATION = ['https://chat.', 'whatsapp.com/', 'IUXv2SjjgAE7SOq72HnHwk'].join('');
+
+type CommunityGroup = {
+  nameId: string;
+  nameEn: string;
+  icon: string;
+  descriptionId: string;
+  descriptionEn: string;
+  benefitsId: string[];
+  benefitsEn: string[];
+};
+
+const COMMUNITY_GROUPS: CommunityGroup[] = [
+  {
+    nameId: 'Pengumuman',
+    nameEn: 'Announcements',
+    icon: '📣',
+    descriptionId: 'Info penting, agenda, dan update komunitas.',
+    descriptionEn: 'Important updates, agendas, and community news.',
+    benefitsId: ['Tidak ketinggalan info penting', 'Tahu agenda komunitas', 'Update aturan dan program'],
+    benefitsEn: ['Stay up to date', 'See community agendas', 'Get rule and program updates'],
+  },
+  {
+    nameId: 'Punya, Butuh & Peluang',
+    nameEn: 'Have, Need & Opportunities',
+    icon: '🔎',
+    descriptionId: 'Tempat menemukan barang, kebutuhan, dan peluang usaha.',
+    descriptionEn: 'Find products, business needs, and opportunities.',
+    benefitsId: ['Cari atau tawarkan kebutuhan usaha', 'Temukan peluang kolaborasi', 'Saling menghubungkan kebutuhan'],
+    benefitsEn: ['Post or find business needs', 'Discover collaboration opportunities', 'Connect supply with demand'],
+  },
+  {
+    nameId: 'Jasa & Partner Usaha',
+    nameEn: 'Services & Business Partners',
+    icon: '🤝',
+    descriptionId: 'Cari jasa dan partner untuk menjalankan usaha.',
+    descriptionEn: 'Find services and partners to grow your business.',
+    benefitsId: ['Cari penyedia jasa', 'Temukan partner kerja', 'Buka peluang kolaborasi'],
+    benefitsEn: ['Find service providers', 'Find business partners', 'Open collaboration opportunities'],
+  },
+  {
+    nameId: 'Logistik & Transportasi',
+    nameEn: 'Logistics & Transport',
+    icon: '🚚',
+    descriptionId: 'Hubungkan kebutuhan kirim, angkut, dan distribusi.',
+    descriptionEn: 'Connect shipping, transport, and distribution needs.',
+    benefitsId: ['Cari jasa angkut', 'Cari kebutuhan pengiriman', 'Hubungkan distribusi antarlokasi'],
+    benefitsEn: ['Find transport services', 'Find shipping options', 'Connect distribution needs'],
+  },
+  {
+    nameId: 'Pengepul, Supplier & Distributor',
+    nameEn: 'Collectors, Suppliers & Distributors',
+    icon: '📦',
+    descriptionId: 'Rantai pasok bahan, produk, dan distribusi usaha.',
+    descriptionEn: 'Business supply, products, and distribution connections.',
+    benefitsId: ['Cari supplier', 'Temukan pengepul atau distributor', 'Buka jalur pasokan baru'],
+    benefitsEn: ['Find suppliers', 'Find collectors or distributors', 'Open new supply channels'],
+  },
+  {
+    nameId: 'UMKM & Pembeli Usaha',
+    nameEn: 'SMEs & Business Buyers',
+    icon: '🏪',
+    descriptionId: 'Tempat UMKM menawarkan produk dan mencari pembeli usaha.',
+    descriptionEn: 'A space for SMEs to offer products and find business buyers.',
+    benefitsId: ['Promosikan usaha', 'Cari pembeli usaha', 'Temukan produk dari UMKM lain'],
+    benefitsEn: ['Promote your business', 'Find business buyers', 'Discover products from other SMEs'],
+  },
+  {
+    nameId: 'Petani & Produsen',
+    nameEn: 'Farmers & Producers',
+    icon: '🌾',
+    descriptionId: 'Hubungkan produsen langsung dengan kebutuhan pasar.',
+    descriptionEn: 'Connect producers directly with market demand.',
+    benefitsId: ['Cari pembeli hasil produksi', 'Cari bahan baku dari produsen', 'Bangun rantai pasok langsung'],
+    benefitsEn: ['Find buyers for production', 'Find producer-sourced materials', 'Build direct supply chains'],
+  },
+];
 
 function loginHref() {
   return '/login?next=%2Fcommunity%2Fjoin';
@@ -22,17 +115,19 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
   const { isAuthenticated } = useAuth();
   const router = useRouter();
   const [listings, setListings] = useState<ContentItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [acceptedRules, setAcceptedRules] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [selectedGroup, setSelectedGroup] = useState<CommunityGroup | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated) {
+      setListings([]);
       setLoading(false);
       return;
     }
 
     let alive = true;
+    setLoading(true);
     fetch('/api/my-listings?status=active&limit=50', { cache: 'no-store', credentials: 'include' })
       .then(async response => {
         const payload = await response.json().catch(() => null);
@@ -66,100 +161,221 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
     return title.length >= 3 && category.length >= 2;
   });
 
-  if (!isAuthenticated) {
-    return (
-      <main className="min-h-[100svh] bg-[color:var(--app-surface-muted)] px-3 py-6 sm:px-5">
-        <section className="mx-auto max-w-2xl rounded-[26px] border border-emerald-100 bg-white p-5 shadow-[0_24px_60px_-42px_rgba(15,23,42,0.35)] sm:p-7">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700"><LogIn className="h-5 w-5" /></div>
-          <p className="mt-4 text-[10px] font-extrabold uppercase tracking-[0.14em] text-emerald-700">{isId ? 'Komunitas Rantai Usaha Lokal' : 'Local Business Chain Community'}</p>
-          <h1 className="mt-1 text-2xl font-black tracking-[-0.045em] text-zinc-950">{isId ? 'Masuk dulu sebelum bergabung' : 'Log in before joining'}</h1>
-          <p className="mt-2 text-sm leading-6 text-zinc-600">{isId ? 'Supaya anggota komunitas bisa dikenali dan dikelompokkan dengan benar, Lajukan membutuhkan akun yang sudah login.' : 'Lajukan needs a logged-in account so community members can be identified and grouped correctly.'}</p>
-          <Link href={loginHref()} className="mt-5 inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-emerald-600 px-5 text-sm font-extrabold text-white">{isId ? 'Login untuk lanjut' : 'Log in to continue'} <ArrowRight className="h-4 w-4" /></Link>
-        </section>
-      </main>
-    );
-  }
+  const openCommunity = () => {
+    window.open(COMMUNITY_DESTINATION, '_blank', 'noopener,noreferrer');
+  };
 
   return (
-    <main className="min-h-[100svh] bg-[color:var(--app-surface-muted)] px-3 py-6 sm:px-5">
-      <section className="mx-auto max-w-3xl space-y-3">
-        <header className="rounded-[26px] border border-emerald-100 bg-white p-5 shadow-[0_24px_60px_-42px_rgba(15,23,42,0.35)] sm:p-7">
-          <div className="flex items-start gap-3">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700"><Users className="h-5 w-5" /></div>
-            <div className="min-w-0">
-              <p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-emerald-700">{isId ? 'Komunitas Rantai Usaha Lokal' : 'Local Business Chain Community'}</p>
-              <h1 className="mt-1 text-2xl font-black tracking-[-0.045em] text-zinc-950">{isId ? 'Masuk komunitas lewat jalur yang benar' : 'Join through the right path'}</h1>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-600">{isId ? 'Bukan sekadar masuk grup. Cantumkan dulu apa yang kamu jual, tawarkan, atau butuhkan supaya peranmu bisa dibaca dan dikelompokkan.' : 'This is more than joining a group. Add what you sell, offer, or need so Lajukan can identify and group your role.'}</p>
+    <main className="min-h-[100svh] bg-[color:var(--app-surface-muted)] px-2.5 pb-8 pt-3 sm:px-4 sm:pt-5">
+      <section className="mx-auto max-w-2xl space-y-2.5">
+        <header className="overflow-hidden rounded-[22px] border border-emerald-100 bg-white shadow-[0_18px_45px_-36px_rgba(15,23,42,0.35)]">
+          <div className="bg-emerald-600 px-4 py-4 text-white sm:px-5">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15">
+                <MessageCircle className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-extrabold uppercase tracking-[0.13em] text-emerald-100">
+                  {isId ? 'Komunitas Rantai Usaha Lokal' : 'Local Business Chain Community'}
+                </p>
+                <h1 className="mt-0.5 text-xl font-black tracking-[-0.035em] sm:text-2xl">
+                  {isId ? 'Gabung komunitas usaha' : 'Join the business community'}
+                </h1>
+                <p className="mt-1 max-w-xl text-xs leading-5 text-emerald-50">
+                  {isId
+                    ? 'Satu komunitas WhatsApp, beberapa grup sesuai kebutuhan usaha kamu.'
+                    : 'One WhatsApp community with groups for different business needs.'}
+                </p>
+              </div>
             </div>
+
+            <button
+              type="button"
+              onClick={openCommunity}
+              className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-white px-4 text-sm font-black text-emerald-700 shadow-sm transition hover:bg-emerald-50 active:scale-[0.99]"
+            >
+              {isId ? 'Gabung WhatsApp' : 'Join WhatsApp'}
+              <ExternalLink className="h-4 w-4" />
+            </button>
+            <p className="mt-1.5 text-center text-[10px] leading-4 text-emerald-100">
+              {isId ? 'Setelah masuk, pilih grup yang paling relevan.' : 'After joining, choose the most relevant group.'}
+            </p>
           </div>
-          <div className="mt-5 grid gap-2 sm:grid-cols-3">
-            {(
-              [
-                [LogIn, isId ? '1. Login' : '1. Log in'],
-                [CheckCircle2, isId ? '2. Minimal 1 listing aktif' : '2. At least 1 listing'],
-                [Users, isId ? '3. Dikelompokkan' : '3. Get grouped'],
-              ] as Array<[LucideIcon, string]>
-            ).map(([StepIcon, label]) => (
-              <div key={label} className="rounded-2xl bg-zinc-50 px-3 py-3">
-                <StepIcon className="h-4 w-4 text-emerald-600" />
-                <p className="mt-2 text-xs font-extrabold text-zinc-900">{label}</p>
+
+          <div className="grid grid-cols-3 divide-x border-t border-zinc-100">
+            {[
+              ['7', isId ? 'grup' : 'groups'],
+              ['1', isId ? 'komunitas' : 'community'],
+              ['WA', isId ? 'langsung' : 'direct'],
+            ].map(([value, label]) => (
+              <div key={label} className="px-2 py-2.5 text-center">
+                <p className="text-sm font-black text-zinc-950">{value}</p>
+                <p className="text-[10px] font-medium text-zinc-500">{label}</p>
               </div>
             ))}
           </div>
         </header>
 
-        {loading ? (
-          <section className="rounded-[24px] border border-zinc-100 bg-white p-6"><div className="flex items-center gap-2 text-sm font-semibold text-zinc-600"><Loader2 className="h-4 w-4 animate-spin" />{isId ? 'Memeriksa listing kamu...' : 'Checking your listings...'}</div></section>
-        ) : error ? (
-          <section className="rounded-[24px] border border-amber-200 bg-amber-50 p-5"><p className="text-sm font-bold text-amber-900">{error}</p><button type="button" onClick={() => router.refresh()} className="mt-3 rounded-full bg-amber-900 px-4 py-2 text-xs font-bold text-white">{isId ? 'Coba lagi' : 'Try again'}</button></section>
-        ) : !ready ? (
-          <section className="rounded-[24px] border border-emerald-100 bg-white p-5 shadow-[0_20px_50px_-40px_rgba(15,23,42,0.3)] sm:p-6">
-            <Sparkles className="h-5 w-5 text-emerald-600" />
-            <h2 className="mt-3 text-lg font-black text-zinc-950">{isId ? 'Satu listing aktif dulu' : 'Add one active listing first'}</h2>
-            <p className="mt-1 text-sm leading-6 text-zinc-600">{isId ? 'Boleh listing barang yang kamu jual, jasa yang kamu tawarkan, atau kebutuhan usaha yang sedang kamu cari. Ini yang dipakai untuk membantu pengelompokan komunitas.' : 'List something you sell, a service you offer, or a business need you are looking for. This is used to help group you correctly.'}</p>
-            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-              <Link href="/create?mode=offer" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-emerald-600 px-5 text-sm font-extrabold text-white">
-                {isId ? 'Saya menawarkan' : 'I offer something'} <ArrowRight className="h-4 w-4" />
-              </Link>
-              <Link href="/create?mode=need" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-emerald-200 bg-white px-5 text-sm font-extrabold text-emerald-700">
-                {isId ? 'Saya membutuhkan' : 'I need something'}
-              </Link>
+        <section className="rounded-[20px] border border-zinc-100 bg-white px-3 py-2.5 shadow-[0_14px_35px_-32px_rgba(15,23,42,0.3)] sm:px-4">
+          <div className="flex items-center justify-between gap-3 px-1 pb-2">
+            <div className="min-w-0">
+              <h2 className="text-sm font-black text-zinc-950">{isId ? 'Pilih grup sesuai kebutuhan' : 'Choose your group'}</h2>
+              <p className="text-[10px] text-zinc-500">{isId ? 'Ketuk untuk lihat manfaat.' : 'Tap a group to see its benefits.'}</p>
+            </div>
+            <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-extrabold text-emerald-700">
+              {COMMUNITY_GROUPS.length}
+            </span>
+          </div>
+
+          <div className="divide-y divide-zinc-100">
+            {COMMUNITY_GROUPS.map(group => (
+              <button
+                key={group.nameId}
+                type="button"
+                onClick={() => setSelectedGroup(group)}
+                className="flex min-h-12 w-full items-center gap-2.5 px-1 py-2 text-left transition hover:bg-zinc-50 active:bg-zinc-100"
+              >
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-zinc-50 text-base">
+                  {group.icon}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-xs font-extrabold text-zinc-900">{isId ? group.nameId : group.nameEn}</span>
+                  <span className="mt-0.5 block truncate text-[10px] text-zinc-500">{isId ? group.descriptionId : group.descriptionEn}</span>
+                </span>
+                <ArrowRight className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="rounded-[20px] border border-emerald-100 bg-white px-3 py-2.5 shadow-[0_14px_35px_-32px_rgba(15,23,42,0.3)] sm:px-4">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+              <Sparkles className="h-4 w-4" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-xs font-black text-zinc-950">{isId ? 'Kenapa gabung?' : 'Why join?'}</h2>
+              <p className="text-[10px] leading-4 text-zinc-500">
+                {isId ? 'Cari supplier, pembeli, partner, jasa, logistik, dan peluang usaha.' : 'Find suppliers, buyers, partners, services, logistics, and opportunities.'}
+              </p>
+            </div>
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+          </div>
+        </section>
+
+        {isAuthenticated ? (
+          <section className="rounded-[20px] border border-zinc-100 bg-white px-3 py-2.5 shadow-[0_14px_35px_-32px_rgba(15,23,42,0.3)] sm:px-4">
+            <div className="flex items-start gap-2.5">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+                <ShieldCheck className="h-4 w-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xs font-black text-zinc-950">{isId ? 'Jalur yang cocok buat kamu' : 'Your suggested path'}</h2>
+                  {loading ? <Loader2 className="h-3 w-3 animate-spin text-emerald-600" /> : null}
+                </div>
+                {error ? (
+                  <p className="mt-0.5 text-[10px] leading-4 text-amber-700">{error}</p>
+                ) : ready ? (
+                  <>
+                    <p className="mt-0.5 text-[11px] font-bold text-emerald-700">{isId ? role.labelId : role.labelEn}</p>
+                    {listing ? <p className="mt-0.5 truncate text-[10px] text-zinc-500">{isId ? 'Dari:' : 'From:'} {listingLabel(listing)}</p> : null}
+                  </>
+                ) : (
+                  <p className="mt-0.5 text-[10px] leading-4 text-zinc-500">
+                    {isId ? 'Belum ada listing aktif. Tambahkan penawaran atau kebutuhan agar Lajukan bisa membantu membaca peranmu.' : 'No active listing yet. Add an offer or need so Lajukan can understand your role.'}
+                  </p>
+                )}
+              </div>
+              {!loading && !error && !ready ? (
+                <Link href="/create?mode=offer" className="shrink-0 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[10px] font-extrabold text-white">
+                  {isId ? 'Buat' : 'Create'}
+                </Link>
+              ) : null}
             </div>
           </section>
         ) : (
-          <>
-            <section className="rounded-[24px] border border-emerald-100 bg-white p-5 shadow-[0_20px_50px_-40px_rgba(15,23,42,0.3)] sm:p-6">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-emerald-700">{isId ? 'Peran yang terdeteksi' : 'Detected role'}</p>
-                  <h2 className="mt-1 text-xl font-black text-zinc-950">{isId ? role.labelId : role.labelEn}</h2>
-                  <p className="mt-1 text-sm leading-6 text-zinc-600">{isId ? role.descriptionId : role.descriptionEn}</p>
-                </div>
-                <ShieldCheck className="h-6 w-6 shrink-0 text-emerald-600" />
-              </div>
-              {listing ? <div className="mt-4 rounded-2xl bg-zinc-50 px-3.5 py-3"><p className="text-[10px] font-bold uppercase tracking-[0.1em] text-zinc-500">{isId ? 'Listing yang dipakai' : 'Listing used'}</p><p className="mt-1 truncate text-sm font-bold text-zinc-900">{listingLabel(listing)}</p></div> : null}
-            </section>
-
-            <section className="rounded-[24px] border border-zinc-100 bg-white p-5 shadow-[0_20px_50px_-40px_rgba(15,23,42,0.3)] sm:p-6">
-              <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700"><Users className="h-4 w-4" /></div>
-                <div>
-                  <h2 className="text-base font-black text-zinc-950">{isId ? 'Komunitas Rantai Usaha Lokal' : 'Local Business Chain Community'}</h2>
-                  <p className="mt-1 text-xs leading-5 text-zinc-600">{isId ? 'Setelah siap, kamu bisa masuk ke komunitas WhatsApp. Peranmu membantu mengarahkan kamu ke grup yang paling relevan.' : 'Once ready, you can enter the WhatsApp community. Your role helps guide you to the most relevant group.'}</p>
-                </div>
-              </div>
-              <label className="mt-4 flex cursor-pointer items-start gap-2.5 rounded-2xl bg-zinc-50 p-3 text-xs leading-5 text-zinc-700">
-                <input type="checkbox" checked={acceptedRules} onChange={event => setAcceptedRules(event.target.checked)} className="mt-0.5 h-4 w-4 accent-emerald-600" />
-                <span>{isId ? 'Saya akan menggunakan komunitas untuk kebutuhan usaha yang nyata, menghormati anggota lain, dan tidak melakukan spam.' : 'I will use the community for genuine business needs, respect other members, and avoid spam.'}</span>
-              </label>
-              <button type="button" disabled={!acceptedRules} onClick={() => window.open(COMMUNITY_DESTINATION, '_blank', 'noopener,noreferrer')} className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-5 text-sm font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto">
-                {isId ? 'Gabung Sekarang' : 'Join Now'} <ExternalLink className="h-4 w-4" />
-              </button>
-              <p className="mt-2 text-[10px] font-medium leading-4 text-zinc-500">{isId ? 'Tautan menuju WhatsApp. Lajukan tidak mengontrol penerimaan anggota di WhatsApp.' : 'This opens WhatsApp. Lajukan does not control WhatsApp membership approval.'}</p>
-            </section>
-          </>
+          <section className="flex items-center gap-2.5 rounded-[20px] border border-zinc-100 bg-white px-3 py-2.5">
+            <LogIn className="h-4 w-4 shrink-0 text-emerald-600" />
+            <p className="min-w-0 flex-1 text-[10px] leading-4 text-zinc-600">
+              {isId ? 'Login opsional — dipakai kalau kamu ingin Lajukan membantu mengarahkan peran dan listing.' : 'Login is optional — it helps Lajukan suggest your role and listings.'}
+            </p>
+            <Link href={loginHref()} className="shrink-0 rounded-lg border border-emerald-200 px-2.5 py-1.5 text-[10px] font-extrabold text-emerald-700">
+              {isId ? 'Login' : 'Log in'}
+            </Link>
+          </section>
         )}
+
+        <p className="px-2 text-center text-[9px] leading-4 text-zinc-400">
+          {isId
+            ? 'Komunitas dikelola di WhatsApp. Tetap hormati anggota lain dan hindari spam.'
+            : 'The community is managed on WhatsApp. Respect other members and avoid spam.'}
+        </p>
       </section>
+
+      {selectedGroup ? (
+        <div
+          className="fixed inset-0 z-[100] flex items-end justify-center bg-zinc-950/45 p-2 sm:items-center sm:p-4"
+          role="presentation"
+          onMouseDown={event => {
+            if (event.target === event.currentTarget) setSelectedGroup(null);
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="community-group-title"
+            className="w-full max-w-md overflow-hidden rounded-[24px] bg-white shadow-2xl"
+          >
+            <div className="flex items-start gap-3 border-b border-zinc-100 px-4 py-3.5">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-xl">
+                {selectedGroup.icon}
+              </span>
+              <div className="min-w-0 flex-1">
+                <h3 id="community-group-title" className="text-base font-black text-zinc-950">
+                  {isId ? selectedGroup.nameId : selectedGroup.nameEn}
+                </h3>
+                <p className="mt-0.5 text-[11px] leading-4 text-zinc-500">
+                  {isId ? selectedGroup.descriptionId : selectedGroup.descriptionEn}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedGroup(null)}
+                aria-label={isId ? 'Tutup' : 'Close'}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-zinc-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="max-h-[55svh] overflow-y-auto px-4 py-3">
+              <p className="mb-2 text-[10px] font-extrabold uppercase tracking-[0.12em] text-emerald-700">
+                {isId ? 'Manfaat' : 'Benefits'}
+              </p>
+              <ul className="space-y-2">
+                {(isId ? selectedGroup.benefitsId : selectedGroup.benefitsEn).map(benefit => (
+                  <li key={benefit} className="flex items-start gap-2 text-xs leading-5 text-zinc-700">
+                    <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />
+                    <span>{benefit}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="border-t border-zinc-100 p-3">
+              <button
+                type="button"
+                onClick={openCommunity}
+                className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-xs font-extrabold text-white"
+              >
+                {isId ? 'Gabung WhatsApp' : 'Join WhatsApp'}
+                <ExternalLink className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </main>
   );
 }
