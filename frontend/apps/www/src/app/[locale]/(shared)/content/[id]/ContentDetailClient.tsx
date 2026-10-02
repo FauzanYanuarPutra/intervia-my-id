@@ -9,6 +9,7 @@ import {
   type ContentMapPoint,
 } from '@/components/content/ContentLocationMap';
 import { ContentSmartMatch } from '@/components/content/ContentSmartMatch';
+import { ContentMarketIntelligence } from '@/components/content/ContentMarketIntelligence';
 import { useLocale } from 'next-intl';
 import {
   BadgePercent,
@@ -5050,6 +5051,13 @@ export default function ContentDetailClient({
                             ? meta.market_side
                             : undefined
                     }
+                    locale={locale === 'en' ? 'en' : 'id'}
+                  />
+                ) : null}
+
+                {isOwner && !publicReference && item.pricing_mode === 'fixed' ? (
+                  <ContentMarketIntelligence
+                    contentId={item.id}
                     locale={locale === 'en' ? 'en' : 'id'}
                   />
                 ) : null}
