@@ -72,7 +72,7 @@ export function ChatComposerPicker({
       return [];
     }
   });
-\n
+
   const categories = useMemo(() => {
     if (mode !== 'emoji' || recent.length === 0) return EMOJI_CATEGORIES;
     return EMOJI_CATEGORIES.map(category =>
