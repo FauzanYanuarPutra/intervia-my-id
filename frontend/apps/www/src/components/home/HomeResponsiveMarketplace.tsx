@@ -4876,9 +4876,9 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
                   isId={isId}
                   items={demandRecommendations}
                 />
+              )}
 
               <HomeCommunityJoinSection isId={isId} />
-              )}
 
               <PublicReferencesSection
                 isId={isId}
