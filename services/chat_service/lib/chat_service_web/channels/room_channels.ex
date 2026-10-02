@@ -76,14 +76,17 @@ defmodule ChatServiceWeb.RoomChannel do
 
   @impl true
   def handle_in("read", _payload, socket) do
+    read_at = DateTime.utc_now()
+
     case UnreadState.clear(socket.assigns.user_id_bin, socket.assigns.room_id) do
       :ok ->
         broadcast_from!(socket, "read", %{
           user_id: socket.assigns.user_id,
-          room_id: socket.assigns.room_id
+          room_id: socket.assigns.room_id,
+          read_at: DateTime.to_iso8601(read_at)
         })
 
-        {:reply, {:ok, %{status: "ok"}}, socket}
+        {:reply, {:ok, %{status: "ok", read_at: DateTime.to_iso8601(read_at)}}, socket}
 
       {:error, reason} ->
         Logger.error("[Scylla] Read receipt update failed: #{inspect(reason)}")
