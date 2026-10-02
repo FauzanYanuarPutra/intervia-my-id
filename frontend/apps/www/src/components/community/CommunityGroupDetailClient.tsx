@@ -1244,6 +1244,18 @@ export default function CommunityGroupDetailClient({
                           : 'Join group'}
                   </button>
 
+                  {group.whatsappJoinUrl ? (
+                    <a
+                      href={group.whatsappJoinUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[14px] border border-emerald-200 bg-emerald-50 px-4 text-sm font-extrabold text-emerald-700 transition hover:bg-emerald-100 active:scale-[0.99] sm:min-w-[150px]"
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                      WhatsApp
+                    </a>
+                  ) : null}
+
                   {group.viewerCanManage ? (
                     <button
                       type="button"
