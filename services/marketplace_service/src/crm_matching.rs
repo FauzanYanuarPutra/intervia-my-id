@@ -2368,5 +2368,3 @@ pub async fn notify_new_listing_matches(
         }
     }
 }
-
-}
