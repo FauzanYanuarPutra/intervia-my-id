@@ -536,6 +536,7 @@ type PublicReferenceItem = {
   sourceContactType: 'whatsapp' | 'source';
   imageAttribution: string;
   clusterKey?: string;
+  sourceKind: 'lajukan' | 'registered' | 'reference';
 };
 
 type PublicReferenceApiItem = {
@@ -1363,39 +1364,118 @@ function mapApiItemToPublicReference(
     !Array.isArray(item.metadata)
       ? (item.metadata as Record<string, unknown>)
       : {};
+
   if (!id || !title) return null;
 
-  const contentItem: ContentItem = {
-    id,
-    title,
-    summary: readText(item.description),
-    cover_image: readText(metadata.cover_image),
-    metadata,
-  };
-  const mapped = mapContentToPublicReference(contentItem);
-  if (!mapped) return null;
+  const isReference =
+    metadata.is_public_reference === true ||
+    String(metadata.source_kind || '').toLowerCase().includes('reference') ||
+    String(metadata.record_kind || '').toLowerCase().includes('reference') ||
+    String(metadata.market_side || '').toLowerCase() === 'reference';
+
+  const sourceKind: PublicReferenceItem['sourceKind'] = isReference
+    ? 'reference'
+    : metadata.source === 'usaha_portal' ||
+        metadata.source_kind === 'lajukan_store' ||
+        metadata.source_kind === 'usaha_portal' ||
+        metadata.owner_user_id != null ||
+        metadata.owner_id != null
+      ? 'lajukan'
+      : 'registered';
+
   const publicPath = readText(item.public_path);
+  const city = readText(item.city);
+  const address = readText(item.address);
+  const location = address || city || metadataText({ id, title, summary: '', metadata }, 'location');
+
   const placeKind = getUmkmPlaceKind({
     id,
     slug: readText(item.id),
     name: title,
     description: readText(item.description) || null,
-    city: readText(item.city) || null,
-    address: readText(item.address) || null,
+    city: city || null,
+    address: address || null,
     lat: Number(metadata.latitude) || 0,
     lng: Number(metadata.longitude) || 0,
     metadata,
   });
 
+  const contactValue =
+    readText(metadata.whatsapp_url) ||
+    readText(metadata.whatsappUrl) ||
+    readText(metadata.whatsapp) ||
+    readText(metadata.whatsapp_number) ||
+    readText(metadata.whatsapp_phone) ||
+    readText(metadata.phone) ||
+    readText(metadata.phone_number) ||
+    readText(metadata.phoneNumber);
+
+  const mappedReference = isReference
+    ? mapContentToPublicReference({
+        id,
+        title,
+        summary: readText(item.description),
+        cover_image: readText(metadata.cover_image),
+        metadata,
+      } as ContentItem)
+    : null;
+
+  if (isReference && mappedReference) {
+    return {
+      ...mappedReference,
+      fallbackImage: NATIVE_BUSINESS_CATEGORY_ARTWORK[placeKind],
+      id,
+      location,
+      href: publicPath.startsWith('/') ? publicPath : mappedReference.href,
+      sourceKind,
+    };
+  }
+
+  const image =
+    readText(metadata.gallery_media_primary) ||
+    readText(metadata.cover_image) ||
+    readText(metadata.cover_image_url) ||
+    readText(metadata.store_photo_url) ||
+    readText(metadata.logo_url) ||
+    readText(metadata.image_url) ||
+    readText(metadata.image);
+
+  const internalHref =
+    publicPath.startsWith('/') && !publicPath.startsWith('/content/')
+      ? publicPath
+      : readText(metadata.storefront_slug)
+        ? `/toko/${encodeURIComponent(readText(metadata.storefront_slug))}`
+        : publicPath.startsWith('/')
+          ? publicPath
+          : '/umkm';
+
   return {
-    ...mapped,
-    fallbackImage: NATIVE_BUSINESS_CATEGORY_ARTWORK[placeKind],
     id,
-    location:
-      readText(item.address) ||
-      readText(item.city) ||
-      metadataText(contentItem, 'location'),
-    href: publicPath.startsWith('/content/') ? publicPath : mapped.href,
+    title,
+    summary: readText(item.description),
+    location,
+    image: image || undefined,
+    fallbackImage: NATIVE_BUSINESS_CATEGORY_ARTWORK[placeKind],
+    href: internalHref,
+    sourceTitle:
+      sourceKind === 'lajukan'
+        ? 'Usaha Lajukan'
+        : sourceKind === 'registered'
+          ? 'Usaha terdaftar'
+          : readText(metadata.source_title) || 'Sumber publik',
+    sourceUrl:
+      sourceKind === 'reference'
+        ? readText(metadata.source_url) || publicPath || '/umkm'
+        : internalHref,
+    sourceLicense: readText(metadata.source_license),
+    sourceLicenseUrl: readText(metadata.source_license_url),
+    sourceContactUrl:
+      contactValue && /^(https?:\/\/)/i.test(contactValue)
+        ? contactValue
+        : '',
+    sourceContactType: contactValue ? 'whatsapp' : 'source',
+    imageAttribution: readText(metadata.image_attribution),
+    sourceKind,
   };
 }
 
@@ -2679,8 +2759,8 @@ export function PublicReferencesSection({
       data-testid="home-public-references-section"
       aria-label={
         isId
-          ? 'Lokasi usaha dari data publik'
-          : 'Business locations from public data'
+          ? 'Usaha sekitar'
+          : 'Nearby businesses'
       }
     >
       {/* HEADER */}
@@ -2688,11 +2768,11 @@ export function PublicReferencesSection({
         <Globe2 className="h-3.5 w-3.5 shrink-0 text-blue-600" />
 
         <h2 className="truncate text-[11px] font-bold leading-none tracking-tight text-[color:var(--app-text)] sm:text-xs">
-          {isId ? 'Lokasi usaha sekitar' : 'Nearby business locations'}
+          {isId ? 'Usaha sekitar' : 'Nearby businesses'}
         </h2>
 
         <span className="hidden text-[9px] font-medium text-zinc-400 sm:inline">
-          {isId ? 'Data lokasi publik' : 'Public location data'}
+          {isId ? 'Utamakan usaha Lajukan, lalu lokasi terdaftar & referensi' : 'Lajukan businesses first, then registered locations & references'}
         </span>
       </div>
 
@@ -2775,7 +2855,17 @@ export function PublicReferencesSection({
                       backdrop-blur
                     "
                   >
-                    {isId ? 'Lokasi usaha' : 'Business location'}
+                    {item.sourceKind === 'lajukan'
+  ? isId
+    ? 'Usaha Lajukan'
+    : 'Lajukan business'
+  : item.sourceKind === 'registered'
+    ? isId
+      ? 'Usaha terdaftar'
+      : 'Registered business'
+    : isId
+      ? 'Referensi publik'
+      : 'Public reference'}
                   </span>
                 </div>
 
@@ -2852,7 +2942,13 @@ export function PublicReferencesSection({
                   </a>
                 ) : (
                   <span className="inline-flex shrink-0 items-center gap-0.5 text-[8px] font-semibold text-blue-600">
-                    {isId ? 'Sumber' : 'Source'}
+                    {item.sourceKind === 'reference'
+                      ? isId
+                        ? 'Sumber'
+                        : 'Source'
+                      : isId
+                        ? 'Lihat usaha'
+                        : 'View business'}
                     <ExternalLink className="h-2.5 w-2.5" />
                   </span>
                 )}
@@ -4183,14 +4279,15 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
 
     const loadReferences = async () => {
       const params = new URLSearchParams({
-        references_only: '1',
+        map: '1',
+        include_references: '1',
         limit: '12',
       });
       addViewerLocation(params);
       const response = await fetch(
         `/api/super-app/umkm/stores?${params.toString()}`,
         {
-          cache: 'no-store',
+          cache: 'default',
           credentials: 'include',
           signal: referenceController.signal,
         },
@@ -4198,7 +4295,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
       const payload = (await response
         .json()
         .catch(() => null)) as PublicReferenceApiResponse | null;
-      if (!response.ok) throw new Error('public_references_unavailable');
+      if (!response.ok) throw new Error('nearby_businesses_unavailable');
       return Array.isArray(payload?.data?.items) ? payload.data.items : [];
     };
 
