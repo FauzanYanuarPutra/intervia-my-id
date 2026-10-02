@@ -44,6 +44,7 @@ describe('public reference content', () => {
       imageLicenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0/',
       sourceContactUrl: '',
       sourceContactType: 'source',
+      sourceFacebookUrl: '',
     });
   });
 
@@ -59,6 +60,20 @@ describe('public reference content', () => {
     ).toMatchObject({
       sourceContactUrl: 'https://wa.me/6281234567890',
       sourceContactType: 'whatsapp',
+    });
+  });
+
+  it('resolves a Facebook page when source contact data exists', () => {
+    expect(
+      readPublicReference({
+        ...referenceItem,
+        metadata: {
+          ...referenceItem.metadata,
+          facebook_url: 'https://www.facebook.com/lajukan.app',
+        },
+      }),
+    ).toMatchObject({
+      sourceFacebookUrl: 'https://www.facebook.com/lajukan.app',
     });
   });
 
