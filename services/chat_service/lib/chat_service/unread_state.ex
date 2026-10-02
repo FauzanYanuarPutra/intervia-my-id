@@ -37,7 +37,7 @@ defmodule ChatService.UnreadState do
              execute,
              """
              UPDATE user_room_state USING TIMESTAMP ?
-             SET unread_count = ?
+             SET unread_count = ?, last_read_at = ?
              WHERE user_id = ? AND room_id = ?
              """,
              [
