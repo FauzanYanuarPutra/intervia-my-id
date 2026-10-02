@@ -208,7 +208,7 @@ const GRID_COMPACT_CARD_FRAME_CLASS = cn(
 const RAIL_COMFORTABLE_CARD_FRAME_CLASS =
   'min-h-[328px] self-stretch sm:min-h-[348px]';
 const GRID_COMFORTABLE_CARD_FRAME_CLASS =
-  'h-[340px] min-h-[340px] max-h-[340px] self-stretch sm:h-[360px] sm:min-h-[360px] sm:max-h-[360px]';
+  'min-h-[328px] self-stretch sm:min-h-[348px]';
 
 function getFrameClass(
   compact: boolean,
