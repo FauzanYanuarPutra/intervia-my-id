@@ -21,7 +21,6 @@ import {
 import { Modal } from '@/components/common/Modal';
 import { ExploreFilterDrawer } from '@/components/explore/ExploreFilterDrawer';
 import { EmblaDesktopControls } from '@/components/common/EmblaDesktopControls';
-import { Header } from '@/components/layout/Header';
 import {
   ExploreArtwork,
   ExploreModeTabs,
@@ -1338,8 +1337,6 @@ export function ExploreAllSearchClient({
     <>
       <div className="min-h-[100svh] overflow-x-clip bg-[color:var(--app-surface-muted)] pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-10">
       <div className="lg:hidden">
-        <Header />
-        <div className="h-[calc(52px+env(safe-area-inset-top))]" />
       </div>
 
       <main className="mx-auto w-full min-w-0 max-w-[1080px] px-3 py-3 sm:px-5 sm:py-4 lg:px-6 lg:py-5">
