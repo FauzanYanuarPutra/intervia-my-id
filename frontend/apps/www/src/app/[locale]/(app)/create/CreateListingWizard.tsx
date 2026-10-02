@@ -1428,13 +1428,7 @@ export default function CreateListingWizard({
     );
 
   const [intent, setIntent] =
-    useState<
-      CreateIntent | undefined
-    >(() =>
-      toIntent(
-        effectiveEntryMode,
-      ),
-    );
+    useState<CreateIntent | undefined>();
 
   const [categorySlug, setCategorySlug] =
     useState<
@@ -1715,23 +1709,18 @@ export default function CreateListingWizard({
             )
           : null;
 
-      const seededIntent =
-        toIntent(
-          effectiveEntryMode,
-        );
-
+      /*
+       * Every fresh post starts by explicitly choosing its purpose.
+       * Query params such as ?mode=offer / ?side=supply are treated only as
+       * legacy/deep-link context and must never skip the purpose step.
+       * Existing drafts/content restore their saved intent in applyLoadedDraft.
+       */
       return {
         ...initial,
-        intent:
-          seededIntent,
+        intent: undefined,
         categorySlug:
           seededCategory?.slugEn,
-        currentStep:
-          seededCategory
-            ? 3
-            : seededIntent
-              ? 2
-              : 1,
+        currentStep: 1,
       };
     }, [
       categoryId,
@@ -5707,10 +5696,14 @@ export default function CreateListingWizard({
         : text(
               locale,
               editingContentId
-                ? 'Simpan perubahan'
+                ? ['active', 'published', 'live'].includes(editingContentStatus.trim().toLowerCase())
+                  ? 'Ajukan revisi'
+                  : 'Simpan perubahan'
                 : 'Terbitkan',
               editingContentId
-                ? 'Save changes'
+                ? ['active', 'published', 'live'].includes(editingContentStatus.trim().toLowerCase())
+                  ? 'Submit revision'
+                  : 'Save changes'
                 : 'Publish',
             )
       : currentStep === 6 && intent === 'request' && media.length === 0
@@ -6428,7 +6421,7 @@ export default function CreateListingWizard({
                   'Tambahkan pilihan lain',
                   'Add another option',
                 )}
-                className={common}
+                className={commonWithError}
               />
 
               <button
@@ -7445,8 +7438,12 @@ export default function CreateListingWizard({
                       <p className="mt-1 text-sm font-medium leading-6 text-emerald-900 dark:text-emerald-100">
                         {text(
                           locale,
-                          'Cek bagian penting di bawah. Kalau sudah benar, postingan bisa langsung diterbitkan.',
-                          'Check the important sections below. If everything is correct, you can publish immediately.',
+                          editingContentId
+                            ? 'Cek perubahan. Versi yang sedang tayang tidak berubah; simpan perubahan untuk mengajukan revisi ke review.'
+                            : 'Cek bagian penting di bawah. Kalau sudah benar, postingan bisa langsung diterbitkan.',
+                          editingContentId
+                            ? 'Review your changes. The current live version stays unchanged; save the changes to send the revision for review.'
+                            : 'Check the important sections below. If everything is correct, you can publish immediately.',
                         )}
                       </p>
                     </div>
