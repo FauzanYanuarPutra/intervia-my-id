@@ -43,8 +43,8 @@ mod data_governance;
 mod data_importer;
 mod health;
 mod identity_projection;
-mod moderation;
 mod market_intelligence;
+mod moderation;
 mod news;
 mod order_engine;
 mod outbox;
@@ -2271,7 +2271,8 @@ async fn main() -> anyhow::Result<()> {
         .route(
             "/v1/content/{id}/matches",
             get(crm_matching::public_matches),
-        ).route(
+        )
+        .route(
             "/v1/content/{id}/market-intelligence",
             get(market_intelligence::market_intelligence),
         )
@@ -13522,18 +13523,10 @@ async fn create_content(
                 let match_id = row.id;
                 let match_owner = row.owner_id;
                 tokio::spawn(async move {
-                    crm_matching::notify_new_listing_matches(
-                        &match_state,
-                        match_id,
-                        match_owner,
-                    )
-                    .await;
-                    market_intelligence::record_price_snapshot(
-                        &match_state,
-                        match_id,
-                        match_owner,
-                    )
-                    .await;
+                    crm_matching::notify_new_listing_matches(&match_state, match_id, match_owner)
+                        .await;
+                    market_intelligence::record_price_snapshot(&match_state, match_id, match_owner)
+                        .await;
                 });
             }
             let seller_stats = match fetch_seller_stats(&state.db, &[row.owner_id]).await {

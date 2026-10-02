@@ -1013,7 +1013,11 @@ async fn run_ai_endpoint(
             .context
             .as_ref()
             .and_then(Value::as_object)
-            .and_then(|context| context.get("content_id").or_else(|| context.get("listing_id")))
+            .and_then(|context| {
+                context
+                    .get("content_id")
+                    .or_else(|| context.get("listing_id"))
+            })
             .and_then(Value::as_str)
             .map(str::trim)
             .filter(|value| !value.is_empty());

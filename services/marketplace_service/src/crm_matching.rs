@@ -18,9 +18,7 @@ use sqlx::Row;
 use std::{collections::HashSet, sync::Arc};
 use uuid::Uuid;
 
-use super::{
-    auth_claims_from_headers, has_agent_access, push_notification_best_effort, AppState,
-};
+use super::{auth_claims_from_headers, has_agent_access, push_notification_best_effort, AppState};
 
 const MATCHING_SCHEMA_VERSION: &str = "lajukan-match-schema-v1";
 const MATCHING_SCORE_VERSION: &str = "lajukan-match-score-v1";
@@ -2344,8 +2342,16 @@ pub async fn notify_new_listing_matches(
         .execute(&state.db)
         .await;
 
-        if inserted.as_ref().map(|r| r.rows_affected() > 0).unwrap_or(false) {
-            let opposite = if is_request { "permintaan" } else { "penawaran" };
+        if inserted
+            .as_ref()
+            .map(|r| r.rows_affected() > 0)
+            .unwrap_or(false)
+        {
+            let opposite = if is_request {
+                "permintaan"
+            } else {
+                "penawaran"
+            };
             push_notification_best_effort(
                 state,
                 candidate.owner_id,

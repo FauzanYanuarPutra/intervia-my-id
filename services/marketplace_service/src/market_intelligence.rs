@@ -97,7 +97,9 @@ fn category_from(category: Option<&str>, metadata: &Value) -> Option<String> {
             }
         }
     }
-    category.map(|v| v.trim().to_ascii_lowercase()).filter(|v| !v.is_empty())
+    category
+        .map(|v| v.trim().to_ascii_lowercase())
+        .filter(|v| !v.is_empty())
 }
 
 fn median(values: &[i64]) -> Option<f64> {
@@ -164,7 +166,10 @@ fn robust_clean_prices(raw: &[i64]) -> (Vec<i64>, Option<f64>, Option<f64>) {
 }
 
 fn stats(observations: &[PriceObservation]) -> Option<MarketStats> {
-    let raw = observations.iter().map(|v| v.price_cents).collect::<Vec<_>>();
+    let raw = observations
+        .iter()
+        .map(|v| v.price_cents)
+        .collect::<Vec<_>>();
     if raw.is_empty() {
         return None;
     }
@@ -261,7 +266,11 @@ fn price_alert(source_price: Option<i64>, market: &MarketStats) -> Value {
         "normal"
     };
 
-    let direction = if deviation_percent > 0.0 { "above" } else { "below" };
+    let direction = if deviation_percent > 0.0 {
+        "above"
+    } else {
+        "below"
+    };
     json!({
         "level": level,
         "code": if level == "normal" { "within_market_range" } else { "price_outlier" },
@@ -357,9 +366,15 @@ async fn current_observations(
             .to_ascii_uppercase();
 
         if currency != target_currency
-            || target_category.as_deref().is_some_and(|v| category.as_deref() != Some(v))
-            || target_city.as_deref().is_some_and(|v| city.as_deref() != Some(v))
-            || target_unit.as_deref().is_some_and(|v| unit.as_deref() != Some(v))
+            || target_category
+                .as_deref()
+                .is_some_and(|v| category.as_deref() != Some(v))
+            || target_city
+                .as_deref()
+                .is_some_and(|v| city.as_deref() != Some(v))
+            || target_unit
+                .as_deref()
+                .is_some_and(|v| unit.as_deref() != Some(v))
         {
             continue;
         }
@@ -566,8 +581,14 @@ async fn build_market_response(
     }
 
     let trend_summary = if trend.len() >= 2 {
-        let first = trend.first().and_then(|v| v.get("median_cents")).and_then(Value::as_i64);
-        let last = trend.last().and_then(|v| v.get("median_cents")).and_then(Value::as_i64);
+        let first = trend
+            .first()
+            .and_then(|v| v.get("median_cents"))
+            .and_then(Value::as_i64);
+        let last = trend
+            .last()
+            .and_then(|v| v.get("median_cents"))
+            .and_then(Value::as_i64);
         match (first, last) {
             (Some(first), Some(last)) if first > 0 => {
                 let change = (last as f64 - first as f64) / first as f64 * 100.0;
@@ -689,7 +710,10 @@ pub async fn record_price_snapshot(state: &Arc<AppState>, content_id: Uuid, owne
     };
 
     let metadata: Value = row.get("metadata");
-    let category = category_from(row.get::<Option<String>, _>("category").as_deref(), &metadata);
+    let category = category_from(
+        row.get::<Option<String>, _>("category").as_deref(),
+        &metadata,
+    );
     let city = city_from(&metadata);
     let currency = row
         .get::<Option<String>, _>("currency")
