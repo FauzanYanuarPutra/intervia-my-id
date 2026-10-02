@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import CreateListingWizard from './CreateListingWizard';
 import { normalizeCreateBusinessCategorySegment } from './createBusinessData';
-import type { CreateFlowIntent } from './createPageUtils';
 
 export const metadata: Metadata = {
   title: 'Create Listing | Lajukan',
@@ -17,21 +16,6 @@ function firstParam(value: string | string[] | undefined): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
-function intentFromSearchParams(
-  searchParams: CreateSearchParams,
-): CreateFlowIntent | undefined {
-  const side = firstParam(searchParams.side);
-  if (side === 'demand' || side === 'supply') return side;
-
-  const mode = firstParam(searchParams.mode).toLowerCase();
-  if (mode === 'find' || mode === 'need' || mode === 'request') {
-    return 'demand';
-  }
-  if (mode === 'offer' || mode === 'sell' || mode === 'quick') {
-    return 'supply';
-  }
-  return undefined;
-}
 
 export default async function CreatePage({
   params,
@@ -50,7 +34,6 @@ export default async function CreatePage({
 
   return (
     <CreateListingWizard
-      entryMode={intentFromSearchParams(resolvedSearchParams)}
       categoryId={category?.id}
     />
   );
