@@ -332,13 +332,15 @@ impl DataResetRepository {
         }
 
         let labels = scopes.iter().map(|scope| scope.label_id()).collect();
+        let can_apply = counts.sales_in_closed_period == 0
+            && !full_reset_blocked_by_protected_orders;
+
         Ok(ResetPreview {
             scopes,
             labels,
             counts,
             warnings,
-            can_apply: counts.sales_in_closed_period == 0
-                && !full_reset_blocked_by_protected_orders,
+            can_apply,
         })
     }
 
