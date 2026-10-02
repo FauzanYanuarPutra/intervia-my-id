@@ -11,7 +11,6 @@ import {
   formatPriceWithUnit,
   priceUnitLabel,
 } from '@/lib/content/priceUnit';
-import { getExploreResultAction } from '@/lib/discovery/exploreResultConversion';
 import type { GlobalSearchItem } from '@/lib/search/globalSearch';
 import { cn } from '@/lib/utils';
 import { useOptionalAuth } from '@/context/AuthContext';
