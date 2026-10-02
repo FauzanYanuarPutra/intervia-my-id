@@ -9,7 +9,7 @@ import {
   type ReactNode,
   type WheelEvent as ReactWheelEvent,
 } from 'react';
-import useEmblaCarousel from 'embla-carousel-react';
+import { useLajukanEmbla } from '@/components/common/useLajukanEmbla';
 import {
   ChevronLeft,
   ChevronRight,
@@ -153,12 +153,13 @@ export function MediaPreviewCarousel({
   const hasInitialisedEmblaRef = useRef(false);
   const mediaWheelBurstRef = useRef(false);
   const mediaWheelBurstTimerRef = useRef<number | null>(null);
-  const [viewportRef, emblaApi] = useEmblaCarousel({
+  const [viewportRef, emblaApi] = useLajukanEmbla({
     align: 'start',
     containScroll: 'trimSnaps',
     dragFree: false,
     loop: false,
     skipSnaps: false,
+    wheel: { enabled: false },
   });
 
   const visibleMediaItems = useMemo(
