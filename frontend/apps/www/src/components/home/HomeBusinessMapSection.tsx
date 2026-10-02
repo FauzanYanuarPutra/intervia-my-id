@@ -578,6 +578,7 @@ export function HomeBusinessMapSection({
           // lightweight colored dots. Do not add a second animated Marker
           // layer; the Canvas-backed dots are already cheap and responsive.
           markerStyle="dots"
+          animateDataDots
           className="leaflet-home-map aspect-[2.35/1] min-h-[148px] w-full sm:aspect-[2.5/1] sm:min-h-[176px] lg:aspect-[2.62/1] lg:min-h-0"
         />
 
