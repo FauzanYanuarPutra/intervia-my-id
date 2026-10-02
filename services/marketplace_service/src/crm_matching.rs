@@ -270,7 +270,6 @@ fn metadata_terms(metadata: &Value, keys: &[&str]) -> String {
     values.join(" ")
 }
 
-
 fn coordinate_from(metadata: &Value) -> Option<(f64, f64)> {
     let lat = json_f64(metadata, &["latitude", "lat", "location_lat"])?;
     let lng = json_f64(metadata, &["longitude", "lng", "lon", "location_lng"])?;
