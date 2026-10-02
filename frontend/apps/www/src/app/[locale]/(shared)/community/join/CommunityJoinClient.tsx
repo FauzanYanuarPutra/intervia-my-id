@@ -10,6 +10,7 @@ import {
   Loader2,
   LogIn,
   Megaphone,
+  Search,
   ShieldCheck,
   Sparkles,
   UsersRound,
