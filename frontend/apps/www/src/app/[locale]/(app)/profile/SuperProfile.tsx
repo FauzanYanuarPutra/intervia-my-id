@@ -1037,11 +1037,11 @@ function ProfileTabRail({
   onChange: (tab: OwnerTab) => void;
 }) {
   return (
-    <div className="px-2.5 pt-2.5 sm:px-2 sm:pt-4">
+    <div className="relative z-10 isolate px-2.5 pt-2.5 sm:px-2 sm:pt-4">
       <div
         role="group"
         aria-label="Profile content status"
-        className="grid grid-cols-2 rounded-xl bg-[color:var(--app-surface-muted)] p-1 dark:bg-[color:var(--app-surface)]"
+        className="relative z-10 grid grid-cols-2 rounded-xl bg-[color:var(--app-surface-muted)] p-1 dark:bg-[color:var(--app-surface)]"
       >
         {items.map(item => {
           const active = item.key === activeTab;
@@ -2649,7 +2649,7 @@ export default function SuperProfile() {
           ) : null}
 
           {profileDetailRows.length > 0 ? (
-            <section className="overflow-hidden rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)]">
+            <section className="relative isolate overflow-hidden rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)]">
               <div className="flex items-center justify-between gap-3 border-b border-[color:var(--app-border)] px-3 py-3 sm:px-5">
                 <div>
                   <h2 className="text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">{isId ? 'Tentang' : 'About'}</h2>
