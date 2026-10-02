@@ -3305,6 +3305,9 @@ export default function ChatRoomPage() {
           ? payload.data
           : [];
       if (res.ok) {
+        setPeerReadAt(
+          typeof payload.peer_read_at === 'string' ? payload.peer_read_at : null,
+        );
         const serverMessages = list.map(row => {
           const message = asObject(row);
           return {
@@ -3323,6 +3326,8 @@ export default function ChatRoomPage() {
               : [],
             created_at: String(message.created_at ?? message.sent_at ?? ''),
             status: 'sent' as MessageStatus,
+            read_at:
+              typeof message.read_at === 'string' ? message.read_at : null,
             reference: readMessageReference(message, String(message.content ?? '')),
           };
         });
@@ -3394,6 +3399,9 @@ export default function ChatRoomPage() {
           ? payload.data
           : [];
       if (!res.ok) return;
+      setPeerReadAt(
+        typeof payload.peer_read_at === 'string' ? payload.peer_read_at : null,
+      );
       if (
         requestId !== messageLoadRequestRef.current ||
         requestRoomId !== canonicalRoomId
@@ -3417,6 +3425,7 @@ export default function ChatRoomPage() {
             : [],
           created_at: String(m.created_at ?? m.sent_at ?? ''),
           status: 'sent' as MessageStatus,
+          read_at: typeof m.read_at === 'string' ? m.read_at : null,
           reference: readMessageReference(m, String(m.content ?? '')),
         };
       });
