@@ -178,6 +178,7 @@ export function buildUmkmStorefrontPath(slug: string): string {
 }
 
 type UmkmMapLinkTarget = {
+  id?: string | null;
   slug?: string | null;
   public_path?: string | null;
   metadata?: Record<string, unknown> | null;
@@ -284,32 +285,101 @@ export function getUmkmMapSourceLabel(
 
 export function buildUmkmMapPlacePath(place: UmkmMapLinkTarget): string {
   const metadata = place.metadata || {};
-  const recordKind = typeof metadata.record_kind === 'string' ? metadata.record_kind.trim().toLowerCase() : '';
-  const sourceKind = typeof metadata.source_kind === 'string' ? metadata.source_kind.trim().toLowerCase() : '';
-  const source = typeof metadata.source === 'string' ? metadata.source.trim().toLowerCase() : '';
+  const recordKind =
+    typeof metadata.record_kind === 'string'
+      ? metadata.record_kind.trim().toLowerCase()
+      : '';
+  const sourceKind =
+    typeof metadata.source_kind === 'string'
+      ? metadata.source_kind.trim().toLowerCase()
+      : '';
+  const source =
+    typeof metadata.source === 'string'
+      ? metadata.source.trim().toLowerCase()
+      : '';
   const metadataSlug =
-    typeof metadata.storefront_slug === 'string' ? metadata.storefront_slug.trim() :
-    typeof metadata.store_slug === 'string' ? metadata.store_slug.trim() :
-    typeof metadata.business_slug === 'string' ? metadata.business_slug.trim() : '';
+    typeof metadata.storefront_slug === 'string'
+      ? metadata.storefront_slug.trim()
+      : typeof metadata.store_slug === 'string'
+        ? metadata.store_slug.trim()
+        : typeof metadata.business_slug === 'string'
+          ? metadata.business_slug.trim()
+          : '';
   const storefrontSlug = place.slug?.trim() || metadataSlug;
+  const storeId = typeof place.id === 'string' ? place.id.trim() : '';
 
   if (isUmkmMapPublicReference(place)) {
     return storefrontSlug
-      ? buildUmkmDiscoveryPath({ store: storefrontSlug })
-      : UMKM_DISCOVERY_PATH;
+      ? buildUmkmDiscoveryPath({
+          store: storefrontSlug,
+          storeId: storeId || undefined,
+        })
+      : storeId
+        ? buildUmkmDiscoveryPath({ storeId })
+        : UMKM_DISCOVERY_PATH;
   }
 
-  if (sourceKind === 'lajukan_store' || sourceKind === 'registered_store' || source === 'usaha_portal' || metadata.owner_user_id != null || metadata.owner_id != null) {
-    return buildUmkmStorefrontPath(storefrontSlug);
+  if (
+    sourceKind === 'lajukan_store' ||
+    sourceKind === 'registered_store' ||
+    source === 'usaha_portal' ||
+    metadata.owner_user_id != null ||
+    metadata.owner_id != null
+  ) {
+    // Prefer the canonical storefront when a slug exists. When the data only
+    // has a store id, never generate the broken "/toko/" URL: deep-link the
+    // business map instead so the exact store can still be selected.
+    return storefrontSlug
+      ? buildUmkmStorefrontPath(storefrontSlug)
+      : storeId
+        ? buildUmkmDiscoveryPath({ view: 'map', storeId })
+        : UMKM_DISCOVERY_PATH;
   }
 
-  if (sourceKind.includes('listing') || sourceKind.includes('content') || recordKind.includes('listing')) {
-    const publicPath = readSafePublicPath(place.public_path) || readSafePublicPath(metadata.public_path);
+  if (
+    sourceKind.includes('listing') ||
+    sourceKind.includes('content') ||
+    recordKind.includes('listing')
+  ) {
+    const publicPath =
+      readSafePublicPath(place.public_path) ||
+      readSafePublicPath(metadata.public_path);
     if (publicPath) return publicPath;
-    return storefrontSlug ? `/content/${encodeURIComponent(storefrontSlug)}` : '/explore';
+
+    if (storefrontSlug) {
+      return `/content/${encodeURIComponent(storefrontSlug)}`;
+    }
+
+    return storeId
+      ? buildUmkmDiscoveryPath({ view: 'map', storeId })
+      : '/explore';
   }
 
-  return buildUmkmStorefrontPath(storefrontSlug);
+  return storefrontSlug
+    ? buildUmkmStorefrontPath(storefrontSlug)
+    : storeId
+      ? buildUmkmDiscoveryPath({ view: 'map', storeId })
+      : UMKM_DISCOVERY_PATH;
+}
+
+export function buildUmkmMapFocusPath(place: UmkmMapLinkTarget): string {
+  const metadata = place.metadata || {};
+  const metadataSlug =
+    typeof metadata.storefront_slug === 'string'
+      ? metadata.storefront_slug.trim()
+      : typeof metadata.store_slug === 'string'
+        ? metadata.store_slug.trim()
+        : typeof metadata.business_slug === 'string'
+          ? metadata.business_slug.trim()
+          : '';
+  const slug = place.slug?.trim() || metadataSlug;
+  const storeId = typeof place.id === 'string' ? place.id.trim() : '';
+
+  return buildUmkmDiscoveryPath({
+    view: 'map',
+    store: slug || undefined,
+    storeId: storeId || undefined,
+  });
 }
 export function buildUmkmScanPath(token?: string | null): string {
   const cleanToken = token?.trim();
