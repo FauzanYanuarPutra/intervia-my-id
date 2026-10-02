@@ -4592,12 +4592,32 @@ export default function ContentDetailClient({
       localizedListingHref,
       window.location.origin,
     ).toString();
+    const shareDescription = (
+      item.summary ||
+      item.body ||
+      ''
+    )
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/\\s+/g, ' ')
+      .trim()
+      .slice(0, 240);
     try {
       if (navigator.share) {
-        await navigator.share({ title: item.title, url: shareUrl });
+        await navigator.share({
+          title: item.title,
+          text: shareDescription || 'Lihat detail listing ini di Lajukan.',
+          url: shareUrl,
+        });
         return;
       }
-      await navigator.clipboard?.writeText(shareUrl);
+      const clipboardText = [
+        item.title,
+        shareDescription,
+        shareUrl,
+      ]
+        .filter(Boolean)
+        .join('\\n');
+      await navigator.clipboard?.writeText(clipboardText);
     } catch {
       // Native share and clipboard can be cancelled by the user.
     }
