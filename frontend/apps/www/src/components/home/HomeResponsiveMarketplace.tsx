@@ -1386,7 +1386,7 @@ function mapApiItemToPublicReference(
   const publicPath = readText(item.public_path);
   const city = readText(item.city);
   const address = readText(item.address);
-  const location = address || city || metadataText({ id, title, summary: '', metadata }, 'location');
+  const location = address || city || readText(metadata.location);
 
   const placeKind = getUmkmPlaceKind({
     id,
