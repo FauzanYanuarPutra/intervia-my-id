@@ -117,6 +117,16 @@ export function ContentSmartMatch({
         </span>
       </div>
 
+      {!loading && results.length > 1 ? (
+        <Link
+          href={`/content/${contentId}/matches`}
+          className="mb-2 flex items-center justify-between rounded-2xl bg-white px-3 py-2.5 text-xs font-black text-emerald-700 ring-1 ring-emerald-200 transition hover:bg-emerald-50 dark:bg-slate-950 dark:text-emerald-300 dark:ring-emerald-400/20"
+        >
+          <span>Lihat & bandingkan {results.length} match</span>
+          <ArrowRight className="h-3.5 w-3.5" />
+        </Link>
+      ) : null}
+
       <div className="mt-3 flex gap-1.5 overflow-x-auto pb-1">
         {([
           ['best', locale === 'id' ? 'Paling cocok' : 'Best match'],
