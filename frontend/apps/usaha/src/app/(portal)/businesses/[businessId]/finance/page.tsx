@@ -25,15 +25,34 @@ export default async function BusinessFinancePage({ params, searchParams }: Page
   if (!business) notFound();
 
   const canView = hasPermission(business, 'viewFinance');
-  const [entries, settlements, channels, financePlan, obligations] = canView
-    ? await Promise.all([
-        listFinanceCoreEntries(business.id),
+  let entries: Awaited<ReturnType<typeof listFinanceCoreEntries>> = [];
+  let settlements: Awaited<ReturnType<typeof listControlSettlements>> = [];
+  let channels: Awaited<ReturnType<typeof listControlChannels>> = [];
+  let financePlan: Awaited<ReturnType<typeof getWave2FinancePlan>> = null;
+  let obligations: Awaited<ReturnType<typeof listWave2Obligations>> = [];
+  let financeCoreError = false;
+
+  if (canView) {
+    try {
+      entries = await listFinanceCoreEntries(business.id);
+    } catch {
+      financeCoreError = true;
+    }
+
+    const [settlementsResult, channelsResult, planResult, obligationsResult] =
+      await Promise.allSettled([
         listControlSettlements(business.id),
         listControlChannels(business.id),
         getWave2FinancePlan(business.id),
         listWave2Obligations(business.id),
-      ])
-    : [[], [], [], null, []];
+      ]);
+
+    if (settlementsResult.status === 'fulfilled') settlements = settlementsResult.value;
+    if (channelsResult.status === 'fulfilled') channels = channelsResult.value;
+    if (planResult.status === 'fulfilled') financePlan = planResult.value;
+    if (obligationsResult.status === 'fulfilled') obligations = obligationsResult.value;
+  }
+
   const enabledChannels = channels.filter(channel => channel.enabled);
   const showSettlement = canView && enabledChannels.length > 0 && settlements.length > 0;
   const requested = query.view;
@@ -57,15 +76,31 @@ export default async function BusinessFinancePage({ params, searchParams }: Page
           <WorkspaceTabs items={tabs} activeId={activeView} ariaLabel="Mode uang" />
 
           {activeView === 'activity' ? (
-            <FinanceLedger
-              businessId={business.id}
-              initialEntries={entries}
-              channels={enabledChannels.map(channel => ({ key: channel.channel_key, label: channel.display_name }))}
-            />
+            financeCoreError ? (
+              <section className="merchant-surface-bordered border-rose-200 bg-rose-50 p-4 sm:p-5">
+                <p className="font-black text-rose-950">Data uang belum tersedia</p>
+                <p className="mt-1 text-xs leading-5 text-rose-800">
+                  Lajukan tidak menampilkan Rp0 agar tidak terlihat seolah-olah usaha belum punya transaksi. Coba muat ulang atau kembali lagi setelah koneksi normal.
+                </p>
+              </section>
+            ) : (
+              <FinanceLedger
+                businessId={business.id}
+                initialEntries={entries}
+                channels={enabledChannels.map(channel => ({ key: channel.channel_key, label: channel.display_name }))}
+              />
+            )
           ) : null}
 
           {activeView === 'plan' ? (
-            <FinancePlanningWorkspace businessId={business.id} initialPlan={financePlan} initialObligations={obligations} entries={entries} />
+            financeCoreError ? (
+              <section className="merchant-surface-bordered border-rose-200 bg-rose-50 p-4 sm:p-5">
+                <p className="font-black text-rose-950">Rencana uang belum bisa dibaca</p>
+                <p className="mt-1 text-xs leading-5 text-rose-800">Data saldo inti sedang tidak tersedia, jadi Lajukan sengaja tidak menghitung ulang dari data parsial.</p>
+              </section>
+            ) : (
+              <FinancePlanningWorkspace businessId={business.id} initialPlan={financePlan} initialObligations={obligations} entries={entries} />
+            )
           ) : null}
 
           {activeView === 'transfers' && showSettlement ? (
