@@ -23,21 +23,21 @@ export function HomeCommunityJoinSection({ isId }: { isId: boolean }) {
               {isId ? 'Komunitas Rantai Usaha Lokal' : 'Local Business Chain Community'}
             </p>
             <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-white/12 px-1.5 py-0.5 text-[8px] font-bold text-white ring-1 ring-white/15">
-              <CheckCircle2 className="h-2.5 w-2.5 text-emerald-100" />
+              <CheckCircle2 className="h-2.5 w-2.5 text-white" />
               {isId ? 'gratis' : 'free'}
             </span>
           </div>
 
           <h2
             id="home-community-join-title"
-            className="mt-0.5 text-[13px] font-black leading-[1.25] tracking-[-0.02em] text-white sm:text-[15px]"
+            className="mt-0.5 text-[16px] font-black leading-[1.25] tracking-[-0.02em] text-white sm:text-[15px]"
           >
             {isId
               ? 'Cari supplier, pembeli, partner, & peluang usaha'
               : 'Find suppliers, buyers, partners & business opportunities'}
           </h2>
 
-          <p className="mt-0.5 line-clamp-2 text-[9px] font-medium leading-4 text-white/78 sm:line-clamp-1 sm:text-[11px]">
+          <p className="mt-0.5 line-clamp-2 text-[9px] font-medium leading-4 text-white sm:line-clamp-1 sm:text-[11px]">
             {isId
               ? 'Lihat dulu tanpa login. Saat mau gabung, Lajukan bantu mencocokkan peranmu agar grup lebih relevan.'
               : 'Explore first without logging in. When you join, Lajukan helps match your role so the group stays relevant.'}
