@@ -3367,7 +3367,6 @@ function HomeCommunityGroupsSection({
     containScroll: 'trimSnaps',
     dragFree: true,
   });
-  useEmblaWheelGestures(emblaApi);
   const [membersModalGroup, setMembersModalGroup] =
     useState<CommunityGroup | null>(null);
   const visibleGroups = groups.slice(0, 8);
