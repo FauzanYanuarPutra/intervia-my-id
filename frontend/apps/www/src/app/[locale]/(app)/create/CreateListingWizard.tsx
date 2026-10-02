@@ -6030,14 +6030,21 @@ export default function CreateListingWizard({
       const rawLocationValue = valueAsString(
         values[field.key],
       ).trim();
+      const isRegisteredBusinessLocation =
+        selectedLocation?.provider === 'business' ||
+        selectedLocation?.placeId?.startsWith('business:');
       const locationLabel =
-        selectedLocation?.formattedAddress?.trim() ||
+        (isRegisteredBusinessLocation
+          ? selectedLocation?.name
+          : selectedLocation?.formattedAddress) ||
         selectedLocation?.name?.trim() ||
         rawLocationValue;
       const locationMeta =
-        selectedLocation?.city?.trim() ||
-        selectedLocation?.province?.trim() ||
-        selectedLocation?.regency?.trim() ||
+        (isRegisteredBusinessLocation
+          ? selectedLocation?.formattedAddress
+          : selectedLocation?.city ||
+            selectedLocation?.province ||
+            selectedLocation?.regency) ||
         (locationPoint
           ? `${locationPoint.lat.toFixed(5)}, ${locationPoint.lng.toFixed(5)}`
           : '');
