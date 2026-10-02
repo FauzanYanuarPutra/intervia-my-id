@@ -34,7 +34,9 @@ describe('UMKM public route helpers', () => {
     };
 
     expect(isUmkmMapPublicReference(reference)).toBe(true);
-    expect(buildUmkmMapPlacePath(reference)).toBe('/toko/osm-node-1');
+    expect(buildUmkmMapPlacePath(reference)).toBe(
+      '/umkm?view=map&store=osm-node-1',
+    );
   });
 
   it('keeps public Wikidata references on the map surface instead of pretending they are stores', () => {
@@ -68,12 +70,15 @@ describe('UMKM public route helpers', () => {
   it('uses a storefront slug from metadata when the map point has no top-level slug', () => {
     expect(
       buildUmkmMapPlacePath({
+        id: 'reference:bank-permata-bintaro',
         metadata: {
           is_public_reference: true,
           storefront_slug: 'bank-permata-bintaro',
         },
       }),
-    ).toBe('/toko/bank-permata-bintaro');
+    ).toBe(
+      '/umkm?view=map&store=bank-permata-bintaro&storeId=reference%3Abank-permata-bintaro',
+    );
   });
 
   it('routes a Lajukan store map point to its storefront', () => {
@@ -83,6 +88,20 @@ describe('UMKM public route helpers', () => {
         metadata: {
           source_kind: 'lajukan_store',
           source: 'usaha_portal',
+        },
+      }),
+    ).toBe('/toko/lajukan-juice-31f8206d');
+  });
+
+  it('routes an owned Lajukan content projection to its storefront', () => {
+    expect(
+      buildUmkmMapPlacePath({
+        id: 'store-1',
+        slug: 'lajukan-juice-31f8206d',
+        public_path: '/content/legacy-store',
+        metadata: {
+          source_kind: 'lajukan_content',
+          owner_user_id: 'user-1',
         },
       }),
     ).toBe('/toko/lajukan-juice-31f8206d');
