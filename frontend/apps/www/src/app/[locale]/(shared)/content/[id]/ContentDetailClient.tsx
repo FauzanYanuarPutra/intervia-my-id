@@ -4000,7 +4000,7 @@ export default function ContentDetailClient({
   const detailRowClass =
     'bg-[color:var(--app-surface-muted)] hover:bg-[color:var(--app-accent-soft)]';
   const detailPageShellClass =
-    'lajukan-market-page lajukan-market-detail page-shell max-lg:!px-0 lg:!px-4 xl:!px-6 overflow-x-hidden bg-[color:var(--app-bg)] py-0 pb-[calc(12rem+env(safe-area-inset-bottom))] sm:py-2 lg:pb-8';
+    'lajukan-market-page lajukan-market-detail page-shell max-lg:!px-0 lg:!px-4 xl:!px-6 overflow-x-hidden bg-[color:var(--app-bg)] py-0 pb-[calc(15rem+env(safe-area-inset-bottom))] sm:py-2 sm:pb-[calc(13rem+env(safe-area-inset-bottom))] lg:pb-8';
   const detailShellStackClass =
     'mx-auto flex w-full max-w-[1200px] flex-col gap-2.5 !px-0 sm:gap-3';
   const detailSectionClass =
@@ -4105,7 +4105,7 @@ export default function ContentDetailClient({
       </a>
     </div>
   ) : (
-    <div className="grid w-full grid-cols-2 gap-2 lg:grid-cols-1 [&>*:only-child]:col-span-2 lg:[&>*:only-child]:col-span-1">
+    <div className="grid w-full grid-cols-1 min-[420px]:grid-cols-2 gap-2 lg:grid-cols-1 [&>*:only-child]:col-span-1 min-[420px]:[&>*:only-child]:col-span-2 lg:[&>*:only-child]:col-span-1">
       {isOwner && (
         <Link
           href={ownerEditHref || `/create?draft=${encodeURIComponent(item.id)}`}
@@ -4878,8 +4878,8 @@ export default function ContentDetailClient({
                       </Link>
                     </div>
                   ) : null}
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
                       <span
                         className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold ring-1 ${listingSideVisual.chip}`}
                       >
@@ -4891,8 +4891,8 @@ export default function ContentDetailClient({
                         {typeLabel}
                       </span>
                     </div>
-                    <div className="flex shrink-0 items-center gap-1">
-                      <div className="flex flex-wrap items-center justify-end gap-1.5">
+                    <div className="flex w-full shrink-0 items-center gap-1 sm:w-auto sm:justify-end">
+                      <div className="flex w-full flex-wrap items-center justify-start gap-1.5 sm:w-auto sm:justify-end">
                         <button
                           type="button"
                           onClick={() => void toggleContentLike()}
@@ -5183,6 +5183,11 @@ export default function ContentDetailClient({
 
                 <div className="lg:hidden">{ownerProfileCard}</div>
 
+                <div
+                  className="h-24 sm:h-28 lg:hidden"
+                  aria-hidden="true"
+                />
+
                 {!isOwner ? (
                   <div className="px-4 pb-1 sm:px-0">
                     <button
@@ -5211,7 +5216,7 @@ export default function ContentDetailClient({
           <div
             className="fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-40 px-2 pt-2 lg:hidden"
             style={{
-              paddingBottom: '0.5rem',
+              paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))',
             }}
           >
             <div className="mx-auto max-w-md rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)]/96 p-1.5 shadow-[0_18px_44px_-30px_rgba(15,23,42,0.32)] backdrop-blur-xl">
