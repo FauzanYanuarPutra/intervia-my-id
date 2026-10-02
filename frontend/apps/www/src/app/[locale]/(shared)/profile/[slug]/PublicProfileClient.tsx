@@ -2605,15 +2605,17 @@ export default function PublicProfileClient({
             {activeProfileTab === 'about' ? (
               <div className="p-2.5 sm:p-5">
                 <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_300px]">
-                  <div className="space-y-4">
-                    <section className="rounded-2xl border border-[color:var(--app-border)] p-3.5 sm:p-5">
-                      <SectionTitle title={copy.aboutTitle} subtitle={businessCategory || (hasMeaningfulHeadline ? detail.headline : undefined)} />
-                      {hasMeaningfulSummary ? (
-                        <p className="mt-2.5 text-sm leading-6 text-[color:var(--app-text-soft)]">{detail.summary}</p>
-                      ) : (
-                        <p className="mt-2.5 text-sm leading-6 text-[color:var(--app-text-soft)]">{copy.noAbout}</p>
-                      )}
-                    </section>
+                  <div className="space-y-3">
+                    {hasMeaningfulSummary || hasMeaningfulHeadline || businessCategory ? (
+                      <section className="rounded-2xl border border-[color:var(--app-border)] p-3.5 sm:p-5">
+                        <SectionTitle title={copy.aboutTitle} subtitle={businessCategory || (hasMeaningfulHeadline ? detail.headline : undefined)} />
+                        {hasMeaningfulSummary ? (
+                          <p className="mt-2.5 text-sm leading-6 text-[color:var(--app-text-soft)]">{detail.summary}</p>
+                        ) : (
+                          <p className="mt-2.5 text-sm leading-6 text-[color:var(--app-text-soft)]">{copy.noAbout}</p>
+                        )}
+                      </section>
+                    ) : null
 
                     {businessRows.length > 0 ? (
                       <section className="rounded-2xl border border-[color:var(--app-border)] p-4 sm:p-5">
