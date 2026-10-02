@@ -167,7 +167,7 @@ export default async function BusinessReportsPage({ params, searchParams }: Page
               <Link href={`/businesses/${business.id}/finance`} className="merchant-surface-bordered p-4 transition hover:border-portal-forest/25">
                 <WalletCards className="h-4 w-4 text-portal-forest" />
                 <p className="mt-3 text-xs font-semibold text-portal-soft">Uang</p>
-                <p className="mt-1 text-lg font-black text-portal-ink">{financeSummary ? money.format(financeSummary.cashMovement) : 'Belum tersedia'}</p>
+                <p className="mt-1 text-lg font-black text-portal-ink">{financeSummary ? money.format(financeSummary.cash_movement) : 'Belum tersedia'}</p>
                 <p className="mt-1 text-xs leading-5 text-portal-soft">Gerak kas yang benar-benar tercatat pada periode ini.</p>
               </Link>
             ) : null}
