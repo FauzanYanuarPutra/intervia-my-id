@@ -214,7 +214,7 @@ const DEFAULT_DRAFT: SettingsDraft = {
 const MAX_AI_ATTACHMENTS = 4;
 const MAX_INLINE_IMAGE_BYTES = 1_600_000;
 const MAX_TEXT_FILE_BYTES = 90_000;
-const PERSONAL_AI_CHAT_TIMEOUT_MS = 120_000;
+const PERSONAL_AI_CHAT_TIMEOUT_MS = 75_000;
 const BUILDER_BLOCK_TYPES: AIBuilderBlockType[] = [
   'text',
   'textarea',
@@ -2336,6 +2336,11 @@ export default function PersonalAiStudio() {
         ],
         Boolean(resolvedThreadId),
       );
+
+      // The AI answer is already on screen and durable. Creation-draft persistence
+      // below is secondary work, so do not keep the composer locked for it.
+      setSending(false);
+
       const assistantMessage = savedMessages.find(
         item => item.role === 'assistant',
       );
