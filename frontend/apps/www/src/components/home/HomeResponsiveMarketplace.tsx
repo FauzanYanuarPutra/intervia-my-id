@@ -133,7 +133,6 @@ import { normalizeCommunityMediaItems } from '@/components/community/community-f
 import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 import {
   buildUmkmMapFocusPath,
-  buildUmkmMapPlacePath,
   UMKM_DISCOVERY_PATH,
 } from '@/lib/umkmSurface';
 import { getUmkmPlaceKind } from '@/lib/super-app/umkm-place-ui';
