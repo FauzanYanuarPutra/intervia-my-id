@@ -12,6 +12,7 @@ import {
 import {
   Clapperboard,
   Compass,
+  ChevronRight,
   Home,
   MessageCircle,
   Newspaper,
@@ -284,7 +285,7 @@ export default function ClientBottomNav() {
             ? 'Saya mau menawarkan'
             : 'I want to offer',
           description: isId
-            ? 'Jual atau tawarkan produk, jasa, alat, tempat, atau peluang usaha.'
+            ? 'Tawarkan produk, jasa, alat, tempat, atau peluang usaha.'
             : 'Offer products, services, equipment, places, or business opportunities.',
           href: authHref(
             '/create?side=supply',
@@ -302,7 +303,7 @@ export default function ClientBottomNav() {
             ? 'Saya sedang mencari'
             : 'I am looking for',
           description: isId
-            ? 'Cari produk, jasa, supplier, alat, tempat, atau kebutuhan usaha lainnya.'
+            ? 'Cari produk, jasa, supplier, alat, tempat, atau kebutuhan usaha.'
             : 'Look for products, services, suppliers, equipment, places, or other business needs.',
           href: authHref(
             '/create?side=demand',
@@ -335,7 +336,7 @@ export default function ClientBottomNav() {
         {
           key: 'community',
           label: isId
-            ? 'Buat postingan'
+            ? 'Posting komunitas'
             : 'Create a post',
           description: isId
             ? 'Bagikan pertanyaan, cerita, pengalaman, atau informasi ke komunitas.'
@@ -716,7 +717,7 @@ export default function ClientBottomNav() {
                 closeSheet();
               }
             }}
-            className="ui-layer-drawer fixed inset-x-0 bottom-0 max-h-[min(88dvh,760px)] overflow-y-auto rounded-t-[28px] border-t border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] pb-[calc(env(safe-area-inset-bottom)+1rem)] shadow-[0_-30px_90px_-35px_rgba(15,23,42,0.55)] lg:hidden"
+            className="ui-layer-drawer fixed inset-x-0 bottom-0 max-h-[min(82dvh,680px)] overflow-y-auto rounded-t-[28px] border-t border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-[0_-30px_90px_-35px_rgba(15,23,42,0.55)] lg:hidden"
           >
             {/* HEADER */}
             <div className="sticky top-0 z-10 border-b border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_94%,transparent)] px-4 pb-4 pt-2 backdrop-blur-xl">
@@ -735,14 +736,14 @@ export default function ClientBottomNav() {
                     className="mt-1 text-xl font-black tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]"
                   >
                     {isId
-                      ? 'Kamu mau ngapain?'
-                      : 'What do you want to do?'}
+                      ? 'Mau mencari atau menawarkan?'
+                      : 'Looking for something or offering?'}
                   </h2>
 
                   <p className="mt-1 max-w-md text-sm leading-5 text-[color:var(--app-text-soft)]">
                     {isId
-                      ? 'Pilih salah satu. Nanti kamu akan masuk ke halaman yang sesuai.'
-                      : 'Pick one and we will take you to the right page.'}
+                      ? 'Pilih tujuan dulu. Detailnya bisa kamu isi setelahnya.'
+                      : 'Choose the goal first. You can add details next.'}
                   </p>
                 </div>
 
@@ -764,113 +765,103 @@ export default function ClientBottomNav() {
             </div>
 
             {/* ACTIONS */}
-            <div className="mx-auto max-w-[680px] px-4 py-4">
-              <div className="grid gap-3">
-                {createActions.map(
-                  (
-                    action,
-                    index,
-                  ) => {
-                    const Icon =
-                      action.icon;
+            <div className="mx-auto max-w-[680px] px-4 py-3 sm:py-4">
+              <section aria-label={isId ? 'Tujuan utama' : 'Primary actions'}>
+                <div className="mb-2 px-0.5">
+                  <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[color:var(--app-text-soft)]">
+                    {isId ? 'Langkah pertama' : 'First step'}
+                  </p>
+                </div>
 
-                    const isPrimaryOffer =
-                      action.key ===
-                      'offer';
+                <div className="grid gap-2">
+                  {createActions
+                    .filter(action => action.key === 'offer' || action.key === 'need')
+                    .map(action => {
+                      const Icon = action.icon;
 
-                    const isPrimaryNeed =
-                      action.key ===
-                      'need';
-
-                    return (
-                      <Link
-                        key={
-                          action.key
-                        }
-                        href={
-                          action.href
-                        }
-                        onClick={
-                          closeSheet
-                        }
-                        className={cn(
-                          'group relative flex min-h-[88px] items-center gap-3 overflow-hidden rounded-[20px] border p-4 text-left transition duration-200 active:scale-[0.99]',
-                          isPrimaryOffer ||
-                          isPrimaryNeed
-                            ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)]/55 hover:bg-[color:var(--app-accent-soft)]'
-                            : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-accent-soft)]',
-                        )}
-                      >
-                        {/* Decorative circle */}
-                        <span
-                          aria-hidden="true"
-                          className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-[color:var(--app-accent-soft)] opacity-40 transition group-hover:scale-110 group-hover:opacity-100"
-                        />
-
-                        {/* Icon */}
-                        <span
-                          className={cn(
-                            'relative inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] border bg-[color:var(--app-surface-strong)] shadow-sm transition group-hover:scale-105',
-                            isPrimaryOffer ||
-                            isPrimaryNeed
-                              ? 'border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]'
-                              : 'border-[color:var(--app-border)] text-[color:var(--app-accent)]',
-                          )}
+                      return (
+                        <Link
+                          key={action.key}
+                          href={action.href}
+                          onClick={closeSheet}
+                          className="group relative flex min-h-[78px] items-center gap-3 overflow-hidden rounded-[18px] border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)]/55 p-3 text-left transition hover:bg-[color:var(--app-accent-soft)] active:scale-[0.99]"
                         >
-                          <Icon className="h-5 w-5" />
-                        </span>
+                          <span
+                            aria-hidden="true"
+                            className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-[color:var(--app-accent-soft)] opacity-60 transition group-hover:scale-110"
+                          />
 
-                        {/* Text */}
-                        <span className="relative min-w-0 flex-1">
-                          <span className="flex items-start justify-between gap-2">
-                            <span className="block text-[14px] font-black leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                              {
-                                action.label
-                              }
+                          <span className="relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] border border-[color:var(--app-accent-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-accent)] shadow-sm">
+                            <Icon className="h-5 w-5" />
+                          </span>
+
+                          <span className="relative min-w-0 flex-1">
+                            <span className="block text-[13px] font-black leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                              {action.label}
                             </span>
-
-                            {action.badge ? (
-                              <span className="shrink-0 rounded-full bg-[color:var(--app-surface-strong)] px-2 py-1 text-[8px] font-black uppercase tracking-wide text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)]">
-                                {
-                                  action.badge
-                                }
-                              </span>
-                            ) : null}
+                            <span className="mt-0.5 block line-clamp-2 text-[10.5px] leading-4 text-[color:var(--app-text-soft)]">
+                              {action.description}
+                            </span>
                           </span>
 
-                          <span className="mt-1 block text-[11px] leading-[18px] text-[color:var(--app-text-soft)]">
-                            {
-                              action.description
-                            }
+                          <ChevronRight className="relative h-4 w-4 shrink-0 text-[color:var(--app-accent)] transition group-hover:translate-x-0.5" />
+                        </Link>
+                      );
+                    })}
+                </div>
+              </section>
+
+              <section className="mt-4" aria-label={isId ? 'Pilihan lainnya' : 'More actions'}>
+                <div className="mb-2 px-0.5">
+                  <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[color:var(--app-text-soft)]">
+                    {isId ? 'Pilihan lainnya' : 'More actions'}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  {createActions
+                    .filter(action => action.key !== 'offer' && action.key !== 'need')
+                    .map(action => {
+                      const Icon = action.icon;
+
+                      return (
+                        <Link
+                          key={action.key}
+                          href={action.href}
+                          onClick={closeSheet}
+                          className="group flex min-h-[76px] min-w-0 items-center gap-2.5 rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-2.5 text-left transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-accent-soft)] active:scale-[0.99]"
+                        >
+                          <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-[color:var(--app-surface-strong)] text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-border)]">
+                            <Icon className="h-4 w-4" />
                           </span>
-                        </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-[11px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                              {action.label}
+                            </span>
+                            <span className="mt-0.5 block line-clamp-2 text-[9px] leading-3.5 text-[color:var(--app-text-soft)]">
+                              {action.description}
+                            </span>
+                          </span>
+                        </Link>
+                      );
+                    })}
+                </div>
+              </section>
 
-                        {/* Arrow */}
-                        <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[color:var(--app-text-soft)] transition group-hover:translate-x-0.5 group-hover:text-[color:var(--app-accent)]">
-                          <Plus className="h-4 w-4 rotate-45" />
-                        </span>
-                      </Link>
-                    );
-                  },
-                )}
-              </div>
-
-              {/* Small helper */}
-              <div className="mt-4 rounded-[18px] border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-4 py-3">
-                <p className="text-center text-[11px] leading-[18px] text-[color:var(--app-text-soft)]">
+              <div className="mt-3 rounded-[14px] border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-2.5">
+                <p className="text-center text-[10px] leading-4 text-[color:var(--app-text-soft)]">
                   {isId
-                    ? 'Belum yakin? Pilih yang paling mendekati. Kamu masih bisa mengubah detailnya nanti.'
-                    : 'Not sure? Choose the closest option. You can change the details later.'}
+                    ? 'Belum yakin? Pilih yang paling mendekati. Detail masih bisa diubah nanti.'
+                    : 'Not sure? Choose the closest option. You can change details later.'}
                 </p>
               </div>
 
-              {/* Logged-out hint */}
               {!isAuthenticated ? (
-                <div className="mt-3 rounded-[16px] border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900/60 dark:bg-amber-950/25">
+                <div className="mt-2.5 rounded-[14px] border border-amber-200 bg-amber-50 px-3 py-2.5 dark:border-amber-900/60 dark:bg-amber-950/25">
                   <p className="text-center text-[10px] font-semibold leading-4 text-amber-900 dark:text-amber-100">
                     {isId
-                      ? 'Kamu akan diminta masuk saat mulai membuat postingan.'
-                      : 'You will be asked to sign in when you start creating.'}
+                      ? 'Kamu akan diminta masuk saat mulai membuat.'
+                      : 'You will be asked to sign in when you start.'}
                   </p>
                 </div>
               ) : null}
