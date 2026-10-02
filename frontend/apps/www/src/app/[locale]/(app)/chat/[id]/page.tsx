@@ -8412,20 +8412,28 @@ export default function ChatRoomPage() {
                                           </button>
                                           {(structuredContentUrl ||
                                             structuredContentId) && (
-                                            <button
-                                              type="button"
-                                              onClick={() =>
-                                                void handleOpenStructuredContent(
-                                                  structuredContentId,
-                                                  structuredContentUrl,
-                                                )
-                                              }
-                                              className="rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-border-strong)]"
-                                            >
-                                              {chatLocale === 'id'
-                                                ? 'Buka listing'
-                                                : 'Open Listing'}
-                                            </button>
+                                            structuredListingInactive ? (
+                                              <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
+                                                {chatLocale === 'id'
+                                                  ? 'Listing sudah tidak aktif'
+                                                  : 'Listing is no longer active'}
+                                              </span>
+                                            ) : (
+                                              <button
+                                                type="button"
+                                                onClick={() =>
+                                                  void handleOpenStructuredContent(
+                                                    structuredContentId,
+                                                    structuredContentUrl,
+                                                  )
+                                                }
+                                                className="rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-border-strong)]"
+                                              >
+                                                {chatLocale === 'id'
+                                                  ? 'Buka listing'
+                                                  : 'Open Listing'}
+                                              </button>
+                                            )
                                           )}
                                         </div>
                                       )}
