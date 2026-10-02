@@ -14,8 +14,10 @@ use crate::{user_id_from_auth, AppState};
 
 use super::{
     identity_client::{IdentityClient, IdentityClientError},
+    finance_core::FinanceCoreError,
     repository::{BusinessRepository, RepositoryError},
     reset::{DataResetRepository, ResetError, ResetRequest, ResetScope},
+    sales::SaleRepositoryError,
 };
 
 pub(crate) fn router() -> Router<Arc<AppState>> {
