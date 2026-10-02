@@ -60,6 +60,7 @@ struct MarketStats {
     upper_band_cents: Option<i64>,
     seller_count: usize,
     top_seller_share_percent: f64,
+    dominant_price_share_percent: f64,
     confidence: String,
 }
 
@@ -191,6 +192,17 @@ fn stats(observations: &[PriceObservation]) -> Option<MarketStats> {
         .map(|count| count as f64 / clean.len() as f64 * 100.0)
         .unwrap_or(0.0);
 
+    let mut price_frequency = HashMap::<i64, usize>::new();
+    for value in &clean {
+        *price_frequency.entry(*value).or_insert(0) += 1;
+    }
+    let dominant_price_share = price_frequency
+        .values()
+        .copied()
+        .max()
+        .map(|count| count as f64 / clean.len() as f64 * 100.0)
+        .unwrap_or(0.0);
+
     let confidence = if clean.len() >= 20 {
         "high"
     } else if clean.len() >= MIN_CONFIDENT_SAMPLE {
@@ -219,6 +231,7 @@ fn stats(observations: &[PriceObservation]) -> Option<MarketStats> {
         upper_band_cents: rounded(median.map(|v| v + robust_spread.unwrap_or(0.0) * 2.5)),
         seller_count: owners.len(),
         top_seller_share_percent: (top_seller_share * 10.0).round() / 10.0,
+        dominant_price_share_percent: (dominant_price_share * 10.0).round() / 10.0,
         confidence: confidence.to_string(),
     })
 }
@@ -523,6 +536,14 @@ async fn build_market_response(
             "code": "seller_concentration",
             "message": "Data pasar cukup terkonsentrasi pada sedikit penjual. Benchmark ini perlu dibaca lebih hati-hati karena belum tentu mewakili seluruh pasar.",
             "top_seller_share_percent": market.top_seller_share_percent
+        }));
+    }
+    if market.dominant_price_share_percent >= 60.0 && market.seller_count >= 3 {
+        alerts.push(json!({
+            "level": "medium",
+            "code": "price_pattern_concentration",
+            "message": "Banyak listing memakai harga yang sama persis. Ini bisa normal, tetapi bila tidak sesuai kondisi pasar sebaiknya diverifikasi dengan sumber lain.",
+            "dominant_price_share_percent": market.dominant_price_share_percent
         }));
     }
     if market.filtered_outlier_count > 0 {
