@@ -103,6 +103,14 @@ impl ToolRegistry {
                 enabled: self.configured(),
             },
             ToolDefinition {
+                name: "get_market_intelligence".to_string(),
+                description: "Read robust market-price benchmarks, trend, outlier filtering, and risk signals for a Lajukan listing."
+                    .to_string(),
+                permission: "READ".to_string(),
+                source_of_truth: "marketplace_service".to_string(),
+                enabled: self.configured(),
+            },
+            ToolDefinition {
                 name: "get_listing".to_string(),
                 description: "Reserved contract for a single listing lookup.".to_string(),
                 permission: "READ".to_string(),
@@ -296,6 +304,79 @@ impl ToolRegistry {
                 side: intent.side.as_str().to_string(),
                 category: intent.category.clone(),
                 location: intent.location.clone(),
+            }],
+        })
+    }
+
+    pub async fn execute_market_intelligence(
+        &self,
+        content_id: &str,
+    ) -> Result<ToolExecution, String> {
+        if !self.configured() || content_id.trim().is_empty() {
+            return Ok(ToolExecution::default());
+        }
+
+        let url = Url::parse(&format!(
+            "{}/v1/content/{}/market-intelligence?days=30",
+            self.config.marketplace_url.trim_end_matches('/'),
+            content_id.trim()
+        ))
+        .map_err(|error| format!("invalid_marketplace_url: {}", error))?;
+
+        let mut request = self
+            .http
+            .get(url)
+            .header("accept", "application/json")
+            .header("x-lajukan-ai-tool", "1");
+
+        if !self.config.service_token.is_empty() {
+            request = request.bearer_auth(&self.config.service_token);
+        }
+
+        let response = request
+            .send()
+            .await
+            .map_err(|error| format!("market_intelligence_network: {}", error))?;
+        let status = response.status();
+        let payload = response
+            .json::<Value>()
+            .await
+            .map_err(|error| format!("market_intelligence_invalid_json: {}", error))?;
+
+        if !status.is_success() {
+            return Err(format!("market_intelligence_http_{}", status.as_u16()));
+        }
+
+        let title = payload
+            .get("scope")
+            .and_then(|v| v.get("category"))
+            .and_then(Value::as_str)
+            .map(|category| format!("Market intelligence: {}", category))
+            .unwrap_or_else(|| "Lajukan market intelligence".to_string());
+
+        let detail = serde_json::to_string(&payload)
+            .map_err(|error| format!("market_intelligence_serialize: {}", error))?;
+
+        Ok(ToolExecution {
+            sources: vec![ToolSource {
+                id: format!("market-intelligence:{}", content_id.trim()),
+                title,
+                content: format!(
+                    "Data agregat pasar Lajukan untuk listing {}. Ini adalah benchmark statistik, bukan bukti manipulasi harga. Payload: {}",
+                    content_id.trim(),
+                    detail
+                ),
+                url: format!("/content/{}/market-intelligence", content_id.trim()),
+                kind: "lajukan_market_intelligence".to_string(),
+            }],
+            traces: vec![ToolCallTrace {
+                name: "get_market_intelligence".to_string(),
+                status: "success".to_string(),
+                result_count: 1,
+                query: content_id.trim().to_string(),
+                side: "unknown".to_string(),
+                category: "market".to_string(),
+                location: "listing_scope".to_string(),
             }],
         })
     }
