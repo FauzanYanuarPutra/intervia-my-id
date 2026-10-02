@@ -345,8 +345,7 @@ impl DataResetRepository {
 
         let existing = load_existing_batch(&self.db, business_id, idempotency_key).await?;
         let mut previous_affected = Value::Object(serde_json::Map::new());
-
-        let batch_id = if let Some(existing) = existing {
+        let (batch_id, retry_batch) = if let Some(existing) = existing {
             if existing.request_hash != hash {
                 return Err(ResetError::Conflict("reset_idempotency_conflict"));
             }
@@ -361,16 +360,24 @@ impl DataResetRepository {
             }
 
             previous_affected = existing.affected_counts.clone();
+            (existing.id, true)
+        } else {
+            (Uuid::new_v4(), false)
+        };
+
+        let preview = self.preview(business_id, organization_id, &scopes).await?;
+        if preview.counts.sales_in_closed_period > 0 {
+            return Err(ResetError::Conflict("sales_in_closed_period"));
+        }
+
+        if retry_batch {
             sqlx::query(
                 "UPDATE business_data_reset_batches SET status='running',error_code=NULL,completed_at=NULL WHERE id=$1 AND status IN ('partial','failed')",
             )
-            .bind(existing.id)
+            .bind(batch_id)
             .execute(&self.db)
             .await?;
-
-            existing.id
         } else {
-            let batch_id = Uuid::new_v4();
             sqlx::query(
                 r#"
                 INSERT INTO business_data_reset_batches
@@ -389,13 +396,6 @@ impl DataResetRepository {
             .bind(actor_id)
             .execute(&self.db)
             .await?;
-
-            batch_id
-        };
-
-        let preview = self.preview(business_id, organization_id, &scopes).await?;
-        if preview.counts.sales_in_closed_period > 0 {
-            return Err(ResetError::Conflict("sales_in_closed_period"));
         }
 
         let effective_on = request
