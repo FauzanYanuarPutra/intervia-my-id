@@ -3194,6 +3194,7 @@ export function UmkmDiscoveryPanel({
                         selectedPlace.ui.coverImage
                       }
                       alt={selectedPlace.store.name}
+                      kind={selectedPlace.ui.kind}
                       className="h-[112px] rounded-[15px] min-[420px]:h-[124px] sm:h-[150px] sm:rounded-[18px]"
                     />
 
@@ -3365,6 +3366,7 @@ export function UmkmDiscoveryPanel({
                             <PlaceThumb
                               src={src}
                               alt={selectedPlace.store.name + ' ' + String(index + 1)}
+                              kind={selectedPlace.ui.kind}
                               className="h-full w-full rounded-[12px]"
                             />
                             {index === 3 && selectedPlace.ui.gallery.length > 4 ? (
@@ -3412,6 +3414,7 @@ export function UmkmDiscoveryPanel({
                             <PlaceThumb
                               src={product.image_url || selectedPlace.ui.gallery[0] || selectedPlace.ui.coverImage}
                               alt={product.name}
+                              kind={selectedPlace.ui.kind}
                               className="h-12 w-12 shrink-0 rounded-[12px]"
                             />
                             <div className="min-w-0 flex-1">
