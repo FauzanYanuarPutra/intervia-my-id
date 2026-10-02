@@ -6783,8 +6783,23 @@ export default function ChatRoomPage() {
                     priority
                   />
                 </span>
-                <span className="min-w-0 flex-1 truncate text-[14px] font-semibold leading-5 text-[#111b21] dark:text-[#e9edef] min-[380px]:text-[15px] sm:text-base">
-                  {roomName}
+                <span className="min-w-0 flex-1 overflow-hidden">
+                  <span className="block truncate text-[14px] font-semibold leading-5 text-[#111b21] dark:text-[#e9edef] min-[380px]:text-[15px] sm:text-base">
+                    {roomName}
+                  </span>
+                  <span className="mt-0.5 flex items-center gap-1 text-[10px] font-medium text-[#667781] dark:text-[#8696a0]">
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${peerOnline ? 'bg-[#25d366]' : 'bg-[#aebac1]'}`}
+                      aria-hidden="true"
+                    />
+                    {peerOnline
+                      ? chatLocale === 'id'
+                        ? 'online'
+                        : 'online'
+                      : chatLocale === 'id'
+                        ? 'offline'
+                        : 'offline'}
+                  </span>
                 </span>
               </Link>
             ) : (
