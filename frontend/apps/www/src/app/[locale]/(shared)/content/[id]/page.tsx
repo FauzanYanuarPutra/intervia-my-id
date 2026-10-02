@@ -9,6 +9,7 @@ import {
   isPublicEditorialContent,
 } from '@/lib/server/publicContent';
 import { buildNewsPath } from '@/lib/news';
+import { buildContentHref } from '@/lib/content/routes';
 import { getUmkmStoreById, getUmkmStoreBySlug } from '@/lib/super-app/umkm-commerce';
 import { isPublicUmkmReferenceVisible } from '@/lib/super-app/umkm-public-discovery';
 import ContentDetailClient, { type ContentItem } from './ContentDetailClient';
