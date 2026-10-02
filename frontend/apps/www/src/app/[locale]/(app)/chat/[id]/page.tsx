@@ -3598,6 +3598,63 @@ export default function ChatRoomPage() {
           const channelErrorRef = channel.onError(onErr);
           const channelCloseRef = channel.onClose(onClose);
 
+          const presenceStateRef = channel.on(
+            'presence_state',
+            (rawPayload: unknown) => {
+              if (cancelled || roomKind !== 'direct' || !peerUserId) return;
+              const state = asObject(rawPayload);
+              setPeerOnline(Object.prototype.hasOwnProperty.call(state, peerUserId));
+            },
+          ) as number;
+
+          const presenceDiffRef = channel.on(
+            'presence_diff',
+            (rawPayload: unknown) => {
+              if (cancelled || roomKind !== 'direct' || !peerUserId) return;
+              const payload = asObject(rawPayload);
+              const joins = asObject(payload.joins);
+              const leaves = asObject(payload.leaves);
+              if (Object.prototype.hasOwnProperty.call(joins, peerUserId)) {
+                setPeerOnline(true);
+              }
+              if (Object.prototype.hasOwnProperty.call(leaves, peerUserId)) {
+                setPeerOnline(false);
+              }
+            },
+          ) as number;
+
+          const readReceiptRef = channel.on(
+            'read',
+            (rawPayload: unknown) => {
+              if (cancelled) return;
+              const payload = asObject(rawPayload);
+              const readerId =
+                typeof payload.user_id === 'string' ? payload.user_id : '';
+              const readAt =
+                typeof payload.read_at === 'string' ? payload.read_at : '';
+              if (
+                !readAt ||
+                !readerId ||
+                normId(readerId) === normId(currentUserId)
+              ) {
+                return;
+              }
+              setPeerReadAt(readAt);
+              setMessages(prev =>
+                prev.map(message => {
+                  if (message.sender_id !== currentUserId) return message;
+                  const sentMs = new Date(message.created_at).getTime();
+                  const readMs = new Date(readAt).getTime();
+                  return Number.isFinite(sentMs) &&
+                    Number.isFinite(readMs) &&
+                    sentMs <= readMs
+                    ? { ...message, read_at: readAt }
+                    : message;
+                }),
+              );
+            },
+          ) as number;
+
           const typingRef = channel.on(
             'typing',
             (payload: {
@@ -3773,6 +3830,9 @@ export default function ChatRoomPage() {
             try {
               channel.off('phx_error', channelErrorRef);
               channel.off('phx_close', channelCloseRef);
+              channel.off('presence_state', presenceStateRef);
+              channel.off('presence_diff', presenceDiffRef);
+              channel.off('read', readReceiptRef);
               channel.off('typing', typingRef);
               channel.off('call_incoming', incomingCallRef);
               channel.off('call_rejected', callRejectedRef);
