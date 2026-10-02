@@ -108,7 +108,9 @@ function loginHref() {
 }
 
 function listingLabel(item: ContentItem): string {
-  return String(item.title || item.category || item.content_type || 'Listing usaha').trim();
+  return String(
+    item.title || item.category || item.content_type || 'Listing usaha',
+  ).trim();
 }
 
 function WhatsAppStepIcon() {
@@ -119,12 +121,18 @@ function WhatsAppStepIcon() {
   );
 }
 
-export default function CommunityJoinClient({ isId }: { isId: boolean }) {
+export default function CommunityJoinClient({
+  isId,
+}: {
+  isId: boolean;
+}) {
   const { isAuthenticated, loading: authLoading } = useAuth();
+
   const [listings, setListings] = useState<ContentItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [selectedGroup, setSelectedGroup] = useState<CommunityGroup | null>(null);
+  const [selectedGroup, setSelectedGroup] =
+    useState<CommunityGroup | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -135,6 +143,7 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
     }
 
     let alive = true;
+
     setLoading(true);
     setError('');
 
@@ -144,6 +153,7 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
     })
       .then(async response => {
         const payload = await response.json().catch(() => null);
+
         if (!response.ok) {
           throw new Error(
             payload?.error ||
@@ -152,15 +162,19 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
                 : 'Your listings could not be checked.'),
           );
         }
+
         return extractContentItems(payload);
       })
       .then(items => {
         if (!alive) return;
+
         setListings(items);
       })
       .catch(err => {
         if (!alive) return;
+
         setListings([]);
+
         setError(
           err instanceof Error
             ? err.message
@@ -170,7 +184,9 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
         );
       })
       .finally(() => {
-        if (alive) setLoading(false);
+        if (alive) {
+          setLoading(false);
+        }
       });
 
     return () => {
@@ -182,19 +198,36 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
     () => hasCommunityJoinReadyListing(listings),
     [listings],
   );
+
   const role = useMemo(
     () => classifyCommunityJoinRole(listings),
     [listings],
   );
+
   const listing = listings.find(item => {
     const title = String(item.title || '').trim();
-    const category = String(item.category || item.content_type || '').trim();
+    const category = String(
+      item.category || item.content_type || '',
+    ).trim();
+
     return title.length >= 3 && category.length >= 2;
   });
 
   const openCommunity = () => {
-    if (!isAuthenticated || !ready || loading || authLoading) return;
-    window.open(COMMUNITY_DESTINATION, '_blank', 'noopener,noreferrer');
+    if (
+      !isAuthenticated ||
+      !ready ||
+      loading ||
+      authLoading
+    ) {
+      return;
+    }
+
+    window.open(
+      COMMUNITY_DESTINATION,
+      '_blank',
+      'noopener,noreferrer',
+    );
   };
 
   const actionLabel = authLoading
@@ -224,15 +257,20 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
           <div className="bg-[linear-gradient(135deg,#047857_0%,#059669_55%,#0f766e_100%)] px-4 py-4 text-white sm:px-5 sm:py-5">
             <div className="flex items-start gap-3">
               <WhatsAppStepIcon />
+
               <div className="min-w-0 flex-1">
                 <p className="text-[11px] font-extrabold uppercase tracking-[0.11em] text-emerald-50">
-                  {isId ? 'Komunitas Rantai Usaha Lokal' : 'Local Business Chain Community'}
+                  {isId
+                    ? 'Komunitas Rantai Usaha Lokal'
+                    : 'Local Business Chain Community'}
                 </p>
+
                 <h1 className="mt-0.5 text-lg font-black leading-tight tracking-[-0.025em] text-white sm:text-xl">
                   {isId
                     ? 'Lihat komunitas dulu, gabung saat siap'
                     : 'Explore first, join when you are ready'}
                 </h1>
+
                 <p className="mt-1 max-w-2xl text-[12px] leading-5 text-emerald-50 sm:text-[13px] sm:leading-5">
                   {isId
                     ? 'Kamu tidak perlu login untuk melihat grup dan manfaatnya. Login + 1 listing aktif hanya diminta saat kamu benar-benar mau masuk ke WhatsApp.'
@@ -243,15 +281,31 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
 
             <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
               {[
-                [isId ? '7 grup' : '7 groups', isId ? 'pilih sesuai kebutuhan' : 'choose by need'],
-                [isId ? '1 listing' : '1 listing', isId ? 'untuk membaca peran' : 'to read your role'],
-                [isId ? 'WhatsApp' : 'WhatsApp', isId ? 'setelah siap' : 'when ready'],
+                [
+                  isId ? '7 grup' : '7 groups',
+                  isId
+                    ? 'pilih sesuai kebutuhan'
+                    : 'choose by need',
+                ],
+                [
+                  isId ? '1 listing' : '1 listing',
+                  isId
+                    ? 'untuk membaca peran'
+                    : 'to read your role',
+                ],
+                [
+                  isId ? 'WhatsApp' : 'WhatsApp',
+                  isId ? 'setelah siap' : 'when ready',
+                ],
               ].map(([value, label]) => (
                 <div
                   key={value}
                   className="min-w-0 rounded-xl bg-white/12 px-2.5 py-2 ring-1 ring-white/12"
                 >
-                  <p className="truncate text-[13px] font-black text-white">{value}</p>
+                  <p className="truncate text-[13px] font-black text-white">
+                    {value}
+                  </p>
+
                   <p className="mt-0.5 truncate text-[10px] font-semibold text-emerald-50 sm:text-[11px]">
                     {label}
                   </p>
@@ -265,6 +319,7 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
                 <ShieldCheck className="h-4 w-4" />
               </div>
+
               <p className="min-w-0 flex-1 text-[12px] font-semibold leading-5 text-zinc-700 sm:text-[13px]">
                 {isId
                   ? 'Tujuannya simpel: bantu kamu masuk ke grup yang paling relevan dan menjaga komunitas tetap rapi dari spam.'
@@ -279,14 +334,21 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
             <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-700">
               <Sparkles className="h-3.5 w-3.5" />
             </div>
+
             <div className="min-w-0 flex-1">
               <h2 className="text-sm font-black text-zinc-950 sm:text-[15px]">
-                {isId ? 'Pilih sesuai kebutuhanmu' : 'Choose what you need'}
+                {isId
+                  ? 'Pilih sesuai kebutuhanmu'
+                  : 'Choose what you need'}
               </h2>
+
               <p className="text-[11px] leading-4 text-zinc-500">
-                {isId ? 'Ketuk grup untuk lihat manfaat singkat.' : 'Tap a group for a quick benefit preview.'}
+                {isId
+                  ? 'Ketuk grup untuk lihat manfaat singkat.'
+                  : 'Tap a group for a quick benefit preview.'}
               </p>
             </div>
+
             <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-extrabold text-emerald-700">
               {COMMUNITY_GROUPS.length}
             </span>
@@ -303,14 +365,19 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-zinc-50 text-base">
                   {group.icon}
                 </span>
+
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[12px] font-extrabold leading-5 text-zinc-900 sm:text-[13px]">
                     {isId ? group.nameId : group.nameEn}
                   </span>
+
                   <span className="mt-0.5 block truncate text-[10px] leading-4 text-zinc-600 sm:text-[11px]">
-                    {isId ? group.descriptionId : group.descriptionEn}
+                    {isId
+                      ? group.descriptionId
+                      : group.descriptionEn}
                   </span>
                 </span>
+
                 <ArrowRight className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
               </button>
             ))}
@@ -322,18 +389,40 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
               <ClipboardCheck className="h-4 w-4" />
             </div>
+
             <div className="min-w-0 flex-1">
               <h2 className="text-sm font-black text-zinc-950 sm:text-[15px]">
-                {isId ? 'Saat mau gabung, tinggal 2 langkah ringan' : 'When you join, there are only 2 light steps'}
+                {isId
+                  ? 'Saat mau gabung, tinggal 2 langkah ringan'
+                  : 'When you join, there are only 2 light steps'}
               </h2>
+
               <div className="mt-2 grid gap-2 sm:grid-cols-2">
                 {[
-                  [isId ? '1. Login' : '1. Log in', isId ? 'Agar Lajukan tahu akunmu.' : 'So Lajukan can identify your account.'],
-                  [isId ? '2. 1 listing aktif' : '2. 1 active listing', isId ? 'Agar peran usaha bisa dicocokkan.' : 'So your business role can be matched.'],
+                  [
+                    isId ? '1. Login' : '1. Log in',
+                    isId
+                      ? 'Agar Lajukan tahu akunmu.'
+                      : 'So Lajukan can identify your account.',
+                  ],
+                  [
+                    isId ? '2. 1 listing aktif' : '2. 1 active listing',
+                    isId
+                      ? 'Agar peran usaha bisa dicocokkan.'
+                      : 'So your business role can be matched.',
+                  ],
                 ].map(([title, body]) => (
-                  <div key={title} className="rounded-xl bg-zinc-50 px-3 py-2.5">
-                    <p className="text-[11px] font-extrabold text-zinc-900">{title}</p>
-                    <p className="mt-0.5 text-[10px] leading-4.5 text-zinc-600">{body}</p>
+                  <div
+                    key={title}
+                    className="rounded-xl bg-zinc-50 px-3 py-2.5"
+                  >
+                    <p className="text-[11px] font-extrabold text-zinc-900">
+                      {title}
+                    </p>
+
+                    <p className="mt-0.5 text-[10px] leading-4.5 text-zinc-600">
+                      {body}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -345,28 +434,40 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
           <section className="rounded-[20px] border border-zinc-100 bg-white px-4 py-3 shadow-[0_12px_28px_-26px_rgba(15,23,42,0.26)] sm:px-4">
             <div className="flex items-center gap-2.5">
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                {loading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4" />
+                )}
               </div>
+
               <div className="min-w-0 flex-1">
                 <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-zinc-500">
                   {isId ? 'Status kamu' : 'Your status'}
                 </p>
+
                 {error ? (
-                  <p className="text-[10px] font-semibold text-amber-700">{error}</p>
+                  <p className="text-[10px] font-semibold text-amber-700">
+                    {error}
+                  </p>
                 ) : ready ? (
                   <>
                     <p className="truncate text-[13px] font-black text-emerald-700">
                       {isId ? role.labelId : role.labelEn}
                     </p>
+
                     {listing ? (
                       <p className="truncate text-[11px] text-zinc-600">
-                        {isId ? 'Dibaca dari:' : 'Read from:'} {listingLabel(listing)}
+                        {isId ? 'Dibaca dari:' : 'Read from:'}{' '}
+                        {listingLabel(listing)}
                       </p>
                     ) : null}
                   </>
                 ) : loading ? (
                   <p className="text-[11px] text-zinc-600">
-                    {isId ? 'Mencocokkan listing kamu…' : 'Matching your listing…'}
+                    {isId
+                      ? 'Mencocokkan listing kamu…'
+                      : 'Matching your listing…'}
                   </p>
                 ) : (
                   <p className="text-[11px] leading-5 text-zinc-600">
@@ -381,6 +482,7 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
         ) : (
           <section className="flex items-start gap-2.5 rounded-[18px] border border-zinc-100 bg-white px-3 py-2.5">
             <LogIn className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+
             <p className="min-w-0 flex-1 text-[11px] leading-5 text-zinc-700">
               {isId
                 ? 'Belum perlu login sekarang. Login baru diminta saat kamu menekan tombol gabung.'
@@ -406,7 +508,10 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
               disabled={loading || authLoading}
               className="flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-4 text-[13px] font-extrabold text-white shadow-[0_14px_28px_-18px_rgba(5,150,105,0.85)] transition hover:bg-emerald-700 active:scale-[0.99] disabled:cursor-wait disabled:opacity-60"
             >
-              <BrandSocialIcon brand="whatsapp" className="h-4 w-4" />
+              <BrandSocialIcon
+                brand="whatsapp"
+                className="h-4 w-4"
+              />
               {actionLabel}
               <ExternalLink className="h-3.5 w-3.5" />
             </button>
@@ -434,7 +539,9 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
           className="fixed inset-0 z-[100] flex items-end justify-center bg-zinc-950/45 p-2 backdrop-blur-[2px] sm:items-center sm:p-4"
           role="presentation"
           onMouseDown={event => {
-            if (event.target === event.currentTarget) setSelectedGroup(null);
+            if (event.target === event.currentTarget) {
+              setSelectedGroup(null);
+            }
           }}
         >
           <section
@@ -447,17 +554,24 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-xl">
                 {selectedGroup.icon}
               </span>
+
               <div className="min-w-0 flex-1">
                 <h3
                   id="community-group-title"
                   className="text-base font-black text-zinc-950"
                 >
-                  {isId ? selectedGroup.nameId : selectedGroup.nameEn}
+                  {isId
+                    ? selectedGroup.nameId
+                    : selectedGroup.nameEn}
                 </h3>
+
                 <p className="mt-1 text-[12px] leading-5 text-zinc-600">
-                  {isId ? selectedGroup.descriptionId : selectedGroup.descriptionEn}
+                  {isId
+                    ? selectedGroup.descriptionId
+                    : selectedGroup.descriptionEn}
                 </p>
               </div>
+
               <button
                 type="button"
                 onClick={() => setSelectedGroup(null)}
@@ -472,18 +586,20 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
               <p className="mb-2 text-[10px] font-extrabold uppercase tracking-[0.12em] text-emerald-700">
                 {isId ? 'Manfaat' : 'Benefits'}
               </p>
+
               <ul className="space-y-2">
-                {(isId ? selectedGroup.benefitsId : selectedGroup.benefitsEn).map(
-                  benefit => (
-                    <li
-                      key={benefit}
-                      className="flex items-start gap-2.5 text-[12px] leading-5 text-zinc-700"
-                    >
-                      <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />
-                      <span>{benefit}</span>
-                    </li>
-                  ),
-                )}
+                {(isId
+                  ? selectedGroup.benefitsId
+                  : selectedGroup.benefitsEn
+                ).map(benefit => (
+                  <li
+                    key={benefit}
+                    className="flex items-start gap-2.5 text-[12px] leading-5 text-zinc-700"
+                  >
+                    <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />
+                    <span>{benefit}</span>
+                  </li>
+                ))}
               </ul>
             </div>
 
@@ -495,7 +611,9 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
                   className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-4 text-[13px] font-extrabold text-white"
                 >
                   <LogIn className="h-3.5 w-3.5" />
-                  {isId ? 'Login untuk lanjut gabung' : 'Log in to continue'}
+                  {isId
+                    ? 'Login untuk lanjut gabung'
+                    : 'Log in to continue'}
                 </Link>
               ) : ready ? (
                 <button
@@ -507,8 +625,13 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
                   disabled={loading || authLoading}
                   className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-4 text-xs font-extrabold text-white disabled:opacity-60"
                 >
-                  <BrandSocialIcon brand="whatsapp" className="h-4 w-4" />
-                  {isId ? 'Lanjut ke WhatsApp' : 'Continue to WhatsApp'}
+                  <BrandSocialIcon
+                    brand="whatsapp"
+                    className="h-4 w-4"
+                  />
+                  {isId
+                    ? 'Lanjut ke WhatsApp'
+                    : 'Continue to WhatsApp'}
                   <ExternalLink className="h-3.5 w-3.5" />
                 </button>
               ) : (
@@ -518,7 +641,9 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
                   className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-4 text-[13px] font-extrabold text-white"
                 >
                   <ClipboardCheck className="h-3.5 w-3.5" />
-                  {isId ? 'Buat 1 listing dulu' : 'Create 1 listing first'}
+                  {isId
+                    ? 'Buat 1 listing dulu'
+                    : 'Create 1 listing first'}
                 </Link>
               )}
             </div>
