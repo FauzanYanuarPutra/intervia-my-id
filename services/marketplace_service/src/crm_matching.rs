@@ -1918,7 +1918,8 @@ pub async fn public_matches(
 
     let mut ranked: Vec<PublicRanked> = Vec::new();
 
-    if listing_intent == "request" {
+    let is_request = matches!(listing_intent.as_str(), "request" | "demand" | "seeker");
+    if is_request {
         let requirement = RequirementItem {
             id: source.id,
             source_id: source.id,
