@@ -44,6 +44,7 @@ mod data_importer;
 mod health;
 mod identity_projection;
 mod moderation;
+mod market_intelligence;
 mod news;
 mod order_engine;
 mod outbox;
@@ -2270,6 +2271,9 @@ async fn main() -> anyhow::Result<()> {
         .route(
             "/v1/content/{id}/matches",
             get(crm_matching::public_matches),
+        ).route(
+            "/v1/content/{id}/market-intelligence",
+            get(market_intelligence::market_intelligence),
         )
         .route(
             "/v1/content/{id}/moderate",
@@ -13522,6 +13526,12 @@ async fn create_content(
                         match_owner,
                     )
                     .await;
+                    market_intelligence::record_price_snapshot(
+                        &match_state,
+                        match_id,
+                        match_owner,
+                    )
+                    .await;
                 });
             }
             let seller_stats = match fetch_seller_stats(&state.db, &[row.owner_id]).await {
@@ -14029,6 +14039,20 @@ async fn update_content(
                         "content_id": row.id,
                         "message": "Perubahan listing sudah disimpan sebagai draft dan masuk antrean review sebelum tayang kembali."
                     }),
+                });
+            }
+
+            if row.content_status == "active" && row.pricing_mode == "fixed" {
+                let market_state = state.clone();
+                let market_id = row.id;
+                let market_owner = row.owner_id;
+                tokio::spawn(async move {
+                    market_intelligence::record_price_snapshot(
+                        &market_state,
+                        market_id,
+                        market_owner,
+                    )
+                    .await;
                 });
             }
 
