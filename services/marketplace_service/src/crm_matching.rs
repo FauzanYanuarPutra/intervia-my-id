@@ -1813,3 +1813,302 @@ mod tests {
         assert!(distance > 2.0 && distance < 4.0);
     }
 }
+
+
+#[derive(Debug, Deserialize, Default)]
+pub struct PublicMatchQuery {
+    pub sort: Option<String>,
+    pub limit: Option<i64>,
+}
+
+fn public_match_sort(value: Option<&str>) -> &str {
+    match value.unwrap_or("best").trim().to_ascii_lowercase().as_str() {
+        "nearest" | "closest" => "nearest",
+        "cheapest" | "cheap" => "cheapest",
+        "balanced" | "value" => "balanced",
+        _ => "best",
+    }
+}
+
+/// Fast owner-scoped Smart Match for the public listing flow.
+pub async fn public_matches(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+    Query(query): Query<PublicMatchQuery>,
+) -> impl IntoResponse {
+    let owner_id = match auth_claims_from_headers(&headers, &state.jwt_secret)
+        .and_then(|claims| Uuid::parse_str(&claims.sub).ok())
+    {
+        Some(id) => id,
+        None => return unauthorized(),
+    };
+
+    let source = match sqlx::query_as::<_, CandidateItem>(
+        r#"
+        SELECT
+            id, owner_id, title, summary, body, content_type, category, tags,
+            price_cents, rating, review_count, cover_image,
+            COALESCE(metadata, '{}'::jsonb) AS metadata, updated_at
+        FROM content_items
+        WHERE id = $1
+          AND owner_id = $2
+          AND content_status = 'active'
+        LIMIT 1
+        "#,
+    )
+    .bind(id)
+    .bind(owner_id)
+    .fetch_optional(&state.db)
+    .await
+    {
+        Ok(Some(row)) => row,
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({"error": "listing not found"})),
+            )
+                .into_response()
+        }
+        Err(error) => {
+            tracing::error!("public match source lookup failed: {:?}", error);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "failed to load listing"})),
+            )
+                .into_response()
+        }
+    };
+
+    let listing_intent = json_text(
+        &source.metadata,
+        &["listing_intent", "intent", "market_side", "listing_side"],
+    )
+    .map(text)
+    .unwrap_or_else(|| {
+        if source.price_cents.is_some() {
+            "offer".to_string()
+        } else {
+            "request".to_string()
+        }
+    });
+
+    let limit = query.limit.unwrap_or(12).clamp(1, 25);
+    let sort = public_match_sort(query.sort.as_deref());
+    let source_text = format!(
+        "{} {} {} {}",
+        source.title,
+        source.summary.as_deref().unwrap_or_default(),
+        source.body,
+        source.category.as_deref().unwrap_or_default()
+    );
+    let query_text = tokens(&source_text)
+        .into_iter()
+        .take(12)
+        .collect::<Vec<_>>()
+        .join(" ");
+
+    struct PublicRanked {
+        item: CandidateItem,
+        score: CandidateScore,
+        distance_km: Option<f64>,
+        target_budget_min: Option<i64>,
+        target_budget_max: Option<i64>,
+    }
+
+    let mut ranked: Vec<PublicRanked> = Vec::new();
+
+    if listing_intent == "request" {
+        let requirement = RequirementItem {
+            id: source.id,
+            source_id: source.id,
+            requester_user_id: Some(source.owner_id),
+            title: source.title.clone(),
+            summary: source.summary.clone(),
+            body: source.body.clone(),
+            category: source.category.clone(),
+            metadata: source.metadata.clone(),
+            review_id: None,
+            review_status: None,
+        };
+
+        let candidates = sqlx::query_as::<_, CandidateItem>(
+            r#"
+            SELECT
+                id, owner_id, title, summary, body, content_type, category, tags,
+                price_cents, rating, review_count, cover_image,
+                COALESCE(metadata, '{}'::jsonb) AS metadata, updated_at
+            FROM content_items
+            WHERE content_status = 'active'
+              AND owner_id <> $2
+              AND content_type IN (
+                  'product', 'service', 'material', 'tool_rental',
+                  'business_transfer', 'property', 'talent'
+              )
+              AND (
+                  ($1 <> '' AND search_vector @@ plainto_tsquery('simple', $1))
+                  OR lower(title) ILIKE '%' || lower($3) || '%'
+                  OR lower(COALESCE(summary, '')) ILIKE '%' || lower($3) || '%'
+                  OR lower(COALESCE(body, '')) ILIKE '%' || lower($3) || '%'
+              )
+            ORDER BY updated_at DESC
+            LIMIT 100
+            "#,
+        )
+        .bind(&query_text)
+        .bind(source.owner_id)
+        .bind(&source.title)
+        .fetch_all(&state.db)
+        .await
+        .unwrap_or_default();
+
+        let (budget_min, budget_max) = budget(&source.metadata);
+        for candidate in candidates {
+            let score = score_candidate(&requirement, &candidate);
+            let distance_km = coordinate_from(&source.metadata)
+                .zip(coordinate_from(&candidate.metadata))
+                .map(|(a, b)| haversine_km(a, b));
+            ranked.push(PublicRanked {
+                item: candidate,
+                score,
+                distance_km,
+                target_budget_min: budget_min,
+                target_budget_max: budget_max,
+            });
+        }
+    } else {
+        let candidates = sqlx::query_as::<_, CandidateItem>(
+            r#"
+            SELECT
+                id, owner_id, title, summary, body, content_type, category, tags,
+                price_cents, rating, review_count, cover_image,
+                COALESCE(metadata, '{}'::jsonb) AS metadata, updated_at
+            FROM content_items
+            WHERE content_status = 'active'
+              AND owner_id <> $2
+              AND content_type = 'request'
+              AND (
+                  ($1 <> '' AND search_vector @@ plainto_tsquery('simple', $1))
+                  OR lower(title) ILIKE '%' || lower($3) || '%'
+                  OR lower(COALESCE(summary, '')) ILIKE '%' || lower($3) || '%'
+                  OR lower(COALESCE(body, '')) ILIKE '%' || lower($3) || '%'
+              )
+            ORDER BY updated_at DESC
+            LIMIT 100
+            "#,
+        )
+        .bind(&query_text)
+        .bind(source.owner_id)
+        .bind(&source.title)
+        .fetch_all(&state.db)
+        .await
+        .unwrap_or_default();
+
+        for request in candidates {
+            let requirement = RequirementItem {
+                id: request.id,
+                source_id: request.id,
+                requester_user_id: Some(request.owner_id),
+                title: request.title.clone(),
+                summary: request.summary.clone(),
+                body: request.body.clone(),
+                category: request.category.clone(),
+                metadata: request.metadata.clone(),
+                review_id: None,
+                review_status: None,
+            };
+            let score = score_candidate(&requirement, &source);
+            let distance_km = coordinate_from(&source.metadata)
+                .zip(coordinate_from(&request.metadata))
+                .map(|(a, b)| haversine_km(a, b));
+            let (budget_min, budget_max) = budget(&request.metadata);
+            ranked.push(PublicRanked {
+                item: request,
+                score,
+                distance_km,
+                target_budget_min: budget_min,
+                target_budget_max: budget_max,
+            });
+        }
+    }
+
+    ranked.sort_by(|a, b| {
+        let ordering = match sort {
+            "nearest" => a
+                .distance_km
+                .unwrap_or(f64::INFINITY)
+                .partial_cmp(&b.distance_km.unwrap_or(f64::INFINITY)),
+            "cheapest" => Some(
+                a.item
+                    .price_cents
+                    .or(a.target_budget_max)
+                    .unwrap_or(i64::MAX)
+                    .cmp(
+                        &b.item
+                            .price_cents
+                            .or(b.target_budget_max)
+                            .unwrap_or(i64::MAX),
+                    ),
+            ),
+            "balanced" | "best" | _ => b.score.total.partial_cmp(&a.score.total),
+        };
+        ordering.unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    let results = ranked
+        .into_iter()
+        .take(limit as usize)
+        .map(|entry| {
+            let score_label = if entry.score.total >= 85.0 {
+                "very_high"
+            } else if entry.score.total >= 70.0 {
+                "high"
+            } else if entry.score.total >= 55.0 {
+                "medium"
+            } else {
+                "low"
+            };
+            json!({
+                "id": entry.item.id,
+                "title": entry.item.title,
+                "summary": entry.item.summary,
+                "content_type": entry.item.content_type,
+                "slug": entry.item.metadata.get("slug").and_then(Value::as_str),
+                "cover_image": entry.item.cover_image,
+                "price_cents": entry.item.price_cents,
+                "currency": entry.item.metadata.get("currency").and_then(Value::as_str).unwrap_or("IDR"),
+                "city": city_from(&entry.item.metadata),
+                "distance_km": entry.distance_km.map(|v| (v * 10.0).round() / 10.0),
+                "budget_min": entry.target_budget_min,
+                "budget_max": entry.target_budget_max,
+                "score": entry.score.total.round(),
+                "score_label": score_label,
+                "breakdown": entry.score.breakdown,
+                "matched_fields": entry.score.matched_fields,
+                "reasons": entry.score.reasons,
+                "warnings": entry.score.warnings,
+                "rating": entry.item.rating,
+                "review_count": entry.item.review_count,
+                "updated_at": entry.item.updated_at,
+            })
+        })
+        .collect::<Vec<_>>();
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "source_id": source.id,
+            "intent": listing_intent,
+            "sort": sort,
+            "count": results.len(),
+            "results": results,
+            "engine": {
+                "name": "Lajukan Smart Match",
+                "version": MATCHING_SCORE_VERSION,
+                "mode": "fast_deterministic",
+                "ai_ready": true
+            }
+        })),
+    )
+        .into_response()
+}
