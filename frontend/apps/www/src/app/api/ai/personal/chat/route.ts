@@ -811,14 +811,6 @@ export async function POST(req: NextRequest) {
           );
         }
 
-        if (!thread) {
-          thread = await createPersonalAiThread(
-            auth.ctx.userId,
-            agent.id,
-            buildThreadTitle(message),
-          );
-          createdThreadId = thread.id;
-        }
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : String(error);
@@ -844,6 +836,15 @@ export async function POST(req: NextRequest) {
           provider_errors: ['provider_unavailable'],
         };
       }
+    }
+
+    if (!thread) {
+      thread = await createPersonalAiThread(
+        auth.ctx.userId,
+        agent.id,
+        buildThreadTitle(message),
+      );
+      createdThreadId = thread.id;
     }
 
     const saved = await appendPersonalAiMessages({
