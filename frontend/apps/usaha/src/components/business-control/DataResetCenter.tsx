@@ -271,10 +271,10 @@ export function DataResetCenter({ business }: Props) {
               <DatabaseBackup className="h-5 w-5" />
             </span>
             <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-[0.12em] text-amber-700">Pemulihan data usaha</p>
-              <h1 className="mt-1 text-lg font-black tracking-tight text-portal-ink sm:text-xl">Kembalikan operasional ke kondisi awal</h1>
+              <p className="text-[10px] font-black uppercase tracking-[0.12em] text-amber-700">Perbaiki data usaha</p>
+              <h1 className="mt-1 text-lg font-black tracking-tight text-portal-ink sm:text-xl">Mulai ulang bagian yang memang salah</h1>
               <p className="mt-1 max-w-3xl text-sm leading-6 text-portal-soft">
-                <strong className="font-black text-portal-ink">Mulai dari nol</strong> menormalkan seluruh angka operasional yang dipilih: penjualan, uang, modal, stok, serta produk aktif. Audit, profil, dan histori tetap dipertahankan.
+                Reset <strong className="font-black text-portal-ink">bukan tombol Undo</strong>. Lajukan membalik dampak operasional yang masih boleh dikoreksi dan tetap menyimpan histori, audit, serta bukti perubahan.
               </p>
             </div>
           </div>
@@ -471,6 +471,13 @@ export function DataResetCenter({ business }: Props) {
           </p>
         </section>
       )}
+
+      <section className="merchant-surface-bordered border-amber-200 bg-amber-50/60 p-4 sm:p-5">
+        <p className="font-black text-amber-950">Pakai reset hanya untuk merapikan pencatatan</p>
+        <p className="mt-1 text-xs leading-5 text-amber-900">
+          Kalau tujuannya hanya mencoba fitur, lebih aman gunakan data latihan yang terpisah. Jangan gunakan reset sebagai pengganti backup atau Undo transaksi.
+        </p>
+      </section>
 
       <section className="merchant-surface-bordered p-4 sm:p-5">
         <div className="flex gap-3">
