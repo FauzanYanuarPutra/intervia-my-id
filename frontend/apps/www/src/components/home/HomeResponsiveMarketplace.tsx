@@ -4292,25 +4292,54 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
       loadListings('demand', demandController, mine);
 
     const loadReferences = async () => {
-      const params = new URLSearchParams({
+      // Keep first-party Lajukan businesses and external/public references on
+      // separate queries. A small combined window can otherwise be dominated
+      // by public references and hide a real Lajukan business.
+      const nativeParams = new URLSearchParams({
         map: '1',
-        include_references: '1',
+        include_references: '0',
         limit: '12',
       });
-      addViewerLocation(params);
-      const response = await fetch(
-        `/api/super-app/umkm/stores?${params.toString()}`,
-        {
+      const referenceParams = new URLSearchParams({
+        map: '1',
+        references_only: '1',
+        limit: '12',
+      });
+      addViewerLocation(nativeParams);
+      addViewerLocation(referenceParams);
+
+      const [nativeResponse, referenceResponse] = await Promise.all([
+        fetch(`/api/super-app/umkm/stores?${nativeParams.toString()}`, {
           cache: 'default',
           credentials: 'include',
           signal: referenceController.signal,
-        },
-      );
-      const payload = (await response
-        .json()
-        .catch(() => null)) as PublicReferenceApiResponse | null;
-      if (!response.ok) throw new Error('nearby_businesses_unavailable');
-      return Array.isArray(payload?.data?.items) ? payload.data.items : [];
+        }).catch(() => null),
+        fetch(`/api/super-app/umkm/stores?${referenceParams.toString()}`, {
+          cache: 'default',
+          credentials: 'include',
+          signal: referenceController.signal,
+        }).catch(() => null),
+      ]);
+
+      const [nativePayload, referencePayload] = await Promise.all([
+        nativeResponse?.json().catch(() => null) as Promise<PublicReferenceApiResponse | null> | undefined,
+        referenceResponse?.json().catch(() => null) as Promise<PublicReferenceApiResponse | null> | undefined,
+      ]);
+
+      const nativeItems =
+        nativeResponse?.ok && Array.isArray(nativePayload?.data?.items)
+          ? nativePayload.data.items
+          : [];
+      const referenceItems =
+        referenceResponse?.ok && Array.isArray(referencePayload?.data?.items)
+          ? referencePayload.data.items
+          : [];
+
+      if (nativeItems.length === 0 && referenceItems.length === 0) {
+        throw new Error('nearby_businesses_unavailable');
+      }
+
+      return [...nativeItems, ...referenceItems];
     };
 
     const myListingsPromise = loadMyListings();
@@ -4396,7 +4425,11 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
         const referenceItems = (await loadReferences())
           .map(mapApiItemToPublicReference)
           .filter((item): item is PublicReferenceItem => Boolean(item))
-          .filter(item => Boolean(item.sourceLicense))
+          .filter(
+            item =>
+              item.sourceKind !== 'reference' ||
+              Boolean(item.sourceLicense),
+          )
           .filter(
             (item, index, allItems) =>
               allItems.findIndex(candidate => candidate.id === item.id) ===
