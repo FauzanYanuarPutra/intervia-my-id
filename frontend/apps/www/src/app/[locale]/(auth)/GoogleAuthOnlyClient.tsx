@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { ArrowRight, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { ArrowRight, ShieldCheck } from 'lucide-react';
 import AuthFlowShell from '@/components/auth/AuthFlowShell';
 import { GoogleBrandIcon } from '@/components/auth/GoogleBrandIcon';
 
@@ -68,8 +68,8 @@ export default function GoogleAuthOnlyClient({ mode }: Props) {
       description={description}
       helperText={
         isId
-          ? 'Belum punya akun? Akun Lajukan akan dibuat otomatis saat kamu pertama kali masuk dengan Google.'
-          : 'New to Lajukan? Your account will be created automatically the first time you continue with Google.'
+          ? 'Belum punya akun? Akun Lajukan dibuat otomatis saat kamu pertama kali masuk dengan Google.'
+          : 'New to Lajukan? Your account is created automatically the first time you continue with Google.'
       }
       highlights={[
         {
@@ -123,23 +123,13 @@ export default function GoogleAuthOnlyClient({ mode }: Props) {
           </span>
         </a>
 
-        <div className="rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3">
-          {[
-            isId
-              ? 'Tidak perlu membuat password baru'
-              : 'No new password to create',
-            isId
-              ? 'Email Google digunakan untuk melindungi akunmu'
-              : 'Your Google email helps protect your account',
-          ].map(item => (
-            <div
-              key={item}
-              className="flex min-h-11 items-start gap-2.5 border-b border-[color:var(--app-border)] py-2.5 text-xs font-semibold leading-5 text-[color:var(--app-text-soft)] last:border-b-0"
-            >
-              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[color:var(--app-accent)]" />
-              <span className="min-w-0 flex-1">{item}</span>
-            </div>
-          ))}
+        <div className="flex items-start gap-2.5 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-2.5">
+          <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[color:var(--app-accent)]" />
+          <p className="text-[11px] font-semibold leading-5 text-[color:var(--app-text-soft)]">
+            {isId
+              ? 'Tidak perlu membuat password atau OTP Lajukan baru. Gunakan akun Google yang memang milikmu.'
+              : 'You do not need a new Lajukan password or OTP. Use your own Google account.'}
+          </p>
         </div>
 
         {/* <p className="flex items-start gap-2 text-left text-[11px] font-semibold leading-5 text-[color:var(--app-text-soft)]">
