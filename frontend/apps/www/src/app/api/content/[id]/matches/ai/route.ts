@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { enforceRateLimit, getClientIp } from '@/lib/rateLimit';
 import { requireAuth } from '@/lib/serverAuth';
+import { extractContentId } from '@/lib/content/routes';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -111,13 +112,24 @@ export async function POST(
     return noStore({ error: 'Body request harus JSON valid.' }, 400);
   }
 
+  const { id } = await params;
+  const resolvedId = extractContentId(id) || id;
+
   const source = record(body.source);
+  const sourceId = text(source.id, 120);
+  if (!sourceId || sourceId !== resolvedId) {
+    return noStore(
+      { error: 'Source content tidak sesuai dengan URL match.' },
+      400,
+    );
+  }
+
   const candidates = (Array.isArray(body.candidates) ? body.candidates : [])
     .map(cleanCandidate)
     .filter(candidate => candidate.id)
     .slice(0, 8);
 
-  if (!source.id || candidates.length < 2) {
+  if (candidates.length < 2) {
     return noStore(
       { error: 'Source dan minimal dua kandidat diperlukan.' },
       400,
