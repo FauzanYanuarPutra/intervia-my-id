@@ -1834,7 +1834,7 @@ export default function PublicProfileClient({
             <button
               type="button"
               onClick={() => router.refresh()}
-              className="mt-5 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-rose-300 bg-white px-5 text-sm font-bold text-rose-800 dark:border-rose-800 dark:bg-transparent dark:text-rose-200"
+              className="mt-5 inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-rose-300 bg-white px-5 text-sm font-bold text-rose-800 dark:border-rose-800 dark:bg-transparent dark:text-rose-200"
             >
               <RefreshCcw className="h-4 w-4" />
               {copy.retry}
@@ -2300,6 +2300,16 @@ export default function PublicProfileClient({
     { key: 'reviews', label: `${copy.reviews} (${reviewCount})` },
   ];
 
+  const hasMeaningfulHeadline =
+    Boolean(detail.headline) &&
+    !/^profil publik di lajukan$/i.test(detail.headline) &&
+    !/^public profile on lajukan$/i.test(detail.headline);
+
+  const hasMeaningfulSummary =
+    Boolean(detail.summary) &&
+    !/^pengguna ini belum menambahkan deskripsi publik\.?$/i.test(detail.summary) &&
+    !/^this user has not added a public description\.?$/i.test(detail.summary);
+
   return (
     <>
       <div className="min-h-screen overflow-x-clip bg-[color:var(--app-surface-muted)] pb-[calc(5.5rem+env(safe-area-inset-bottom))] dark:bg-[color:var(--app-surface)] sm:pb-8">
@@ -2307,7 +2317,7 @@ export default function PublicProfileClient({
 
         <main className="mx-auto w-full max-w-[980px] px-3 py-3 sm:px-4 sm:py-4 lg:px-5 lg:py-5">
           <section className="overflow-hidden rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-sm sm:rounded-[26px] sm:shadow-[0_18px_48px_-40px_rgba(15,23,42,0.32)]">
-            <div className="relative h-28 overflow-hidden sm:h-32 lg:h-36">
+            <div className="relative h-24 overflow-hidden sm:h-32 lg:h-36">
               {coverUrl ? (
                 <Image src={coverUrl} alt="" fill priority unoptimized sizes="(max-width: 640px) 100vw, 1080px" className="object-cover" />
               ) : (
@@ -2337,28 +2347,32 @@ export default function PublicProfileClient({
             </div>
 
             <div className="px-3 pb-3 sm:px-6 sm:pb-4">
-              <div className="-mt-10 flex min-w-0 flex-col items-center gap-2 sm:-mt-11 sm:flex-row sm:items-end sm:gap-4">
-                <div className="relative h-[76px] w-[76px] shrink-0 overflow-hidden rounded-full border-[4px] border-[color:var(--app-surface-strong)] bg-[color:var(--app-surface-muted)] shadow-md sm:h-[88px] sm:w-[88px] sm:border-[5px]">
+              <div className="-mt-9 flex min-w-0 items-end gap-2.5 sm:-mt-11 sm:gap-4">
+                <div className="relative h-[68px] w-[68px] shrink-0 overflow-hidden rounded-full border-[4px] border-[color:var(--app-surface-strong)] bg-[color:var(--app-surface-muted)] shadow-md sm:h-[88px] sm:w-[88px] sm:border-[5px]">
                   <Image src={avatarUrl} alt={detail.displayName} fill priority unoptimized sizes="96px" className="object-cover" />
                 </div>
-                <div className="min-w-0 flex-1 pb-0 text-center sm:pb-0.5 sm:text-left">
-                  <div className="flex min-w-0 items-center justify-center gap-1.5 sm:justify-start">
-                    <h1 className="min-w-0 max-w-full truncate text-[20px] font-black leading-tight tracking-[-0.02em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[26px]">{detail.displayName}</h1>
+                <div className="min-w-0 flex-1 pb-0.5 text-left">
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    <h1 className="min-w-0 max-w-full truncate text-[18px] font-black leading-tight tracking-[-0.02em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[26px]">{detail.displayName}</h1>
                     {profile.identity_verified ? <BadgeCheck className="h-5 w-5 shrink-0 fill-emerald-600 text-white" aria-label={copy.verified} /> : null}
                   </div>
-                  <p className="mt-0.5 truncate text-[11px] font-medium text-[color:var(--app-text-soft)] sm:text-xs">@{detail.handle}</p>
+                  <p className="mt-0.5 truncate text-[10px] font-medium text-[color:var(--app-text-soft)] sm:text-xs">@{detail.handle}</p>
                 </div>
               </div>
 
-              <div className="mt-2 flex min-w-0 flex-wrap justify-center gap-1.5 sm:justify-start">
+              <div className="mt-2 flex min-w-0 flex-wrap gap-1.5">
                 {businessCategory ? <span className="inline-flex max-w-full items-center rounded-full bg-[color:var(--app-accent-soft)] px-2.5 py-1 text-[10px] font-bold text-[color:var(--app-accent)] sm:text-[11px]"><span className="truncate">{businessCategory}</span></span> : null}
                 {profile.location ? <span className="inline-flex max-w-full items-center gap-1 rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[10px] font-medium text-[color:var(--app-text-soft)] sm:text-[11px]"><MapPin className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{profile.location}</span></span> : null}
               </div>
 
-              {detail.headline ? <p className="mt-2.5 text-[13px] font-extrabold leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-sm">{detail.headline}</p> : null}
-              <p className="mt-0.5 line-clamp-3 max-w-3xl text-[12px] leading-5 text-[color:var(--app-text-soft)] sm:text-[13px] sm:leading-6">{detail.summary}</p>
+              {hasMeaningfulHeadline ? <p className="mt-2.5 text-[13px] font-extrabold leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-sm">{detail.headline}</p> : null}
+              {hasMeaningfulSummary ? (
+                <p className="mt-2 line-clamp-3 max-w-3xl text-[12px] leading-5 text-[color:var(--app-text-soft)] sm:text-[13px] sm:leading-6">
+                  {detail.summary}
+                </p>
+              ) : null}
 
-              <div className="mt-3 grid w-full grid-cols-3 divide-x divide-[color:var(--app-border)] overflow-hidden rounded-2xl border border-[color:var(--app-border)] py-2 sm:max-w-[560px]">
+              <div className="mt-2.5 grid w-full grid-cols-3 divide-x divide-[color:var(--app-border)] overflow-hidden rounded-2xl border border-[color:var(--app-border)] py-2 sm:max-w-[560px]">
                 <button type="button" onClick={() => setActiveProfileTab('posts')} className="min-w-0 cursor-pointer px-2 text-center transition hover:bg-[color:var(--app-surface-muted)] active:scale-[0.99] sm:px-4">
                   <span className="block text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">{formatCompactNumber(listings.length, localeCode)}</span>
                   <span className="mt-0.5 block truncate text-[9px] font-semibold text-[color:var(--app-text-soft)] sm:text-[11px]">{localeCode === 'id' ? 'Etalase' : 'Items'}</span>
@@ -2373,10 +2387,10 @@ export default function PublicProfileClient({
                 </button>
               </div>
 
-              <div className="mt-2.5 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+              <div className="mt-2 grid grid-cols-2 gap-1.5 sm:flex sm:flex-wrap">
                 {isOwnProfile ? (
                   <>
-                    <Link href="/profile/edit" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 text-xs font-black text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)] dark:text-[color:var(--app-text-inverse)]"><Edit3 className="h-4 w-4" />{copy.editProfile}</Link>
+                    <Link href="/profile/edit" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-[11px] font-black text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)] dark:text-[color:var(--app-text-inverse)]"><Edit3 className="h-4 w-4" />{copy.editProfile}</Link>
                     <Link href="/manage" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-xs font-black text-white transition hover:bg-emerald-700"><Wrench className="h-4 w-4" />{copy.managePosts}</Link>
                   </>
                 ) : (
@@ -2407,7 +2421,7 @@ export default function PublicProfileClient({
               </div> : null}
 
               {publicTrustSignals.length > 0 ? (
-                <div className="mt-2.5 flex min-w-0 gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <div className="mt-2 flex min-w-0 gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                   {publicTrustSignals.map(item => {
                     const Icon = item.icon;
                     return <span key={item.key} className="inline-flex min-h-7 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300"><Icon className="h-3.5 w-3.5" />{item.label}</span>;
@@ -2418,7 +2432,7 @@ export default function PublicProfileClient({
           </section>
 
           <section className="mt-3 overflow-hidden rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-sm sm:rounded-[26px]">
-            <div className="sticky top-[calc(3.25rem+env(safe-area-inset-top))] z-20 border-b border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)]/96 backdrop-blur sm:top-0">
+            <div className="border-b border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)]">
               <div
                 role="tablist"
                 aria-label={localeCode === 'id' ? 'Navigasi profil' : 'Profile navigation'}
@@ -2589,12 +2603,16 @@ export default function PublicProfileClient({
             ) : null}
 
             {activeProfileTab === 'about' ? (
-              <div className="p-3 sm:p-5">
-                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
+              <div className="p-2.5 sm:p-5">
+                <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_300px]">
                   <div className="space-y-4">
-                    <section className="rounded-2xl border border-[color:var(--app-border)] p-4 sm:p-5">
-                      <SectionTitle title={copy.aboutTitle} subtitle={businessCategory || detail.headline} />
-                      <p className="mt-3 text-sm leading-6 text-[color:var(--app-text-soft)]">{detail.summary}</p>
+                    <section className="rounded-2xl border border-[color:var(--app-border)] p-3.5 sm:p-5">
+                      <SectionTitle title={copy.aboutTitle} subtitle={businessCategory || (hasMeaningfulHeadline ? detail.headline : undefined)} />
+                      {hasMeaningfulSummary ? (
+                        <p className="mt-2.5 text-sm leading-6 text-[color:var(--app-text-soft)]">{detail.summary}</p>
+                      ) : (
+                        <p className="mt-2.5 text-sm leading-6 text-[color:var(--app-text-soft)]">{copy.noAbout}</p>
+                      )}
                     </section>
 
                     {businessRows.length > 0 ? (
