@@ -145,8 +145,8 @@ type OwnedStoreLocation = {
   name?: string;
   city?: string | null;
   address?: string | null;
-  lat?: number;
-  lng?: number;
+  lat?: number | string | null;
+  lng?: number | string | null;
 };
 
 type ListingCopyAiResponse = {
@@ -519,6 +519,14 @@ function readSelectedLocationFromValues(
   )
     ? structured
     : null;
+}
+
+function deleteLinkedBusiness(
+  values: Record<string, unknown>,
+): Record<string, never> {
+  const next = { ...values };
+  delete next.linked_store_id;
+  return {};
 }
 
 function hasMeaningfulValue(
@@ -2467,71 +2475,55 @@ export default function CreateListingWizard({
             payload.data
               ?.items || [];
 
-          setOwnedStoreLocations(
-            items
-              .filter(
-                item =>
-                  Number.isFinite(
-                    item.lat,
-                  ) &&
-                  Number.isFinite(
-                    item.lng,
-                  ) &&
-                  Boolean(
-                    item.name?.trim(),
-                  ),
-              )
-              .map(item => ({
-                ...buildBusinessLocationSuggestion(
-                  {
-                    id: item.id,
-                    name:
-                      item.name?.trim() ||
-                      text(
-                        locale,
-                        'Lokasi usaha',
-                        'Business location',
-                      ),
-                    address:
-                      item.address,
-                    city:
-                      item.city,
-                    lat:
-                      item.lat as number,
-                    lng:
-                      item.lng as number,
-                  },
-                ),
-                id: `business-${item.id}`,
-                label:
+          const businessSuggestions = items
+            .map(item => ({
+              item,
+              lat: readNumber(item.lat),
+              lng: readNumber(item.lng),
+            }))
+            .filter(
+              entry =>
+                entry.lat !== null &&
+                entry.lng !== null &&
+                Boolean(entry.item.name?.trim()),
+            )
+            .map(({ item, lat, lng }) => ({
+              ...buildBusinessLocationSuggestion({
+                id: item.id,
+                name:
                   item.name?.trim() ||
                   text(
                     locale,
                     'Lokasi usaha',
                     'Business location',
                   ),
-                subtitle: [
-                  item.address,
-                  item.city,
-                ]
-                  .filter(Boolean)
-                  .join(' • '),
-                point: {
-                  lat: Number(
-                    (
-                      item.lat as number
-                    ).toFixed(6),
-                  ),
-                  lng: Number(
-                    (
-                      item.lng as number
-                    ).toFixed(6),
-                  ),
-                },
-                source:
-                  'business' as const,
-              })),
-          );
+                address: item.address,
+                city: item.city,
+                lat: lat as number,
+                lng: lng as number,
+              }),
+              id: `business-${item.id}`,
+              label:
+                item.name?.trim() ||
+                text(
+                  locale,
+                  'Lokasi usaha',
+                  'Business location',
+                ),
+              subtitle: [
+                item.address,
+                item.city,
+              ]
+                .filter(Boolean)
+                .join(' • '),
+              point: {
+                lat: Number((lat as number).toFixed(6)),
+                lng: Number((lng as number).toFixed(6)),
+              },
+              source: 'business' as const,
+            }));
+
+          setOwnedStoreLocations(businessSuggestions);
         },
       )
       .catch(() => {
@@ -3368,6 +3360,7 @@ export default function CreateListingWizard({
               point.lng,
             location_point:
               point,
+            ...(deleteLinkedBusiness(previous)),
           }),
         );
 
@@ -3401,6 +3394,7 @@ export default function CreateListingWizard({
               delete next.location_structured;
               delete next.location_place_id;
               delete next.location_provider;
+              delete next.linked_store_id;
               delete next.location_lat;
               delete next.location_lng;
               delete next.latitude;
@@ -3415,6 +3409,17 @@ export default function CreateListingWizard({
             const displayText =
               location.formattedAddress ||
               location.name;
+
+            const businessId =
+              location.placeId.startsWith('business:')
+                ? location.placeId.slice('business:'.length).trim()
+                : '';
+
+            if (businessId) {
+              next.linked_store_id = businessId;
+            } else {
+              delete next.linked_store_id;
+            }
 
             return {
               ...next,
