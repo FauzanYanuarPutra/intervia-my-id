@@ -12,7 +12,6 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import {
   ArrowRight,
   BadgeCheck,
-  Camera,
   Clapperboard,
   Clock3,
   Heart,
