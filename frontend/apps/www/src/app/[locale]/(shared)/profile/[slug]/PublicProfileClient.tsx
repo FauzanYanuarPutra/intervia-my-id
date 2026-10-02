@@ -2319,7 +2319,7 @@ export default function PublicProfileClient({
           <section className="relative overflow-hidden rounded-[24px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-sm sm:rounded-[28px] sm:shadow-[0_20px_56px_-42px_rgba(15,23,42,0.32)]">
             <div className="relative h-32 overflow-hidden rounded-t-[23px] sm:h-40 sm:rounded-t-[27px] lg:h-48 xl:h-52">
               {coverUrl ? (
-                <Image src={coverUrl} alt="" fill priority unoptimized sizes="(max-width: 640px) 100vw, 1080px" className="object-cover" />
+                <Image src={coverUrl} alt="" fill priority unoptimized sizes="(max-width: 640px) 100vw, 1180px" className="object-cover object-center" />
               ) : (
                 <div className="absolute inset-0 bg-[linear-gradient(135deg,#d1fae5_0%,#f8fafc_58%,#ccfbf1_100%)] dark:bg-[linear-gradient(135deg,#052e25_0%,#0f172a_58%,#022c22_100%)]" />
               )}
