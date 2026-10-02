@@ -2268,6 +2268,10 @@ async fn main() -> anyhow::Result<()> {
         )
         .route("/v1/content/{id}/report", post(moderation::report_content))
         .route(
+            "/v1/content/{id}/matches",
+            get(crm_matching::public_matches),
+        )
+        .route(
             "/v1/content/{id}/moderate",
             post(moderation::moderate_content),
         )
