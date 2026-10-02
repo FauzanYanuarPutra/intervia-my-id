@@ -41,6 +41,11 @@ type LocationAutocompleteProps = {
   localSuggestions?: LocationSuggestion[];
   isId?: boolean;
   className?: string;
+  /**
+   * On small screens, show the location search as a keyboard-like
+   * full-screen sheet instead of a tiny dropdown.
+   */
+  mobileSheet?: boolean;
 };
 
 function buildSuggestionKey(item: LocationSuggestion): string {
@@ -91,6 +96,7 @@ export function LocationAutocomplete({
   localSuggestions = [],
   isId = true,
   className,
+  mobileSheet = true,
 }: LocationAutocompleteProps) {
   const reactId = useId();
   const listboxId = `${reactId}-location-listbox`;
@@ -326,10 +332,40 @@ export function LocationAutocomplete({
       ref={rootRef}
       className={cn(
         'relative space-y-2',
+        expanded &&
+          mobileSheet &&
+          'max-sm:fixed max-sm:inset-0 max-sm:z-[130000] max-sm:flex max-sm:flex-col max-sm:gap-3 max-sm:overflow-hidden max-sm:bg-[color:var(--app-surface-strong)] max-sm:p-3 max-sm:pt-[max(12px,env(safe-area-inset-top))] max-sm:pb-[max(12px,env(safe-area-inset-bottom))]',
         expanded && 'ui-layer-popover',
         className,
       )}
     >
+      {expanded && mobileSheet ? (
+        <div className="flex items-center justify-between gap-3 max-sm:shrink-0">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-black text-slate-900 dark:text-white">
+              {label ||
+                (isId ? 'Pilih lokasi' : 'Choose location')}
+            </p>
+            <p className="mt-0.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+              {isId
+                ? 'Cari tempat, alamat, atau gunakan lokasi saat ini.'
+                : 'Search a place, address, or use your current location.'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              setActiveIndex(-1);
+            }}
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+            aria-label={isId ? 'Tutup pencarian lokasi' : 'Close location search'}
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      ) : null}
+
       {label ? (
         <label
           htmlFor={reactId}
@@ -444,7 +480,11 @@ export function LocationAutocomplete({
         <div
           id={listboxId}
           role="listbox"
-          className="ui-layer-popover absolute left-0 right-0 top-[calc(100%+0.5rem)] max-h-[min(26rem,calc(100dvh-9rem))] overflow-y-auto overscroll-contain rounded-[18px] border border-slate-200 bg-white p-1.5 shadow-[0_28px_72px_-28px_rgba(15,23,42,0.5)] dark:border-slate-700 dark:bg-slate-950"
+          className={cn(
+            'ui-layer-popover absolute left-0 right-0 top-[calc(100%+0.5rem)] max-h-[min(26rem,calc(100dvh-9rem))] overflow-y-auto overscroll-contain rounded-[18px] border border-slate-200 bg-white p-1.5 shadow-[0_28px_72px_-28px_rgba(15,23,42,0.5)] dark:border-slate-700 dark:bg-slate-950',
+            mobileSheet &&
+              'max-sm:static max-sm:flex-1 max-sm:min-h-0 max-sm:max-h-none max-sm:overflow-y-auto max-sm:rounded-2xl max-sm:border-0 max-sm:bg-transparent max-sm:p-0 max-sm:shadow-none',
+          )}
         >
           <CurrentLocationButton
             isId={isId}
