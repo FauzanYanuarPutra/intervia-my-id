@@ -43,6 +43,7 @@ defmodule ChatService.UnreadState do
              [
                {"bigint", write_timestamp},
                {"int", 0},
+               {"timestamp", DateTime.utc_now()},
                {"uuid", user_id_bin},
                {"text", room_id}
              ]
