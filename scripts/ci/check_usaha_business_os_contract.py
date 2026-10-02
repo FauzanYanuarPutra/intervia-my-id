@@ -191,7 +191,7 @@ def main() -> int:
     require('frontend/apps/usaha/src/lib/business-control/next-actions.ts', 'canViewCosting', 'canViewFinance', 'canViewChannels', 'productsMissingChannelPriceCount: number | null')
     require('frontend/apps/usaha/src/lib/business-control/progressive-disclosure.ts', 'sortStockAttentionFirst', 'productPrimaryMode', 'shouldShowSettlementWorkspace', 'channelSimulationReadiness')
 
-    require('frontend/apps/usaha/src/app/(portal)/businesses/[businessId]/reports/page.tsx', 'listControlIngredients', 'listControlFinanceEntries', 'listControlChannels', 'summarizeControlCenter', 'jakartaDateKey')
+    require('frontend/apps/usaha/src/app/(portal)/businesses/[businessId]/reports/page.tsx', 'listControlIngredients', 'getFinanceCoreSummary', 'getSalesPeriodSummary', 'cash_movement', 'listControlChannels', 'summarizeControlCenter', 'jakartaDateKey')
     require('frontend/apps/usaha/src/lib/business-control/costing.ts', 'calculateRecipeCost', 'recommendChannelPrice', 'calculateProductionCapacity')
     require('frontend/apps/usaha/src/lib/business-control/finance.ts', 'summarizeBusinessDay', 'ownerDrawing', 'cashMovement')
     require('frontend/apps/usaha/src/lib/business-control/ledger.ts', 'summarizeFinanceEntries', 'ownerCapital', 'ownerDrawing')
@@ -218,7 +218,7 @@ def main() -> int:
     require('frontend/apps/usaha/src/app/(portal)/businesses/[businessId]/channels/page.tsx', 'ChannelSettingsWorkspace', 'MerchantCopyPack', 'parseRecordedProductPrice', 'Jual Online')
     forbid('frontend/apps/usaha/src/app/(portal)/businesses/[businessId]/channels/page.tsx', '|| 15000', '|| 15_000')
     require('frontend/apps/usaha/src/app/(portal)/businesses/[businessId]/products/hpp/page.tsx', 'DurableHppWorkspace', 'listControlIngredients')
-    require('frontend/apps/usaha/src/app/(portal)/businesses/[businessId]/finance/page.tsx', 'FinanceLedger', 'listControlFinanceEntries')
+    require('frontend/apps/usaha/src/app/(portal)/businesses/[businessId]/finance/page.tsx', 'FinanceLedger', 'listFinanceCoreEntries', '/finance-core/entries')
     require('frontend/apps/usaha/src/app/(portal)/businesses/[businessId]/inventory/page.tsx', 'IngredientWorkspace', 'listControlIngredients', "hasPermission(business, 'viewCosting')")
     for compose in ['docker-compose.dev.yml', 'docker-compose.staging.yml', 'docker-compose.prod.yml']:
         require(compose, 'USAHA_GOOGLE_REDIRECT_URI', 'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'INTERNAL_API_URL')
