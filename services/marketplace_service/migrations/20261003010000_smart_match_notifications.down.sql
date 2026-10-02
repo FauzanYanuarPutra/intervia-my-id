@@ -1,0 +1,3 @@
+DROP INDEX IF EXISTS idx_crm_smart_match_notifications_recipient_created;
+DROP INDEX IF EXISTS idx_crm_smart_match_notifications_unique;
+DROP TABLE IF EXISTS crm_smart_match_notifications;
