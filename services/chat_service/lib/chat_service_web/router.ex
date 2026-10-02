@@ -29,6 +29,9 @@ defmodule ChatServiceWeb.Router do
 
     # Group rooms (multi-member)
     post("/rooms", RoomController, :create)
+    patch("/rooms/:room_id", RoomController, :rename)
+    delete("/rooms/:room_id/members", RoomController, :remove_member)
+    post("/rooms/:room_id/leave", RoomController, :leave)
     post("/rooms/:room_id/members", RoomController, :add_members)
     get("/rooms/:room_id/members", RoomController, :members)
 
