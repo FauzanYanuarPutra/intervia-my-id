@@ -6023,84 +6023,92 @@ export default function CreateListingWizard({
         values,
       );
 
-    const locationPickerControl =
-      isStructuredLocationField ? (
-        <button
-          type="button"
-          onClick={() => setMapPickerFieldKey(field.key)}
-          className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 text-sm font-bold text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100 dark:border-emerald-900/70 dark:bg-emerald-950/30 dark:text-emerald-200"
-        >
-          <MapPin className="h-4 w-4" />
-          {text(
-            locale,
-            locationPoint ? 'Ubah titik peta' : 'Pilih di peta',
-            locationPoint ? 'Change map point' : 'Pick on map',
-          )}
-        </button>
-      ) : null;
-
     if (
       isStructuredLocationField
     ) {
+      const rawLocationValue = valueAsString(
+        values[field.key],
+      ).trim();
+      const locationLabel =
+        selectedLocation?.formattedAddress?.trim() ||
+        selectedLocation?.name?.trim() ||
+        rawLocationValue;
+      const locationMeta =
+        selectedLocation?.secondaryText?.trim() ||
+        selectedLocation?.city?.trim() ||
+        selectedLocation?.region?.trim() ||
+        (locationPoint
+          ? `${locationPoint.lat.toFixed(5)}, ${locationPoint.lng.toFixed(5)}`
+          : '');
+
       return (
         <div
           key={field.key}
           className={cn(
-            'space-y-2 rounded-xl',
+            'space-y-2 rounded-2xl',
             fieldError && 'border border-red-300 bg-red-50/30 p-2 dark:border-red-900/70 dark:bg-red-950/20',
           )}
         >
           {labelBlock}
 
-          <LocationAutocomplete
-            value={
-              selectedLocation
-            }
-            onChange={location =>
-              setStructuredLocation(
-                location,
-                field.key,
-              )
-            }
-            textValue={valueAsString(
-              values[field.key],
+          <button
+            type="button"
+            onClick={() => setMapPickerFieldKey(field.key)}
+            className={cn(
+              'group flex min-h-[76px] w-full items-center gap-3 rounded-2xl border px-3.5 py-3 text-left transition active:scale-[0.995]',
+              locationLabel
+                ? 'border-emerald-200 bg-emerald-50/70 hover:border-emerald-300 hover:bg-emerald-50 dark:border-emerald-900/60 dark:bg-emerald-950/20 dark:hover:bg-emerald-950/30'
+                : 'border-slate-200 bg-white hover:border-emerald-300 hover:bg-emerald-50/40 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-emerald-700',
             )}
-            onTextChange={next =>
-              setField(
-                field.key,
-                next,
-              )
-            }
-            onSelect={location =>
-              setStructuredLocation(
-                location,
-                field.key,
-              )
-            }
-            placeholder={text(
-              locale,
-              field.placeholderId ||
-                'Cari nama tempat, jalan, kecamatan, atau kota',
-              field.placeholderEn ||
-                'Search place, street, district, or city',
-            )}
-            helperText=""
-            required={
-              field.required
-            }
-            countryCode="ID"
-            locationBias={
-              locationPoint
-            }
-            localSuggestions={
-              ownedStoreLocations
-            }
-            isId={
-              locale === 'id'
-            }
-          />
+            aria-describedby={fieldError ? `${id}-error` : undefined}
+          >
+            <span
+              className={cn(
+                'grid h-11 w-11 shrink-0 place-items-center rounded-2xl',
+                locationLabel
+                  ? 'bg-emerald-600 text-white'
+                  : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/12 dark:text-emerald-200',
+              )}
+            >
+              <MapPin className="h-5 w-5" />
+            </span>
 
-          {locationPickerControl}
+            <span className="min-w-0 flex-1">
+              <span className="block text-[10px] font-black uppercase tracking-[0.08em] text-emerald-700 dark:text-emerald-300">
+                {text(
+                  locale,
+                  locationLabel ? 'Lokasi terpilih' : 'Lokasi postingan',
+                  locationLabel ? 'Selected location' : 'Listing location',
+                )}
+              </span>
+              <span
+                className={cn(
+                  'mt-1 block truncate text-sm font-extrabold',
+                  locationLabel
+                    ? 'text-slate-900 dark:text-white'
+                    : 'text-slate-500 dark:text-slate-400',
+                )}
+              >
+                {locationLabel ||
+                  text(
+                    locale,
+                    'Pilih alamat, area, atau titik di peta',
+                    'Choose an address, area, or point on the map',
+                  )}
+              </span>
+              <span className="mt-0.5 block truncate text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                {locationMeta ||
+                  text(
+                    locale,
+                    'Bisa cari nama tempat, gunakan lokasi saat ini, atau geser pin',
+                    'Search a place, use current location, or drag the pin',
+                  )}
+              </span>
+            </span>
+
+            <ArrowRight className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5" />
+          </button>
+
           {fieldErrorText}
         </div>
       );
