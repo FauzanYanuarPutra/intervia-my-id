@@ -23,7 +23,7 @@ describe('UMKM public route helpers', () => {
     );
   });
 
-  it('routes public map references to the storefront detail surface', () => {
+  it('keeps public map references on the map surface', () => {
     const reference = {
       slug: 'osm-node-1',
       public_path: '/content/pasar-uji-reference-id',
@@ -35,7 +35,7 @@ describe('UMKM public route helpers', () => {
 
     expect(isUmkmMapPublicReference(reference)).toBe(true);
     expect(buildUmkmMapPlacePath(reference)).toBe(
-      '/umkm?view=map&store=osm-node-1',
+      '/umkm?store=osm-node-1&view=map',
     );
   });
 
@@ -53,18 +53,18 @@ describe('UMKM public route helpers', () => {
         },
       }),
     ).toBe(
-      '/umkm?view=map&store=wikidata-q111754951-mcdonald-s-banjar-baru-6f9f6ab8-ac91-48eb-88af-0b12f1aa9d6e&storeId=reference%3Awikidata-q111754951',
+      '/umkm?store=wikidata-q111754951-mcdonald-s-banjar-baru-6f9f6ab8-ac91-48eb-88af-0b12f1aa9d6e&storeId=reference%3Awikidata-q111754951&view=map',
     );
   });
 
-  it('does not accept an external or protocol-relative reference path', () => {
+  it('ignores an unsafe reference path and stays on the map surface', () => {
     expect(
       buildUmkmMapPlacePath({
         slug: 'osm-node-1',
         public_path: '//example.test/unsafe',
         metadata: { is_public_reference: true },
       }),
-    ).toBe('/toko/osm-node-1');
+    ).toBe('/umkm?store=osm-node-1&view=map');
   });
 
   it('uses a storefront slug from metadata when the map point has no top-level slug', () => {
@@ -77,7 +77,7 @@ describe('UMKM public route helpers', () => {
         },
       }),
     ).toBe(
-      '/umkm?view=map&store=bank-permata-bintaro&storeId=reference%3Abank-permata-bintaro',
+      '/umkm?store=bank-permata-bintaro&storeId=reference%3Abank-permata-bintaro&view=map',
     );
   });
 
