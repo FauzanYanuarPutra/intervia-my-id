@@ -108,7 +108,7 @@ export function HorizontalRail({
         <div
           ref={railRef}
           className={[
-            'w-full min-w-0 max-w-full overflow-hidden touch-pan-y',
+            'w-full min-w-0 max-w-full overflow-hidden overscroll-x-contain touch-pan-y',
             minimal ? '' : 'py-2',
             className,
           ].join(' ')}
