@@ -93,7 +93,7 @@ export function NewsCarousel({
         ) : null}
       </div>
 
-      <div ref={viewportRef} className="min-w-0 overflow-hidden" data-news-carousel>
+      <div ref={viewportRef} className="min-w-0 overflow-hidden overscroll-x-contain" data-news-carousel>
         <div className="-ml-2.5 flex touch-pan-y sm:-ml-3">
           {articles.map(article => (
             <div
