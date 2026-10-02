@@ -5,10 +5,8 @@ import {
   useEffect,
   type ReactNode,
 } from 'react';
-import useEmblaCarousel from 'embla-carousel-react';
-
+import { useLajukanEmbla } from '@/components/common/useLajukanEmbla';
 import { EmblaDesktopControls } from '@/components/common/EmblaDesktopControls';
-import { useEmblaWheelGestures } from '@/components/common/useEmblaWheelGestures';
 import { cn } from '@/lib/utils';
 
 type ProfileRailProps = {
@@ -47,14 +45,12 @@ export function ProfileRail({
   ariaLabel,
   scrollToActive = true,
 }: ProfileRailProps) {
-  const [viewportRef, api] = useEmblaCarousel({
+  const [viewportRef, api] = useLajukanEmbla({
     align: 'start',
     containScroll: 'trimSnaps',
     dragFree: true,
     skipSnaps: true,
   });
-
-  useEmblaWheelGestures(api);
 
   useEffect(() => {
     if (!scrollToActive || activeIndex < 0) return;
