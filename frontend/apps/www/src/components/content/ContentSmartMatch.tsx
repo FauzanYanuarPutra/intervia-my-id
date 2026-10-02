@@ -88,7 +88,7 @@ export function ContentSmartMatch({
   }, [contentId, sort]);
 
   const results = payload?.results ?? [];
-  if (!loading && results.length === 0) return null;
+  const requestError = !loading && payload === null;
 
   const isRequest = intent === 'request' || intent === 'demand' || intent === 'seeker';
   const title = isRequest
@@ -125,6 +125,21 @@ export function ContentSmartMatch({
           <span>Lihat & bandingkan {results.length} match</span>
           <ArrowRight className="h-3.5 w-3.5" />
         </Link>
+      ) : null}
+
+      {!loading && results.length === 0 ? (
+        <div className="mt-3 rounded-2xl bg-white/80 p-3 ring-1 ring-emerald-200/70 dark:bg-slate-950 dark:ring-emerald-400/20">
+          <p className="text-xs font-bold text-[color:var(--app-text)]">
+            {requestError
+              ? locale === 'id' ? 'Smart Match belum bisa mengambil data.' : 'Smart Match could not load the data.'
+              : locale === 'id' ? 'Belum ada match yang cukup cocok.' : 'No strong match yet.'}
+          </p>
+          <p className="mt-1 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
+            {requestError
+              ? locale === 'id' ? 'Coba buka lagi beberapa saat. Fitur ini tetap aktif di belakang layar.' : 'Try again shortly. The matching engine remains active in the background.'
+              : locale === 'id' ? 'Saat ada posting yang relevan, Lajukan akan menampilkannya di sini.' : 'When a relevant listing appears, Lajukan will show it here.'}
+          </p>
+        </div>
       ) : null}
 
       <div className="mt-3 flex gap-1.5 overflow-x-auto pb-1">
