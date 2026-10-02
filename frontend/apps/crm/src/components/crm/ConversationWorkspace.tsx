@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ExternalLink, MessageCircle } from 'lucide-react';
 import { Card, EmptyState, PageHeader, StatusBadge } from 'lajukan-ui';
 import type { CrmChatRow } from './models';
 import { rankConversations } from './queues';
@@ -61,7 +60,7 @@ export function ConversationWorkspace({ chats }: { chats: CrmChatRow[] }) {
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <MessageCircle className="h-4 w-4 text-emerald-600" />
+                    <span className="text-emerald-600" aria-hidden="true">●</span>
                     <h2 className="text-lg font-bold">{selected.name}</h2>
                     <StatusBadge tone={selected.stage === 'Hot' ? 'warning' : 'neutral'}>{selected.stage}</StatusBadge>
                   </div>
@@ -74,7 +73,7 @@ export function ConversationWorkspace({ chats }: { chats: CrmChatRow[] }) {
                   onClick={openChat}
                   className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-emerald-600 px-3.5 text-xs font-black text-white hover:bg-emerald-700"
                 >
-                  <ExternalLink className="h-3.5 w-3.5" />
+                  <span aria-hidden="true">↗</span>
                   Buka chat
                 </button>
               </div>
