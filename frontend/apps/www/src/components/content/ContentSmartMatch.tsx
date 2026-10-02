@@ -16,10 +16,22 @@ type SmartMatch = {
   budget_min?: number | null;
   budget_max?: number | null;
   score?: number;
+  similarity_score?: number | null;
+  worth_score?: number | null;
   score_label?: string;
   reasons?: string[];
+  warnings?: string[];
   rating?: number | null;
   review_count?: number | null;
+};
+
+type SmartMatchAssessment = {
+  id: string;
+  similarity: number | null;
+  fit: number | null;
+  worth_it: number | null;
+  reason: string;
+  caution: string;
 };
 
 type SmartMatchPayload = {
@@ -27,6 +39,13 @@ type SmartMatchPayload = {
   count?: number;
   results?: SmartMatch[];
   engine?: { name?: string; version?: string; mode?: string };
+};
+
+type SmartMatchAiPayload = {
+  available?: boolean;
+  ranked_candidate_ids?: string[];
+  assessments?: SmartMatchAssessment[];
+  confidence?: number | null;
 };
 
 function money(value: number | null | undefined, currency = 'IDR') {
@@ -60,10 +79,22 @@ export function ContentSmartMatch({
   contentId: string;
   intent?: string;
   locale?: 'id' | 'en';
+  source?: {
+    title?: string;
+    summary?: string | null;
+    body?: string | null;
+    category?: string | null;
+    content_type?: string | null;
+    price_cents?: number | null;
+    price_unit?: string | null;
+    city?: string | null;
+  };
 }) {
   const [payload, setPayload] = useState<SmartMatchPayload | null>(null);
-  const [sort, setSort] = useState<'best' | 'nearest' | 'cheapest'>('best');
+  const [aiPayload, setAiPayload] = useState<SmartMatchAiPayload | null>(null);
+  const [sort, setSort] = useState<'worth' | 'similarity' | 'nearest' | 'cheapest'>('worth');
   const [loading, setLoading] = useState(true);
+  const [aiLoading, setAiLoading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
