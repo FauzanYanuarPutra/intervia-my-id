@@ -15,7 +15,7 @@ use chrono::{DateTime, Duration, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sqlx::Row;
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, env, sync::Arc};
 use uuid::Uuid;
 
 use super::{auth_claims_from_headers, AppState};
@@ -612,13 +612,42 @@ async fn build_market_response(
     }))
 }
 
+fn authorized(headers: &HeaderMap, state: &Arc<AppState>) -> bool {
+    if auth_claims_from_headers(headers, &state.jwt_secret).is_some() {
+        return true;
+    }
+
+    let ai_tool = headers
+        .get("x-lajukan-ai-tool")
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| value == "1");
+
+    if !ai_tool {
+        return false;
+    }
+
+    let expected = env::var("MARKETPLACE_SERVICE_TOKEN")
+        .unwrap_or_default()
+        .trim()
+        .to_string();
+    if expected.is_empty() {
+        return false;
+    }
+
+    headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.strip_prefix("Bearer "))
+        .is_some_and(|value| value.trim() == expected)
+}
+
 pub async fn market_intelligence(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Path(id): Path<Uuid>,
     Query(query): Query<MarketQuery>,
 ) -> impl IntoResponse {
-    if auth_claims_from_headers(&headers, &state.jwt_secret).is_none() {
+    if !authorized(&headers, &state) {
         return (
             StatusCode::UNAUTHORIZED,
             Json(json!({"error": "unauthorized"})),
