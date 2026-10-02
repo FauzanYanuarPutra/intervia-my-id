@@ -12,6 +12,12 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
 
+const MARKETPLACE_URL =
+  process.env.INTERNAL_MARKETPLACE_URL ||
+  process.env.MARKETPLACE_URL ||
+  process.env.NEXT_PUBLIC_MARKETPLACE_URL ||
+  'http://localhost:8081';
+
 function readGalleryMedia(store: Awaited<ReturnType<typeof getUmkmStoreById>>) {
   const metadata = store && store.metadata && typeof store.metadata === 'object' ? store.metadata as Record<string, unknown> : {};
   const value = metadata.gallery_media;
@@ -32,6 +38,35 @@ async function getAuthorizedStore(req: NextRequest, storeId: string) {
     return { response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }), store: null, auth: null };
   }
   return { response: null, store, auth };
+}
+
+export async function GET(req: NextRequest, { params }: { params: Promise<{ storeId: string }> }) {
+  try {
+    const { storeId } = await params;
+    if (!storeId || storeId.length > 100) {
+      return NextResponse.json({ error: 'Store tidak valid.' }, { status: 400 });
+    }
+
+    const upstream = await fetch(
+      `${MARKETPLACE_URL}/v1/umkm/stores/${encodeURIComponent(storeId)}/media`,
+      {
+        headers: { Accept: 'application/json' },
+        cache: 'no-store',
+        signal: AbortSignal.timeout(10000),
+      },
+    );
+    const payload = await upstream.json().catch(() => ({}));
+    return NextResponse.json(payload, {
+      status: upstream.status,
+      headers: { 'Cache-Control': 'no-store' },
+    });
+  } catch (error) {
+    console.error('[UMKM_STORE_MEDIA_PUBLIC_READ_ERROR]', error);
+    return NextResponse.json(
+      { error: 'Galeri usaha belum tersedia.' },
+      { status: 503, headers: { 'Cache-Control': 'no-store' } },
+    );
+  }
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ storeId: string }> }) {
