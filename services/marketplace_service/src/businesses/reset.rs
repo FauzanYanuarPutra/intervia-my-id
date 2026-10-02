@@ -321,13 +321,23 @@ impl DataResetRepository {
             );
         }
 
+        let full_reset_blocked_by_protected_orders =
+            scopes.len() >= FULL_SCOPE_COUNT && counts.protected_order_linked_sales > 0;
+
+        if full_reset_blocked_by_protected_orders {
+            warnings.push(
+                "Mulai dari nol belum dapat mengosongkan seluruh angka karena masih ada transaksi yang terhubung ke order/pesanan. Selesaikan transaksi tersebut lewat flow order terlebih dahulu."
+                    .to_owned(),
+            );
+        }
+
         let labels = scopes.iter().map(|scope| scope.label_id()).collect();
         Ok(ResetPreview {
             scopes,
             labels,
             counts,
             warnings,
-            can_apply: true,
+            can_apply: counts.sales_in_closed_period == 0 && !full_reset_blocked_by_protected_orders,
         })
     }
 
@@ -368,6 +378,14 @@ impl DataResetRepository {
         let preview = self.preview(business_id, organization_id, &scopes).await?;
         if preview.counts.sales_in_closed_period > 0 {
             return Err(ResetError::Conflict("sales_in_closed_period"));
+        }
+        if scopes.len() >= FULL_SCOPE_COUNT && preview.counts.protected_order_linked_sales > 0 {
+            return Err(ResetError::Conflict(
+                "business_start_fresh_order_linked_sales",
+            ));
+        }
+        if !preview.can_apply {
+            return Err(ResetError::Conflict("business_data_reset_not_ready"));
         }
 
         if retry_batch {
