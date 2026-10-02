@@ -12,7 +12,6 @@ import {
 import { getFinanceCoreSummary } from '@/lib/finance-core-server';
 import { getSalesPeriodSummary } from '@/lib/sales-summary-server';
 import { jakartaDateKey, summarizeControlCenter } from '@/lib/business-control/insights';
-import { summarizeFinanceEntries } from '@/lib/business-control/ledger';
 import { hasPermission } from '@/lib/portal-logic';
 import { resolvePortalBusinessPageState } from '@/lib/portal-server';
 
