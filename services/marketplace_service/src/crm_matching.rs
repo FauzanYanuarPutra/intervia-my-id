@@ -1814,7 +1814,6 @@ mod tests {
     }
 }
 
-
 #[derive(Debug, Deserialize, Default)]
 pub struct PublicMatchQuery {
     pub sort: Option<String>,
@@ -1876,7 +1875,7 @@ pub async fn public_matches(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(json!({"error": "failed to load listing"})),
             )
-                .into_response()
+                .into_response();
         }
     };
 
