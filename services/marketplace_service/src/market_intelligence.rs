@@ -23,12 +23,13 @@ use super::{auth_claims_from_headers, AppState};
 const MAX_OBSERVATIONS: i64 = 1500;
 const MIN_CONFIDENT_SAMPLE: usize = 8;
 
-#[derive(Debug, Deserialize, Default)]
+#[derive(Debug, Clone, Deserialize, Default)]
 pub struct MarketQuery {
     pub city: Option<String>,
     pub category: Option<String>,
     pub price_unit: Option<String>,
     pub days: Option<i64>,
+    pub scope: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -346,7 +347,12 @@ async fn current_observations(
     .fetch_all(&state.db)
     .await?;
 
-    let target_city = clean(query.city.clone()).or(source_city);
+    let scope = clean(query.scope.clone()).unwrap_or_else(|| "auto".to_string());
+    let target_city = if scope == "national" {
+        None
+    } else {
+        clean(query.city.clone()).or(source_city)
+    };
     let target_category = clean(query.category.clone()).or(source_category);
     let target_unit = clean(query.price_unit.clone()).or(source_unit);
     let target_currency = source_observation.currency.to_ascii_uppercase();
