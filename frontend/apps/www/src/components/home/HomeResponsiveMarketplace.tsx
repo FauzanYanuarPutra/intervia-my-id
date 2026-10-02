@@ -1499,6 +1499,7 @@ function mapApiItemToPublicReference(
         ? contactValue
         : '',
     sourceContactType: contactValue ? 'whatsapp' : 'source',
+    sourceFacebookUrl: safeFacebookUrl,
     imageAttribution: readText(metadata.image_attribution),
     sourceKind,
   };
