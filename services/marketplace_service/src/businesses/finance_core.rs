@@ -338,6 +338,31 @@ impl FinanceCoreRepository {
         business_id: Uuid,
         organization_id: Uuid,
     ) -> Result<FinanceSummary, FinanceCoreError> {
+        self.summary_internal(business_id, organization_id, None, None).await
+    }
+
+    pub(crate) async fn summary_for_period(
+        &self,
+        business_id: Uuid,
+        organization_id: Uuid,
+        from: Option<NaiveDate>,
+        to: Option<NaiveDate>,
+    ) -> Result<FinanceSummary, FinanceCoreError> {
+        if let (Some(from), Some(to)) = (from, to) {
+            if from > to {
+                return Err(FinanceCoreError::Validation("invalid_finance_period"));
+            }
+        }
+        self.summary_internal(business_id, organization_id, from, to).await
+    }
+
+    async fn summary_internal(
+        &self,
+        business_id: Uuid,
+        organization_id: Uuid,
+        from: Option<NaiveDate>,
+        to: Option<NaiveDate>,
+    ) -> Result<FinanceSummary, FinanceCoreError> {
         let accounts = sqlx::query_as::<_, FinanceAccountBalance>(
             "SELECT account_key,balance FROM business_finance_account_balances WHERE business_id=$1 AND organization_id=$2 ORDER BY account_key",
         )
@@ -348,7 +373,17 @@ impl FinanceCoreRepository {
         let allocations = self
             .allocation_balances(business_id, organization_id)
             .await?;
-        let totals = finance_totals(&self.db, business_id, organization_id).await?;
+        let totals = match (from, to) {
+            (None, None) => finance_totals(&self.db, business_id, organization_id).await?,
+            (from, to) => finance_totals_for_period(
+                &self.db,
+                business_id,
+                organization_id,
+                from,
+                to,
+            )
+            .await?,
+        };
         Ok(build_summary(accounts, allocations, totals))
     }
 
@@ -1452,6 +1487,40 @@ async fn finance_totals(
     )
     .bind(business_id)
     .bind(organization_id)
+    .fetch_one(pool)
+    .await
+    .map_err(Into::into)
+}
+
+async fn finance_totals_for_period(
+    pool: &PgPool,
+    business_id: Uuid,
+    organization_id: Uuid,
+    from: Option<NaiveDate>,
+    to: Option<NaiveDate>,
+) -> Result<(i64, i64, i64, i64, i64, i64, i64), FinanceCoreError> {
+    sqlx::query_as::<_, (i64, i64, i64, i64, i64, i64, i64)>(
+        r#"SELECT
+           COALESCE(SUM(CASE WHEN lower(entry_type)='sale_income' THEN amount*effect_multiplier WHEN lower(entry_type)='sale_refund' THEN -amount*effect_multiplier ELSE 0 END),0)::bigint,
+           COALESCE(SUM(CASE WHEN lower(entry_type)='other_income' THEN amount*effect_multiplier ELSE 0 END),0)::bigint,
+           COALESCE(SUM(CASE WHEN lower(entry_type) IN ('payroll_expense','salary','rent_expense','rent','utilities_expense','utilities','transport_expense','transport','marketing_expense','marketing','equipment_expense','equipment','other_expense') THEN amount*effect_multiplier ELSE 0 END),0)::bigint,
+           COALESCE(SUM(CASE WHEN lower(entry_type) IN ('inventory_purchase','inventory_expense','ingredient_purchase','packaging_purchase') THEN amount*effect_multiplier ELSE 0 END),0)::bigint,
+           COALESCE(SUM(CASE WHEN lower(entry_type) IN ('capital_income','owner_capital') THEN amount*effect_multiplier ELSE 0 END),0)::bigint,
+           COALESCE(SUM(CASE WHEN lower(entry_type) IN ('owner_draw','owner_drawing') THEN amount*effect_multiplier ELSE 0 END),0)::bigint,
+           COALESCE(SUM(CASE
+             WHEN lower(account_key) IN ('cash','bank','ewallet') AND lower(entry_type) IN ('sale_income','other_income','capital_income','owner_capital','receivable_payment') THEN amount*effect_multiplier
+             WHEN lower(account_key) IN ('cash','bank','ewallet') AND lower(entry_type) IN ('inventory_purchase','inventory_expense','ingredient_purchase','packaging_purchase','payroll_expense','salary','rent_expense','rent','utilities_expense','utilities','transport_expense','transport','marketing_expense','marketing','equipment_expense','equipment','owner_draw','owner_drawing','payable_payment','other_expense','sale_refund') THEN -amount*effect_multiplier
+             ELSE 0 END),0)::bigint
+           FROM business_finance_entries
+           WHERE business_id=$1
+             AND organization_id=$2
+             AND ($3::date IS NULL OR occurred_on >= $3)
+             AND ($4::date IS NULL OR occurred_on <= $4)"#,
+    )
+    .bind(business_id)
+    .bind(organization_id)
+    .bind(from)
+    .bind(to)
     .fetch_one(pool)
     .await
     .map_err(Into::into)
