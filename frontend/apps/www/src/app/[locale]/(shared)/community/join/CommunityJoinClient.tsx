@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import type { LucideIcon } from 'lucide-react';
 import { ArrowRight, CheckCircle2, ExternalLink, Loader2, LogIn, ShieldCheck, Sparkles, Users } from 'lucide-react';
 import { Link, useRouter } from '@/i18n/navigation';
 import { useAuth } from '@/context/AuthContext';
@@ -92,14 +93,18 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
             </div>
           </div>
           <div className="mt-5 grid gap-2 sm:grid-cols-3">
-            {[
-              [LogIn, isId ? '1. Login' : '1. Log in'],
-              [CheckCircle2, isId ? '2. Minimal 1 listing aktif' : '2. At least 1 listing'],
-              [Users, isId ? '3. Dikelompokkan' : '3. Get grouped'],
-            ].map(([Icon, label]) => {
-              const StepIcon = Icon as typeof CheckCircle2;
-              return <div key={String(label)} className="rounded-2xl bg-zinc-50 px-3 py-3"><StepIcon className="h-4 w-4 text-emerald-600" /><p className="mt-2 text-xs font-extrabold text-zinc-900">{label}</p></div>;
-            })}
+            {(
+              [
+                [LogIn, isId ? '1. Login' : '1. Log in'],
+                [CheckCircle2, isId ? '2. Minimal 1 listing aktif' : '2. At least 1 listing'],
+                [Users, isId ? '3. Dikelompokkan' : '3. Get grouped'],
+              ] as Array<[LucideIcon, string]>
+            ).map(([StepIcon, label]) => (
+              <div key={label} className="rounded-2xl bg-zinc-50 px-3 py-3">
+                <StepIcon className="h-4 w-4 text-emerald-600" />
+                <p className="mt-2 text-xs font-extrabold text-zinc-900">{label}</p>
+              </div>
+            ))}
           </div>
         </header>
 
