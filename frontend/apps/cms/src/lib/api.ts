@@ -404,3 +404,23 @@ export const backofficeApi = {
     });
   },
 };
+
+
+// Community API (Community Service)
+export const communityApi = {
+  groups: async (token: string, params: Record<string, string> = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return fetchWithAuth(`/api/community/groups${query ? `?${query}` : ''}`, {
+      method: 'GET',
+      token,
+    });
+  },
+
+  updateGroup: async (token: string, id: string, data: Record<string, unknown>) => {
+    return fetchWithAuth(`/api/community/groups/${encodeURIComponent(id)}/permissions`, {
+      method: 'PATCH',
+      token,
+      body: JSON.stringify(data),
+    });
+  },
+};
