@@ -125,6 +125,90 @@ defmodule ChatServiceWeb.RoomController do
     end
   end
 
+  def rename(conn, %{"room_id" => room_id_raw} = params) do
+    room_id = room_id_raw |> URI.decode() |> String.trim()
+    room_name = normalize_text(params["room_name"], "")
+
+    cond do
+      room_id == "" ->
+        conn |> put_status(:bad_request) |> json(%{error: "invalid room_id"})
+      room_name == "" or byte_size(room_name) > 120 ->
+        conn |> put_status(:bad_request) |> json(%{error: "room_name must be 1-120 characters"})
+      true ->
+        current_user_id_bin = conn.assigns.current_user_id_bin
+        with {:ok, room} <- fetch_room_meta(room_id),
+             :ok <- authorize_group_manager(room_id, current_user_id_bin, room),
+             :ok <- ensure_group(room),
+             {:ok, members} <- fetch_room_members(room_id),
+             :ok <- update_room_name(room_id, room_name),
+             :ok <- execute_each(members, fn member_id -> update_user_room_name(room_id, member_id, room_name) end) do
+          broadcast_inbox_updated(room_id, members)
+          json(conn, %{data: %{room_id: room_id, room_name: room_name, room_type: room.room_type}})
+        else
+          {:error, :not_found} -> conn |> put_status(:not_found) |> json(%{error: "room not found or access denied"})
+          {:error, :forbidden} -> conn |> put_status(:forbidden) |> json(%{error: "owner or admin role required"})
+          {:error, :not_group} -> conn |> put_status(:bad_request) |> json(%{error: "room is not a group"})
+          _reason -> storage_unavailable(conn, "group rename")
+        end
+    end
+  end
+
+  def remove_member(conn, %{"room_id" => room_id_raw} = params) do
+    room_id = room_id_raw |> URI.decode() |> String.trim()
+    member_id_raw = normalize_text(params["member_id"], "")
+
+    if room_id == "" or member_id_raw == "" do
+      conn |> put_status(:bad_request) |> json(%{error: "room_id and member_id are required"})
+    else
+      current_user_id_bin = conn.assigns.current_user_id_bin
+
+      with {:ok, room} <- fetch_room_meta(room_id),
+           :ok <- authorize_group_manager(room_id, current_user_id_bin, room),
+           :ok <- ensure_group(room),
+           {:ok, member_id_bin} <- cast_member_id(member_id_raw),
+           {:ok, role} <- room_member_role(room_id, member_id_bin),
+           :ok <- ensure_removable_group_member(role),
+           :ok <- delete_room_member(room_id, member_id_bin),
+           :ok <- delete_user_room_state(room_id, member_id_bin) do
+        broadcast_inbox_updated(room_id, [member_id_bin, current_user_id_bin])
+        json(conn, %{data: %{room_id: room_id, removed_user_id: Ecto.UUID.cast!(member_id_bin)}})
+      else
+        {:error, :invalid_member_id} -> conn |> put_status(:bad_request) |> json(%{error: "invalid member_id"})
+        {:error, :owner_cannot_be_removed} -> conn |> put_status(:conflict) |> json(%{error: "group owner cannot be removed"})
+        {:error, :member_not_found} -> conn |> put_status(:not_found) |> json(%{error: "member not found"})
+        {:error, :not_found} -> conn |> put_status(:not_found) |> json(%{error: "room not found or access denied"})
+        {:error, :forbidden} -> conn |> put_status(:forbidden) |> json(%{error: "owner or admin role required"})
+        {:error, :not_group} -> conn |> put_status(:bad_request) |> json(%{error: "room is not a group"})
+        _reason -> storage_unavailable(conn, "group member removal")
+      end
+    end
+  end
+
+  def leave(conn, %{"room_id" => room_id_raw}) do
+    room_id = room_id_raw |> URI.decode() |> String.trim()
+    current_user_id_bin = conn.assigns.current_user_id_bin
+
+    if room_id == "" do
+      conn |> put_status(:bad_request) |> json(%{error: "invalid room_id"})
+    else
+      with {:ok, room} <- fetch_room_meta(room_id),
+           :ok <- ensure_group(room),
+           {:ok, role} <- room_member_role(room_id, current_user_id_bin),
+           :ok <- ensure_member_can_leave(role),
+           :ok <- delete_room_member(room_id, current_user_id_bin),
+           :ok <- delete_user_room_state(room_id, current_user_id_bin) do
+        broadcast_inbox_updated(room_id, [current_user_id_bin])
+        json(conn, %{data: %{room_id: room_id, left: true}})
+      else
+        {:error, :owner_cannot_leave} -> conn |> put_status(:conflict) |> json(%{error: "group owner must transfer ownership before leaving"})
+        {:error, :not_member} -> conn |> put_status(:not_found) |> json(%{error: "member not found"})
+        {:error, :not_found} -> conn |> put_status(:not_found) |> json(%{error: "room not found or access denied"})
+        {:error, :not_group} -> conn |> put_status(:bad_request) |> json(%{error: "room is not a group"})
+        _reason -> storage_unavailable(conn, "group leave")
+      end
+    end
+  end
+
   def members(conn, %{"room_id" => room_id_raw}) do
     room_id = room_id_raw |> URI.decode() |> String.trim()
     current_user_id_bin = conn.assigns.current_user_id_bin
@@ -144,6 +228,49 @@ defmodule ChatServiceWeb.RoomController do
         _reason ->
           storage_unavailable(conn, "room member lookup")
       end
+    end
+  end
+
+  defp cast_member_id(value) when is_binary(value) do
+    case Ecto.UUID.dump(value) do
+      {:ok, binary} -> {:ok, binary}
+      :error -> {:error, :invalid_member_id}
+    end
+  end
+
+  defp cast_member_id(_value), do: {:error, :invalid_member_id}
+  defp ensure_removable_group_member("owner"), do: {:error, :owner_cannot_be_removed}
+  defp ensure_removable_group_member(nil), do: {:error, :member_not_found}
+  defp ensure_removable_group_member(_role), do: :ok
+  defp ensure_member_can_leave("owner"), do: {:error, :owner_cannot_leave}
+  defp ensure_member_can_leave(nil), do: {:error, :not_member}
+  defp ensure_member_can_leave(_role), do: :ok
+
+  defp update_room_name(room_id, room_name) do
+    case Repo.execute("UPDATE rooms SET room_name = ? WHERE room_id = ?", [{"text", room_name}, {"text", room_id}]) do
+      {:ok, _} -> :ok
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp update_user_room_name(room_id, user_id_bin, room_name) do
+    case Repo.execute("UPDATE user_room_state SET room_name = ? WHERE user_id = ? AND room_id = ?", [{"text", room_name}, {"uuid", user_id_bin}, {"text", room_id}]) do
+      {:ok, _} -> :ok
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp delete_room_member(room_id, user_id_bin) do
+    case Repo.execute("DELETE FROM room_members WHERE room_id = ? AND user_id = ?", [{"text", room_id}, {"uuid", user_id_bin}]) do
+      {:ok, _} -> :ok
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp delete_user_room_state(room_id, user_id_bin) do
+    case Repo.execute("DELETE FROM user_room_state WHERE user_id = ? AND room_id = ?", [{"uuid", user_id_bin}, {"text", room_id}]) do
+      {:ok, _} -> :ok
+      {:error, reason} -> {:error, reason}
     end
   end
 

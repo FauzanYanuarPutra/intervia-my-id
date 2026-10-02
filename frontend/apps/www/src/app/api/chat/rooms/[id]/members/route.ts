@@ -99,3 +99,35 @@ export async function POST(
     );
   }
 }
+
+
+export async function DELETE(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> },
+) {
+  const { id } = await context.params;
+  const roomId = safeDecodeRoomId(id);
+  try {
+    const auth = await requireAuth(req);
+    if (!auth.ok) return auth.res;
+    const body = await req.json().catch(() => ({}));
+    const memberId = typeof body?.member_id === 'string' ? body.member_id.trim() : '';
+    if (!memberId) {
+      return NextResponse.json({ error: 'member_id is required' }, { status: 400 });
+    }
+    const pathSegment = encodeURIComponent(roomId);
+    const res = await fetch(`${CHAT_URL}/api/v1/rooms/${pathSegment}/members`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${auth.ctx.token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ member_id: memberId }),
+    });
+    const data = await res.json().catch(() => ({}));
+    return NextResponse.json(data, { status: res.status });
+  } catch (error) {
+    console.error('[CHAT_ROOM_MEMBER_DELETE_ERROR]', error);
+    return NextResponse.json({ error: 'Chat service unavailable' }, { status: 503 });
+  }
+}

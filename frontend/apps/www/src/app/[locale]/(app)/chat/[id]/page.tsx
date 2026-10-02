@@ -90,6 +90,7 @@ import { soundManager } from '@/lib/soundManager';
 import { closeBrowserNotificationsByTag } from '@/lib/browserNotifications';
 import { ChatDetailSkeleton } from '@/components/system/feedback/RouteSkeletons';
 import { ChatSafetyControls } from '@/components/chat/ChatSafetyControls';
+import { ChatGroupControls } from '@/components/chat/ChatGroupControls';
 import { Modal } from '@/components/common/Modal';
 import { trackLajukanEvent } from '@/lib/analytics/lajukanEvents';
 import {
@@ -9949,6 +9950,21 @@ export default function ChatRoomPage() {
               locale={chatLocale}
               onBlockedChange={setIsPeerBlocked}
             />
+
+            {roomKind === 'group' && user?.id ? (
+              <ChatGroupControls
+                roomId={canonicalRoomId}
+                currentUserId={user.id}
+                locale={chatLocale}
+                authFetch={authFetch}
+                onRoomRenamed={setRoomName}
+                onLeft={() => {
+                  setShowChatSettings(false);
+                  router.push('/chat');
+                  void refetchInbox();
+                }}
+              />
+            ) : null}
 
             <div className="rounded-[20px] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-3">
               <p className="text-xs font-bold text-[color:var(--app-text)]">
