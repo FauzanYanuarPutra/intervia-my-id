@@ -337,7 +337,8 @@ impl DataResetRepository {
             labels,
             counts,
             warnings,
-            can_apply: counts.sales_in_closed_period == 0 && !full_reset_blocked_by_protected_orders,
+            can_apply: counts.sales_in_closed_period == 0
+                && !full_reset_blocked_by_protected_orders,
         })
     }
 

@@ -229,16 +229,23 @@ async fn ensure_reset_schema_ready(db: &sqlx::PgPool) -> Result<(), Response> {
     )
     .fetch_one(db)
     .await
-    .map_err(|_| api_error(StatusCode::SERVICE_UNAVAILABLE, "business_data_reset_storage_unavailable"))?;
+    .map_err(|_| {
+        api_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "business_data_reset_storage_unavailable",
+        )
+    })?;
 
     if ready {
         return Ok(());
     }
 
-    sqlx::migrate!("./migrations")
-        .run(db)
-        .await
-        .map_err(|_| api_error(StatusCode::SERVICE_UNAVAILABLE, "business_data_reset_storage_unavailable"))?;
+    sqlx::migrate!("./migrations").run(db).await.map_err(|_| {
+        api_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "business_data_reset_storage_unavailable",
+        )
+    })?;
 
     let ready_after_migration = sqlx::query_scalar::<_, bool>(
         r#"
@@ -271,7 +278,12 @@ async fn ensure_reset_schema_ready(db: &sqlx::PgPool) -> Result<(), Response> {
     )
     .fetch_one(db)
     .await
-    .map_err(|_| api_error(StatusCode::SERVICE_UNAVAILABLE, "business_data_reset_storage_unavailable"))?;
+    .map_err(|_| {
+        api_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "business_data_reset_storage_unavailable",
+        )
+    })?;
 
     if ready_after_migration {
         Ok(())
@@ -297,10 +309,7 @@ fn reset_error_response(error: ResetError) -> Response {
                 StatusCode::SERVICE_UNAVAILABLE,
                 "business_data_reset_storage_unavailable",
             ),
-            _ => api_error(
-                StatusCode::CONFLICT,
-                "business_data_reset_sales_failed",
-            ),
+            _ => api_error(StatusCode::CONFLICT, "business_data_reset_sales_failed"),
         },
         ResetError::Finance(error) => match error {
             FinanceCoreError::Database => api_error(
