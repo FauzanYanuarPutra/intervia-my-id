@@ -24,17 +24,23 @@ export default async function NewBusinessPage({
 
   const account = state.account;
   const businesses = state.businesses;
+  const hasExistingBusinesses = businesses.length > 0;
+  const pageTitle = hasExistingBusinesses ? 'Tambah usaha lain' : 'Tambah usaha';
 
   return (
-    <PortalShell activeBusiness={null} availableBusinesses={businesses} viewerName={account.name} currentSection="home" pageTitle="Tambah usaha">
-      <div className="mx-auto max-w-3xl space-y-4 py-1 sm:py-3">
-        <ExistingBusinessesPanel businesses={businesses} />
-
+    <PortalShell activeBusiness={null} availableBusinesses={businesses} viewerName={account.name} currentSection="home" pageTitle={pageTitle}>
+      <div className="mx-auto max-w-3xl space-y-4 py-1 pb-8 sm:py-3">
         <PageHeader
           eyebrow="Mulai"
-          title="Tambah usaha"
-          description="Isi yang penting dulu. Produk, stok, uang, dan pengaturan lain bisa dilengkapi setelah usaha dibuat."
+          title={pageTitle}
+          description={
+            hasExistingBusinesses
+              ? 'Akun ini sudah punya usaha. Cek dulu usaha yang ada supaya tidak membuat data ganda.'
+              : 'Isi yang penting dulu. Produk, stok, uang, dan pengaturan lain bisa dilengkapi setelah usaha dibuat.'
+          }
         />
+
+        <ExistingBusinessesPanel businesses={businesses} />
 
         <section id="new-business-form" className="merchant-surface-bordered scroll-mt-24 overflow-hidden">
           <div className="grid grid-cols-3 divide-x divide-portal-line/70 border-b border-portal-line/70 bg-[#fafbf9]">
