@@ -139,6 +139,7 @@ import {
   type LajukanExploreCategoryId,
 } from '@/lib/discovery/lajukanCategories';
 import { cn } from '@/lib/utils';
+import { BrandSocialIcon } from '@/components/common/BrandSocialIcon';
 import { trackLajukanEvent } from '@/lib/analytics/lajukanEvents';
 import type { GlobalSearchItem } from '@/lib/search/globalSearch';
 import useEmblaCarousel from 'embla-carousel-react';
@@ -535,6 +536,7 @@ type PublicReferenceItem = {
   sourceLicenseUrl: string;
   sourceContactUrl: string;
   sourceContactType: 'whatsapp' | 'source';
+  sourceFacebookUrl: string;
   imageAttribution: string;
   clusterKey?: string;
   sourceKind: 'lajukan' | 'registered' | 'reference';
@@ -1341,6 +1343,7 @@ function mapContentToPublicReference(
     sourceLicenseUrl: reference.sourceLicenseUrl,
     sourceContactUrl: reference.sourceContactUrl,
     sourceContactType: reference.sourceContactType,
+    sourceFacebookUrl: reference.sourceFacebookUrl,
     imageAttribution:
       reference.imageAttribution || contentImageAttribution(item),
     sourceKind: 'reference',
@@ -1401,6 +1404,26 @@ function mapApiItemToPublicReference(
     lng: Number(metadata.longitude) || 0,
     metadata,
   });
+
+  const facebookValue =
+    readText(metadata.facebook_url) ||
+    readText(metadata.facebookUrl) ||
+    readText(metadata.facebook) ||
+    readText(metadata.contact_facebook) ||
+    readText(metadata.contactFacebook);
+
+  const safeFacebookUrl = (() => {
+    if (!facebookValue) return '';
+    try {
+      const parsed = new URL(facebookValue);
+      const hostname = parsed.hostname.toLowerCase();
+      return ['facebook.com', 'www.facebook.com', 'm.facebook.com', 'fb.me'].includes(hostname)
+        ? parsed.toString()
+        : '';
+    } catch {
+      return '';
+    }
+  })();
 
   const contactValue =
     readText(metadata.whatsapp_url) ||
@@ -2924,25 +2947,30 @@ export function PublicReferencesSection({
                     href={item.sourceContactUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    aria-label={
-                      isId
-                        ? item.sourceContactType === 'whatsapp'
-                          ? 'Hubungi via WhatsApp'
-                          : 'Hubungi sumber'
-                        : item.sourceContactType === 'whatsapp'
-                          ? 'Contact via WhatsApp'
-                          : 'Contact source'
-                    }
-                    className="inline-flex min-h-7 shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2 text-[8px] font-bold text-emerald-700 ring-1 ring-emerald-100"
+                    aria-label={item.sourceContactType === 'whatsapp' ? 'Hubungi via WhatsApp' : isId ? 'Hubungi sumber' : 'Contact source'}
+                    className="inline-flex min-h-7 shrink-0 items-center gap-1 rounded-full bg-[#e9f9ef] px-2 text-[8px] font-bold text-[#128c4a] ring-1 ring-[#b7ebc9]"
                   >
-                    <MessageCircle className="h-2.5 w-2.5" />
-                    {item.sourceContactType === 'whatsapp'
-                      ? 'WhatsApp'
-                      : isId
-                        ? 'Kontak'
-                        : 'Contact'}
+                    {item.sourceContactType === 'whatsapp' ? (
+                      <BrandSocialIcon brand="whatsapp" className="h-2.5 w-2.5" />
+                    ) : (
+                      <MessageCircle className="h-2.5 w-2.5" />
+                    )}
+                    {item.sourceContactType === 'whatsapp' ? 'WhatsApp' : isId ? 'Kontak' : 'Contact'}
                   </a>
-                ) : (
+                ) : null}
+                {item.sourceFacebookUrl ? (
+                  <a
+                    href={item.sourceFacebookUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="Facebook"
+                    className="inline-flex min-h-7 shrink-0 items-center gap-1 rounded-full bg-[#edf3ff] px-2 text-[8px] font-bold text-[#1877f2] ring-1 ring-[#b9cdf5]"
+                  >
+                    <BrandSocialIcon brand="facebook" className="h-2.5 w-2.5" />
+                    Facebook
+                  </a>
+                ) : null}
+                {!item.sourceContactUrl && !item.sourceFacebookUrl ? (
                   <span className="inline-flex shrink-0 items-center gap-0.5 text-[8px] font-semibold text-blue-600">
                     {item.sourceKind === 'reference'
                       ? isId
