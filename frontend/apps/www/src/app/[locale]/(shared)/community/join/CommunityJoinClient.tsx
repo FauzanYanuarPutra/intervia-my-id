@@ -3,24 +3,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowRight,
-  Bell,
   CheckCircle2,
   ExternalLink,
-  Handshake,
   Loader2,
   LogIn,
   MessageCircle,
-  Package,
-  Search,
   ShieldCheck,
   Sparkles,
-  Store,
-  Truck,
   Users,
-  Wheat,
   X,
 } from 'lucide-react';
-import { Link, useRouter } from '@/i18n/navigation';
+import { Link } from '@/i18n/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { extractContentItems, type ContentItem } from '@/lib/content/catalog';
 import { classifyCommunityJoinRole, hasCommunityJoinReadyListing } from '@/lib/community/communityJoin';
@@ -113,7 +106,6 @@ function listingLabel(item: ContentItem): string {
 
 export default function CommunityJoinClient({ isId }: { isId: boolean }) {
   const { isAuthenticated } = useAuth();
-  const router = useRouter();
   const [listings, setListings] = useState<ContentItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
