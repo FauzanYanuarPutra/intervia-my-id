@@ -3556,10 +3556,10 @@ async fn create_group(
         INSERT INTO lajukan_groups
           (
             id, category_id, name, slug, description, privacy,
-            posting_permission, membership_permission, avatar_url, cover_url, rules,
+            posting_permission, membership_permission, avatar_url, cover_url, whatsapp_join_url, rules,
             created_by_user_id, status, created_at, updated_at
           )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'active', now(), now())
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'active', now(), now())
         "#,
     )
     .bind(&group_id)
@@ -3572,6 +3572,7 @@ async fn create_group(
     .bind(&membership_permission)
     .bind(&avatar_url)
     .bind(&cover_url)
+    .bind(&whatsapp_join_url)
     .bind(&rules)
     .bind(&forum_user.id)
     .execute(&mut *tx)
@@ -3752,7 +3753,8 @@ async fn update_group_permissions(
             membership_permission = $6,
             avatar_url = $7,
             cover_url = $8,
-            rules = $9,
+            whatsapp_join_url = $9,
+            rules = $10,
             updated_at = now()
         WHERE id = $1
         "#,
@@ -3765,6 +3767,7 @@ async fn update_group_permissions(
     .bind(&membership_permission)
     .bind(&avatar_url)
     .bind(&cover_url)
+    .bind(&whatsapp_join_url)
     .bind(&rules)
     .execute(&mut *tx)
     .await
