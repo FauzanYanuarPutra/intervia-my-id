@@ -7555,14 +7555,17 @@ export default function ChatRoomPage() {
                           />
                         )}
                         {status === 'sent' && (
-                          <Check
-                            className="h-3 w-3"
-                            aria-label={
-                              chatLocale === 'id'
-                                ? 'Terkirim ke Lajukan'
-                                : 'Sent to Lajukan'
-                            }
-                          />
+                          msg.read_at ? (
+                            <span className="inline-flex items-center" aria-label={chatLocale === 'id' ? 'Sudah dibaca' : 'Read'}>
+                              <Check className="h-3 w-3 text-[#53bdeb]" />
+                              <Check className="-ml-1.5 h-3 w-3 text-[#53bdeb]" />
+                            </span>
+                          ) : (
+                            <Check
+                              className="h-3 w-3"
+                              aria-label={chatLocale === 'id' ? 'Terkirim' : 'Sent'}
+                            />
+                          )
                         )}
                         {status === 'failed' && (
                           <AlertCircle
