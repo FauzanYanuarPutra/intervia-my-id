@@ -37,7 +37,7 @@ export function EmblaInlineRail({
   return (
     <div
       ref={viewportRef}
-      className={['w-full min-w-0 overflow-hidden overscroll-x-contain', className]
+      className={['w-full min-w-0 overflow-hidden overscroll-x-contain touch-pan-y', className]
         .filter(Boolean)
         .join(' ')}
     >
