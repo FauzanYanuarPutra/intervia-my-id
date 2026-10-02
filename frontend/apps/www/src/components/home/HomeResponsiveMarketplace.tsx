@@ -2709,7 +2709,14 @@ function HomeListingCarouselSection({
 
       {items.length === 0 ? (
         <div className="mt-1.5 px-2 sm:px-3 md:px-4 lg:px-6">
-          <div className="rounded-xl border border-dashed border-zinc-200 bg-zinc-50/60 px-3 py-4 text-center dark:border-zinc-800 dark:bg-zinc-900/40">
+          <div
+            className={cn(
+              'rounded-[16px] border border-dashed px-3 py-4 text-center',
+              isDemand
+                ? 'border-amber-200 bg-amber-50/55 dark:border-amber-900/60 dark:bg-amber-950/20'
+                : 'border-emerald-200 bg-emerald-50/55 dark:border-emerald-900/60 dark:bg-emerald-950/20',
+            )}
+          >
             <p className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400 sm:text-[11px]">
               {isDemand
                 ? isId
@@ -2729,11 +2736,11 @@ function HomeListingCarouselSection({
           >
             <div
               className="
-                flex min-w-0 touch-pan-y gap-2
+                flex min-w-0 touch-pan-y gap-2.5
                 px-2 py-0.5
-                sm:gap-2.5 sm:px-3
+                sm:gap-3 sm:px-3
                 md:px-4
-                lg:gap-3 lg:px-6
+                lg:gap-3.5 lg:px-6
                 [backface-visibility:hidden]
               "
             >
@@ -2742,13 +2749,13 @@ function HomeListingCarouselSection({
                   key={item.id}
                   className="
                     min-w-0 shrink-0 grow-0 select-none
-                    basis-[calc((100vw-28px)/2.08)]
-                    min-[390px]:basis-[calc((100vw-34px)/2.15)]
-                    sm:basis-[180px]
-                    md:basis-[190px]
-                    lg:basis-[200px]
-                    xl:basis-[210px]
-                    2xl:basis-[220px]
+                    basis-[78vw]
+                    min-[430px]:basis-[72vw]
+                    sm:basis-[210px]
+                    md:basis-[225px]
+                    lg:basis-[240px]
+                    xl:basis-[250px]
+                    2xl:basis-[260px]
                   "
                   style={{ backfaceVisibility: 'hidden' }}
                 >
@@ -2847,22 +2854,26 @@ export function PublicReferencesSection({
             [will-change:transform]
           "
         >
-          {items.map(item => (
+          {clusteredItems.map(item => (
             <article
               key={item.id}
               className="
                 flex
-                w-[min(76vw,240px)]
+                w-[min(82vw,280px)]
                 shrink-0
                 flex-col
                 overflow-hidden
-                rounded-xl
-                border border-zinc-200/80
+                rounded-[18px]
+                border border-emerald-100/80
                 bg-white
-                transition-colors
-                hover:border-zinc-300
-                sm:w-[230px]
-                md:w-[240px]
+                shadow-[0_8px_24px_-22px_rgba(15,23,42,0.35)]
+                transition-[border-color,transform,box-shadow]
+                hover:-translate-y-0.5
+                hover:border-emerald-200
+                hover:shadow-[0_14px_30px_-24px_rgba(16,185,129,0.35)]
+                sm:w-[250px]
+                md:w-[270px]
+                lg:w-[280px]
               "
               style={{ backfaceVisibility: 'hidden' }}
             >
@@ -2906,8 +2917,8 @@ export function PublicReferencesSection({
                       max-w-[calc(100%-16px)]
                       truncate rounded-full
                       bg-white/90 px-2 py-0.5
-                      text-[8px] font-semibold
-                      text-zinc-600
+                      text-[8px] font-bold
+                      text-slate-700 dark:text-slate-200
                       backdrop-blur
                     "
                   >
@@ -2933,7 +2944,7 @@ export function PublicReferencesSection({
                       text-[11px]
                       font-bold
                       leading-4
-                      text-zinc-900
+                      text-slate-900 dark:text-slate-100
                       transition-colors
                       group-hover:text-blue-700
                     "
@@ -2953,7 +2964,7 @@ export function PublicReferencesSection({
                   </h3>
 
                   {item.location ? (
-                    <p className="mt-1 flex min-w-0 items-center gap-1 text-[9px] font-medium text-zinc-500">
+                    <p className="mt-1 flex min-w-0 items-center gap-1 text-[9px] font-semibold text-slate-500 dark:text-slate-400">
                       <MapPin className="h-3 w-3 shrink-0 text-zinc-400" />
 
                       <span className="truncate">
@@ -3100,8 +3111,8 @@ function RecommendationCard({
       className={cn(
         'group flex h-full min-w-0 w-full flex-col overflow-hidden rounded-2xl text-left shadow-[0_1px_2px_rgba(0,0,0,0.025)] transition-all duration-200 ease-out hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
         isDemand
-          ? 'border border-blue-200/90 bg-blue-50/45 hover:border-blue-300 hover:shadow-[0_10px_28px_-18px_rgba(37,99,235,0.24)] focus-visible:ring-blue-500/70 dark:border-blue-900/70 dark:bg-blue-950/25 dark:hover:border-blue-800 dark:hover:shadow-[0_10px_28px_-18px_rgba(37,99,235,0.28)]'
-          : 'border border-zinc-200/80 bg-white hover:border-zinc-300 hover:shadow-[0_10px_28px_-18px_rgba(0,0,0,0.22)] focus-visible:ring-emerald-500/70 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700 dark:hover:shadow-[0_10px_28px_-18px_rgba(0,0,0,0.55)]',
+          ? 'border border-amber-200/90 bg-amber-50/55 hover:border-amber-300 hover:bg-amber-50 focus-visible:ring-amber-500/70 dark:border-amber-900/70 dark:bg-amber-950/20 dark:hover:border-amber-800'
+          : 'border border-emerald-100/90 bg-white hover:border-emerald-200 hover:bg-emerald-50/30 focus-visible:ring-emerald-500/70 dark:border-emerald-900/60 dark:bg-slate-950 dark:hover:border-emerald-800',
       )}
     >
       {/* IMAGE */}
@@ -3109,8 +3120,8 @@ function RecommendationCard({
         className={cn(
           'relative aspect-[4/3] w-full shrink-0 overflow-hidden',
           isDemand
-            ? 'bg-blue-100 dark:bg-blue-950/60'
-            : 'bg-zinc-100 dark:bg-zinc-900',
+            ? 'bg-amber-100 dark:bg-amber-950/45'
+            : 'bg-emerald-50 dark:bg-emerald-950/30',
         )}
       >
         {image ? (
@@ -3156,8 +3167,8 @@ function RecommendationCard({
             cn(
               'absolute inset-0 flex-col items-center justify-center gap-2 px-4 text-center',
               isDemand
-                ? 'bg-[linear-gradient(135deg,#eff6ff_0%,#dbeafe_55%,#f0f9ff_100%)] dark:bg-[linear-gradient(135deg,#172554_0%,#0c4a6e_55%,#082f49_100%)]'
-                : 'bg-[linear-gradient(135deg,#ecfdf5_0%,#f8fafc_55%,#fff7ed_100%)] dark:bg-[linear-gradient(135deg,#052e24_0%,#0f172a_60%,#1c1917_100%)]',
+                ? 'bg-[linear-gradient(135deg,#fff7ed_0%,#fffbeb_55%,#fef3c7_100%)] dark:bg-[linear-gradient(135deg,#451a03_0%,#422006_58%,#1c1917_100%)]'
+                : 'bg-[linear-gradient(135deg,#ecfdf5_0%,#f8fafc_55%,#ecfeff_100%)] dark:bg-[linear-gradient(135deg,#052e24_0%,#0f172a_60%,#062b2b_100%)]',
             ),
           )}
         >
@@ -3165,7 +3176,7 @@ function RecommendationCard({
             className={cn(
               'grid h-10 w-10 place-items-center rounded-2xl shadow-sm ring-1',
               isDemand
-                ? 'bg-blue-600/10 text-blue-700 ring-blue-200 dark:bg-blue-400/10 dark:text-blue-200 dark:ring-blue-800'
+                ? 'bg-amber-600/10 text-amber-700 ring-amber-200 dark:bg-amber-400/10 dark:text-amber-200 dark:ring-amber-800'
                 : 'bg-white/80 text-emerald-700 ring-emerald-100 dark:bg-slate-950/60 dark:text-emerald-300 dark:ring-white/10',
             )}
           >
@@ -3214,8 +3225,8 @@ function RecommendationCard({
             className={cn(
               'absolute left-2 top-2 max-w-[72%] truncate rounded-full border px-2.5 py-1.5 text-[8px] font-bold leading-none shadow-sm backdrop-blur-md sm:text-[9px]',
               isDemand
-                ? 'border-blue-100/70 bg-blue-700/90 text-white dark:border-blue-700/70 dark:bg-blue-950/85'
-                : 'border-white/20 bg-black/55 text-white',
+                ? 'border-amber-100/70 bg-amber-600/90 text-white dark:border-amber-700/70 dark:bg-amber-950/85'
+                : 'border-white/20 bg-emerald-950/70 text-white',
             )}
           >
             {item.typeLabel}
@@ -3288,7 +3299,7 @@ function RecommendationCard({
         {locationLabel ? (
           <p
             title={locationLabel}
-            className="mt-1.5 flex min-w-0 items-center gap-1.5 truncate text-[9px] font-semibold leading-4 text-slate-500 dark:text-slate-400 min-[360px]:text-[10px] sm:text-[11px]"
+            className="mt-1.5 flex min-w-0 items-center gap-1.5 truncate text-[9px] font-semibold leading-4 text-slate-600 dark:text-slate-400 min-[360px]:text-[10px] sm:text-[11px]"
           >
             <MapPin className="h-3 w-3 shrink-0" aria-hidden="true" />
             <span className="truncate">{locationLabel}</span>
