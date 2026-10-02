@@ -24,13 +24,14 @@ defmodule ChatService.UnreadStateTest do
 
     assert_receive {:execute, projection_query, projection_params}
     assert projection_query =~ "UPDATE user_room_state USING TIMESTAMP ?"
-    assert projection_query =~ "SET unread_count = ?"
+    assert projection_query =~ "SET unread_count = ?, last_read_at = ?"
     refute projection_query =~ "last_message"
     refute projection_query =~ "last_message_at"
 
     assert projection_params == [
              {"bigint", @write_timestamp},
              {"int", 0},
+             {"timestamp", DateTime.from_unix!(@write_timestamp, :microsecond)},
              {"uuid", @user_id},
              {"text", @room_id}
            ]
