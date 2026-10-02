@@ -4648,7 +4648,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
         inviteDescription:
           'Login untuk simpan favorit, lanjut chat, dan dapat rekomendasi yang makin relevan.',
         inviteButton: 'Daftar Sekarang',
-        searchPlaceholder: 'Cari supplier, jasa, lokasi...',
+        searchPlaceholder: 'Cari produk, supplier, jasa, mesin, tempat...',
         searchButton: 'Cari',
       }
     : {
@@ -4710,7 +4710,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
           {
             id: 'explore',
             label: isId ? 'Jelajahi' : 'Explore',
-            caption: isId ? 'Cari usaha, produk, dan jasa' : 'Find businesses, products, and services',
+            caption: isId ? 'Cari produk, jasa, supplier, mesin, dan tempat' : 'Find products, services, suppliers, equipment, and places',
             href: '/explore',
             icon: Search,
           },
@@ -4730,7 +4730,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
           },
           {
             id: 'reels',
-            label: isId ? 'Reels Bisnis' : 'Business Reels',
+            label: isId ? 'Video Usaha' : 'Business Videos',
             caption: isId ? 'Tips singkat' : 'Short inspiration and tips',
             href: '/reels',
             icon: PlayCircle,
@@ -4853,7 +4853,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
           },
           {
             id: 'reels',
-            label: isId ? 'Reels' : 'Business Reels',
+            label: isId ? 'Video Usaha' : 'Business Videos',
             caption: isId ? 'Tips singkat' : 'Short inspiration and tips',
             href: '/reels',
             icon: PlayCircle,
