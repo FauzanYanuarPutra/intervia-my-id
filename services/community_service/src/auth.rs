@@ -238,6 +238,18 @@ mod tests {
     }
 
     #[test]
+    fn cms_super_admin_role_is_a_moderator() {
+        let actor = AuthActor {
+            user_id: "user".to_string(),
+            roles: vec!["super_admin".to_string()],
+            username: None,
+            email: None,
+            name: None,
+        };
+        assert!(is_moderator(&actor));
+    }
+
+    #[test]
     fn production_like_environments_reject_hs256_access_tokens() {
         assert!(resolve_access_token_algorithm("HS256", true).is_none());
         assert_eq!(
