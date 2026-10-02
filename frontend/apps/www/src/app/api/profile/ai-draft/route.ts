@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
         },
         use_rag: false,
         response_mode: 'json',
-        max_tokens: 1200,
+        max_tokens: 800,
       }),
     });
 
