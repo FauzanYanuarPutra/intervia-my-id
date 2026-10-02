@@ -1,7 +1,6 @@
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { Children, ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
-import useEmblaCarousel from 'embla-carousel-react';
-import { useEmblaWheelGestures } from '@/components/common/useEmblaWheelGestures';
+import { useLajukanEmbla } from '@/components/common/useLajukanEmbla';
 
 type HorizontalRailProps = {
   children: ReactNode;
@@ -20,11 +19,17 @@ export function HorizontalRail({
 }: HorizontalRailProps) {
   const items = useMemo(() => Children.toArray(children), [children]);
   const childCount = items.length;
-  const [railRef, railApi] = useEmblaCarousel({
+  const [railRef, railApi] = useLajukanEmbla({
     align: 'start',
     containScroll: 'trimSnaps',
     dragFree: false,
     loop: false,
+    skipSnaps: false,
+    wheel: {
+      enabled: true,
+      desktopOnly: true,
+      threshold: 42,
+    },
   });
 
   const [activeIndex, setActiveIndex] = useState(0);
@@ -40,12 +45,6 @@ export function HorizontalRail({
     setCanGoNext(railApi.canScrollNext());
     setHasOverflow(railApi.scrollSnapList().length > 1);
   }, [railApi]);
-
-  useEmblaWheelGestures(railApi, {
-    enabled: true,
-    desktopOnly: true,
-    threshold: 42,
-  });
 
   useEffect(() => {
     if (!railApi) return;
