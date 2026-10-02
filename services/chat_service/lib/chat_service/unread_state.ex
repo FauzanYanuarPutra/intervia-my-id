@@ -43,7 +43,7 @@ defmodule ChatService.UnreadState do
              [
                {"bigint", write_timestamp},
                {"int", 0},
-               {"timestamp", DateTime.utc_now()},
+               {"timestamp", DateTime.from_unix!(write_timestamp, :microsecond)},
                {"uuid", user_id_bin},
                {"text", room_id}
              ]
