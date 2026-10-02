@@ -3513,7 +3513,10 @@ async fn create_group(
     let had_whatsapp_join_url = payload.whatsapp_join_url.is_some();
     let whatsapp_join_url = normalize_whatsapp_join_url(payload.whatsapp_join_url);
     if had_whatsapp_join_url && whatsapp_join_url.is_none() {
-        return Err(ApiError::new(StatusCode::BAD_REQUEST, "whatsapp_join_url must be a WhatsApp https URL"));
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "whatsapp_join_url must be a WhatsApp https URL",
+        ));
     }
     let rules = {
         let clean = sanitize_group_rules(payload.rules);
@@ -8662,9 +8665,7 @@ fn calculate_hot_score(
 fn normalize_whatsapp_join_url(value: Option<String>) -> Option<String> {
     let value = clean_optional(value)?;
     let lower = value.to_ascii_lowercase();
-    if lower.starts_with("https://chat.whatsapp.com/")
-        || lower.starts_with("https://wa.me/")
-    {
+    if lower.starts_with("https://chat.whatsapp.com/") || lower.starts_with("https://wa.me/") {
         Some(value)
     } else {
         None
