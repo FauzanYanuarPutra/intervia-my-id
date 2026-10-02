@@ -163,6 +163,7 @@ type Message = {
   attachments?: string[];
   created_at: string;
   status?: MessageStatus;
+  read_at?: string | null;
   reference?: MessageReference | null;
 };
 
@@ -2675,6 +2676,8 @@ export default function ChatRoomPage() {
   ]);
 
   const [messages, setMessages] = useState<Message[]>([]);
+  const [peerReadAt, setPeerReadAt] = useState<string | null>(null);
+  const [peerOnline, setPeerOnline] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [newMessage, setNewMessage] = useState('');
