@@ -56,6 +56,15 @@ export default async function BusinessTeamPage({ params }: PageProps) {
 
   const activeMembers = members.filter(member => member.status === 'active').length;
   const pendingInvites = invitations.filter(invitation => invitation.status === 'pending').length;
+  const roleLabel: Record<typeof business.currentRole, string> = {
+    owner: 'Pemilik',
+    manager: 'Manager',
+    cashier: 'Kasir',
+    accounting: 'Keuangan',
+    inventory: 'Stok',
+    viewer: 'Pantau',
+  };
+  const currentRoleLabel = roleLabel[business.currentRole] ?? 'Pantau';
 
   return (
     <PortalShell activeBusiness={business} availableBusinesses={businesses} viewerName={account?.name ?? null} currentSection="team">
@@ -68,7 +77,7 @@ export default async function BusinessTeamPage({ params }: PageProps) {
           <MetricStrip items={[
             { label: 'Anggota aktif', value: activeMembers },
             { label: 'Undangan menunggu', value: pendingInvites },
-            { label: 'Aksesmu', value: canManageRoles ? 'Pemilik' : canInvite ? 'Manager' : 'Pantau', note: canManageRoles ? 'Bisa mengatur peran' : canInvite ? 'Bisa mengundang anggota' : 'Lihat saja' },
+            { label: 'Aksesmu', value: currentRoleLabel, note: canManageRoles ? 'Bisa mengatur peran' : canInvite ? 'Bisa mengundang anggota' : 'Lihat saja' },
           ]} />
 
           <section>
