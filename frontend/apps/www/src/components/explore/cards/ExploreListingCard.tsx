@@ -69,15 +69,25 @@ export function ExploreListingCard({
   const imageSrc = normalizeMediaUrl(item.image);
   const listingType = item.metadata.contentType || item.kind;
   const isService =
-    item.kind === 'services' || String(listingType).toLowerCase().includes('service');
+    item.kind === 'services' ||
+    String(listingType).toLowerCase().includes('service');
   const ListingIcon = isService ? Wrench : Package2;
   const sideLabel =
     getSideLabel(item, locale) || (locale === 'id' ? 'Menawarkan' : 'Offering');
+
+  const rawTypeLabel = String(item.label || listingType || '').trim();
   const typeLabel =
-    item.label ||
-    (isService
-      ? locale === 'id' ? 'Jasa' : 'Service'
-      : locale === 'id' ? 'Produk' : 'Product');
+    /service|jasa/i.test(rawTypeLabel) || isService
+      ? locale === 'id'
+        ? 'Jasa'
+        : 'Service'
+      : /product|produk|barang/i.test(rawTypeLabel)
+        ? locale === 'id'
+          ? 'Produk'
+          : 'Product'
+        : rawTypeLabel ||
+          (locale === 'id' ? 'Penawaran' : 'Offering');
+
   const baseValueLabel =
     item.priceLabel ||
     getListingValueFallback('supply', locale, String(listingType));
@@ -89,7 +99,6 @@ export function ExploreListingCard({
     locale,
   );
   const valueLabel = formatPriceWithUnit(baseValueLabel, resolvedPriceUnit);
-  const action = getExploreResultAction(isService ? 'services' : 'products', locale);
 
   const normalizedStatus = String(
     item.metadata.contentStatus ||
@@ -121,28 +130,44 @@ export function ExploreListingCard({
     : isOwner
       ? '/create?draft=' + encodeURIComponent(item.id)
       : '';
+
   const statusLabel =
     normalizedStatus === 'draft'
-      ? 'Draft'
+      ? locale === 'id'
+        ? 'Draft'
+        : 'Draft'
       : ['pending', 'pending_review', 'review'].includes(normalizedStatus)
-        ? locale === 'id' ? 'Menunggu ditinjau' : 'Under review'
+        ? locale === 'id'
+          ? 'Menunggu ditinjau'
+          : 'Under review'
         : ['paused', 'inactive'].includes(normalizedStatus)
-          ? locale === 'id' ? 'Dijeda' : 'Paused'
+          ? locale === 'id'
+            ? 'Dijeda'
+            : 'Paused'
           : ['archived', 'deleted'].includes(normalizedStatus)
-            ? locale === 'id' ? 'Diarsipkan' : 'Archived'
-            : locale === 'id' ? 'Belum tayang' : 'Not published';
+            ? locale === 'id'
+              ? 'Diarsipkan'
+              : 'Archived'
+            : locale === 'id'
+              ? 'Belum tayang'
+              : 'Not published';
 
-  const actionLabel = isOwner && !isPublic
-    ? locale === 'id' ? 'Edit & tayangkan' : 'Edit & publish'
-    : action.label;
+  const actionLabel =
+    isOwner && !isPublic
+      ? locale === 'id'
+        ? 'Edit & tayangkan'
+        : 'Edit & publish'
+      : locale === 'id'
+        ? 'Lihat detail'
+        : 'View details';
 
   const card = (
     <article
       data-testid="canonical-listing-card"
       className={cn(
-        'flex h-full min-h-[276px] min-w-0 flex-col overflow-hidden rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-[0_16px_34px_-30px_rgba(15,23,42,0.4)] sm:min-h-[292px]',
+        'flex h-full min-w-0 flex-col overflow-hidden rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-[0_12px_28px_-26px_rgba(15,23,42,0.38)]',
         interactive &&
-          'cursor-pointer transition motion-reduce:transform-none hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:shadow-[0_18px_38px_-27px_rgba(15,23,42,0.28)]',
+          'cursor-pointer transition-[transform,border-color,box-shadow] duration-200 motion-reduce:transform-none hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:shadow-[0_18px_34px_-28px_rgba(15,23,42,0.32)]',
       )}
     >
       <div className="relative">
@@ -151,59 +176,82 @@ export function ExploreListingCard({
           alt={item.title}
           attribution={imageAttribution}
           fallbackLabel={locale === 'id' ? 'Belum ada foto' : 'No photo yet'}
-          className="aspect-[4/3] w-full sm:aspect-[16/10]"
+          className="aspect-[5/4] w-full sm:aspect-[16/10]"
         />
-        <span className="absolute left-2 top-2 inline-flex min-h-7 items-center rounded-full border border-white/70 bg-white/90 px-2.5 text-[10px] font-black text-emerald-800 shadow-sm backdrop-blur">
-          {sideLabel}
-        </span>
-        {isOwner && !isPublic ? (
-          <span className="absolute right-2 top-2 inline-flex min-h-7 items-center gap-1 rounded-full border border-amber-200 bg-amber-50/95 px-2.5 text-[10px] font-black text-amber-900 shadow-sm backdrop-blur">
-            <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
-            {statusLabel}
+
+        <div className="pointer-events-none absolute inset-x-2 top-2 flex items-start justify-between gap-2">
+          <span className="inline-flex min-h-6 items-center rounded-full border border-white/80 bg-white/92 px-2 py-1 text-[9px] font-black text-emerald-800 shadow-sm backdrop-blur sm:text-[10px]">
+            {sideLabel}
           </span>
-        ) : null}
+
+          {isOwner && !isPublic ? (
+            <span className="inline-flex min-h-6 items-center gap-1 rounded-full border border-amber-200 bg-amber-50/95 px-2 py-1 text-[9px] font-black text-amber-900 shadow-sm backdrop-blur sm:text-[10px]">
+              <Clock3 className="h-3 w-3 shrink-0" aria-hidden="true" />
+              <span className="truncate">{statusLabel}</span>
+            </span>
+          ) : null}
+        </div>
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col p-2.5 sm:p-3">
         <div className="flex min-w-0 items-center gap-1.5 text-[10px] font-bold text-[color:var(--app-text-soft)] sm:text-[11px]">
-          <ListingIcon className="h-3.5 w-3.5 shrink-0 text-[color:var(--app-accent)]" aria-hidden="true" />
+          <ListingIcon
+            className="h-3.5 w-3.5 shrink-0 text-[color:var(--app-accent)]"
+            aria-hidden="true"
+          />
           <span className="truncate">{typeLabel}</span>
           {item.verified ? (
-            <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-emerald-700 dark:text-emerald-400" aria-label={locale === 'id' ? 'Terverifikasi' : 'Verified'} />
+            <BadgeCheck
+              className="h-3.5 w-3.5 shrink-0 text-emerald-700 dark:text-emerald-400"
+              aria-label={locale === 'id' ? 'Terverifikasi' : 'Verified'}
+            />
           ) : null}
         </div>
 
-        <h3 className={cn(
-          'mt-1.5 min-h-10 break-words line-clamp-2 text-sm font-bold leading-5 text-[color:var(--app-text)]',
-          interactive && 'group-hover:text-[color:var(--app-accent)]',
-        )}>
+        <h3
+          className={cn(
+            'mt-1.5 line-clamp-2 min-h-10 break-words text-sm font-bold leading-5 text-[color:var(--app-text)] sm:text-[15px]',
+            interactive && 'group-hover:text-[color:var(--app-accent)]',
+          )}
+        >
           {item.title}
         </h3>
 
-        <p className="mt-1.5 truncate text-[15px] font-black leading-5 text-[color:var(--app-text)]">
+        <p className="mt-2 truncate text-[16px] font-black leading-5 tracking-[-0.02em] text-[color:var(--app-text)] sm:text-[17px]">
           {valueLabel}
         </p>
 
-        <div className="mt-1.5 min-h-5 min-w-0">
-          {(item.location || item.ownerName) ? (
-          <p className="flex min-w-0 items-center gap-1.5 truncate text-[10px] font-medium text-[color:var(--app-text-soft)] sm:text-[11px]">
-            {item.location ? <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> : <Store className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />}
-            <span className="truncate">{item.location || item.ownerName}</span>
-          </p>
-          ) : null}
-        </div>
+        {item.location || item.ownerName ? (
+          <div className="mt-2 flex min-w-0 items-center gap-1.5 text-[10px] font-medium text-[color:var(--app-text-soft)] sm:text-[11px]">
+            {item.location ? (
+              <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            ) : (
+              <Store className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            )}
+            <span className="line-clamp-1 min-w-0 break-words">
+              {item.location || item.ownerName}
+            </span>
+          </div>
+        ) : null}
 
         {interactive ? (
-          <p className={cn(
-            "mt-auto flex items-center gap-1 pt-2.5 text-[10px] font-black sm:text-[11px]",
-            isOwner && !isPublic
-              ? "text-amber-700 dark:text-amber-300"
-              : "text-[color:var(--app-accent)]",
-          )}>
-            {isOwner && !isPublic ? <Pencil className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> : null}
+          <p
+            className={cn(
+              'mt-auto flex items-center gap-1 pt-3 text-[10px] font-black sm:text-[11px]',
+              isOwner && !isPublic
+                ? 'text-amber-700 dark:text-amber-300'
+                : 'text-[color:var(--app-accent)]',
+            )}
+          >
+            {isOwner && !isPublic ? (
+              <Pencil className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            ) : null}
             <span className="truncate">{actionLabel}</span>
             {destinationHref ? (
-              <ArrowRight className="h-3.5 w-3.5 shrink-0 transition group-hover:translate-x-0.5" aria-hidden="true" />
+              <ArrowRight
+                className="h-3.5 w-3.5 shrink-0 transition-transform group-hover:translate-x-0.5"
+                aria-hidden="true"
+              />
             ) : null}
           </p>
         ) : null}
@@ -216,7 +264,7 @@ export function ExploreListingCard({
   return (
     <Link
       href={destinationHref}
-      className="group block h-full rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--app-surface-muted)]"
+      className="group block h-full rounded-[16px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--app-surface-muted)]"
       aria-label={
         isOwner && !isPublic
           ? (locale === 'id' ? 'Edit ' : 'Edit ') + item.title
