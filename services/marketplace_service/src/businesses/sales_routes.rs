@@ -93,11 +93,17 @@ async fn period_summary(
         )
         .await
     {
-        Ok(summary) => (
-            StatusCode::OK,
-            Json(json!({"data": {"summary": summary}})),
-        )
-            .into_response(),
+        Ok(mut summary) => {
+            if !access.can_view_costs {
+                summary.cogs = 0;
+                summary.incomplete_cost_count = summary.transaction_count;
+            }
+            (
+                StatusCode::OK,
+                Json(json!({"data": {"summary": summary}})),
+            )
+                .into_response()
+        }
         Err(error) => sale_error_response(error),
     }
 }
