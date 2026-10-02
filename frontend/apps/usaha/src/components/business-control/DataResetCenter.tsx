@@ -475,7 +475,7 @@ export function DataResetCenter({ business }: Props) {
       <section className="merchant-surface-bordered border-amber-200 bg-amber-50/60 p-4 sm:p-5">
         <p className="font-black text-amber-950">Pakai reset hanya untuk merapikan pencatatan</p>
         <p className="mt-1 text-xs leading-5 text-amber-900">
-          Kalau tujuannya hanya mencoba fitur, lebih aman gunakan data latihan yang terpisah. Jangan gunakan reset sebagai pengganti backup atau Undo transaksi.
+          Kalau tujuannya hanya mencoba fitur, gunakan usaha/workspace terpisah. Jangan gunakan reset sebagai pengganti backup atau Undo transaksi.
         </p>
       </section>
 
