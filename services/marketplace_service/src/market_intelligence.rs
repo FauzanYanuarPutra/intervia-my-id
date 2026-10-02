@@ -512,7 +512,10 @@ async fn build_market_response(
             .await
             .map_err(|error| {
                 tracing::warn!("national market fallback failed: {:?}", error);
-                (StatusCode::INTERNAL_SERVER_ERROR, "market benchmark unavailable".to_string())
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "market benchmark unavailable".to_string(),
+                )
             })?;
         if national_observations.len() > observations.len() {
             observations = national_observations;
