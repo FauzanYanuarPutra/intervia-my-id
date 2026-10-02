@@ -4251,10 +4251,22 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
       const nativeParams = buildHomeListingParams(side, true);
       const broadParams = buildHomeListingParams(side, false);
 
-      const [nativeItems, broadItems] = await Promise.all([
-        fetchHomeContent(nativeParams, controller.signal).catch(() => []),
-        fetchHomeContent(broadParams, controller.signal).catch(() => []),
-      ]);
+      // Keep the Home fast and reliable: query the native Lajukan source first.
+      // Only expand to the broader/imported feed when native data does not fill
+      // the recommendation window. This avoids firing four large /api/content
+      // requests in parallel and protects the Home surface from backend spikes.
+      const nativeItems = await fetchHomeContent(
+        nativeParams,
+        controller.signal,
+      ).catch(() => []);
+
+      let broadItems: ContentItem[] = [];
+      if (nativeItems.length < 8 && !controller.signal.aborted) {
+        broadItems = await fetchHomeContent(
+          broadParams,
+          controller.signal,
+        ).catch(() => []);
+      }
 
       const matchingMine = mine.filter(item => {
         const resolvedSide = resolveListingSide({
