@@ -18,7 +18,7 @@ use sqlx::Row;
 use std::{collections::HashSet, sync::Arc};
 use uuid::Uuid;
 
-use super::{auth_claims_from_headers, has_agent_access, AppState};
+use super::{auth_claims_from_headers, has_agent_access, push_notification_best_effort, AppState};
 
 const MATCHING_SCHEMA_VERSION: &str = "lajukan-match-schema-v1";
 const MATCHING_SCORE_VERSION: &str = "lajukan-match-score-v1";
@@ -2111,4 +2111,259 @@ pub async fn public_matches(
         })),
     )
         .into_response()
+
+pub async fn notify_new_listing_matches(
+    state: &Arc<AppState>,
+    source_id: Uuid,
+    source_owner_id: Uuid,
+) {
+    let source = match sqlx::query_as::<_, CandidateItem>(
+        r#"
+        SELECT
+            id, owner_id, title, summary, body, content_type, category, tags,
+            price_cents, rating, review_count, cover_image,
+            COALESCE(metadata, '{}'::jsonb) AS metadata, updated_at
+        FROM content_items
+        WHERE id = $1
+          AND owner_id = $2
+          AND content_status = 'active'
+        LIMIT 1
+        "#,
+    )
+    .bind(source_id)
+    .bind(source_owner_id)
+    .fetch_optional(&state.db)
+    .await
+    {
+        Ok(Some(row)) => row,
+        Ok(None) => return,
+        Err(error) => {
+            tracing::warn!("smart match notification source lookup failed: {:?}", error);
+            return;
+        }
+    };
+
+    let listing_intent = json_text(
+        &source.metadata,
+        &["listing_intent", "intent", "market_side", "listing_side"],
+    )
+    .map(text)
+    .unwrap_or_else(|| {
+        if source.price_cents.is_some() {
+            "offer".to_string()
+        } else {
+            "request".to_string()
+        }
+    });
+
+    let query_text = tokens(&format!(
+        "{} {} {} {}",
+        source.title,
+        source.summary.as_deref().unwrap_or_default(),
+        source.body,
+        source.category.as_deref().unwrap_or_default()
+    ))
+    .into_iter()
+    .take(12)
+    .collect::<Vec<_>>()
+    .join(" ");
+
+    let is_request = matches!(listing_intent.as_str(), "request" | "demand" | "seeker");
+    let candidates = if is_request {
+        sqlx::query_as::<_, CandidateItem>(
+            r#"
+            SELECT
+                id, owner_id, title, summary, body, content_type, category, tags,
+                price_cents, rating, review_count, cover_image,
+                COALESCE(metadata, '{}'::jsonb) AS metadata, updated_at
+            FROM content_items
+            WHERE content_status = 'active'
+              AND owner_id <> $2
+              AND content_type IN (
+                  'product', 'service', 'material', 'tool_rental',
+                  'business_transfer', 'property', 'talent'
+              )
+              AND (
+                  ($1 <> '' AND search_vector @@ plainto_tsquery('simple', $1))
+                  OR lower(title) ILIKE '%' || lower($3) || '%'
+                  OR lower(COALESCE(summary, '')) ILIKE '%' || lower($3) || '%'
+                  OR lower(COALESCE(body, '')) ILIKE '%' || lower($3) || '%'
+              )
+            ORDER BY updated_at DESC
+            LIMIT 50
+            "#,
+        )
+        .bind(&query_text)
+        .bind(source.owner_id)
+        .bind(&source.title)
+        .fetch_all(&state.db)
+        .await
+        .unwrap_or_default()
+    } else {
+        sqlx::query_as::<_, CandidateItem>(
+            r#"
+            SELECT
+                id, owner_id, title, summary, body, content_type, category, tags,
+                price_cents, rating, review_count, cover_image,
+                COALESCE(metadata, '{}'::jsonb) AS metadata, updated_at
+            FROM content_items
+            WHERE content_status = 'active'
+              AND owner_id <> $2
+              AND content_type = 'request'
+              AND (
+                  ($1 <> '' AND search_vector @@ plainto_tsquery('simple', $1))
+                  OR lower(title) ILIKE '%' || lower($3) || '%'
+                  OR lower(COALESCE(summary, '')) ILIKE '%' || lower($3) || '%'
+                  OR lower(COALESCE(body, '')) ILIKE '%' || lower($3) || '%'
+              )
+            ORDER BY updated_at DESC
+            LIMIT 50
+            "#,
+        )
+        .bind(&query_text)
+        .bind(source.owner_id)
+        .bind(&source.title)
+        .fetch_all(&state.db)
+        .await
+        .unwrap_or_default()
+    };
+
+    let requirement_for_source = RequirementItem {
+        id: source.id,
+        source_id: source.id,
+        requester_user_id: Some(source.owner_id),
+        title: source.title.clone(),
+        summary: source.summary.clone(),
+        body: source.body.clone(),
+        category: source.category.clone(),
+        metadata: source.metadata.clone(),
+        review_id: None,
+        review_status: None,
+    };
+
+    let mut scored = Vec::with_capacity(candidates.len());
+    for candidate in candidates {
+        let score = if is_request {
+            score_candidate(&requirement_for_source, &candidate)
+        } else {
+            let candidate_requirement = RequirementItem {
+                id: candidate.id,
+                source_id: candidate.id,
+                requester_user_id: Some(candidate.owner_id),
+                title: candidate.title.clone(),
+                summary: candidate.summary.clone(),
+                body: candidate.body.clone(),
+                category: candidate.category.clone(),
+                metadata: candidate.metadata.clone(),
+                review_id: None,
+                review_status: None,
+            };
+            score_candidate(&candidate_requirement, &source)
+        };
+        if score.total >= 55.0 {
+            scored.push((candidate, score.total));
+        }
+    }
+
+    scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    let top = scored.into_iter().take(5).collect::<Vec<_>>();
+
+    if top.is_empty() {
+        return;
+    }
+
+    let owner_message = if top.len() == 1 {
+        "Lajukan menemukan 1 listing yang cocok. Cek perbandingannya."
+    } else {
+        "Lajukan menemukan beberapa listing yang cocok. Cek dan bandingkan sekarang."
+    };
+
+    if let Ok(result) = sqlx::query(
+        r#"
+        INSERT INTO crm_smart_match_notifications (
+            source_content_id, matched_content_id, recipient_user_id, direction
+        )
+        SELECT $1, $2, $3, 'source_owner'
+        WHERE NOT EXISTS (
+            SELECT 1 FROM crm_smart_match_notifications
+            WHERE source_content_id = $1
+              AND matched_content_id = $2
+              AND recipient_user_id = $3
+              AND direction = 'source_owner'
+        )
+        "#,
+    )
+    .bind(source.id)
+    .bind(top[0].0.id)
+    .bind(source.owner_id)
+    .execute(&state.db)
+    .await
+    {
+        if result.rows_affected() > 0 {
+            push_notification_best_effort(
+                state,
+                source.owner_id,
+                "system",
+                "smart_match.found",
+                "Ada yang cocok dengan listing kamu",
+                owner_message,
+                json!({
+                    "source_content_id": source.id,
+                    "match_count": top.len(),
+                    "top_match_id": top[0].0.id,
+                    "top_score": top[0].1.round(),
+                    "action": "compare_matches"
+                }),
+            )
+            .await;
+        }
+    }
+
+    for (candidate, score) in top {
+        let inserted = sqlx::query(
+            r#"
+            INSERT INTO crm_smart_match_notifications (
+                source_content_id, matched_content_id, recipient_user_id, direction
+            )
+            SELECT $1, $2, $3, 'matched_owner'
+            WHERE NOT EXISTS (
+                SELECT 1 FROM crm_smart_match_notifications
+                WHERE source_content_id = $1
+                  AND matched_content_id = $2
+                  AND recipient_user_id = $3
+                  AND direction = 'matched_owner'
+            )
+            "#,
+        )
+        .bind(source.id)
+        .bind(candidate.id)
+        .bind(candidate.owner_id)
+        .execute(&state.db)
+        .await;
+
+        if inserted.as_ref().map(|r| r.rows_affected() > 0).unwrap_or(false) {
+            let opposite = if is_request { "permintaan" } else { "penawaran" };
+            push_notification_best_effort(
+                state,
+                candidate.owner_id,
+                "system",
+                "smart_match.opportunity",
+                "Ada peluang yang cocok",
+                &format!(
+                    "Listing kamu cocok dengan {}. Kecocokan sekitar {}%. Buka untuk membandingkan.",
+                    opposite,
+                    score.round()
+                ),
+                json!({
+                    "source_content_id": source.id,
+                    "matched_content_id": candidate.id,
+                    "score": score.round(),
+                    "action": "compare_matches"
+                }),
+            )
+            .await;
+        }
+    }
+}
+
 }
