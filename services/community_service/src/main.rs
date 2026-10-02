@@ -387,6 +387,7 @@ struct CreateGroupRequest {
     avatar_url: Option<String>,
     cover_url: Option<String>,
     whatsapp_join_url: Option<String>,
+    facebook_group_url: Option<String>,
     #[serde(default)]
     rules: Vec<String>,
 }
@@ -402,6 +403,7 @@ struct UpdateGroupPermissionsRequest {
     avatar_url: Option<String>,
     cover_url: Option<String>,
     whatsapp_join_url: Option<String>,
+    facebook_group_url: Option<String>,
     rules: Option<Vec<String>>,
 }
 
@@ -685,6 +687,7 @@ struct ForumGroup {
     avatar_url: Option<String>,
     cover_url: Option<String>,
     whatsapp_join_url: Option<String>,
+    facebook_group_url: Option<String>,
     rules: Vec<String>,
     member_count: i32,
     post_count: i32,
@@ -3512,10 +3515,17 @@ async fn create_group(
     let cover_url = sanitize_public_url(payload.cover_url, true);
     let had_whatsapp_join_url = payload.whatsapp_join_url.is_some();
     let whatsapp_join_url = normalize_whatsapp_join_url(payload.whatsapp_join_url);
+    let facebook_group_url = normalize_facebook_group_url(payload.facebook_group_url);
     if had_whatsapp_join_url && whatsapp_join_url.is_none() {
         return Err(ApiError::new(
             StatusCode::BAD_REQUEST,
             "whatsapp_join_url must be a WhatsApp https URL",
+        ));
+    }
+    if payload.facebook_group_url.is_some() && facebook_group_url.is_none() {
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "facebook_group_url must be a Facebook https URL",
         ));
     }
     let rules = {
@@ -3560,10 +3570,10 @@ async fn create_group(
         INSERT INTO lajukan_groups
           (
             id, category_id, name, slug, description, privacy,
-            posting_permission, membership_permission, avatar_url, cover_url, whatsapp_join_url, rules,
+            posting_permission, membership_permission, avatar_url, cover_url, whatsapp_join_url, facebook_group_url, rules,
             created_by_user_id, status, created_at, updated_at
           )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'active', now(), now())
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'active', now(), now())
         "#,
     )
     .bind(&group_id)
@@ -3577,6 +3587,7 @@ async fn create_group(
     .bind(&avatar_url)
     .bind(&cover_url)
     .bind(&whatsapp_join_url)
+    .bind(&facebook_group_url)
     .bind(&rules)
     .bind(&forum_user.id)
     .execute(&mut *tx)
@@ -3739,8 +3750,17 @@ async fn update_group_permissions(
         .map(|value| normalize_whatsapp_join_url(Some(value)))
         .flatten()
         .or(group.whatsapp_join_url.clone());
+    let facebook_group_url = payload
+        .facebook_group_url
+        .clone()
+        .map(|value| normalize_facebook_group_url(Some(value)))
+        .flatten()
+        .or(group.facebook_group_url.clone());
     if had_whatsapp_join_url && whatsapp_join_url.is_none() {
         return Err(ApiError::new(StatusCode::BAD_REQUEST, "whatsapp_join_url must be a WhatsApp https URL"));
+    }
+    if payload.facebook_group_url.is_some() && facebook_group_url.is_none() {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "facebook_group_url must be a Facebook https URL"));
     }
     let rules = payload
         .rules
@@ -3760,7 +3780,8 @@ async fn update_group_permissions(
             avatar_url = $7,
             cover_url = $8,
             whatsapp_join_url = $9,
-            rules = $10,
+            facebook_group_url = $10,
+            rules = $11,
             updated_at = now()
         WHERE id = $1
         "#,
@@ -3774,6 +3795,7 @@ async fn update_group_permissions(
     .bind(&avatar_url)
     .bind(&cover_url)
     .bind(&whatsapp_join_url)
+    .bind(&facebook_group_url)
     .bind(&rules)
     .execute(&mut *tx)
     .await
@@ -8666,6 +8688,19 @@ fn normalize_whatsapp_join_url(value: Option<String>) -> Option<String> {
     let value = clean_optional(value)?;
     let lower = value.to_ascii_lowercase();
     if lower.starts_with("https://chat.whatsapp.com/") || lower.starts_with("https://wa.me/") {
+        Some(value)
+    } else {
+        None
+    }
+}
+
+fn normalize_facebook_group_url(value: Option<String>) -> Option<String> {
+    let value = clean_optional(value)?;
+    let lower = value.to_ascii_lowercase();
+    if lower.starts_with("https://facebook.com/")
+        || lower.starts_with("https://www.facebook.com/")
+        || lower.starts_with("https://m.facebook.com/")
+    {
         Some(value)
     } else {
         None
