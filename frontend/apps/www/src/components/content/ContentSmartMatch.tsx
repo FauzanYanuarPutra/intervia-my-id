@@ -99,6 +99,7 @@ export function ContentSmartMatch({
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setAiPayload(null);
     fetch(`/api/content/${encodeURIComponent(contentId)}/matches?sort=${sort}&limit=8`, {
       credentials: 'include',
       cache: 'no-store',
@@ -119,7 +120,81 @@ export function ContentSmartMatch({
   }, [contentId, sort]);
 
   const results = payload?.results ?? [];
+
+  useEffect(() => {
+    if (loading || results.length < 2) {
+      setAiLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 2200);
+    setAiLoading(true);
+
+    fetch(
+      '/api/content/' + encodeURIComponent(contentId) + '/matches/ai',
+      {
+        method: 'POST',
+        credentials: 'include',
+        cache: 'no-store',
+        signal: controller.signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          locale,
+          source: {
+            id: contentId,
+            title: source?.title || '',
+            summary: source?.summary || '',
+            body: source?.body || '',
+            category: source?.category || '',
+            content_type: source?.content_type || '',
+            price_cents: source?.price_cents ?? null,
+            price_unit: source?.price_unit || '',
+            city: source?.city || '',
+          },
+          candidates: results.slice(0, 8),
+        }),
+      },
+    )
+      .then(response => (response.ok ? response.json() : null))
+      .then((data: SmartMatchAiPayload | null) => {
+        if (!cancelled && data?.available) setAiPayload(data);
+      })
+      .catch(() => {
+        if (!cancelled) setAiPayload(null);
+      })
+      .finally(() => {
+        window.clearTimeout(timeout);
+        if (!cancelled) setAiLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [contentId, loading, locale, results, source]);
+
   const requestError = !loading && payload === null;
+  const aiOrder = new Map(
+    (aiPayload?.ranked_candidate_ids || []).map((id, index) => [id, index]),
+  );
+  const aiAssessment = new Map(
+    (aiPayload?.assessments || []).map(assessment => [assessment.id, assessment]),
+  );
+  const displayResults = aiPayload?.available
+    ? [...results].sort((a, b) => {
+        const aiA = aiOrder.get(a.id);
+        const aiB = aiOrder.get(b.id);
+        if (aiA == null && aiB == null) {
+          return (b.worth_score ?? b.score ?? 0) - (a.worth_score ?? a.score ?? 0);
+        }
+        if (aiA == null) return 1;
+        if (aiB == null) return -1;
+        return aiA - aiB;
+      })
+    : results;
 
   const isRequest = intent === 'request' || intent === 'demand' || intent === 'seeker';
   const title = isRequest
