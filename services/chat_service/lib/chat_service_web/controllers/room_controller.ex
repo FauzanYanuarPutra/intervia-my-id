@@ -125,6 +125,34 @@ defmodule ChatServiceWeb.RoomController do
     end
   end
 
+  def rename(conn, %{"room_id" => room_id_raw} = params) do
+    room_id = room_id_raw |> URI.decode() |> String.trim()
+    room_name = normalize_text(params["room_name"], "")
+
+    cond do
+      room_id == "" ->
+        conn |> put_status(:bad_request) |> json(%{error: "invalid room_id"})
+      room_name == "" or byte_size(room_name) > 120 ->
+        conn |> put_status(:bad_request) |> json(%{error: "room_name must be 1-120 characters"})
+      true ->
+        current_user_id_bin = conn.assigns.current_user_id_bin
+        with {:ok, room} <- fetch_room_meta(room_id),
+             :ok <- authorize_group_manager(room_id, current_user_id_bin, room),
+             :ok <- ensure_group(room),
+             {:ok, members} <- fetch_room_members(room_id),
+             :ok <- update_room_name(room_id, room_name),
+             :ok <- execute_each(members, fn member_id -> update_user_room_name(room_id, member_id, room_name) end) do
+          broadcast_inbox_updated(room_id, members)
+          json(conn, %{data: %{room_id: room_id, room_name: room_name, room_type: room.room_type}})
+        else
+          {:error, :not_found} -> conn |> put_status(:not_found) |> json(%{error: "room not found or access denied"})
+          {:error, :forbidden} -> conn |> put_status(:forbidden) |> json(%{error: "owner or admin role required"})
+          {:error, :not_group} -> conn |> put_status(:bad_request) |> json(%{error: "room is not a group"})
+          _reason -> storage_unavailable(conn, "group rename")
+        end
+    end
+  end
+
   def members(conn, %{"room_id" => room_id_raw}) do
     room_id = room_id_raw |> URI.decode() |> String.trim()
     current_user_id_bin = conn.assigns.current_user_id_bin
