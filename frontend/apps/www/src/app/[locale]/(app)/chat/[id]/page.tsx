@@ -3233,6 +3233,9 @@ export default function ChatRoomPage() {
       return;
     }
     markRoomRead(canonicalRoomId);
+    try {
+      channelRef.current?.push('read', {});
+    } catch {}
     void authFetch(
       `/api/chat/rooms/${encodeURIComponent(canonicalRoomId)}/read`,
       {
