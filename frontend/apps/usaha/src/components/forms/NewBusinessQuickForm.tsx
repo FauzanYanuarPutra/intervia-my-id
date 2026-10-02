@@ -21,6 +21,8 @@ const categoryOptions = [
   { value: 'Toko kelontong', label: 'Toko kelontong' },
   { value: 'Jasa', label: 'Jasa' },
   { value: 'Retail', label: 'Retail' },
+  { value: 'Perdagangan dan distribusi', label: 'Perdagangan & distribusi' },
+  { value: 'Pertanian dan komoditas', label: 'Pertanian & komoditas' },
   { value: 'Manufaktur', label: 'Manufaktur' },
   { value: 'Usaha umum', label: 'Usaha umum' },
 ] as const;
@@ -34,8 +36,8 @@ type NewBusinessQuickFormProps = {
 export function NewBusinessQuickForm({ initialOwnerPhone = '' }: NewBusinessQuickFormProps) {
   const router = useRouter();
   const [name, setName] = useState('');
-  const [templateKey, setTemplateKey] = useState<BusinessTemplateKey>('juice_fnb');
-  const [category, setCategory] = useState(getBusinessTemplatePreset('juice_fnb').defaultCategory);
+  const [templateKey, setTemplateKey] = useState<BusinessTemplateKey>('general');
+  const [category, setCategory] = useState(getBusinessTemplatePreset('general').defaultCategory);
   const [city, setCity] = useState('');
   const [address, setAddress] = useState('');
   const [locationQuery, setLocationQuery] = useState('');
