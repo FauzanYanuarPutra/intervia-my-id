@@ -19,7 +19,7 @@ import {
   classifyCommunityJoinRole,
   hasCommunityJoinReadyListing,
 } from '@/lib/community/communityJoin';
-import { WhatsAppBrandIcon } from '@/components/community/WhatsAppBrandIcon';
+import { BrandSocialIcon } from '@/components/common/BrandSocialIcon';
 
 const COMMUNITY_DESTINATION = [
   'https://chat.',
@@ -114,7 +114,7 @@ function listingLabel(item: ContentItem): string {
 function WhatsAppStepIcon() {
   return (
     <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm">
-      <WhatsAppBrandIcon className="h-5 w-5" />
+      <BrandSocialIcon brand="whatsapp" className="h-5 w-5" />
     </span>
   );
 }
@@ -406,7 +406,7 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
               disabled={loading || authLoading}
               className="flex min-h-10 w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-4 text-xs font-extrabold text-white shadow-[0_14px_28px_-18px_rgba(5,150,105,0.85)] transition hover:bg-emerald-700 active:scale-[0.99] disabled:cursor-wait disabled:opacity-60"
             >
-              <WhatsAppBrandIcon className="h-4 w-4" />
+              <BrandSocialIcon brand="whatsapp" className="h-4 w-4" />
               {actionLabel}
               <ExternalLink className="h-3.5 w-3.5" />
             </button>
@@ -507,7 +507,7 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
                   disabled={loading || authLoading}
                   className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-4 text-xs font-extrabold text-white disabled:opacity-60"
                 >
-                  <WhatsAppBrandIcon className="h-4 w-4" />
+                  <BrandSocialIcon brand="whatsapp" className="h-4 w-4" />
                   {isId ? 'Lanjut ke WhatsApp' : 'Continue to WhatsApp'}
                   <ExternalLink className="h-3.5 w-3.5" />
                 </button>
