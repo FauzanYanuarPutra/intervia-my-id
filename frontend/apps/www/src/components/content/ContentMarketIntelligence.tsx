@@ -22,6 +22,7 @@ type MarketData = {
     currency: string;
     price_unit?: string | null;
   } | null;
+  insight?: { price_position?: string; headline?: string; action?: string };
   trend?: {
     summary?: {
       direction?: 'up' | 'down' | 'stable';
@@ -118,6 +119,16 @@ export function ContentMarketIntelligence({
           <Info className="mt-1 h-5 w-5 text-sky-600" />
         )}
       </div>
+
+      {data.insight ? (
+        <div className="mt-3 rounded-2xl bg-white p-3 ring-1 ring-slate-200/80 dark:bg-slate-950 dark:ring-slate-800">
+          <p className="text-sm font-black text-[color:var(--app-text)]">{data.insight.headline}</p>
+          <p className="mt-1 text-xs leading-5 text-[color:var(--app-text-soft)]">{data.insight.action}</p>
+          {data.scope?.level === 'national_fallback' ? (
+            <p className="mt-1 text-[10px] font-semibold text-sky-700 dark:text-sky-300">Data lokal belum cukup, jadi Lajukan memperluas pembanding ke pasar nasional.</p>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
         <div className="rounded-2xl bg-white p-3 ring-1 ring-slate-200/80 dark:bg-slate-950 dark:ring-slate-800">
