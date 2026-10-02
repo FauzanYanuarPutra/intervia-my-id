@@ -91,6 +91,7 @@ pub struct ReviewStoreMediaRequest {
     pub placement: Option<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Clone)]
 pub struct PublicStoreMediaRow {
     pub id: Uuid,
