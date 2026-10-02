@@ -197,16 +197,16 @@ function getSideVisual(side: DiscoveryCardSide): {
 }
 
 export const DISCOVERY_COMPACT_CARD_BASELINE_CLASS =
-  'h-[300px] min-h-[300px] max-h-[300px] sm:h-[312px] sm:min-h-[312px] sm:max-h-[312px]';
+  'min-h-[292px] sm:min-h-[304px]';
 
 const RAIL_COMPACT_CARD_FRAME_CLASS =
-  'h-[300px] min-h-[300px] max-h-[300px] self-stretch sm:h-[312px] sm:min-h-[312px] sm:max-h-[312px]';
+  'min-h-[292px] self-stretch sm:min-h-[304px]';
 const GRID_COMPACT_CARD_FRAME_CLASS = cn(
   'self-stretch',
   DISCOVERY_COMPACT_CARD_BASELINE_CLASS,
 );
 const RAIL_COMFORTABLE_CARD_FRAME_CLASS =
-  'h-[340px] min-h-[340px] max-h-[340px] self-stretch sm:h-[360px] sm:min-h-[360px] sm:max-h-[360px]';
+  'min-h-[328px] self-stretch sm:min-h-[348px]';
 const GRID_COMFORTABLE_CARD_FRAME_CLASS =
   'h-[340px] min-h-[340px] max-h-[340px] self-stretch sm:h-[360px] sm:min-h-[360px] sm:max-h-[360px]';
 
