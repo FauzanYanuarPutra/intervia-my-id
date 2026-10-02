@@ -2889,16 +2889,16 @@ export function PublicReferencesSection({
                 "
               >
                 {/* IMAGE */}
-                <div className="relative aspect-[16/8.5] w-full shrink-0 overflow-hidden bg-zinc-100">
+                <div className="relative aspect-[16/8.8] w-full shrink-0 overflow-hidden bg-emerald-50 dark:bg-emerald-950/30">
                   {item.image || item.fallbackImage ? (
                     <Image
                       src={item.image || item.fallbackImage || ''}
                       alt={item.title}
                       fill
                       sizes="
-                        (max-width: 480px) 68vw,
-                        (max-width: 768px) 230px,
-                        240px
+                        (max-width: 640px) 82vw,
+                        (max-width: 1024px) 250px,
+                        280px
                       "
                       className={cn(
                         'transition-transform duration-300 group-hover:scale-[1.025]',
@@ -3190,7 +3190,7 @@ function RecommendationCard({
             className={cn(
               'text-[10px] font-bold sm:text-xs',
               isDemand
-                ? 'text-blue-800/80 dark:text-blue-200/80'
+                ? 'text-amber-900/80 dark:text-amber-200/80'
                 : 'text-emerald-800/70 dark:text-emerald-200/70',
             )}
           >
@@ -3264,7 +3264,7 @@ function RecommendationCard({
             font-semibold
             leading-[16px]
             tracking-[-0.01em]
-            text-zinc-800
+            text-slate-900
             min-[360px]:text-[13px]
             min-[360px]:leading-[17px]
             sm:text-sm
@@ -3288,7 +3288,7 @@ function RecommendationCard({
             className={cn(
               'mt-1.5 truncate text-[14px] font-black leading-tight tracking-[-0.025em] min-[360px]:text-[15px] sm:text-base',
               isDemand
-                ? 'text-blue-700 dark:text-blue-300'
+                ? 'text-amber-700 dark:text-amber-300'
                 : 'text-emerald-700 dark:text-emerald-400',
             )}
           >
