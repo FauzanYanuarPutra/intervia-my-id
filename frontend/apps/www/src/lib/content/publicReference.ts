@@ -154,7 +154,11 @@ function resolveSourceContact(metadata: JsonRecord): {
     .map(safeExternalUrl)
     .find(Boolean);
   if (directContact) {
-    return { url: directContact, type: 'source' };
+    return {
+      url: directContact,
+      type: 'source',
+      facebookUrl: sourceFacebookUrl(metadata),
+    };
   }
 
   return {
