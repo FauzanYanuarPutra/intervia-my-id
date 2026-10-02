@@ -221,7 +221,7 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
     <main className="min-h-[100svh] bg-[color:var(--app-surface-muted)] px-2.5 pb-8 pt-3 sm:px-4 sm:pt-5">
       <section className="mx-auto max-w-2xl space-y-2.5">
         <header className="overflow-hidden rounded-[22px] border border-emerald-100 bg-white shadow-[0_18px_38px_-30px_rgba(15,23,42,0.35)]">
-          <div className="bg-[linear-gradient(135deg,#047857_0%,#059669_55%,#0f766e_100%)] px-4 py-4.5 text-white sm:px-5 sm:py-5">
+          <div className="bg-[linear-gradient(135deg,#047857_0%,#059669_55%,#0f766e_100%)] px-4 py-4 text-white sm:px-5 sm:py-5">
             <div className="flex items-start gap-3">
               <WhatsAppStepIcon />
               <div className="min-w-0 flex-1">
@@ -233,7 +233,7 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
                     ? 'Lihat komunitas dulu, gabung saat siap'
                     : 'Explore first, join when you are ready'}
                 </h1>
-                <p className="mt-1 max-w-2xl text-[12px] leading-5 text-emerald-50 sm:text-[13px] sm:leading-5.5">
+                <p className="mt-1 max-w-2xl text-[12px] leading-5 text-emerald-50 sm:text-[13px] sm:leading-5">
                   {isId
                     ? 'Kamu tidak perlu login untuk melihat grup dan manfaatnya. Login + 1 listing aktif hanya diminta saat kamu benar-benar mau masuk ke WhatsApp.'
                     : 'You can explore the groups without logging in. Login + 1 active listing is only needed when you are ready to enter WhatsApp.'}
@@ -487,12 +487,12 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
               </ul>
             </div>
 
-            <div className="border-t border-zinc-100 p-3">
+            <div className="border-t border-zinc-100 p-3.5">
               {!isAuthenticated ? (
                 <Link
                   href={loginHref()}
                   onClick={() => setSelectedGroup(null)}
-                  className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-4 text-xs font-extrabold text-white"
+                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-4 text-[13px] font-extrabold text-white"
                 >
                   <LogIn className="h-3.5 w-3.5" />
                   {isId ? 'Login untuk lanjut gabung' : 'Log in to continue'}
@@ -515,7 +515,7 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
                 <Link
                   href="/create?mode=offer"
                   onClick={() => setSelectedGroup(null)}
-                  className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-4 text-xs font-extrabold text-white"
+                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-4 text-[13px] font-extrabold text-white"
                 >
                   <ClipboardCheck className="h-3.5 w-3.5" />
                   {isId ? 'Buat 1 listing dulu' : 'Create 1 listing first'}
