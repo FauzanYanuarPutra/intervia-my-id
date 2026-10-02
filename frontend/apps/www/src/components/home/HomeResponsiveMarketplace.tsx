@@ -2814,7 +2814,23 @@ export function PublicReferencesSection({
   });
 
   if (items.length === 0) return null;
-  const clusteredItems = clusterHomeFeedItems(items, 12, 3);
+
+  // First-party Lajukan businesses must stay ahead of registered/external
+  // locations. Do this before clustering so a reference cannot leapfrog a
+  // native listing simply because it shares the same category/city bucket.
+  const prioritizedItems = [...items].sort((left, right) => {
+    const priority = (item: PublicReferenceItem) =>
+      item.sourceKind === 'lajukan'
+        ? 0
+        : item.sourceKind === 'registered'
+          ? 1
+          : 2;
+    const delta = priority(left) - priority(right);
+    if (delta !== 0) return delta;
+    if (left.verified !== right.verified) return left.verified ? -1 : 1;
+    return left.title.localeCompare(right.title, 'id');
+  });
+  const clusteredItems = clusterHomeFeedItems(prioritizedItems, 12, 3);
 
   return (
     <section
