@@ -8,6 +8,7 @@ import {
   ContentLocationMap,
   type ContentMapPoint,
 } from '@/components/content/ContentLocationMap';
+import { ContentSmartMatch } from '@/components/content/ContentSmartMatch';
 import { useLocale } from 'next-intl';
 import {
   BadgePercent,
