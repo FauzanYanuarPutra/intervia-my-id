@@ -343,40 +343,60 @@ impl DataResetRepository {
         let scopes = normalize_scopes(&request.scopes)?;
         let hash = request_hash(&request, &scopes)?;
 
-        if let Some(existing) = load_existing_batch(&self.db, business_id, idempotency_key).await? {
+        let existing = load_existing_batch(&self.db, business_id, idempotency_key).await?;
+        let mut previous_affected = Value::Object(serde_json::Map::new());
+
+        let batch_id = if let Some(existing) = existing {
             if existing.request_hash != hash {
                 return Err(ResetError::Conflict("reset_idempotency_conflict"));
             }
             if existing.status == "running" {
                 return Err(ResetError::Conflict("reset_already_running"));
             }
-            return Ok(existing.into_record());
-        }
+            if existing.status == "completed" {
+                return Ok(existing.into_record());
+            }
+            if !matches!(existing.status.as_str(), "partial" | "failed") {
+                return Err(ResetError::Conflict("reset_already_running"));
+            }
+
+            previous_affected = existing.affected_counts.clone();
+            sqlx::query(
+                "UPDATE business_data_reset_batches SET status='running',error_code=NULL,completed_at=NULL WHERE id=$1 AND status IN ('partial','failed')",
+            )
+            .bind(existing.id)
+            .execute(&self.db)
+            .await?;
+
+            existing.id
+        } else {
+            let batch_id = Uuid::new_v4();
+            sqlx::query(
+                r#"
+                INSERT INTO business_data_reset_batches
+                  (id,business_id,organization_id,idempotency_key,request_hash,scopes,reason,status,affected_counts,actor_user_id)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,'running',$8,$9)
+                "#,
+            )
+            .bind(batch_id)
+            .bind(business_id)
+            .bind(organization_id)
+            .bind(idempotency_key)
+            .bind(&hash)
+            .bind(json!(scopes))
+            .bind(request.reason.trim())
+            .bind(json!({}))
+            .bind(actor_id)
+            .execute(&self.db)
+            .await?;
+
+            batch_id
+        };
 
         let preview = self.preview(business_id, organization_id, &scopes).await?;
         if preview.counts.sales_in_closed_period > 0 {
             return Err(ResetError::Conflict("sales_in_closed_period"));
         }
-
-        let batch_id = Uuid::new_v4();
-        sqlx::query(
-            r#"
-            INSERT INTO business_data_reset_batches
-              (id,business_id,organization_id,idempotency_key,request_hash,scopes,reason,status,affected_counts,actor_user_id)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,'running',$8,$9)
-            "#,
-        )
-        .bind(batch_id)
-        .bind(business_id)
-        .bind(organization_id)
-        .bind(idempotency_key)
-        .bind(&hash)
-        .bind(json!(scopes))
-        .bind(request.reason.trim())
-        .bind(json!({}))
-        .bind(actor_id)
-        .execute(&self.db)
-        .await?;
 
         let effective_on = request
             .effective_on
@@ -395,12 +415,13 @@ impl DataResetRepository {
 
         match result {
             Ok(affected) => {
+                let merged_affected = merge_affected_counts(&previous_affected, &affected);
                 let mut tx = self.db.begin().await?;
                 sqlx::query(
                     "UPDATE business_data_reset_batches SET status='completed',affected_counts=$2,completed_at=NOW() WHERE id=$1",
                 )
                 .bind(batch_id)
-                .bind(&affected)
+                .bind(&merged_affected)
                 .execute(&mut *tx)
                 .await?;
                 audit::record_tx(
@@ -413,7 +434,7 @@ impl DataResetRepository {
                     "business_data_reset_batch",
                     Some(batch_id),
                     Some(request.reason.trim()),
-                    json!({"scopes":scopes,"affected_counts":affected}),
+                    json!({"scopes":scopes,"affected_counts":merged_affected}),
                 )
                 .await?;
                 tx.commit().await?;
@@ -968,6 +989,31 @@ async fn compensate_finance_entries_tx(
         }
     }
     Ok((finance_count, capital_count))
+}
+
+fn merge_affected_counts(previous: &Value, current: &Value) -> Value {
+    let mut merged = serde_json::Map::new();
+
+    if let Some(object) = previous.as_object() {
+        for (key, value) in object {
+            merged.insert(key.clone(), value.clone());
+        }
+    }
+
+    if let Some(object) = current.as_object() {
+        for (key, value) in object {
+            match (merged.get(key).and_then(Value::as_i64), value.as_i64()) {
+                (Some(previous_count), Some(current_count)) => {
+                    merged.insert(key.clone(), json!(previous_count + current_count));
+                }
+                _ => {
+                    merged.insert(key.clone(), value.clone());
+                }
+            }
+        }
+    }
+
+    Value::Object(merged)
 }
 
 fn hash_child_request(batch_id: Uuid, entry_id: Uuid, reason: &str) -> String {
