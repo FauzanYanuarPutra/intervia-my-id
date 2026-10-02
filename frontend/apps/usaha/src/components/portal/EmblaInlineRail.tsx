@@ -31,10 +31,10 @@ export function EmblaInlineRail({
   return (
     <div
       ref={viewportRef}
-      className={['w-full min-w-0 overflow-hidden overscroll-x-contain', className]
+      className={['w-full min-w-0 overflow-hidden overscroll-x-contain touch-pan-y', className]
         .filter(Boolean)
         .join(' ')}
-      style={{ touchAction: 'pan-x pinch-zoom' }}
+      style={{ touchAction: 'pan-y pinch-zoom' }}
     >
       <div
         className={['flex min-w-full w-max', contentClassName]
