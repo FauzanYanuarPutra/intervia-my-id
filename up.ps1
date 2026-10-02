@@ -790,15 +790,16 @@ try {
     }
 
     if ($Build.IsPresent -and -not $Down.IsPresent) {
-        # Compose v5 can leave temporary, hash-prefixed containers behind when
-        # a previous recreate is interrupted. Remove runtime containers before
-        # the fresh start; never remove volumes because they hold application
-        # data and migration state.
-        Write-Host "Cleaning stale Compose containers before fresh build start (volumes preserved)..." -ForegroundColor Yellow
-        & docker @ComposeArgs down --remove-orphans
-        if ($LASTEXITCODE -ne 0) {
-            throw "Docker Compose gagal membersihkan container lama sebelum startup. Volume/database tidak dihapus."
-        }
+        # IMPORTANT: never tear down the live stack just because a new image was
+        # built. A full compose down also stops Caddy and cloudflared, which can
+        # surface as Cloudflare Tunnel error 1033 while the new images are built
+        # or while the application is starting.
+        #
+        # Compose can safely detect which services changed and recreate only those
+        # containers. Volumes and unchanged edge infrastructure remain online.
+        # Explicit -Fresh remains the maintenance-mode escape hatch when a full
+        # recreation is genuinely required.
+        Write-Host "Keeping the current stack online while deploying rebuilt images..." -ForegroundColor Green
     }
 
     # Local AI must be provisioned before the main stack starts. Otherwise
@@ -831,10 +832,10 @@ try {
     $UpArgs = @("up", "-d", "--remove-orphans", "--wait", "--wait-timeout", "420")
     if ($Build.IsPresent) {
         # The images were compiled above. Prevent Compose from rebuilding them a
-        # second time and always recreate containers so the fresh images are
-        # actually used. Volumes, including the database volumes, are preserved.
+        # second time. Do NOT force-recreate the entire stack here: Compose will
+        # recreate only services whose image/config changed, leaving Caddy,
+        # cloudflared, databases, and other unchanged services running.
         $UpArgs += "--no-build"
-        $UpArgs += "--force-recreate"
     }
     if ($ForceRecreate.IsPresent) {
         $UpArgs += "--force-recreate"
