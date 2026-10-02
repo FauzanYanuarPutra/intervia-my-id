@@ -140,7 +140,7 @@ export function ExploreListingCard({
     <article
       data-testid="canonical-listing-card"
       className={cn(
-        'flex h-full min-w-0 flex-col overflow-hidden rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-[0_16px_34px_-30px_rgba(15,23,42,0.4)]',
+        'flex h-full min-h-[276px] min-w-0 flex-col overflow-hidden rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-[0_16px_34px_-30px_rgba(15,23,42,0.4)] sm:min-h-[292px]',
         interactive &&
           'cursor-pointer transition motion-reduce:transform-none hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:shadow-[0_18px_38px_-27px_rgba(15,23,42,0.28)]',
       )}
@@ -174,7 +174,7 @@ export function ExploreListingCard({
         </div>
 
         <h3 className={cn(
-          'mt-1.5 line-clamp-2 min-h-10 text-sm font-bold leading-5 text-[color:var(--app-text)]',
+          'mt-1.5 min-h-10 break-words line-clamp-2 text-sm font-bold leading-5 text-[color:var(--app-text)]',
           interactive && 'group-hover:text-[color:var(--app-accent)]',
         )}>
           {item.title}
@@ -184,12 +184,14 @@ export function ExploreListingCard({
           {valueLabel}
         </p>
 
-        {(item.location || item.ownerName) ? (
-          <p className="mt-1.5 flex min-w-0 items-center gap-1.5 truncate text-[10px] font-medium text-[color:var(--app-text-soft)] sm:text-[11px]">
+        <div className="mt-1.5 min-h-5 min-w-0">
+          {(item.location || item.ownerName) ? (
+          <p className="flex min-w-0 items-center gap-1.5 truncate text-[10px] font-medium text-[color:var(--app-text-soft)] sm:text-[11px]">
             {item.location ? <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> : <Store className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />}
             <span className="truncate">{item.location || item.ownerName}</span>
           </p>
-        ) : null}
+          ) : null}
+        </div>
 
         {interactive ? (
           <p className={cn(
