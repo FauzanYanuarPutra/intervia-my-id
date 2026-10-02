@@ -32,7 +32,6 @@ import {
 import { NeedSearchCard } from '@/components/search/result-cards/NeedSearchCard';
 import { ProductSearchCard } from '@/components/search/result-cards/ProductSearchCard';
 import { ServiceSearchCard } from '@/components/search/result-cards/ServiceSearchCard';
-import { LocationAutocomplete } from '@/components/location/LocationAutocomplete';
 import {
   UmkmLocationPicker,
   type LocationPickerSuggestion,
@@ -6034,9 +6033,9 @@ export default function CreateListingWizard({
         selectedLocation?.name?.trim() ||
         rawLocationValue;
       const locationMeta =
-        selectedLocation?.secondaryText?.trim() ||
         selectedLocation?.city?.trim() ||
-        selectedLocation?.region?.trim() ||
+        selectedLocation?.province?.trim() ||
+        selectedLocation?.regency?.trim() ||
         (locationPoint
           ? `${locationPoint.lat.toFixed(5)}, ${locationPoint.lng.toFixed(5)}`
           : '');
