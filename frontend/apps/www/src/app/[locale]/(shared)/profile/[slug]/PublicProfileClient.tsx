@@ -2348,7 +2348,7 @@ export default function PublicProfileClient({
 
             <div className="px-4 pb-4 sm:px-7 sm:pb-6 lg:px-8 lg:pb-7">
               <div className="relative z-20 -mt-12 flex min-w-0 items-end gap-3 sm:-mt-14 sm:gap-5 lg:-mt-16">
-                <div className="relative h-[92px] w-[92px] shrink-0 overflow-hidden rounded-full border-[5px] border-[color:var(--app-surface-strong)] bg-[color:var(--app-surface-muted)] shadow-lg sm:h-[112px] sm:w-[112px] sm:border-[6px] lg:h-[128px] lg:w-[128px]">
+                <div className="relative h-[100px] w-[100px] shrink-0 overflow-hidden rounded-full border-[5px] border-[color:var(--app-surface-strong)] bg-[color:var(--app-surface-muted)] shadow-lg sm:h-[112px] sm:w-[112px] sm:border-[6px] lg:h-[128px] lg:w-[128px]">
                   <Image src={avatarUrl} alt={detail.displayName} fill priority unoptimized sizes="128px" className="object-cover object-center" />
                 </div>
                 <div className="min-w-0 flex-1 self-end pb-1 text-left">
@@ -2356,7 +2356,7 @@ export default function PublicProfileClient({
                     <h1 className="min-w-0 max-w-full break-words text-[21px] font-black leading-[1.12] tracking-[-0.025em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[29px] lg:text-[32px]">{detail.displayName}</h1>
                     {profile.identity_verified ? <BadgeCheck className="h-5 w-5 shrink-0 fill-emerald-600 text-white" aria-label={copy.verified} /> : null}
                   </div>
-                  <p className="mt-1 break-all text-[11px] font-medium text-[color:var(--app-text-soft)] sm:text-xs">@{detail.handle}</p>
+                  <p className="break-all text-[11px] font-medium text-[color:var(--app-text-soft)] sm:text-xs">@{detail.handle}</p>
                 </div>
               </div>
 

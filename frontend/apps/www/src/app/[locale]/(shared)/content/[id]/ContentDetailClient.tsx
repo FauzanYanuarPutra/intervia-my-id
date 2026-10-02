@@ -4002,7 +4002,7 @@ export default function ContentDetailClient({
   const detailPageShellClass =
     'lajukan-market-page lajukan-market-detail page-shell max-lg:!px-0 lg:!px-4 xl:!px-6 overflow-x-hidden bg-[color:var(--app-bg)] py-0 pb-[calc(15rem+env(safe-area-inset-bottom))] sm:py-2 sm:pb-[calc(13rem+env(safe-area-inset-bottom))] lg:pb-8';
   const detailShellStackClass =
-    'mx-auto flex w-full max-w-[1200px] flex-col gap-2.5 !px-0 sm:gap-3';
+    'mx-auto flex w-full max-w-[1200px] flex-col gap-2.5 !px-0 sm:gap-3 mb-[70px] md:mb-[20px]';
   const detailSectionClass =
     'relative overflow-hidden border-y border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-4 py-4 sm:rounded-[20px] sm:border sm:px-4 sm:shadow-[0_12px_28px_-28px_rgba(15,23,42,0.28)]';
   const detailInsetClass =
