@@ -34,7 +34,9 @@ const RESET_ERROR_MESSAGES: Record<string, string> = {
   business_storage_unavailable: 'Penyimpanan usaha belum siap. Restart stack agar migrasi marketplace selesai sebelum layanan usaha digunakan.',
   business_data_reset_storage_unavailable: 'Penyimpanan pemulihan belum siap. Restart stack agar migrasi database marketplace dijalankan lebih dulu. Data tidak dihapus oleh kegagalan ini.',
   finance_core_storage_unavailable: 'Penyimpanan keuangan belum siap. Tidak ada reset yang dijalankan.',
-  business_data_reset_sales_failed: 'Reset transaksi tidak selesai. Data yang terhubung order atau periode tertutup tetap dilindungi.',
+  business_data_reset_sales_failed: 'Reset transaksi belum selesai. Periksa transaksi yang masih dilindungi atau ulangi setelah preview terbaru.',
+  business_start_fresh_order_linked_sales: 'Mulai dari nol belum bisa diselesaikan karena masih ada transaksi yang terhubung ke order/pesanan.',
+  business_data_reset_not_ready: 'Reset belum siap dijalankan. Tinjau preview terbaru sebelum mengulang.',
   business_data_reset_finance_failed: 'Reset keuangan tidak selesai. Histori asli tetap dipertahankan.',
   business_data_reset_permission_denied: 'Peranmu tidak punya izin untuk salah satu reset yang dipilih.',
   business_start_fresh_permission_denied: 'Mulai dari nol hanya boleh dilakukan pemilik usaha.',
@@ -270,9 +272,9 @@ export function DataResetCenter({ business }: Props) {
             </span>
             <div className="min-w-0">
               <p className="text-[10px] font-black uppercase tracking-[0.12em] text-amber-700">Pemulihan data usaha</p>
-              <h1 className="mt-1 text-lg font-black tracking-tight text-portal-ink sm:text-xl">Reset sebagian atau mulai dari nol</h1>
+              <h1 className="mt-1 text-lg font-black tracking-tight text-portal-ink sm:text-xl">Kembalikan operasional ke kondisi awal</h1>
               <p className="mt-1 max-w-3xl text-sm leading-6 text-portal-soft">
-                Reset di sini tidak menghapus audit, profil usaha, atau histori. Sistem membuat koreksi/penyesuaian supaya angka operasional kembali bersih.
+                <strong className="font-black text-portal-ink">Mulai dari nol</strong> menormalkan seluruh angka operasional yang dipilih: penjualan, uang, modal, stok, serta produk aktif. Audit, profil, dan histori tetap dipertahankan.
               </p>
             </div>
           </div>
@@ -320,7 +322,15 @@ export function DataResetCenter({ business }: Props) {
               {allAvailableSelected ? 'Semua dipilih' : 'Pilih semua yang boleh'}
             </button>
             {fullResetAvailable ? (
-              <button type="button" className="portal-button-ghost" onClick={selectAll} disabled={busy !== null}>
+              <button
+                type="button"
+                className="portal-button-ghost"
+                onClick={() => {
+                  selectAll();
+                  setConfirmation('');
+                }}
+                disabled={busy !== null}
+              >
                 <RotateCcw className="h-4 w-4" /> Mulai dari nol
               </button>
             ) : null}
@@ -450,7 +460,7 @@ export function DataResetCenter({ business }: Props) {
             </button>
           </div>
           <p className="mt-3 text-[11px] leading-5 text-portal-soft">
-            Reset tidak menghapus histori. Transaksi manual memakai flow void/koreksi yang sudah ada; order terhubung dan periode yang sudah ditutup tetap dilindungi.
+            Untuk <strong>Mulai dari nol</strong>, setelah selesai angka operasional yang memang boleh dikoreksi akan kembali ke 0. Order terhubung dan periode yang sudah ditutup tetap dilindungi agar histori tidak rusak.
           </p>
         </section>
       ) : (
