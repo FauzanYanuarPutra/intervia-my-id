@@ -116,8 +116,13 @@ function data(payload: unknown) {
 
 export async function getFinanceCoreSummary(
   businessId: string,
+  options: { from?: string; to?: string } = {},
 ): Promise<FinanceCoreSummary> {
-  const payload = await requestFinanceCore(path(businessId, '/summary'));
+  const query = new URLSearchParams();
+  if (options.from) query.set('from', options.from);
+  if (options.to) query.set('to', options.to);
+  const suffix = query.toString() ? `/summary?${query.toString()}` : '/summary';
+  const payload = await requestFinanceCore(path(businessId, suffix));
   const value = data(payload).summary;
   if (!value || typeof value !== 'object') {
     throw new FinanceCoreHttpError(502, 'invalid_finance_summary_response');
