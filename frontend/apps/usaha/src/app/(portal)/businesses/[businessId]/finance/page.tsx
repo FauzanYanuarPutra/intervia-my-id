@@ -7,7 +7,8 @@ import { PageHeader } from '@/components/portal/PageHeader';
 import { PortalShell } from '@/components/portal/PortalShell';
 import { WorkspaceTabs } from '@/components/portal/WorkspaceTabs';
 import { getWave2FinancePlan, listWave2Obligations } from '@/lib/business-wave2-server';
-import { listControlChannels, listControlFinanceEntries, listControlSettlements } from '@/lib/business-control-server';
+import { listFinanceCoreEntries } from '@/lib/finance-core-server';
+import { listControlChannels, listControlSettlements } from '@/lib/business-control-server';
 import { hasPermission } from '@/lib/portal-logic';
 import { resolvePortalBusinessPageState } from '@/lib/portal-server';
 
@@ -26,7 +27,7 @@ export default async function BusinessFinancePage({ params, searchParams }: Page
   const canView = hasPermission(business, 'viewFinance');
   const [entries, settlements, channels, financePlan, obligations] = canView
     ? await Promise.all([
-        listControlFinanceEntries(business.id),
+        listFinanceCoreEntries(business.id),
         listControlSettlements(business.id),
         listControlChannels(business.id),
         getWave2FinancePlan(business.id),
