@@ -22,6 +22,10 @@ import {
   normalizeLocationText,
 } from '@/lib/location/location.utils';
 import { CurrentLocationButton } from './CurrentLocationButton';
+import {
+  LocationPermissionModal,
+  type LocationPermissionModalState,
+} from './LocationPermissionModal';
 import { LocationSuggestionItem } from './LocationSuggestionItem';
 
 type LocationAutocompleteProps = {
@@ -52,6 +56,21 @@ function buildSuggestionKey(item: LocationSuggestion): string {
   return (
     item.placeId || `${item.primaryText}-${item.latitude}-${item.longitude}`
   );
+}
+
+type GeolocationPermissionState = 'granted' | 'prompt' | 'denied';
+
+async function readGeolocationPermissionState(): Promise<GeolocationPermissionState> {
+  if (typeof navigator === 'undefined') return 'prompt';
+  if (!navigator.permissions?.query) return 'prompt';
+  try {
+    const permission = await navigator.permissions.query({ name: 'geolocation' });
+    return permission.state === 'granted' || permission.state === 'denied'
+      ? permission.state
+      : 'prompt';
+  } catch {
+    return 'prompt';
+  }
 }
 
 function mergeSuggestions(
@@ -119,6 +138,8 @@ export function LocationAutocomplete({
   const [locating, setLocating] = useState(false);
   const [status, setStatus] = useState<'idle' | 'empty' | 'error'>('idle');
   const [localError, setLocalError] = useState('');
+  const [permissionModalState, setPermissionModalState] =
+    useState<LocationPermissionModalState | null>(null);
 
   const setInputText = useCallback(
     (next: string) => {
@@ -241,17 +262,16 @@ export function LocationAutocomplete({
     [isId],
   );
 
-  const useCurrentLocation = useCallback(() => {
+  const requestCurrentLocation = useCallback(() => {
     if (!navigator.geolocation) {
-      setLocalError(
-        isId
-          ? 'Browser belum mendukung lokasi. Cari lokasi secara manual.'
-          : 'Browser geolocation is unavailable. Search manually.',
-      );
+      setLocating(false);
+      setPermissionModalState('unsupported');
       return;
     }
+
     setLocating(true);
     setLocalError('');
+
     navigator.geolocation.getCurrentPosition(
       position => {
         const lat = Number(position.coords.latitude.toFixed(6));
@@ -259,11 +279,7 @@ export function LocationAutocomplete({
         reverseGeocode(lat, lng)
           .then(selected => {
             if (!selected) {
-              setLocalError(
-                isId
-                  ? 'Lokasi terdekat belum ditemukan. Cari lokasi secara manual.'
-                  : 'Nearby address was not found. Search manually.',
-              );
+              setPermissionModalState('error');
               return;
             }
             const display =
@@ -272,27 +288,50 @@ export function LocationAutocomplete({
             onChange(selected);
             onSelect?.(selected);
             setOpen(false);
+            setActiveIndex(-1);
+            setPermissionModalState(null);
           })
           .catch(() => {
-            setLocalError(
-              isId
-                ? 'Lokasi belum dapat dimuat. Coba beberapa saat lagi.'
-                : 'Location could not be loaded. Please retry shortly.',
-            );
+            setPermissionModalState('error');
           })
           .finally(() => setLocating(false));
       },
-      () => {
+      error => {
         setLocating(false);
-        setLocalError(
-          isId
-            ? 'Izin lokasi tidak diberikan. Cari lokasi secara manual.'
-            : 'Location permission was not granted. Search manually.',
-        );
+        if (error.code === 1) {
+          setPermissionModalState('denied');
+          return;
+        }
+        setPermissionModalState('error');
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
     );
-  }, [isId, onChange, onSelect, reverseGeocode, setInputText]);
+  }, [onChange, onSelect, reverseGeocode, setInputText]);
+
+  const openCurrentLocationPermission = useCallback(async () => {
+    setLocalError('');
+    if (!navigator.geolocation) {
+      setPermissionModalState('unsupported');
+      return;
+    }
+
+    const permissionState = await readGeolocationPermissionState();
+    if (permissionState === 'denied') {
+      setPermissionModalState('denied');
+      return;
+    }
+
+    if (permissionState === 'prompt') {
+      setPermissionModalState('prompt');
+      return;
+    }
+
+    requestCurrentLocation();
+  }, [requestCurrentLocation]);
+
+  const useCurrentLocation = useCallback(() => {
+    void openCurrentLocationPermission();
+  }, [openCurrentLocationPermission]);
 
   useEffect(() => {
     if (controlledText) return;
@@ -326,6 +365,11 @@ export function LocationAutocomplete({
     activeIndex >= 0 && suggestions[activeIndex]
       ? `${listboxId}-${activeIndex}`
       : undefined;
+
+  const closeLocationPermissionModal = useCallback(() => {
+    if (locating) return;
+    setPermissionModalState(null);
+  }, [locating]);
 
   return (
     <div
@@ -553,6 +597,21 @@ export function LocationAutocomplete({
           ) : null}
         </div>
       ) : null}
+
+      <LocationPermissionModal
+        open={Boolean(permissionModalState)}
+        state={permissionModalState || 'error'}
+        isId={isId}
+        loading={locating}
+        onConfirm={() => {
+          setPermissionModalState(null);
+          requestCurrentLocation();
+        }}
+        onRetry={() => {
+          void openCurrentLocationPermission();
+        }}
+        onClose={closeLocationPermissionModal}
+      />
     </div>
   );
 }
