@@ -110,7 +110,7 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
         ) : !ready ? (
           <section className="rounded-[24px] border border-emerald-100 bg-white p-5 shadow-[0_20px_50px_-40px_rgba(15,23,42,0.3)] sm:p-6">
             <Sparkles className="h-5 w-5 text-emerald-600" />
-            <h2 className="mt-3 text-lg font-black text-zinc-950">{isId ? 'Satu listing dulu' : 'Add one listing first'}</h2>
+            <h2 className="mt-3 text-lg font-black text-zinc-950">{isId ? 'Satu listing aktif dulu' : 'Add one listing first'}</h2>
             <p className="mt-1 text-sm leading-6 text-zinc-600">{isId ? 'Boleh listing barang yang kamu jual, jasa yang kamu tawarkan, atau kebutuhan usaha yang sedang kamu cari. Ini yang dipakai untuk membantu pengelompokan komunitas.' : 'List something you sell, a service you offer, or a business need you are looking for. This is used to help group you correctly.'}</p>
             <div className="mt-4 flex flex-col gap-2 sm:flex-row">
               <Link href="/create?mode=offer" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-emerald-600 px-5 text-sm font-extrabold text-white">
