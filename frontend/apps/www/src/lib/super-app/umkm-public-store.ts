@@ -1,6 +1,8 @@
 import type { UmkmStore } from './umkm-commerce.types';
 
 const PUBLIC_METADATA_KEYS = [
+  'verification_status',
+  'lajukan_verified',
   // Public reference/provenance fields. These contain source metadata only;
   // never owner IDs, claims, private contacts, or transactional state.
   'record_kind',
