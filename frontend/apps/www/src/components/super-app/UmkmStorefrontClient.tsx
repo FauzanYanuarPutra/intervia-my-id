@@ -4514,21 +4514,41 @@ export function UmkmStorefrontClient({
                 </p>
 
                 {storeGallery.length === 0 ? (
-                  <div className="mt-4 rounded-[22px] border border-dashed border-[color:var(--app-accent-border)] bg-[color:var(--app-surface-muted)] p-6 text-center">
-                    <Camera className="mx-auto h-7 w-7 text-[color:var(--app-accent)]" />
-                    <p className="mt-2 text-sm font-bold text-[color:var(--app-text)]">
-                      {isId ? 'Belum ada media usaha' : 'No business media yet'}
-                    </p>
-                    <p className="mx-auto mt-1 max-w-md text-[11px] leading-5 text-[color:var(--app-text-soft)]">
-                      {isStoreOwner
-                        ? isId
-                          ? 'Tambahkan foto produk, outlet, proses, atau video singkat agar profil usaha lebih meyakinkan.'
-                          : 'Add product photos, storefront shots, process media, or short videos to make the business profile more useful.'
-                        : isId
-                          ? 'Belum ada foto atau video yang ditambahkan usaha ini.'
-                          : 'This business has not added photos or videos yet.'}
-                    </p>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (isStoreOwner) galleryUploadInputRef.current?.click();
+                    }}
+                    className={cn(
+                      'mt-4 flex w-full items-center gap-4 rounded-[22px] border border-dashed border-[color:var(--app-accent-border)] bg-[color:var(--app-surface-muted)] p-5 text-left',
+                      isStoreOwner && 'cursor-pointer hover:border-[color:var(--app-accent)]',
+                    )}
+                  >
+                    <span className={cn(
+                      'grid h-16 w-16 shrink-0 place-items-center rounded-[18px]',
+                      placeHeader?.kind ? toneClass(placeHeader.kind) : 'bg-teal-50 text-teal-700',
+                    )}>
+                      {(() => {
+                        const Icon = placeHeader?.kind ? getPlaceIcon(placeHeader.kind) : Store;
+                        return <Icon className="h-7 w-7" aria-hidden="true" />;
+                      })()}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-sm font-black text-[color:var(--app-text)]">
+                        {isId ? 'Belum ada foto usaha' : 'No business photo yet'}
+                      </span>
+                      <span className="mt-1 block text-[11px] leading-5 text-[color:var(--app-text-soft)]">
+                        {placeHeader?.categoryLabel ? `${placeHeader.categoryLabel} · ` : ''}
+                        {isStoreOwner
+                          ? isId
+                            ? 'Tambahkan foto produk, outlet, proses, atau video.'
+                            : 'Add product, storefront, process, or video media.'
+                          : isId
+                            ? 'Ikon kategori tetap ditampilkan sampai ada foto yang disetujui.'
+                            : 'The category icon stays visible until an approved photo is available.'}
+                      </span>
+                    </span>
+                  </button>
                 ) : null}
 
                 {storeGallery.length > 0 ? (
