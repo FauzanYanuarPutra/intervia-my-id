@@ -367,6 +367,8 @@ fn freshness_score(updated_at: DateTime<Utc>) -> f64 {
 #[derive(Debug)]
 struct CandidateScore {
     total: f64,
+    similarity: f64,
+    worth: f64,
     breakdown: Value,
     matched_fields: Vec<String>,
     missing_fields: Vec<String>,
@@ -398,11 +400,33 @@ fn score_candidate(requirement: &RequirementItem, candidate: &CandidateItem) -> 
     let need_tokens = tokens(&requirement_text);
     let candidate_tokens = tokens(&candidate_text);
     let overlap = need_tokens.intersection(&candidate_tokens).count();
-    let keyword_fit = if need_tokens.is_empty() {
+    let need_recall = if need_tokens.is_empty() {
         0.0
     } else {
-        ((overlap as f64 / need_tokens.len() as f64) * 25.0).min(25.0)
+        overlap as f64 / need_tokens.len() as f64
     };
+    let candidate_precision = if candidate_tokens.is_empty() {
+        0.0
+    } else {
+        overlap as f64 / candidate_tokens.len() as f64
+    };
+    let token_f1 = if need_recall + candidate_precision > 0.0 {
+        2.0 * need_recall * candidate_precision / (need_recall + candidate_precision)
+    } else {
+        0.0
+    };
+    let title_need_tokens = tokens(&requirement.title);
+    let title_candidate_tokens = tokens(&candidate.title);
+    let title_overlap = title_need_tokens
+        .intersection(&title_candidate_tokens)
+        .count();
+    let title_similarity = if title_need_tokens.is_empty() {
+        0.0
+    } else {
+        title_overlap as f64 / title_need_tokens.len() as f64
+    };
+    let similarity = ((token_f1 * 0.65 + title_similarity * 0.35) * 100.0).clamp(0.0, 100.0);
+    let keyword_fit = (similarity * 0.25).min(25.0);
 
     let requirement_category =
         category_from(&requirement.metadata).or_else(|| requirement.category.clone().map(text));
@@ -476,6 +500,30 @@ fn score_candidate(requirement: &RequirementItem, candidate: &CandidateItem) -> 
         + freshness)
         .clamp(0.0, 100.0);
 
+    let price_value = match (candidate.price_cents, budget_min, budget_max) {
+        (Some(price), Some(min), Some(max)) if max > min => {
+            if price < min {
+                0.65
+            } else if price <= max {
+                let span = (max - min).max(1) as f64;
+                let position = ((price - min) as f64 / span).clamp(0.0, 1.0);
+                1.0 - position * 0.25
+            } else {
+                0.35
+            }
+        }
+        (Some(price), _, Some(max)) if max > 0 => (1.0 - (price as f64 / max as f64).clamp(0.0, 1.0) * 0.35).max(0.35),
+        (Some(_), _, _) => 0.55,
+        _ => 0.50,
+    };
+    let value_index =
+        (similarity * 0.40) +
+        (price_value * 100.0 * 0.20) +
+        (trust * 10.0) * 0.20 +
+        (availability * 10.0) * 0.10 +
+        (quality * 20.0) * 0.10;
+    let worth = (total * 0.70 + value_index * 0.30).clamp(0.0, 100.0);
+
     let mut matched_fields = Vec::new();
     let mut missing_fields = Vec::new();
     let mut reasons = Vec::new();
@@ -483,7 +531,8 @@ fn score_candidate(requirement: &RequirementItem, candidate: &CandidateItem) -> 
 
     if overlap > 0 {
         matched_fields.push(format!("{} kata kunci", overlap));
-        reasons.push("Konten penyedia memiliki istilah yang selaras dengan kebutuhan.".to_string());
+        reasons.push(format!("Kemiripan isi terdeteksi sekitar {:.0}%.", similarity));
+        reasons.push("Konten kandidat memiliki istilah dan konteks yang selaras dengan kebutuhan.".to_string());
     } else {
         missing_fields.push("keyword_fit".to_string());
         warnings.push("Tidak ada kecocokan kata kunci yang kuat.".to_string());
@@ -516,9 +565,13 @@ fn score_candidate(requirement: &RequirementItem, candidate: &CandidateItem) -> 
 
     CandidateScore {
         total,
+        similarity,
+        worth,
         breakdown: json!({
             "keyword_category_fit": (keyword_fit + category_fit).round(),
             "need_item_fit": keyword_fit.round(),
+            "similarity": similarity.round(),
+            "worth": worth.round(),
             "category_fit": category_fit.round(),
             "location_fit": location_fit.round(),
             "price_budget_fit": price_fit.round(),
@@ -1824,8 +1877,9 @@ fn public_match_sort(value: Option<&str>) -> &str {
     match value.unwrap_or("best").trim().to_ascii_lowercase().as_str() {
         "nearest" | "closest" => "nearest",
         "cheapest" | "cheap" => "cheapest",
-        "balanced" | "value" => "balanced",
-        _ => "best",
+        "similar" | "similarity" | "match" => "similarity",
+        "worth" | "value" | "best" | "balanced" => "worth",
+        _ => "worth",
     }
 }
 
@@ -2050,7 +2104,12 @@ pub async fn public_matches(
                             .unwrap_or(i64::MAX),
                     ),
             ),
-            "balanced" | "best" | _ => b.score.total.partial_cmp(&a.score.total),
+            "similarity" => b.score.similarity.partial_cmp(&a.score.similarity),
+            "worth" | "best" | "balanced" | _ => b
+                .score
+                .worth
+                .partial_cmp(&a.score.worth)
+                .or_else(|| b.score.total.partial_cmp(&a.score.total)),
         };
         ordering.unwrap_or(std::cmp::Ordering::Equal)
     });
@@ -2082,6 +2141,8 @@ pub async fn public_matches(
                 "budget_min": entry.target_budget_min,
                 "budget_max": entry.target_budget_max,
                 "score": entry.score.total.round(),
+                "similarity_score": entry.score.similarity.round(),
+                "worth_score": entry.score.worth.round(),
                 "score_label": score_label,
                 "breakdown": entry.score.breakdown,
                 "matched_fields": entry.score.matched_fields,
