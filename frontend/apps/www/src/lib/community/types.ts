@@ -45,6 +45,7 @@ export type CommunityGroup = {
   avatarUrl?: string | null;
   coverUrl?: string | null;
   whatsappJoinUrl?: string | null;
+  facebookGroupUrl?: string | null;
   rules: string[];
   memberCount: number;
   postCount: number;
