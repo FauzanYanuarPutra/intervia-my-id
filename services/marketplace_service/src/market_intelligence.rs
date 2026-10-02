@@ -570,6 +570,10 @@ async fn build_market_response(
 
     let mut alerts = Vec::<Value>::new();
     let source_alert = price_alert(Some(source.price_cents), &market);
+    let price_position = source_alert
+        .get("direction")
+        .and_then(Value::as_str)
+        .unwrap_or("within");
     if source_alert.get("level").and_then(Value::as_str) != Some("normal") {
         alerts.push(source_alert);
     }
@@ -650,6 +654,19 @@ async fn build_market_response(
             "days": days,
             "summary": trend_summary,
             "daily": trend
+        },
+        "insight": {
+            "price_position": price_position,
+            "headline": match price_position {
+                "above" => "Harga listing berada di atas pusat pasar.",
+                "below" => "Harga listing berada di bawah pusat pasar.",
+                _ => "Harga listing masih dekat dengan pusat pasar."
+            },
+            "action": match price_position {
+                "above" => "Cek kualitas, spesifikasi, ongkir, dan kondisi barang sebelum mengubah harga.",
+                "below" => "Cek stok, kualitas, promo, dan biaya sebelum menaikkan harga.",
+                _ => "Tidak ada sinyal harga besar yang perlu ditindaklanjuti."
+            }
         },
         "alerts": alerts,
         "intelligence": {
