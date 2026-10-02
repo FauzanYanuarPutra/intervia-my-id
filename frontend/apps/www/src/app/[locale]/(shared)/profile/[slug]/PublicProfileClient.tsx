@@ -2431,12 +2431,12 @@ export default function PublicProfileClient({
             </div>
           </section>
 
-          <section className="mt-3 overflow-hidden rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-sm sm:rounded-[26px]">
-            <div className="border-b border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)]">
+          <section className="relative isolate mt-3 overflow-hidden rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-sm sm:rounded-[26px]">
+            <div className="relative z-10 shrink-0 border-b border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)]">
               <div
                 role="tablist"
                 aria-label={localeCode === 'id' ? 'Navigasi profil' : 'Profile navigation'}
-                className="flex min-w-full overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                className="relative z-10 flex min-w-full touch-pan-x overflow-x-auto overscroll-x-contain px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
               >
                 {profileTabs.map(tab => {
                   const active = activeProfileTab === tab.key;
@@ -2462,7 +2462,7 @@ export default function PublicProfileClient({
             </div>
 
             {activeProfileTab === 'posts' ? (
-              <div className="p-2.5 sm:p-5">
+              <div className="relative z-0 min-w-0 p-2.5 sm:p-5">
                 <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
                   <ProfileFilterStrip
                     activeKey={resolvedContentTab}
@@ -2603,7 +2603,7 @@ export default function PublicProfileClient({
             ) : null}
 
             {activeProfileTab === 'about' ? (
-              <div className="p-2.5 sm:p-5">
+              <div className="relative z-0 min-w-0 p-2.5 sm:p-5">
                 <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_300px]">
                   <div className="space-y-3">
                     {hasMeaningfulSummary || hasMeaningfulHeadline || businessCategory ? (
@@ -2807,7 +2807,7 @@ export default function PublicProfileClient({
             ) : null}
 
             {activeProfileTab === 'reviews' ? (
-              <div className="p-3 sm:p-5">
+              <div className="relative z-0 min-w-0 p-3 sm:p-5">
                 <div className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
                   <section className="rounded-2xl border border-[color:var(--app-border)] p-5 text-center lg:sticky lg:top-16 lg:self-start">
                     <p className="text-4xl font-black tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">{typeof rating === 'number' && rating > 0 ? rating.toFixed(1) : '—'}</p>
