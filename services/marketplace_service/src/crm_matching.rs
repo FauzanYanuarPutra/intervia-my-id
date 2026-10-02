@@ -1112,13 +1112,15 @@ pub async fn run_match(
         FROM content_items
         WHERE content_status = 'active'
           AND content_type IN ('product', 'service', 'material', 'tool_rental', 'business_transfer', 'property', 'talent')
-          AND (
-              ($1 <> '' AND search_vector @@ plainto_tsquery('simple', $1))
-              OR lower(title) ILIKE '%' || lower($2) || '%'
-              OR lower(COALESCE(summary, '')) ILIKE '%' || lower($2) || '%'
-              OR lower(COALESCE(body, '')) ILIKE '%' || lower($2) || '%'
-          )
-        ORDER BY updated_at DESC
+        ORDER BY
+            CASE
+                WHEN ($1 <> '' AND search_vector @@ plainto_tsquery('simple', $2)) THEN 0
+                WHEN lower(title) ILIKE '%' || lower($2) || '%' THEN 1
+                WHEN lower(COALESCE(summary, '')) ILIKE '%' || lower($2) || '%' THEN 2
+                WHEN lower(COALESCE(body, '')) ILIKE '%' || lower($2) || '%' THEN 3
+                ELSE 4
+            END,
+            updated_at DESC
         LIMIT $3
         "#,
     )
@@ -2302,14 +2304,16 @@ pub async fn notify_new_listing_matches(
                   'product', 'service', 'material', 'tool_rental',
                   'business_transfer', 'property', 'talent'
               )
-              AND (
-                  ($1 <> '' AND search_vector @@ plainto_tsquery('simple', $1))
-                  OR lower(title) ILIKE '%' || lower($3) || '%'
-                  OR lower(COALESCE(summary, '')) ILIKE '%' || lower($3) || '%'
-                  OR lower(COALESCE(body, '')) ILIKE '%' || lower($3) || '%'
-              )
-            ORDER BY updated_at DESC
-            LIMIT 50
+            ORDER BY
+                CASE
+                    WHEN ($1 <> '' AND search_vector @@ plainto_tsquery('simple', $1)) THEN 0
+                    WHEN lower(title) ILIKE '%' || lower($3) || '%' THEN 1
+                    WHEN lower(COALESCE(summary, '')) ILIKE '%' || lower($3) || '%' THEN 2
+                    WHEN lower(COALESCE(body, '')) ILIKE '%' || lower($3) || '%' THEN 3
+                    ELSE 4
+                END,
+                updated_at DESC
+            LIMIT 80
             "#,
         )
         .bind(&query_text)
