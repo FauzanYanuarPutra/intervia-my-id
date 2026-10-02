@@ -54,8 +54,12 @@ defmodule ChatServiceWeb.MessageController do
              joined_at
            ),
          {:ok, rows} <- Repo.execute(query, args) do
+      peer_read_at = peer_last_read_at(room_id, user_id_bin, room_type)
+
       data =
         Enum.map(rows, fn row ->
+          sent_at = row["sent_at"]
+
           %{
             message_id: message_id_string(row["message_id"]),
             sender_id: uuid_to_string(row["sender_id"]),
@@ -69,12 +73,13 @@ defmodule ChatServiceWeb.MessageController do
             reference: message_reference_from_row(row),
             is_edited: row["is_edited"] || false,
             is_deleted: row["is_deleted"] || false,
-            sent_at: row["sent_at"]
+            sent_at: sent_at,
+            read_at: message_read_at(row["sender_id"], user_id_bin, sent_at, peer_read_at)
           }
         end)
 
       room_name = resolve_room_name(room_id, user_id_bin)
-      json(conn, %{data: data, room_name: room_name})
+      json(conn, %{data: data, room_name: room_name, peer_read_at: peer_read_at})
     else
       :error ->
         conn |> put_status(:bad_request) |> json(%{error: "invalid history cursor"})
@@ -717,6 +722,58 @@ defmodule ChatServiceWeb.MessageController do
   end
 
   defp valid_bucket?(_bucket), do: false
+
+  defp peer_last_read_at(room_id, user_id_bin, "dm") do
+    case Repo.execute("SELECT user_id FROM room_members WHERE room_id = ?", [
+           {"text", room_id}
+         ]) do
+      {:ok, rows} ->
+        peer_id =
+          rows
+          |> Enum.to_list()
+          |> Enum.map(& &1["user_id"])
+          |> Enum.find(fn id -> is_binary(id) and id != user_id_bin end)
+
+        case peer_id do
+          nil ->
+            nil
+
+          peer_id ->
+            case Repo.execute(
+                   "SELECT last_read_at FROM user_room_state WHERE user_id = ? AND room_id = ? LIMIT 1",
+                   [{"uuid", peer_id}, {"text", room_id}]
+                 ) do
+              {:ok, peer_rows} ->
+                peer_rows
+                |> Enum.to_list()
+                |> List.first()
+                |> case do
+                  %{"last_read_at" => value} -> value
+                  _ -> nil
+                end
+
+              _ ->
+                nil
+            end
+        end
+
+      _ ->
+        nil
+    end
+  end
+
+  defp peer_last_read_at(_room_id, _user_id_bin, _room_type), do: nil
+
+  defp message_read_at(sender_id, current_user_id, sent_at, peer_read_at)
+       when is_binary(sender_id) and is_binary(current_user_id) do
+    if sender_id == current_user_id and not is_nil(peer_read_at) and not is_nil(sent_at) do
+      peer_read_at
+    else
+      nil
+    end
+  end
+
+  defp message_read_at(_sender_id, _current_user_id, _sent_at, _peer_read_at), do: nil
 
   defp message_reference_from_row(row) when is_map(row) do
     case row["reply_to_message_id"] do
