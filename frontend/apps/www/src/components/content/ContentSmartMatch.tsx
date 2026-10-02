@@ -128,6 +128,7 @@ export function ContentSmartMatch({
     }
 
     let cancelled = false;
+    setAiPayload(null);
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 2200);
     setAiLoading(true);
@@ -174,7 +175,20 @@ export function ContentSmartMatch({
       window.clearTimeout(timeout);
       controller.abort();
     };
-  }, [contentId, loading, locale, results, source]);
+  }, [
+    contentId,
+    loading,
+    locale,
+    results,
+    source?.title,
+    source?.summary,
+    source?.body,
+    source?.category,
+    source?.content_type,
+    source?.price_cents,
+    source?.price_unit,
+    source?.city,
+  ]);
 
   const requestError = !loading && payload === null;
   const aiOrder = new Map(
