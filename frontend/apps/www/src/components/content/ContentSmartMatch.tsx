@@ -214,12 +214,12 @@ export function ContentSmartMatch({
           <h2 className="mt-1 text-base font-bold text-[color:var(--app-text)] sm:text-lg">{title}</h2>
           <p className="mt-1 text-xs leading-5 text-[color:var(--app-text-soft)]">
             {locale === 'id'
-              ? 'Lajukan mencocokkan lokasi, harga, kategori, ketersediaan, dan kecocokan isi posting.'
-              : 'Lajukan compares location, price, category, availability, and listing relevance.'}
+              ? 'Lajukan mencocokkan isi, kategori, lokasi, harga, ketersediaan, kualitas listing, lalu AI menyempurnakan urutan kandidat teratas.'
+              : 'Lajukan compares semantic fit, category, location, price, availability, and listing quality, then AI reranks the top candidates.'}
           </p>
         </div>
         <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-emerald-700 ring-1 ring-emerald-200 dark:bg-white/5 dark:text-emerald-300 dark:ring-emerald-300/20">
-          {loading ? '...' : `${payload?.count ?? results.length} match`}
+          {loading ? '...' : aiLoading ? 'AI merapikan...' : `${payload?.count ?? results.length} match`}
         </span>
       </div>
 
@@ -250,7 +250,8 @@ export function ContentSmartMatch({
 
       <div className="mt-3 flex gap-1.5 overflow-x-auto pb-1">
         {([
-          ['best', locale === 'id' ? 'Paling cocok' : 'Best match'],
+          ['worth', locale === 'id' ? 'Paling worth it' : 'Best value'],
+          ['similarity', locale === 'id' ? 'Paling mirip' : 'Most similar'],
           ['nearest', locale === 'id' ? 'Terdekat' : 'Nearest'],
           ['cheapest', locale === 'id' ? 'Harga' : 'Price'],
         ] as const).map(([value, label]) => (
@@ -271,7 +272,7 @@ export function ContentSmartMatch({
         </div>
       ) : (
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
-          {results.slice(0, 6).map(match => (
+          {displayResults.slice(0, 6).map(match => (
             <Link
               key={match.id}
               href={`/content/${match.id}`}
@@ -286,7 +287,12 @@ export function ContentSmartMatch({
                   </div>
                 </div>
                 <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-black text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300">
-                  {Math.round(match.score ?? 0)}%
+                  {Math.round(
+                    aiAssessment.get(match.id)?.worth_it ??
+                      match.worth_score ??
+                      match.score ??
+                      0,
+                  )}% worth it
                 </span>
               </div>
 
@@ -294,7 +300,19 @@ export function ContentSmartMatch({
                 <span className="truncate text-xs font-bold text-[color:var(--app-text)]">{budgetLabel(match) || (locale === 'id' ? 'Harga nego' : 'Negotiable')}</span>
                 <ArrowRight className="h-3.5 w-3.5 shrink-0 text-[color:var(--app-text-soft)] transition group-hover:translate-x-0.5" />
               </div>
-              {match.reasons?.[0] ? <p className="mt-1 line-clamp-1 text-[10px] text-[color:var(--app-text-soft)]">{match.reasons[0]}</p> : null}
+              {aiAssessment.get(match.id)?.reason || match.reasons?.[0] ? (
+                <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-[color:var(--app-text-soft)]">
+                  {aiAssessment.get(match.id)?.reason || match.reasons?.[0]}
+                  {match.similarity_score != null
+                    ? ' · Mirip ' +
+                      Math.round(
+                        aiAssessment.get(match.id)?.similarity ??
+                          match.similarity_score,
+                      ) +
+                      '%'
+                    : ''}
+                </p>
+              ) : null}
             </Link>
           ))}
         </div>
