@@ -334,14 +334,22 @@ pub fn infer_marketplace_intent(query: &str) -> MarketplaceIntent {
         ],
     );
 
+    // A plain buyer-style lookup such as "Cari mesin kopi" is still a
+    // supply-side discovery request: the user is looking for something to buy.
+    // Demand is reserved for language that explicitly describes a buyer need
+    // being posted ("butuh pembeli", "dibutuhkan", "sedang mencari" as a brief).
+    let implicit_product_lookup = search_language
+        && !demand
+        && !supply
+        && !matches!(infer_category(&lower).as_str(), "services" | "business-opportunities")
+        && !infer_category(&lower).is_empty();
+
     let side = if demand && !supply {
         MarketplaceSide::Demand
-    } else if supply && !demand {
+    } else if supply || implicit_product_lookup {
         MarketplaceSide::Supply
     } else if demand {
         MarketplaceSide::Demand
-    } else if supply {
-        MarketplaceSide::Supply
     } else {
         MarketplaceSide::Unknown
     };
