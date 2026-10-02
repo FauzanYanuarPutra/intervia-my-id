@@ -25,7 +25,7 @@ export function HomeCommunityJoinSection({ isId }: { isId: boolean }) {
             </h2>
             <p className="mt-1 max-w-2xl text-xs font-medium leading-5 text-zinc-600 sm:text-sm">
               {isId
-                ? 'Login, cantumkan minimal 1 listing usaha, lalu Lajukan bantu mengenali peranmu sebelum kamu masuk ke komunitas WhatsApp.'
+                ? 'Login, cantumkan minimal 1 listing aktif usaha, lalu Lajukan bantu mengenali peranmu sebelum kamu masuk ke komunitas WhatsApp.'
                 : 'Log in, add at least one business listing, then Lajukan identifies your role before you enter the WhatsApp community.'}
             </p>
             <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] font-bold text-zinc-600">
