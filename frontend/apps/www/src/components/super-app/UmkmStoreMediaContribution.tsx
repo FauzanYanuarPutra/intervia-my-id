@@ -178,11 +178,17 @@ export function UmkmStoreMediaContribution({
           ref={inputRef}
           type="file"
           accept="image/*,video/*"
+          multiple
           className="hidden"
-          onChange={event => {
-            const file = event.target.files?.[0];
+          onChange={async event => {
+            const files = Array.from(event.currentTarget.files || []).slice(0, 6);
             event.currentTarget.value = '';
-            if (file) void submit(file);
+            // Google-Maps-like contribution flow: allow a small batch, but
+            // submit sequentially so upload/review limits and mobile memory
+            // stay predictable.
+            for (const file of files) {
+              await submit(file);
+            }
           }}
         />
         <button
