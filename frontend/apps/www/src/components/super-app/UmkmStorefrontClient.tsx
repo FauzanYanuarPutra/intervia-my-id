@@ -167,6 +167,22 @@ type StoreGalleryLikeUpdateResponse = {
   error?: string;
 };
 
+type PublicStoreMediaResponse = {
+  data?: {
+    items?: Array<{
+      id: string;
+      media_url: string;
+      media_type: 'image' | 'video';
+      caption?: string | null;
+      uploader_name?: string | null;
+      uploader_username?: string | null;
+      is_primary?: boolean;
+      created_at?: string;
+    }>;
+  };
+  error?: string;
+};
+
 type ReservationRecord = {
   id: string;
   reservation_code: string;
@@ -3147,6 +3163,76 @@ export function UmkmStorefrontClient({
     },
     [storeGallery.length],
   );
+  useEffect(() => {
+    if (!store) return;
+
+    let active = true;
+    const loadApprovedStoreMedia = async () => {
+      try {
+        const response = await fetch(
+          `/api/super-app/umkm/stores/${encodeURIComponent(store.id)}/media`,
+          { method: 'GET', cache: 'no-store' },
+        );
+        const payload = (await response.json().catch(() => ({}))) as PublicStoreMediaResponse;
+        if (!response.ok || !active) return;
+
+        const items = Array.isArray(payload.data?.items)
+          ? payload.data.items.filter(item =>
+              typeof item?.media_url === 'string' && item.media_url.trim(),
+            )
+          : [];
+        if (!items.length) return;
+
+        setStore(current => {
+          if (!current || current.id !== store.id) return current;
+          const currentMetadata = asRecord(current.metadata);
+          const existingItems = Array.isArray(currentMetadata.gallery_media_items)
+            ? currentMetadata.gallery_media_items
+            : [];
+          const mergedItems = [...items, ...existingItems]
+            .filter(item => item && typeof item === 'object')
+            .reduce<unknown[]>((acc, item) => {
+              const record = item as Record<string, unknown>;
+              const url = readText(record.media_url || record.url);
+              if (!url || acc.some(existing => readText(asRecord(existing).media_url || asRecord(existing).url) === url)) return acc;
+              acc.push({
+                id: readText(record.id),
+                url,
+                media_url: url,
+                media_type: readText(record.media_type).toLowerCase() === 'video' ? 'video' : 'image',
+                caption: readText(record.caption) || null,
+                uploader_name: readText(record.uploader_name) || null,
+                uploader_username: readText(record.uploader_username) || null,
+                is_primary: record.is_primary === true,
+                created_at: readText(record.created_at) || null,
+              });
+              return acc;
+            }, [])
+            .slice(0, 24);
+          const primary = items.find(item => item.is_primary === true)?.media_url?.trim();
+          return {
+            ...current,
+            metadata: {
+              ...currentMetadata,
+              gallery_media_items: mergedItems,
+              gallery_media: mergedItems
+                .map(item => readText(asRecord(item).url || asRecord(item).media_url))
+                .filter(Boolean),
+              ...(primary ? { gallery_media_primary: primary } : {}),
+            },
+          };
+        });
+      } catch {
+        // Public gallery is progressive; the rest of the storefront must keep working.
+      }
+    };
+
+    void loadApprovedStoreMedia();
+    return () => {
+      active = false;
+    };
+  }, [store?.id]);
+
   useEffect(() => {
     if (!store) {
       setGalleryLikes({});
