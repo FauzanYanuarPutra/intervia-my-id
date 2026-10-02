@@ -1,13 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import useEmblaCarousel from 'embla-carousel-react';
+import { useLajukanEmbla } from '@/components/common/useLajukanEmbla';
 import { Clock3, MapPin } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import type { LajukanNewsArticle } from '@/lib/news';
 import { NewsMedia } from '@/components/news/NewsMedia';
 import { EmblaDesktopControls } from '@/components/common/EmblaDesktopControls';
-import { useEmblaWheelGestures } from '@/components/common/useEmblaWheelGestures';
 
 function formatDate(value: string, locale: string) {
   const date = new Date(value);
@@ -38,11 +37,17 @@ export function NewsCarousel({
   eyebrow?: string;
   related?: boolean;
 }) {
-  const [viewportRef, emblaApi] = useEmblaCarousel({
+  const [viewportRef, emblaApi] = useLajukanEmbla({
     align: 'start',
     containScroll: 'trimSnaps',
     loop: articles.length > 2,
     dragFree: false,
+    skipSnaps: false,
+    wheel: {
+      enabled: articles.length > 1,
+      desktopOnly: true,
+      threshold: 42,
+    },
   });
   const [selected, setSelected] = useState(0);
 
@@ -62,12 +67,6 @@ export function NewsCarousel({
   }, [emblaApi, onSelect]);
 
   const dots = useMemo(() => Math.min(articles.length, 6), [articles.length]);
-
-  useEmblaWheelGestures(emblaApi, {
-    enabled: articles.length > 1,
-    desktopOnly: true,
-    threshold: 42,
-  });
 
   if (!articles.length) return null;
 
