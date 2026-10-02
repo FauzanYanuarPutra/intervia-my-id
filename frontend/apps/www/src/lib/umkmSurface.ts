@@ -310,28 +310,32 @@ export function buildUmkmMapPlacePath(place: UmkmMapLinkTarget): string {
           : '';
   const storefrontSlug = place.slug?.trim() || metadataSlug;
   const storeId = typeof place.id === 'string' ? place.id.trim() : '';
+  const sourceKindClass = getUmkmMapSourceKind(place);
 
   if (isUmkmMapPublicReference(place)) {
-    return storefrontSlug
-      ? buildUmkmDiscoveryPath({
-          store: storefrontSlug,
-          storeId: storeId || undefined,
-        })
-      : storeId
-        ? buildUmkmDiscoveryPath({ storeId })
-        : UMKM_DISCOVERY_PATH;
+    return buildUmkmDiscoveryPath(
+      storeId
+        ? { view: 'map', store: storefrontSlug || undefined, storeId }
+        : storefrontSlug
+          ? { view: 'map', store: storefrontSlug }
+          : {},
+    );
   }
 
   if (
-    sourceKind === 'lajukan_store' ||
-    sourceKind === 'registered_store' ||
-    source === 'usaha_portal' ||
-    metadata.owner_user_id != null ||
-    metadata.owner_id != null
+    sourceKindClass === 'lajukan' &&
+    (
+      sourceKind === 'lajukan_store' ||
+      sourceKind === 'usaha_portal' ||
+      source === 'usaha_portal' ||
+      metadata.owner_user_id != null ||
+      metadata.owner_id != null ||
+      Boolean(metadataSlug)
+    )
   ) {
-    // Prefer the canonical storefront when a slug exists. When the data only
-    // has a store id, never generate the broken "/toko/" URL: deep-link the
-    // business map instead so the exact store can still be selected.
+    // A real Lajukan business always opens its canonical storefront.
+    // Never fall back to a generic /content URL just because the backing
+    // record originated from a content/listing projection.
     return storefrontSlug
       ? buildUmkmStorefrontPath(storefrontSlug)
       : storeId
@@ -348,10 +352,6 @@ export function buildUmkmMapPlacePath(place: UmkmMapLinkTarget): string {
       readSafePublicPath(place.public_path) ||
       readSafePublicPath(metadata.public_path);
     if (publicPath) return publicPath;
-
-    if (storefrontSlug) {
-      return `/content/${encodeURIComponent(storefrontSlug)}`;
-    }
 
     return storeId
       ? buildUmkmDiscoveryPath({ view: 'map', storeId })
