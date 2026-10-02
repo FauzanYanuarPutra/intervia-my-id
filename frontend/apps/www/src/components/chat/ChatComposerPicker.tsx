@@ -60,20 +60,18 @@ export function ChatComposerPicker({
   onStickerSelect,
 }: Props) {
   const [categoryId, setCategoryId] = useState('recent');
-  const [recent, setRecent] = useState<string[]>([]);
-
-  useEffect(() => {
-    if (mode !== 'emoji') return;
+  const [recent, setRecent] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return [];
     try {
       const raw = window.localStorage.getItem('lajukan:chat:recent-emojis:v1');
       const parsed = raw ? JSON.parse(raw) : [];
-      if (Array.isArray(parsed)) {
-        setRecent(parsed.filter(item => typeof item === 'string').slice(0, 24));
-      }
+      return Array.isArray(parsed)
+        ? parsed.filter(item => typeof item === 'string').slice(0, 24)
+        : [];
     } catch {
-      setRecent([]);
+      return [];
     }
-  }, [mode]);
+  });
 \n
   const categories = useMemo(() => {
     if (mode !== 'emoji' || recent.length === 0) return EMOJI_CATEGORIES;
