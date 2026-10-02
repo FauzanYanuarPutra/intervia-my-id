@@ -250,7 +250,6 @@ export function NeedSearchCard({
           !isPlaceholderLikeContentImage(value),
       ) || null;
 
-  const hasImage = Boolean(imageSrc);
 
   const card = (
     <article
