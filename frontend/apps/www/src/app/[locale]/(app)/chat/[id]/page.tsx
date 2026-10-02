@@ -7348,6 +7348,28 @@ export default function ChatRoomPage() {
                             listingSnapshot.content_id.trim()
                           ? String(listingSnapshot.content_id).trim()
                           : '';
+                    const structuredContentStatus =
+                      typeof meta?.content_status === 'string'
+                        ? meta.content_status.trim().toLowerCase()
+                        : typeof listingSnapshot.content_status === 'string'
+                          ? String(listingSnapshot.content_status).trim().toLowerCase()
+                          : 'active';
+                    const structuredListingInactive = [
+                      'deleted',
+                      'archived',
+                      'paused',
+                      'inactive',
+                      'draft',
+                      'expired',
+                    ].includes(structuredContentStatus);
+                    const structuredListingImage = [
+                      meta?.cover_image,
+                      listingSnapshot.cover_image,
+                      meta?.image_url,
+                      listingSnapshot.image_url,
+                    ]
+                      .map(value => (typeof value === 'string' ? value.trim() : ''))
+                      .find(Boolean) || '';
                     const isAiRoomDraftCard =
                       msg.message_type === 'listing' &&
                       typeof meta?.source === 'string' &&
@@ -8151,28 +8173,43 @@ export default function ChatRoomPage() {
                                         </span>
                                       )}
                                     </div>
-                                    {typeof meta?.cover_image === 'string' &&
-                                      meta.cover_image.trim() && (
+                                    <div className="mt-2 overflow-hidden rounded-[16px] border border-black/5 bg-black/[0.03] dark:border-white/10 dark:bg-white/[0.04]">
+                                      {structuredListingImage ? (
                                         <img
-                                          src={normalizeAttachmentUrl(
-                                            meta.cover_image,
-                                          )}
-                                          alt={String(
-                                            meta?.content_title || 'Listing',
-                                          )}
-                                          className="mt-2 h-28 w-full rounded-lg object-cover"
+                                          src={normalizeAttachmentUrl(structuredListingImage)}
+                                          alt={String(meta?.content_title || listingSnapshot.title || 'Listing')}
+                                          className="h-32 w-full object-cover"
                                           loading="lazy"
                                         />
+                                      ) : (
+                                        <div className="flex h-32 items-center justify-center gap-2 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                                          <FileText className="h-7 w-7" />
+                                          <span className="text-[11px] font-bold">
+                                            {String(meta?.content_type || listingSnapshot.content_type || 'Listing')}
+                                          </span>
+                                        </div>
                                       )}
-                                    <p className="mt-2 text-xs font-semibold">
-                                      {String(meta?.content_title || 'Listing')}
-                                    </p>
-                                    <p className="mt-1 text-[11px] opacity-80">
-                                      {String(meta?.content_type || 'content')}{' '}
-                                      {meta?.location
-                                        ? `• ${String(meta.location)}`
-                                        : ''}
-                                    </p>
+                                    </div>
+                                    <div className="mt-2 flex items-start justify-between gap-2">
+                                      <div className="min-w-0">
+                                        <p className="line-clamp-2 text-sm font-bold leading-5">
+                                          {String(meta?.content_title || listingSnapshot.title || 'Listing')}
+                                        </p>
+                                        <p className="mt-1 line-clamp-1 text-[11px] opacity-75">
+                                          {String(meta?.content_type || listingSnapshot.content_type || 'content')}{' '}
+                                          {meta?.location
+                                            ? `• ${String(meta.location)}`
+                                            : listingSnapshot.location
+                                              ? `• ${String(listingSnapshot.location)}`
+                                              : ''}
+                                        </p>
+                                      </div>
+                                      <span className="shrink-0 rounded-full bg-black/5 px-2 py-1 text-[9px] font-bold dark:bg-white/10">
+                                        {structuredListingInactive
+                                          ? chatLocale === 'id' ? 'Tidak aktif' : 'Unavailable'
+                                          : chatLocale === 'id' ? 'Aktif' : 'Active'}
+                                      </span>
+                                    </div>
                                     <div className="mt-1 flex items-end gap-1.5">
                                       <p className="text-base font-bold text-[color:var(--app-accent)]">
                                         {inferPricingMode(meta || {}) ===
