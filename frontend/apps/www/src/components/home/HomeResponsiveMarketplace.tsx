@@ -1342,6 +1342,7 @@ function mapContentToPublicReference(
     sourceContactType: reference.sourceContactType,
     imageAttribution:
       reference.imageAttribution || contentImageAttribution(item),
+    sourceKind: 'reference',
     clusterKey: [
       normalizeClusterToken(
         metadataText(item, 'place_type', 'amenity', 'shop', 'tourism', 'office'),
