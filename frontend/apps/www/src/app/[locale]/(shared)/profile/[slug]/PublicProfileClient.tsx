@@ -2615,7 +2615,7 @@ export default function PublicProfileClient({
                           <p className="mt-2.5 text-sm leading-6 text-[color:var(--app-text-soft)]">{copy.noAbout}</p>
                         )}
                       </section>
-                    ) : null
+                    ) : null}
 
                     {businessRows.length > 0 ? (
                       <section className="rounded-2xl border border-[color:var(--app-border)] p-4 sm:p-5">
