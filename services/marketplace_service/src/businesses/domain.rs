@@ -508,8 +508,10 @@ fn validate_coordinates(lat: Option<f64>, lng: Option<f64>) -> Result<(), Valida
     }
 }
 
-const PUBLIC_STORE_KEYS: [&str; 70] = [
+const PUBLIC_STORE_KEYS: [&str; 72] = [
     "source",
+    "verification_status",
+    "lajukan_verified",
     "source_kind",
     "portal_public_url",
     "store_photo_url",
