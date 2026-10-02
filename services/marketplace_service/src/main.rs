@@ -8639,7 +8639,7 @@ async fn list_umkm_stores(
             WITH candidates AS (
               SELECT
                 id, owner_user_id, organization_id, name, slug, description, city, address, lat, lng, phone,
-                is_active, online_order_enabled, offline_order_enabled, metadata || jsonb_build_object(
+                is_active, online_order_enabled, offline_order_enabled, metadata::jsonb || jsonb_build_object(
                   'verification_status',
                   CASE COALESCE((
                     SELECT bv.status
@@ -8718,7 +8718,7 @@ async fn list_umkm_stores(
             r#"
             SELECT
               id, owner_user_id, organization_id, name, slug, description, city, address, lat, lng, phone,
-              is_active, online_order_enabled, offline_order_enabled, metadata || jsonb_build_object(
+              is_active, online_order_enabled, offline_order_enabled, metadata::jsonb || jsonb_build_object(
                   'verification_status',
                   CASE COALESCE((
                     SELECT bv.status
