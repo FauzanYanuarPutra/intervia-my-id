@@ -1,8 +1,7 @@
 'use client';
 
 import { Children, type ReactNode } from 'react';
-import useEmblaCarousel from 'embla-carousel-react';
-import { useEmblaWheelGestures } from '@/components/common/useEmblaWheelGestures';
+import { useLajukanEmbla } from '@/components/common/useLajukanEmbla';
 
 type EmblaInlineRailProps = {
   children: ReactNode;
@@ -21,17 +20,16 @@ export function EmblaInlineRail({
   dragFree = false,
   wheelEnabled = true,
 }: EmblaInlineRailProps) {
-  const [viewportRef, emblaApi] = useEmblaCarousel({
+  const [viewportRef] = useLajukanEmbla({
     align: 'start',
     containScroll: 'trimSnaps',
     dragFree,
     loop: false,
-  });
-
-  useEmblaWheelGestures(emblaApi, {
-    enabled: wheelEnabled,
-    desktopOnly: true,
-    threshold: 42,
+    wheel: {
+      enabled: wheelEnabled,
+      desktopOnly: true,
+      threshold: 42,
+    },
   });
 
   const items = Children.toArray(children);
@@ -39,7 +37,7 @@ export function EmblaInlineRail({
   return (
     <div
       ref={viewportRef}
-      className={['w-full min-w-0 overflow-hidden', className]
+      className={['w-full min-w-0 overflow-hidden overscroll-x-contain', className]
         .filter(Boolean)
         .join(' ')}
     >
