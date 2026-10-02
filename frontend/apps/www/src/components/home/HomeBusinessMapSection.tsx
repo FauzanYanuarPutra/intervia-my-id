@@ -465,7 +465,13 @@ export function HomeBusinessMapSection({
 
   const handleMapClick = (event: MouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement | null;
-    if (target?.closest('a,button')) return;
+    if (
+      target?.closest(
+        'a,button,.leaflet-marker-icon,.leaflet-interactive,.leaflet-popup,.leaflet-control',
+      )
+    ) {
+      return;
+    }
     openMap();
   };
 
@@ -570,7 +576,7 @@ export function HomeBusinessMapSection({
         <UmkmStoreMap
           stores={displayStores}
           isId={isId}
-          interactive={false}
+          interactive
           controls={false}
           theme="default"
           focusMode="indonesia"
