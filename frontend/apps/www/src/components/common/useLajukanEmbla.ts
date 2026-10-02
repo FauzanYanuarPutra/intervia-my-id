@@ -32,7 +32,7 @@ export function useLajukanEmbla(
       containScroll: 'trimSnaps',
       dragFree: true,
       loop: false,
-      skipSnaps: true,
+      skipSnaps: false,
       ...emblaOptions,
     },
     plugins,
