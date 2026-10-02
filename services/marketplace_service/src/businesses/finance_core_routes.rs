@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::{header, HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     routing::{get, post},
@@ -81,17 +81,29 @@ struct FinanceHistoryRow {
     updated_at: DateTime<Utc>,
 }
 
+#[derive(Debug, Clone, serde::Deserialize)]
+struct FinanceSummaryQuery {
+    from: Option<NaiveDate>,
+    to: Option<NaiveDate>,
+}
+
 async fn summary(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Path(business_id): Path<Uuid>,
+    Query(query): Query<FinanceSummaryQuery>,
 ) -> Response {
     let (_, organization_id) = match finance_context(&state, &headers, business_id).await {
         Ok(value) => value,
         Err(response) => return response,
     };
     match FinanceCoreRepository::new(state.db.clone())
-        .summary(business_id, organization_id)
+        .summary_for_period(
+            business_id,
+            organization_id,
+            query.from,
+            query.to,
+        )
         .await
     {
         Ok(summary) => {
