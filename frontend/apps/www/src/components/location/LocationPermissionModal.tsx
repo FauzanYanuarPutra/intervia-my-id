@@ -190,7 +190,7 @@ export function LocationPermissionModal({
                 <LocateFixed className="h-4 w-4" />
                 {copy.promptPrimary}
               </button>
-            ) : state === 'denied' ? (
+            ) : state === 'denied' || state === 'error' ? (
               <button
                 type="button"
                 onClick={onRetry}
