@@ -24227,6 +24227,7 @@ async fn reverse_completed_transaction_funds_tx(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn update_transaction_status(
     state: &Arc<AppState>,
     id: Uuid,
@@ -26042,7 +26043,7 @@ mod tests {
 
     #[test]
     fn public_media_contribution_route_has_one_canonical_owner() {
-        const ROUTE: String = ["/v1/umkm/stores/{store_ref}/media", "contributions"].join("/");
+        const ROUTE: &str = "/v1/umkm/stores/{store_ref}/media/contributions";
         let main_source = include_str!("main.rs");
         let moderation_source = include_str!("business_moderation.rs");
 
