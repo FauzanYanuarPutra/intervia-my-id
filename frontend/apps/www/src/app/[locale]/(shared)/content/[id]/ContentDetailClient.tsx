@@ -82,6 +82,7 @@ import { trackLajukanEvent } from '@/lib/analytics/lajukanEvents';
 import { useViewerLocation } from '@/components/super-app/useViewerLocation';
 import { haversineKm, isCoordinateValid } from '@/lib/super-app/location-guard';
 import { formatDistanceKm } from '@/lib/geo/distance';
+import { BrandSocialIcon } from '@/components/common/BrandSocialIcon';
 
 export type ContentItem = {
   id: string;
@@ -4064,7 +4065,11 @@ export default function ContentDetailClient({
           rel="noreferrer"
           className={detailPrimaryButtonClass}
         >
-          <MessageCircle className="mr-2 h-4 w-4" />
+          {publicReference.sourceContactType === 'whatsapp' ? (
+            <BrandSocialIcon brand="whatsapp" className="mr-2 h-4 w-4" />
+          ) : (
+            <MessageCircle className="mr-2 h-4 w-4" />
+          )}
           {locale === 'id'
             ? publicReference.sourceContactType === 'whatsapp'
               ? 'Hubungi via WhatsApp'
@@ -4072,6 +4077,17 @@ export default function ContentDetailClient({
             : publicReference.sourceContactType === 'whatsapp'
               ? 'Contact via WhatsApp'
               : 'Contact source'}
+        </a>
+      ) : null}
+      {publicReference.sourceFacebookUrl ? (
+        <a
+          href={publicReference.sourceFacebookUrl}
+          target="_blank"
+          rel="noreferrer"
+          className={detailSecondaryButtonClass}
+        >
+          <BrandSocialIcon brand="facebook" className="mr-2 h-4 w-4 text-[#1877f2]" />
+          Facebook
         </a>
       ) : null}
       <a
