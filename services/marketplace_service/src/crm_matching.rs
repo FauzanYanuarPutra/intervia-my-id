@@ -248,6 +248,28 @@ fn category_from(metadata: &Value) -> Option<String> {
     )
     .map(text)
 }
+fn metadata_terms(metadata: &Value, keys: &[&str]) -> String {
+    let mut values = Vec::<String>::new();
+
+    for key in keys {
+        match metadata.get(*key) {
+            Some(Value::String(value)) if !value.trim().is_empty() => values.push(value.clone()),
+            Some(Value::Array(items)) => {
+                values.extend(
+                    items
+                        .iter()
+                        .filter_map(Value::as_str)
+                        .filter(|value| !value.trim().is_empty())
+                        .map(ToOwned::to_owned),
+                );
+            }
+            _ => {}
+        }
+    }
+
+    values.join(" ")
+}
+
 
 fn coordinate_from(metadata: &Value) -> Option<(f64, f64)> {
     let lat = json_f64(metadata, &["latitude", "lat", "location_lat"])?;
@@ -378,14 +400,26 @@ struct CandidateScore {
 
 fn score_candidate(requirement: &RequirementItem, candidate: &CandidateItem) -> CandidateScore {
     let requirement_text = format!(
-        "{} {} {} {}",
+        "{} {} {} {} {}",
         requirement.title,
         requirement.summary.as_deref().unwrap_or_default(),
         requirement.body,
-        requirement.category.as_deref().unwrap_or_default()
+        requirement.category.as_deref().unwrap_or_default(),
+        metadata_terms(
+            &requirement.metadata,
+            &[
+                "subcategory",
+                "sub_category",
+                "keywords",
+                "search_keywords",
+                "product_name",
+                "service_name",
+                "attributes",
+            ],
+        ),
     );
     let candidate_text = format!(
-        "{} {} {} {} {}",
+        "{} {} {} {} {} {}",
         candidate.title,
         candidate.summary.as_deref().unwrap_or_default(),
         candidate.body,
@@ -394,7 +428,19 @@ fn score_candidate(requirement: &RequirementItem, candidate: &CandidateItem) -> 
             .tags
             .as_ref()
             .map(|v| v.join(" "))
-            .unwrap_or_default()
+            .unwrap_or_default(),
+        metadata_terms(
+            &candidate.metadata,
+            &[
+                "subcategory",
+                "sub_category",
+                "keywords",
+                "search_keywords",
+                "product_name",
+                "service_name",
+                "attributes",
+            ],
+        ),
     );
 
     let need_tokens = tokens(&requirement_text);
@@ -2006,14 +2052,16 @@ pub async fn public_matches(
                   'product', 'service', 'material', 'tool_rental',
                   'business_transfer', 'property', 'talent'
               )
-              AND (
-                  ($1 <> '' AND search_vector @@ plainto_tsquery('simple', $1))
-                  OR lower(title) ILIKE '%' || lower($3) || '%'
-                  OR lower(COALESCE(summary, '')) ILIKE '%' || lower($3) || '%'
-                  OR lower(COALESCE(body, '')) ILIKE '%' || lower($3) || '%'
-              )
-            ORDER BY updated_at DESC
-            LIMIT 100
+            ORDER BY
+                CASE
+                    WHEN ($1 <> '' AND search_vector @@ plainto_tsquery('simple', $1)) THEN 0
+                    WHEN lower(title) ILIKE '%' || lower($3) || '%' THEN 1
+                    WHEN lower(COALESCE(summary, '')) ILIKE '%' || lower($3) || '%' THEN 2
+                    WHEN lower(COALESCE(body, '')) ILIKE '%' || lower($3) || '%' THEN 3
+                    ELSE 4
+                END,
+                updated_at DESC
+            LIMIT 120
             "#,
         )
         .bind(&query_text)
@@ -2048,14 +2096,16 @@ pub async fn public_matches(
             WHERE content_status = 'active'
               AND owner_id <> $2
               AND content_type = 'request'
-              AND (
-                  ($1 <> '' AND search_vector @@ plainto_tsquery('simple', $1))
-                  OR lower(title) ILIKE '%' || lower($3) || '%'
-                  OR lower(COALESCE(summary, '')) ILIKE '%' || lower($3) || '%'
-                  OR lower(COALESCE(body, '')) ILIKE '%' || lower($3) || '%'
-              )
-            ORDER BY updated_at DESC
-            LIMIT 100
+            ORDER BY
+                CASE
+                    WHEN ($1 <> '' AND search_vector @@ plainto_tsquery('simple', $1)) THEN 0
+                    WHEN lower(title) ILIKE '%' || lower($3) || '%' THEN 1
+                    WHEN lower(COALESCE(summary, '')) ILIKE '%' || lower($3) || '%' THEN 2
+                    WHEN lower(COALESCE(body, '')) ILIKE '%' || lower($3) || '%' THEN 3
+                    ELSE 4
+                END,
+                updated_at DESC
+            LIMIT 120
             "#,
         )
         .bind(&query_text)
