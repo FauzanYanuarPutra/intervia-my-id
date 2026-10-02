@@ -75,6 +75,7 @@ export function ContentSmartMatch({
   contentId,
   intent,
   locale = 'id',
+  source,
 }: {
   contentId: string;
   intent?: string;
