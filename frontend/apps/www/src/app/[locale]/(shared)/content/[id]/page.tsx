@@ -64,8 +64,14 @@ function buildShareDescription(content: Record<string, unknown>, locale: string)
 
 function toPublicImageUrl(raw: string): string {
   const normalized = normalizeContentMediaUrl(raw);
-  if (!normalized) return '';
-  if (/^https?:\\/\\//i.test(normalized)) return normalized;
+  if (
+    !normalized ||
+    normalized.startsWith('blob:') ||
+    normalized.startsWith('data:')
+  ) {
+    return '';
+  }
+  if (/^https?:\/\//i.test(normalized)) return normalized;
   if (normalized.startsWith('//')) return `https:${normalized}`;
   return `${SITE_URL}${normalized.startsWith('/') ? '' : '/'}${normalized}`;
 }
