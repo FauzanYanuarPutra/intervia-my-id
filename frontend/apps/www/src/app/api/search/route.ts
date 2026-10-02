@@ -1060,6 +1060,11 @@ function mapPublicReferenceItem(
       sourceContactType:
         reference.sourceContactType,
 
+      sourceFacebookUrl:
+        reference.sourceFacebookUrl.length <= 2048
+          ? reference.sourceFacebookUrl
+          : '',
+
       distanceKm,
 
       isTransactional:
