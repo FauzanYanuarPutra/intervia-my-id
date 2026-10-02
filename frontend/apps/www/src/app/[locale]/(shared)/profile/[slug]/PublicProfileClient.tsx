@@ -2316,8 +2316,8 @@ export default function PublicProfileClient({
         <DetailMobileTopBar title={detail.displayName} eyebrow={copy.publicProfile} backLabel={copy.back} />
 
         <main className="mx-auto w-full max-w-[980px] px-3 py-3 sm:px-4 sm:py-4 lg:px-5 lg:py-5">
-          <section className="overflow-hidden rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-sm sm:rounded-[26px] sm:shadow-[0_18px_48px_-40px_rgba(15,23,42,0.32)]">
-            <div className="relative h-24 overflow-hidden sm:h-32 lg:h-36">
+          <section className="relative rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-sm sm:rounded-[26px] sm:shadow-[0_18px_48px_-40px_rgba(15,23,42,0.32)]">
+            <div className="relative h-24 overflow-hidden rounded-t-[21px] sm:h-32 sm:rounded-t-[25px] lg:h-36">
               {coverUrl ? (
                 <Image src={coverUrl} alt="" fill priority unoptimized sizes="(max-width: 640px) 100vw, 1080px" className="object-cover" />
               ) : (
@@ -2347,16 +2347,16 @@ export default function PublicProfileClient({
             </div>
 
             <div className="px-3 pb-3 sm:px-6 sm:pb-4">
-              <div className="-mt-9 flex min-w-0 items-end gap-2.5 sm:-mt-11 sm:gap-4">
+              <div className="relative z-20 -mt-9 flex min-w-0 items-end gap-2.5 sm:-mt-11 sm:gap-4">
                 <div className="relative h-[68px] w-[68px] shrink-0 overflow-hidden rounded-full border-[4px] border-[color:var(--app-surface-strong)] bg-[color:var(--app-surface-muted)] shadow-md sm:h-[88px] sm:w-[88px] sm:border-[5px]">
                   <Image src={avatarUrl} alt={detail.displayName} fill priority unoptimized sizes="96px" className="object-cover" />
                 </div>
                 <div className="min-w-0 flex-1 pb-0.5 text-left">
                   <div className="flex min-w-0 items-center gap-1.5">
-                    <h1 className="min-w-0 max-w-full truncate text-[18px] font-black leading-tight tracking-[-0.02em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[26px]">{detail.displayName}</h1>
+                    <h1 className="min-w-0 max-w-full break-words text-[18px] font-black leading-tight tracking-[-0.02em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[26px]">{detail.displayName}</h1>
                     {profile.identity_verified ? <BadgeCheck className="h-5 w-5 shrink-0 fill-emerald-600 text-white" aria-label={copy.verified} /> : null}
                   </div>
-                  <p className="mt-0.5 truncate text-[10px] font-medium text-[color:var(--app-text-soft)] sm:text-xs">@{detail.handle}</p>
+                  <p className="mt-0.5 break-all text-[10px] font-medium text-[color:var(--app-text-soft)] sm:text-xs">@{detail.handle}</p>
                 </div>
               </div>
 
