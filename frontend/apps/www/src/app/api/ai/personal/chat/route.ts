@@ -23,6 +23,7 @@ import {
   buildThreadTitle,
   claimPersonalAiChatRequest,
   createPersonalAiThread,
+  deletePersonalAiThread,
   getPersonalAiAgentForUse,
   getPersonalAiMemory,
   getPersonalAiThreadWithMessages,
@@ -576,6 +577,7 @@ export async function POST(req: NextRequest) {
   let requestHash = '';
   let claimOwned = false;
   let claimCompleted = false;
+  let createdThreadId = '';
 
   try {
     const agent = await getPersonalAiAgentForUse({
@@ -716,13 +718,6 @@ export async function POST(req: NextRequest) {
     }
 
     let thread = threadData?.thread;
-    if (!thread) {
-      thread = await createPersonalAiThread(
-        auth.ctx.userId,
-        agent.id,
-        buildThreadTitle(message),
-      );
-    }
 
     const memoryEnabled = await isPersonalAiMemoryEnabled({
       agent,
@@ -789,6 +784,8 @@ export async function POST(req: NextRequest) {
           response: normalizedResponse,
           provider: cleanText(ai.provider, 80) || 'ai-service',
           model: cleanText(ai.model, 160) || 'unknown',
+          degraded: Boolean(ai.degraded),
+          error_code: cleanText(ai.error_code, 120) || undefined,
           provider_errors: Array.isArray(ai.provider_errors)
             ? ai.provider_errors
                 .filter(item => typeof item === 'string')
@@ -797,6 +794,31 @@ export async function POST(req: NextRequest) {
                 .slice(0, 6)
             : [],
         };
+
+        if (ai.degraded || ai.provider === 'safe-fallback') {
+          return jsonResponse(
+            requestId,
+            {
+              error:
+                locale === 'id'
+                  ? 'Layanan AI sedang tidak tersedia. Pesan belum disimpan. Coba lagi sebentar.'
+                  : 'The AI service is temporarily unavailable. Your message was not saved. Please retry shortly.',
+              code: ai.error_code || 'ai_service_unavailable',
+              retryable: true,
+              request_id: requestId,
+            },
+            { status: 503 },
+          );
+        }
+
+        if (!thread) {
+          thread = await createPersonalAiThread(
+            auth.ctx.userId,
+            agent.id,
+            buildThreadTitle(message),
+          );
+          createdThreadId = thread.id;
+        }
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : String(error);
@@ -840,8 +862,7 @@ export async function POST(req: NextRequest) {
       metadata: {
         provider: ai.provider,
         model: ai.model,
-        provider_errors:
-          ai.provider_errors.length > 0 ? ['provider_unavailable'] : [],
+        provider_errors: ai.provider_errors,
         media_count: mediaMetadata.length,
         has_action_instruction: Boolean(actionInstruction),
         creation_flow: creationFlow || undefined,
@@ -936,6 +957,16 @@ export async function POST(req: NextRequest) {
       }).catch(error => {
         console.warn('[PERSONAL_AI_REQUEST_RELEASE_ERROR]', {
           request_id: requestId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
+    }
+
+    if (createdThreadId && !claimCompleted) {
+      await deletePersonalAiThread(auth.ctx.userId, createdThreadId).catch(error => {
+        console.warn('[PERSONAL_AI_THREAD_CLEANUP_ERROR]', {
+          request_id: requestId,
+          thread_id: createdThreadId,
           error: error instanceof Error ? error.message : String(error),
         });
       });
