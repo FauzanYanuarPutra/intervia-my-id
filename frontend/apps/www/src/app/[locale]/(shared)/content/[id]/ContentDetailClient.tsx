@@ -5038,6 +5038,22 @@ export default function ContentDetailClient({
                   ) : null}
                 </section>
 
+                {isOwner && !publicReference ? (
+                  <ContentSmartMatch
+                    contentId={item.id}
+                    intent={
+                      typeof meta.listing_intent === 'string'
+                        ? meta.listing_intent
+                        : typeof meta.listing_side === 'string'
+                          ? meta.listing_side
+                          : typeof meta.market_side === 'string'
+                            ? meta.market_side
+                            : undefined
+                    }
+                    locale={locale === 'en' ? 'en' : 'id'}
+                  />
+                ) : null}
+
                 {bodyDisplayText || visibleExpandedDetailItems.length > 0 ? (
                   <section className={`${detailSurfaceClass} p-3 sm:p-4`}>
                     <h2 className="text-lg font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-xl">
