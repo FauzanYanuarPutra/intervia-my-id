@@ -412,7 +412,7 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
             </button>
           ) : (
             <Link
-              href="/create?mode=offer"
+              href="/create"
               className="flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-4 text-[13px] font-extrabold text-white shadow-[0_14px_28px_-18px_rgba(5,150,105,0.85)] transition hover:bg-emerald-700 active:scale-[0.99]"
             >
               <ClipboardCheck className="h-3.5 w-3.5" />
@@ -513,7 +513,7 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
                 </button>
               ) : (
                 <Link
-                  href="/create?mode=offer"
+                  href="/create"
                   onClick={() => setSelectedGroup(null)}
                   className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-4 text-[13px] font-extrabold text-white"
                 >
