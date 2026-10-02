@@ -15,6 +15,7 @@ import {
   type DragEvent,
   type FormEvent,
   type ReactNode,
+  type RefObject,
 } from 'react';
 import { createPortal } from 'react-dom';
 import {
@@ -2185,9 +2186,11 @@ function normalizeCommunityBody(body: string): {
 function CommunityFormattedBody({
   body,
   collapsed = false,
+  bodyRef,
 }: {
   body: string;
   collapsed?: boolean;
+  bodyRef?: RefObject<HTMLDivElement | null>;
 }) {
   const normalized = String(body || '')
     .replace(/\r\n?/g, '\n')
@@ -2199,6 +2202,7 @@ function CommunityFormattedBody({
 
   return (
     <div
+      ref={bodyRef}
       className={cn(
         'space-y-2 break-words text-sm leading-6 text-[color:var(--app-text)]',
         collapsed
@@ -2240,6 +2244,9 @@ export function CommunityPostCard({
   const [saveLoading, setSaveLoading] = useState(false);
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const bodyPreviewRef = useRef<HTMLDivElement | null>(null);
+  const [bodyMeasureReady, setBodyMeasureReady] = useState(false);
+  const [bodyCanExpand, setBodyCanExpand] = useState(false);
   const [hidden, setHidden] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [blockSaving, setBlockSaving] = useState(false);
@@ -2266,8 +2273,30 @@ export function CommunityPostCard({
     [rawDisplayBody],
   );
   const displayBody = normalizedCardBody.body;
-  const bodyHasMoreContent =
-    displayBody.length > 240 || displayBody.split(/\n/).length > 5;
+
+  useEffect(() => {
+    setBodyMeasureReady(false);
+    setBodyCanExpand(false);
+
+    const node = bodyPreviewRef.current;
+    if (!node || !displayBody) return;
+
+    const measure = () => {
+      setBodyCanExpand(node.scrollHeight > node.clientHeight + 2);
+      setBodyMeasureReady(true);
+    };
+
+    measure();
+    const resizeObserver =
+      typeof ResizeObserver !== 'undefined'
+        ? new ResizeObserver(measure)
+        : null;
+    resizeObserver?.observe(node);
+
+    return () => {
+      resizeObserver?.disconnect();
+    };
+  }, [displayBody]);
   const displayTags = useMemo(() => {
     const tags = [
       ...normalizedCardBody.hashtags,
@@ -3086,10 +3115,14 @@ export function CommunityPostCard({
         </h2>
 
         {displayBody ? (
-          <div className="mt-2">
-            <CommunityFormattedBody body={displayBody} collapsed={bodyHasMoreContent} />
+          <div className="mt-2 min-w-0">
+            <CommunityFormattedBody
+              body={displayBody}
+              bodyRef={bodyPreviewRef}
+              collapsed={!bodyMeasureReady || bodyCanExpand}
+            />
 
-            {bodyHasMoreContent ? (
+            {bodyCanExpand ? (
               <button
                 type="button"
                 onClick={openDetail}
