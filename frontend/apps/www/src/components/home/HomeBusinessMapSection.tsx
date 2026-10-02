@@ -9,6 +9,7 @@ import {
   type UmkmPlaceKind,
 } from '@/lib/super-app/umkm-place-ui';
 import {
+  buildUmkmMapFocusPath,
   getUmkmMapSourceKind,
   UMKM_DISCOVERY_PATH,
 } from '@/lib/umkmSurface';
@@ -580,6 +581,23 @@ export function HomeBusinessMapSection({
           // not invent points and avoids the "empty map" look on mobile.
           markerStyle="default"
           animateDataDots
+          onSelectStore={storeId => {
+            const selectedStore = displayStores.find(
+              store => store.id === storeId,
+            );
+            if (!selectedStore) {
+              openMap();
+              return;
+            }
+
+            router.push(
+              buildUmkmMapFocusPath({
+                id: selectedStore.id,
+                slug: selectedStore.slug,
+                metadata: selectedStore.metadata,
+              }),
+            );
+          }}
           className="leaflet-home-map aspect-[2.35/1] min-h-[148px] w-full sm:aspect-[2.5/1] sm:min-h-[176px] lg:aspect-[2.62/1] lg:min-h-0"
         />
 
