@@ -521,14 +521,6 @@ function readSelectedLocationFromValues(
     : null;
 }
 
-function deleteLinkedBusiness(
-  values: Record<string, unknown>,
-): Record<string, never> {
-  const next = { ...values };
-  delete next.linked_store_id;
-  return {};
-}
-
 function hasMeaningfulValue(
   value: unknown,
 ): boolean {
@@ -3344,24 +3336,29 @@ export default function CreateListingWizard({
     useCallback(
       (point: LatLng) => {
         setValues(
-          previous => ({
-            ...previous,
-            location_lat:
-              point.lat,
-            location_lng:
-              point.lng,
-            latitude:
-              point.lat,
-            longitude:
-              point.lng,
-            lat:
-              point.lat,
-            lng:
-              point.lng,
-            location_point:
-              point,
-            ...(deleteLinkedBusiness(previous)),
-          }),
+          previous => {
+            const next = {
+              ...previous,
+            };
+            delete next.linked_store_id;
+            return {
+              ...next,
+              location_lat:
+                point.lat,
+              location_lng:
+                point.lng,
+              latitude:
+                point.lat,
+              longitude:
+                point.lng,
+              lat:
+                point.lat,
+              lng:
+                point.lng,
+              location_point:
+                point,
+            };
+          },
         );
 
         setFieldErrors(previous => {
