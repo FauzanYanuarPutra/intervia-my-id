@@ -357,7 +357,7 @@ export function MediaPreviewCarousel({
             ref={viewportRef}
             onWheel={handleMediaWheel}
             className={cn(
-              'relative flex h-full min-h-0 w-full min-w-0 overflow-hidden [touch-action:pan-y]',
+              'relative flex h-full min-h-0 w-full min-w-0 overflow-hidden overscroll-x-contain [touch-action:pan-y]',
               viewportClassName,
             )}
           >
