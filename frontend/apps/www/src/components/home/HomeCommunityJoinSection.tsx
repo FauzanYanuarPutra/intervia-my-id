@@ -2,7 +2,7 @@
 
 import { ArrowRight, CheckCircle2 } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
-import { WhatsAppBrandIcon } from '@/components/community/WhatsAppBrandIcon';
+import { BrandSocialIcon } from '@/components/common/BrandSocialIcon';
 
 const COMMUNITY_JOIN_HREF = '/community/join';
 
@@ -14,7 +14,7 @@ export function HomeCommunityJoinSection({ isId }: { isId: boolean }) {
     >
       <div className="flex items-center gap-2.5 sm:gap-3">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm">
-          <WhatsAppBrandIcon className="h-5 w-5" />
+          <BrandSocialIcon brand="whatsapp" className="h-5 w-5" />
         </div>
 
         <div className="min-w-0 flex-1">
