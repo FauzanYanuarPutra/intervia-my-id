@@ -113,7 +113,7 @@ function listingLabel(item: ContentItem): string {
 
 function WhatsAppStepIcon() {
   return (
-    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm">
+    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/14 text-white shadow-sm ring-1 ring-white/10">
       <BrandSocialIcon brand="whatsapp" className="h-5 w-5" />
     </span>
   );
@@ -220,20 +220,20 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
   return (
     <main className="min-h-[100svh] bg-[color:var(--app-surface-muted)] px-2.5 pb-8 pt-3 sm:px-4 sm:pt-5">
       <section className="mx-auto max-w-2xl space-y-2.5">
-        <header className="overflow-hidden rounded-[20px] border border-emerald-100 bg-white shadow-[0_14px_32px_-28px_rgba(15,23,42,0.35)]">
-          <div className="bg-[linear-gradient(135deg,#047857_0%,#059669_55%,#0f766e_100%)] px-3.5 py-3.5 text-white sm:px-4">
-            <div className="flex items-start gap-2.5">
+        <header className="overflow-hidden rounded-[22px] border border-emerald-100 bg-white shadow-[0_18px_38px_-30px_rgba(15,23,42,0.35)]">
+          <div className="bg-[linear-gradient(135deg,#047857_0%,#059669_55%,#0f766e_100%)] px-4 py-4.5 text-white sm:px-5 sm:py-5">
+            <div className="flex items-start gap-3">
               <WhatsAppStepIcon />
               <div className="min-w-0 flex-1">
-                <p className="text-[9px] font-extrabold uppercase tracking-[0.12em] text-emerald-100">
+                <p className="text-[11px] font-extrabold uppercase tracking-[0.11em] text-emerald-50">
                   {isId ? 'Komunitas Rantai Usaha Lokal' : 'Local Business Chain Community'}
                 </p>
-                <h1 className="mt-0.5 text-base font-black tracking-[-0.02em] sm:text-lg">
+                <h1 className="mt-0.5 text-lg font-black leading-tight tracking-[-0.025em] text-white sm:text-xl">
                   {isId
                     ? 'Lihat komunitas dulu, gabung saat siap'
                     : 'Explore first, join when you are ready'}
                 </h1>
-                <p className="mt-0.5 max-w-xl text-[10px] leading-4 text-emerald-50 sm:text-[11px]">
+                <p className="mt-1 max-w-2xl text-[12px] leading-5 text-emerald-50 sm:text-[13px] sm:leading-5.5">
                   {isId
                     ? 'Kamu tidak perlu login untuk melihat grup dan manfaatnya. Login + 1 listing aktif hanya diminta saat kamu benar-benar mau masuk ke WhatsApp.'
                     : 'You can explore the groups without logging in. Login + 1 active listing is only needed when you are ready to enter WhatsApp.'}
@@ -241,7 +241,7 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
               </div>
             </div>
 
-            <div className="mt-2.5 grid grid-cols-3 gap-1.5">
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
               {[
                 [isId ? '7 grup' : '7 groups', isId ? 'pilih sesuai kebutuhan' : 'choose by need'],
                 [isId ? '1 listing' : '1 listing', isId ? 'untuk membaca peran' : 'to read your role'],
@@ -249,10 +249,10 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
               ].map(([value, label]) => (
                 <div
                   key={value}
-                  className="min-w-0 rounded-xl bg-white/10 px-2 py-1.5 ring-1 ring-white/10"
+                  className="min-w-0 rounded-xl bg-white/12 px-2.5 py-2 ring-1 ring-white/12"
                 >
-                  <p className="truncate text-[10px] font-black">{value}</p>
-                  <p className="mt-0.5 truncate text-[8px] font-medium text-emerald-100">
+                  <p className="truncate text-[13px] font-black text-white">{value}</p>
+                  <p className="mt-0.5 truncate text-[10px] font-semibold text-emerald-50 sm:text-[11px]">
                     {label}
                   </p>
                 </div>
@@ -260,12 +260,12 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
             </div>
           </div>
 
-          <div className="px-3.5 py-2.5 sm:px-4">
+          <div className="px-4 py-3.5 sm:px-5">
             <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
                 <ShieldCheck className="h-4 w-4" />
               </div>
-              <p className="min-w-0 flex-1 text-[10px] font-semibold leading-4 text-zinc-600">
+              <p className="min-w-0 flex-1 text-[12px] font-semibold leading-5 text-zinc-700 sm:text-[13px]">
                 {isId
                   ? 'Tujuannya simpel: bantu kamu masuk ke grup yang paling relevan dan menjaga komunitas tetap rapi dari spam.'
                   : 'The goal is simple: match you with the most relevant group and keep the community focused.'}
@@ -274,20 +274,20 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
           </div>
         </header>
 
-        <section className="rounded-[18px] border border-zinc-100 bg-white px-3 py-2.5 shadow-[0_12px_28px_-26px_rgba(15,23,42,0.3)] sm:px-4">
+        <section className="rounded-[20px] border border-zinc-100 bg-white px-4 py-3 shadow-[0_12px_28px_-26px_rgba(15,23,42,0.3)] sm:px-4">
           <div className="flex items-center gap-2 pb-1.5">
             <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-700">
               <Sparkles className="h-3.5 w-3.5" />
             </div>
             <div className="min-w-0 flex-1">
-              <h2 className="text-xs font-black text-zinc-950">
+              <h2 className="text-sm font-black text-zinc-950 sm:text-[15px]">
                 {isId ? 'Pilih sesuai kebutuhanmu' : 'Choose what you need'}
               </h2>
-              <p className="text-[9px] text-zinc-500">
+              <p className="text-[11px] leading-4 text-zinc-500">
                 {isId ? 'Ketuk grup untuk lihat manfaat singkat.' : 'Tap a group for a quick benefit preview.'}
               </p>
             </div>
-            <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-extrabold text-emerald-700">
+            <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-extrabold text-emerald-700">
               {COMMUNITY_GROUPS.length}
             </span>
           </div>
@@ -298,16 +298,16 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
                 key={group.nameId}
                 type="button"
                 onClick={() => setSelectedGroup(group)}
-                className="flex min-h-10 w-full items-center gap-2 px-1 py-1.5 text-left transition hover:bg-zinc-50 active:bg-zinc-100"
+                className="flex min-h-12 w-full items-center gap-2.5 rounded-xl px-1.5 py-2 text-left transition hover:bg-zinc-50 active:bg-zinc-100"
               >
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-zinc-50 text-sm">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-zinc-50 text-base">
                   {group.icon}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[10px] font-extrabold text-zinc-900 sm:text-[11px]">
+                  <span className="block truncate text-[12px] font-extrabold leading-5 text-zinc-900 sm:text-[13px]">
                     {isId ? group.nameId : group.nameEn}
                   </span>
-                  <span className="mt-0.5 block truncate text-[9px] text-zinc-500">
+                  <span className="mt-0.5 block truncate text-[10px] leading-4 text-zinc-600 sm:text-[11px]">
                     {isId ? group.descriptionId : group.descriptionEn}
                   </span>
                 </span>
@@ -317,23 +317,23 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
           </div>
         </section>
 
-        <section className="rounded-[18px] border border-emerald-100 bg-white px-3 py-2.5 shadow-[0_12px_28px_-26px_rgba(15,23,42,0.28)] sm:px-4">
-          <div className="flex items-start gap-2.5">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+        <section className="rounded-[20px] border border-emerald-100 bg-white px-4 py-3 shadow-[0_12px_28px_-26px_rgba(15,23,42,0.28)] sm:px-4">
+          <div className="flex items-start gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
               <ClipboardCheck className="h-4 w-4" />
             </div>
             <div className="min-w-0 flex-1">
-              <h2 className="text-xs font-black text-zinc-950">
+              <h2 className="text-sm font-black text-zinc-950 sm:text-[15px]">
                 {isId ? 'Saat mau gabung, tinggal 2 langkah ringan' : 'When you join, there are only 2 light steps'}
               </h2>
-              <div className="mt-1.5 grid gap-1.5 sm:grid-cols-2">
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
                 {[
                   [isId ? '1. Login' : '1. Log in', isId ? 'Agar Lajukan tahu akunmu.' : 'So Lajukan can identify your account.'],
                   [isId ? '2. 1 listing aktif' : '2. 1 active listing', isId ? 'Agar peran usaha bisa dicocokkan.' : 'So your business role can be matched.'],
                 ].map(([title, body]) => (
-                  <div key={title} className="rounded-xl bg-zinc-50 px-2.5 py-2">
-                    <p className="text-[10px] font-extrabold text-zinc-800">{title}</p>
-                    <p className="mt-0.5 text-[9px] leading-4 text-zinc-500">{body}</p>
+                  <div key={title} className="rounded-xl bg-zinc-50 px-3 py-2.5">
+                    <p className="text-[11px] font-extrabold text-zinc-900">{title}</p>
+                    <p className="mt-0.5 text-[10px] leading-4.5 text-zinc-600">{body}</p>
                   </div>
                 ))}
               </div>
@@ -342,34 +342,34 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
         </section>
 
         {isAuthenticated ? (
-          <section className="rounded-[18px] border border-zinc-100 bg-white px-3 py-2.5 shadow-[0_12px_28px_-26px_rgba(15,23,42,0.26)] sm:px-4">
+          <section className="rounded-[20px] border border-zinc-100 bg-white px-4 py-3 shadow-[0_12px_28px_-26px_rgba(15,23,42,0.26)] sm:px-4">
             <div className="flex items-center gap-2.5">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[9px] font-bold uppercase tracking-[0.1em] text-zinc-400">
+                <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-zinc-500">
                   {isId ? 'Status kamu' : 'Your status'}
                 </p>
                 {error ? (
                   <p className="text-[10px] font-semibold text-amber-700">{error}</p>
                 ) : ready ? (
                   <>
-                    <p className="truncate text-[11px] font-black text-emerald-700">
+                    <p className="truncate text-[13px] font-black text-emerald-700">
                       {isId ? role.labelId : role.labelEn}
                     </p>
                     {listing ? (
-                      <p className="truncate text-[9px] text-zinc-500">
+                      <p className="truncate text-[11px] text-zinc-600">
                         {isId ? 'Dibaca dari:' : 'Read from:'} {listingLabel(listing)}
                       </p>
                     ) : null}
                   </>
                 ) : loading ? (
-                  <p className="text-[10px] text-zinc-500">
+                  <p className="text-[11px] text-zinc-600">
                     {isId ? 'Mencocokkan listing kamu…' : 'Matching your listing…'}
                   </p>
                 ) : (
-                  <p className="text-[10px] leading-4 text-zinc-500">
+                  <p className="text-[11px] leading-5 text-zinc-600">
                     {isId
                       ? 'Belum ada 1 listing aktif yang bisa dipakai untuk membaca peranmu.'
                       : 'There is no active listing yet that can be used to read your role.'}
@@ -381,7 +381,7 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
         ) : (
           <section className="flex items-start gap-2.5 rounded-[18px] border border-zinc-100 bg-white px-3 py-2.5">
             <LogIn className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-            <p className="min-w-0 flex-1 text-[10px] leading-4 text-zinc-600">
+            <p className="min-w-0 flex-1 text-[11px] leading-5 text-zinc-700">
               {isId
                 ? 'Belum perlu login sekarang. Login baru diminta saat kamu menekan tombol gabung.'
                 : 'No login needed yet. We only ask you to log in when you continue to join.'}
@@ -393,7 +393,7 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
           {!isAuthenticated ? (
             <Link
               href={loginHref()}
-              className="flex min-h-10 w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-4 text-xs font-extrabold text-white shadow-[0_14px_28px_-18px_rgba(5,150,105,0.85)] transition hover:bg-emerald-700 active:scale-[0.99]"
+              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-4 text-[13px] font-extrabold text-white shadow-[0_14px_28px_-18px_rgba(5,150,105,0.85)] transition hover:bg-emerald-700 active:scale-[0.99]"
             >
               <LogIn className="h-3.5 w-3.5" />
               {actionLabel}
@@ -404,7 +404,7 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
               type="button"
               onClick={openCommunity}
               disabled={loading || authLoading}
-              className="flex min-h-10 w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-4 text-xs font-extrabold text-white shadow-[0_14px_28px_-18px_rgba(5,150,105,0.85)] transition hover:bg-emerald-700 active:scale-[0.99] disabled:cursor-wait disabled:opacity-60"
+              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-4 text-[13px] font-extrabold text-white shadow-[0_14px_28px_-18px_rgba(5,150,105,0.85)] transition hover:bg-emerald-700 active:scale-[0.99] disabled:cursor-wait disabled:opacity-60"
             >
               <BrandSocialIcon brand="whatsapp" className="h-4 w-4" />
               {actionLabel}
@@ -413,7 +413,7 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
           ) : (
             <Link
               href="/create?mode=offer"
-              className="flex min-h-10 w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-4 text-xs font-extrabold text-white shadow-[0_14px_28px_-18px_rgba(5,150,105,0.85)] transition hover:bg-emerald-700 active:scale-[0.99]"
+              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-4 text-[13px] font-extrabold text-white shadow-[0_14px_28px_-18px_rgba(5,150,105,0.85)] transition hover:bg-emerald-700 active:scale-[0.99]"
             >
               <ClipboardCheck className="h-3.5 w-3.5" />
               {actionLabel}
@@ -422,7 +422,7 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
           )}
         </div>
 
-        <p className="px-2 text-center text-[9px] leading-4 text-zinc-400">
+        <p className="px-2 text-center text-[11px] leading-5 text-zinc-500">
           {isId
             ? 'Lihat bebas dulu. Persyaratan hanya diminta saat kamu benar-benar ingin masuk ke komunitas WhatsApp.'
             : 'Browse freely first. Requirements are only requested when you are ready to enter the WhatsApp community.'}
@@ -441,20 +441,20 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
             role="dialog"
             aria-modal="true"
             aria-labelledby="community-group-title"
-            className="w-full max-w-md overflow-hidden rounded-[22px] bg-white shadow-2xl"
+            className="w-full max-w-md overflow-hidden rounded-[24px] bg-white shadow-2xl"
           >
             <div className="flex items-start gap-2.5 border-b border-zinc-100 px-3.5 py-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-lg">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-xl">
                 {selectedGroup.icon}
               </span>
               <div className="min-w-0 flex-1">
                 <h3
                   id="community-group-title"
-                  className="text-sm font-black text-zinc-950"
+                  className="text-base font-black text-zinc-950"
                 >
                   {isId ? selectedGroup.nameId : selectedGroup.nameEn}
                 </h3>
-                <p className="mt-0.5 text-[10px] leading-4 text-zinc-500">
+                <p className="mt-1 text-[12px] leading-5 text-zinc-600">
                   {isId ? selectedGroup.descriptionId : selectedGroup.descriptionEn}
                 </p>
               </div>
@@ -468,16 +468,16 @@ export default function CommunityJoinClient({ isId }: { isId: boolean }) {
               </button>
             </div>
 
-            <div className="max-h-[48svh] overflow-y-auto px-3.5 py-3">
-              <p className="mb-1.5 text-[9px] font-extrabold uppercase tracking-[0.12em] text-emerald-700">
+            <div className="max-h-[52svh] overflow-y-auto px-4 py-4">
+              <p className="mb-2 text-[10px] font-extrabold uppercase tracking-[0.12em] text-emerald-700">
                 {isId ? 'Manfaat' : 'Benefits'}
               </p>
-              <ul className="space-y-1.5">
+              <ul className="space-y-2">
                 {(isId ? selectedGroup.benefitsId : selectedGroup.benefitsEn).map(
                   benefit => (
                     <li
                       key={benefit}
-                      className="flex items-start gap-2 text-[10px] leading-4 text-zinc-700"
+                      className="flex items-start gap-2.5 text-[12px] leading-5 text-zinc-700"
                     >
                       <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />
                       <span>{benefit}</span>
