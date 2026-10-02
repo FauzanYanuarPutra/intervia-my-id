@@ -3517,6 +3517,7 @@ async fn create_group(
     let cover_url = sanitize_public_url(payload.cover_url, true);
     let had_whatsapp_join_url = payload.whatsapp_join_url.is_some();
     let whatsapp_join_url = normalize_whatsapp_join_url(payload.whatsapp_join_url);
+    let had_facebook_group_url = payload.facebook_group_url.is_some();
     let facebook_group_url = normalize_facebook_group_url(payload.facebook_group_url);
     if had_whatsapp_join_url && whatsapp_join_url.is_none() {
         return Err(ApiError::new(
@@ -3524,7 +3525,7 @@ async fn create_group(
             "whatsapp_join_url must be a WhatsApp https URL",
         ));
     }
-    if payload.facebook_group_url.is_some() && facebook_group_url.is_none() {
+    if had_facebook_group_url && facebook_group_url.is_none() {
         return Err(ApiError::new(
             StatusCode::BAD_REQUEST,
             "facebook_group_url must be a Facebook https URL",
