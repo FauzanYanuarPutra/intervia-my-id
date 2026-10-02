@@ -161,6 +161,15 @@ export type PersonalAiProviderResult = {
    */
   provider: string;
   model: string;
+  /**
+   * True when the response is a transport/dependency fallback and must not be
+   * persisted as a normal AI answer.
+   */
+  degraded?: boolean;
+  /**
+   * Stable public failure category. Detailed provider errors stay server-side.
+   */
+  error_code?: string;
 };
 
 type SanitizedMediaResult = {
@@ -631,6 +640,25 @@ function localizedUnavailable(locale: 'id' | 'en', hasImage: boolean) {
     : 'AI is temporarily unavailable. Please try again shortly.';
 }
 
+function publicAiFailureCode(errorCode: string) {
+  const normalized = errorCode.trim().toLowerCase();
+
+  if (/http_401|http_403|unauthorized/.test(normalized)) {
+    return 'ai_service_unauthorized';
+  }
+  if (/http_429|concurr|busy/.test(normalized)) {
+    return 'ai_service_busy';
+  }
+  if (/http_502|http_503|http_504|network_error|timeout|timed_out/.test(normalized)) {
+    return 'ai_service_unavailable';
+  }
+  if (/vision_model_not_configured/.test(normalized)) {
+    return 'ai_vision_not_configured';
+  }
+
+  return 'ai_service_failed';
+}
+
 function sanitizeGatewayWarnings(value: unknown) {
   if (!Array.isArray(value)) return [];
   return value
@@ -851,9 +879,11 @@ export async function runPersonalAi(input: {
       response: localizedUnavailable(locale, hasImage),
       provider: 'safe-fallback',
       model: 'personal-ai-fallback',
+      degraded: true,
+      error_code: publicAiFailureCode(errorCode || 'ai-service:unknown'),
       provider_errors: [
         ...sanitizedMedia.warnings,
-        errorCode || 'ai-service:unknown',
+        publicAiFailureCode(errorCode || 'ai-service:unknown'),
       ].slice(0, 6),
     };
   }
