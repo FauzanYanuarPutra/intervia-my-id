@@ -34,6 +34,7 @@ import type {
   GlobalSearchTab,
 } from '@/lib/search/globalSearch';
 import { cn } from '@/lib/utils';
+import { BrandSocialIcon } from '@/components/common/BrandSocialIcon';
 
 export const SEARCH_GROUPS: GlobalSearchGroupKey[] = [
   'products', 'services', 'businesses', 'references', 'needs', 'communities', 'videos', 'users',
@@ -107,16 +108,34 @@ function PublicReferenceCard({ item, locale }: { item: GlobalSearchItem; locale:
                   href={sourceContactUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex min-h-8 items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2 text-emerald-700"
+                  aria-label={sourceContactType === 'whatsapp' ? 'Hubungi via WhatsApp' : isId ? 'Hubungi sumber' : 'Contact source'}
+                  className={cn(
+                    'inline-flex min-h-8 items-center gap-1.5 rounded-md px-2 text-[10px] font-bold',
+                    sourceContactType === 'whatsapp'
+                      ? 'border border-[#b7ebc9] bg-[#e9f9ef] text-[#128c4a]'
+                      : 'border border-[color:var(--app-border)]',
+                  )}
                 >
-                  <MessageCircle className="h-3.5 w-3.5" />
+                  {sourceContactType === 'whatsapp' ? (
+                    <BrandSocialIcon brand="whatsapp" className="h-3.5 w-3.5 shrink-0" />
+                  ) : (
+                    <MessageCircle className="h-3.5 w-3.5 shrink-0" />
+                  )}
                   <span className="truncate">
-                    {sourceContactType === 'whatsapp'
-                      ? 'WhatsApp'
-                      : isId
-                        ? 'Kontak sumber'
-                        : 'Source contact'}
+                    {sourceContactType === 'whatsapp' ? 'WhatsApp' : isId ? 'Kontak sumber' : 'Source contact'}
                   </span>
+                </a>
+              ) : null}
+              {metadataText(item, 'sourceFacebookUrl') ? (
+                <a
+                  href={safeExternalHref(metadataText(item, 'sourceFacebookUrl'))}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Facebook"
+                  className="inline-flex min-h-8 items-center gap-1.5 rounded-md border border-[#b9cdf5] bg-[#edf3ff] px-2 text-[10px] font-bold text-[#1877f2]"
+                >
+                  <BrandSocialIcon brand="facebook" className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">Facebook</span>
                 </a>
               ) : null}
               {sourceLicense && sourceLicenseUrl ? (
