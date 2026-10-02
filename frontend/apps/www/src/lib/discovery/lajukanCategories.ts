@@ -593,10 +593,6 @@ export const LAJUKAN_EXPLORE_CATEGORIES:
           titleId:
             'Kebutuhan mesin & alat',
         },
-        'featured-providers': {
-          titleId:
-            'Dealer dan teknisi terkait',
-        },
         'latest-listings': {
           titleId:
             'Mesin baru dan bekas',
