@@ -3510,8 +3510,9 @@ async fn create_group(
     let membership_permission = normalize_membership_permission(payload.membership_permission);
     let avatar_url = sanitize_public_url(payload.avatar_url, true);
     let cover_url = sanitize_public_url(payload.cover_url, true);
+    let had_whatsapp_join_url = payload.whatsapp_join_url.is_some();
     let whatsapp_join_url = normalize_whatsapp_join_url(payload.whatsapp_join_url);
-    if payload.whatsapp_join_url.is_some() && whatsapp_join_url.is_none() {
+    if had_whatsapp_join_url && whatsapp_join_url.is_none() {
         return Err(ApiError::new(StatusCode::BAD_REQUEST, "whatsapp_join_url must be a WhatsApp https URL"));
     }
     let rules = {
@@ -3728,12 +3729,14 @@ async fn update_group_permissions(
         .cover_url
         .and_then(|value| sanitize_public_url(Some(value), true))
         .or(group.cover_url);
+    let had_whatsapp_join_url = payload.whatsapp_join_url.is_some();
     let whatsapp_join_url = payload
         .whatsapp_join_url
+        .clone()
         .map(|value| normalize_whatsapp_join_url(Some(value)))
         .flatten()
         .or(group.whatsapp_join_url.clone());
-    if payload.whatsapp_join_url.is_some() && whatsapp_join_url.is_none() {
+    if had_whatsapp_join_url && whatsapp_join_url.is_none() {
         return Err(ApiError::new(StatusCode::BAD_REQUEST, "whatsapp_join_url must be a WhatsApp https URL"));
     }
     let rules = payload
