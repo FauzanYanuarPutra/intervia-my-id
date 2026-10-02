@@ -2981,7 +2981,7 @@ export function PublicReferencesSection({
                         : 'View business'}
                     <ExternalLink className="h-2.5 w-2.5" />
                   </span>
-                )}
+                ) : null}
               </div>
             </article>
           ))}
