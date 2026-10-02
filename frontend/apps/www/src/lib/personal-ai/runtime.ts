@@ -32,7 +32,7 @@ const INTERNAL_AI_TIMEOUT_MS = cleanInteger(
   process.env.PERSONAL_AI_GATEWAY_TIMEOUT_MS ||
     process.env.INTERNAL_AI_TIMEOUT_MS ||
     process.env.AI_REQUEST_TIMEOUT_MS,
-  105_000,
+  60_000,
   10_000,
   180_000,
 );
@@ -68,17 +68,17 @@ const PERSONAL_AI_MAX_FILE_TEXT_CHARS = cleanInteger(
 const PERSONAL_AI_MAX_HISTORY_MESSAGES = cleanInteger(
   process.env.PERSONAL_AI_MAX_HISTORY_MESSAGES ||
     process.env.PERSONAL_AI_MAX_HISTORY,
-  18,
+  10,
   4,
-  24,
+  20,
 );
 
 const PERSONAL_AI_MAX_OUTPUT_TOKENS = cleanInteger(
   process.env.PERSONAL_AI_MAX_OUTPUT_TOKENS ||
     process.env.AI_MAX_OUTPUT_TOKENS,
-  1_200,
+  900,
   256,
-  2_400,
+  1_800,
 );
 
 const PERSONAL_AI_USE_RAG =
@@ -622,7 +622,7 @@ function buildPersonalAiContext(input: {
             },
           }
         : undefined,
-      domain_reference: cleanText(input.domainContext, 12_000),
+      domain_reference: cleanText(input.domainContext, 7_000),
       media_warnings: input.mediaWarnings,
     },
   };
@@ -748,7 +748,7 @@ async function callAiService(input: {
       if (candidate.body) {
         await candidate.body.cancel().catch(() => undefined);
       }
-      await new Promise(resolve => setTimeout(resolve, 350 * attempt));
+      await new Promise(resolve => setTimeout(resolve, 200 * attempt));
     } catch (error) {
       lastFetchError = error;
       if (attempt >= 3) break;
@@ -815,6 +815,7 @@ export async function runPersonalAi(input: {
     })),
     locale,
     items: domainKnowledge,
+    limit: 6,
   });
 
   const callerInstruction = buildBuilderInstruction(
