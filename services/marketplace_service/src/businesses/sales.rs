@@ -154,6 +154,14 @@ pub(crate) struct SaleAggregate {
     pub(crate) lines: Vec<SaleLineRecord>,
 }
 
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+pub(crate) struct SalesPeriodSummary {
+    pub(crate) revenue: i64,
+    pub(crate) cogs: i64,
+    pub(crate) transaction_count: i64,
+    pub(crate) incomplete_cost_count: i64,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct CreateSaleOutcome {
     pub(crate) sale: SaleAggregate,
@@ -233,6 +241,44 @@ impl SaleRepository {
             aggregates.push(SaleAggregate { sale, lines });
         }
         Ok(aggregates)
+    }
+
+    pub(crate) async fn period_summary(
+        &self,
+        business_id: Uuid,
+        organization_id: Uuid,
+        from: Option<NaiveDate>,
+        to: Option<NaiveDate>,
+    ) -> Result<SalesPeriodSummary, SaleRepositoryError> {
+        ensure_business_pool(&self.db, business_id, organization_id).await?;
+        if let (Some(from), Some(to)) = (from, to) {
+            if from > to {
+                return Err(SaleRepositoryError::Validation("invalid_sales_period"));
+            }
+        }
+
+        sqlx::query_as::<_, SalesPeriodSummary>(
+            r#"
+            SELECT
+              COALESCE(SUM(final_amount), 0)::bigint AS revenue,
+              COALESCE(SUM(cogs_amount), 0)::bigint AS cogs,
+              COUNT(*)::bigint AS transaction_count,
+              COUNT(*) FILTER (WHERE NOT cost_complete OR cogs_amount IS NULL)::bigint AS incomplete_cost_count
+            FROM business_sales
+            WHERE business_id=$1
+              AND organization_id=$2
+              AND status='completed'
+              AND ($3::date IS NULL OR occurred_on >= $3)
+              AND ($4::date IS NULL OR occurred_on <= $4)
+            "#,
+        )
+        .bind(business_id)
+        .bind(organization_id)
+        .bind(from)
+        .bind(to)
+        .fetch_one(&self.db)
+        .await
+        .map_err(Into::into)
     }
 
     pub(crate) async fn void(
