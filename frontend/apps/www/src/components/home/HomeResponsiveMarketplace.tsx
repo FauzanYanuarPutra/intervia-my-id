@@ -4909,6 +4909,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
                 onOpenFilters={openSearchFilters}
               />
               {/* <MobileAppDownloadSection isId={isId} /> */}
+              <HomeCommunityJoinSection isId={isId} />
               <QuickCategoriesSection isId={isId} />
 
               <HomeErrorBoundary
@@ -4938,8 +4939,6 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
                   items={demandRecommendations}
                 />
               )}
-
-              <HomeCommunityJoinSection isId={isId} />
 
               <PublicReferencesSection
                 isId={isId}
