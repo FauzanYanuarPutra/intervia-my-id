@@ -15,6 +15,7 @@ export type PublicReferenceInfo = {
   imageLicenseUrl: string;
   sourceContactUrl: string;
   sourceContactType: 'whatsapp' | 'source';
+  sourceFacebookUrl: string;
 };
 
 function asRecord(value: unknown): JsonRecord {
@@ -100,13 +101,48 @@ function sourceWhatsAppUrl(metadata: JsonRecord): string {
   return phone.length >= 8 ? `https://wa.me/${phone}` : '';
 }
 
+function sourceFacebookUrl(metadata: JsonRecord): string {
+  const contact = asRecord(metadata.contact);
+  const value = [
+    metadata.facebook_url,
+    metadata.facebookUrl,
+    metadata.facebook,
+    metadata.contact_facebook,
+    metadata.contactFacebook,
+    contact.facebook_url,
+    contact.facebookUrl,
+    contact.facebook,
+  ]
+    .map(safeExternalUrl)
+    .find(url => {
+      if (!url) return false;
+      try {
+        const hostname = new URL(url).hostname.toLowerCase();
+        return (
+          hostname === 'facebook.com' ||
+          hostname === 'www.facebook.com' ||
+          hostname === 'm.facebook.com' ||
+          hostname === 'fb.me'
+        );
+      } catch {
+        return false;
+      }
+    });
+  return value || '';
+}
+
 function resolveSourceContact(metadata: JsonRecord): {
   url: string;
   type: 'whatsapp' | 'source';
+  facebookUrl: string;
 } {
   const whatsapp = sourceWhatsAppUrl(metadata);
   if (whatsapp) {
-    return { url: whatsapp, type: 'whatsapp' };
+    return {
+      url: whatsapp,
+      type: 'whatsapp',
+      facebookUrl: sourceFacebookUrl(metadata),
+    };
   }
 
   const contact = asRecord(metadata.contact);
@@ -124,6 +160,7 @@ function resolveSourceContact(metadata: JsonRecord): {
   return {
     url: '',
     type: 'source',
+    facebookUrl: sourceFacebookUrl(metadata),
   };
 }
 
@@ -199,5 +236,6 @@ export function readPublicReference(
     imageLicenseUrl: safeExternalUrl(imageCredit.license_url),
     sourceContactUrl: sourceContact.url,
     sourceContactType: sourceContact.type,
+    sourceFacebookUrl: sourceContact.facebookUrl,
   };
 }
