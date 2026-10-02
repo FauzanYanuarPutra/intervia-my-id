@@ -386,6 +386,7 @@ struct CreateGroupRequest {
     membership_permission: Option<String>,
     avatar_url: Option<String>,
     cover_url: Option<String>,
+    whatsapp_join_url: Option<String>,
     #[serde(default)]
     rules: Vec<String>,
 }
@@ -400,6 +401,7 @@ struct UpdateGroupPermissionsRequest {
     membership_permission: Option<String>,
     avatar_url: Option<String>,
     cover_url: Option<String>,
+    whatsapp_join_url: Option<String>,
     rules: Option<Vec<String>>,
 }
 
@@ -682,6 +684,7 @@ struct ForumGroup {
     membership_permission: String,
     avatar_url: Option<String>,
     cover_url: Option<String>,
+    whatsapp_join_url: Option<String>,
     rules: Vec<String>,
     member_count: i32,
     post_count: i32,
@@ -2140,6 +2143,7 @@ async fn fetch_groups(
           g.membership_permission,
           g.avatar_url,
           g.cover_url,
+          g.whatsapp_join_url,
           g.rules,
           COUNT(DISTINCT active_members.user_id)::int AS member_count,
           COUNT(DISTINCT t.id)::int AS post_count,
@@ -2211,6 +2215,7 @@ async fn fetch_group(
           g.membership_permission,
           g.avatar_url,
           g.cover_url,
+          g.whatsapp_join_url,
           g.rules,
           COUNT(DISTINCT active_members.user_id)::int AS member_count,
           COUNT(DISTINCT t.id)::int AS post_count,
@@ -3505,6 +3510,10 @@ async fn create_group(
     let membership_permission = normalize_membership_permission(payload.membership_permission);
     let avatar_url = sanitize_public_url(payload.avatar_url, true);
     let cover_url = sanitize_public_url(payload.cover_url, true);
+    let whatsapp_join_url = normalize_whatsapp_join_url(payload.whatsapp_join_url);
+    if payload.whatsapp_join_url.is_some() && whatsapp_join_url.is_none() {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "whatsapp_join_url must be a WhatsApp https URL"));
+    }
     let rules = {
         let clean = sanitize_group_rules(payload.rules);
         if clean.is_empty() {
@@ -3718,6 +3727,14 @@ async fn update_group_permissions(
         .cover_url
         .and_then(|value| sanitize_public_url(Some(value), true))
         .or(group.cover_url);
+    let whatsapp_join_url = payload
+        .whatsapp_join_url
+        .map(|value| normalize_whatsapp_join_url(Some(value)))
+        .flatten()
+        .or(group.whatsapp_join_url.clone());
+    if payload.whatsapp_join_url.is_some() && whatsapp_join_url.is_none() {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "whatsapp_join_url must be a WhatsApp https URL"));
+    }
     let rules = payload
         .rules
         .map(sanitize_group_rules)
@@ -8501,6 +8518,7 @@ async fn fetch_groups_for_ids(
           g.membership_permission,
           g.avatar_url,
           g.cover_url,
+          g.whatsapp_join_url,
           g.rules,
           COUNT(DISTINCT active_members.user_id)::int AS member_count,
           COUNT(DISTINCT t.id)::int AS post_count,
@@ -8633,6 +8651,18 @@ fn calculate_hot_score(
 ) -> f64 {
     let age_hours = (Utc::now() - created_at).num_minutes().max(1) as f64 / 60.0;
     ((reply_count * 2 + views + vote_score * 8) as f64) / age_hours.powf(0.7)
+}
+
+fn normalize_whatsapp_join_url(value: Option<String>) -> Option<String> {
+    let value = clean_optional(value)?;
+    let lower = value.to_ascii_lowercase();
+    if lower.starts_with("https://chat.whatsapp.com/")
+        || lower.starts_with("https://wa.me/")
+    {
+        Some(value)
+    } else {
+        None
+    }
 }
 
 fn clean_optional(value: Option<String>) -> Option<String> {
