@@ -115,6 +115,7 @@ import {
   MarketplacePageFrame,
 } from '@/components/layout/MarketplacePageFrame';
 import { FeedColumnFooter } from '@/components/layout/FeedColumnFooter';
+import { HomeCommunityJoinSection } from '@/components/home/HomeCommunityJoinSection';
 import { HomeNewsSection } from '@/components/home/HomeNewsSection';
 import { HomeErrorBoundary } from '@/components/home/HomeErrorBoundary';
 import { useHomeNews } from '@/components/home/HomeNewsContext';
@@ -4863,6 +4864,8 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
                   isId={isId}
                   items={demandRecommendations}
                 />
+
+              <HomeCommunityJoinSection isId={isId} />
               )}
 
               <PublicReferencesSection
