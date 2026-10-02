@@ -131,7 +131,11 @@ import {
 } from '@/components/community/CommunityFeedClient';
 import { normalizeCommunityMediaItems } from '@/components/community/community-feed-helpers';
 import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
-import { buildUmkmMapPlacePath, UMKM_DISCOVERY_PATH } from '@/lib/umkmSurface';
+import {
+  buildUmkmMapFocusPath,
+  buildUmkmMapPlacePath,
+  UMKM_DISCOVERY_PATH,
+} from '@/lib/umkmSurface';
 import { getUmkmPlaceKind } from '@/lib/super-app/umkm-place-ui';
 import {
   LAJUKAN_EXPLORE_CATEGORIES,
@@ -1465,14 +1469,29 @@ function mapApiItemToPublicReference(
     readText(metadata.image_url) ||
     readText(metadata.image);
 
+  const storefrontSlug =
+    readText(metadata.storefront_slug) ||
+    readText(metadata.store_slug) ||
+    readText(metadata.business_slug);
+
+  const storeFocusHref =
+    sourceKind === 'lajukan' || sourceKind === 'registered'
+      ? buildUmkmMapFocusPath({
+          id,
+          slug: storefrontSlug || null,
+          metadata,
+        })
+      : '';
+
   const internalHref =
-    publicPath.startsWith('/') && !publicPath.startsWith('/content/')
+    storeFocusHref ||
+    (publicPath.startsWith('/') && !publicPath.startsWith('/content/')
       ? publicPath
-      : readText(metadata.storefront_slug)
-        ? `/toko/${encodeURIComponent(readText(metadata.storefront_slug))}`
+      : storefrontSlug
+        ? `/toko/${encodeURIComponent(storefrontSlug)}`
         : publicPath.startsWith('/')
           ? publicPath
-          : '/umkm';
+          : '/umkm');
 
   return {
     id,
