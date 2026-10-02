@@ -395,11 +395,11 @@ export default function CommunityJoinClient({
             </div>
             <div className="min-w-0">
               <h2 className="text-sm font-black text-zinc-950 sm:text-[15px]">
-                {isId ? 'Kenapa ikut komunitas ini?' : 'Why join this community?'}
+                {isId ? 'Kenapa jangan lewatkan?' : 'Why not miss out?'}
               </h2>
-              <p className="mt-0.5 text-[11px] leading-4.5 text-zinc-500">
+              <p className="mt-0.5 text-[11px] leading-4.5 text-zinc-600">
                 {isId
-                  ? 'Bukan sekadar grup WhatsApp. Tujuannya supaya kebutuhan usaha lebih mudah ditemukan orang yang tepat.'
+                  ? 'Kalau kamu punya kebutuhan atau penawaran nyata, komunitas ini memberi jalur tambahan untuk ditemukan, menemukan orang yang relevan, dan membuka peluang kerja sama.'
                   : 'More than a WhatsApp group: the goal is to make business needs easier to discover by the right people.'}
               </p>
             </div>
@@ -546,12 +546,12 @@ export default function CommunityJoinClient({
                   </p>
                 ) : ready ? (
                   <>
-                    <p className="truncate text-[13px] font-black text-emerald-700">
+                    <p className="whitespace-normal text-[13px] font-black text-emerald-700">
                       {isId ? role.labelId : role.labelEn}
                     </p>
 
                     {listing ? (
-                      <p className="truncate text-[11px] text-zinc-600">
+                      <p className="whitespace-normal text-[11px] leading-4 text-zinc-600">
                         {isId ? 'Dibaca dari:' : 'Read from:'}{' '}
                         {listingLabel(listing)}
                       </p>
