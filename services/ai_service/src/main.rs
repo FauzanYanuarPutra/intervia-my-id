@@ -248,7 +248,9 @@ impl AiTask {
             "support" | "support_triage" | "triage" => Self::SupportTriage,
             "moderate" | "moderation" | "content_moderation" => Self::Moderation,
             "match" | "marketplace_match" | "supplier_match" | "rfq" => Self::MarketplaceMatch,
-            "similar" | "similar_match" | "content_similarity" | "match_rerank" => Self::SimilarMatch,
+            "similar" | "similar_match" | "content_similarity" | "match_rerank" => {
+                Self::SimilarMatch
+            }
             "deal" | "deal_assist" | "negotiation" | "negotiate" => Self::DealAssist,
             "analytics" | "analytics_insight" | "metric_insight" | "diagnostic" => {
                 Self::AnalyticsInsight

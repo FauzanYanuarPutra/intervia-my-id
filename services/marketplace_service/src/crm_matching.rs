@@ -512,16 +512,17 @@ fn score_candidate(requirement: &RequirementItem, candidate: &CandidateItem) -> 
                 0.35
             }
         }
-        (Some(price), _, Some(max)) if max > 0 => (1.0 - (price as f64 / max as f64).clamp(0.0, 1.0) * 0.35).max(0.35),
+        (Some(price), _, Some(max)) if max > 0 => {
+            (1.0 - (price as f64 / max as f64).clamp(0.0, 1.0) * 0.35).max(0.35)
+        }
         (Some(_), _, _) => 0.55,
         _ => 0.50,
     };
-    let value_index =
-        (similarity * 0.40) +
-        (price_value * 100.0 * 0.20) +
-        (trust * 10.0) * 0.20 +
-        (availability * 10.0) * 0.10 +
-        (quality * 20.0) * 0.10;
+    let value_index = (similarity * 0.40)
+        + (price_value * 100.0 * 0.20)
+        + (trust * 10.0) * 0.20
+        + (availability * 10.0) * 0.10
+        + (quality * 20.0) * 0.10;
     let worth = (total * 0.70 + value_index * 0.30).clamp(0.0, 100.0);
 
     let mut matched_fields = Vec::new();
@@ -531,8 +532,14 @@ fn score_candidate(requirement: &RequirementItem, candidate: &CandidateItem) -> 
 
     if overlap > 0 {
         matched_fields.push(format!("{} kata kunci", overlap));
-        reasons.push(format!("Kemiripan isi terdeteksi sekitar {:.0}%.", similarity));
-        reasons.push("Konten kandidat memiliki istilah dan konteks yang selaras dengan kebutuhan.".to_string());
+        reasons.push(format!(
+            "Kemiripan isi terdeteksi sekitar {:.0}%.",
+            similarity
+        ));
+        reasons.push(
+            "Konten kandidat memiliki istilah dan konteks yang selaras dengan kebutuhan."
+                .to_string(),
+        );
     } else {
         missing_fields.push("keyword_fit".to_string());
         warnings.push("Tidak ada kecocokan kata kunci yang kuat.".to_string());
