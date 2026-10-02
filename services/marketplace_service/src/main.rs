@@ -13509,6 +13509,20 @@ async fn create_content(
         Ok(row) => {
             if row.content_type == "news" {
                 news::after_submission_created(&state, row.id, row.owner_id).await;
+            } else if row.content_status == "active" && row.listing_status == "published" {
+                // Smart Match is deliberately async: publishing a listing stays fast,
+                // while candidate retrieval and notification fan-out happen separately.
+                let match_state = state.clone();
+                let match_id = row.id;
+                let match_owner = row.owner_id;
+                tokio::spawn(async move {
+                    crm_matching::notify_new_listing_matches(
+                        &match_state,
+                        match_id,
+                        match_owner,
+                    )
+                    .await;
+                });
             }
             let seller_stats = match fetch_seller_stats(&state.db, &[row.owner_id]).await {
                 Ok(map) => map.get(&row.owner_id).cloned(),
