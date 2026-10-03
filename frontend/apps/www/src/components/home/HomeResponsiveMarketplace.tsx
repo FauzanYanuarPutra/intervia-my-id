@@ -1980,7 +1980,7 @@ export function TrendingSearchSection({ isId }: { isId: boolean }) {
             [will-change:transform]
           "
         >
-          {clusteredItems.map(item => (
+          {items.map(item => (
             <Link
               key={`${item.label}-${item.href}`}
               href={item.href}
