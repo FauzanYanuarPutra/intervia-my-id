@@ -1297,15 +1297,10 @@ pub async fn run_match(
             Ok(rows) => {
                 let mut map = HashMap::<String, String>::new();
                 for row in rows.into_iter().rev() {
-                    if let Some(candidate_id) =
-                        row.get::<Option<String>, _>("matched_content_id")
-                    {
+                    if let Some(candidate_id) = row.get::<Option<String>, _>("matched_content_id") {
                         let candidate_id = candidate_id.trim().to_string();
                         if !candidate_id.is_empty() {
-                            map.insert(
-                                candidate_id,
-                                row.get::<String, _>("feedback_type"),
-                            );
+                            map.insert(candidate_id, row.get::<String, _>("feedback_type"));
                         }
                     }
                 }
@@ -2692,15 +2687,10 @@ pub async fn public_matches(
         Ok(rows) => {
             let mut map = HashMap::<String, String>::new();
             for row in rows.into_iter().rev() {
-                if let Some(candidate_id) =
-                    row.get::<Option<String>, _>("matched_content_id")
-                {
+                if let Some(candidate_id) = row.get::<Option<String>, _>("matched_content_id") {
                     let candidate_id = candidate_id.trim().to_string();
                     if !candidate_id.is_empty() {
-                        map.insert(
-                            candidate_id,
-                            row.get::<String, _>("feedback_type"),
-                        );
+                        map.insert(candidate_id, row.get::<String, _>("feedback_type"));
                     }
                 }
             }
