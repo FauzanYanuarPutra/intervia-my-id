@@ -5543,8 +5543,8 @@ export default function CreateListingWizard({
     currentStep === 1
       ? text(
           locale,
-          'Mau posting apa?',
-          'What do you want to post?',
+          'Kamu mau menawarkan atau membutuhkan?',
+          'Do you want to offer something or post a need?',
         )
       : currentStep === 2
         ? intent === 'request'
