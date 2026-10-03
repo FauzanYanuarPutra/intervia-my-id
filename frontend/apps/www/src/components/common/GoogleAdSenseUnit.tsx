@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 
 const ADSENSE_CLIENT = 'ca-pub-7020398942986974';
-const DEFAULT_SLOT = '2055669263';
+const DEFAULT_SLOT = '4886770179';
 
 type GoogleAdSenseUnitProps = {
   slot?: string;
@@ -23,7 +23,7 @@ export function GoogleAdSenseUnit({
 }: GoogleAdSenseUnitProps) {
   const pathname = usePathname();
   const hostRef = useRef<HTMLDivElement | null>(null);
-  const insRef = useRef<HTMLElement | null>(null);
+  const insRef = useRef<HTMLModElement | null>(null);
   const pushedRef = useRef(false);
   const retryTimerRef = useRef<number | null>(null);
   const [adState, setAdState] = useState<'pending' | 'filled' | 'unfilled'>('pending');
@@ -148,7 +148,8 @@ export function GoogleAdSenseUnit({
         ref={insRef}
         className="adsbygoogle"
         style={{ display: 'block', minHeight: 0 }}
-        data-ad-format="autorelaxed"
+        data-ad-format="auto"
+        data-full-width-responsive="true"
         data-ad-client={ADSENSE_CLIENT}
         data-ad-slot={slot}
       />
