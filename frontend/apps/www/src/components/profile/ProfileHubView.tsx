@@ -1730,7 +1730,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
 
   const followedIds = useMemo(
     () => new Set((backendSocial?.following || []).map(item => item.id)),
-    [profileSocial],
+    [backendSocial],
   );
 
   const toggleFollow = useCallback(
