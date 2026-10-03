@@ -96,7 +96,6 @@ CREATE TABLE IF NOT EXISTS user_room_state (
     last_sender uuid,
     unread_count int,
     is_pinned boolean,
-    last_read_at timestamp,
     PRIMARY KEY ((user_id), room_id)
 )
 WITH compression = {'sstable_compression': 'LZ4Compressor'};
