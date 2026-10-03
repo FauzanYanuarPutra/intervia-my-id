@@ -214,7 +214,7 @@ fn json_f64(metadata: &Value, keys: &[&str]) -> Option<f64> {
 }
 
 fn normalize_match_phrase(input: &str) -> String {
-    input
+    let normalized = input
         .chars()
         .map(|c| if c.is_alphanumeric() || c.is_whitespace() { c.to_ascii_lowercase() } else { ' ' })
         .collect::<String>()
@@ -223,8 +223,22 @@ fn normalize_match_phrase(input: &str) -> String {
             *token,
             "untuk" | "dengan" | "yang" | "dan" | "atau" | "di" | "ke" | "dari" | "harga" | "butuh" | "membutuhkan"
         ))
-        .collect::<Vec<_>>()
-        .join(" ")
+        .collect::<Vec<_>>();
+
+    // Common Indonesian produce shorthand: "mangga HR" and
+    // "mangga harum manis" describe the same variety in many listings.
+    if normalized.iter().any(|token| token == "mangga")
+        && normalized.iter().any(|token| token == "hr")
+    {
+        return normalized
+            .into_iter()
+            .filter(|token| token != "hr")
+            .chain(["harum", "manis"])
+            .collect::<Vec<_>>()
+            .join(" ");
+    }
+
+    normalized.join(" ")
 }
 
 fn tokens(input: &str) -> HashSet<String> {
