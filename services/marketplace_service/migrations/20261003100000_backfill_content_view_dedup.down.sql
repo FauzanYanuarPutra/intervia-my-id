@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS idx_event_log_content_view_lookup;
