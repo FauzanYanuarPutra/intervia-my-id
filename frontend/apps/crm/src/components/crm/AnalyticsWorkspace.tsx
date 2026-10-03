@@ -1,112 +1,21 @@
 import { EmptyState, PageHeader } from 'lajukan-ui';
-import type { CrmListingRow, CrmTransactionRow, CrmUserRow, DashboardData } from './models';
+import type { DashboardData } from './models';
 import { buildAnalyticsSummary } from './analyticsModel';
 import CrmAnalyticsDashboard from './CrmAnalyticsDashboard';
-import type { CrmLead, CrmActivity, CrmBusiness, SuperAppOrder, SuperAppTrustProfile, SupportTicket } from '@/lib/api';
 
 const money=(c:number)=>new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(Math.max(0,c)/100);
 
-function toDashboardData({
-  users,
-  listings,
-  transactions,
-  openSupport,
-}: {
-  users: CrmUserRow[];
-  listings: CrmListingRow[];
-  transactions: CrmTransactionRow[];
-  openSupport: number;
-}): DashboardData {
-  const orders: SuperAppOrder[] = transactions.map(item => ({
-    id: item.id,
-    requester_id: item.buyer,
-    partner_id: item.seller || null,
-    merchant_id: null,
-    provider_id: item.seller || null,
-    service_type: item.serviceType,
-    status: item.status,
-    payment_mode: 'crm',
-    currency: 'IDR',
-    amount_estimate_cents: item.amountCents,
-    amount_final_cents: item.amountCents,
-    pickup_address: null,
-    pickup_lat: null,
-    pickup_lng: null,
-    dropoff_address: null,
-    dropoff_lat: null,
-    dropoff_lng: null,
-    risk_score: item.riskScore,
-    risk_flags: null,
-    metadata: {},
-    created_at: item.updatedAt,
-    updated_at: item.updatedAt,
+export function AnalyticsWorkspace({ data }: { data: DashboardData }) {
+  const transactions = data.orders.map(order => ({
+    amountCents: order.amount_final_cents || order.amount_estimate_cents || 0,
   }));
-
-  const businesses: CrmBusiness[] = [];
-  const tickets: SupportTicket[] = Array.from({ length: Math.max(0, openSupport) }, (_, index) => ({
-    id: 'analytics-open-' + index,
-    requester_user_id: null,
-    requester_email: '',
-    requester_name: null,
-    category: 'support',
-    subject: 'Support terbuka',
-    status: 'open',
-    priority: 'normal',
-    assigned_agent_id: null,
-    support_room_id: null,
-    source: 'analytics',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    resolved_at: null,
-    first_response_at: null,
-    latest_message: null,
-    latest_message_at: null,
-  }));
-
-  const leads: CrmLead[] = [];
-  const activities: CrmActivity[] = [];
-  const trustProfiles: SuperAppTrustProfile[] = [];
-
-  return {
-    users,
-    listings,
-    businesses,
-    orders,
-    tickets,
-    leads,
-    activities,
-    trustProfiles,
-    chats: [],
-    sampleCollections: [],
-    emptyCollections: [],
-    failures: [],
-  };
-}
-
-export function AnalyticsWorkspace({
-  users,
-  listings,
-  transactions,
-  openSupport,
-}: {
-  users: CrmUserRow[];
-  listings: CrmListingRow[];
-  transactions: CrmTransactionRow[];
-  openSupport: number;
-}) {
   const s = buildAnalyticsSummary({
-    users: users.length,
-    listings: listings.length,
+    users: data.users.length,
+    listings: data.listings.length,
     transactions,
-    openSupport,
+    openSupport: data.tickets.filter(ticket => ['open', 'in_progress', 'pending_customer'].includes(ticket.status)).length,
   });
-  const dashboardData = toDashboardData({
-    users,
-    listings,
-    transactions,
-    openSupport,
-  });
-  const sellers = [...users]
+  const sellers = [...data.users]
     .filter(u => u.role === 'Seller' || u.role === 'Talent')
     .sort((a, b) => b.gmvCents - a.gmvCents)
     .slice(0, 5);
@@ -115,9 +24,9 @@ export function AnalyticsWorkspace({
     <div className="space-y-4">
       <PageHeader
         title="Analytics CRM"
-        description="Grafik interaktif dari data live yang sedang dimuat CRM. Gunakan filter chart untuk melihat beberapa sudut pandang tanpa pindah halaman."
+        description="Grafik interaktif dari data live yang sedang dimuat CRM. Filter chart bekerja langsung di snapshot yang sama dengan workspace lain."
       />
-      <CrmAnalyticsDashboard data={dashboardData} />
+      <CrmAnalyticsDashboard data={data} />
 
       <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_12px_34px_-28px_rgba(15,23,42,0.6)]">
