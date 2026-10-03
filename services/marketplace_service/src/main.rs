@@ -10876,6 +10876,9 @@ async fn delete_listing_draft(
         UPDATE content_items
         SET content_status = 'deleted',
             listing_status = 'archived',
+            deleted_at = COALESCE(deleted_at, NOW()),
+            deleted_by = $2,
+            delete_reason = COALESCE(delete_reason, 'draft_deleted'),
             updated_at = NOW()
         WHERE id = $1
           AND owner_id = $2
