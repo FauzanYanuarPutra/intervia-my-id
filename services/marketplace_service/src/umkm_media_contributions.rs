@@ -87,7 +87,6 @@ fn assess_media_risk(
     MediaRiskAssessment { score, level, flags }
 }
 
-
 #[derive(Debug, Clone, Copy)]
 enum MediaTarget {
     Store(Uuid),
