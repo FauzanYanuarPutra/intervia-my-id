@@ -39,7 +39,7 @@ use identity_service::routes::{
     health_check, list_backoffice_google_access, list_backoffice_invitations,
     list_my_backoffice_invitations, list_my_privacy_requests, list_privacy_requests,
     list_security_incidents, list_users, login, login_phone, logout, me, moderate_user,
-    oauth_google, ready_check, refresh_token, register, reset_password,
+    oauth_facebook, oauth_google, ready_check, refresh_token, register, reset_password,
     respond_backoffice_invitation, revoke_backoffice_invitation, search_backoffice_candidates,
     service_metrics, transition_privacy_request, transition_security_incident, update_me_profile,
     upsert_backoffice_google_access,
@@ -595,6 +595,7 @@ async fn main() -> Result<()> {
                 .route("/login", post(login))
                 .route("/login-phone", post(login_phone))
                 .route("/oauth/google", post(oauth_google))
+                .route("/oauth/facebook", post(oauth_facebook))
                 .route("/change-password", post(change_password))
                 .route("/reset-password", post(reset_password))
                 .route("/me", get(me))
