@@ -19,6 +19,7 @@ use std::{collections::HashMap, env, sync::Arc};
 use uuid::Uuid;
 
 use super::{auth_claims_from_headers, AppState};
+use super::market_signals::market_signal_summary;
 
 const MAX_OBSERVATIONS: i64 = 1500;
 const MIN_CONFIDENT_SAMPLE: usize = 8;
@@ -594,6 +595,17 @@ async fn build_market_response(
         .await
         .unwrap_or(None);
 
+    let negotiation_signals = market_signal_summary(
+        state,
+        category,
+        city,
+        unit,
+        &source.currency,
+        days,
+    )
+    .await
+    .unwrap_or_default();
+
     let mut alerts = Vec::<Value>::new();
     let source_alert = price_alert(Some(source.price_cents), &market);
     let price_position = source_alert
@@ -683,6 +695,11 @@ async fn build_market_response(
             "days": days,
             "summary": trend_summary,
             "daily": trend
+        },
+        "negotiation_signals": {
+            "days": days,
+            "items": negotiation_signals,
+            "note": "Sinyal negosiasi menunjukkan harga yang sedang ditanyakan atau diajukan; ini bukan bukti transaksi selesai dan dibaca terpisah dari harga listing."
         },
         "insight": {
             "price_position": price_position,
