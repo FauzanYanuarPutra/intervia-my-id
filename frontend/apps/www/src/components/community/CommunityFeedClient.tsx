@@ -2282,20 +2282,71 @@ export function CommunityPostCard({
     const node = bodyPreviewRef.current;
     if (!node || !displayBody) return;
 
+    let cancelled = false;
+    let frameId: number | null = null;
+    let secondFrameId: number | null = null;
+
     const measure = () => {
-      setBodyCanExpand(node.scrollHeight > node.clientHeight + 2);
+      if (cancelled || !bodyPreviewRef.current) return;
+      const current = bodyPreviewRef.current;
+      const overflowed = current.scrollHeight > current.clientHeight + 2;
+      const longEnoughForPreview =
+        displayBody.replace(/\s+/g, ' ').trim().length > 420;
+      setBodyCanExpand(overflowed || longEnoughForPreview);
       setBodyMeasureReady(true);
     };
 
-    measure();
+    const scheduleMeasure = () => {
+      if (frameId !== null) window.cancelAnimationFrame(frameId);
+      if (secondFrameId !== null) window.cancelAnimationFrame(secondFrameId);
+
+      frameId = window.requestAnimationFrame(() => {
+        measure();
+        secondFrameId = window.requestAnimationFrame(measure);
+      });
+    };
+
+    scheduleMeasure();
+
     const resizeObserver =
       typeof ResizeObserver !== 'undefined'
-        ? new ResizeObserver(measure)
+        ? new ResizeObserver(scheduleMeasure)
         : null;
     resizeObserver?.observe(node);
 
+    const mutationObserver =
+      typeof MutationObserver !== 'undefined'
+        ? new MutationObserver(scheduleMeasure)
+        : null;
+    mutationObserver?.observe(node, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
+
+    let fontsReady = false;
+    if (
+      typeof document !== 'undefined' &&
+      'fonts' in document &&
+      document.fonts?.ready
+    ) {
+      void document.fonts.ready.then(() => {
+        if (cancelled || fontsReady) return;
+        fontsReady = true;
+        scheduleMeasure();
+      });
+    }
+
+    const onWindowResize = () => scheduleMeasure();
+    window.addEventListener('resize', onWindowResize);
+
     return () => {
+      cancelled = true;
+      if (frameId !== null) window.cancelAnimationFrame(frameId);
+      if (secondFrameId !== null) window.cancelAnimationFrame(secondFrameId);
       resizeObserver?.disconnect();
+      mutationObserver?.disconnect();
+      window.removeEventListener('resize', onWindowResize);
     };
   }, [displayBody]);
   const displayTags = useMemo(() => {
