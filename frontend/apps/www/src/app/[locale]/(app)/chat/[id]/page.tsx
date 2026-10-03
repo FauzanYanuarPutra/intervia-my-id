@@ -2717,6 +2717,7 @@ export default function ChatRoomPage() {
   const [showVoiceCall, setShowVoiceCall] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showStickerPanel, setShowStickerPanel] = useState(false);
+  const [emojiKeyboardHeightPx, setEmojiKeyboardHeightPx] = useState(320);
   const [showCameraModal, setShowCameraModal] = useState(false);
   const [showListingActionModal, setShowListingActionModal] = useState(false);
   const [listingActionMode, setListingActionMode] =
@@ -2901,6 +2902,37 @@ export default function ChatRoomPage() {
   const sendPointerHandledRef = useRef(false);
   const sendShouldRefocusComposerRef = useRef(false);
   const composerRef = useRef<HTMLDivElement>(null);
+
+  const captureNativeKeyboardHeight = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const viewport = window.visualViewport;
+    const keyboardInset = viewport
+      ? Math.max(0, window.innerHeight - viewport.height)
+      : 0;
+    if (keyboardInset >= 120) {
+      setEmojiKeyboardHeightPx(Math.round(Math.min(520, Math.max(280, keyboardInset))));
+      return;
+    }
+    setEmojiKeyboardHeightPx(
+      Math.round(Math.min(420, Math.max(280, window.innerHeight * 0.38))),
+    );
+  }, []);
+
+  const toggleEmojiKeyboard = useCallback(() => {
+    captureNativeKeyboardHeight();
+    messageInputRef.current?.blur();
+    setShowAttachmentActions(false);
+    setShowStickerPanel(false);
+    setShowEmojiPicker(previous => !previous);
+  }, [captureNativeKeyboardHeight]);
+
+  const toggleStickerKeyboard = useCallback(() => {
+    captureNativeKeyboardHeight();
+    messageInputRef.current?.blur();
+    setShowAttachmentActions(false);
+    setShowEmojiPicker(false);
+    setShowStickerPanel(previous => !previous);
+  }, [captureNativeKeyboardHeight]);
 
   useEffect(() => {
     if (!showEmojiPicker && !showStickerPanel) return;
@@ -9149,11 +9181,7 @@ export default function ChatRoomPage() {
                 <div className="flex shrink-0 items-center gap-0.5">
                   <button
                     type="button"
-                    onClick={() => {
-                      setShowAttachmentActions(false);
-                      setShowEmojiPicker(prev => !prev);
-                      setShowStickerPanel(false);
-                    }}
+                    onClick={toggleEmojiKeyboard}
                     disabled={isPeerBlocked || roomReadOnly}
                     className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[#54656f] transition hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-50 dark:text-[#aebac1] dark:hover:bg-white/5 min-[380px]:h-11 min-[380px]:w-11"
                     title="Emoji"
@@ -9164,11 +9192,7 @@ export default function ChatRoomPage() {
 
                   <button
                     type="button"
-                    onClick={() => {
-                      setShowAttachmentActions(false);
-                      setShowStickerPanel(prev => !prev);
-                      setShowEmojiPicker(false);
-                    }}
+                    onClick={toggleStickerKeyboard}
                     disabled={isPeerBlocked || roomReadOnly}
                     className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[#54656f] transition hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-50 max-[420px]:hidden dark:text-[#aebac1] dark:hover:bg-white/5 min-[480px]:h-11 min-[480px]:w-11"
                     title={chatLocale === 'id' ? 'Stiker' : 'Stickers'}
@@ -9482,6 +9506,7 @@ export default function ChatRoomPage() {
             <ChatComposerPicker
               locale={chatLocale}
               mode={showEmojiPicker ? 'emoji' : 'sticker'}
+              keyboardHeightPx={emojiKeyboardHeightPx}
               disabled={isPeerBlocked || roomReadOnly}
               onClose={() => {
                 setShowEmojiPicker(false);
