@@ -22,17 +22,20 @@ export function GoogleAdSenseUnit({
   className = '',
 }: GoogleAdSenseUnitProps) {
   const pathname = usePathname();
+  const hostRef = useRef<HTMLDivElement | null>(null);
   const insRef = useRef<HTMLElement | null>(null);
   const pushedRef = useRef(false);
   const [adState, setAdState] = useState<'pending' | 'filled' | 'unfilled'>('pending');
 
   useEffect(() => {
     pushedRef.current = false;
+    setAdState('pending');
   }, [pathname, slot]);
 
   useEffect(() => {
+    const host = hostRef.current;
     const ins = insRef.current;
-    if (!ins) return;
+    if (!host || !ins) return;
 
     const readStatus = () => {
       const status = ins.getAttribute('data-ad-status');
@@ -50,49 +53,77 @@ export function GoogleAdSenseUnit({
       attributeFilter: ['data-ad-status'],
     });
 
-    const timer = window.setInterval(readStatus, 1000);
-    return () => {
-      observer.disconnect();
-      window.clearInterval(timer);
-    };
+    return () => observer.disconnect();
   }, [pathname, slot]);
 
   useEffect(() => {
-    if (pushedRef.current) return;
+    const host = hostRef.current;
+    if (!host || pushedRef.current || adState === 'unfilled') return;
 
     const pushAd = () => {
+      if (pushedRef.current) return;
       try {
         window.adsbygoogle = window.adsbygoogle || [];
         window.adsbygoogle.push({});
         pushedRef.current = true;
       } catch {
-        pushedRef.current = false;
+        // AdSense can fail transiently; keep the slot eligible for a later
+        // observer callback without blocking the rest of the page.
       }
     };
 
-    if (
-      typeof window !== 'undefined' &&
-      document.querySelector(
-        'script[src*="pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"]',
-      )
-    ) {
+    const observeTarget = () => {
+      if (pushedRef.current) return;
+
+      const scriptReady =
+        typeof window !== 'undefined' &&
+        Boolean(
+          document.querySelector(
+            'script[src*="pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"]',
+          ),
+        );
+
+      if (!scriptReady) {
+        window.setTimeout(observeTarget, 500);
+        return;
+      }
+
       pushAd();
+    };
+
+    if (typeof IntersectionObserver === 'undefined') {
+      observeTarget();
       return;
     }
 
-    const timer = window.setTimeout(pushAd, 250);
-    return () => window.clearTimeout(timer);
-  }, [pathname, slot]);
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries.some(entry => entry.isIntersecting)) {
+          observeTarget();
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '320px 0px' },
+    );
+
+    observer.observe(host);
+    return () => observer.disconnect();
+  }, [adState, pathname, slot]);
 
   if (adState === 'unfilled') return null;
 
   return (
     <div
-      className={'w-full min-w-0 overflow-hidden ' + className}
+      ref={hostRef}
+      className={
+        adState === 'pending'
+          ? 'h-px w-full min-w-0 overflow-hidden opacity-0 ' + className
+          : 'w-full min-w-0 overflow-hidden ' + className
+      }
       data-ad-placement="adsense-autorelaxed"
       data-ad-slot={slot}
       data-ad-state={adState}
-      aria-hidden={adState === 'unfilled' ? true : undefined}
+      aria-hidden={adState === 'pending' ? true : undefined}
     >
       <ins
         ref={insRef}
