@@ -298,6 +298,7 @@ function normalizeListings(items: CrmContentItem[]): CrmListingRow[] {
       ownerId: asString(item.owner_id),
       featured: asBoolean(metadata.featured),
       updatedAt: asString(item.updated_at || item.created_at),
+      createdAt: asString(item.created_at || item.updated_at),
       metadata,
       reportCount: 0,
       reporters: [],
