@@ -3,6 +3,20 @@ import { createSession } from '@/lib/session';
 import { authSecurityHeaders, enforceAuthRouteSecurity } from '@/lib/authSecurity';
 import { shouldUseSecureCookies } from '@/lib/server/forwardCookies';
 
+type FacebookOAuthState = {
+  nonce?: string;
+  callbackUrl?: string;
+};
+
+type FacebookAuthResponse = {
+  access_token?: string;
+  refresh_token?: string;
+  session_id?: string;
+  user?: {
+    id?: string;
+  };
+};
+
 function origin(req: NextRequest) {
   const host=req.headers.get('x-forwarded-host')?.split(',')[0]?.trim();
   const proto=req.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
@@ -19,7 +33,18 @@ export async function GET(req: NextRequest) {
     const code=req.nextUrl.searchParams.get('code');
     const state=req.nextUrl.searchParams.get('state')||'';
     if(!code||!state)return fail('oauth_state_invalid');
-    let parsed:any; try{parsed=JSON.parse(Buffer.from(state,'base64url').toString());}catch{return fail('oauth_state_invalid');}
+    let parsed: FacebookOAuthState;
+    try {
+      const decoded = JSON.parse(
+        Buffer.from(state, 'base64url').toString(),
+      ) as unknown;
+      if (!decoded || typeof decoded !== 'object') {
+        return fail('oauth_state_invalid');
+      }
+      parsed = decoded as FacebookOAuthState;
+    } catch {
+      return fail('oauth_state_invalid');
+    }
     if(parsed.nonce!==(req.cookies.get('facebook_oauth_state')?.value||''))return fail('oauth_state_invalid');
     const appId=process.env.FACEBOOK_APP_ID, appSecret=process.env.FACEBOOK_APP_SECRET;
     const version=process.env.FACEBOOK_GRAPH_VERSION||'v24.0';
@@ -32,8 +57,10 @@ export async function GET(req: NextRequest) {
     const backend=await fetch((process.env.INTERNAL_API_URL||'http://identity_service:8080')+'/auth/oauth/facebook',{method:'POST',headers:{'Content-Type':'application/json',...authSecurityHeaders(security)},body:JSON.stringify({access_token:token.access_token})});
     if(backend.status===409)return fail('account_exists_use_existing_login');
     if(!backend.ok)return fail('backend_failed');
-    const data=await backend.json() as any;
-    if(!data.access_token||!data.user?.id)return fail('backend_invalid_response');
+    const data = (await backend.json()) as FacebookAuthResponse;
+    if (!data.access_token || !data.user?.id) {
+      return fail('backend_invalid_response');
+    }
     const session=await createSession(data.user.id,{userAgent:req.headers.get('user-agent')||'Unknown',ipAddress:req.headers.get('x-forwarded-for')||req.headers.get('x-real-ip')||'127.0.0.1',sessionId:data.session_id});
     const target=typeof parsed.callbackUrl==='string'&&parsed.callbackUrl.startsWith('/')?parsed.callbackUrl:'/id/profile';
     const response=NextResponse.redirect(new URL(target,base));
