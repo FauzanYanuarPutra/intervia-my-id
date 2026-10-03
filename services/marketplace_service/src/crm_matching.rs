@@ -1985,6 +1985,19 @@ mod tests {
         let distance = haversine_km((-6.2000, 106.8166), (-6.1754, 106.8272));
         assert!(distance > 2.0 && distance < 4.0);
     }
+
+    #[test]
+    fn mangga_hr_normalizes_to_harum_manis_alias() {
+        assert_eq!(
+            normalize_match_phrase("Mangga HR"),
+            "mangga harum manis"
+        );
+        assert_eq!(
+            normalize_match_phrase("Mangga Harum Manis"),
+            "mangga harum manis"
+        );
+    }
+
 }
 
 #[derive(Debug, Deserialize, Default)]
