@@ -15169,10 +15169,62 @@ async fn create_offer(
     if !is_valid_wallet_environment(&wallet_environment) {
         return err(StatusCode::BAD_REQUEST, "invalid wallet_environment").into_response();
     }
+    let intermediary_mode = payload
+        .intermediary_mode
+        .as_deref()
+        .unwrap_or("direct")
+        .trim()
+        .to_lowercase();
+
+    let intermediary_candidate = match intermediary_mode.as_str() {
+        "direct" => None,
+        "managed" => {
+            let Some(email) = payload.intermediary_email.as_deref().map(str::trim).filter(|v| !v.is_empty()) else {
+                return err(StatusCode::BAD_REQUEST, "intermediary_email is required for managed transactions").into_response();
+            };
+            match resolve_transaction_intermediary_candidate(&state.db, email).await {
+                Ok(Some(candidate)) => {
+                    if candidate.user_id == buyer_id || candidate.user_id == content.owner_id {
+                        return err(StatusCode::BAD_REQUEST, "intermediary cannot be a transaction party").into_response();
+                    }
+                    Some(candidate)
+                }
+                Ok(None) => {
+                    return err(StatusCode::BAD_REQUEST, "selected intermediary is not available").into_response();
+                }
+                Err(error) => {
+                    tracing::error!("resolve intermediary candidate error: {:?}", error);
+                    return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to resolve intermediary").into_response();
+                }
+            }
+        }
+        _ => {
+            return err(StatusCode::BAD_REQUEST, "invalid intermediary_mode").into_response();
+        }
+    };
+
     let base_meta = payload
         .transaction_meta
         .filter(|v| !v.is_null())
         .unwrap_or_else(|| json!({}));
+
+    let intermediary_meta = match intermediary_candidate.as_ref() {
+        Some(candidate) => json!({
+            "mode": "managed",
+            "status": "requested",
+            "email": candidate.email,
+            "user_id": candidate.user_id,
+            "display_name": candidate.display_name,
+            "note": candidate.note,
+            "requested_by": buyer_id,
+            "requested_at": Utc::now()
+        }),
+        None => json!({
+            "mode": "direct",
+            "status": "not_requested"
+        }),
+    };
+
     let transaction_meta = merge_json_objects(
         base_meta,
         json!({
@@ -15180,8 +15232,10 @@ async fn create_offer(
                 "safety_mode": "strict",
                 "pricing_mode": listing_mode,
                 "offer_channel": "chat_or_content",
-                "wallet_environment": wallet_environment
+                "wallet_environment": wallet_environment,
+                "intermediary_mode": intermediary_mode
             },
+            "intermediary": intermediary_meta,
             "payment": {
                 "status": "awaiting_payment",
                 "funded": false
