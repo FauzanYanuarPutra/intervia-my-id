@@ -187,9 +187,14 @@ pub async fn create_market_signal(
     let currency = payload
         .currency
         .as_deref()
-        .unwrap_or_else(|| row.get::<Option<String>, _>("currency").as_deref().unwrap_or("IDR"))
-        .trim()
-        .to_ascii_uppercase();
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_ascii_uppercase)
+        .or_else(|| {
+            row.get::<Option<String>, _>("currency")
+                .map(|value| value.trim().to_ascii_uppercase())
+        })
+        .unwrap_or_else(|| "IDR".to_string());
     let signal_type = normalize_signal_type(payload.signal_type.as_deref());
     let source = clean_text(payload.source.as_deref(), 64).unwrap_or_else(|| "content_detail".to_string());
     let quantity_unit = clean_text(payload.quantity_unit.as_deref(), 32);
