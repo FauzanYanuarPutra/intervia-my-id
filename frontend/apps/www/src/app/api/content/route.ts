@@ -17,6 +17,7 @@ import {
 import { enforceRateLimit, getClientIp } from '@/lib/rateLimit';
 import { isEditorialContentRecord } from '@/lib/server/contentEditorial';
 import { resolveListingSide, type ListingSide } from '@/lib/content/listingSide';
+import { normalizeListingTitle } from '@/lib/content/listingFlowRules';
 
 const marketplaceBase =
   process.env.INTERNAL_MARKETPLACE_URL ||
@@ -1762,7 +1763,11 @@ export async function GET(req: NextRequest) {
           resolvedPayload.items || [],
           requestedMarketplaceSide,
         ),
-      ),
+      ).map(item => {
+        if (!item || typeof item !== 'object') return item;
+        const normalizedTitle = normalizeListingTitle(item.title, 180);
+        return normalizedTitle ? { ...item, title: normalizedTitle } : item;
+      }),
     };
 
     return NextResponse.json(resolvedPayload, {
