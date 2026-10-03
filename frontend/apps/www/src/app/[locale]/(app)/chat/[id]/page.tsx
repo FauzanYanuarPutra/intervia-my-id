@@ -3394,7 +3394,7 @@ export default function ChatRoomPage() {
       const data = await res.json().catch(() => ({}));
       const payload =
         data && typeof data === 'object'
-          ? (data as { messages?: unknown[]; data?: unknown[] })
+          ? (data as { messages?: unknown[]; data?: unknown[]; peer_read_at?: unknown })
           : {};
       const list = Array.isArray(payload.messages)
         ? payload.messages
