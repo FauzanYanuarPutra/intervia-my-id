@@ -18,6 +18,79 @@ const BUSINESS_MAX_QUERY_LEN: usize = 120;
 const BUSINESS_MAX_LIMIT: i64 = 100;
 const BUSINESS_MAX_REASON_LEN: usize = 4_000;
 
+#[derive(Debug)]
+struct MediaRiskAssessment {
+    score: i32,
+    level: &'static str,
+    flags: Vec<&'static str>,
+}
+
+fn assess_media_risk(
+    recent_hour: i64,
+    recent_day: i64,
+    recent_store_day: i64,
+    reviewed_30d: i64,
+    rejected_30d: i64,
+    repeated_caption_7d: i64,
+) -> MediaRiskAssessment {
+    let mut score = 0i32;
+    let mut flags = Vec::new();
+
+    if recent_hour >= 12 {
+        score += 45;
+        flags.push("high_submission_velocity");
+    } else if recent_hour >= 6 {
+        score += 25;
+        flags.push("elevated_submission_velocity");
+    }
+
+    if recent_day >= 20 {
+        score += 25;
+        flags.push("high_daily_volume");
+    } else if recent_day >= 10 {
+        score += 12;
+        flags.push("elevated_daily_volume");
+    }
+
+    if recent_store_day >= 6 {
+        score += 20;
+        flags.push("many_submissions_same_business");
+    } else if recent_store_day >= 3 {
+        score += 8;
+        flags.push("repeated_submissions_same_business");
+    }
+
+    if reviewed_30d >= 5 && rejected_30d * 2 >= reviewed_30d {
+        score += 25;
+        flags.push("high_rejection_history");
+    } else if reviewed_30d >= 3 && rejected_30d * 3 >= reviewed_30d * 2 {
+        score += 12;
+        flags.push("elevated_rejection_history");
+    }
+
+    if repeated_caption_7d >= 5 {
+        score += 15;
+        flags.push("reused_caption_pattern");
+    } else if repeated_caption_7d >= 3 {
+        score += 7;
+        flags.push("repeated_caption_pattern");
+    }
+
+    let score = score.clamp(0, 100);
+    let level = if score >= 75 {
+        "critical"
+    } else if score >= 50 {
+        "high"
+    } else if score >= 25 {
+        "medium"
+    } else {
+        "low"
+    };
+
+    MediaRiskAssessment { score, level, flags }
+}
+
+
 #[derive(Debug, Deserialize, Default)]
 pub struct ListCrmBusinessesQuery {
     pub q: Option<String>,
@@ -805,20 +878,104 @@ async fn create_store_media_contribution(
         }
     };
 
+    let risk_row = match sqlx::query(
+        r#"
+        SELECT
+          COUNT(*) FILTER (WHERE created_at >= NOW() - interval '1 hour')::bigint AS recent_hour,
+          COUNT(*) FILTER (WHERE created_at >= NOW() - interval '24 hours')::bigint AS recent_day,
+          COUNT(*) FILTER (
+            WHERE store_id = $2
+              AND created_at >= NOW() - interval '24 hours'
+          )::bigint AS recent_store_day,
+          COUNT(*) FILTER (
+            WHERE created_at >= NOW() - interval '30 days'
+              AND status IN ('approved', 'rejected', 'hidden')
+          )::bigint AS reviewed_30d,
+          COUNT(*) FILTER (
+            WHERE created_at >= NOW() - interval '30 days'
+              AND status = 'rejected'
+          )::bigint AS rejected_30d
+        FROM umkm_store_media_contributions
+        WHERE uploader_user_id = $1
+        "#
+    )
+    .bind(actor_id)
+    .bind(store.id)
+    .fetch_one(&state.db)
+    .await
+    {
+        Ok(row) => row,
+        Err(error) => {
+            tracing::error!("create_store_media_contribution risk history error: {:?}", error);
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to validate media safety",
+            )
+            .into_response();
+        }
+    };
+
+    let repeated_caption_7d = if let Some(caption) = caption.as_deref() {
+        match sqlx::query_scalar::<_, i64>(
+            r#"
+            SELECT COUNT(*)::bigint
+            FROM umkm_store_media_contributions
+            WHERE uploader_user_id = $1
+              AND caption = $2
+              AND created_at >= NOW() - interval '7 days'
+            "#,
+        )
+        .bind(actor_id)
+        .bind(caption)
+        .fetch_one(&state.db)
+        .await
+        {
+            Ok(value) => value,
+            Err(error) => {
+                tracing::error!("create_store_media_contribution caption risk error: {:?}", error);
+                return err(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to validate media safety",
+                )
+                .into_response();
+            }
+        }
+    } else {
+        0
+    };
+
+    let risk = assess_media_risk(
+        risk_row.get("recent_hour"),
+        risk_row.get("recent_day"),
+        risk_row.get("recent_store_day"),
+        risk_row.get("reviewed_30d"),
+        risk_row.get("rejected_30d"),
+        repeated_caption_7d,
+    );
+
     let row = match sqlx::query(
         r#"
         INSERT INTO umkm_store_media_contributions (
           store_id, uploader_user_id, media_url, media_type, caption,
-          uploader_name_snapshot, uploader_username_snapshot, status
+          uploader_name_snapshot, uploader_username_snapshot, status,
+          risk_score, risk_level, risk_flags, risk_checked_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
+        VALUES (
+          $1, $2, $3, $4, $5, $6, $7, 'pending',
+          $8, $9, $10, NOW()
+        )
         ON CONFLICT (store_id, media_url)
         DO UPDATE SET
           caption = COALESCE(EXCLUDED.caption, umkm_store_media_contributions.caption),
+          risk_score = EXCLUDED.risk_score,
+          risk_level = EXCLUDED.risk_level,
+          risk_flags = EXCLUDED.risk_flags,
+          risk_checked_at = NOW(),
           updated_at = NOW()
         RETURNING
           id, store_id, media_url, media_type, caption, uploader_user_id,
-          uploader_name_snapshot, uploader_username_snapshot, is_primary, created_at
+          uploader_name_snapshot, uploader_username_snapshot, is_primary,
+          risk_score, risk_level, risk_flags, created_at
         "#,
     )
     .bind(store.id)
@@ -828,6 +985,9 @@ async fn create_store_media_contribution(
     .bind(&caption)
     .bind(&uploader_name)
     .bind(&uploader_username)
+    .bind(risk.score)
+    .bind(risk.level)
+    .bind(json!(risk.flags))
     .fetch_one(&state.db)
     .await
     {
@@ -849,6 +1009,9 @@ async fn create_store_media_contribution(
         "uploader_name": row.get::<Option<String>, _>("uploader_name_snapshot"),
         "uploader_username": row.get::<Option<String>, _>("uploader_username_snapshot"),
         "is_primary": row.get::<bool, _>("is_primary"),
+        "risk_score": row.get::<i32, _>("risk_score"),
+        "risk_level": row.get::<String, _>("risk_level"),
+        "risk_flags": row.get::<Value, _>("risk_flags"),
         "created_at": row.get::<DateTime<Utc>, _>("created_at"),
     });
 
@@ -896,6 +1059,7 @@ async fn list_crm_store_media(
           m.media_url, m.media_type, m.caption, m.uploader_user_id,
           m.uploader_name_snapshot, m.uploader_username_snapshot,
           m.status, m.is_primary, m.review_note, m.reviewed_by, m.reviewed_at,
+          m.risk_score, m.risk_level, m.risk_flags, m.risk_checked_at,
           m.created_at
         FROM umkm_store_media_contributions m
         JOIN umkm_stores s ON s.id = m.store_id
@@ -908,7 +1072,16 @@ async fn list_crm_store_media(
             COALESCE(m.uploader_name_snapshot, '') ILIKE '%' || $3 || '%' OR
             COALESCE(m.uploader_username_snapshot, '') ILIKE '%' || $3 || '%'
           )
-        ORDER BY m.created_at ASC, m.id ASC
+        ORDER BY
+          CASE m.risk_level
+            WHEN 'critical' THEN 0
+            WHEN 'high' THEN 1
+            WHEN 'medium' THEN 2
+            ELSE 3
+          END,
+          m.risk_score DESC,
+          m.created_at ASC,
+          m.id ASC
         LIMIT $4 OFFSET $5
         "#,
     )
@@ -950,6 +1123,10 @@ async fn list_crm_store_media(
                 "review_note": row.get::<Option<String>, _>("review_note"),
                 "reviewed_by": row.get::<Option<Uuid>, _>("reviewed_by"),
                 "reviewed_at": row.get::<Option<DateTime<Utc>>, _>("reviewed_at"),
+                "risk_score": row.get::<i32, _>("risk_score"),
+                "risk_level": row.get::<String, _>("risk_level"),
+                "risk_flags": row.get::<Value, _>("risk_flags"),
+                "risk_checked_at": row.get::<Option<DateTime<Utc>>, _>("risk_checked_at"),
                 "created_at": row.get::<DateTime<Utc>, _>("created_at"),
             })
         })
@@ -3927,5 +4104,27 @@ mod tests {
                 "/api/content/media/laju-chat/content/lajukan-juice-gallery.webp".to_string(),
             ]
         );
+    }
+}
+
+#[cfg(test)]
+mod media_risk_tests {
+    use super::assess_media_risk;
+
+    #[test]
+    fn normal_contribution_is_low_risk() {
+        let result = assess_media_risk(0, 1, 1, 0, 0, 0);
+        assert_eq!(result.level, "low");
+        assert_eq!(result.score, 0);
+        assert!(result.flags.is_empty());
+    }
+
+    #[test]
+    fn repeated_high_velocity_is_flagged_without_auto_rejection() {
+        let result = assess_media_risk(12, 24, 8, 6, 4, 5);
+        assert_eq!(result.level, "critical");
+        assert!(result.score >= 75);
+        assert!(result.flags.contains(&"high_submission_velocity"));
+        assert!(result.flags.contains(&"high_rejection_history"));
     }
 }
