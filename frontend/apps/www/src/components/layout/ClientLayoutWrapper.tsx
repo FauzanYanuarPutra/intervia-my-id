@@ -160,15 +160,21 @@ export default function ClientLayoutWrapper({
   const routeIntent = resolveRouteIntent(pathname, meta.routeIntent);
   const showSiteAd =
     !isImmersiveRoute &&
-    ![
-      'chat',
-      'notifications',
-      'settings',
-      'dashboard',
-      'manage',
-      'profile',
-      'create',
-    ].includes(routeIntent);
+    new Set([
+      'home',
+      'explore',
+      'search',
+      'community',
+      'news',
+      'reels',
+      'content',
+      'about',
+      'contact',
+      'support',
+      'learn',
+      'blog',
+      'education',
+    ]).has(routeIntent);
 
   useBodyScrollLock(isImmersiveRoute, {
     resetScroll: true,
