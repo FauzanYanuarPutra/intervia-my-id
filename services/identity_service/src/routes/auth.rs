@@ -2770,6 +2770,11 @@ pub async fn oauth_facebook(
                 return (StatusCode::CONFLICT,Json(json!({"error":"account_creation_conflict"}))).into_response();
             }
             let avatar=identity.picture.clone().unwrap_or_else(||DEFAULT_PROFILE_AVATAR.to_string());
+            if let Ok(Some(role_id)) = sqlx::query_scalar::<_, Uuid>("SELECT id FROM roles WHERE name='buyer' LIMIT 1")
+                .fetch_optional(&state.db).await {
+                let _ = sqlx::query("INSERT INTO core.user_roles(user_id,role_id) VALUES($1,$2) ON CONFLICT DO NOTHING")
+                    .bind(id).bind(role_id).execute(&state.db).await;
+            }
             if sqlx::query("INSERT INTO core.user_profiles(user_id,full_name,username,picture,metadata) VALUES($1,$2,$3,$4,$5)")
                 .bind(id).bind(identity.name.clone()).bind(username).bind(&avatar)
                 .bind(json!({"avatar_url":avatar,"avatar_source":"facebook","auth_provider":"facebook"}))
