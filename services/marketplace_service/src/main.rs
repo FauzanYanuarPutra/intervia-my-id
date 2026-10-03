@@ -2413,7 +2413,19 @@ async fn main() -> anyhow::Result<()> {
         .route("/v1/orders/{id}", get(get_order))
         .route("/v1/orders/{id}/transition", put(transition_order))
         .route("/v1/transactions", get(list_transactions))
+        .route(
+            "/v1/transaction-intermediaries",
+            get(list_transaction_intermediaries),
+        )
         .route("/v1/transactions/{id}", get(get_transaction))
+        .route(
+            "/v1/transactions/{id}/intermediary/accept",
+            put(accept_transaction_intermediary),
+        )
+        .route(
+            "/v1/transactions/{id}/intermediary/decline",
+            put(decline_transaction_intermediary),
+        )
         .route(
             "/v1/transactions/{id}/counter-offer",
             put(counter_offer_transaction),
