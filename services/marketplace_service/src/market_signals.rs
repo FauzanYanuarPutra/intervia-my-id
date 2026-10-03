@@ -11,6 +11,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use super::{auth::user_id_from_auth, AppState};
+use crate::market_signal_risk;
 
 #[derive(Debug, Deserialize)]
 pub struct CreateMarketSignal {
