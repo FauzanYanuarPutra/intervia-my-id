@@ -208,16 +208,19 @@ pub async fn create_market_signal(
         .and_then(|v| v.to_str().ok())
         .and_then(|v| clean_text(Some(v), 160));
 
+    let signal_id = Uuid::new_v4();
+
     let insert = sqlx::query(
         r#"
         INSERT INTO market_negotiation_signals
-          (content_id, actor_id, signal_side, signal_type, amount_cents, currency,
+          (id, content_id, actor_id, signal_side, signal_type, amount_cents, currency,
            quantity, quantity_unit, city, category, price_unit, source, idempotency_key)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
         ON CONFLICT (idempotency_key) DO NOTHING
         RETURNING id, created_at
         "#,
     )
+    .bind(signal_id)
     .bind(content_id)
     .bind(actor_id)
     .bind(signal_side)
