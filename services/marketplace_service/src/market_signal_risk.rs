@@ -60,7 +60,7 @@ pub fn score_signal(
         if listing > 0 {
             let ratio = amount as f64 / listing as f64;
             if !(0.02..=50.0).contains(&ratio) {
-                score += 30;
+                score += 50;
                 reasons.push("extreme_price_ratio");
             } else if !(0.10..=10.0).contains(&ratio) {
                 score += 12;
