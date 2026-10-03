@@ -26,7 +26,7 @@ pub struct CreateMarketSignal {
 }
 
 #[derive(Debug, Serialize)]
-struct SignalSummary {
+pub(crate) struct SignalSummary {
     signal_side: String,
     sample_count: i64,
     median_amount_cents: Option<i64>,
