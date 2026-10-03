@@ -45,6 +45,7 @@ mod health;
 mod identity_projection;
 mod market_intelligence;
 mod market_signals;
+mod market_signal_risk;
 mod moderation;
 mod news;
 mod order_engine;
