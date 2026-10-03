@@ -21212,35 +21212,37 @@ async fn settle_dispute_funds_tx(
     resolved_by: Uuid,
     settlement: &DisputeSettlementAmounts,
 ) -> Result<(), WalletTransitionError> {
-    let buyer_account =
-        lock_wallet_account_tx(tx, txn.buyer_id, environment, txn.currency.as_str()).await?;
+    let managed_intermediary = intermediary_mode(&txn.transaction_meta) == "managed";
+    let holder_user_id = if managed_intermediary {
+        intermediary_user_id(&txn.transaction_meta)
+            .ok_or(WalletTransitionError::InvalidHeldBalance)?
+    } else {
+        txn.buyer_id
+    };
+
+    let holder_account =
+        lock_wallet_account_tx(tx, holder_user_id, environment, txn.currency.as_str()).await?;
     let seller_account =
         lock_wallet_account_tx(tx, txn.seller_id, environment, txn.currency.as_str()).await?;
 
     let total_to_settle = settlement.refund_amount_cents
         + settlement.release_amount_cents
         + settlement.platform_fee_cents;
-    if buyer_account.held_balance_cents < total_to_settle {
+
+    if holder_account.held_balance_cents < total_to_settle {
         return Err(WalletTransitionError::InvalidHeldBalance);
     }
 
-    let next_buyer_available =
-        buyer_account.available_balance_cents + settlement.refund_amount_cents;
-    let next_buyer_held = buyer_account.held_balance_cents - total_to_settle;
-    let next_buyer_spend = buyer_account.total_spend_cents
-        + settlement.release_amount_cents
-        + settlement.platform_fee_cents;
-    if next_buyer_held < 0 || next_buyer_available < 0 || next_buyer_spend < 0 {
-        return Err(WalletTransitionError::InvalidHeldBalance);
-    }
+    let next_holder_held = holder_account
+        .held_balance_cents
+        .checked_sub(total_to_settle)
+        .ok_or(WalletTransitionError::InvalidHeldBalance)?;
 
-    let updated_buyer = sqlx::query_as::<_, WalletAccountRow>(
+    let updated_holder = sqlx::query_as::<_, WalletAccountRow>(
         r#"
         UPDATE wallet_accounts
         SET
-            available_balance_cents = $2,
-            held_balance_cents = $3,
-            total_spend_cents = $4,
+            held_balance_cents = $2,
             updated_at = NOW()
         WHERE id = $1
         RETURNING
@@ -21248,12 +21250,38 @@ async fn settle_dispute_funds_tx(
             total_topup_cents, total_spend_cents, status, metadata, created_at, updated_at
         "#,
     )
-    .bind(buyer_account.id)
-    .bind(next_buyer_available)
-    .bind(next_buyer_held)
-    .bind(next_buyer_spend)
+    .bind(holder_account.id)
+    .bind(next_holder_held)
     .fetch_one(&mut **tx)
     .await?;
+
+    let updated_buyer = if settlement.refund_amount_cents > 0 {
+        Some(
+            {
+                let buyer_account =
+                    lock_wallet_account_tx(tx, txn.buyer_id, environment, txn.currency.as_str())
+                        .await?;
+                sqlx::query_as::<_, WalletAccountRow>(
+                    r#"
+                    UPDATE wallet_accounts
+                    SET
+                        available_balance_cents = $2,
+                        updated_at = NOW()
+                    WHERE id = $1
+                    RETURNING
+                        id, user_id, environment, currency, available_balance_cents, held_balance_cents,
+                        total_topup_cents, total_spend_cents, status, metadata, created_at, updated_at
+                    "#,
+                )
+                .bind(buyer_account.id)
+                .bind(buyer_account.available_balance_cents + settlement.refund_amount_cents)
+                .fetch_one(&mut **tx)
+                .await?
+            }
+        )
+    } else {
+        None
+    };
 
     let updated_seller = if settlement.release_amount_cents > 0 {
         Some(
@@ -21279,21 +21307,26 @@ async fn settle_dispute_funds_tx(
     };
 
     if settlement.refund_amount_cents > 0 {
+        let buyer = updated_buyer.as_ref().expect("buyer refund account must exist");
         insert_wallet_ledger_entry_tx(
             tx,
             txn.buyer_id,
-            &updated_buyer,
+            buyer,
             "credit",
             settlement.refund_amount_cents,
-            updated_buyer.available_balance_cents,
+            buyer.available_balance_cents,
             "refund",
             "transaction",
             txn.id,
             format!("Dispute refund for transaction {}", txn.id),
             json!({
                 "transaction_id": txn.id,
-                "counterparty_user_id": txn.seller_id,
-                "flow": "dispute_resolution_refund",
+                "counterparty_user_id": holder_user_id,
+                "flow": if managed_intermediary {
+                    "intermediary_custody_dispute_refund"
+                } else {
+                    "dispute_resolution_refund"
+                },
                 "environment": environment,
                 "decision": decision,
                 "resolved_by": resolved_by
@@ -21305,11 +21338,11 @@ async fn settle_dispute_funds_tx(
     if settlement.release_amount_cents > 0 {
         insert_wallet_ledger_entry_tx(
             tx,
-            txn.buyer_id,
-            &updated_buyer,
+            holder_user_id,
+            &updated_holder,
             "debit",
             settlement.release_amount_cents,
-            updated_buyer.available_balance_cents,
+            updated_holder.available_balance_cents,
             "payment_release",
             "transaction",
             txn.id,
@@ -21317,10 +21350,15 @@ async fn settle_dispute_funds_tx(
             json!({
                 "transaction_id": txn.id,
                 "counterparty_user_id": txn.seller_id,
-                "flow": "dispute_resolution_release",
+                "flow": if managed_intermediary {
+                    "intermediary_custody_dispute_release"
+                } else {
+                    "dispute_resolution_release"
+                },
                 "environment": environment,
                 "decision": decision,
-                "resolved_by": resolved_by
+                "resolved_by": resolved_by,
+                "held_balance_after_cents": updated_holder.held_balance_cents
             }),
         )
         .await?;
@@ -21329,22 +21367,26 @@ async fn settle_dispute_funds_tx(
     if settlement.platform_fee_cents > 0 {
         insert_wallet_ledger_entry_tx(
             tx,
-            txn.buyer_id,
-            &updated_buyer,
+            holder_user_id,
+            &updated_holder,
             "debit",
             settlement.platform_fee_cents,
-            updated_buyer.available_balance_cents,
+            updated_holder.available_balance_cents,
             "fee",
             "transaction",
             txn.id,
             format!("Dispute platform fee for transaction {}", txn.id),
             json!({
                 "transaction_id": txn.id,
-                "counterparty_user_id": txn.seller_id,
-                "flow": "dispute_resolution_fee",
+                "flow": if managed_intermediary {
+                    "intermediary_custody_dispute_fee"
+                } else {
+                    "dispute_resolution_fee"
+                },
                 "environment": environment,
                 "decision": decision,
-                "resolved_by": resolved_by
+                "resolved_by": resolved_by,
+                "held_balance_after_cents": updated_holder.held_balance_cents
             }),
         )
         .await?;
@@ -21364,8 +21406,12 @@ async fn settle_dispute_funds_tx(
             format!("Dispute settlement received for transaction {}", txn.id),
             json!({
                 "transaction_id": txn.id,
-                "counterparty_user_id": txn.buyer_id,
-                "flow": "dispute_resolution_release",
+                "counterparty_user_id": holder_user_id,
+                "flow": if managed_intermediary {
+                    "intermediary_custody_dispute_release"
+                } else {
+                    "dispute_resolution_release"
+                },
                 "environment": environment,
                 "decision": decision,
                 "resolved_by": resolved_by
