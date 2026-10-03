@@ -5,7 +5,7 @@ import { AlertTriangle, ArrowDown, ArrowUp, BarChart3, Info, ShieldAlert } from 
 
 type MarketData = {
   source?: { price_cents?: number | null };
-  scope?: { city?: string | null; category?: string | null; price_unit?: string | null; currency?: string };
+  scope?: { city?: string | null; category?: string | null; price_unit?: string | null; currency?: string; level?: string | null };
   market?: {
     raw_sample_count: number;
     clean_sample_count: number;
