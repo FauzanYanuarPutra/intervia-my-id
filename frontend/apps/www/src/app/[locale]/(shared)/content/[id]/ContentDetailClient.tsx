@@ -5238,6 +5238,126 @@ export default function ContentDetailClient({
         </div>
       )}
 
+      {showIntermediaryModal && (
+        <div
+          className="fixed inset-0 z-[55] flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-3"
+          onClick={() => {
+            if (!submitting && !intermediariesLoading) setShowIntermediaryModal(false);
+          }}
+        >
+          <div
+            className="max-h-[min(88dvh,760px)] w-full max-w-lg overflow-y-auto rounded-t-[28px] bg-white p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-[0_-20px_60px_-30px_rgba(15,23,42,.45)] dark:bg-slate-950 sm:rounded-[28px] sm:pb-5"
+            onClick={event => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[11px] font-black uppercase tracking-[0.12em] text-[color:var(--app-accent)]">
+                  {locale === 'id' ? 'CARA TRANSAKSI' : 'TRANSACTION MODE'}
+                </p>
+                <h2 className="mt-1 text-xl font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                  {locale === 'id' ? 'Mau pakai perantara Lajukan?' : 'Use a Lajukan intermediary?'}
+                </h2>
+                <p className="mt-1 text-sm leading-5 text-[color:var(--app-text-soft)]">
+                  {locale === 'id'
+                    ? 'Pilih perantara agar dana ditahan di custody Lajukan sampai proses dinyatakan selesai.'
+                    : 'Choose an intermediary so funds stay in Lajukan custody until the transaction is completed.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={intermediariesLoading}
+                onClick={() => setShowIntermediaryModal(false)}
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] disabled:opacity-50"
+                aria-label={locale === 'id' ? 'Tutup' : 'Close'}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-2.5">
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-3.5 dark:border-emerald-400/20 dark:bg-emerald-400/10">
+                <div className="flex items-start gap-3">
+                  <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700 dark:text-emerald-300" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-black text-emerald-950 dark:text-emerald-100">
+                      {locale === 'id' ? 'Pakai perantara Lajukan' : 'Use Lajukan intermediary'}
+                    </p>
+                    <p className="mt-1 text-xs leading-5 text-emerald-900/80 dark:text-emerald-100/80">
+                      {locale === 'id'
+                        ? 'Perantara memantau proses. Dana ditahan di custody akun perantara, lalu dilepas ke penerima setelah proses selesai.'
+                        : 'The intermediary monitors the process. Funds stay in the intermediary custody balance and are released to the recipient after completion.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {intermediariesLoading ? (
+                <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-4 text-center text-xs font-semibold text-[color:var(--app-text-soft)]">
+                  {locale === 'id' ? 'Memuat akun perantara...' : 'Loading intermediary accounts...'}
+                </div>
+              ) : intermediaries.length ? (
+                <div className="grid gap-2">
+                  {intermediaries.map(option => (
+                    <button
+                      key={option.email}
+                      type="button"
+                      onClick={() => chooseIntermediaryMode('managed', option.email)}
+                      className="flex w-full items-start gap-3 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface)] p-3 text-left transition hover:border-emerald-300 hover:bg-emerald-50/50 dark:hover:bg-emerald-400/5"
+                    >
+                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300">
+                        <ShieldCheck className="h-4 w-4" />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-sm font-black text-[color:var(--app-text)]">
+                          {option.display_name || 'Perantara Lajukan'}
+                        </span>
+                        <span className="mt-0.5 block truncate text-xs font-semibold text-[color:var(--app-text-soft)]">
+                          {option.email}
+                        </span>
+                        {option.note ? (
+                          <span className="mt-1 block text-[10px] leading-4 text-[color:var(--app-text-soft)]">
+                            {option.note}
+                          </span>
+                        ) : null}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+
+              {intermediariesError ? (
+                <p className="rounded-xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 dark:bg-red-950/30 dark:text-red-300">
+                  {intermediariesError}
+                </p>
+              ) : null}
+
+              <div className="rounded-2xl border border-amber-200 bg-amber-50/80 p-3.5 dark:border-amber-400/20 dark:bg-amber-400/10">
+                <div className="flex items-start gap-3">
+                  <Handshake className="mt-0.5 h-5 w-5 shrink-0 text-amber-700 dark:text-amber-300" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-black text-amber-950 dark:text-amber-100">
+                      {locale === 'id' ? 'Tanpa perantara / COD' : 'Without intermediary / COD'}
+                    </p>
+                    <p className="mt-1 text-xs leading-5 text-amber-900/80 dark:text-amber-100/80">
+                      {locale === 'id'
+                        ? 'Pastikan COD, cek barang, identitas, dan bukti transaksi. Penipuan atau pembayaran di luar flow perantara Lajukan menjadi tanggung jawab para pihak dan tidak dilindungi custody Lajukan.'
+                        : 'Prefer COD and verify the item, identity, and payment evidence. Fraud or payments outside the Lajukan intermediary flow remain the parties\' responsibility and are not protected by Lajukan custody.'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => chooseIntermediaryMode('direct')}
+                  className="mt-3 inline-flex min-h-10 w-full items-center justify-center rounded-xl border border-amber-300 bg-white px-3 text-xs font-black text-amber-900 dark:border-amber-400/30 dark:bg-slate-950 dark:text-amber-100"
+                >
+                  {locale === 'id' ? 'Lanjut tanpa perantara' : 'Continue without intermediary'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showOfferModal && (
         <div
           className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-3"
