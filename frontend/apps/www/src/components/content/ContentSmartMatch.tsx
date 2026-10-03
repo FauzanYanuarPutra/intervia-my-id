@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ArrowRight, Check, MapPin, Sparkles, ThumbsDown } from 'lucide-react';
+import { ArrowRight, Check, Image as ImageIcon, MapPin, Sparkles, ThumbsDown } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 
 type SmartMatch = {
@@ -9,6 +9,7 @@ type SmartMatch = {
   title: string;
   summary?: string | null;
   content_type?: string;
+  cover_image?: string | null;
   price_cents?: number | null;
   currency?: string;
   city?: string | null;
@@ -284,23 +285,23 @@ export function ContentSmartMatch({
     : locale === 'id' ? 'Yang mungkin sedang membutuhkan' : 'People who may need this';
 
   return (
-    <section className="overflow-hidden rounded-[18px] border border-emerald-200/70 bg-emerald-50/60 p-3.5 shadow-sm dark:border-emerald-400/20 dark:bg-emerald-500/5 sm:rounded-[22px] sm:p-4" data-testid="content-smart-match">
+    <section className="overflow-hidden rounded-[22px] bg-gradient-to-br from-emerald-700 via-emerald-800 to-emerald-950 text-white shadow-[0_18px_50px_-28px_rgba(4,120,87,0.65)]" data-testid="content-smart-match">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-300">
+          <div className="flex items-center gap-2 text-emerald-100">
             <Sparkles className="h-4 w-4 shrink-0" />
-            <span className="text-[11px] font-black uppercase tracking-[0.12em]">
+            <span className="text-[10px] font-black uppercase tracking-[0.14em]">
               Smart Match
             </span>
           </div>
-          <h2 className="mt-1 text-base font-bold text-[color:var(--app-text)] sm:text-lg">{title}</h2>
-          <p className="mt-1 text-xs leading-5 text-[color:var(--app-text-soft)]">
+          <h2 className="mt-0.5 text-base font-black text-white sm:text-lg">{title}</h2>
+          <p className="mt-2 text-[11px] leading-4.5 text-emerald-50/85">
             {locale === 'id'
-              ? 'Lajukan mencocokkan isi, kategori, lokasi, harga, ketersediaan, kualitas listing, lalu AI menyempurnakan urutan kandidat teratas.'
-              : 'Lajukan compares semantic fit, category, location, price, availability, and listing quality, then AI reranks the top candidates.'}
+              ? 'Pilihan listing yang paling relevan dari isi, lokasi, harga, dan kualitas.'
+              : 'The most relevant listings based on content, location, price, and quality.'}
           </p>
         </div>
-        <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-emerald-700 ring-1 ring-emerald-200 dark:bg-white/5 dark:text-emerald-300 dark:ring-emerald-300/20">
+        <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[10px] font-black text-emerald-800 shadow-sm">
           {loading ? '...' : aiLoading ? 'AI merapikan...' : `${payload?.count ?? results.length} match`}
         </span>
       </div>
@@ -308,7 +309,7 @@ export function ContentSmartMatch({
       {!loading && results.length > 1 ? (
         <Link
           href={`/content/${contentId}/matches`}
-          className="mb-2 flex items-center justify-between rounded-2xl bg-white px-3 py-2.5 text-xs font-black text-emerald-700 ring-1 ring-emerald-200 transition hover:bg-emerald-50 dark:bg-slate-950 dark:text-emerald-300 dark:ring-emerald-400/20"
+          className="mb-2 flex items-center justify-between rounded-xl bg-white/10 px-3 py-2.5 text-[11px] font-black text-white ring-1 ring-white/10 transition hover:bg-white/15"
         >
           <span>Lihat & bandingkan {results.length} match</span>
           <ArrowRight className="h-3.5 w-3.5" />
@@ -316,13 +317,13 @@ export function ContentSmartMatch({
       ) : null}
 
       {!loading && results.length === 0 ? (
-        <div className="mt-3 rounded-2xl bg-white/80 p-3 ring-1 ring-emerald-200/70 dark:bg-slate-950 dark:ring-emerald-400/20">
-          <p className="text-xs font-bold text-[color:var(--app-text)]">
+        <div className="mt-3 rounded-2xl border border-dashed border-white/20 bg-white/[0.07] p-3.5">
+          <p className="text-xs font-black text-white">
             {requestError
               ? locale === 'id' ? 'Smart Match belum bisa mengambil data.' : 'Smart Match could not load the data.'
               : locale === 'id' ? 'Belum ada match yang sangat kuat — kandidat yang masih relevan tetap ditampilkan.' : 'No very strong match yet — relevant lower-score candidates are still shown.'}
           </p>
-          <p className="mt-1 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
+          <p className="mt-1 text-[11px] leading-5 text-emerald-50/70">
             {requestError
               ? locale === 'id' ? 'Coba buka lagi beberapa saat. Fitur ini tetap aktif di belakang layar.' : 'Try again shortly. The matching engine remains active in the background.'
               : locale === 'id' ? 'Semakin sering kamu menekan Sesuai atau Tidak sesuai, semakin jelas sinyal yang dipakai Lajukan untuk mengurutkan kandidat berikutnya.' : 'The more you mark matches as suitable or unsuitable, the better Lajukan can learn your preference for future rankings.'}
@@ -332,7 +333,7 @@ export function ContentSmartMatch({
 
       <div className="mt-3 flex gap-1.5 overflow-x-auto pb-1">
         {([
-          ['worth', locale === 'id' ? 'Paling worth it' : 'Best value'],
+          ['worth', locale === 'id' ? 'Paling cocok' : 'Best fit'],
           ['similarity', locale === 'id' ? 'Paling mirip' : 'Most similar'],
           ['nearest', locale === 'id' ? 'Terdekat' : 'Nearest'],
           ['cheapest', locale === 'id' ? 'Harga' : 'Price'],
@@ -341,7 +342,7 @@ export function ContentSmartMatch({
             key={value}
             type="button"
             onClick={() => setSort(value)}
-            className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-bold transition ${sort === value ? 'bg-emerald-700 text-white' : 'bg-white text-[color:var(--app-text-soft)] ring-1 ring-slate-200 dark:bg-slate-950 dark:ring-slate-800'}`}
+            className={`shrink-0 rounded-full px-3 py-1.5 text-[10px] font-black transition ${sort === value ? 'bg-white text-emerald-800 shadow-sm' : 'bg-white/10 text-emerald-50 ring-1 ring-white/10 hover:bg-white/15'}`}
           >
             {label}
           </button>
@@ -357,9 +358,28 @@ export function ContentSmartMatch({
           {displayResults.slice(0, 6).map(match => (
             <article
               key={match.id}
-              className="group min-w-0 rounded-2xl bg-white p-3 ring-1 ring-slate-200/80 transition hover:-translate-y-0.5 hover:shadow-md dark:bg-slate-950 dark:ring-slate-800"
+              className="group relative min-w-0 overflow-hidden rounded-2xl bg-white p-3 text-slate-950 shadow-sm ring-1 ring-white/10 transition hover:-translate-y-0.5 hover:shadow-lg"
             >
-              <div className="flex items-start justify-between gap-2">
+              <Link
+                href={`/content/${match.id}`}
+                aria-label={match.title}
+                className="absolute left-3 top-3 h-20 w-20 overflow-hidden rounded-xl bg-slate-100 sm:h-24 sm:w-24"
+              >
+                {match.cover_image?.trim() ? (
+                  <img
+                    src={match.cover_image.trim()}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                  />
+                ) : (
+                  <span className="grid h-full w-full place-items-center bg-gradient-to-br from-emerald-50 to-slate-100 text-emerald-700">
+                    <ImageIcon className="h-6 w-6" />
+                  </span>
+                )}
+              </Link>
+              <div className="flex min-h-20 items-start justify-between gap-2 pl-[92px] sm:min-h-24 sm:pl-[112px]">
                 <div className="min-w-0">
                   <Link
                     href={`/content/${match.id}`}
@@ -367,7 +387,7 @@ export function ContentSmartMatch({
                   >
                     {match.title}
                   </Link>
-                  <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-semibold text-[color:var(--app-text-soft)]">
+                  <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-semibold text-slate-500">
                     {match.city ? <span>{match.city}</span> : null}
                     {match.distance_km != null ? <span className="inline-flex items-center gap-0.5"><MapPin className="h-3 w-3" />{match.distance_km < 1 ? '<1 km' : `${match.distance_km} km`}</span> : null}
                   </div>
@@ -382,7 +402,7 @@ export function ContentSmartMatch({
                 </span>
               </div>
 
-              <div className="mt-2 flex items-center justify-between gap-2">
+              <div className="mt-2 flex items-center justify-between gap-2 pl-[92px] sm:pl-[112px]">
                 <span className="truncate text-xs font-bold text-[color:var(--app-text)]">{budgetLabel(match) || (locale === 'id' ? 'Harga nego' : 'Negotiable')}</span>
                 <Link
                   href={`/content/${match.id}`}
@@ -401,7 +421,7 @@ export function ContentSmartMatch({
                   className={`inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl px-2 text-[10px] font-black transition disabled:opacity-50 ${
                     match.viewer_feedback === 'approved'
                       ? 'bg-emerald-700 text-white'
-                      : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-400/20'
+                      : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100'
                   }`}
                 >
                   <Check className="h-3.5 w-3.5" />
@@ -414,7 +434,7 @@ export function ContentSmartMatch({
                   className={`inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl px-2 text-[10px] font-black transition disabled:opacity-50 ${
                     match.viewer_feedback === 'rejected'
                       ? 'bg-slate-700 text-white'
-                      : 'bg-slate-50 text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100 dark:bg-white/5 dark:text-white/70 dark:ring-white/10'
+                      : 'bg-slate-50 text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100'
                   }`}
                 >
                   <ThumbsDown className="h-3.5 w-3.5" />
@@ -422,7 +442,7 @@ export function ContentSmartMatch({
                 </button>
               </div>
               {aiAssessment.get(match.id)?.reason || match.reasons?.[0] ? (
-                <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-[color:var(--app-text-soft)]">
+                <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-slate-500">
                   {aiAssessment.get(match.id)?.reason || match.reasons?.[0]}
                   {match.similarity_score != null
                     ? ' · Mirip ' +
