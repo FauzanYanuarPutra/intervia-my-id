@@ -1053,7 +1053,6 @@ export default function ContentDetailClient({
     setOfferAmount('');
     setOfferMessage('');
     setOfferError(null);
-    setShowDealChoiceModal(false);
     setShowOfferModal(true);
   };
 
