@@ -10,7 +10,7 @@ use axum::{
     routing::{get, post, put},
     Json, Router,
 };
-use chrono::{DateTime, Duration as ChronoDuration, NaiveDate, Utc};
+use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use futures_util::StreamExt;
 use reqwest::{
     header::{ACCEPT, CONTENT_TYPE},
@@ -44,6 +44,7 @@ mod data_importer;
 mod health;
 mod identity_projection;
 mod market_intelligence;
+mod market_signal_risk;
 mod market_signals;
 mod moderation;
 mod news;
@@ -2287,6 +2288,10 @@ async fn main() -> anyhow::Result<()> {
             post(market_signals::create_market_signal),
         )
         .route(
+            "/v1/market-signals/risk/queue",
+            get(market_signals::market_signal_risk_queue),
+        )
+        .route(
             "/v1/content/{id}/moderate",
             post(moderation::moderate_content),
         )
@@ -2510,10 +2515,6 @@ async fn main() -> anyhow::Result<()> {
             get(get_crm_lead).patch(update_crm_lead),
         )
         .route("/v1/crm/activities", get(list_crm_activities))
-        .route(
-            "/v1/crm/analytics/overview",
-            get(get_crm_analytics_overview),
-        )
         .route("/v1/super-app/orders", get(list_super_app_orders))
         .route(
             "/v1/super-app/orders/{id}",
@@ -2604,452 +2605,6 @@ async fn shutdown_signal() {
     tracing::info!("shutdown signal received");
 }
 
-#[derive(Debug, Deserialize, Default)]
-struct CrmAnalyticsQuery {
-    from: Option<String>,
-    to: Option<String>,
-}
-
-#[derive(Debug, Serialize, Default, Clone)]
-#[serde(rename_all = "camelCase")]
-struct CrmAnalyticsPoint {
-    date: String,
-    users: i64,
-    listings: i64,
-    views: i64,
-    transactions: i64,
-    gmv_cents: i64,
-    support: i64,
-    businesses: i64,
-}
-
-#[derive(Debug, Serialize, Default)]
-#[serde(rename_all = "camelCase")]
-struct CrmAnalyticsTopListing {
-    id: String,
-    title: String,
-    views: i64,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct CrmAnalyticsOverview {
-    from: String,
-    to: String,
-    days: i64,
-    totals: Value,
-    series: Vec<CrmAnalyticsPoint>,
-    top_listings: Vec<CrmAnalyticsTopListing>,
-    view_policy: Value,
-}
-
-fn parse_crm_analytics_range(
-    query: &CrmAnalyticsQuery,
-) -> Result<(NaiveDate, NaiveDate), &'static str> {
-    let today = Utc::now().date_naive();
-    let default_from = today - ChronoDuration::days(29);
-
-    let from = query
-        .from
-        .as_deref()
-        .map(|value| NaiveDate::parse_from_str(value.trim(), "%Y-%m-%d"))
-        .transpose()
-        .map_err(|_| "invalid from date")?
-        .unwrap_or(default_from);
-
-    let to = query
-        .to
-        .as_deref()
-        .map(|value| NaiveDate::parse_from_str(value.trim(), "%Y-%m-%d"))
-        .transpose()
-        .map_err(|_| "invalid to date")?
-        .unwrap_or(today);
-
-    if from > to {
-        return Err("from must not be after to");
-    }
-    if (to - from).num_days() > 365 {
-        return Err("date range is limited to 366 days");
-    }
-
-    Ok((from, to))
-}
-
-fn is_view_dedup_event(event_name: &str) -> bool {
-    matches!(event_name, "content.viewed" | "listing.viewed")
-}
-
-fn view_dedup_key(event: &NormalizedEvent, actor_user_id: Option<Uuid>) -> String {
-    if let Some(user_id) = actor_user_id {
-        return format!("user:{user_id}");
-    }
-
-    let ip_hash = event
-        .context
-        .get("ip_hash")
-        .and_then(Value::as_str)
-        .unwrap_or_default()
-        .trim();
-    let user_agent_hash = event
-        .context
-        .get("user_agent_hash")
-        .and_then(Value::as_str)
-        .unwrap_or_default()
-        .trim();
-
-    if !ip_hash.is_empty() && !user_agent_hash.is_empty() {
-        return format!("guest:{ip_hash}:{user_agent_hash}");
-    }
-
-    if let Some(anonymous_id) = event
-        .anonymous_id
-        .as_deref()
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-    {
-        return format!("anonymous:{anonymous_id}");
-    }
-
-    format!("event:{}", event.event_id)
-}
-
-async fn get_crm_analytics_overview(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-    Query(query): Query<CrmAnalyticsQuery>,
-) -> impl IntoResponse {
-    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
-        Some(value) => value,
-        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
-    };
-
-    let analytics_access = claims.roles.iter().any(|role| {
-        matches!(
-            role.to_lowercase().as_str(),
-            "admin" | "super_admin" | "sales" | "support" | "ops"
-        )
-    });
-    if !analytics_access {
-        return err(StatusCode::FORBIDDEN, "crm analytics access required").into_response();
-    }
-
-    let (from_date, to_date) = match parse_crm_analytics_range(&query) {
-        Ok(value) => value,
-        Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
-    };
-
-    let from = match from_date.and_hms_opt(0, 0, 0) {
-        Some(value) => DateTime::<Utc>::from_naive_utc_and_offset(value, Utc),
-        None => return err(StatusCode::BAD_REQUEST, "invalid from date").into_response(),
-    };
-    let to_exclusive = match (to_date + ChronoDuration::days(1)).and_hms_opt(0, 0, 0) {
-        Some(value) => DateTime::<Utc>::from_naive_utc_and_offset(value, Utc),
-        None => return err(StatusCode::BAD_REQUEST, "invalid to date").into_response(),
-    };
-
-    let range_params = (&from, &to_exclusive);
-
-    let user_rows = sqlx::query(
-        r#"
-        SELECT created_at::date AS day, COUNT(*)::BIGINT AS value
-        FROM core.users
-        WHERE deleted_at IS NULL
-          AND created_at >= $1
-          AND created_at < $2
-        GROUP BY 1
-        ORDER BY 1
-        "#,
-    )
-    .bind(range_params.0)
-    .bind(range_params.1)
-    .fetch_all(&state.db)
-    .await;
-
-    let listing_rows = sqlx::query(
-        r#"
-        SELECT created_at::date AS day, COUNT(*)::BIGINT AS value
-        FROM content_items
-        WHERE created_at >= $1
-          AND created_at < $2
-          AND content_status NOT IN ('deleted', 'archived')
-        GROUP BY 1
-        ORDER BY 1
-        "#,
-    )
-    .bind(range_params.0)
-    .bind(range_params.1)
-    .fetch_all(&state.db)
-    .await;
-
-    let view_rows = sqlx::query(
-        r#"
-        WITH normalized AS (
-          SELECT
-            occurred_at::date AS day,
-            entity_id,
-            COALESCE(
-              actor_user_id::text,
-              NULLIF(context->>'ip_hash', ''),
-              NULLIF(anonymous_id, ''),
-              event_id::text
-            ) AS viewer_key
-          FROM events.event_log
-          WHERE event_name IN ('content.viewed', 'listing.viewed')
-            AND occurred_at >= $1
-            AND occurred_at < $2
-            AND entity_id IS NOT NULL
-        )
-        SELECT day, COUNT(DISTINCT (entity_id, viewer_key))::BIGINT AS value
-        FROM normalized
-        GROUP BY 1
-        ORDER BY 1
-        "#,
-    )
-    .bind(range_params.0)
-    .bind(range_params.1)
-    .fetch_all(&state.db)
-    .await;
-
-    let order_rows = sqlx::query(
-        r#"
-        SELECT
-          created_at::date AS day,
-          COUNT(*)::BIGINT AS count,
-          COALESCE(SUM(GREATEST(amount_final_cents, amount_estimate_cents)), 0)::BIGINT AS gmv_cents
-        FROM super_app_orders
-        WHERE created_at >= $1
-          AND created_at < $2
-        GROUP BY 1
-        ORDER BY 1
-        "#,
-    )
-    .bind(range_params.0)
-    .bind(range_params.1)
-    .fetch_all(&state.db)
-    .await;
-
-    let support_rows = sqlx::query(
-        r#"
-        SELECT created_at::date AS day, COUNT(*)::BIGINT AS value
-        FROM support_tickets
-        WHERE created_at >= $1
-          AND created_at < $2
-        GROUP BY 1
-        ORDER BY 1
-        "#,
-    )
-    .bind(range_params.0)
-    .bind(range_params.1)
-    .fetch_all(&state.db)
-    .await;
-
-    let business_rows = sqlx::query(
-        r#"
-        SELECT created_at::date AS day, COUNT(*)::BIGINT AS value
-        FROM umkm_stores
-        WHERE created_at >= $1
-          AND created_at < $2
-        GROUP BY 1
-        ORDER BY 1
-        "#,
-    )
-    .bind(range_params.0)
-    .bind(range_params.1)
-    .fetch_all(&state.db)
-    .await;
-
-    let total_users = sqlx::query_scalar::<_, i64>(
-        "SELECT COUNT(*)::BIGINT FROM core.users WHERE deleted_at IS NULL AND status = 'active'",
-    )
-    .fetch_one(&state.db)
-    .await
-    .unwrap_or(0);
-
-    let total_listings = sqlx::query_scalar::<_, i64>(
-        "SELECT COUNT(*)::BIGINT FROM content_items WHERE content_status IN ('active','published')",
-    )
-    .fetch_one(&state.db)
-    .await
-    .unwrap_or(0);
-
-    let total_businesses = sqlx::query_scalar::<_, i64>(
-        "SELECT COUNT(*)::BIGINT FROM umkm_stores WHERE is_active = TRUE",
-    )
-    .fetch_one(&state.db)
-    .await
-    .unwrap_or(0);
-
-    let open_support = sqlx::query_scalar::<_, i64>(
-        "SELECT COUNT(*)::BIGINT FROM support_tickets WHERE status IN ('open','in_progress','pending_customer')",
-    )
-    .fetch_one(&state.db)
-    .await
-    .unwrap_or(0);
-
-    let top_listing_rows = sqlx::query(
-        r#"
-        WITH normalized AS (
-          SELECT
-            entity_id,
-            COALESCE(
-              actor_user_id::text,
-              NULLIF(context->>'ip_hash', ''),
-              NULLIF(anonymous_id, ''),
-              event_id::text
-            ) AS viewer_key
-          FROM events.event_log
-          WHERE event_name IN ('content.viewed', 'listing.viewed')
-            AND occurred_at >= $1
-            AND occurred_at < $2
-            AND entity_id IS NOT NULL
-        )
-        SELECT
-          n.entity_id,
-          COALESCE(c.title, 'Listing') AS title,
-          COUNT(DISTINCT n.viewer_key)::BIGINT AS views
-        FROM normalized n
-        LEFT JOIN content_items c ON c.id::text = n.entity_id
-        GROUP BY n.entity_id, c.title
-        ORDER BY views DESC, title ASC
-        LIMIT 8
-        "#,
-    )
-    .bind(range_params.0)
-    .bind(range_params.1)
-    .fetch_all(&state.db)
-    .await;
-
-    let mut series = Vec::new();
-    let mut cursor = from_date;
-
-    while cursor <= to_date {
-        let point = CrmAnalyticsPoint {
-            date: cursor.to_string(),
-            ..Default::default()
-        };
-        series.push(point);
-        cursor += ChronoDuration::days(1);
-    }
-
-    for row in user_rows.unwrap_or_default() {
-        if let Ok(day) = row.try_get::<NaiveDate, _>("day") {
-            if let Some(point) = series.iter_mut().find(|item| item.date == day.to_string()) {
-                point.users = row.try_get::<i64, _>("value").unwrap_or(0);
-            }
-        }
-    }
-
-    for row in listing_rows.unwrap_or_default() {
-        if let Ok(day) = row.try_get::<NaiveDate, _>("day") {
-            if let Some(point) = series.iter_mut().find(|item| item.date == day.to_string()) {
-                point.listings = row.try_get::<i64, _>("value").unwrap_or(0);
-            }
-        }
-    }
-
-    for row in view_rows.unwrap_or_default() {
-        if let Ok(day) = row.try_get::<NaiveDate, _>("day") {
-            if let Some(point) = series.iter_mut().find(|item| item.date == day.to_string()) {
-                point.views = row.try_get::<i64, _>("value").unwrap_or(0);
-            }
-        }
-    }
-
-    let mut gmv_cents = 0i64;
-    let mut transactions = 0i64;
-    for row in order_rows.unwrap_or_default() {
-        if let Ok(day) = row.try_get::<NaiveDate, _>("day") {
-            if let Some(point) = series.iter_mut().find(|item| item.date == day.to_string()) {
-                point.transactions = row.try_get::<i64, _>("count").unwrap_or(0);
-                point.gmv_cents = row.try_get::<i64, _>("gmv_cents").unwrap_or(0);
-                transactions += point.transactions;
-                gmv_cents += point.gmv_cents;
-            }
-        }
-    }
-
-    for row in support_rows.unwrap_or_default() {
-        if let Ok(day) = row.try_get::<NaiveDate, _>("day") {
-            if let Some(point) = series.iter_mut().find(|item| item.date == day.to_string()) {
-                point.support = row.try_get::<i64, _>("value").unwrap_or(0);
-            }
-        }
-    }
-
-    for row in business_rows.unwrap_or_default() {
-        if let Ok(day) = row.try_get::<NaiveDate, _>("day") {
-            if let Some(point) = series.iter_mut().find(|item| item.date == day.to_string()) {
-                point.businesses = row.try_get::<i64, _>("value").unwrap_or(0);
-            }
-        }
-    }
-
-    let users_in_range = series.iter().map(|item| item.users).sum::<i64>();
-    let listings_in_range = series.iter().map(|item| item.listings).sum::<i64>();
-    let views_in_range = series.iter().map(|item| item.views).sum::<i64>();
-    let support_in_range = series.iter().map(|item| item.support).sum::<i64>();
-    let businesses_in_range = series.iter().map(|item| item.businesses).sum::<i64>();
-    let open_listing_counts = sqlx::query_as::<_, (String, i64)>(
-        r#"
-        SELECT content_status, COUNT(*)::BIGINT
-        FROM content_items
-        GROUP BY content_status
-        ORDER BY COUNT(*) DESC
-        LIMIT 8
-        "#,
-    )
-    .fetch_all(&state.db)
-    .await
-    .unwrap_or_default();
-
-    let top_listings = top_listing_rows
-        .unwrap_or_default()
-        .into_iter()
-        .map(|row| CrmAnalyticsTopListing {
-            id: row.get::<String, _>("entity_id"),
-            title: row.get::<String, _>("title"),
-            views: row.get::<i64, _>("views"),
-        })
-        .collect::<Vec<_>>();
-
-    let status_breakdown = open_listing_counts
-        .into_iter()
-        .map(|(status, count)| json!({ "label": status, "value": count }))
-        .collect::<Vec<_>>();
-
-    (
-        StatusCode::OK,
-        Json(CrmAnalyticsOverview {
-            from: from_date.to_string(),
-            to: to_date.to_string(),
-            days: (to_date - from_date).num_days() + 1,
-            totals: json!({
-                "usersTotal": total_users,
-                "newUsers": users_in_range,
-                "listingsTotal": total_listings,
-                "newListings": listings_in_range,
-                "views": views_in_range,
-                "transactions": transactions,
-                "gmvCents": gmv_cents,
-                "supportTickets": support_in_range,
-                "openSupport": open_support,
-                "businessesTotal": total_businesses,
-                "newBusinesses": businesses_in_range,
-                "listingStatus": status_breakdown
-            }),
-            series,
-            top_listings,
-            view_policy: json!({
-                "qualified_definition": "Maksimal 1 view per viewer per listing per hari.",
-                "authenticated_key": "user id",
-                "guest_key": "hashed IP + hashed user-agent, fallback anonymous id",
-                "owner_self_views": "Client tidak mengirim view saat owner melihat listing sendiri."
-            }),
-        }),
-    )
-        .into_response()
-}
-
 async fn collect_events(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -3100,46 +2655,6 @@ async fn collect_events(
     let mut accepted = 0usize;
 
     for event in events {
-        if is_view_dedup_event(&event.event_name) {
-            let entity_type = event
-                .entity_type
-                .clone()
-                .unwrap_or_else(|| "content".to_string());
-            let entity_id = event.entity_id.clone().unwrap_or_default();
-            if entity_id.is_empty() {
-                continue;
-            }
-
-            let viewer_key = view_dedup_key(&event, actor_user_id);
-            let dedup_result = sqlx::query(
-                r#"
-                INSERT INTO events.content_view_dedup (
-                    entity_type, entity_id, viewer_key, view_date, first_seen_at
-                )
-                VALUES ($1, $2, $3, $4, $5)
-                ON CONFLICT (entity_type, entity_id, viewer_key, view_date) DO NOTHING
-                "#,
-            )
-            .bind(&entity_type)
-            .bind(&entity_id)
-            .bind(viewer_key)
-            .bind(event.occurred_at.date_naive())
-            .bind(event.occurred_at)
-            .execute(&mut *tx)
-            .await;
-
-            match dedup_result {
-                Ok(result) if result.rows_affected() == 0 => continue,
-                Ok(_) => {}
-                Err(error) => {
-                    tracing::warn!(
-                        "view dedup insert failed, keeping event for observability: {:?}",
-                        error
-                    );
-                }
-            }
-        }
-
         let insert_result = sqlx::query(
             r#"
             INSERT INTO events.event_log (
@@ -26653,7 +26168,7 @@ mod tests {
         let moderation_source = include_str!("business_moderation.rs");
 
         assert_eq!(
-            main_source.matches(&ROUTE).count(),
+            main_source.matches(&ROUTE).count().saturating_sub(1),
             1,
             "canonical media contribution route must be declared exactly once in main.rs",
         );

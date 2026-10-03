@@ -10,19 +10,17 @@ use sqlx::Row;
 use std::sync::Arc;
 use uuid::Uuid;
 
-use super::{auth::user_id_from_auth, AppState};
+use super::{auth::user_id_from_auth, market_signal_risk, AppState};
 
 #[derive(Debug, Deserialize)]
 pub struct CreateMarketSignal {
     pub signal_type: Option<String>,
+    pub market_side: Option<String>,
     pub amount_cents: Option<i64>,
     pub currency: Option<String>,
     pub quantity: Option<f64>,
     pub quantity_unit: Option<String>,
     pub source: Option<String>,
-    /// Optional explicit market side supplied by the client.
-    /// When omitted, the server derives it from listing metadata.
-    pub market_side: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -55,7 +53,7 @@ fn median(mut values: Vec<i64>) -> Option<i64> {
     }
     values.sort_unstable();
     let middle = values.len() / 2;
-    if values.len() % 2 == 0 {
+    if values.len().is_multiple_of(2) {
         Some(((values[middle - 1] as i128 + values[middle] as i128) / 2) as i64)
     } else {
         Some(values[middle])
@@ -103,6 +101,17 @@ pub async fn create_market_signal(
         return (
             StatusCode::BAD_REQUEST,
             Json(json!({"error": "quantity must be positive"})),
+        )
+            .into_response();
+    }
+
+    if payload
+        .amount_cents
+        .is_some_and(|v| v > 10_000_000_000_000_000)
+    {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "amount_cents is outside supported range"})),
         )
             .into_response();
     }
@@ -217,14 +226,36 @@ pub async fn create_market_signal(
         .and_then(|v| v.to_str().ok())
         .and_then(|v| clean_text(Some(v), 160));
 
+    let risk = match market_signal_risk::evaluate_signal(
+        &state.db,
+        actor_id,
+        content_id,
+        payload.amount_cents,
+        payload.quantity,
+    )
+    .await
+    {
+        Ok(value) => value,
+        Err(error) => {
+            tracing::warn!("market signal risk evaluation failed: {:?}", error);
+            return (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(json!({"error": "market signal risk check unavailable"})),
+            )
+                .into_response();
+        }
+    };
+
+    let risk_reasons = serde_json::to_value(&risk.reasons).unwrap_or_else(|_| json!([]));
     let signal_id = Uuid::new_v4();
 
     let insert = sqlx::query(
         r#"
         INSERT INTO market_negotiation_signals
           (id, content_id, actor_id, signal_side, signal_type, amount_cents, currency,
-           quantity, quantity_unit, city, category, price_unit, source, idempotency_key)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+           quantity, quantity_unit, city, category, price_unit, source, idempotency_key,
+           risk_score, risk_decision, risk_reasons, eligible_for_market, risk_evaluated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, NOW())
         ON CONFLICT (idempotency_key) DO NOTHING
         RETURNING id, created_at
         "#,
@@ -243,22 +274,48 @@ pub async fn create_market_signal(
     .bind(price_unit)
     .bind(source)
     .bind(idempotency_key)
+    .bind(risk.score)
+    .bind(risk.decision)
+    .bind(&risk_reasons)
+    .bind(risk.eligible_for_market)
     .fetch_optional(&state.db)
     .await;
 
     match insert {
-        Ok(Some(row)) => (
-            StatusCode::CREATED,
-            Json(json!({
-                "id": row.get::<Uuid, _>("id"),
-                "content_id": content_id,
-                "signal_side": signal_side,
-                "signal_type": signal_type,
-                "created_at": row.get::<chrono::DateTime<chrono::Utc>, _>("created_at"),
-                "message": "Negotiation signal recorded"
-            })),
-        )
-            .into_response(),
+        Ok(Some(row)) => {
+            if risk.decision != "allow" {
+                let _ = sqlx::query(
+                    r#"
+                    INSERT INTO market_signal_risk_events
+                      (id, signal_id, actor_id, content_id, risk_score, decision, reasons)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7)
+                    "#,
+                )
+                .bind(Uuid::new_v4())
+                .bind(row.get::<Uuid, _>("id"))
+                .bind(actor_id)
+                .bind(content_id)
+                .bind(risk.score)
+                .bind(risk.decision)
+                .bind(&risk_reasons)
+                .execute(&state.db)
+                .await;
+            }
+
+            (
+                StatusCode::CREATED,
+                Json(json!({
+                    "id": row.get::<Uuid, _>("id"),
+                    "content_id": content_id,
+                    "signal_side": signal_side,
+                    "signal_type": signal_type,
+                    "risk_status": if risk.eligible_for_market { "accepted" } else { "review" },
+                    "created_at": row.get::<chrono::DateTime<chrono::Utc>, _>("created_at"),
+                    "message": "Negotiation signal recorded"
+                })),
+            )
+                .into_response()
+        }
         Ok(None) => (
             StatusCode::OK,
             Json(json!({
@@ -280,6 +337,93 @@ pub async fn create_market_signal(
     }
 }
 
+pub async fn market_signal_risk_queue(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    let Some(claims) = super::auth::auth_claims_from_headers(&headers, &state.jwt_secret) else {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({"error": "unauthorized"})),
+        )
+            .into_response();
+    };
+
+    let allowed = claims.roles.iter().any(|role| {
+        matches!(
+            role.trim().to_ascii_lowercase().as_str(),
+            "moderator" | "admin" | "super_admin"
+        )
+    }) || claims
+        .perms
+        .iter()
+        .any(|permission| permission.eq_ignore_ascii_case("market:risk:review"));
+
+    if !allowed {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({"error": "risk review permission required"})),
+        )
+            .into_response();
+    }
+
+    let rows = match sqlx::query(
+        r#"
+        SELECT
+          e.id,
+          e.signal_id,
+          e.actor_id,
+          e.content_id,
+          e.risk_score,
+          e.decision,
+          e.reasons,
+          e.created_at,
+          i.title,
+          i.owner_id
+        FROM market_signal_risk_events e
+        JOIN content_items i ON i.id = e.content_id
+        WHERE e.decision <> 'allow'
+        ORDER BY e.created_at DESC
+        LIMIT 100
+        "#,
+    )
+    .fetch_all(&state.db)
+    .await
+    {
+        Ok(value) => value,
+        Err(error) => {
+            tracing::error!("market signal risk queue failed: {:?}", error);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "risk queue unavailable"})),
+            )
+                .into_response();
+        }
+    };
+
+    let items = rows
+        .into_iter()
+        .map(|row| {
+            json!({
+                "id": row.get::<Uuid, _>("id"),
+                "signal_id": row.get::<Uuid, _>("signal_id"),
+                "actor_id": row.get::<Uuid, _>("actor_id"),
+                "content_id": row.get::<Uuid, _>("content_id"),
+                "risk_score": row.get::<i16, _>("risk_score"),
+                "decision": row.get::<String, _>("decision"),
+                "reasons": row.get::<serde_json::Value, _>("reasons"),
+                "created_at": row.get::<chrono::DateTime<chrono::Utc>, _>("created_at"),
+                "content": {
+                    "title": row.get::<String, _>("title"),
+                    "owner_id": row.get::<Uuid, _>("owner_id")
+                }
+            })
+        })
+        .collect::<Vec<_>>();
+
+    (StatusCode::OK, Json(json!({"items": items}))).into_response()
+}
+
 pub async fn market_signal_summary(
     state: &Arc<AppState>,
     category: Option<&str>,
@@ -296,6 +440,7 @@ pub async fn market_signal_summary(
           AND currency = $2
           AND amount_cents IS NOT NULL
           AND amount_cents > 0
+          AND eligible_for_market = TRUE
           AND ($3::text IS NULL OR category = $3)
           AND ($4::text IS NULL OR city = $4)
           AND ($5::text IS NULL OR price_unit = $5)

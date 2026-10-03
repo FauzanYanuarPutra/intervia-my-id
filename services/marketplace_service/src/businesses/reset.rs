@@ -93,7 +93,8 @@ pub(crate) enum ResetError {
 }
 
 impl From<sqlx::Error> for ResetError {
-    fn from(_: sqlx::Error) -> Self {
+    fn from(error: sqlx::Error) -> Self {
+        eprintln!("business data reset database error: {error:?}");
         Self::Database
     }
 }
@@ -494,6 +495,7 @@ impl DataResetRepository {
             .map(ExistingBatch::into_record)
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn run_scopes(
         &self,
         actor_id: Uuid,
@@ -873,6 +875,7 @@ impl ExistingBatch {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn compensate_finance_entries_tx(
     tx: &mut Transaction<'_, Postgres>,
     actor_id: Uuid,
@@ -889,10 +892,12 @@ async fn compensate_finance_entries_tx(
         SELECT entry.id,entry.entry_type,entry.account_key,entry.amount,entry.occurred_on,
                entry.note,entry.channel_key,entry.effect_multiplier,entry.allocation_bucket
         FROM business_finance_entries entry
-        LEFT JOIN business_finance_entry_corrections correction
-          ON correction.original_entry_id=entry.id
         WHERE entry.business_id=$1 AND entry.organization_id=$2
-          AND correction.original_entry_id IS NULL
+          AND NOT EXISTS (
+            SELECT 1
+            FROM business_finance_entry_corrections correction
+            WHERE correction.original_entry_id=entry.id
+          )
           AND (
             ($3 AND NOT lower(entry.entry_type) IN ('capital_income','owner_capital','owner_draw','owner_drawing')
                  AND COALESCE(entry.source_type,'') NOT LIKE 'business_sale%')

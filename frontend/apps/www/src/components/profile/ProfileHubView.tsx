@@ -3752,7 +3752,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                   item={item}
                   isId={isId}
                   following={
-                    socialModal === 'following' || followedIds.includes(item.id)
+                    socialModal === 'following' || followedIds.has(item.id)
                   }
                   onToggle={toggleFollow}
                 />
