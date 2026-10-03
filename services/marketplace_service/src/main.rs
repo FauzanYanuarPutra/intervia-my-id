@@ -2510,7 +2510,10 @@ async fn main() -> anyhow::Result<()> {
             get(get_crm_lead).patch(update_crm_lead),
         )
         .route("/v1/crm/activities", get(list_crm_activities))
-        .route("/v1/crm/analytics/overview", get(get_crm_analytics_overview))
+        .route(
+            "/v1/crm/analytics/overview",
+            get(get_crm_analytics_overview),
+        )
         .route("/v1/super-app/orders", get(list_super_app_orders))
         .route(
             "/v1/super-app/orders/{id}",
@@ -2601,7 +2604,6 @@ async fn shutdown_signal() {
     tracing::info!("shutdown signal received");
 }
 
-
 #[derive(Debug, Deserialize, Default)]
 struct CrmAnalyticsQuery {
     from: Option<String>,
@@ -2641,7 +2643,9 @@ struct CrmAnalyticsOverview {
     view_policy: Value,
 }
 
-fn parse_crm_analytics_range(query: &CrmAnalyticsQuery) -> Result<(NaiveDate, NaiveDate), &'static str> {
+fn parse_crm_analytics_range(
+    query: &CrmAnalyticsQuery,
+) -> Result<(NaiveDate, NaiveDate), &'static str> {
     let today = Utc::now().date_naive();
     let default_from = today - ChronoDuration::days(29);
 
@@ -3086,7 +3090,10 @@ async fn collect_events(
 
     for event in events {
         if is_view_dedup_event(&event.event_name) {
-            let entity_type = event.entity_type.clone().unwrap_or_else(|| "content".to_string());
+            let entity_type = event
+                .entity_type
+                .clone()
+                .unwrap_or_else(|| "content".to_string());
             let entity_id = event.entity_id.clone().unwrap_or_default();
             if entity_id.is_empty() {
                 continue;
@@ -3114,7 +3121,10 @@ async fn collect_events(
                 Ok(result) if result.rows_affected() == 0 => continue,
                 Ok(_) => {}
                 Err(error) => {
-                    tracing::warn!("view dedup insert failed, keeping event for observability: {:?}", error);
+                    tracing::warn!(
+                        "view dedup insert failed, keeping event for observability: {:?}",
+                        error
+                    );
                 }
             }
         }
