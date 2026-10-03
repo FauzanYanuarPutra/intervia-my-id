@@ -66,14 +66,36 @@ function asRecord(value: unknown): Record<string, unknown> {
 }
 
 function normalizeType(value: unknown): string {
-  const raw = cleanText(value, 80).toLowerCase();
-  if (raw === 'products' || raw === 'product') return 'product';
-  if (raw === 'services' || raw === 'service') return 'service';
-  if (raw === 'jobs' || raw === 'job') return 'job';
-  if (raw === 'property' || raw === 'properties') return 'property';
+  const raw = cleanText(value, 100).toLowerCase().replace(/[^a-z0-9_]+/g, '');
+  if (
+    ['product', 'products', 'produk', 'menawarkanproduk', 'menjualproduk', 'barang', 'jualan'].includes(raw)
+  ) return 'product';
+  if (
+    ['service', 'services', 'jasa', 'menawarkanjasa', 'menyediakanjasa', 'layanan'].includes(raw)
+  ) return 'service';
+  if (
+    ['job', 'jobs', 'lowongan', 'loker', 'menawarkanpekerjaan'].includes(raw)
+  ) return 'job';
+  if (['property', 'properties', 'properti', 'realestate', 'rumah', 'tanah'].includes(raw)) return 'property';
   if (raw.includes('rental') || raw.includes('sewa')) return 'tool_rental';
-  if (raw.includes('company') || raw.includes('business')) return 'company';
+  if (raw.includes('company') || raw.includes('business') || raw.includes('perusahaan')) return 'company';
   return raw || 'other';
+}
+
+function normalizePriceUnit(value: unknown): string {
+  const raw = cleanText(value, 80).toLowerCase().replace(/\s+/g, ' ');
+  if (!raw) return '';
+  if (['per proyek', 'proyek', 'project', 'per project'].includes(raw)) return 'project';
+  if (['per sesi', 'sesi', 'session'].includes(raw)) return 'session';
+  if (['per jam', 'jam', 'hour', 'per hour'].includes(raw)) return 'hour';
+  if (['per hari', 'hari', 'day', 'per day'].includes(raw)) return 'day';
+  if (['per bulan', 'bulan', 'month', 'per month'].includes(raw)) return 'month';
+  if (['per tahun', 'tahun', 'year', 'per year'].includes(raw)) return 'year';
+  if (['per kg', 'kg', 'kilogram', 'kilo'].includes(raw)) return 'kg';
+  if (['per pcs', 'pcs', 'piece', 'item'].includes(raw)) return 'pcs';
+  if (['per buah', 'buah'].includes(raw)) return 'pcs';
+  if (['liter', 'per liter', 'l'].includes(raw)) return 'liter';
+  return raw.replace(/^per\s+/, '');
 }
 
 function typeLabel(type: string): string {
@@ -102,7 +124,7 @@ function inferLocalQuality(item: Record<string, unknown>): Omit<QualityResult, '
   const combined = `${title} ${summary} ${body} ${JSON.stringify(formValues)}`.toLowerCase();
 
   const currentType = normalizeType(item.content_type || item.type);
-  const priceUnit = cleanText(item.price_unit || formValues.price_unit, 80).toLowerCase();
+  const priceUnit = normalizePriceUnit(item.price_unit || formValues.price_unit);
   const price = Number(item.price_cents);
 
   const productScore = scoreKeyword(combined, [
