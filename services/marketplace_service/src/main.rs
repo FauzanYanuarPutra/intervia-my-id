@@ -16042,6 +16042,19 @@ async fn fund_transaction(
     let merged_meta = merge_json_objects(
         txn.transaction_meta.clone(),
         json!({
+            "intermediary": if managed_intermediary {
+                json!({
+                    "mode": "managed",
+                    "status": "active",
+                    "funded_at": funded_at,
+                    "activated_by": user_id
+                })
+            } else {
+                txn.transaction_meta
+                    .get("intermediary")
+                    .cloned()
+                    .unwrap_or_else(|| json!({"mode": "direct", "status": "not_requested"}))
+            },
             "payment": {
                 "status": "paid",
                 "funded": true,
@@ -25319,7 +25332,11 @@ async fn update_transaction_status(
         }
     }
 
-    let protection_status = protection_status_for_transaction(next_status);
+    let protection_status = if managed_intermediary && next_status == "accepted" {
+        "awaiting_funding"
+    } else {
+        protection_status_for_transaction(next_status)
+    };
     let mut merged_transaction_meta = txn.transaction_meta.clone();
     if let Some(meta_patch) = transaction_meta_patch {
         merged_transaction_meta = merge_json_objects(merged_transaction_meta, meta_patch);
