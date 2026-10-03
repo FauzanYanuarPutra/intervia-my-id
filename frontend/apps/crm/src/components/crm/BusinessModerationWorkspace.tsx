@@ -145,6 +145,10 @@ export default function BusinessModerationWorkspace() {
     status: "pending" | "approved" | "rejected" | "hidden";
     is_primary: boolean;
     review_note?: string | null;
+    risk_score: number;
+    risk_level: "low" | "medium" | "high" | "critical";
+    risk_flags: string[];
+    risk_checked_at?: string | null;
     created_at: string;
   }>>([]);
   const [mediaStatus, setMediaStatus] = useState("pending");
@@ -486,9 +490,34 @@ export default function BusinessModerationWorkspace() {
                     <p className="text-[11px] font-semibold text-slate-500">{item.city}</p>
                   </div>
                   <div className="rounded-xl bg-slate-50 px-3 py-2 text-xs">
-                    <p className="font-bold text-slate-800">
-                      Diunggah oleh {item.uploader_name || item.uploader_username || "Pengguna"}
-                    </p>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <p className="font-bold text-slate-800">
+                        Diunggah oleh {item.uploader_name || item.uploader_username || "Pengguna"}
+                      </p>
+                      <span
+                        title={
+                          item.risk_flags.length > 0
+                            ? item.risk_flags.join(", ")
+                            : "Tidak ada sinyal risiko"
+                        }
+                        className={
+                          item.risk_level === "critical"
+                            ? "rounded-full bg-rose-100 px-2 py-0.5 text-[9px] font-black text-rose-700"
+                            : item.risk_level === "high"
+                              ? "rounded-full bg-orange-100 px-2 py-0.5 text-[9px] font-black text-orange-700"
+                              : item.risk_level === "medium"
+                                ? "rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-black text-amber-700"
+                                : "rounded-full bg-emerald-100 px-2 py-0.5 text-[9px] font-black text-emerald-700"
+                        }
+                      >
+                        Risiko {item.risk_level} · {item.risk_score}
+                      </span>
+                    </div>
+                    {item.risk_flags.length > 0 ? (
+                      <p className="mt-1 text-[10px] font-semibold text-slate-500">
+                        Sinyal: {item.risk_flags.slice(0, 3).join(" · ")}
+                      </p>
+                    ) : null}
                     {item.caption ? <p className="mt-1 text-slate-500">{item.caption}</p> : null}
                   </div>
                   <div className="flex flex-wrap gap-2">
