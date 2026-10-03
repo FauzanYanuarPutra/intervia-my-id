@@ -250,9 +250,7 @@ fn normalize_match_phrase(input: &str) -> String {
 
     // Common Indonesian produce shorthand: "mangga HR" and
     // "mangga harum manis" describe the same variety in many listings.
-    if normalized.contains(&"mangga")
-        && normalized.contains(&"hr")
-    {
+    if normalized.contains(&"mangga") && normalized.contains(&"hr") {
         return normalized
             .into_iter()
             .filter(|token| *token != "hr")
