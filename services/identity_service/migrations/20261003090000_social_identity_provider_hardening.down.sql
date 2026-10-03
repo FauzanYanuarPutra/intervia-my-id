@@ -1,0 +1,2 @@
+DROP INDEX IF EXISTS idx_user_identities_provider_user_active;
+DROP INDEX IF EXISTS idx_user_identities_provider_subject_active;
