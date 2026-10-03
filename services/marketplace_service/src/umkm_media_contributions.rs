@@ -15,6 +15,79 @@ const MAX_MEDIA_FILENAME_LEN: usize = 200;
 const MAX_CAPTION_LEN: usize = 500;
 const MAX_ITEMS: i64 = 24;
 
+#[derive(Debug)]
+struct MediaRiskAssessment {
+    score: i32,
+    level: &'static str,
+    flags: Vec<&'static str>,
+}
+
+fn assess_media_risk(
+    recent_hour: i64,
+    recent_day: i64,
+    recent_target_day: i64,
+    reviewed_30d: i64,
+    rejected_30d: i64,
+    repeated_caption_7d: i64,
+) -> MediaRiskAssessment {
+    let mut score = 0i32;
+    let mut flags = Vec::new();
+
+    if recent_hour >= 12 {
+        score += 45;
+        flags.push("high_submission_velocity");
+    } else if recent_hour >= 6 {
+        score += 25;
+        flags.push("elevated_submission_velocity");
+    }
+
+    if recent_day >= 20 {
+        score += 25;
+        flags.push("high_daily_volume");
+    } else if recent_day >= 10 {
+        score += 12;
+        flags.push("elevated_daily_volume");
+    }
+
+    if recent_target_day >= 6 {
+        score += 20;
+        flags.push("many_submissions_same_location");
+    } else if recent_target_day >= 3 {
+        score += 8;
+        flags.push("repeated_submissions_same_location");
+    }
+
+    if reviewed_30d >= 5 && rejected_30d * 2 >= reviewed_30d {
+        score += 25;
+        flags.push("high_rejection_history");
+    } else if reviewed_30d >= 3 && rejected_30d * 3 >= reviewed_30d * 2 {
+        score += 12;
+        flags.push("elevated_rejection_history");
+    }
+
+    if repeated_caption_7d >= 5 {
+        score += 15;
+        flags.push("reused_caption_pattern");
+    } else if repeated_caption_7d >= 3 {
+        score += 7;
+        flags.push("repeated_caption_pattern");
+    }
+
+    let score = score.clamp(0, 100);
+    let level = if score >= 75 {
+        "critical"
+    } else if score >= 50 {
+        "high"
+    } else if score >= 25 {
+        "medium"
+    } else {
+        "low"
+    };
+
+    MediaRiskAssessment { score, level, flags }
+}
+
+
 #[derive(Debug, Clone, Copy)]
 enum MediaTarget {
     Store(Uuid),
@@ -486,6 +559,118 @@ pub(crate) async fn create_media_contribution(
         }
     }
 
+    let risk_row = match sqlx::query(
+        r#"
+        SELECT
+          COUNT(*) FILTER (WHERE created_at >= NOW() - interval '1 hour')::bigint AS recent_hour,
+          COUNT(*) FILTER (WHERE created_at >= NOW() - interval '24 hours')::bigint AS recent_day,
+          COUNT(*) FILTER (
+            WHERE created_at >= NOW() - interval '30 days'
+              AND status IN ('approved', 'rejected', 'hidden')
+          )::bigint AS reviewed_30d,
+          COUNT(*) FILTER (
+            WHERE created_at >= NOW() - interval '30 days'
+              AND status = 'rejected'
+          )::bigint AS rejected_30d
+        FROM umkm_store_media_contributions
+        WHERE uploader_user_id = $1
+        "#
+    )
+    .bind(user_id)
+    .fetch_one(&state.db)
+    .await
+    {
+        Ok(row) => row,
+        Err(error) => {
+            tracing::error!("media contribution risk history error: {:?}", error);
+            return error_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to validate media safety",
+            )
+            .into_response();
+        }
+    };
+
+    let recent_target_day = match target {
+        MediaTarget::Store(store_id) => sqlx::query_scalar::<_, i64>(
+            r#"
+            SELECT COUNT(*)::bigint
+            FROM umkm_store_media_contributions
+            WHERE store_id = $1
+              AND uploader_user_id = $2
+              AND created_at >= NOW() - interval '24 hours'
+            "#,
+        )
+        .bind(store_id)
+        .bind(user_id)
+        .fetch_one(&state.db)
+        .await,
+        MediaTarget::Reference(reference_id) => sqlx::query_scalar::<_, i64>(
+            r#"
+            SELECT COUNT(*)::bigint
+            FROM umkm_store_media_contributions
+            WHERE reference_content_id = $1
+              AND uploader_user_id = $2
+              AND created_at >= NOW() - interval '24 hours'
+            "#,
+        )
+        .bind(reference_id)
+        .bind(user_id)
+        .fetch_one(&state.db)
+        .await,
+    };
+    let recent_target_day = match recent_target_day {
+        Ok(value) => value,
+        Err(error) => {
+            tracing::error!("media contribution target risk error: {:?}", error);
+            return error_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to validate media safety",
+            )
+            .into_response();
+        }
+    };
+
+    let repeated_caption_7d = if let Some(caption) = caption.as_deref() {
+        match sqlx::query_scalar::<_, i64>(
+            r#"
+            SELECT COUNT(*)::bigint
+            FROM umkm_store_media_contributions
+            WHERE uploader_user_id = $1
+              AND caption = $2
+              AND created_at >= NOW() - interval '7 days'
+            "#,
+        )
+        .bind(user_id)
+        .bind(caption)
+        .fetch_one(&state.db)
+        .await
+        {
+            Ok(value) => value,
+            Err(error) => {
+                tracing::error!("media contribution caption risk error: {:?}", error);
+                return error_response(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to validate media safety",
+                )
+                .into_response();
+            }
+        }
+    } else {
+        0
+    };
+
+    let risk = assess_media_risk(
+        risk_row.get("recent_hour"),
+        risk_row.get("recent_day"),
+        recent_target_day,
+        risk_row.get("reviewed_30d"),
+        risk_row.get("rejected_30d"),
+        repeated_caption_7d,
+    );
+
+    let risk_allows_owner_auto_approval = matches!(risk.level, "low" | "medium");
+
     let result = match target {
         MediaTarget::Store(store_id) => {
             sqlx::query(
@@ -493,13 +678,15 @@ pub(crate) async fn create_media_contribution(
                 INSERT INTO umkm_store_media_contributions (
                   store_id, uploader_user_id, media_url, media_type, caption,
                   uploader_name_snapshot, uploader_username_snapshot, status,
-                  reviewed_by, reviewed_at
+                  reviewed_by, reviewed_at, risk_score, risk_level,
+                  risk_flags, risk_checked_at
                 )
                 VALUES (
                   $1, $2, $3, $4, $5, $6, $7,
                   CASE WHEN $8 THEN 'approved' ELSE 'pending' END,
                   CASE WHEN $8 THEN $2 ELSE NULL END,
-                  CASE WHEN $8 THEN NOW() ELSE NULL END
+                  CASE WHEN $8 THEN NOW() ELSE NULL END,
+                  $9, $10, $11, NOW()
                 )
                 "#,
             )
@@ -510,7 +697,10 @@ pub(crate) async fn create_media_contribution(
             .bind(caption.as_deref())
             .bind(&uploader_name)
             .bind(&uploader_username)
-            .bind(store_owner)
+            .bind(store_owner && risk_allows_owner_auto_approval)
+            .bind(risk.score)
+            .bind(risk.level)
+            .bind(json!(risk.flags))
             .execute(&state.db)
             .await
         }
@@ -519,9 +709,10 @@ pub(crate) async fn create_media_contribution(
                 r#"
                 INSERT INTO umkm_store_media_contributions (
                   reference_content_id, uploader_user_id, media_url, media_type, caption,
-                  uploader_name_snapshot, uploader_username_snapshot, status
+                  uploader_name_snapshot, uploader_username_snapshot, status,
+                  risk_score, risk_level, risk_flags, risk_checked_at
                 )
-                VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
+                VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', $8, $9, $10, NOW())
                 "#,
             )
             .bind(reference_id)
@@ -531,6 +722,9 @@ pub(crate) async fn create_media_contribution(
             .bind(caption.as_deref())
             .bind(&uploader_name)
             .bind(&uploader_username)
+            .bind(risk.score)
+            .bind(risk.level)
+            .bind(json!(risk.flags))
             .execute(&state.db)
             .await
         }
@@ -541,7 +735,14 @@ pub(crate) async fn create_media_contribution(
             StatusCode::CREATED,
             Json(serde_json::json!({
                 "data": {
-                    "status": if store_owner { "approved" } else { "pending" },
+                    "status": if store_owner && risk_allows_owner_auto_approval {
+                        "approved"
+                    } else {
+                        "pending"
+                    },
+                    "risk_score": risk.score,
+                    "risk_level": risk.level,
+                    "risk_flags": risk.flags,
                     "media_url": media_url,
                     "media_type": media_type,
                     "caption": caption,
