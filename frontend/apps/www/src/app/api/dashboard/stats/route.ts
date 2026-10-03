@@ -113,6 +113,8 @@ export async function GET(req: NextRequest) {
       pending_payout_cents: 0,
       wallet_environment: 'development' as 'development' | 'live',
       wallet_currency: 'IDR',
+      profile_views: 0,
+      total_favorites: 0,
     };
 
     const [contentResult, transactionsResult, inboxResult, walletResult] =
