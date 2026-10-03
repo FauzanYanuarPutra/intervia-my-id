@@ -70,7 +70,7 @@ pub fn score_signal(
     }
 
     if quantity.is_some_and(|value| !value.is_finite() || value > 1_000_000.0) {
-        score += 60;
+        score += 30;
         reasons.push("abnormal_quantity");
     }
 
