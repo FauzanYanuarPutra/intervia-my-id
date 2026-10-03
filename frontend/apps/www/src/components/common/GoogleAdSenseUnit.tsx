@@ -23,7 +23,7 @@ export function GoogleAdSenseUnit({
 }: GoogleAdSenseUnitProps) {
   const pathname = usePathname();
   const hostRef = useRef<HTMLDivElement | null>(null);
-  const insRef = useRef<HTMLElement | null>(null);
+  const insRef = useRef<HTMLModElement | null>(null);
   const pushedRef = useRef(false);
   const retryTimerRef = useRef<number | null>(null);
   const [adState, setAdState] = useState<'pending' | 'filled' | 'unfilled'>('pending');
