@@ -298,7 +298,6 @@ function normalizeListings(items: CrmContentItem[]): CrmListingRow[] {
       ownerId: asString(item.owner_id),
       featured: asBoolean(metadata.featured),
       updatedAt: asString(item.updated_at || item.created_at),
-      createdAt: asString(item.created_at || item.updated_at),
       metadata,
       reportCount: 0,
       reporters: [],
@@ -1127,7 +1126,7 @@ export default function CrmCommandCenter() {
                 <OperationsPriorityPanel items={operationPriorities} onOpen={destination => navigatePage(destination)} />
               ) : null}
 
-              {activePage === "dashboard" ? <OperationsOverview data={filteredData} accessToken={accessToken || ""} onOpen={page => navigatePage(page)} /> : null}
+              {activePage === "dashboard" ? <OperationsOverview data={filteredData} accessToken={accessToken} onOpen={page => navigatePage(page)} /> : null}
               {activePage === "pipeline" ? <PipelineWorkspace leads={filteredData.leads} /> : null}
               {activePage === "matching" ? <MatchWorkspace /> : null}
               {activePage === "users" ? (
@@ -1144,7 +1143,7 @@ export default function CrmCommandCenter() {
               ) : null}
               {activePage === "transactions" ? <TransactionWorkspace transactions={filteredTransactions} /> : null}
               {activePage === "chat" ? <ConversationWorkspace chats={filteredData.chats} /> : null}
-              {activePage === "analytics" ? <AnalyticsWorkspace data={filteredData} accessToken={accessToken || ""} /> : null}
+              {activePage === "analytics" ? <AnalyticsWorkspace users={filteredData.users} listings={filteredData.listings} transactions={filteredTransactions} openSupport={openIssues} /> : null}
               {activePage === "disputes" ? <SupportRiskWorkspace tickets={filteredData.tickets} transactions={filteredTransactions} users={filteredData.users} supportFailed={data.failures.includes("support") || data.failures.includes("tickets")} /> : null}
               {activePage === "news" ? (
                 <NewsEditorialWorkspace
