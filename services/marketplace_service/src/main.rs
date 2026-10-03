@@ -5583,6 +5583,17 @@ fn protection_status_for_transaction(status: &str) -> &'static str {
     }
 }
 
+fn updated_buyer_balance_after_cents(
+    holder: &WalletAccountRow,
+    fallback: i64,
+    refund_amount_cents: i64,
+) -> i64 {
+    if refund_amount_cents > 0 && holder.user_id == Uuid::nil() {
+        return fallback;
+    }
+    fallback + refund_amount_cents
+}
+
 fn merge_json_objects(base: Value, extension: Value) -> Value {
     let mut merged = match base {
         Value::Object(map) => map,
@@ -21293,6 +21304,16 @@ async fn settle_dispute_funds_tx(
         None
     };
 
+    let holder_ledger_balance_after_cents = if managed_intermediary {
+        holder_ledger_balance_after_cents
+    } else {
+        updated_buyer_balance_after_cents(
+            &updated_holder,
+            holder_ledger_balance_after_cents,
+            settlement.refund_amount_cents,
+        )
+    };
+
     let updated_seller = if settlement.release_amount_cents > 0 {
         Some(
             sqlx::query_as::<_, WalletAccountRow>(
@@ -21352,7 +21373,7 @@ async fn settle_dispute_funds_tx(
             &updated_holder,
             "debit",
             settlement.release_amount_cents,
-            updated_holder.available_balance_cents,
+            holder_ledger_balance_after_cents,
             "payment_release",
             "transaction",
             txn.id,
@@ -21381,7 +21402,7 @@ async fn settle_dispute_funds_tx(
             &updated_holder,
             "debit",
             settlement.platform_fee_cents,
-            updated_holder.available_balance_cents,
+            holder_ledger_balance_after_cents,
             "fee",
             "transaction",
             txn.id,
