@@ -320,7 +320,7 @@ function SectionSkeleton({
       : [{ kind: 'listing' as const, title: 'Hasil', count: 6 }];
 
   return (
-    <div aria-hidden="true" data-skeleton-route="explore-category">
+    <div aria-hidden="true" data-skeleton-route="explore-category" className="space-y-3 sm:space-y-4">
       {visibleConfigs.map((config, sectionIndex) => {
         const gridClass =
           config.kind === 'video'
@@ -332,7 +332,7 @@ function SectionSkeleton({
         return (
           <section
             key={config.title + '-' + sectionIndex}
-            className="mt-3 rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 sm:p-4"
+            className="rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 sm:p-4"
           >
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0 flex-1">
@@ -692,7 +692,7 @@ function DataSection({
     );
 
   return (
-    <section className="mt-3 rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 sm:p-4">
+    <section className="rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 sm:p-4">
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
           <h2 className="min-w-0 truncate text-[13px] font-black text-[color:var(--app-text)] sm:text-sm">
@@ -1648,7 +1648,7 @@ export function ExploreCategoryClient({
       <div className="lg:hidden">
       </div>
 
-      <main className="mx-auto w-full min-w-0 max-w-[1080px] px-3 py-2.5 sm:px-5 sm:py-4 lg:px-6 lg:py-5">
+      <main className="mx-auto flex w-full min-w-0 max-w-[1080px] flex-col space-y-3 px-3 py-2.5 sm:space-y-4 sm:px-5 sm:py-4 lg:px-6 lg:py-5">
         <Link
           href={exploreBackHref}
           aria-label={
@@ -1656,7 +1656,7 @@ export function ExploreCategoryClient({
               ? 'Kembali ke Jelajahi'
               : 'Back to Explore'
           }
-          className="mb-2 inline-flex min-h-8 items-center gap-1.5 rounded-lg px-1 text-[11px] font-bold text-zinc-500 transition hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/25 dark:text-zinc-400 dark:hover:text-white sm:mb-2.5 sm:text-xs"
+          className="inline-flex min-h-8 items-center gap-1.5 rounded-lg px-1 text-[11px] font-bold text-zinc-500 transition hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/25 dark:text-zinc-400 dark:hover:text-white sm:text-xs"
         >
           <ArrowLeft
             aria-hidden="true"
@@ -2251,7 +2251,7 @@ export function ExploreCategoryClient({
         </ExploreSurface>
 
         {isFilteredSearchMode ? (
-          <section className="mt-3 min-w-0">
+          <section className="min-w-0">
             <ExploreSearchResults
               payload={
                 searchPayload
@@ -2290,7 +2290,7 @@ export function ExploreCategoryClient({
         {!isFilteredSearchMode &&
         error &&
         !payload ? (
-          <ExploreSurface className="mt-3 border-amber-200/80 bg-amber-50/60 p-4 dark:border-amber-900/60 dark:bg-amber-950/25">
+          <ExploreSurface className="border-amber-200/80 bg-amber-50/60 p-4 dark:border-amber-900/60 dark:bg-amber-950/25">
             <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="flex items-center gap-2 text-sm font-black text-amber-950 dark:text-amber-100">
@@ -2488,7 +2488,7 @@ export function ExploreCategoryClient({
               : null}
 
             {payload.degraded ? (
-              <ExploreSurface className="mt-3 border-amber-200/80 bg-amber-50/60 p-4 dark:border-amber-900/60 dark:bg-amber-950/25">
+              <ExploreSurface className="border-amber-200/80 bg-amber-50/60 p-4 dark:border-amber-900/60 dark:bg-amber-950/25">
                 <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="flex items-center gap-2 text-sm font-black text-amber-950 dark:text-amber-100">
@@ -2526,7 +2526,7 @@ export function ExploreCategoryClient({
             {!payload.degraded &&
             primaryResultTotal ===
               0 ? (
-              <div className="mt-3">
+              <div className="min-w-0">
                 <EmptyPrimarySection
                   locale={locale}
                   category={
