@@ -12,7 +12,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-const MAX_FILES = 12;
+const MAX_FILES = 50;
 const IMAGE_KEYS = [
   'images',
   'image',
