@@ -2613,7 +2613,7 @@ function RecommendationsLoadingSkeleton({
           >
             <div className="overflow-hidden rounded-2xl border border-zinc-200/80 bg-white">
               <Skeleton className="aspect-[16/10] w-full rounded-none" />
-              <div className="space-y-2 p-3">
+              <div className="space-y-1.5 p-2 sm:p-2.5">
                 <Skeleton className="h-3.5 w-4/5 rounded" />
                 <Skeleton className="h-4 w-2/5 rounded" />
                 <Skeleton className="h-2.5 w-3/5 rounded" />
@@ -2649,7 +2649,7 @@ function HomeListingCarouselSection({
 
   const isDemand = mode === 'demand';
   const clusteredItems = useMemo(
-    () => clusterHomeFeedItems(items, 12, 3),
+    () => clusterHomeFeedItems(items, 8, 3),
     [items],
   );
 
@@ -2830,7 +2830,7 @@ export function PublicReferencesSection({
     if (left.verified !== right.verified) return left.verified ? -1 : 1;
     return left.title.localeCompare(right.title, 'id');
   });
-  const clusteredItems = clusterHomeFeedItems(prioritizedItems, 12, 3);
+  const clusteredItems = clusterHomeFeedItems(prioritizedItems, 8, 3);
 
   return (
     <section
