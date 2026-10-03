@@ -649,9 +649,7 @@ export default function MyListingsPage() {
       setError('');
       try {
         const requestUrl =
-          activeStatus === 'draft'
-            ? '/api/my-listings?limit=100'
-            : `/api/my-listings?status=${activeStatus}`;
+          `/api/my-listings?status=${encodeURIComponent(activeStatus)}&limit=100`;
         const res = await authFetch(requestUrl);
         const data = (await res.json().catch(() => ({}))) as {
           results?: ListingItem[];
@@ -662,7 +660,6 @@ export default function MyListingsPage() {
           setItems(Array.isArray(data.results) ? data.results : []);
       } catch (err) {
         if (!cancelled) {
-          setItems([]);
           setError(
             err instanceof Error ? err.message : 'Failed to load listings',
           );
@@ -880,8 +877,8 @@ export default function MyListingsPage() {
 
     const pageDescription =
       locale === 'id'
-        ? 'Kelola semua yang kamu tawarkan dan yang sedang kamu cari.'
-        : 'Manage everything you offer and everything you are looking for.';
+        ? 'Yang kamu tawarkan dan yang sedang kamu cari.'
+        : 'What you offer and what you are looking for.';
     const closeDetails = (target: EventTarget & HTMLElement) => {
       target.closest('details')?.removeAttribute('open');
     };
@@ -916,7 +913,18 @@ export default function MyListingsPage() {
                     <button
                       key={tab.id}
                       type="button"
-                      onClick={() => setActiveStatus(tab.id)}
+                      onClick={() => {
+                        setActiveStatus(tab.id);
+                        const params = new URLSearchParams(
+                          searchParams?.toString() || '',
+                        );
+                        params.set('status', tab.id);
+                        params.delete('listing');
+                        const queryString = params.toString();
+                        router.replace(
+                          queryString ? `${pathname}?${queryString}` : pathname,
+                        );
+                      }}
                       aria-pressed={activeStatus === tab.id}
                       className={`min-h-9 rounded-[10px] px-2 text-xs font-bold transition ${
                         activeStatus === tab.id
@@ -952,7 +960,8 @@ export default function MyListingsPage() {
               </label>
             </div>
 
-            <div className="mt-2 flex min-w-0 gap-2 overflow-x-auto pb-0.5">
+            <div className="mt-2 grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(160px,220px)]">
+              <div className="flex min-w-0 gap-1.5 overflow-x-auto pb-0.5">
                 {(['all', 'supply', 'demand'] as ListingSideFilter[]).map(side => {
                   const active = sideFilter === side;
                   return (
@@ -962,49 +971,47 @@ export default function MyListingsPage() {
                       onClick={() => setSideFilter(side)}
                       aria-pressed={active}
                       className={
-                        'inline-flex min-h-9 shrink-0 items-center rounded-full px-3 text-xs font-bold transition ' +
+                        'inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-[11px] font-bold transition ' +
                         (active
                           ? side === 'demand'
                             ? 'bg-sky-100 text-sky-800'
                             : side === 'supply'
                               ? 'bg-emerald-100 text-emerald-800'
                               : 'bg-slate-900 text-white'
-                          : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50')
+                          : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-white/5')
                       }
                     >
                       <span>{listingSideFilterLabel(side, locale)}</span>
-                      <span className="text-[10px] opacity-70">
+                      <span className="text-[10px] opacity-65">
                         {filterCounts[side]}
                       </span>
                     </button>
                   );
                 })}
-
-                <span className="my-1 w-px shrink-0 bg-slate-200" aria-hidden="true" />
-
-                {(['all', 'supplies', 'service', 'equipment', 'property', 'opportunity'] as ListingCategoryFilter[]).map(category => {
-                  const active = categoryFilter === category;
-                  return (
-                    <button
-                      key={category}
-                      type="button"
-                      onClick={() => setCategoryFilter(category)}
-                      aria-pressed={active}
-                      className={
-                        'inline-flex min-h-9 shrink-0 items-center rounded-full px-3 text-xs font-bold transition ' +
-                        (active
-                          ? 'bg-emerald-700 text-white'
-                          : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50')
-                      }
-                    >
-                      <span>{listingManagementCategoryLabel(category, locale)}</span>
-                      <span className="text-[10px] opacity-70">
-                        {filterCounts[category]}
-                      </span>
-                    </button>
-                  );
-                })}
               </div>
+
+              <label className="relative flex min-h-8 min-w-0 items-center">
+                <span className="sr-only">
+                  {locale === 'id' ? 'Kategori' : 'Category'}
+                </span>
+                <select
+                  value={categoryFilter}
+                  onChange={event =>
+                    setCategoryFilter(event.target.value as ListingCategoryFilter)
+                  }
+                  className="min-h-8 w-full appearance-none rounded-full border border-slate-200 bg-white px-3 pr-8 text-[11px] font-bold text-slate-700 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200 dark:focus:ring-emerald-400/10"
+                  aria-label={locale === 'id' ? 'Filter kategori' : 'Category filter'}
+                >
+                  {(['all', 'supplies', 'service', 'equipment', 'property', 'opportunity'] as ListingCategoryFilter[]).map(
+                    category => (
+                      <option key={category} value={category}>
+                        {listingManagementCategoryLabel(category, locale)} · {filterCounts[category]}
+                      </option>
+                    ),
+                  )}
+                </select>
+              </label>
+            </div>
           </header>
 
           {error ? (
