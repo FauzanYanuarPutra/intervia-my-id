@@ -384,10 +384,10 @@ export default function CreatePostingLanding() {
 
   const findIntent: IntentCard = {
     key: 'find',
-    titleId: 'Saya Mau Mencari',
+    titleId: 'Saya Sedang Mencari',
     titleEn: 'I Want To Find',
     descriptionId:
-      'Pasang kebutuhan yang sedang kamu cari agar bisa ditemukan oleh yang punya solusinya.',
+      'Cari produk, jasa, supplier, alat, tempat, atau kebutuhan usaha yang sedang kamu perlukan.',
     descriptionEn:
       'Post what you need so people who can help can find it.',
     examples: FIND_EXAMPLES,
