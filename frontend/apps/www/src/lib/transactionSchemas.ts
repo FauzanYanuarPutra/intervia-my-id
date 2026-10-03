@@ -38,6 +38,8 @@ export const CreateOfferSchema = z
       .enum(['standard', 'shipping', 'pickup', 'remote', 'onsite', 'instant'])
       .optional(),
     transaction_meta: z.record(z.string(), z.unknown()).optional(),
+    intermediary_mode: z.enum(['direct', 'managed']).optional(),
+    intermediary_email: optionalTrimmed,
     safety_checklist: z
       .object({
         identity_confirmed: z.boolean(),
