@@ -90,7 +90,6 @@ fn assess_media_risk(
     MediaRiskAssessment { score, level, flags }
 }
 
-
 #[derive(Debug, Deserialize, Default)]
 pub struct ListCrmBusinessesQuery {
     pub q: Option<String>,
