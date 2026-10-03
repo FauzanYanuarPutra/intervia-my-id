@@ -1146,6 +1146,61 @@ export const newsApi = {
   },
 };
 
+export type CrmAnalyticsSeriesPoint = {
+  date: string;
+  users: number;
+  listings: number;
+  views: number;
+  transactions: number;
+  gmvCents: number;
+  support: number;
+  businesses: number;
+};
+
+export type CrmAnalyticsOverview = {
+  from: string;
+  to: string;
+  days: number;
+  totals: {
+    usersTotal: number;
+    newUsers: number;
+    listingsTotal: number;
+    newListings: number;
+    views: number;
+    transactions: number;
+    gmvCents: number;
+    supportTickets: number;
+    openSupport: number;
+    businessesTotal: number;
+    newBusinesses: number;
+    listingStatus: Array<{ label: string; value: number }>;
+  };
+  series: CrmAnalyticsSeriesPoint[];
+  topListings: Array<{ id: string; title: string; views: number }>;
+  viewPolicy: {
+    qualifiedDefinition: string;
+    authenticatedKey: string;
+    guestKey: string;
+    ownerSelfViews: string;
+  };
+};
+
+export const analyticsApi = {
+  overview: async (
+    token: string,
+    params: { from: string; to: string },
+  ): Promise<CrmAnalyticsOverview> => {
+    const query = new URLSearchParams(params).toString();
+    return fetchJson<CrmAnalyticsOverview>(
+      `${MARKETPLACE_URL}/v1/crm/analytics/overview?${query}`,
+      {
+        method: 'GET',
+        token,
+      },
+    );
+  },
+};
+
 export const usersApi = {
   list: async (
     token: string,
