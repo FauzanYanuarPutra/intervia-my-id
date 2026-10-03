@@ -271,8 +271,8 @@ function MobileMock({ locale }: { locale: 'id' | 'en' }) {
               locale={locale}
               item={{
                 key: 'offer',
-                titleId: 'Saya Mau Menawarkan',
-                titleEn: 'I Want To Offer',
+                titleId: 'Penawaran',
+                titleEn: 'Offer',
                 descriptionId:
                   'Tawarkan produk, jasa, atau peluang bisnis Anda kepada banyak orang.',
                 descriptionEn:
@@ -286,8 +286,8 @@ function MobileMock({ locale }: { locale: 'id' | 'en' }) {
               locale={locale}
               item={{
                 key: 'find',
-                titleId: 'Saya Mau Mencari',
-                titleEn: 'I Want To Find',
+                titleId: 'Kebutuhan',
+                titleEn: 'Need',
                 descriptionId:
                   'Cari supplier, partner, investor, atau peluang yang kamu butuhkan.',
                 descriptionEn:
@@ -374,9 +374,9 @@ export default function CreatePostingLanding() {
     titleId: 'Saya Mau Menawarkan',
     titleEn: 'I Want To Offer',
     descriptionId:
-      'Tawarkan produk, jasa, atau peluang bisnis Anda kepada banyak orang.',
+      'Pasang produk, jasa, atau hal lain yang ingin kamu tawarkan.',
     descriptionEn:
-      'Offer products, services, or business opportunities to the right audience.',
+      'Post products, services, or anything else you want to offer.',
     examples: OFFER_EXAMPLES,
     imageSrc: '/images/create/kategori/tawar.png',
     href: offerHref,
@@ -387,9 +387,9 @@ export default function CreatePostingLanding() {
     titleId: 'Saya Mau Mencari',
     titleEn: 'I Want To Find',
     descriptionId:
-      'Cari supplier, partner, investor, atau peluang yang kamu butuhkan.',
+      'Pasang kebutuhan yang sedang kamu cari agar bisa ditemukan oleh yang punya solusinya.',
     descriptionEn:
-      'Find suppliers, partners, investors, or opportunities you need.',
+      'Post what you need so people who can help can find it.',
     examples: FIND_EXAMPLES,
     imageSrc: '/images/create/kategori/cari.png',
     href: findHref,
