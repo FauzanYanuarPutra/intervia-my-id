@@ -190,13 +190,13 @@ function EntitySkeletonCard({ kind }: { kind: GlobalSearchGroupKey }) {
 
   if (kind === 'users') {
     return (
-      <article className={cn(base, 'flex min-h-[154px] gap-3 rounded-lg p-3')} data-skeleton-kind={kind}>
-        <Skeleton variant="circle" className="h-16 w-16 shrink-0" />
-        <div className="min-w-0 flex-1">
+      <article className={cn(base, 'flex min-h-[124px] gap-2.5 rounded-[12px] p-2.5 sm:gap-3 sm:p-3')} data-skeleton-kind={kind}>
+        <Skeleton variant="circle" className="h-12 w-12 shrink-0 sm:h-14 sm:w-14" />
+        <div className="flex min-w-0 flex-1 flex-col self-stretch">
           <Skeleton variant="line" className="h-3 w-20" />
           <Skeleton variant="line" className="mt-2 h-4 w-4/5" />
           <SkeletonStack lines={2} className="mt-2" />
-          <Skeleton variant="line" className="mt-2 h-3 w-24" />
+          <Skeleton variant="chip" className="mt-auto h-8 w-24 pt-2" />
         </div>
       </article>
     );
