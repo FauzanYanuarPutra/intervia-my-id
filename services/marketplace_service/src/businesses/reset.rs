@@ -495,6 +495,7 @@ impl DataResetRepository {
             .map(ExistingBatch::into_record)
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn run_scopes(
         &self,
         actor_id: Uuid,
@@ -874,6 +875,7 @@ impl ExistingBatch {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn compensate_finance_entries_tx(
     tx: &mut Transaction<'_, Postgres>,
     actor_id: Uuid,
