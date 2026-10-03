@@ -3086,55 +3086,7 @@ async fn collect_events(
         }
     }
 
-    let mut normalized_events = Vec::with_capacity(events.len());
-
-    for event in events {
-        if is_view_dedup_event(&event.event_name) {
-            let entity_type = event
-                .entity_type
-                .clone()
-                .unwrap_or_else(|| "content".to_string());
-            let entity_id = event.entity_id.clone().unwrap_or_default();
-            if entity_id.is_empty() {
-                continue;
-            }
-
-            let viewer_key = view_dedup_key(&event, actor_user_id);
-            let inserted = sqlx::query(
-                r#"
-                INSERT INTO events.content_view_dedup (
-                    entity_type, entity_id, viewer_key, view_date, first_seen_at
-                )
-                VALUES ($1, $2, $3, $4, $5)
-                ON CONFLICT (entity_type, entity_id, viewer_key, view_date) DO NOTHING
-                "#,
-            )
-            .bind(&entity_type)
-            .bind(&entity_id)
-            .bind(viewer_key)
-            .bind(event.occurred_at.date_naive())
-            .bind(event.occurred_at)
-            .execute(&state.db)
-            .await;
-
-            match inserted {
-                Ok(result) if result.rows_affected() == 0 => continue,
-                Ok(_) => {}
-                Err(error) => {
-                    tracing::warn!(
-                        "view dedup insert failed, keeping event for observability: {:?}",
-                        error
-                    );
-                }
-            }
-        }
-
-        normalized_events.push(event);
-    }
-
-    let events = normalized_events;
-
-    let mut tx = match state.db.begin().await {
+        let mut tx = match state.db.begin().await {
         Ok(tx) => tx,
         Err(error) => {
             tracing::error!("collect_events begin transaction error: {:?}", error);
@@ -3148,6 +3100,46 @@ async fn collect_events(
     let mut accepted = 0usize;
 
     for event in events {
+        if is_view_dedup_event(&event.event_name) {
+            let entity_type = event
+                .entity_type
+                .clone()
+                .unwrap_or_else(|| "content".to_string());
+            let entity_id = event.entity_id.clone().unwrap_or_default();
+            if entity_id.is_empty() {
+                continue;
+            }
+
+            let viewer_key = view_dedup_key(&event, actor_user_id);
+            let dedup_result = sqlx::query(
+                r#"
+                INSERT INTO events.content_view_dedup (
+                    entity_type, entity_id, viewer_key, view_date, first_seen_at
+                )
+                VALUES ($1, $2, $3, $4, $5)
+                ON CONFLICT (entity_type, entity_id, viewer_key, view_date) DO NOTHING
+                "#,
+            )
+            .bind(&entity_type)
+            .bind(&entity_id)
+            .bind(viewer_key)
+            .bind(event.occurred_at.date_naive())
+            .bind(event.occurred_at)
+            .execute(&mut *tx)
+            .await;
+
+            match dedup_result {
+                Ok(result) if result.rows_affected() == 0 => continue,
+                Ok(_) => {}
+                Err(error) => {
+                    tracing::warn!(
+                        "view dedup insert failed, keeping event for observability: {:?}",
+                        error
+                    );
+                }
+            }
+        }
+
         let insert_result = sqlx::query(
             r#"
             INSERT INTO events.event_log (
