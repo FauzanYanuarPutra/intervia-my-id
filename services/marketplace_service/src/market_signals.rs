@@ -10,7 +10,7 @@ use sqlx::Row;
 use std::sync::Arc;
 use uuid::Uuid;
 
-use super::{auth::user_id_from_auth, AppState};
+use super::{auth::user_id_from_auth, market_signal_risk, AppState};
 
 #[derive(Debug, Deserialize)]
 pub struct CreateMarketSignal {
@@ -100,6 +100,14 @@ pub async fn create_market_signal(
         return (
             StatusCode::BAD_REQUEST,
             Json(json!({"error": "quantity must be positive"})),
+        )
+            .into_response();
+    }
+
+    if payload.amount_cents.is_some_and(|v| v > 10_000_000_000_000_000) {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "amount_cents is outside supported range"})),
         )
             .into_response();
     }
@@ -214,14 +222,36 @@ pub async fn create_market_signal(
         .and_then(|v| v.to_str().ok())
         .and_then(|v| clean_text(Some(v), 160));
 
+    let risk = match market_signal_risk::evaluate_signal(
+        &state.db,
+        actor_id,
+        content_id,
+        payload.amount_cents,
+        payload.quantity,
+    )
+    .await
+    {
+        Ok(value) => value,
+        Err(error) => {
+            tracing::warn!("market signal risk evaluation failed: {:?}", error);
+            return (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(json!({"error": "market signal risk check unavailable"})),
+            )
+                .into_response();
+        }
+    };
+
+    let risk_reasons = serde_json::to_value(&risk.reasons).unwrap_or_else(|_| json!([]));
     let signal_id = Uuid::new_v4();
 
     let insert = sqlx::query(
         r#"
         INSERT INTO market_negotiation_signals
           (id, content_id, actor_id, signal_side, signal_type, amount_cents, currency,
-           quantity, quantity_unit, city, category, price_unit, source, idempotency_key)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+           quantity, quantity_unit, city, category, price_unit, source, idempotency_key,
+           risk_score, risk_decision, risk_reasons, eligible_for_market, risk_evaluated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, NOW())
         ON CONFLICT (idempotency_key) DO NOTHING
         RETURNING id, created_at
         "#,
@@ -240,8 +270,31 @@ pub async fn create_market_signal(
     .bind(price_unit)
     .bind(source)
     .bind(idempotency_key)
+    .bind(risk.score)
+    .bind(risk.decision)
+    .bind(risk_reasons)
+    .bind(risk.eligible_for_market)
     .fetch_optional(&state.db)
     .await;
+
+    if risk.decision != "allow" {
+        let _ = sqlx::query(
+            r#"
+            INSERT INTO market_signal_risk_events
+              (id, signal_id, actor_id, content_id, risk_score, decision, reasons)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            "#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(signal_id)
+        .bind(actor_id)
+        .bind(content_id)
+        .bind(risk.score)
+        .bind(risk.decision)
+        .bind(&risk_reasons)
+        .execute(&state.db)
+        .await;
+    }
 
     match insert {
         Ok(Some(row)) => (
@@ -251,6 +304,7 @@ pub async fn create_market_signal(
                 "content_id": content_id,
                 "signal_side": signal_side,
                 "signal_type": signal_type,
+                "risk_status": if risk.eligible_for_market { "accepted" } else { "review" },
                 "created_at": row.get::<chrono::DateTime<chrono::Utc>, _>("created_at"),
                 "message": "Negotiation signal recorded"
             })),
@@ -293,6 +347,7 @@ pub async fn market_signal_summary(
           AND currency = $2
           AND amount_cents IS NOT NULL
           AND amount_cents > 0
+          AND eligible_for_market = TRUE
           AND ($3::text IS NULL OR category = $3)
           AND ($4::text IS NULL OR city = $4)
           AND ($5::text IS NULL OR price_unit = $5)
