@@ -374,11 +374,11 @@ export function ContentSmartMatch({
                 </div>
                 <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-black text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300">
                   {Math.round(
-                    aiAssessment.get(match.id)?.worth_it ??
-                      match.worth_score ??
+                    aiAssessment.get(match.id)?.fit ??
                       match.score ??
+                      match.similarity_score ??
                       0,
-                  )}% worth it
+                  )}% cocok
                 </span>
               </div>
 
