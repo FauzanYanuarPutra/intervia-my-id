@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   activeListingNeedsPrimaryImage,
   canTransitionContentStatus,
+  normalizeListingTitle,
   toUpsertListingPayload,
   validateListingPayload,
 } from './listingFlowRules';
@@ -37,6 +38,23 @@ describe('activeListingNeedsPrimaryImage', () => {
       );
     },
   );
+});
+
+describe('normalizeListingTitle', () => {
+  it('keeps the user-entered intent phrase without injecting or duplicating it', () => {
+    expect(normalizeListingTitle('Butuh Butuh Buah Alpukat 1 kg')).toBe(
+      'Butuh Buah Alpukat 1 kg',
+    );
+    expect(normalizeListingTitle('Butuh Buah Alpukat 1 kg')).toBe(
+      'Butuh Buah Alpukat 1 kg',
+    );
+    expect(normalizeListingTitle('Mencari Mencari kios dekat kampus')).toBe(
+      'Mencari kios dekat kampus',
+    );
+    expect(normalizeListingTitle('Cup sealer otomatis siap kirim')).toBe(
+      'Cup sealer otomatis siap kirim',
+    );
+  });
 });
 
 describe('validateListingPayload', () => {
