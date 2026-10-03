@@ -890,10 +890,12 @@ async fn compensate_finance_entries_tx(
         SELECT entry.id,entry.entry_type,entry.account_key,entry.amount,entry.occurred_on,
                entry.note,entry.channel_key,entry.effect_multiplier,entry.allocation_bucket
         FROM business_finance_entries entry
-        LEFT JOIN business_finance_entry_corrections correction
-          ON correction.original_entry_id=entry.id
         WHERE entry.business_id=$1 AND entry.organization_id=$2
-          AND correction.original_entry_id IS NULL
+          AND NOT EXISTS (
+            SELECT 1
+            FROM business_finance_entry_corrections correction
+            WHERE correction.original_entry_id=entry.id
+          )
           AND (
             ($3 AND NOT lower(entry.entry_type) IN ('capital_income','owner_capital','owner_draw','owner_drawing')
                  AND COALESCE(entry.source_type,'') NOT LIKE 'business_sale%')
