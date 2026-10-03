@@ -2676,7 +2676,6 @@ export default function ChatRoomPage() {
   ]);
 
   const [messages, setMessages] = useState<Message[]>([]);
-  const [peerReadAt, setPeerReadAt] = useState<string | null>(null);
   const [peerOnline, setPeerOnline] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -3308,9 +3307,6 @@ export default function ChatRoomPage() {
           ? payload.data
           : [];
       if (res.ok) {
-        setPeerReadAt(
-          typeof payload.peer_read_at === 'string' ? payload.peer_read_at : null,
-        );
         const serverMessages = list.map(row => {
           const message = asObject(row);
           return {
@@ -3642,7 +3638,6 @@ export default function ChatRoomPage() {
               ) {
                 return;
               }
-              setPeerReadAt(readAt);
               setMessages(prev =>
                 prev.map(message => {
                   if (message.sender_id !== currentUserId) return message;
