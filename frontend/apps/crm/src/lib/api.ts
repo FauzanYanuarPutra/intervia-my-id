@@ -936,6 +936,10 @@ export const businessModerationApi = {
         review_note?: string | null;
         reviewed_by?: string | null;
         reviewed_at?: string | null;
+        risk_score: number;
+        risk_level: 'low' | 'medium' | 'high' | 'critical';
+        risk_flags: string[];
+        risk_checked_at?: string | null;
         created_at: string;
       }>;
       count: number;
