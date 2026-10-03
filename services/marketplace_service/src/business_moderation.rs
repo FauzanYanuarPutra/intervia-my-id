@@ -996,7 +996,7 @@ async fn create_store_media_contribution(
     .bind(&uploader_username)
     .bind(risk.score)
     .bind(risk.level)
-    .bind(json!(risk.flags))
+    .bind(json!(&risk.flags))
     .fetch_one(&state.db)
     .await
     {
