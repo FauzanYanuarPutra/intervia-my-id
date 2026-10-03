@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import type { DashboardData } from './models';
 import {
   buildBreakdown,
@@ -70,7 +70,7 @@ function CardShell({
   children,
   className = '',
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
   className?: string;
 }) {
   return (
