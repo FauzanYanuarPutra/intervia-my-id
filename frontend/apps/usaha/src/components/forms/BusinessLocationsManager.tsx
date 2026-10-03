@@ -290,6 +290,11 @@ export function BusinessLocationsManager({ businessId, businessName, initialLoca
               locationQuery={[editing.name, editing.address, editing.city].filter(Boolean).join(', ')}
               point={point}
               onLocationQueryChange={() => {}}
+              onNameChange={value => setEditing({ ...editing, name: value })}
+              onAddressChange={value => setEditing({ ...editing, address: value })}
+              onCityChange={value => setEditing({ ...editing, city: value })}
+              onProvinceChange={value => setEditing({ ...editing, province: value })}
+              onDistrictChange={value => setEditing({ ...editing, district: value })}
               onPointChange={next => setEditing({
                 ...editing,
                 latitude: next?.lat ?? null,
