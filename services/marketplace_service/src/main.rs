@@ -3086,7 +3086,7 @@ async fn collect_events(
         }
     }
 
-        let mut tx = match state.db.begin().await {
+    let mut tx = match state.db.begin().await {
         Ok(tx) => tx,
         Err(error) => {
             tracing::error!("collect_events begin transaction error: {:?}", error);
