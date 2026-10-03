@@ -2731,7 +2731,7 @@ pub async fn public_matches(
                 .worth
                 .partial_cmp(&a.score.worth)
                 .or_else(|| b.score.total.partial_cmp(&a.score.total)),
-            _ => std::cmp::Ordering::Equal,
+            _ => Some(std::cmp::Ordering::Equal),
         };
         ordering.unwrap_or(std::cmp::Ordering::Equal)
     });
