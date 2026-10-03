@@ -2727,6 +2727,8 @@ export default function ChatRoomPage() {
   const [listingActionAmount, setListingActionAmount] = useState('');
   const [listingActionMessage, setListingActionMessage] = useState('');
   const [listingActionSubmitting, setListingActionSubmitting] = useState(false);
+  // Legacy transaction records are kept for history; active UI no longer opens a transaction drawer.
+  const [showTransactionsDrawer] = useState(false);
   const [roomSummaryExpanded, setRoomSummaryExpanded] = useState(false);
   const [transactionsLoading, setTransactionsLoading] = useState(false);
   const [transactionsError, setTransactionsError] = useState<string | null>(
@@ -6212,11 +6214,6 @@ export default function ChatRoomPage() {
     },
     [authFetch, loadRoomTransactions, prompt, sendPayload, user?.id],
   );
-
-  useEffect(() => {
-    if (!showTransactionsDrawer) return;
-    loadRoomTransactions();
-  }, [showTransactionsDrawer, loadRoomTransactions]);
 
   const timelineItems = useMemo<TimelineItem[]>(() => {
     if (messages.length === 0) return [];
