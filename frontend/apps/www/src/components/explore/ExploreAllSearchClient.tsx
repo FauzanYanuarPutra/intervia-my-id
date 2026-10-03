@@ -1339,7 +1339,7 @@ export function ExploreAllSearchClient({
       <div className="lg:hidden">
       </div>
 
-      <main className="mx-auto w-full min-w-0 max-w-[1080px] px-3 py-3 sm:px-5 sm:py-4 lg:px-6 lg:py-5">
+      <main className="mx-auto flex w-full min-w-0 max-w-[1080px] flex-col space-y-3 px-3 py-3 sm:space-y-4 sm:px-5 sm:py-4 lg:px-6 lg:py-5">
         <ExploreSurface
           elevated
           className="p-3 sm:p-4"
@@ -1508,7 +1508,7 @@ export function ExploreAllSearchClient({
         </ExploreSurface>
 
         {referenceMode ? (
-          <div className="mt-2 rounded-[14px] border border-amber-200/80 bg-amber-50/70 px-3 py-2.5 dark:border-amber-900/60 dark:bg-amber-950/20 sm:flex sm:items-center sm:justify-between sm:gap-4">
+          <div className="rounded-[14px] border border-amber-200/80 bg-amber-50/70 px-3 py-2.5 dark:border-amber-900/60 dark:bg-amber-950/20 sm:flex sm:items-center sm:justify-between sm:gap-4">
             <div className="min-w-0">
               <p className="text-[11px] font-black text-amber-950 dark:text-amber-100 sm:text-xs">
                 {isId
@@ -1564,7 +1564,7 @@ export function ExploreAllSearchClient({
             </Link>
           </div>
         ) : peopleMode ? (
-          <div className="mt-2 rounded-[14px] border border-teal-200/70 bg-teal-50/60 px-3 py-2 text-[10px] font-medium leading-4 text-teal-950 dark:border-teal-900/60 dark:bg-teal-950/25 dark:text-teal-100/80 sm:text-[11px]">
+          <div className="rounded-[14px] border border-teal-200/70 bg-teal-50/60 px-3 py-2 text-[10px] font-medium leading-4 text-teal-950 dark:border-teal-900/60 dark:bg-teal-950/25 dark:text-teal-100/80 sm:text-[11px]">
             <span className="font-black">
               {isId
                 ? 'Profil publik · '
@@ -1577,7 +1577,7 @@ export function ExploreAllSearchClient({
           </div>
         ) : (
           <ExploreSurface
-            className="mt-2 p-2.5 sm:p-3"
+            className="p-2.5 sm:p-3"
             aria-labelledby="explore-result-category-title"
           >
             <div className="flex min-w-0 items-center justify-between gap-2">
@@ -1887,7 +1887,7 @@ export function ExploreAllSearchClient({
 
         {filterOpen && !referenceMode && !peopleMode ? <ExploreFilterDrawer onClose={()=>setFilterOpen(false)} value={{location:state.location,distanceKm:state.distanceKm,sort:state.sort}} onApply={changes=>updateParams(changes,'replace')} onClear={clearAdvancedFilters} isId={isId} /> : null}
 
-        <div className="mb-2 flex items-center justify-between gap-3 rounded-[14px] border border-zinc-200/80 bg-white px-3 py-2.5 dark:border-zinc-800 dark:bg-zinc-950">
+        <div className="flex items-center justify-between gap-3 rounded-[14px] border border-zinc-200/80 bg-white px-3 py-2.5 dark:border-zinc-800 dark:bg-zinc-950">
           <div className="min-w-0">
             <p className="text-[10px] font-black text-zinc-800 dark:text-zinc-100">
               {isId
@@ -1911,7 +1911,7 @@ export function ExploreAllSearchClient({
           </button>
         </div>
 
-        <section className="mt-2 min-w-0 sm:mt-3">
+        <section className="min-w-0">
           <ExploreSearchResults
             payload={payload}
             loading={loading}
