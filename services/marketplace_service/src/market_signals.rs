@@ -104,7 +104,10 @@ pub async fn create_market_signal(
             .into_response();
     }
 
-    if payload.amount_cents.is_some_and(|v| v > 10_000_000_000_000_000) {
+    if payload
+        .amount_cents
+        .is_some_and(|v| v > 10_000_000_000_000_000)
+    {
         return (
             StatusCode::BAD_REQUEST,
             Json(json!({"error": "amount_cents is outside supported range"})),
@@ -299,16 +302,16 @@ pub async fn create_market_signal(
             }
 
             (
-            StatusCode::CREATED,
-            Json(json!({
-                "id": row.get::<Uuid, _>("id"),
-                "content_id": content_id,
-                "signal_side": signal_side,
-                "signal_type": signal_type,
-                "risk_status": if risk.eligible_for_market { "accepted" } else { "review" },
-                "created_at": row.get::<chrono::DateTime<chrono::Utc>, _>("created_at"),
-                "message": "Negotiation signal recorded"
-            })),
+                StatusCode::CREATED,
+                Json(json!({
+                    "id": row.get::<Uuid, _>("id"),
+                    "content_id": content_id,
+                    "signal_side": signal_side,
+                    "signal_type": signal_type,
+                    "risk_status": if risk.eligible_for_market { "accepted" } else { "review" },
+                    "created_at": row.get::<chrono::DateTime<chrono::Utc>, _>("created_at"),
+                    "message": "Negotiation signal recorded"
+                })),
             )
                 .into_response()
         },
