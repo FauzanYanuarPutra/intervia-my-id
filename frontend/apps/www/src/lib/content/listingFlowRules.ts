@@ -248,6 +248,28 @@ function normalizeText(value: unknown, maxLength = 5000): string | undefined {
   return trimmed.slice(0, maxLength);
 }
 
+/**
+ * Keep the listing title exactly as the user writes it, except for an
+ * accidental duplicated intent prefix such as "Butuh Butuh ...".
+ *
+ * The market side is persisted separately in listing_intent/listing_side and
+ * must never be injected into the title automatically.
+ */
+export function normalizeListingTitle(
+  value: unknown,
+  maxLength = 180,
+): string | undefined {
+  const normalized = normalizeText(value, maxLength);
+  if (!normalized) return undefined;
+
+  const deduplicated = normalized.replace(
+    /^(Butuh|Membutuhkan|Mencari|Menawarkan|Need|Looking for|Providing|Offering)\\s+\\1(?=\\s|$)\\s*/i,
+    '$1 ',
+  );
+
+  return deduplicated.trim().slice(0, maxLength);
+}
+
 function collectSafetyText(
   payload: Record<string, unknown>,
   metadata: Record<string, unknown>,
@@ -716,7 +738,7 @@ function enforceStrictListingRules(
   metadata: Record<string, unknown>,
   issues: string[],
 ): void {
-  const title = normalizeText(payload.title, 180);
+  const title = normalizeListingTitle(payload.title, 180);
   const summary = normalizeText(payload.summary, 2000);
   const body = normalizeText(payload.body, 15000);
   if (!title) issues.push('title is required for active listing');
