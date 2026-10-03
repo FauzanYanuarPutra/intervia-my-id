@@ -44,6 +44,7 @@ mod data_importer;
 mod health;
 mod identity_projection;
 mod market_intelligence;
+mod market_signals;
 mod moderation;
 mod news;
 mod order_engine;
@@ -2280,6 +2281,10 @@ async fn main() -> anyhow::Result<()> {
         .route(
             "/v1/content/{id}/market-intelligence",
             get(market_intelligence::market_intelligence),
+        )
+        .route(
+            "/v1/content/{id}/market-signals",
+            post(market_signals::create_market_signal),
         )
         .route(
             "/v1/content/{id}/moderate",
