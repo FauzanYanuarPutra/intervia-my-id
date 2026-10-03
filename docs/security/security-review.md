@@ -20,6 +20,19 @@ This review is based on static repository inspection. It does not print or copy 
 | SEC-008 | High | WebRTC | Static TURN credentials in `NEXT_PUBLIC_*` variables could be copied from a browser bundle and reused to consume relay bandwidth; public STUN/direct P2P can expose participant network addresses. | Historical `frontend/www/src/lib/webrtc.ts`; call components. | Relay abuse, unexpected cost, denial of call capacity, and avoidable network-metadata disclosure. | Applied statically: authenticated `/api/chat/calls/ice` issues bounded coturn REST credentials from a server-only secret. Production and privacy mode are relay-only and fail closed without TURN; public STUN fallback is restricted to development/test. Configure relay capacity and rotate the shared secret before production calls. |
 | SEC-009 | Critical | Profile AI sharing | A shared agent response could expose owner/config fields and historical shared-owner metadata to a non-owner. | Personal AI store serializer, agent detail route, chat history metadata. | Prompt/config disclosure and user identifier leakage. | Applied statically: shared DTOs now use an explicit allowlist and history metadata is sanitized; keep regression tests in the release gate. |
 
+## Market Negotiation Abuse Controls
+
+The negotiation-first marketplace flow now uses layered abuse controls:
+- IP, authenticated-user, and device-bound throttling at the public BFF boundary.
+- Server-side ownership and listing-state checks.
+- Idempotency support for retries.
+- Behavioral scoring for actor velocity, listing bursts, repeated identical prices, extreme price ratios, and abnormal quantities.
+- Suspicious signals are retained as audit evidence but excluded from market intelligence when they are not market-eligible.
+- A restricted risk-review queue is available to moderator/admin roles.
+- Market intelligence reads and content reports are separately rate-limited.
+
+The design intentionally uses graduated outcomes (allow, review, block) rather than relying on a single client-side rule. This is consistent with layered abuse prevention and business-logic security guidance: rate limiting alone is insufficient, while backend behavioral signals and review/audit trails provide additional protection.
+
 ## Authentication Review Notes
 
 Evidence exists for password, phone login, OTP, Google OAuth, JWT, refresh, session, lockout config, and profile verification. Missing follow-up: brute-force behavior, token revocation, cookie flags, redirect validation, and enumeration resistance should be tested route-by-route.
