@@ -1092,6 +1092,7 @@ export default function ContentDetailClient({
           },
           body: JSON.stringify({
             signal_type: amountCents ? 'price_indication' : 'inquiry',
+            market_side: toMarketSideValue(listingSide),
             amount_cents: amountCents,
             currency: baseCurrency,
             source: 'content_detail_negotiation',
