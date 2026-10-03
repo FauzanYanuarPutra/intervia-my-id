@@ -22,7 +22,7 @@ export function GoogleAdSenseUnit({
   className = '',
 }: GoogleAdSenseUnitProps) {
   const pathname = usePathname();
-  const insRef = useRef<HTMLElement | null>(null);
+  const insRef = useRef<HTMLModElement | null>(null);
   const pushedRef = useRef(false);
   const [adState, setAdState] = useState<'pending' | 'filled' | 'unfilled'>('pending');
 
