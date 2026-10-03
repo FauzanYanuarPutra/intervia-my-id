@@ -94,11 +94,70 @@ try {
                 $StartInfo.RedirectStandardOutput = $true
                 $StartInfo.RedirectStandardError = $true
                 $StartInfo.CreateNoWindow = $true
-                foreach ($Argument in $Arguments) {
-                    [void]$StartInfo.ArgumentList.Add([string]$Argument)
+
+                # .NET 6+/PowerShell 7 exposes ProcessStartInfo.ArgumentList, but
+                # Windows PowerShell 5.1 / .NET Framework does not. The launcher
+                # must work on both because the local Windows environment may use
+                # either shell/runtime. Prefer ArgumentList when available and
+                # fall back to the correctly-escaped Windows command-line string.
+                $ArgumentListProperty = $StartInfo.PSObject.Properties['ArgumentList']
+                if ($null -ne $ArgumentListProperty) {
+                    foreach ($Argument in $Arguments) {
+                        [void]$StartInfo.ArgumentList.Add([string]$Argument)
+                    }
+                }
+                else {
+                    $EscapedArguments = foreach ($Argument in $Arguments) {
+                        $Value = [string]$Argument
+                        if ($Value.Length -eq 0) {
+                            '""'
+                            continue
+                        }
+
+                        if ($Value -notmatch '[\s"]') {
+                            $Value
+                            continue
+                        }
+
+                        $Builder = New-Object System.Text.StringBuilder
+                        [void]$Builder.Append('"')
+                        $BackslashCount = 0
+
+                        foreach ($Character in $Value.ToCharArray()) {
+                            if ($Character -eq '\') {
+                                $BackslashCount++
+                                continue
+                            }
+
+                            if ($Character -eq '"') {
+                                if ($BackslashCount -gt 0) {
+                                    [void]$Builder.Append(('\' * ($BackslashCount * 2)))
+                                }
+                                [void]$Builder.Append('\"')
+                                $BackslashCount = 0
+                                continue
+                            }
+
+                            if ($BackslashCount -gt 0) {
+                                [void]$Builder.Append(('\' * $BackslashCount))
+                                $BackslashCount = 0
+                            }
+                            [void]$Builder.Append($Character)
+                        }
+
+                        # Backslashes immediately before the closing quote must
+                        # be doubled for Windows command-line parsing.
+                        if ($BackslashCount -gt 0) {
+                            [void]$Builder.Append(('\' * ($BackslashCount * 2)))
+                        }
+                        [void]$Builder.Append('"')
+                        $Builder.ToString()
+                    }
+
+                    $StartInfo.Arguments = ($EscapedArguments -join ' ')
                 }
 
-                $Process = [System.Diagnostics.Process]::new()
+                $Process = New-Object System.Diagnostics.Process
                 $Process.StartInfo = $StartInfo
                 [void]$Process.Start()
 
