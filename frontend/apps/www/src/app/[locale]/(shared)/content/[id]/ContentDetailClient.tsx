@@ -3945,6 +3945,7 @@ export default function ContentDetailClient({
           {shareError}
         </p>
       )}
+    );
   const locationLabel =
     quickSpecs.find(spec => spec.key === 'location')?.value ||
     readMetaText(meta, 'location', 'city', 'region', 'address') ||
