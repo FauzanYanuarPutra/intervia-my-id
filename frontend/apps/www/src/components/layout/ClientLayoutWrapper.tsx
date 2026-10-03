@@ -1,6 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import Script from 'next/script';
 import { ReactNode, Suspense, useEffect } from 'react';
 import { Sparkles } from 'lucide-react';
 
@@ -164,13 +165,10 @@ export default function ClientLayoutWrapper({
       'home',
       'explore',
       'search',
-      'community',
       'news',
       'reels',
       'content',
       'about',
-      'contact',
-      'support',
       'learn',
       'blog',
       'education',
@@ -261,12 +259,21 @@ export default function ClientLayoutWrapper({
             <>
               {children}
               {showSiteAd ? (
-                <div className="mx-auto w-full max-w-[1200px] px-3 pb-4 pt-2 sm:px-4 lg:px-5">
-                  <GoogleAdSenseUnit
-                    key={pathname || 'root'}
-                    slot="2055669263"
+                <>
+                  <Script
+                    id="google-adsense-public"
+                    async
+                    src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7020398942986974"
+                    crossOrigin="anonymous"
+                    strategy="afterInteractive"
                   />
-                </div>
+                  <div className="mx-auto w-full max-w-[1200px] px-3 pb-4 pt-2 sm:px-4 lg:px-5">
+                    <GoogleAdSenseUnit
+                      key={pathname || 'root'}
+                      slot="2055669263"
+                    />
+                  </div>
+                </>
               ) : null}
             </>
           </StackMaintenanceGate>
