@@ -707,7 +707,7 @@ pub(crate) async fn create_media_contribution(
             .bind(store_owner && risk_allows_owner_auto_approval)
             .bind(risk.score)
             .bind(risk.level)
-            .bind(serde_json::json!(risk.flags))
+            .bind(serde_json::json!(&risk.flags))
             .execute(&state.db)
             .await
         }
@@ -731,7 +731,7 @@ pub(crate) async fn create_media_contribution(
             .bind(&uploader_username)
             .bind(risk.score)
             .bind(risk.level)
-            .bind(json!(risk.flags))
+            .bind(json!(&risk.flags))
             .execute(&state.db)
             .await
         }
