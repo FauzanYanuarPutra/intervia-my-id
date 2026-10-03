@@ -1268,7 +1268,7 @@ pub async fn run_match(
     .await
     .unwrap_or_default();
 
-    let requirement_for_score = requirement;
+    let requirement_for_score = &requirement;
     let mut ranked = candidates
         .iter()
         .map(|candidate| {
