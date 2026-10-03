@@ -1183,6 +1183,14 @@ export default function ContentDetailClient({
       );
       return;
     }
+    if (intermediaryMode === 'managed' && !finalAmount) {
+      setOfferError(
+        locale === 'id'
+          ? 'Mode perantara membutuhkan nominal transaksi yang jelas.'
+          : 'Managed intermediary mode requires a clear transaction amount.',
+      );
+      return;
+    }
 
     setOfferError(null);
     setSubmitting(true);
@@ -1218,6 +1226,71 @@ export default function ContentDetailClient({
               ? 'Sinyal negosiasi belum bisa disimpan.'
               : 'The negotiation signal could not be saved.',
         );
+      }
+
+      let transactionId: string | null = null;
+      if (intermediaryMode === 'managed') {
+        const transactionResponse = await authFetch('/api/transactions/offer', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Idempotency-Key': createIdempotencyKey('transaction-offer'),
+          },
+          body: JSON.stringify({
+            content_id: resolvedContentId,
+            amount_cents: amountCents,
+            currency: baseCurrency,
+            offer_message: offerMessage.trim() || undefined,
+            deal_kind:
+              displayType === 'service'
+                ? 'service'
+                : displayType === 'property'
+                  ? 'property'
+                  : displayType === 'tool_rental'
+                    ? 'tool_rental'
+                    : displayType === 'profile'
+                      ? 'profile'
+                      : 'product',
+            fulfillment_mode: 'standard',
+            intermediary_mode: 'managed',
+            intermediary_email: selectedIntermediaryEmail,
+            transaction_meta: {
+              source: 'content_detail_negotiation',
+              content_url: listingHref,
+              market_side: toMarketSideValue(listingSide),
+              intermediary_requested_from: 'content_detail',
+            },
+            safety_checklist: {
+              identity_confirmed: true,
+              platform_payment_confirmed: true,
+              item_detail_confirmed: true,
+              anti_scam_acknowledged: true,
+            },
+            risk_flags: [],
+          }),
+        });
+        const transactionPayload = await transactionResponse.json().catch(() => ({}));
+        if (!transactionResponse.ok) {
+          throw new Error(
+            typeof transactionPayload?.error === 'string'
+              ? transactionPayload.error
+              : locale === 'id'
+                ? 'Transaksi perantara belum bisa dibuat.'
+                : 'The managed transaction could not be created.',
+          );
+        }
+        transactionId =
+          transactionPayload?.id ||
+          transactionPayload?.transaction?.id ||
+          transactionPayload?.data?.id ||
+          null;
+        if (!transactionId) {
+          throw new Error(
+            locale === 'id'
+              ? 'ID transaksi tidak diterima server.'
+              : 'Transaction ID was not returned by the server.',
+          );
+        }
       }
 
       const chatRes = await authFetch('/api/chat/dm', {
@@ -1256,6 +1329,14 @@ export default function ContentDetailClient({
         finalAmount
           ? `${locale === 'id' ? 'Nominal yang saya ajukan' : 'My proposed amount'}: ${formatCurrency(amountCents || 0, baseCurrency)}`
           : '',
+        intermediaryMode === 'managed'
+          ? locale === 'id'
+            ? `Saya memilih perantara Lajukan: ${selectedIntermediaryEmail}. Dana akan diproses melalui custody Lajukan dan dilepas setelah proses dinyatakan selesai.`
+            : `I selected Lajukan intermediary: ${selectedIntermediaryEmail}. Funds will stay in Lajukan custody until the process is completed.`
+          : locale === 'id'
+            ? 'Saya memilih transaksi langsung/COD. Transaksi di luar flow perantara Lajukan menjadi tanggung jawab para pihak dan tidak mendapat perlindungan custody Lajukan.'
+            : 'I chose direct/COD. Transactions outside the Lajukan intermediary flow are the parties\' responsibility and are not protected by Lajukan custody.',
+        transactionId ? `Transaction ID: ${transactionId}` : '',
         offerMessage.trim(),
       ].filter(Boolean);
 
