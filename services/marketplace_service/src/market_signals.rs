@@ -276,7 +276,7 @@ pub async fn create_market_signal(
     .bind(idempotency_key)
     .bind(risk.score)
     .bind(risk.decision)
-    .bind(risk_reasons)
+    .bind(&risk_reasons)
     .bind(risk.eligible_for_market)
     .fetch_optional(&state.db)
     .await;
