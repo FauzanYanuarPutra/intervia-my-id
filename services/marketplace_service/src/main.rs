@@ -25462,6 +25462,18 @@ async fn update_transaction_status(
     }
 
     if next_status == "cancelled" && txn.status == "completed" {
+        if managed_intermediary {
+            return (
+                StatusCode::CONFLICT,
+                Json(json!({
+                    "error": "managed completed transactions require support correction",
+                    "code": "managed_completed_correction_manual",
+                    "message": "Transaksi perantara yang sudah selesai tidak dibalik otomatis. Ajukan koreksi/dispute agar custody dan payout tetap konsisten."
+                })),
+            )
+                .into_response();
+        }
+
         let now = Utc::now();
         let deadline = completed_transaction_correction_deadline(txn.updated_at);
         if !completed_transaction_correction_allowed(txn.updated_at, now) {
