@@ -8102,7 +8102,15 @@ export default function ChatRoomPage() {
                                           <button
                                             type="button"
                                             onClick={() =>
-                                              openListingActionModal(meta)
+                                              openListingActionModal(
+                                                meta,
+                                                structuredSide === 'supply' &&
+                                                  inferPricingMode(
+                                                    meta || {},
+                                                  ) === 'fixed'
+                                                  ? 'direct'
+                                                  : 'offer',
+                                              )
                                             }
                                             className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-accent)_20%,_transparent)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-accent)] hover:bg-[color:color-mix(in_srgb,_var(--app-accent)_30%,_transparent)]"
                                           >
@@ -10027,7 +10035,7 @@ export default function ChatRoomPage() {
                 <button
                   type="button"
                   onClick={() =>
-                    applyListingActionMode(listingActionDraft!, 'direct')
+                    applyListingActionMode(listingActionDraft, 'direct')
                   }
                   className={`ui-feed-tile rounded-2xl border px-3 py-3 text-left transition ${
                     listingActionMode === 'direct'
@@ -10049,7 +10057,7 @@ export default function ChatRoomPage() {
                 <button
                   type="button"
                   onClick={() =>
-                    applyListingActionMode(listingActionDraft!, 'offer')
+                    applyListingActionMode(listingActionDraft, 'offer')
                   }
                   className={`ui-feed-tile rounded-2xl border px-3 py-3 text-left transition ${
                     listingActionMode === 'offer'
