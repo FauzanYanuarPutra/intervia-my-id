@@ -237,6 +237,13 @@ type SocialUser = {
   meta: string;
 };
 
+type ProfileSocialState = {
+  followersCount: number;
+  followingCount: number;
+  followers: SocialUser[];
+  following: SocialUser[];
+};
+
 const PAGE_CLASS =
   'min-h-screen overflow-x-hidden bg-[linear-gradient(180deg,#f5fbf7_0%,#eef7f1_34%,#f8fafc_100%)] pb-[calc(5.25rem+env(safe-area-inset-bottom))] pt-0 dark:bg-[linear-gradient(180deg,#07120f_0%,#07111d_44%,#020617_100%)] sm:pb-8 sm:pt-2';
 const CARD_CLASS =
@@ -279,7 +286,6 @@ const TONAL_ACTION_CLASS =
 const INPUT_CLASS =
   'w-full rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3.5 py-2.5 text-sm text-[color:var(--app-text)] outline-none transition focus:border-[color:var(--app-accent-border)] focus:ring-2 focus:ring-[color:var(--app-accent-soft)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)]';
 const REELS_PROFILE_STORAGE_KEY = 'lajukan.reels.preference.v1';
-const PROFILE_SOCIAL_STORAGE_KEY = 'lajukan.profile.following.v1';
 
 type ProfileSocialActivity = {
   id: string;
@@ -584,6 +590,38 @@ function mergeSocialUsers(...groups: SocialUser[][]): SocialUser[] {
   return result;
 }
 
+function normalizeProfileSocialResponse(
+  value: unknown,
+  isId: boolean,
+): ProfileSocialState | null {
+  const record = asSocialRecord(value);
+  if (!record) return null;
+
+  const followers = readSocialList(
+    record.followers ?? record.follower_users,
+    isId,
+  );
+  const following = readSocialList(
+    record.following ?? record.following_users,
+    isId,
+  );
+
+  return {
+    followersCount: Math.max(
+      followers.length,
+      readSocialNumber(record.followersCount),
+      readSocialNumber(record.followers_count),
+    ),
+    followingCount: Math.max(
+      following.length,
+      readSocialNumber(record.followingCount),
+      readSocialNumber(record.following_count),
+    ),
+    followers,
+    following,
+  };
+}
+
 function buildSocialUserProfileHref({
   id,
   username,
@@ -604,11 +642,13 @@ function SocialUserRow({
   item,
   isId,
   following,
+  busy = false,
   onToggle,
 }: {
   item: SocialUser;
   isId: boolean;
   following: boolean;
+  busy?: boolean;
   onToggle: (id: string) => void;
 }) {
   return (
@@ -649,6 +689,8 @@ function SocialUserRow({
       <button
         type="button"
         onClick={() => onToggle(item.id)}
+        disabled={busy}
+        aria-busy={busy}
         className={cn(
           'inline-flex min-h-[36px] shrink-0 items-center justify-center gap-1 rounded-full px-3 text-[11px] font-bold transition sm:text-xs',
           following
@@ -1426,7 +1468,10 @@ export function ProfileHubView(props: ProfileHubViewProps) {
   const { items: inboxNotifications } = useNotificationInbox();
   const [activeHubTab, setActiveHubTab] = useState<HubTab>('ringkas');
   const [socialModal, setSocialModal] = useState<SocialModalTab | null>(null);
-  const [followedIds, setFollowedIds] = useState<string[]>([]);
+  const [backendSocial, setBackendSocial] = useState<ProfileSocialState | null>(null);
+  const [followBusyIds, setFollowBusyIds] = useState<string[]>([]);
+  const [socialLoading, setSocialLoading] = useState(false);
+  const [socialError, setSocialError] = useState<string | null>(null);
   const [reelsSignalCount, setReelsSignalCount] = useState(0);
   const [reelsPreferenceTags, setReelsPreferenceTags] = useState<string[]>([]);
   const [originBase] = useState(() =>
@@ -1642,56 +1687,100 @@ export function ProfileHubView(props: ProfileHubViewProps) {
   const locale = useMemo(() => resolveLocaleFromPathname(pathname), [pathname]);
   const isId = locale === 'id';
 
-  const followingStorageKey = `${PROFILE_SOCIAL_STORAGE_KEY}:${user.id || 'me'}`;
+  const loadProfileSocial = useCallback(async () => {
+    const targetId = String(detail?.id || user.id || '').trim();
+    if (!targetId) return;
+
+    setSocialLoading(true);
+    setSocialError(null);
+
+    try {
+      const response = await authFetch(
+        `/api/community/users/${encodeURIComponent(targetId)}/social?limit=48`,
+        { cache: 'no-store' },
+      );
+      const payload = await response.json().catch(() => null);
+      const normalized = normalizeProfileSocialResponse(payload, isId);
+
+      if (!response.ok || !normalized) {
+        throw new Error(
+          isId
+            ? 'Data koneksi belum bisa dimuat.'
+            : 'Connection data could not be loaded.',
+        );
+      }
+
+      setBackendSocial(normalized);
+    } catch (error) {
+      setSocialError(
+        error instanceof Error && error.message
+          ? error.message
+          : isId
+            ? 'Data koneksi belum bisa dimuat.'
+            : 'Connection data could not be loaded.',
+      );
+    } finally {
+      setSocialLoading(false);
+    }
+  }, [authFetch, detail?.id, isId, user.id]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    void loadProfileSocial();
+  }, [loadProfileSocial]);
 
-    const timeout = window.setTimeout(() => {
-      try {
-        const raw = window.localStorage.getItem(followingStorageKey);
-        const parsed = raw ? JSON.parse(raw) : [];
-        setFollowedIds(
-          Array.isArray(parsed)
-            ? parsed.map(item => String(item)).filter(Boolean)
-            : [],
-        );
-      } catch {
-        setFollowedIds([]);
-      }
-    }, 0);
-
-    return () => window.clearTimeout(timeout);
-  }, [followingStorageKey]);
-
-  const persistFollowedIds = useCallback(
-    (next: string[]) => {
-      const unique = Array.from(new Set(next.filter(Boolean)));
-      setFollowedIds(unique);
-      if (typeof window === 'undefined') return;
-      try {
-        window.localStorage.setItem(
-          followingStorageKey,
-          JSON.stringify(unique),
-        );
-      } catch {
-        // local follow state is best-effort until backend social graph exists.
-      }
-    },
-    [followingStorageKey],
+  const followedIds = useMemo(
+    () => new Set((backendSocial?.following || []).map(item => item.id)),
+    [backendSocial],
   );
 
   const toggleFollow = useCallback(
-    (targetId: string) => {
-      if (!targetId || targetId === user.id) return;
-      const following = followedIds.includes(targetId);
-      persistFollowedIds(
-        following
-          ? followedIds.filter(item => item !== targetId)
-          : [...followedIds, targetId],
+    async (targetId: string) => {
+      if (!targetId || targetId === user.id || followBusyIds.includes(targetId)) {
+        return;
+      }
+
+      const isFollowing = followedIds.has(targetId);
+      setFollowBusyIds(current =>
+        current.includes(targetId) ? current : [...current, targetId],
       );
+
+      try {
+        const response = await authFetch(
+          `/api/community/users/${encodeURIComponent(targetId.replace(/^auth-/, ''))}/follow`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ active: !isFollowing }),
+          },
+        );
+        const payload = await response.json().catch(() => null);
+        const normalized = normalizeProfileSocialResponse(payload, isId);
+
+        if (!response.ok || !normalized) {
+          throw new Error(
+            isId
+              ? 'Gagal memperbarui koneksi.'
+              : 'Failed to update the connection.',
+          );
+        }
+
+        setBackendSocial(normalized);
+        setSocialError(null);
+      } catch (error) {
+        setSocialError(
+          error instanceof Error && error.message
+            ? error.message
+            : isId
+              ? 'Gagal memperbarui koneksi.'
+              : 'Failed to update the connection.',
+        );
+      } finally {
+        setFollowBusyIds(current =>
+          current.filter(id => id !== targetId),
+        );
+      }
     },
-    [followedIds, persistFollowedIds, user.id],
+    [authFetch, followBusyIds, followedIds, isId, user.id],
   );
 
   const copy = useMemo(
@@ -1911,24 +2000,31 @@ export function ProfileHubView(props: ProfileHubViewProps) {
       ),
     [isId, metadataRecord, metadataSocial, profileSocial],
   );
-  const followingUsers = useMemo(
-    () => metadataFollowingUsers,
-    [metadataFollowingUsers],
-  );
-  const followerUsers = metadataFollowerUsers;
-  const followerCount = Math.max(
-    followerUsers.length,
-    readSocialNumber(metadataRecord?.followers_count),
-    readSocialNumber(metadataRecord?.follower_count),
-    readSocialNumber(metadataSocial?.followers_count),
-    readSocialNumber(profileSocial?.followers_count),
-  );
-  const followingCount = Math.max(
-    followingUsers.length,
-    readSocialNumber(metadataRecord?.following_count),
-    readSocialNumber(metadataSocial?.following_count),
-    readSocialNumber(profileSocial?.following_count),
-  );
+  const followingUsers = backendSocial
+    ? backendSocial.following
+    : metadataFollowingUsers;
+  const followerUsers = backendSocial
+    ? backendSocial.followers
+    : metadataFollowerUsers;
+
+  const followerCount = backendSocial
+    ? Math.max(backendSocial.followersCount, backendSocial.followers.length)
+    : Math.max(
+        followerUsers.length,
+        readSocialNumber(metadataRecord?.followers_count),
+        readSocialNumber(metadataRecord?.follower_count),
+        readSocialNumber(metadataSocial?.followers_count),
+        readSocialNumber(profileSocial?.followers_count),
+      );
+
+  const followingCount = backendSocial
+    ? Math.max(backendSocial.followingCount, backendSocial.following.length)
+    : Math.max(
+        followingUsers.length,
+        readSocialNumber(metadataRecord?.following_count),
+        readSocialNumber(metadataSocial?.following_count),
+        readSocialNumber(profileSocial?.following_count),
+      );
   const socialModalUsers =
     socialModal === 'followers' ? followerUsers : followingUsers;
   const socialModalTitle =
@@ -3493,7 +3589,8 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                       item={item}
                       isId={isId}
                       following
-                      onToggle={toggleFollow}
+                      busy={followBusyIds.includes(item.id)}
+                      onToggle={targetId => void toggleFollow(targetId)}
                     />
                   ))}
                   {followingUsers.length === 0 ? (
@@ -3614,7 +3711,18 @@ export function ProfileHubView(props: ProfileHubViewProps) {
             ))}
           </div>
 
-          {socialModalUsers.length === 0 ? (
+          {socialError ? (
+            <div className="rounded-[14px] border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 dark:border-amber-900/60 dark:bg-amber-500/10 dark:text-amber-200">
+              {socialError}
+            </div>
+          ) : null}
+
+          {socialLoading && socialModalUsers.length === 0 ? (
+            <div className="flex min-h-32 items-center justify-center rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-4 text-center text-xs font-semibold text-[color:var(--app-text-soft)]">
+              <Loader2 className="mr-2 h-4 w-4 animate-spin text-[color:var(--app-accent)]" />
+              {isId ? 'Memuat koneksi...' : 'Loading connections...'}
+            </div>
+          ) : socialModalUsers.length === 0 ? (
             <EmptyState
               title={socialModalEmpty}
               description={
@@ -3644,7 +3752,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                   item={item}
                   isId={isId}
                   following={
-                    socialModal === 'following' || followedIds.includes(item.id)
+                    socialModal === 'following' || followedIds.has(item.id)
                   }
                   onToggle={toggleFollow}
                 />
