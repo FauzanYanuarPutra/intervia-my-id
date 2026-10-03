@@ -51,6 +51,13 @@ type ListingQualityAssistantProps = {
 
 function labelUnit(value: string) {
   const map: Record<string, string> = {
+    product: 'Produk',
+    service: 'Jasa',
+    job: 'Lowongan',
+    property: 'Properti',
+    tool_rental: 'Sewa alat',
+    company: 'Perusahaan',
+    other: 'Lainnya',
     kg: 'kg',
     pcs: 'pcs',
     project: 'proyek',
@@ -319,7 +326,7 @@ export function ListingQualityAssistant({
                       }
                       className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-amber-300 bg-white px-3 py-2 text-xs font-black text-amber-950 transition hover:bg-amber-100 disabled:opacity-60 dark:border-amber-800 dark:bg-slate-950/30 dark:text-amber-100 dark:hover:bg-amber-950/40"
                     >
-                      <span>Rp… / {labelUnit(choice.unit)}</span>
+                      <span>{result.current.price ? `${result.current.price} / ${labelUnit(choice.unit)}` : `Per ${labelUnit(choice.unit)}`}</span>
                       <span className="text-[10px] opacity-60">
                         {Math.round(choice.confidence * 100)}%
                       </span>
