@@ -84,7 +84,11 @@ fn assess_media_risk(
         "low"
     };
 
-    MediaRiskAssessment { score, level, flags }
+    MediaRiskAssessment {
+        score,
+        level,
+        flags,
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -573,7 +577,7 @@ pub(crate) async fn create_media_contribution(
           )::bigint AS rejected_30d
         FROM umkm_store_media_contributions
         WHERE uploader_user_id = $1
-        "#
+        "#,
     )
     .bind(user_id)
     .fetch_one(&state.db)
@@ -591,32 +595,36 @@ pub(crate) async fn create_media_contribution(
     };
 
     let recent_target_day = match target {
-        MediaTarget::Store(store_id) => sqlx::query_scalar::<_, i64>(
-            r#"
+        MediaTarget::Store(store_id) => {
+            sqlx::query_scalar::<_, i64>(
+                r#"
             SELECT COUNT(*)::bigint
             FROM umkm_store_media_contributions
             WHERE store_id = $1
               AND uploader_user_id = $2
               AND created_at >= NOW() - interval '24 hours'
             "#,
-        )
-        .bind(store_id)
-        .bind(user_id)
-        .fetch_one(&state.db)
-        .await,
-        MediaTarget::Reference(reference_id) => sqlx::query_scalar::<_, i64>(
-            r#"
+            )
+            .bind(store_id)
+            .bind(user_id)
+            .fetch_one(&state.db)
+            .await
+        }
+        MediaTarget::Reference(reference_id) => {
+            sqlx::query_scalar::<_, i64>(
+                r#"
             SELECT COUNT(*)::bigint
             FROM umkm_store_media_contributions
             WHERE reference_content_id = $1
               AND uploader_user_id = $2
               AND created_at >= NOW() - interval '24 hours'
             "#,
-        )
-        .bind(reference_id)
-        .bind(user_id)
-        .fetch_one(&state.db)
-        .await,
+            )
+            .bind(reference_id)
+            .bind(user_id)
+            .fetch_one(&state.db)
+            .await
+        }
     };
     let recent_target_day = match recent_target_day {
         Ok(value) => value,
