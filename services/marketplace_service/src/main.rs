@@ -16743,6 +16743,42 @@ async fn review_delivery_transaction(
     });
 
     if decision == "accept" {
+        if intermediary_mode(&txn.transaction_meta) == "managed" {
+            if let Some(intermediary_id) = intermediary_user_id(&txn.transaction_meta) {
+                push_notification_best_effort(
+                    &state,
+                    intermediary_id,
+                    "transaction",
+                    "transaction.delivery_accepted",
+                    "Delivery diterima buyer",
+                    &format!(
+                        "Buyer menerima hasil transaksi {}. Perantara dapat memverifikasi dan menyelesaikan transaksi.",
+                        id
+                    ),
+                    json!({
+                        "transaction_id": id,
+                        "intermediary_status": "active",
+                        "delivery_review_status": "accepted"
+                    }),
+                )
+                .await;
+            }
+
+            return update_transaction_status(
+                &state,
+                id,
+                user_id,
+                "delivered",
+                &["delivered"],
+                false,
+                true,
+                response_message.or_else(|| evidence_note.clone()),
+                Some(review_context),
+                Some(transaction_meta_patch),
+            )
+            .await;
+        }
+
         return update_transaction_status(
             &state,
             id,
