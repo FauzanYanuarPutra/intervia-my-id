@@ -1,1 +1,33 @@
-import { NextRequest, NextResponse } from 'next/server';\nimport { withProtectedRoute, buildForwardAuthHeaders } from '@/lib/api/withProtectedRoute';\n\nconst MARKETPLACE_URL =\n  process.env.INTERNAL_MARKETPLACE_URL ||\n  process.env.MARKETPLACE_URL ||\n  'http://localhost:8081';\n\nexport async function GET(req: NextRequest) {\n  try {\n    return withProtectedRoute(\n      req,\n      {\n        routeKey: 'tx-intermediaries',\n        ipLimit: 120,\n        deviceLimit: 80,\n        windowSeconds: 900,\n      },\n      async ctx =>\n        fetch(MARKETPLACE_URL + '/v1/transaction-intermediaries', {\n          method: 'GET',\n          headers: buildForwardAuthHeaders(ctx),\n          cache: 'no-store',\n        }),\n    );\n  } catch (error) {\n    console.error('[TRANSACTION_INTERMEDIARIES_ERROR]', error);\n    return NextResponse.json(\n      { error: 'Internal server error' },\n      { status: 500 },\n    );\n  }\n}\n
+import { NextRequest, NextResponse } from 'next/server';
+import { withProtectedRoute, buildForwardAuthHeaders } from '@/lib/api/withProtectedRoute';
+
+const MARKETPLACE_URL =
+  process.env.INTERNAL_MARKETPLACE_URL ||
+  process.env.MARKETPLACE_URL ||
+  'http://localhost:8081';
+
+export async function GET(req: NextRequest) {
+  try {
+    return withProtectedRoute(
+      req,
+      {
+        routeKey: 'tx-intermediaries',
+        ipLimit: 120,
+        deviceLimit: 80,
+        windowSeconds: 900,
+      },
+      async ctx =>
+        fetch(MARKETPLACE_URL + '/v1/transaction-intermediaries', {
+          method: 'GET',
+          headers: buildForwardAuthHeaders(ctx),
+          cache: 'no-store',
+        }),
+    );
+  } catch (error) {
+    console.error('[TRANSACTION_INTERMEDIARIES_ERROR]', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 },
+    );
+  }
+}
