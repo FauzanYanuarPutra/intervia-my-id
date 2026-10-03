@@ -20797,6 +20797,10 @@ async fn refund_intermediary_transaction_funds_tx(
         lock_wallet_account_tx(tx, txn.buyer_id, environment, txn.currency.as_str()).await?;
 
     if intermediary_account.held_balance_cents < txn.amount_cents {
+        // Cancellation can happen before the buyer funds a managed transaction.
+        if intermediary_account.held_balance_cents == 0 {
+            return Ok(());
+        }
         return Err(WalletTransitionError::InvalidHeldBalance);
     }
 
