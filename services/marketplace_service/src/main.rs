@@ -5657,12 +5657,16 @@ async fn resolve_transaction_intermediary_candidate(
     .bind(&normalized)
     .fetch_optional(db)
     .await
-    .map(|row| row.map(|(email, user_id, display_name, note)| TransactionIntermediaryCandidate {
-        email,
-        user_id,
-        display_name: display_name.unwrap_or_else(|| "Perantara Lajukan".to_string()),
-        note,
-    }))
+    .map(|row| {
+        row.map(
+            |(email, user_id, display_name, note)| TransactionIntermediaryCandidate {
+                email,
+                user_id,
+                display_name: display_name.unwrap_or_else(|| "Perantara Lajukan".to_string()),
+                note,
+            },
+        )
+    })
 }
 
 async fn list_transaction_intermediaries(
@@ -5697,15 +5701,19 @@ async fn list_transaction_intermediaries(
     {
         Ok(rows) => (
             StatusCode::OK,
-            Json(rows
-                .into_iter()
-                .map(|(email, user_id, display_name, note)| TransactionIntermediaryCandidate {
-                    email,
-                    user_id,
-                    display_name: display_name.unwrap_or_else(|| "Perantara Lajukan".to_string()),
-                    note,
-                })
-                .collect::<Vec<_>>()),
+            Json(
+                rows.into_iter()
+                    .map(
+                        |(email, user_id, display_name, note)| TransactionIntermediaryCandidate {
+                            email,
+                            user_id,
+                            display_name: display_name
+                                .unwrap_or_else(|| "Perantara Lajukan".to_string()),
+                            note,
+                        },
+                    )
+                    .collect::<Vec<_>>(),
+            ),
         )
             .into_response(),
         Err(error) => {
@@ -5776,7 +5784,11 @@ async fn update_transaction_intermediary_status(
         Ok(tx) => tx,
         Err(error) => {
             tracing::error!("update intermediary begin error: {:?}", error);
-            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update intermediary").into_response();
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to update intermediary",
+            )
+            .into_response();
         }
     };
 
@@ -5800,16 +5812,28 @@ async fn update_transaction_intermediary_status(
         Ok(None) => return err(StatusCode::NOT_FOUND, "transaction not found").into_response(),
         Err(error) => {
             tracing::error!("update intermediary transaction read error: {:?}", error);
-            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load transaction").into_response();
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load transaction",
+            )
+            .into_response();
         }
     };
 
     if intermediary_mode(&txn.transaction_meta) != "managed" {
-        return err(StatusCode::CONFLICT, "transaction does not use a Lajukan intermediary").into_response();
+        return err(
+            StatusCode::CONFLICT,
+            "transaction does not use a Lajukan intermediary",
+        )
+        .into_response();
     }
 
     if intermediary_user_id(&txn.transaction_meta) != Some(actor_id) {
-        return err(StatusCode::FORBIDDEN, "only the selected intermediary can perform this action").into_response();
+        return err(
+            StatusCode::FORBIDDEN,
+            "only the selected intermediary can perform this action",
+        )
+        .into_response();
     }
 
     let current_status = intermediary_status(&txn.transaction_meta);
@@ -5855,13 +5879,12 @@ async fn update_transaction_intermediary_status(
         );
     }
 
-    let next_transaction_status = if next_status == "declined"
-        && matches!(txn.status.as_str(), "pending" | "accepted")
-    {
-        "cancelled"
-    } else {
-        txn.status.as_str()
-    };
+    let next_transaction_status =
+        if next_status == "declined" && matches!(txn.status.as_str(), "pending" | "accepted") {
+            "cancelled"
+        } else {
+            txn.status.as_str()
+        };
 
     let updated = match sqlx::query_as::<_, TransactionRow>(
         r#"
@@ -5891,13 +5914,21 @@ async fn update_transaction_intermediary_status(
         Ok(row) => row,
         Err(error) => {
             tracing::error!("update intermediary transaction error: {:?}", error);
-            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update intermediary").into_response();
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to update intermediary",
+            )
+            .into_response();
         }
     };
 
     if let Err(error) = tx.commit().await {
         tracing::error!("update intermediary commit error: {:?}", error);
-        return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update intermediary").into_response();
+        return err(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to update intermediary",
+        )
+        .into_response();
     }
 
     let title = if next_status == "accepted" {
@@ -5911,7 +5942,10 @@ async fn update_transaction_intermediary_status(
         "transaction",
         "transaction.intermediary_status",
         title,
-        &format!("Transaksi {}: status perantara {}.", updated.id, next_status),
+        &format!(
+            "Transaksi {}: status perantara {}.",
+            updated.id, next_status
+        ),
         json!({
             "transaction_id": updated.id,
             "intermediary_status": next_status
@@ -5946,7 +5980,10 @@ async fn update_transaction_intermediary_status(
             "transaction",
             "transaction.intermediary_declined",
             "Perantara Lajukan menolak transaksi",
-            &format!("Transaksi {} tidak dilanjutkan dengan perantara.", updated.id),
+            &format!(
+                "Transaksi {} tidak dilanjutkan dengan perantara.",
+                updated.id
+            ),
             json!({
                 "transaction_id": updated.id,
                 "intermediary_status": "declined"
@@ -15220,22 +15257,43 @@ async fn create_offer(
     let intermediary_candidate = match intermediary_mode.as_str() {
         "direct" => None,
         "managed" => {
-            let Some(email) = payload.intermediary_email.as_deref().map(str::trim).filter(|v| !v.is_empty()) else {
-                return err(StatusCode::BAD_REQUEST, "intermediary_email is required for managed transactions").into_response();
+            let Some(email) = payload
+                .intermediary_email
+                .as_deref()
+                .map(str::trim)
+                .filter(|v| !v.is_empty())
+            else {
+                return err(
+                    StatusCode::BAD_REQUEST,
+                    "intermediary_email is required for managed transactions",
+                )
+                .into_response();
             };
             match resolve_transaction_intermediary_candidate(&state.db, email).await {
                 Ok(Some(candidate)) => {
                     if candidate.user_id == buyer_id || candidate.user_id == content.owner_id {
-                        return err(StatusCode::BAD_REQUEST, "intermediary cannot be a transaction party").into_response();
+                        return err(
+                            StatusCode::BAD_REQUEST,
+                            "intermediary cannot be a transaction party",
+                        )
+                        .into_response();
                     }
                     Some(candidate)
                 }
                 Ok(None) => {
-                    return err(StatusCode::BAD_REQUEST, "selected intermediary is not available").into_response();
+                    return err(
+                        StatusCode::BAD_REQUEST,
+                        "selected intermediary is not available",
+                    )
+                    .into_response();
                 }
                 Err(error) => {
                     tracing::error!("resolve intermediary candidate error: {:?}", error);
-                    return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to resolve intermediary").into_response();
+                    return err(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "failed to resolve intermediary",
+                    )
+                    .into_response();
                 }
             }
         }
@@ -15364,8 +15422,7 @@ async fn create_offer(
                     "Permintaan perantara Lajukan",
                     &format!(
                         "Kamu diminta menjadi perantara untuk transaksi {} sebesar {}.",
-                        row.id,
-                        amount_label
+                        row.id, amount_label
                     ),
                     json!({
                         "transaction_id": row.id,
@@ -16015,12 +16072,8 @@ async fn fund_transaction(
     };
 
     let hold_result = if managed_intermediary {
-        hold_transaction_funds_with_intermediary_tx(
-            &mut tx,
-            &txn,
-            wallet_environment.as_str(),
-        )
-        .await
+        hold_transaction_funds_with_intermediary_tx(&mut tx, &txn, wallet_environment.as_str())
+            .await
     } else {
         hold_transaction_funds_tx(&mut tx, &txn, wallet_environment.as_str()).await
     };
@@ -20685,7 +20738,10 @@ async fn hold_transaction_funds_with_intermediary_tx(
         "intermediary_custody_funding",
         "transaction",
         txn.id,
-        format!("Funds moved to Lajukan intermediary custody for transaction {}", txn.id),
+        format!(
+            "Funds moved to Lajukan intermediary custody for transaction {}",
+            txn.id
+        ),
         json!({
             "transaction_id": txn.id,
             "custodian_user_id": intermediary_id,
@@ -20705,7 +20761,10 @@ async fn hold_transaction_funds_with_intermediary_tx(
         "intermediary_custody_hold",
         "transaction",
         txn.id,
-        format!("Funds held in intermediary custody for transaction {}", txn.id),
+        format!(
+            "Funds held in intermediary custody for transaction {}",
+            txn.id
+        ),
         json!({
             "transaction_id": txn.id,
             "source_user_id": txn.buyer_id,
@@ -20781,7 +20840,10 @@ async fn release_intermediary_transaction_funds_tx(
         "intermediary_custody_release",
         "transaction",
         txn.id,
-        format!("Funds released from intermediary custody for transaction {}", txn.id),
+        format!(
+            "Funds released from intermediary custody for transaction {}",
+            txn.id
+        ),
         json!({
             "transaction_id": txn.id,
             "recipient_user_id": txn.seller_id,
@@ -20802,7 +20864,10 @@ async fn release_intermediary_transaction_funds_tx(
         "payment_release",
         "transaction",
         txn.id,
-        format!("Payment released from intermediary custody for transaction {}", txn.id),
+        format!(
+            "Payment released from intermediary custody for transaction {}",
+            txn.id
+        ),
         json!({
             "transaction_id": txn.id,
             "custodian_user_id": intermediary_id,
@@ -20881,7 +20946,10 @@ async fn refund_intermediary_transaction_funds_tx(
         "intermediary_custody_refund",
         "transaction",
         txn.id,
-        format!("Funds returned from intermediary custody for transaction {}", txn.id),
+        format!(
+            "Funds returned from intermediary custody for transaction {}",
+            txn.id
+        ),
         json!({
             "transaction_id": txn.id,
             "recipient_user_id": txn.buyer_id,
@@ -20902,7 +20970,10 @@ async fn refund_intermediary_transaction_funds_tx(
         "refund",
         "transaction",
         txn.id,
-        format!("Refund from intermediary custody for transaction {}", txn.id),
+        format!(
+            "Refund from intermediary custody for transaction {}",
+            txn.id
+        ),
         json!({
             "transaction_id": txn.id,
             "custodian_user_id": intermediary_id,
@@ -21266,12 +21337,11 @@ async fn settle_dispute_funds_tx(
     .await?;
 
     let updated_buyer = if settlement.refund_amount_cents > 0 {
-        Some(
-            {
-                let buyer_account =
-                    lock_wallet_account_tx(tx, txn.buyer_id, environment, txn.currency.as_str())
-                        .await?;
-                sqlx::query_as::<_, WalletAccountRow>(
+        Some({
+            let buyer_account =
+                lock_wallet_account_tx(tx, txn.buyer_id, environment, txn.currency.as_str())
+                    .await?;
+            sqlx::query_as::<_, WalletAccountRow>(
                     r#"
                     UPDATE wallet_accounts
                     SET
@@ -21287,8 +21357,7 @@ async fn settle_dispute_funds_tx(
                 .bind(buyer_account.available_balance_cents + settlement.refund_amount_cents)
                 .fetch_one(&mut **tx)
                 .await?
-            }
-        )
+        })
     } else {
         None
     };
@@ -21323,7 +21392,9 @@ async fn settle_dispute_funds_tx(
     };
 
     if settlement.refund_amount_cents > 0 {
-        let buyer = updated_buyer.as_ref().expect("buyer refund account must exist");
+        let buyer = updated_buyer
+            .as_ref()
+            .expect("buyer refund account must exist");
         insert_wallet_ledger_entry_tx(
             tx,
             txn.buyer_id,
@@ -25269,9 +25340,8 @@ async fn update_transaction_status(
 
     let is_buyer = txn.buyer_id == user_id;
     let is_seller = txn.seller_id == user_id;
-    let is_intermediary =
-        intermediary_mode(&txn.transaction_meta) == "managed"
-            && intermediary_user_id(&txn.transaction_meta) == Some(user_id);
+    let is_intermediary = intermediary_mode(&txn.transaction_meta) == "managed"
+        && intermediary_user_id(&txn.transaction_meta) == Some(user_id);
     let managed_intermediary = intermediary_mode(&txn.transaction_meta) == "managed";
     let wallet_environment = parse_transaction_wallet_environment(&txn.transaction_meta);
 
@@ -25284,7 +25354,10 @@ async fn update_transaction_status(
                 )
                 .into_response();
             }
-            if !matches!(intermediary_status(&txn.transaction_meta), "accepted" | "active") {
+            if !matches!(
+                intermediary_status(&txn.transaction_meta),
+                "accepted" | "active"
+            ) {
                 return err(
                     StatusCode::CONFLICT,
                     "the intermediary must accept the transaction before completion",
@@ -25292,14 +25365,17 @@ async fn update_transaction_status(
                 .into_response();
             }
         } else if !is_buyer {
-            return err(StatusCode::FORBIDDEN, "only buyer can complete this action").into_response();
+            return err(StatusCode::FORBIDDEN, "only buyer can complete this action")
+                .into_response();
         }
     } else {
         if seller_only && !is_seller {
-            return err(StatusCode::FORBIDDEN, "only seller can perform this action").into_response();
+            return err(StatusCode::FORBIDDEN, "only seller can perform this action")
+                .into_response();
         }
         if buyer_only && !is_buyer {
-            return err(StatusCode::FORBIDDEN, "only buyer can perform this action").into_response();
+            return err(StatusCode::FORBIDDEN, "only buyer can perform this action")
+                .into_response();
         }
         if !seller_only && !buyer_only && !is_buyer && !is_seller {
             return err(StatusCode::FORBIDDEN, "forbidden").into_response();
@@ -25333,13 +25409,9 @@ async fn update_transaction_status(
             .await
             .map(|_| ()),
         "completed" if managed_intermediary => {
-            release_intermediary_transaction_funds_tx(
-                &mut tx,
-                &txn,
-                wallet_environment.as_str(),
-            )
-            .await
-            .map(|_| ())
+            release_intermediary_transaction_funds_tx(&mut tx, &txn, wallet_environment.as_str())
+                .await
+                .map(|_| ())
         }
         "completed" => release_transaction_funds_tx(&mut tx, &txn, wallet_environment.as_str())
             .await
