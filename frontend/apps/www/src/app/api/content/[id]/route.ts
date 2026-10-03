@@ -4,6 +4,7 @@ import { evaluateTrustSafety } from '@/lib/trustSafety';
 import {
   canTransitionContentStatus,
   collectTrustSafetyCandidates,
+  normalizeListingTitle,
   toUpsertListingPayload,
   validateListingPayload,
 } from '@/lib/content/listingFlowRules';
@@ -412,6 +413,15 @@ export async function GET(
       }
     }
     data = attachResolvedContentMedia(data as Record<string, unknown>);
+    if (data && typeof data === 'object' && !Array.isArray(data)) {
+      const normalizedTitle = normalizeListingTitle(
+        (data as Record<string, unknown>).title,
+        180,
+      );
+      if (normalizedTitle) {
+        (data as Record<string, unknown>).title = normalizedTitle;
+      }
+    }
   }
   return NextResponse.json(data ?? { error: 'Invalid response' }, {
     status: backendRes.status,
