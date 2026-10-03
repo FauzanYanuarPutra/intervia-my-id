@@ -12548,7 +12548,12 @@ async fn list_content(
                 SELECT COUNT(*)::bigint
                 FROM content_item_likes cil
                 WHERE cil.content_id = content_items.id
-            ), 0) AS like_count,
+            COALESCE((
+                SELECT COUNT(*)::bigint
+                FROM events.content_view_dedup cvd
+                WHERE cvd.entity_type = 'content'
+                  AND cvd.entity_id = id::text
+            ), 0) AS view_count,
             jsonb_set(
                 COALESCE(metadata, '{}'::jsonb),
                 '{listing_intent}',
@@ -14007,7 +14012,12 @@ async fn create_content(
                 SELECT COUNT(*)::bigint
                 FROM content_item_likes cil
                 WHERE cil.content_id = id
-            ), 0) AS like_count,
+            COALESCE((
+                SELECT COUNT(*)::bigint
+                FROM events.content_view_dedup cvd
+                WHERE cvd.entity_type = 'content'
+                  AND cvd.entity_id = id::text
+            ), 0) AS view_count,
             metadata, created_at, updated_at
         "#,
     )
@@ -14456,7 +14466,12 @@ async fn update_content(
                 SELECT COUNT(*)::bigint
                 FROM content_item_likes cil
                 WHERE cil.content_id = id
-            ), 0) AS like_count,
+            COALESCE((
+                SELECT COUNT(*)::bigint
+                FROM events.content_view_dedup cvd
+                WHERE cvd.entity_type = 'content'
+                  AND cvd.entity_id = id::text
+            ), 0) AS view_count,
             metadata, created_at, updated_at
         "#,
     )
@@ -14661,7 +14676,12 @@ async fn delete_content(
                 SELECT COUNT(*)::bigint
                 FROM content_item_likes cil
                 WHERE cil.content_id = id
-            ), 0) AS like_count,
+            COALESCE((
+                SELECT COUNT(*)::bigint
+                FROM events.content_view_dedup cvd
+                WHERE cvd.entity_type = 'content'
+                  AND cvd.entity_id = id::text
+            ), 0) AS view_count,
             metadata, created_at, updated_at
         "#,
     )
@@ -26257,7 +26277,12 @@ async fn find_content(db: &PgPool, id_or_slug: &str) -> Result<Option<ContentRow
                 SELECT COUNT(*)::bigint
                 FROM content_item_likes cil
                 WHERE cil.content_id = content_items.id
-            ), 0) AS like_count,
+            COALESCE((
+                SELECT COUNT(*)::bigint
+                FROM events.content_view_dedup cvd
+                WHERE cvd.entity_type = 'content'
+                  AND cvd.entity_id = id::text
+            ), 0) AS view_count,
             metadata, created_at, updated_at
         FROM content_items
         WHERE id::text = $1 OR slug = $1
