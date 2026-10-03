@@ -10,8 +10,8 @@ pub mod users;
 pub mod verification;
 
 pub use auth::{
-    change_password, login, login_phone, logout, me, oauth_facebook, oauth_google, refresh_token, register,
-    reset_password,
+    change_password, login, login_phone, logout, me, oauth_facebook, oauth_google, refresh_token,
+    register, reset_password,
 };
 pub use governance::{
     cancel_my_privacy_request, create_privacy_request, create_security_incident,
