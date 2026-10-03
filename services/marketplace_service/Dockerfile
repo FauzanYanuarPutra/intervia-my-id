@@ -41,6 +41,21 @@ RUN if [ ! -d migrations ]; then \
     mkdir -p migrations && touch migrations/.keep; \
     fi
 
+# SQLx uses the numeric filename prefix as the migration identity. Validate all
+# forward migrations here so two different migrations can never share a version
+# and make the one-shot migration service fail deterministically at build time.
+RUN set -eu; \
+    duplicate_versions="$(find migrations -maxdepth 1 -type f -name '*.sql' ! -name '*.down.sql' -printf '%f\n' \
+      | awk -F_ '{print \$1}' \
+      | sort \
+      | uniq -d)"; \
+    if [ -n "$duplicate_versions" ]; then \
+      echo "ERROR: duplicate marketplace SQLx migration version(s):"; \
+      printf '%s\n' "$duplicate_versions"; \
+      echo "Each forward migration version must be unique."; \
+      exit 1; \
+    fi
+
 RUN find src -type f -name '*.rs' -exec touch {} +
 
 RUN cargo build --release --locked
