@@ -21237,12 +21237,21 @@ async fn settle_dispute_funds_tx(
         .held_balance_cents
         .checked_sub(total_to_settle)
         .ok_or(WalletTransitionError::InvalidHeldBalance)?;
+    let next_holder_spend = if managed_intermediary {
+        holder_account.total_spend_cents
+    } else {
+        holder_account
+            .total_spend_cents
+            .checked_add(settlement.release_amount_cents + settlement.platform_fee_cents)
+            .ok_or(WalletTransitionError::InvalidHeldBalance)?
+    };
 
     let updated_holder = sqlx::query_as::<_, WalletAccountRow>(
         r#"
         UPDATE wallet_accounts
         SET
             held_balance_cents = $2,
+            total_spend_cents = $3,
             updated_at = NOW()
         WHERE id = $1
         RETURNING
@@ -21252,6 +21261,7 @@ async fn settle_dispute_funds_tx(
     )
     .bind(holder_account.id)
     .bind(next_holder_held)
+    .bind(next_holder_spend)
     .fetch_one(&mut **tx)
     .await?;
 
