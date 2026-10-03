@@ -93,7 +93,7 @@ export const businessLocationProvider: LocationProvider = {
         const sourceKind = text(item.source_kind).toLowerCase();
         return sourceKind !== 'reference_store' && !text(item.id).startsWith('reference:');
       })
-      .map(item => {
+      .map((item): LocationSuggestion | null => {
         const selectedLocation = toSelectedLocation(item);
         if (!selectedLocation) return null;
         const city = text(item.city);
