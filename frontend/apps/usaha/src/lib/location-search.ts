@@ -6,6 +6,12 @@ export type LocationSuggestion = {
   subtitle?: string | null;
   point: LatLng;
   rawLabel: string;
+  source?: 'business' | 'osm';
+  address?: string;
+  city?: string;
+  province?: string;
+  district?: string;
+  businessId?: string;
 };
 
 function pickAddressPart(
@@ -109,66 +115,81 @@ export async function searchLocationSuggestions(
     ] satisfies LocationSuggestion[];
   }
 
-  const url = new URL('https://nominatim.openstreetmap.org/search');
-  url.searchParams.set('format', 'jsonv2');
-  url.searchParams.set('addressdetails', '1');
-  url.searchParams.set('limit', String(options.limit ?? 5));
+  const url = new URL('/api/locations/autocomplete', window.location.origin);
   url.searchParams.set('q', normalizedQuery);
-  url.searchParams.set('accept-language', options.language ?? 'id');
-  url.searchParams.set('countrycodes', 'id');
+  url.searchParams.set('locale', options.language === 'en' ? 'en' : 'id');
 
   const response = await fetch(url.toString(), {
     signal: options.signal,
-    headers: {
-      Accept: 'application/json',
-    },
+    headers: { Accept: 'application/json' },
   });
 
-  if (!response.ok) {
-    return [];
-  }
+  if (!response.ok) return [];
 
-  const payload = (await response.json().catch(() => [])) as Array<{
-    display_name?: string;
-    name?: string;
-    lat?: string;
-    lon?: string;
-    address?: Record<string, string | undefined>;
-  }>;
+  const payload = (await response.json().catch(() => ({}))) as {
+    data?: Array<{
+      placeId?: string;
+      primaryText?: string;
+      secondaryText?: string;
+      description?: string;
+      source?: 'business' | 'osm';
+      latitude?: number;
+      longitude?: number;
+      province?: string;
+      city?: string;
+      district?: string;
+      selectedLocation?: {
+        latitude?: number;
+        longitude?: number;
+        formattedAddress?: string;
+        province?: string;
+        city?: string;
+        district?: string;
+      } | null;
+    }>;
+  };
 
-  if (!Array.isArray(payload)) {
-    return [];
-  }
-
-  return payload
+  return (Array.isArray(payload.data) ? payload.data : [])
     .map(item => {
-      const lat = Number(item.lat);
-      const lng = Number(item.lon);
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-        return null;
-      }
+      const lat = Number(item.selectedLocation?.latitude ?? item.latitude);
+      const lng = Number(item.selectedLocation?.longitude ?? item.longitude);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
 
-      const rawLabel = String(item.display_name || item.name || '').trim();
-      if (!rawLabel) {
-        return null;
-      }
+      const title = String(item.primaryText || '').trim();
+      const address = String(
+        item.selectedLocation?.formattedAddress || item.description || '',
+      ).trim();
+      if (!title && !address) return null;
 
-      const copy = buildSuggestionCopy({
-        displayName: item.display_name,
-        name: item.name,
-        address: item.address,
-      });
+      const point = normalizeLatLng({ lat, lng });
+      const businessId =
+        item.source === 'business' && String(item.placeId || '').startsWith('business:')
+          ? String(item.placeId).slice('business:'.length)
+          : undefined;
+      const subtitle =
+        String(item.secondaryText || '').trim() ||
+        [item.selectedLocation?.city || item.city, item.selectedLocation?.province || item.province]
+          .filter(Boolean)
+          .join(', ') ||
+        null;
 
       return {
-        label: copy.label,
-        title: copy.title,
-        subtitle: copy.subtitle,
-        point: normalizeLatLng({ lat, lng }),
-        rawLabel,
+        label: subtitle ? `${title || address}, ${subtitle}` : title || address,
+        title: title || address,
+        subtitle,
+        point,
+        rawLabel: address || title,
+        source: item.source === 'business' ? 'business' : 'osm',
+        address,
+        city: item.selectedLocation?.city || item.city,
+        province: item.selectedLocation?.province || item.province,
+        district: item.selectedLocation?.district || item.district,
+        businessId,
       } satisfies LocationSuggestion;
     })
     .filter(Boolean) as LocationSuggestion[];
 }
+
 
 export async function geocodeLocation(
   query: string,
