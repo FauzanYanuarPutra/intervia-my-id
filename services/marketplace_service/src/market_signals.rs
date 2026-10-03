@@ -277,27 +277,28 @@ pub async fn create_market_signal(
     .fetch_optional(&state.db)
     .await;
 
-    if risk.decision != "allow" {
-        let _ = sqlx::query(
-            r#"
-            INSERT INTO market_signal_risk_events
-              (id, signal_id, actor_id, content_id, risk_score, decision, reasons)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
-            "#,
-        )
-        .bind(Uuid::new_v4())
-        .bind(signal_id)
-        .bind(actor_id)
-        .bind(content_id)
-        .bind(risk.score)
-        .bind(risk.decision)
-        .bind(&risk_reasons)
-        .execute(&state.db)
-        .await;
-    }
-
     match insert {
-        Ok(Some(row)) => (
+        Ok(Some(row)) => {
+            if risk.decision != "allow" {
+                let _ = sqlx::query(
+                    r#"
+                    INSERT INTO market_signal_risk_events
+                      (id, signal_id, actor_id, content_id, risk_score, decision, reasons)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7)
+                    "#,
+                )
+                .bind(Uuid::new_v4())
+                .bind(row.get::<Uuid, _>("id"))
+                .bind(actor_id)
+                .bind(content_id)
+                .bind(risk.score)
+                .bind(risk.decision)
+                .bind(&risk_reasons)
+                .execute(&state.db)
+                .await;
+            }
+
+            (
             StatusCode::CREATED,
             Json(json!({
                 "id": row.get::<Uuid, _>("id"),
@@ -308,8 +309,9 @@ pub async fn create_market_signal(
                 "created_at": row.get::<chrono::DateTime<chrono::Utc>, _>("created_at"),
                 "message": "Negotiation signal recorded"
             })),
-        )
-            .into_response(),
+            )
+                .into_response()
+        },
         Ok(None) => (
             StatusCode::OK,
             Json(json!({
