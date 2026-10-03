@@ -71,14 +71,8 @@ import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 import { Modal } from '@/components/common/Modal';
 import { DetailMobileTopBar } from '@/components/layout/DetailMobileTopBar';
 import { ContentDetailSkeleton } from '@/components/system/feedback/RouteSkeletons';
-import { TransactionVerificationPromptModal } from '@/components/verification/TransactionVerificationPromptModal';
 import { createIdempotencyKey } from '@/lib/clientIdempotency';
 import { useAppBack } from '@/lib/navigation/useAppBack';
-import {
-  // PHONE_VERIFICATION_SETTINGS_PATH,
-  readTransactionVerification,
-  type TransactionVerificationState,
-} from '@/lib/identityVerification';
 import { recordListingView } from '@/lib/listingViewHistory';
 import { trackLajukanEvent } from '@/lib/analytics/lajukanEvents';
 import { useViewerLocation } from '@/components/super-app/useViewerLocation';
@@ -889,11 +883,7 @@ export default function ContentDetailClient({
   const { getSectorById } = useSectors();
   const [item, setItem] = useState<ContentItem | null>(initialItem);
   const [loading, setLoading] = useState(false);
-  const [showDealChoiceModal, setShowDealChoiceModal] = useState(false);
   const [showOfferModal, setShowOfferModal] = useState(false);
-  const [offerFlowMode, setOfferFlowMode] = useState<'offer' | 'direct'>(
-    'offer',
-  );
   const [showApplyModal, setShowApplyModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
@@ -933,13 +923,6 @@ export default function ContentDetailClient({
   const [likeActionLoading, setLikeActionLoading] = useState(false);
   const [saveActionLoading, setSaveActionLoading] = useState(false);
   const [showFullDescription, setShowFullDescription] = useState(false);
-  const [relatedTx, setRelatedTx] = useState<RelatedTransaction | null>(null);
-  const [relatedTxLoading, setRelatedTxLoading] = useState(false);
-  const [nowTs, setNowTs] = useState<number>(Date.now());
-  const [verificationPrompt, setVerificationPrompt] =
-    useState<TransactionVerificationState | null>(null);
-  const [createdDealHandoff, setCreatedDealHandoff] =
-    useState<CreatedDealHandoff | null>(null);
   const trackedContentViewRef = useRef<string>('');
   const resolvedContentId = extractContentId(contentId);
 
@@ -1196,62 +1179,6 @@ export default function ContentDetailClient({
     setShowFullDescription(false);
   }, [resolvedContentId]);
 
-  useEffect(() => {
-    const timer = setInterval(() => setNowTs(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    if (PROMO_ONLY_MODE || !resolvedContentId || !user) {
-      setRelatedTx(null);
-      setRelatedTxLoading(false);
-      return;
-    }
-    let active = true;
-    const loadRelatedTransaction = async () => {
-      setRelatedTxLoading(true);
-      try {
-        const res = await authFetch('/api/transactions?limit=60&offset=0');
-        const payload = await res.json().catch(() => ({}));
-        if (!res.ok)
-          throw new Error(
-            (payload as { error?: string }).error ||
-              'Failed to load transactions',
-          );
-        const rawList = Array.isArray(payload)
-          ? payload
-          : Array.isArray((payload as { data?: unknown[] }).data)
-            ? (payload as { data: unknown[] }).data
-            : Array.isArray((payload as { items?: unknown[] }).items)
-              ? (payload as { items: unknown[] }).items
-              : [];
-        const candidates = rawList
-          .filter((entry): entry is RelatedTransaction =>
-            Boolean(entry && typeof entry === 'object'),
-          )
-          .filter(
-            txn => String(txn.content_id || '').trim() === resolvedContentId,
-          )
-          .sort((a, b) => {
-            const aTime = new Date(a.updated_at || a.created_at || 0).getTime();
-            const bTime = new Date(b.updated_at || b.created_at || 0).getTime();
-            return bTime - aTime;
-          });
-        if (active) setRelatedTx(candidates[0] || null);
-      } catch (error) {
-        console.error('[RELATED_TX_LOAD_ERROR]', error);
-      } finally {
-        if (active) setRelatedTxLoading(false);
-      }
-    };
-
-    loadRelatedTransaction();
-    const poll = setInterval(loadRelatedTransaction, 15000);
-    return () => {
-      active = false;
-      clearInterval(poll);
-    };
-  }, [authFetch, resolvedContentId, user]);
 
   const openDealFlowPicker = async () => {
     if (displayType === 'company') {
@@ -1264,33 +1191,14 @@ export default function ContentDetailClient({
       return;
     }
     if (displayType === 'job') {
-      setShowDealChoiceModal(true);
-      return;
-    }
-    if (isDemandListing) {
-      setShowDealChoiceModal(true);
+      if (quickApplyAvailable) {
+        await handleApplySubmit(true);
+      } else {
+        setShowApplyModal(true);
+      }
       return;
     }
     await startDealFlow();
-  };
-
-  const ensureTransactionEligible = async () => {
-    let latestUser: unknown = user;
-    try {
-      const meRes = await authFetch('/api/auth/me', { cache: 'no-store' });
-      if (meRes.ok) {
-        latestUser = await meRes.json().catch(() => user);
-      }
-    } catch {
-      // Fallback to current auth context data.
-    }
-
-    const verification = readTransactionVerification(latestUser);
-    if (!verification.transactionEligible) {
-      setVerificationPrompt(verification);
-      return false;
-    }
-    return true;
   };
 
   const startDealFlow = async () => {
@@ -3518,13 +3426,9 @@ export default function ContentDetailClient({
             ? locale === 'id'
               ? 'Minta penawaran'
               : 'Request Quote'
-            : pricingMode === 'fixed'
-              ? locale === 'id'
-                ? 'Lanjutkan deal'
-                : 'Continue Deal'
-              : locale === 'id'
-                ? 'Pilih respons'
-                : 'Choose Action';
+            : locale === 'id'
+              ? 'Negosiasi'
+              : 'Negotiate';
   const primaryActionHint = PROMO_ONLY_MODE
     ? locale === 'id'
       ? 'Fase awal: promosi dan chat dulu.'
@@ -3753,38 +3657,6 @@ export default function ContentDetailClient({
             ? 'Buat transaksi dulu. Detail lanjut di chat.'
             : 'Create the transaction first, then continue the practical details in chat.';
 
-  const relatedTxStatus = resolveTxnStatusText(relatedTx);
-  const relatedTxPaymentStatus = resolveTxnPaymentStatus(relatedTx);
-  const relatedTxGuidance = resolveRelatedTxnGuidance(relatedTx, locale);
-  const explicitDeadlineIso = extractDeadlineIso(relatedTx);
-  const fallbackDeadlineIso =
-    !explicitDeadlineIso &&
-    relatedTx &&
-    (relatedTxStatus === 'pending' || relatedTxStatus === 'accepted') &&
-    typeof relatedTx.created_at === 'string'
-      ? new Date(
-          new Date(relatedTx.created_at).getTime() + 24 * 60 * 60 * 1000,
-        ).toISOString()
-      : '';
-  const activeDeadlineIso = explicitDeadlineIso || fallbackDeadlineIso;
-  const deadlineTs = activeDeadlineIso
-    ? new Date(activeDeadlineIso).getTime()
-    : 0;
-  const remainingMs = deadlineTs > 0 ? deadlineTs - nowTs : 0;
-  const deadlineExpired = Boolean(deadlineTs) && remainingMs <= 0;
-  const showRealtimeDeadline =
-    Boolean(relatedTx) &&
-    (relatedTxStatus === 'pending' ||
-      relatedTxStatus === 'accepted' ||
-      relatedTxStatus === 'in_progress');
-  const relatedTxUpdatedLabel = relatedTx
-    ? new Date(
-        relatedTx.updated_at || relatedTx.created_at || Date.now(),
-      ).toLocaleString()
-    : '';
-  const relatedTxWorkspaceHref = relatedTx
-    ? `/transactions?focus_transaction_id=${encodeURIComponent(relatedTx.id)}`
-    : '/transactions';
   const detailRowClass =
     'bg-[color:var(--app-surface-muted)] hover:bg-[color:var(--app-accent-soft)]';
   const detailPageShellClass =
@@ -4221,132 +4093,6 @@ export default function ContentDetailClient({
           {shareError}
         </p>
       )}
-      {!publicReference &&
-        !PROMO_ONLY_MODE &&
-        user &&
-        !isOwner &&
-        displayType !== 'company' && (
-          <div
-            className={`mt-4 ${detailInsetClass} border border-[color:var(--app-border)] bg-[color:var(--app-surface)] shadow-[0_18px_36px_-28px_rgba(15,23,42,0.18)]`}
-          >
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
-                {locale === 'id'
-                  ? 'Status transaksi realtime'
-                  : 'Realtime transaction status'}
-              </p>
-              {relatedTxLoading ? (
-                <span className="text-[11px] text-[color:var(--app-text)]">
-                  {locale === 'id' ? 'Memuat...' : 'Loading...'}
-                </span>
-              ) : relatedTx ? (
-                <span className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-accent)_15%,_transparent)] px-2 py-0.5 text-[10px] font-semibold text-[color:var(--app-accent)] dark:text-[color:var(--app-accent)]">
-                  {relatedTxStatus}
-                </span>
-              ) : (
-                <span className="text-[11px] text-[color:var(--app-text)]">
-                  {locale === 'id'
-                    ? 'Belum ada transaksi'
-                    : 'No transaction yet'}
-                </span>
-              )}
-            </div>
-
-            {relatedTx && showRealtimeDeadline && (
-              <div className="mt-2 flex items-center gap-2 text-xs">
-                <Clock3 className="h-3.5 w-3.5 text-[color:var(--app-warning)]" />
-                <span
-                  className={
-                    deadlineExpired
-                      ? 'font-semibold text-[color:var(--app-danger)] dark:text-[color:var(--app-danger)]'
-                      : 'font-semibold text-[color:var(--app-warning)] dark:text-[color:var(--app-warning)]'
-                  }
-                >
-                  {deadlineExpired
-                    ? locale === 'id'
-                      ? 'Waktu bayar/konfirmasi sudah habis'
-                      : 'Payment/confirmation window expired'
-                    : locale === 'id'
-                      ? `Batas bayar/konfirmasi: ${formatRemainingDuration(remainingMs, locale)}`
-                      : `Payment/confirmation deadline: ${formatRemainingDuration(remainingMs, locale)}`}
-                </span>
-              </div>
-            )}
-
-            {relatedTx ? (
-              <>
-                <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                  <div className={detailInsetCompactClass}>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
-                      {locale === 'id' ? 'Nominal' : 'Amount'}
-                    </p>
-                    <p className="mt-1 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                      {formatCurrency(
-                        relatedTx.amount_cents || 0,
-                        relatedTx.currency || baseCurrency,
-                      )}
-                    </p>
-                  </div>
-                  <div className={detailInsetCompactClass}>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
-                      {locale === 'id' ? 'Proteksi' : 'Protection'}
-                    </p>
-                    <p className="mt-1 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                      {humanizeValue(
-                        relatedTx.protection_status || 'awaiting_funding',
-                      )}
-                    </p>
-                  </div>
-                  <div className={detailInsetCompactClass}>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
-                      {locale === 'id' ? 'Pembayaran' : 'Payment'}
-                    </p>
-                    <p className="mt-1 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                      {humanizeValue(relatedTxPaymentStatus)}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-3 rounded-[20px] bg-[color:color-mix(in_srgb,var(--app-accent-soft)_48%,white)] p-3 dark:bg-[color:color-mix(in_srgb,var(--app-accent)_20%,rgba(15,23,42,0.96))]">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
-                    {locale === 'id' ? 'Langkah berikutnya' : 'Next step'}
-                  </p>
-                  <p className="mt-1 text-xs font-semibold text-[color:var(--app-text)]">
-                    {relatedTxGuidance}
-                  </p>
-                  <p className="mt-2 text-[11px] text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                    {locale === 'id'
-                      ? `Update terakhir: ${relatedTxUpdatedLabel}`
-                      : `Last update: ${relatedTxUpdatedLabel}`}
-                  </p>
-                </div>
-
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Link
-                    href={relatedTxWorkspaceHref}
-                    className={detailPrimaryButtonClass}
-                  >
-                    {locale === 'id'
-                      ? 'Buka workspace order'
-                      : 'Open order workspace'}
-                  </Link>
-                  <Link href="/support" className={detailSecondaryButtonClass}>
-                    {locale === 'id' ? 'Butuh bantuan' : 'Need help'}
-                  </Link>
-                </div>
-              </>
-            ) : (
-              <div
-                className={`mt-3 ${detailInsetCompactClass} text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]`}
-              >
-                {relatedTxGuidance}
-              </div>
-            )}
-          </div>
-        )}
-    </section>
-  );
-
   const locationLabel =
     quickSpecs.find(spec => spec.key === 'location')?.value ||
     readMetaText(meta, 'location', 'city', 'region', 'address') ||
@@ -5453,372 +5199,6 @@ export default function ContentDetailClient({
           </div>
         </div>
       )}
-
-      {showDealChoiceModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_50%,_transparent)] p-3">
-          <div className="max-h-[calc(var(--app-viewport-height)-2rem)] w-full max-w-lg overflow-y-auto rounded-[28px] bg-white/98 p-5 shadow-[0_28px_56px_-32px_rgba(15,23,42,0.32)] dark:bg-slate-950/96 dark:shadow-[0_32px_60px_-36px_rgba(2,6,23,0.8)]">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
-                  {displayType === 'job'
-                    ? locale === 'id'
-                      ? 'Pilih langkah lamaran'
-                      : 'Choose application path'
-                    : isDemandListing
-                      ? locale === 'id'
-                        ? 'Pilih cara merespons'
-                        : 'Choose response path'
-                      : locale === 'id'
-                        ? 'Pilih langkah deal'
-                        : 'Choose your next step'}
-                </p>
-                <h2 className="text-base font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                  {item.title}
-                </h2>
-                <p className="text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                  {primaryActionHint}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowDealChoiceModal(false)}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] transition hover:bg-[color:var(--app-accent-soft)]"
-                aria-label={locale === 'id' ? 'Tutup' : 'Close'}
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="mt-4 space-y-3">
-              {displayType === 'job' ? (
-                <>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowDealChoiceModal(false);
-                        if (quickApplyAvailable) {
-                          void handleApplySubmit(true);
-                          return;
-                        }
-                        setShowApplyModal(true);
-                      }}
-                      className="rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 text-left transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface-muted)]"
-                    >
-                      <p className="text-xs font-bold text-[color:var(--app-accent)]">
-                        {locale === 'id' ? 'Lamar cepat' : 'Quick apply'}
-                      </p>
-                      <p className="mt-1 text-sm font-semibold text-[color:var(--app-text)]">
-                        {quickApplyAvailable
-                          ? locale === 'id'
-                            ? 'Kirim profil tersimpan sekarang'
-                            : 'Send saved profile now'
-                          : locale === 'id'
-                            ? 'Lengkapi profil dasar dulu'
-                            : 'Complete basic profile first'}
-                      </p>
-                      <p className="mt-1 text-[11px] text-[color:var(--app-text)]">
-                        {locale === 'id'
-                          ? 'Paling cepat kalau data nama, email, dan CV sudah siap.'
-                          : 'Fastest path when your name, email, and CV are ready.'}
-                      </p>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowDealChoiceModal(false);
-                        setShowApplyModal(true);
-                      }}
-                      className="rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 text-left transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface-muted)]"
-                    >
-                      <p className="text-xs font-bold text-[color:var(--app-accent)]">
-                        {locale === 'id'
-                          ? 'Isi data lamaran'
-                          : 'Fill application form'}
-                      </p>
-                      <p className="mt-1 text-sm font-semibold text-[color:var(--app-text)]">
-                        {locale === 'id'
-                          ? 'Lengkapi detail kandidat'
-                          : 'Complete candidate details'}
-                      </p>
-                      <p className="mt-1 text-[11px] text-[color:var(--app-text)]">
-                        {locale === 'id'
-                          ? 'Kirim profil, pengalaman, dan catatan.'
-                          : 'Use this when you want to send a fuller profile, experience, expectations, and note.'}
-                      </p>
-                    </button>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowDealChoiceModal(false);
-                      void handleStartChat();
-                    }}
-                    className="w-full rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 py-3 text-left text-xs font-semibold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)]"
-                  >
-                    {locale === 'id'
-                      ? 'Chat recruiter dulu'
-                      : 'Chat recruiter first'}
-                  </button>
-                </>
-              ) : isDemandListing ? (
-                <>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <button
-                      type="button"
-                      onClick={() => void startDealFlow('offer')}
-                      className="rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 text-left transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface-muted)]"
-                    >
-                      <p className="text-xs font-bold text-[color:var(--app-accent)]">
-                        {offerCardTitle}
-                      </p>
-                      <p className="mt-1 text-sm font-semibold text-[color:var(--app-text)]">
-                        {offerLabel}
-                      </p>
-                      <p className="mt-1 text-[11px] text-[color:var(--app-text)]">
-                        {offerCardBody}
-                      </p>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowDealChoiceModal(false);
-                        void handleStartChat();
-                      }}
-                      className="rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 text-left transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface-muted)]"
-                    >
-                      <p className="text-xs font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                        {chatFirstLabel}
-                      </p>
-                      <p className="mt-1 text-sm font-semibold text-[color:var(--app-text)]">
-                        {chatLabel}
-                      </p>
-                      <p className="mt-1 text-[11px] text-[color:var(--app-text)]">
-                        {chatFirstBody}
-                      </p>
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div
-                    className={`grid gap-3 ${pricingMode === 'fixed' ? 'sm:grid-cols-2' : ''}`}
-                  >
-                    {pricingMode === 'fixed' && (
-                      <button
-                        type="button"
-                        onClick={() => void startDealFlow('direct')}
-                        className="rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 text-left transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface-muted)]"
-                      >
-                        <p className="text-xs font-bold text-[color:var(--app-accent)]">
-                          {directDealTitle}
-                        </p>
-                        <p className="mt-1 text-sm font-semibold text-[color:var(--app-text)]">
-                          {listPriceCents > 0
-                            ? formatCurrency(listPriceCents, baseCurrency)
-                            : primaryPrice}
-                        </p>
-                        <p className="mt-1 text-[11px] text-[color:var(--app-text)]">
-                          {directDealBody}
-                        </p>
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => void startDealFlow('offer')}
-                      className="rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 text-left transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface-muted)]"
-                    >
-                      <p className="text-xs font-bold text-[color:var(--app-accent)]">
-                        {offerCardTitle}
-                      </p>
-                      <p className="mt-1 text-sm font-semibold text-[color:var(--app-text)]">
-                        {offerLabel}
-                      </p>
-                      <p className="mt-1 text-[11px] text-[color:var(--app-text)]">
-                        {offerCardBody}
-                      </p>
-                    </button>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowDealChoiceModal(false);
-                      void handleStartChat();
-                    }}
-                    className="w-full rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 py-3 text-left text-xs font-semibold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)]"
-                  >
-                    {chatFirstLabel}
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      <TransactionVerificationPromptModal
-        open={Boolean(verificationPrompt)}
-        locale={locale}
-        prompt={verificationPrompt}
-        onClose={() => setVerificationPrompt(null)}
-        onOpenVerification={() => {
-          const shouldOpenPhoneVerification = Boolean(
-            verificationPrompt?.hasPhone && !verificationPrompt.phoneReady,
-          );
-          setVerificationPrompt(null);
-          // router.push(
-          //   shouldOpenPhoneVerification
-          //     ? PHONE_VERIFICATION_SETTINGS_PATH
-          //     : '/profile/edit',
-          // );
-        }}
-        onOpenProfile={() => {
-          setVerificationPrompt(null);
-          router.push('/profile');
-        }}
-      />
-
-      <Modal
-        open={Boolean(createdDealHandoff)}
-        title={
-          locale === 'id' ? 'Pesanan siap dilanjutkan' : 'Your order is ready'
-        }
-        onClose={() => setCreatedDealHandoff(null)}
-        footer={
-          createdDealHandoff ? (
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <button
-                type="button"
-                onClick={() => {
-                  router.push(
-                    createdDealHandoff.flowMode === 'direct'
-                      ? `/transactions?transaction_id=${encodeURIComponent(
-                          createdDealHandoff.transactionId,
-                        )}&open_payment=1`
-                      : `/transactions?focus_transaction_id=${encodeURIComponent(
-                          createdDealHandoff.transactionId,
-                        )}`,
-                  );
-                  setCreatedDealHandoff(null);
-                }}
-                className="inline-flex flex-1 items-center justify-center rounded-[12px] bg-[color:var(--app-accent)] px-4 py-2 text-xs font-semibold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)]"
-              >
-                {createdDealHandoff.flowMode === 'direct'
-                  ? locale === 'id'
-                    ? 'Buka transaksi'
-                    : 'Pay safely now'
-                  : locale === 'id'
-                    ? 'Buka workspace order'
-                    : 'Open order workspace'}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (createdDealHandoff.roomId) {
-                    router.push(
-                      `/chat/${encodeURIComponent(createdDealHandoff.roomId)}`,
-                    );
-                  } else {
-                    router.push('/chat');
-                  }
-                  setCreatedDealHandoff(null);
-                }}
-                className="inline-flex flex-1 items-center justify-center rounded-[12px] border border-[color:var(--app-border)] px-4 py-2 text-xs font-semibold text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)]"
-              >
-                {createdDealHandoff.roomId
-                  ? locale === 'id'
-                    ? 'Buka chat order'
-                    : 'Open order chat'
-                  : locale === 'id'
-                    ? 'Buka daftar chat'
-                    : 'Open chat list'}
-              </button>
-            </div>
-          ) : null
-        }
-      >
-        {createdDealHandoff ? (
-          <div className="space-y-3">
-            <div className={detailInsetClass}>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
-                {locale === 'id' ? 'Ikhtisar order' : 'Order overview'}
-              </p>
-              <p className="mt-1 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                {item?.title}
-              </p>
-              <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                <div className={detailInsetCompactClass}>
-                  <p className="text-[10px] uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
-                    {locale === 'id' ? 'Nominal' : 'Amount'}
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                    {createdDealHandoff.amountCents != null
-                      ? formatCurrency(
-                          createdDealHandoff.amountCents,
-                          createdDealHandoff.currency,
-                        )
-                      : locale === 'id'
-                        ? 'Nominal menyusul'
-                        : 'Amount to follow'}
-                  </p>
-                </div>
-                <div className={detailInsetCompactClass}>
-                  <p className="text-[10px] uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
-                    {locale === 'id' ? 'Status' : 'Status'}
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                    {humanizeValue(createdDealHandoff.status)}
-                  </p>
-                </div>
-                <div className={detailInsetCompactClass}>
-                  <p className="text-[10px] uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
-                    {locale === 'id' ? 'Proteksi' : 'Protection'}
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                    {humanizeValue(createdDealHandoff.protectionStatus)}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid gap-2 sm:grid-cols-3">
-              {[
-                locale === 'id'
-                  ? 'Order sudah tersimpan dan bisa dibuka lagi dari halaman Pesanan Saya.'
-                  : 'The order is stored and can be reopened from My Orders.',
-                locale === 'id'
-                  ? 'Chat tetap untuk progres dan bukti.'
-                  : 'Chat is still used for discussion, progress updates, and conversation evidence.',
-                locale === 'id'
-                  ? 'Kalau ada masalah, bukti tetap rapi.'
-                  : 'If something goes wrong, CRM can review the order timeline, fund status, and evidence from this flow.',
-              ].map((copy, index) => (
-                <div
-                  key={`handoff-step-${index}`}
-                  className={`${detailInsetCompactClass} text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]`}
-                >
-                  <p className="font-semibold text-[color:var(--app-accent)]">
-                    {locale === 'id'
-                      ? `Langkah ${index + 1}`
-                      : `Step ${index + 1}`}
-                  </p>
-                  <p className="mt-1">{copy}</p>
-                </div>
-              ))}
-            </div>
-
-            <div className="rounded-[16px] bg-[color:var(--app-surface-muted)] p-3 text-xs text-[color:var(--app-text)]">
-              {createdDealHandoff.flowMode === 'direct'
-                ? locale === 'id'
-                  ? 'Lanjut ke order untuk mencatat nominal, status, dan kesepakatan. Ketersediaan pembayaran ditandai jelas di halaman transaksi.'
-                  : 'Continue to the order workspace to record the amount, status, and agreement. Payment availability is shown explicitly on the transaction page.'
-                : locale === 'id'
-                  ? 'Pantau status di order. Detail tetap lanjut di chat.'
-                  : 'For offer-based deals, use the order workspace to track status, then continue technical discussion in chat without losing the transaction trail.'}
-            </div>
-          </div>
-        ) : null}
-      </Modal>
 
       {showOfferModal && (
         <div
