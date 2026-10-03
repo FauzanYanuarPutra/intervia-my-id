@@ -656,10 +656,7 @@ async fn verify_facebook_access_token(
         return Err("missing facebook access token");
     }
 
-    let graph_version = graph_version
-        .trim()
-        .trim_start_matches('/')
-        .to_string();
+    let graph_version = graph_version.trim().trim_start_matches('/').to_string();
     if graph_version.is_empty() {
         return Err("facebook graph version not configured");
     }
@@ -2908,10 +2905,36 @@ pub async fn oauth_facebook(
     Json(payload): Json<FacebookOAuthRequest>,
 ) -> impl IntoResponse {
     let (ip_address, user_agent) = extract_audit_info(&headers);
-    let app_id = match state.config.facebook_app_id.as_deref() { Some(v)=>v, None=>return (StatusCode::SERVICE_UNAVAILABLE,Json(json!({"error":"facebook oauth not configured"}))).into_response() };
-    let app_secret = match state.config.facebook_app_secret.as_deref() { Some(v)=>v, None=>return (StatusCode::SERVICE_UNAVAILABLE,Json(json!({"error":"facebook oauth not configured"}))).into_response() };
-    let identity = match verify_facebook_access_token(app_id,app_secret,&state.config.facebook_graph_version,&payload.access_token).await {
-        Ok(v)=>v, Err(e)=>return (StatusCode::UNAUTHORIZED,Json(json!({"error":e}))).into_response()
+    let app_id = match state.config.facebook_app_id.as_deref() {
+        Some(v) => v,
+        None => {
+            return (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(json!({"error":"facebook oauth not configured"})),
+            )
+                .into_response()
+        }
+    };
+    let app_secret = match state.config.facebook_app_secret.as_deref() {
+        Some(v) => v,
+        None => {
+            return (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(json!({"error":"facebook oauth not configured"})),
+            )
+                .into_response()
+        }
+    };
+    let identity = match verify_facebook_access_token(
+        app_id,
+        app_secret,
+        &state.config.facebook_graph_version,
+        &payload.access_token,
+    )
+    .await
+    {
+        Ok(v) => v,
+        Err(e) => return (StatusCode::UNAUTHORIZED, Json(json!({"error":e}))).into_response(),
     };
     let user_id = match sqlx::query_scalar::<_,Uuid>("SELECT user_id FROM core.user_identities WHERE provider='facebook' AND provider_user_id=$1 LIMIT 1")
         .bind(&identity.provider_user_id).fetch_optional(&state.db).await {
@@ -2950,13 +2973,76 @@ pub async fn oauth_facebook(
         .bind(user_id).bind(&identity.provider_user_id).bind(&identity.email).bind(&identity.raw_profile).execute(&state.db).await.is_err() {
         return (StatusCode::INTERNAL_SERVER_ERROR,Json(json!({"error":"database error"}))).into_response();
     }
-    let username=sqlx::query_scalar::<_,String>("SELECT username FROM core.user_profiles WHERE user_id=$1").bind(user_id).fetch_optional(&state.db).await.ok().flatten().unwrap_or_else(||"user".into());
-    let rp=get_roles_permissions_from_db(&state,user_id).await.unwrap_or(RolesPermissions{roles:vec![],permissions:vec![]});
-    let access_token=match create_access_token(&state.config.jwt_secret,user_id,username,ACCESS_TOKEN_EXP_HOURS,rp.roles.clone(),rp.permissions.clone()){Ok(v)=>v,Err(_)=>return (StatusCode::INTERNAL_SERVER_ERROR,Json(json!({"error":"token creation failed"}))).into_response()};
-    let refresh=generate_opaque_refresh_token().await;
-    let hash=match hash_refresh_token(&refresh).await{Ok(v)=>v,Err(_)=>return (StatusCode::INTERNAL_SERVER_ERROR,Json(json!({"error":"token creation failed"}))).into_response()};
-    let session=match store_refresh_session(&state,user_id,&hash,Utc::now()+Duration::days(state.config.refresh_token_exp_days),None).await{Ok(v)=>v,Err(_)=>return (StatusCode::INTERNAL_SERVER_ERROR,Json(json!({"error":"token creation failed"}))).into_response()};
-    record_audit_log(state,"user".into(),"oauth.facebook.login.success",Some(user_id),Some(user_id),Some(json!({"provider":"facebook"})),(ip_address,user_agent)).await;
+    let username =
+        sqlx::query_scalar::<_, String>("SELECT username FROM core.user_profiles WHERE user_id=$1")
+            .bind(user_id)
+            .fetch_optional(&state.db)
+            .await
+            .ok()
+            .flatten()
+            .unwrap_or_else(|| "user".into());
+    let rp = get_roles_permissions_from_db(&state, user_id)
+        .await
+        .unwrap_or(RolesPermissions {
+            roles: vec![],
+            permissions: vec![],
+        });
+    let access_token = match create_access_token(
+        &state.config.jwt_secret,
+        user_id,
+        username,
+        ACCESS_TOKEN_EXP_HOURS,
+        rp.roles.clone(),
+        rp.permissions.clone(),
+    ) {
+        Ok(v) => v,
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error":"token creation failed"})),
+            )
+                .into_response()
+        }
+    };
+    let refresh = generate_opaque_refresh_token().await;
+    let hash = match hash_refresh_token(&refresh).await {
+        Ok(v) => v,
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error":"token creation failed"})),
+            )
+                .into_response()
+        }
+    };
+    let session = match store_refresh_session(
+        &state,
+        user_id,
+        &hash,
+        Utc::now() + Duration::days(state.config.refresh_token_exp_days),
+        None,
+    )
+    .await
+    {
+        Ok(v) => v,
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error":"token creation failed"})),
+            )
+                .into_response()
+        }
+    };
+    record_audit_log(
+        state,
+        "user".into(),
+        "oauth.facebook.login.success",
+        Some(user_id),
+        Some(user_id),
+        Some(json!({"provider":"facebook"})),
+        (ip_address, user_agent),
+    )
+    .await;
     (StatusCode::OK,Json(json!({"access_token":access_token,"token_type":"Bearer","expires_in":ACCESS_TOKEN_EXP_HOURS*3600,"refresh_token":refresh,"session_id":session,"user":{"id":user_id,"email":identity.email,"roles":rp.roles,"permissions":rp.permissions}}))).into_response()
 }
 
