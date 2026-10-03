@@ -151,7 +151,22 @@ mod tests {
     #[test]
     fn extreme_price_is_not_market_eligible() {
         let result = score_signal(Some(1), Some(1_000_000), 1, 1, 1, 1, None);
-        assert!(result.score >= 30);
+        assert!(result.score >= 50);
+        assert_eq!(result.decision, "review");
         assert!(!result.eligible_for_market);
+    }
+
+    #[test]
+    fn abnormal_quantity_is_not_market_eligible() {
+        let result = score_signal(None, None, 1, 1, 1, 1, Some(1_000_001.0));
+        assert!(result.reasons.contains(&"abnormal_quantity"));
+        assert!(!result.eligible_for_market);
+    }
+
+    #[test]
+    fn repeated_identical_price_adds_risk() {
+        let result = score_signal(Some(700_000), Some(750_000), 1, 1, 2, 5, None);
+        assert!(result.score >= 20);
+        assert!(result.reasons.contains(&"repeated_identical_price"));
     }
 }
