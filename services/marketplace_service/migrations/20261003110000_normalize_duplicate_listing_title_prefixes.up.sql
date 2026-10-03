@@ -3,10 +3,10 @@
 UPDATE content_items
 SET title = regexp_replace(
   btrim(title),
-  '^(Butuh|Membutuhkan|Mencari|Menawarkan|Need|Looking for|Providing|Offering)[[:space:]]+\\1(?=[[:space:]]|$)[[:space:]]*',
-  '\\1 ',
+  '^(Butuh|Membutuhkan|Mencari|Menawarkan|Need|Looking for|Providing|Offering)[[:space:]]+\\1([[:space:]]|$)',
+  '\\1\\2',
   1,
   0,
   'i'
 )
-WHERE title ~* '^(Butuh|Membutuhkan|Mencari|Menawarkan|Need|Looking for|Providing|Offering)[[:space:]]+\\1(?=[[:space:]]|$)';
+WHERE title ~* '^(Butuh|Membutuhkan|Mencari|Menawarkan|Need|Looking for|Providing|Offering)[[:space:]]+\\1([[:space:]]|$)';
