@@ -2729,7 +2729,6 @@ export default function ChatRoomPage() {
   const [listingActionSubmitting, setListingActionSubmitting] = useState(false);
   // Legacy transaction records are kept for history; active UI no longer opens a transaction drawer.
   const [showTransactionsDrawer, setShowTransactionsDrawer] = useState(false);
-  const [roomSummaryExpanded, setRoomSummaryExpanded] = useState(false);
   const [transactionsLoading, setTransactionsLoading] = useState(false);
   const [transactionsError, setTransactionsError] = useState<string | null>(
     null,
@@ -6283,53 +6282,6 @@ export default function ChatRoomPage() {
   };
 
   const statusInfo = statusMeta[connectionStatus];
-  const roomSummaryTransaction = useMemo(() => {
-    if (selectedTransaction) return selectedTransaction;
-    const activeTxn = roomTransactions.find(txn => {
-      const status = normalizeTransactionStatus(
-        txn.status || txn.transaction_status,
-      );
-      return status !== 'completed' && status !== 'cancelled';
-    });
-    return activeTxn || roomTransactions[0] || null;
-  }, [roomTransactions, selectedTransaction]);
-  const roomSummaryTransactionId = roomSummaryTransaction?.id || '';
-  useEffect(() => {
-    setRoomSummaryExpanded(false);
-  }, [roomSummaryTransactionId]);
-  const roomSummaryTxnStatus = normalizeTransactionStatus(
-    roomSummaryTransaction?.status ||
-      roomSummaryTransaction?.transaction_status,
-  );
-  const roomSummaryTxnIsTerminal =
-    roomSummaryTxnStatus === 'completed' ||
-    roomSummaryTxnStatus === 'cancelled';
-  const roomSummaryTxnProgress = useMemo(
-    () => getTransactionProgressPercent(roomSummaryTransaction),
-    [roomSummaryTransaction],
-  );
-  const roomSummaryTxnWaitingParty = useMemo(
-    () => getTransactionWaitingParty(roomSummaryTransaction, user?.id),
-    [roomSummaryTransaction, user?.id],
-  );
-  const roomSummaryTxnTitle =
-    typeof roomSummaryTransaction?.snapshot_listing?.title === 'string' &&
-    roomSummaryTransaction.snapshot_listing.title.trim()
-      ? roomSummaryTransaction.snapshot_listing.title
-      : typeof roomSummaryTransaction?.content_id === 'string' &&
-          roomSummaryTransaction.content_id.trim()
-        ? roomSummaryTransaction.content_id
-        : chatLocale === 'id'
-          ? 'Transaksi aktif'
-          : 'Active transaction';
-  const roomSummaryTxnShouldPay = Boolean(
-    roomSummaryTransaction &&
-    user?.id &&
-    normId(roomSummaryTransaction.buyer_id) === normId(user.id) &&
-    (roomSummaryTxnStatus === 'pending' ||
-      roomSummaryTxnStatus === 'accepted') &&
-    !transactionPaymentReady(roomSummaryTransaction),
-  );
   const selectedTxnStatus = normalizeTransactionStatus(
     selectedTransaction?.status || selectedTransaction?.transaction_status,
   );
