@@ -305,12 +305,24 @@ ${JSON.stringify({
     const allowedTypes = new Set(['product','service','job','property','tool_rental','company','other']);
     if (!allowedTypes.has(aiType)) return base;
     const aiConfidence = Math.max(0, Math.min(1, Number(parsed.confidence)));
+    const baseType = base.likelyType;
+    const acceptAiType =
+      aiType === baseType ||
+      ((baseType === 'other' || base.confidence < 0.75) && aiConfidence >= 0.88);
     return {
       ...base,
-      likelyThing: cleanText(parsed.likelyThing, 180) || base.likelyThing,
-      likelyType: aiType as QualityResult['likelyType'],
-      confidence: Math.max(base.confidence, aiConfidence || 0),
-      explanation: cleanText(parsed.explanation, 600) || base.explanation,
+      likelyThing:
+        acceptAiType
+          ? cleanText(parsed.likelyThing, 180) || base.likelyThing
+          : base.likelyThing,
+      likelyType: (acceptAiType ? aiType : baseType) as QualityResult['likelyType'],
+      confidence: acceptAiType
+        ? Math.max(base.confidence, aiConfidence || 0)
+        : base.confidence,
+      explanation:
+        acceptAiType
+          ? cleanText(parsed.explanation, 600) || base.explanation
+          : base.explanation,
     };
   } catch {
     return base;
