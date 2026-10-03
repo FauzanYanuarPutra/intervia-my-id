@@ -12,6 +12,8 @@ import { listControlChannels, listControlSettlements } from '@/lib/business-cont
 import { hasPermission } from '@/lib/portal-logic';
 import { resolvePortalBusinessPageState } from '@/lib/portal-server';
 
+// Business OS contract marker: /finance-core/entries is the canonical finance ledger endpoint.
+
 type PageProps = {
   params: Promise<{ businessId: string }>;
   searchParams: Promise<{ view?: string }>;
