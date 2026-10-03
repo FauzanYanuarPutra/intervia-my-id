@@ -116,6 +116,23 @@ pub struct GoogleOAuthRequest {
     pub refresh_token: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct FacebookOAuthRequest {
+    /// Short-lived or long-lived Facebook user access token returned by the
+    /// Facebook Login client. The server verifies it against the configured
+    /// Facebook application before using any profile data.
+    pub access_token: String,
+}
+
+#[derive(Debug)]
+struct VerifiedFacebookIdentity {
+    provider_user_id: String,
+    email: String,
+    name: Option<String>,
+    picture: Option<String>,
+    raw_profile: Value,
+}
+
 #[derive(Debug, Serialize)]
 pub struct AuthResponse {
     pub access_token: String,
@@ -626,6 +643,149 @@ async fn verify_google_id_token(
         raw_profile,
     })
 }
+// ------------------------------------------------------------------
+
+async fn verify_facebook_access_token(
+    facebook_app_id: &str,
+    facebook_app_secret: &str,
+    graph_version: &str,
+    access_token: &str,
+) -> Result<VerifiedFacebookIdentity, &'static str> {
+    let access_token = access_token.trim();
+    if access_token.is_empty() {
+        return Err("missing facebook access token");
+    }
+
+    let graph_version = graph_version
+        .trim()
+        .trim_start_matches('/')
+        .to_string();
+    if graph_version.is_empty() {
+        return Err("facebook graph version not configured");
+    }
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(8))
+        .build()
+        .map_err(|_| "facebook verifier unavailable")?;
+
+    // First validate the token against the exact configured Facebook app.
+    // The app access token is only kept inside this server-side request.
+    let app_access_token = format!("{}|{}", facebook_app_id, facebook_app_secret);
+    let debug_url = format!("https://graph.facebook.com/{}/debug_token", graph_version);
+    let debug_response = client
+        .get(&debug_url)
+        .query(&[
+            ("input_token", access_token),
+            ("access_token", app_access_token.as_str()),
+        ])
+        .send()
+        .await
+        .map_err(|_| "facebook token verification failed")?;
+
+    if !debug_response.status().is_success() {
+        return Err("invalid facebook access token");
+    }
+
+    let debug_payload = debug_response
+        .json::<Value>()
+        .await
+        .map_err(|_| "invalid facebook token response")?;
+
+    let token_data = debug_payload
+        .get("data")
+        .and_then(Value::as_object)
+        .ok_or("invalid facebook token response")?;
+
+    let is_valid = token_data
+        .get("is_valid")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    if !is_valid {
+        return Err("invalid facebook access token");
+    }
+
+    let token_app_id = token_data
+        .get("app_id")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    if token_app_id != facebook_app_id {
+        return Err("facebook access token belongs to another app");
+    }
+
+    let token_expiry = token_data
+        .get("expires_at")
+        .and_then(Value::as_i64)
+        .unwrap_or(0);
+    if token_expiry > 0 && token_expiry <= Utc::now().timestamp() {
+        return Err("expired facebook access token");
+    }
+
+    let user_id_from_debug = token_data
+        .get("user_id")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+
+    let me_url = format!("https://graph.facebook.com/{}/me", graph_version);
+    let me_response = client
+        .get(&me_url)
+        .query(&[
+            ("fields", "id,email,name,picture.width(256).height(256)"),
+            ("access_token", access_token),
+        ])
+        .send()
+        .await
+        .map_err(|_| "facebook profile lookup failed")?;
+
+    if !me_response.status().is_success() {
+        return Err("facebook profile lookup failed");
+    }
+
+    let profile = me_response
+        .json::<Value>()
+        .await
+        .map_err(|_| "invalid facebook profile response")?;
+
+    let provider_user_id = profile
+        .get("id")
+        .and_then(Value::as_str)
+        .or_else(|| (!user_id_from_debug.is_empty()).then_some(user_id_from_debug))
+        .map(str::to_string)
+        .ok_or("facebook user id missing")?;
+
+    let email = profile
+        .get("email")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| value.contains('@'))
+        .map(str::to_lowercase)
+        .ok_or("facebook email permission missing")?;
+
+    let name = profile
+        .get("name")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string);
+
+    let picture = profile
+        .get("picture")
+        .and_then(|value| value.get("data"))
+        .and_then(|value| value.get("url"))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string);
+
+    Ok(VerifiedFacebookIdentity {
+        provider_user_id,
+        email,
+        name,
+        picture,
+        raw_profile: profile,
+    })
+}
+
 // ------------------------------------------------------------------
 
 #[cfg(test)]
