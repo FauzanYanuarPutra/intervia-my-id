@@ -667,12 +667,12 @@ async fn build_market_response(
         },
         "insight": {
             "price_position": price_position,
-            "headline": match price_position {
+            "headline": match price_position.as_str() {
                 "above" => "Harga listing berada di atas pusat pasar.",
                 "below" => "Harga listing berada di bawah pusat pasar.",
                 _ => "Harga listing masih dekat dengan pusat pasar."
             },
-            "action": match price_position {
+            "action": match price_position.as_str() {
                 "above" => "Cek kualitas, spesifikasi, ongkir, dan kondisi barang sebelum mengubah harga.",
                 "below" => "Cek stok, kualitas, promo, dan biaya sebelum menaikkan harga.",
                 _ => "Tidak ada sinyal harga besar yang perlu ditindaklanjuti."
