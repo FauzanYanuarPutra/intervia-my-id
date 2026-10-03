@@ -2288,6 +2288,10 @@ async fn main() -> anyhow::Result<()> {
             post(market_signals::create_market_signal),
         )
         .route(
+            "/v1/market-signals/risk/queue",
+            get(market_signals::market_signal_risk_queue),
+        )
+        .route(
             "/v1/content/{id}/moderate",
             post(moderation::moderate_content),
         )
