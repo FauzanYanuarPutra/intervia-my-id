@@ -333,6 +333,7 @@ impl FinanceCoreRepository {
         Self { db }
     }
 
+    #[allow(dead_code)]
     pub(crate) async fn summary(
         &self,
         business_id: Uuid,
