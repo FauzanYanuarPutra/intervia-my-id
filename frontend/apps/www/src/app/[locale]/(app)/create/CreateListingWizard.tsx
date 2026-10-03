@@ -5543,8 +5543,8 @@ export default function CreateListingWizard({
     currentStep === 1
       ? text(
           locale,
-          'Kamu mau menawarkan atau membutuhkan?',
-          'Are you offering something or do you need something?',
+          'Mau posting apa?',
+          'What do you want to post?',
         )
       : currentStep === 2
         ? intent === 'request'
@@ -5622,8 +5622,8 @@ export default function CreateListingWizard({
     currentStep === 1
       ? text(
           locale,
-          'Pilih satu dulu ya. Setelah itu pertanyaannya akan menyesuaikan sendiri.',
-          'Choose one. Lajukan will adapt the next questions for you.',
+          'Pilih Kebutuhan kalau kamu sedang mencari sesuatu. Pilih Penawaran kalau kamu punya sesuatu yang ingin ditawarkan.',
+          'Choose Need when you are looking for something. Choose Offer when you have something to offer.',
         )
       : currentStep === 2
         ? text(
@@ -6931,18 +6931,18 @@ export default function CreateListingWizard({
               {[
                 {
                   value: 'request' as const,
-                  titleId: getListingSideLabel('demand', 'id'),
-                  titleEn: getListingSideLabel('demand', 'en'),
-                  shortId: 'Pasang kebutuhan pembeli',
-                  shortEn: 'I need a product / service',
+                  titleId: 'Kebutuhan',
+                  titleEn: 'Need',
+                  shortId: 'Pasang kebutuhanmu',
+                  shortEn: 'Post what you need',
                   imageSrc: '/images/create/kategori/cari.png',
                 },
                 {
                   value: 'offer' as const,
-                  titleId: getListingSideLabel('supply', 'id'),
-                  titleEn: getListingSideLabel('supply', 'en'),
-                  shortId: 'Pasang penawaran',
-                  shortEn: 'I offer a product / service',
+                  titleId: 'Penawaran',
+                  titleEn: 'Offer',
+                  shortId: 'Pasang penawaranmu',
+                  shortEn: 'Post what you offer',
                   imageSrc: '/images/create/kategori/tawar.png',
                 },
               ].map(item => (
