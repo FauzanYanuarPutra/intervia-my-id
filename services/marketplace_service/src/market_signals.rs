@@ -20,6 +20,9 @@ pub struct CreateMarketSignal {
     pub quantity: Option<f64>,
     pub quantity_unit: Option<String>,
     pub source: Option<String>,
+    /// Optional explicit market side supplied by the client.
+    /// When omitted, the server derives it from listing metadata.
+    pub market_side: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
