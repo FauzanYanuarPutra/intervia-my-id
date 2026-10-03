@@ -2298,7 +2298,7 @@ export default function ChatRoomPage() {
   const handleBack = useAppBack(router, '/chat');
 
   const handleOpenStructuredContent = useCallback(
-    async (contentId: string, href = '') => {
+    async (contentId: string, href: string) => {
       const safeHref = href.trim();
       const safeContentId = contentId.trim();
       if (!safeHref && !safeContentId) {
@@ -2729,6 +2729,7 @@ export default function ChatRoomPage() {
   const [listingActionSubmitting, setListingActionSubmitting] = useState(false);
   // Legacy transaction records are kept for history; active UI no longer opens a transaction drawer.
   const [showTransactionsDrawer, setShowTransactionsDrawer] = useState(false);
+  const [roomSummaryExpanded, setRoomSummaryExpanded] = useState(false);
   const [transactionsLoading, setTransactionsLoading] = useState(false);
   const [transactionsError, setTransactionsError] = useState<string | null>(
     null,
@@ -4893,10 +4894,7 @@ export default function ChatRoomPage() {
   ]);
 
   const handlePublishStructuredDraft = useCallback(
-    async (
-      messageId: string,
-      meta: StructuredChatPayload | null | undefined = null,
-    ) => {
+    async (messageId: string, meta: StructuredChatPayload | null) => {
       const draftId =
         typeof meta?.draft_id === 'string' && meta.draft_id.trim()
           ? meta.draft_id.trim()
@@ -5551,7 +5549,7 @@ export default function ChatRoomPage() {
   );
 
   const openListingActionModal = useCallback(
-    (meta: StructuredChatPayload, preferredMode: OfferFlowMode = 'offer') => {
+    (meta: StructuredChatPayload) => {
       const contentId =
         typeof meta.content_id === 'string' ? meta.content_id : '';
       if (!contentId) {
@@ -5607,14 +5605,7 @@ export default function ChatRoomPage() {
       };
 
       setListingActionDraft(draft);
-
-      const safeMode =
-        preferredMode === 'direct' &&
-        (draft.listingSide === 'demand' || draft.pricingMode === 'request')
-          ? 'offer'
-          : preferredMode;
-
-      applyListingActionMode(draft, safeMode);
+      applyListingActionMode(draft, 'offer');
       setShowListingActionModal(true);
     },
     [applyListingActionMode, chatLocale, notify],
@@ -6292,6 +6283,53 @@ export default function ChatRoomPage() {
   };
 
   const statusInfo = statusMeta[connectionStatus];
+  const roomSummaryTransaction = useMemo(() => {
+    if (selectedTransaction) return selectedTransaction;
+    const activeTxn = roomTransactions.find(txn => {
+      const status = normalizeTransactionStatus(
+        txn.status || txn.transaction_status,
+      );
+      return status !== 'completed' && status !== 'cancelled';
+    });
+    return activeTxn || roomTransactions[0] || null;
+  }, [roomTransactions, selectedTransaction]);
+  const roomSummaryTransactionId = roomSummaryTransaction?.id || '';
+  useEffect(() => {
+    setRoomSummaryExpanded(false);
+  }, [roomSummaryTransactionId]);
+  const roomSummaryTxnStatus = normalizeTransactionStatus(
+    roomSummaryTransaction?.status ||
+      roomSummaryTransaction?.transaction_status,
+  );
+  const roomSummaryTxnIsTerminal =
+    roomSummaryTxnStatus === 'completed' ||
+    roomSummaryTxnStatus === 'cancelled';
+  const roomSummaryTxnProgress = useMemo(
+    () => getTransactionProgressPercent(roomSummaryTransaction),
+    [roomSummaryTransaction],
+  );
+  const roomSummaryTxnWaitingParty = useMemo(
+    () => getTransactionWaitingParty(roomSummaryTransaction, user?.id),
+    [roomSummaryTransaction, user?.id],
+  );
+  const roomSummaryTxnTitle =
+    typeof roomSummaryTransaction?.snapshot_listing?.title === 'string' &&
+    roomSummaryTransaction.snapshot_listing.title.trim()
+      ? roomSummaryTransaction.snapshot_listing.title
+      : typeof roomSummaryTransaction?.content_id === 'string' &&
+          roomSummaryTransaction.content_id.trim()
+        ? roomSummaryTransaction.content_id
+        : chatLocale === 'id'
+          ? 'Transaksi aktif'
+          : 'Active transaction';
+  const roomSummaryTxnShouldPay = Boolean(
+    roomSummaryTransaction &&
+    user?.id &&
+    normId(roomSummaryTransaction.buyer_id) === normId(user.id) &&
+    (roomSummaryTxnStatus === 'pending' ||
+      roomSummaryTxnStatus === 'accepted') &&
+    !transactionPaymentReady(roomSummaryTransaction),
+  );
   const selectedTxnStatus = normalizeTransactionStatus(
     selectedTransaction?.status || selectedTransaction?.transaction_status,
   );
@@ -6832,6 +6870,7 @@ export default function ChatRoomPage() {
 
 
 
+      {/* Messages */}
       <main
         className="relative flex min-h-0 min-w-0 flex-1 basis-0 flex-col overflow-hidden bg-[#efeae2] dark:bg-[#0b141a]"
         onDragEnter={event => {
@@ -9991,6 +10030,52 @@ export default function ChatRoomPage() {
               </button>
             </div>
 
+            {false && canListingActionDirect && (
+              <div className="mb-3 grid gap-2 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    applyListingActionMode(listingActionDraft, 'direct')
+                  }
+                  className={`ui-feed-tile rounded-2xl border px-3 py-3 text-left transition ${
+                    listingActionMode === 'direct'
+                      ? 'border-[color:var(--app-accent-border)] bg-[color:color-mix(in_srgb,_var(--app-accent)_14%,_transparent)]'
+                      : 'border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-muted)]'
+                  }`}
+                >
+                  <p className="text-[11px] font-semibold text-[color:var(--app-accent)]">
+                    {chatLocale === 'id'
+                      ? 'Lanjut langsung'
+                      : 'Proceed directly'}
+                  </p>
+                  <p className="mt-1 text-xs text-[color:var(--app-text-soft)]">
+                    {chatLocale === 'id'
+                      ? 'Pakai harga listing dan buat tiket deal sekarang.'
+                      : 'Use the listed price and create the deal ticket now.'}
+                  </p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    applyListingActionMode(listingActionDraft, 'offer')
+                  }
+                  className={`ui-feed-tile rounded-2xl border px-3 py-3 text-left transition ${
+                    listingActionMode === 'offer'
+                      ? 'border-[color:var(--app-info-border)] bg-[color:color-mix(in_srgb,_var(--app-info)_12%,_transparent)]'
+                      : 'border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-muted)]'
+                  }`}
+                >
+                  <p className="text-[11px] font-semibold text-[color:var(--app-info)]">
+                    {chatLocale === 'id' ? 'Nego dulu' : 'Negotiate first'}
+                  </p>
+                  <p className="mt-1 text-xs text-[color:var(--app-text-soft)]">
+                    {chatLocale === 'id'
+                      ? 'Kirim nominal, scope, catatan.'
+                      : 'Send a starting amount, scope, and note to open negotiation.'}
+                  </p>
+                </button>
+              </div>
+            )}
 
             {canListingActionAskPrice && (
               <div className="ui-feed-row mb-3 rounded-2xl border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-muted)] p-3">
