@@ -30,6 +30,39 @@ function readString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+function unwrapPublicContentPayload(
+  payload: unknown,
+  fallbackId = '',
+): ContentRecord | null {
+  const direct = asRecord(payload);
+  if (!direct) return null;
+  if (readString(direct.id)) return direct;
+
+  const nestedKeys = ['data', 'content', 'item', 'listing', 'result'];
+  for (const key of nestedKeys) {
+    const nested = asRecord(direct[key]);
+    if (nested && readString(nested.id)) return nested;
+  }
+
+  const collections = ['items', 'results', 'listings', 'contents'];
+  for (const key of collections) {
+    const value = direct[key];
+    if (!Array.isArray(value)) continue;
+    const match =
+      value
+        .map(asRecord)
+        .find(entry => {
+          const id = readString(entry?.id);
+          return Boolean(entry && id && (!fallbackId || id === fallbackId));
+        }) ||
+      value.map(asRecord).find(entry => Boolean(entry && readString(entry.id)));
+    if (match) return match;
+  }
+
+  return null;
+}
+
+
 export function isPublicContentActive(content: ContentRecord): boolean {
   const status = readString(content.content_status || content.status)
     .toLowerCase()
@@ -136,7 +169,8 @@ export async function getPublicContent(
     }
     if (!response.ok) return { status: 'unavailable' };
 
-    const content = asRecord(await response.json().catch(() => null));
+    const payload = await response.json().catch(() => null);
+    const content = unwrapPublicContentPayload(payload, contentId);
     if (!content?.id) return { status: 'unavailable' };
 
     const ownerId = readString(content.owner_id);
