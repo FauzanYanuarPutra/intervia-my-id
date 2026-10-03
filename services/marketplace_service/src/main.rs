@@ -883,6 +883,8 @@ struct CreateOfferRequest {
     transaction_meta: Option<Value>,
     safety_checklist: Option<Value>,
     risk_flags: Option<Value>,
+    intermediary_mode: Option<String>,
+    intermediary_email: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Default)]
