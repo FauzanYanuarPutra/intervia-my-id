@@ -5551,7 +5551,7 @@ export default function ChatRoomPage() {
   );
 
   const openListingActionModal = useCallback(
-    (meta: StructuredChatPayload) => {
+    (meta: StructuredChatPayload, preferredMode: OfferFlowMode = 'offer') => {
       const contentId =
         typeof meta.content_id === 'string' ? meta.content_id : '';
       if (!contentId) {
@@ -5607,7 +5607,14 @@ export default function ChatRoomPage() {
       };
 
       setListingActionDraft(draft);
-      applyListingActionMode(draft, 'offer');
+
+      const safeMode =
+        preferredMode === 'direct' &&
+        (draft.listingSide === 'demand' || draft.pricingMode === 'request')
+          ? 'offer'
+          : preferredMode;
+
+      applyListingActionMode(draft, safeMode);
       setShowListingActionModal(true);
     },
     [applyListingActionMode, chatLocale, notify],
