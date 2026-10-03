@@ -87,12 +87,9 @@ fn assess_media_risk(
         "low"
     };
 
-    MediaRiskAssessment {
-        score,
-        level,
-        flags,
-    }
+    MediaRiskAssessment { score, level, flags }
 }
+
 
 #[derive(Debug, Deserialize, Default)]
 pub struct ListCrmBusinessesQuery {
@@ -900,7 +897,7 @@ async fn create_store_media_contribution(
           )::bigint AS rejected_30d
         FROM umkm_store_media_contributions
         WHERE uploader_user_id = $1
-        "#,
+        "#
     )
     .bind(actor_id)
     .bind(store.id)
@@ -909,10 +906,7 @@ async fn create_store_media_contribution(
     {
         Ok(row) => row,
         Err(error) => {
-            tracing::error!(
-                "create_store_media_contribution risk history error: {:?}",
-                error
-            );
+            tracing::error!("create_store_media_contribution risk history error: {:?}", error);
             return err(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "failed to validate media safety",
@@ -938,10 +932,7 @@ async fn create_store_media_contribution(
         {
             Ok(value) => value,
             Err(error) => {
-                tracing::error!(
-                    "create_store_media_contribution caption risk error: {:?}",
-                    error
-                );
+                tracing::error!("create_store_media_contribution caption risk error: {:?}", error);
                 return err(
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "failed to validate media safety",
@@ -996,7 +987,7 @@ async fn create_store_media_contribution(
     .bind(&uploader_username)
     .bind(risk.score)
     .bind(risk.level)
-    .bind(json!(&risk.flags))
+    .bind(json!(risk.flags))
     .fetch_one(&state.db)
     .await
     {
