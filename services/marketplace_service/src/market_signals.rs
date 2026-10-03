@@ -294,16 +294,16 @@ pub async fn create_market_signal(
             }
 
             (
-            StatusCode::CREATED,
-            Json(json!({
-                "id": row.get::<Uuid, _>("id"),
-                "content_id": content_id,
-                "signal_side": signal_side,
-                "signal_type": signal_type,
-                "risk_status": if risk.eligible_for_market { "accepted" } else { "review" },
-                "created_at": row.get::<chrono::DateTime<chrono::Utc>, _>("created_at"),
-                "message": "Negotiation signal recorded"
-            })),
+                StatusCode::CREATED,
+                Json(json!({
+                    "id": row.get::<Uuid, _>("id"),
+                    "content_id": content_id,
+                    "signal_side": signal_side,
+                    "signal_type": signal_type,
+                    "risk_status": if risk.eligible_for_market { "accepted" } else { "review" },
+                    "created_at": row.get::<chrono::DateTime<chrono::Utc>, _>("created_at"),
+                    "message": "Negotiation signal recorded"
+                })),
             )
                 .into_response()
         }
