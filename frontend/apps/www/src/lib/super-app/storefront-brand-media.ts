@@ -141,7 +141,7 @@ export function resolveStorefrontBrandMedia(
       .find(usableImage) ?? null;
   const galleryUrls = rawGallery
     .filter(image => image !== logoUrl && image !== coverUrl)
-    .slice(0, 6);
+    .slice(0, 50);
 
   return {
     logoUrl,
