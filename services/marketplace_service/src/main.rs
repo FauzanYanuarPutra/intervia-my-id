@@ -25149,15 +25149,41 @@ async fn update_transaction_status(
 
     let is_buyer = txn.buyer_id == user_id;
     let is_seller = txn.seller_id == user_id;
+    let is_intermediary =
+        intermediary_mode(&txn.transaction_meta) == "managed"
+            && intermediary_user_id(&txn.transaction_meta) == Some(user_id);
+    let managed_intermediary = intermediary_mode(&txn.transaction_meta) == "managed";
     let wallet_environment = parse_transaction_wallet_environment(&txn.transaction_meta);
-    if seller_only && !is_seller {
-        return err(StatusCode::FORBIDDEN, "only seller can perform this action").into_response();
-    }
-    if buyer_only && !is_buyer {
-        return err(StatusCode::FORBIDDEN, "only buyer can perform this action").into_response();
-    }
-    if !seller_only && !buyer_only && !is_buyer && !is_seller {
-        return err(StatusCode::FORBIDDEN, "forbidden").into_response();
+
+    if next_status == "completed" {
+        if managed_intermediary {
+            if !is_intermediary {
+                return err(
+                    StatusCode::FORBIDDEN,
+                    "only the selected intermediary can complete a managed transaction",
+                )
+                .into_response();
+            }
+            if !matches!(intermediary_status(&txn.transaction_meta), "accepted" | "active") {
+                return err(
+                    StatusCode::CONFLICT,
+                    "the intermediary must accept the transaction before completion",
+                )
+                .into_response();
+            }
+        } else if !is_buyer {
+            return err(StatusCode::FORBIDDEN, "only buyer can complete this action").into_response();
+        }
+    } else {
+        if seller_only && !is_seller {
+            return err(StatusCode::FORBIDDEN, "only seller can perform this action").into_response();
+        }
+        if buyer_only && !is_buyer {
+            return err(StatusCode::FORBIDDEN, "only buyer can perform this action").into_response();
+        }
+        if !seller_only && !buyer_only && !is_buyer && !is_seller {
+            return err(StatusCode::FORBIDDEN, "forbidden").into_response();
+        }
     }
     if !allowed_current.contains(&txn.status.as_str()) {
         return err(StatusCode::CONFLICT, "invalid transaction state").into_response();
@@ -25182,14 +25208,35 @@ async fn update_transaction_status(
     }
 
     let wallet_transition_result = match next_status {
+        "accepted" if managed_intermediary => Ok(()),
         "accepted" => hold_transaction_funds_tx(&mut tx, &txn, wallet_environment.as_str())
             .await
             .map(|_| ()),
+        "completed" if managed_intermediary => {
+            release_intermediary_transaction_funds_tx(
+                &mut tx,
+                &txn,
+                wallet_environment.as_str(),
+            )
+            .await
+            .map(|_| ())
+        }
         "completed" => release_transaction_funds_tx(&mut tx, &txn, wallet_environment.as_str())
             .await
             .map(|_| ()),
         "cancelled" if txn.status == "completed" => {
             reverse_completed_transaction_funds_tx(&mut tx, &txn, wallet_environment.as_str())
+                .await
+                .map(|_| ())
+        }
+        "cancelled"
+            if managed_intermediary
+                && matches!(
+                    txn.status.as_str(),
+                    "pending" | "accepted" | "in_progress" | "delivered"
+                ) =>
+        {
+            refund_intermediary_transaction_funds_tx(&mut tx, &txn, wallet_environment.as_str())
                 .await
                 .map(|_| ())
         }
