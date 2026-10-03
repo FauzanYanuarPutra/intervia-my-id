@@ -25,11 +25,23 @@ export function GoogleAdSenseUnit({
   const hostRef = useRef<HTMLDivElement | null>(null);
   const insRef = useRef<HTMLElement | null>(null);
   const pushedRef = useRef(false);
+  const retryTimerRef = useRef<number | null>(null);
   const [adState, setAdState] = useState<'pending' | 'filled' | 'unfilled'>('pending');
 
   useEffect(() => {
     pushedRef.current = false;
     setAdState('pending');
+    if (retryTimerRef.current !== null) {
+      window.clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
+
+    return () => {
+      if (retryTimerRef.current !== null) {
+        window.clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
+    };
   }, [pathname, slot]);
 
   useEffect(() => {
@@ -84,10 +96,11 @@ export function GoogleAdSenseUnit({
         );
 
       if (!scriptReady) {
-        window.setTimeout(observeTarget, 500);
+        retryTimerRef.current = window.setTimeout(observeTarget, 500);
         return;
       }
 
+      retryTimerRef.current = null;
       pushAd();
     };
 
@@ -107,7 +120,13 @@ export function GoogleAdSenseUnit({
     );
 
     observer.observe(host);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      if (retryTimerRef.current !== null) {
+        window.clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
+    };
   }, [adState, pathname, slot]);
 
   if (adState === 'unfilled') return null;
@@ -117,7 +136,7 @@ export function GoogleAdSenseUnit({
       ref={hostRef}
       className={
         adState === 'pending'
-          ? 'h-px w-full min-w-0 overflow-hidden opacity-0 ' + className
+          ? 'pointer-events-none h-px w-full min-w-0 overflow-hidden opacity-0 ' + className
           : 'w-full min-w-0 overflow-hidden ' + className
       }
       data-ad-placement="adsense-autorelaxed"
