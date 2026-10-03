@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 
 const ADSENSE_CLIENT = 'ca-pub-7020398942986974';
@@ -22,10 +22,39 @@ export function GoogleAdSenseUnit({
   className = '',
 }: GoogleAdSenseUnitProps) {
   const pathname = usePathname();
+  const insRef = useRef<HTMLElement | null>(null);
   const pushedRef = useRef(false);
+  const [adState, setAdState] = useState<'pending' | 'filled' | 'unfilled'>('pending');
 
   useEffect(() => {
     pushedRef.current = false;
+  }, [pathname, slot]);
+
+  useEffect(() => {
+    const ins = insRef.current;
+    if (!ins) return;
+
+    const readStatus = () => {
+      const status = ins.getAttribute('data-ad-status');
+      if (status === 'unfilled') {
+        setAdState('unfilled');
+      } else if (status === 'filled') {
+        setAdState('filled');
+      }
+    };
+
+    readStatus();
+    const observer = new MutationObserver(readStatus);
+    observer.observe(ins, {
+      attributes: true,
+      attributeFilter: ['data-ad-status'],
+    });
+
+    const timer = window.setInterval(readStatus, 1000);
+    return () => {
+      observer.disconnect();
+      window.clearInterval(timer);
+    };
   }, [pathname, slot]);
 
   useEffect(() => {
@@ -55,15 +84,20 @@ export function GoogleAdSenseUnit({
     return () => window.clearTimeout(timer);
   }, [pathname, slot]);
 
+  if (adState === 'unfilled') return null;
+
   return (
     <div
       className={'w-full min-w-0 overflow-hidden ' + className}
       data-ad-placement="adsense-autorelaxed"
       data-ad-slot={slot}
+      data-ad-state={adState}
+      aria-hidden={adState === 'unfilled' ? true : undefined}
     >
       <ins
+        ref={insRef}
         className="adsbygoogle"
-        style={{ display: 'block' }}
+        style={{ display: 'block', minHeight: 0 }}
         data-ad-format="autorelaxed"
         data-ad-client={ADSENSE_CLIENT}
         data-ad-slot={slot}
