@@ -925,6 +925,7 @@ struct ContentRow {
     rating: Option<f32>,
     review_count: Option<i32>,
     like_count: i64,
+    view_count: i64,
     metadata: Value,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
@@ -1002,6 +1003,8 @@ struct ContentResponse {
     liked: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     like_count: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    view_count: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     seller_stats: Option<SellerStats>,
     metadata: Value,
@@ -1083,6 +1086,7 @@ impl ContentResponse {
                 .flatten(),
             liked: (!is_public_reference).then_some(liked),
             like_count: (!is_public_reference).then_some(value.like_count),
+            view_count: (!is_public_reference).then_some(value.view_count),
             seller_stats: (!is_public_reference).then_some(seller_stats).flatten(),
             metadata,
             created_at: value.created_at,
@@ -2619,6 +2623,90 @@ async fn shutdown_signal() {
     tracing::info!("shutdown signal received");
 }
 
+async fn record_content_view_dedup(
+    db: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    event: &NormalizedEvent,
+    actor_user_id: Option<Uuid>,
+) -> Result<(), sqlx::Error> {
+    if event.event_name != "content.viewed"
+        || !event
+            .entity_type
+            .as_deref()
+            .is_some_and(|value| value.eq_ignore_ascii_case("content"))
+    {
+        return Ok(());
+    }
+
+    let Some(entity_id) = event
+        .entity_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    else {
+        return Ok(());
+    };
+
+    let Ok(content_id) = Uuid::parse_str(entity_id) else {
+        return Ok(());
+    };
+
+    let owner_id = sqlx::query_scalar::<_, Uuid>(
+        "SELECT owner_id FROM content_items WHERE id = $1",
+    )
+    .bind(content_id)
+    .fetch_optional(&mut **db)
+    .await?;
+
+    if owner_id == actor_user_id {
+        return Ok(());
+    }
+
+    let viewer_key = if let Some(user_id) = actor_user_id {
+        format!("user:{user_id}")
+    } else if let Some(anonymous_id) = event
+        .anonymous_id
+        .as_deref()
+        .filter(|value| !value.is_empty())
+    {
+        format!("anonymous:{anonymous_id}")
+    } else if let Some(session_id) = event
+        .session_id
+        .as_deref()
+        .filter(|value| !value.is_empty())
+    {
+        format!("session:{session_id}")
+    } else if let Some(ip_hash) = event
+        .context
+        .get("ip_hash")
+        .and_then(Value::as_str)
+        .filter(|value| !value.is_empty())
+    {
+        format!("ip:{ip_hash}")
+    } else {
+        return Ok(());
+    };
+
+    sqlx::query(
+        r#"
+        INSERT INTO events.content_view_dedup (
+            entity_type,
+            entity_id,
+            viewer_key,
+            view_date
+        )
+        VALUES ('content', $1, $2, $3)
+        ON CONFLICT DO NOTHING
+        "#,
+    )
+    .bind(content_id.to_string())
+    .bind(viewer_key)
+    .bind(event.occurred_at.date_naive())
+    .execute(&mut **db)
+    .await?;
+
+    Ok(())
+}
+
 async fn collect_events(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -2725,6 +2813,10 @@ async fn collect_events(
         }
 
         accepted += 1;
+
+        if let Err(error) = record_content_view_dedup(&mut tx, &event, actor_user_id).await {
+            tracing::warn!("collect_events content view dedup error: {:?}", error);
+        }
 
         let workflow_key = automation_workflow_for_event(&event.event_name);
         if let Some(workflow_key) = workflow_key {
@@ -11400,6 +11492,12 @@ async fn publish_listing_draft(
                 FROM content_item_likes cil
                 WHERE cil.content_id = content_items.id
             ), 0) AS like_count,
+            COALESCE((
+                SELECT COUNT(*)::bigint
+                FROM events.content_view_dedup cvd
+                WHERE cvd.entity_type = 'content'
+                  AND cvd.entity_id = id::text
+            ), 0) AS view_count,
             metadata, created_at, updated_at
         "#,
     )
