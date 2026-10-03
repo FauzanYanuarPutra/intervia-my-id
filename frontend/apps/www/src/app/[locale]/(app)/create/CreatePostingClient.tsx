@@ -7305,12 +7305,12 @@ export function CreatePostingClient({
       eyebrow: locale === 'id' ? 'Mulai dari sini' : 'Start here',
       title:
         locale === 'id'
-          ? 'Mau menawarkan atau mencari?'
-          : 'Do you want to sell or need something?',
+          ? 'Kamu mau menawarkan atau membutuhkan?'
+          : 'Do you want to offer something or post a need?',
       description:
         locale === 'id'
-          ? 'Pilih sesuai tujuan Anda. Setelah itu isi detail singkat seperti judul, harga atau budget, lokasi, dan referensi bila ada.'
-          : 'Choose one first. Then add short details like title, price/budget, location, and references when available.',
+          ? 'Pilih Kebutuhan kalau sedang mencari sesuatu. Pilih Penawaran kalau punya sesuatu untuk ditawarkan. Setelah itu form akan menyesuaikan.'
+          : 'Choose Need when you are looking for something. Choose Offer when you have something to offer. The form will adapt next.',
       children: (
         <>
           {/* <div className="grid gap-3 lg:grid-cols-2">
