@@ -15,7 +15,10 @@ use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sqlx::Row;
-use std::{collections::{HashMap, HashSet}, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 use uuid::Uuid;
 
 use super::{auth_claims_from_headers, has_agent_access, push_notification_best_effort, AppState};
@@ -771,9 +774,7 @@ fn passes_public_match_filter(score: &CandidateScore) -> bool {
         return false;
     }
 
-    score.similarity >= 8.0
-        || score.semantic_relevance > 0.0
-        || score.category_fit >= 14.0
+    score.similarity >= 8.0 || score.semantic_relevance > 0.0 || score.category_fit >= 14.0
 }
 
 async fn ensure_review(
@@ -1295,15 +1296,10 @@ pub async fn run_match(
         Ok(rows) => {
             let mut map = HashMap::<String, String>::new();
             for row in rows.into_iter().rev() {
-                if let Some(candidate_id) =
-                    row.get::<Option<String>, _>("matched_content_id")
-                {
+                if let Some(candidate_id) = row.get::<Option<String>, _>("matched_content_id") {
                     let candidate_id = candidate_id.trim().to_string();
                     if !candidate_id.is_empty() {
-                        map.insert(
-                            candidate_id,
-                            row.get::<String, _>("feedback_type"),
-                        );
+                        map.insert(candidate_id, row.get::<String, _>("feedback_type"));
                     }
                 }
             }
@@ -1316,7 +1312,9 @@ pub async fn run_match(
     };
 
     for entry in &mut ranked {
-        let feedback = viewer_feedback.get(&entry.item.id.to_string()).map(String::as_str);
+        let feedback = viewer_feedback
+            .get(&entry.item.id.to_string())
+            .map(String::as_str);
         apply_viewer_feedback(&mut entry.score, feedback);
     }
 
@@ -2250,11 +2248,7 @@ pub async fn get_public_matching_feedback(
                 })
                 .collect::<Vec<_>>();
 
-            (
-                StatusCode::OK,
-                Json(json!({"feedback": feedback})),
-            )
-                .into_response()
+            (StatusCode::OK, Json(json!({"feedback": feedback}))).into_response()
         }
         Err(error) => {
             tracing::error!("load public matching feedback failed: {:?}", error);
@@ -2318,7 +2312,10 @@ pub async fn create_public_matching_feedback(
                 .into_response()
         }
         Err(error) => {
-            tracing::error!("load source for public matching feedback failed: {:?}", error);
+            tracing::error!(
+                "load source for public matching feedback failed: {:?}",
+                error
+            );
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(json!({"error": "failed to load source listing"})),
@@ -2405,7 +2402,11 @@ pub async fn create_public_matching_feedback(
         "#,
     )
     .bind(feedback_type)
-    .bind(if note.is_empty() { None } else { Some(note.as_str()) })
+    .bind(if note.is_empty() {
+        None
+    } else {
+        Some(note.as_str())
+    })
     .bind(metadata)
     .bind(actor)
     .fetch_one(&state.db)
@@ -2425,7 +2426,11 @@ pub async fn create_public_matching_feedback(
                     "matched_content_id": candidate.id,
                     "feedback_type": feedback_type,
                 })),
-                if note.is_empty() { None } else { Some(note.clone()) },
+                if note.is_empty() {
+                    None
+                } else {
+                    Some(note.clone())
+                },
             )
             .await;
 
