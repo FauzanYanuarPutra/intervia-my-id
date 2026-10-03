@@ -11,6 +11,10 @@ export const maxDuration = 5;
 const INTERNAL_AI_URL = (
   process.env.INTERNAL_AI_URL || 'http://ai_service:8080'
 ).trim().replace(/\/+$/, '');
+const MARKETPLACE_URL =
+  process.env.INTERNAL_MARKETPLACE_URL ||
+  process.env.NEXT_PUBLIC_MARKETPLACE_URL ||
+  'http://localhost:8081';
 const AI_SERVICE_TOKEN = (process.env.AI_SERVICE_TOKEN || '').trim();
 
 function text(value: unknown, max = 500) {
@@ -138,6 +142,58 @@ export async function POST(
 
   const candidateIds = new Set(candidates.map(candidate => candidate.id));
 
+  let feedbackHistory: Array<{
+    matched_content_id: string;
+    feedback_type: 'approved' | 'rejected';
+    note: string;
+    created_at: string;
+  }> = [];
+
+  try {
+    const feedbackResponse = await fetch(
+      `${MARKETPLACE_URL}/v1/content/${encodeURIComponent(resolvedId)}/matches/feedback`,
+      {
+        headers: {
+          Authorization: `Bearer ${auth.ctx.token}`,
+          'Content-Type': 'application/json',
+        },
+        cache: 'no-store',
+        signal: AbortSignal.timeout(900),
+      },
+    ).catch(() => null);
+
+    if (feedbackResponse?.ok) {
+      const feedbackPayload = (await feedbackResponse.json().catch(() => ({}))) as {
+        feedback?: unknown;
+      };
+      feedbackHistory = Array.isArray(feedbackPayload.feedback)
+        ? feedbackPayload.feedback
+            .map(item => {
+              const value = record(item);
+              const type = text(value.feedback_type, 32);
+              return {
+                matched_content_id: text(value.matched_content_id, 120),
+                feedback_type:
+                  type === 'approved' ? 'approved' : type === 'rejected' ? 'rejected' : null,
+                note: text(value.note, 300),
+                created_at: text(value.created_at, 80),
+              };
+            })
+            .filter(
+              (
+                item,
+              ): item is {
+                matched_content_id: string;
+                feedback_type: 'approved' | 'rejected';
+                note: string;
+                created_at: string;
+              } => Boolean(item.matched_content_id && item.feedback_type),
+            )
+            .slice(0, 50)
+        : [];
+    }
+  } catch {}
+
   try {
     const response = await fetch(`${INTERNAL_AI_URL}/v1/match/similar`, {
       method: 'POST',
@@ -154,8 +210,8 @@ export async function POST(
         locale: body.locale === 'en' ? 'en' : 'id',
         message:
           body.locale === 'en'
-            ? 'Rank the supplied candidates for this listing. Use only the candidate IDs supplied in context.'
-            : 'Urutkan kandidat yang sudah diberikan untuk listing ini. Gunakan hanya ID kandidat yang ada di context.',
+            ? 'Rank the supplied candidates for this listing. Use only the candidate IDs supplied in context. Learn from feedback_history: approved means the user found that kind of match useful; rejected means downrank that candidate and similar patterns when evidence supports it.'
+            : 'Urutkan kandidat yang sudah diberikan untuk listing ini. Gunakan hanya ID kandidat yang ada di context. Pelajari feedback_history: approved berarti pengguna menilai match seperti itu berguna; rejected berarti turunkan kandidat itu dan pola serupa bila buktinya mendukung.',
         context: {
           source: {
             id: text(source.id, 120),
@@ -172,6 +228,7 @@ export async function POST(
             city: text(source.city, 100),
           },
           candidates,
+          feedback_history: feedbackHistory,
         },
         use_rag: false,
         response_mode: 'json',
