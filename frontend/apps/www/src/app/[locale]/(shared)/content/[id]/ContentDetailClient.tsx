@@ -79,6 +79,7 @@ import { useViewerLocation } from '@/components/super-app/useViewerLocation';
 import { haversineKm, isCoordinateValid } from '@/lib/super-app/location-guard';
 import { formatDistanceKm } from '@/lib/geo/distance';
 import { BrandSocialIcon } from '@/components/common/BrandSocialIcon';
+import { ListingQualityAssistant } from '@/components/content/ListingQualityAssistant';
 
 export type ContentItem = {
   id: string;
@@ -1929,6 +1930,21 @@ export default function ContentDetailClient({
               ? 'Tayang'
               : 'Live'
             : normalizedContentStatus || (locale === 'id' ? 'Belum tayang' : 'Not live');
+
+  const handleAiListingUpdated = (patch: Record<string, unknown>) => {
+    setItem(prev => {
+      if (!prev) return prev;
+      const next = { ...prev, ...patch } as ContentItem;
+      if (typeof patch.content_type === 'string') {
+        next.content_type = patch.content_type;
+        next.type = patch.content_type;
+      }
+      if (typeof patch.price_unit === 'string') {
+        next.price_unit = patch.price_unit;
+      }
+      return next;
+    });
+  };
 
   const sectorId = meta.sector as string | undefined;
   const sectorObj = sectorId ? getSectorById(sectorId) : null;
@@ -3789,6 +3805,15 @@ export default function ContentDetailClient({
     </div>
   );
 
+  const ownerQualityAssistant =
+    isOwner && !publicReference ? (
+      <ListingQualityAssistant
+        contentId={resolvedContentId || item.id}
+        locale={locale}
+        onUpdated={handleAiListingUpdated}
+      />
+    ) : null;
+
   const ownerProfileCard =
     !publicReference && ownerProfileHref && ownerDisplayName ? (
       <section className={detailSectionClass}>
@@ -4724,6 +4749,7 @@ export default function ContentDetailClient({
                   ) : null}
                 </div>
 
+                {ownerQualityAssistant}
                 <div className="lg:hidden">{ownerProfileCard}</div>
 
                 {!isOwner ? (
