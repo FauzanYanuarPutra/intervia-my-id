@@ -1213,7 +1213,6 @@ export default function ContentDetailClient({
       setShowOfferModal(false);
       setOfferAmount('');
       setOfferMessage('');
-      setCreatedDealHandoff(null);
       setChatError(null);
       router.push(`/chat/${encodeURIComponent(roomId)}`);
     } catch (error) {
@@ -3945,6 +3944,9 @@ export default function ContentDetailClient({
           {shareError}
         </p>
       )}
+    </section>
+  );
+
   const locationLabel =
     quickSpecs.find(spec => spec.key === 'location')?.value ||
     readMetaText(meta, 'location', 'city', 'region', 'address') ||
