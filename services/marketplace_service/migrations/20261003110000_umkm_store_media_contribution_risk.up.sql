@@ -1,5 +1,3 @@
-BEGIN;
-
 ALTER TABLE umkm_store_media_contributions
   ADD COLUMN IF NOT EXISTS risk_score INTEGER NOT NULL DEFAULT 0
     CHECK (risk_score BETWEEN 0 AND 100),
@@ -11,5 +9,3 @@ ALTER TABLE umkm_store_media_contributions
 CREATE INDEX IF NOT EXISTS idx_umkm_store_media_contributions_risk_queue
   ON umkm_store_media_contributions (status, risk_level, risk_score DESC, created_at ASC)
   WHERE status = 'pending';
-
-COMMIT;
