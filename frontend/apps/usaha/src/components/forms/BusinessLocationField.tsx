@@ -14,6 +14,11 @@ type BusinessLocationFieldProps = {
   locationQuery: string;
   point: LatLng | null;
   onLocationQueryChange: (value: string) => void;
+  onAddressChange?: (value: string) => void;
+  onCityChange?: (value: string) => void;
+  onProvinceChange?: (value: string) => void;
+  onDistrictChange?: (value: string) => void;
+  onNameChange?: (value: string) => void;
   onPointChange: (value: LatLng) => void;
 };
 
@@ -24,6 +29,11 @@ export function BusinessLocationField({
   locationQuery,
   point,
   onLocationQueryChange,
+  onAddressChange,
+  onCityChange,
+  onProvinceChange,
+  onDistrictChange,
+  onNameChange,
   onPointChange,
 }: BusinessLocationFieldProps) {
   const [suggestions, setSuggestions] = useState<LocationSuggestion[]>([]);
@@ -152,9 +162,20 @@ export function BusinessLocationField({
   function handleSelectSuggestion(item: LocationSuggestion) {
     onLocationQueryChange(item.rawLabel);
     onPointChange(item.point);
+    if (item.address && onAddressChange) onAddressChange(item.address);
+    if (item.city && onCityChange) onCityChange(item.city);
+    if (item.province && onProvinceChange) onProvinceChange(item.province);
+    if (item.district && onDistrictChange) onDistrictChange(item.district);
+    if (item.source === 'business' && onNameChange && item.title) {
+      onNameChange(item.title);
+    }
     setSuggestions([]);
     setError('');
-    setFeedback('Lokasi dipilih dari hasil pencarian. Marker siap dikoreksi langsung di peta.');
+    setFeedback(
+      item.source === 'business'
+        ? 'Lokasi usaha terdaftar dipakai. Alamat dan koordinat ikut tersinkron.'
+        : 'Lokasi dipilih dari hasil pencarian. Marker siap dikoreksi langsung di peta.',
+    );
   }
 
   function handleMapChange(nextPoint: LatLng) {
@@ -238,7 +259,14 @@ export function BusinessLocationField({
               onClick={() => handleSelectSuggestion(item)}
               className="rounded-[14px] border border-transparent px-3 py-2 text-left transition hover:border-portal-line hover:bg-portal-sand/30"
             >
-              <div className="text-sm font-semibold text-portal-ink">{item.title}</div>
+              <div className="flex items-center gap-2 text-sm font-semibold text-portal-ink">
+                <span>{item.title}</span>
+                {item.source === 'business' ? (
+                  <span className="rounded-full bg-portal-forest/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-portal-forest">
+                    Usaha terdaftar
+                  </span>
+                ) : null}
+              </div>
               {item.subtitle ? (
                 <div className="mt-1 text-xs leading-5 text-portal-soft">{item.subtitle}</div>
               ) : null}
