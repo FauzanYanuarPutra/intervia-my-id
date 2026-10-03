@@ -25426,9 +25426,7 @@ async fn update_transaction_status(
         return err(StatusCode::CONFLICT, "invalid transaction state").into_response();
     }
 
-    if managed_intermediary
-        && matches!(next_status, "in_progress" | "delivered" | "completed")
-    {
+    if managed_intermediary && matches!(next_status, "in_progress" | "delivered" | "completed") {
         let payment_paid = txn
             .transaction_meta
             .get("payment")
