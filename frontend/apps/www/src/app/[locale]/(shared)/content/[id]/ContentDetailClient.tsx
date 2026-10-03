@@ -1260,6 +1260,18 @@ export default function ContentDetailClient({
               content_url: listingHref,
               market_side: toMarketSideValue(listingSide),
               intermediary_requested_from: 'content_detail',
+              source_group_id:
+                typeof item?.metadata?.group_id === 'string'
+                  ? item.metadata.group_id
+                  : typeof item?.metadata?.community_group_id === 'string'
+                    ? item.metadata.community_group_id
+                    : null,
+              source_group_slug:
+                typeof item?.metadata?.group_slug === 'string'
+                  ? item.metadata.group_slug
+                  : typeof item?.metadata?.community_group_slug === 'string'
+                    ? item.metadata.community_group_slug
+                    : null,
             },
             safety_checklist: {
               identity_confirmed: true,
