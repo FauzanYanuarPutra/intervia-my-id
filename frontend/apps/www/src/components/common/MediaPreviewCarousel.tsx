@@ -53,6 +53,10 @@ type MediaPreviewCarouselProps = {
   initialIndex?: number;
   onIndexChange?: (index: number) => void;
   keyboardControls?: boolean;
+  /** Open the preview when the user clicks/taps an image in the carousel. */
+  openOnMediaClick?: boolean;
+  /** Keep carousel arrows visible instead of relying on desktop hover. */
+  alwaysShowControls?: boolean;
 };
 
 type NormalizedMedia = {
@@ -138,6 +142,8 @@ export function MediaPreviewCarousel({
   initialIndex = 0,
   onIndexChange,
   keyboardControls = false,
+  openOnMediaClick = true,
+  alwaysShowControls = false,
 }: MediaPreviewCarouselProps) {
   const mediaItems = useMemo(
     () => normalizeMediaItems(items, alt),
@@ -364,11 +370,33 @@ export function MediaPreviewCarousel({
             {visibleMediaItems.map((item, index) => (
               <div
                 key={`${item.src}-${index}`}
-                className="relative h-full min-h-0 w-full min-w-0 shrink-0 grow-0 basis-full overflow-hidden bg-slate-100 dark:bg-slate-950"
+                className={cn(
+                  'relative h-full min-h-0 w-full min-w-0 shrink-0 grow-0 basis-full overflow-hidden bg-slate-100 dark:bg-slate-950',
+                  openOnMediaClick &&
+                    lightbox &&
+                    item.type === 'image' &&
+                    'cursor-zoom-in',
+                )}
+                onClick={event => {
+                  if (
+                    !openOnMediaClick ||
+                    !lightbox ||
+                    item.type !== 'image' ||
+                    shouldIgnoreMediaGesture(event.target)
+                  ) {
+                    return;
+                  }
+                  setLightboxOpen(true);
+                }}
+                aria-label={
+                  openOnMediaClick && lightbox && item.type === 'image'
+                    ? 'Buka preview gambar'
+                    : undefined
+                }
               >
                 {renderMedia(item, index)}
                 {item.type === 'video' ? (
-                  <span className="pointer-events-none absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-medium text-white  shadow-sm">
+                  <span className="pointer-events-none absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-medium text-white shadow-sm">
                     <PlayCircle className="h-3.5 w-3.5 text-white/90" />
                     Video
                   </span>
@@ -417,7 +445,9 @@ export function MediaPreviewCarousel({
                 scrollToIndex(active - 1);
               }}
               className={cn(
-                'absolute left-2.5 top-1/2 z-[3] inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/92 text-slate-900 shadow-md ring-1 ring-black/5 transition-all duration-200 hover:bg-white active:scale-95 dark:bg-slate-900/92 dark:text-white dark:ring-white/10 md:opacity-0 md:group-hover:opacity-100 sm:left-3',
+                'absolute left-2.5 top-1/2 z-[8] inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/92 text-slate-900 shadow-lg ring-1 ring-black/5 transition-all duration-200 hover:bg-white active:scale-95 dark:bg-slate-900/92 dark:text-white dark:ring-white/10 sm:left-3 sm:h-10 sm:w-10',
+                !alwaysShowControls &&
+                  'md:opacity-0 md:group-hover:opacity-100',
                 active === 0 &&
                   'cursor-not-allowed opacity-40 md:group-hover:opacity-40',
               )}
@@ -434,7 +464,9 @@ export function MediaPreviewCarousel({
                 scrollToIndex(active + 1);
               }}
               className={cn(
-                'absolute right-2.5 top-1/2 z-[3] inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/92 text-slate-900 shadow-md ring-1 ring-black/5 transition-all duration-200 hover:bg-white active:scale-95 dark:bg-slate-900/92 dark:text-white dark:ring-white/10 md:opacity-0 md:group-hover:opacity-100 sm:right-3',
+                'absolute right-2.5 top-1/2 z-[8] inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/92 text-slate-900 shadow-lg ring-1 ring-black/5 transition-all duration-200 hover:bg-white active:scale-95 dark:bg-slate-900/92 dark:text-white dark:ring-white/10 sm:right-3 sm:h-10 sm:w-10',
+                !alwaysShowControls &&
+                  'md:opacity-0 md:group-hover:opacity-100',
                 active === visibleMediaItems.length - 1 &&
                   'cursor-not-allowed opacity-40 md:group-hover:opacity-40',
               )}
@@ -490,6 +522,9 @@ export function MediaPreviewCarousel({
               showCounter
               showDots
               objectFit="contain"
+              openOnMediaClick={false}
+              alwaysShowControls
+              keyboardControls
               initialIndex={active} // Sinkronisasi index dari layar utama
             />
           </div>
