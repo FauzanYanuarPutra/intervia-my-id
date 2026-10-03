@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Check, ChevronDown, SlidersHorizontal, X } from 'lucide-react';
 
 import { EmblaInlineRail } from '@/components/common/EmblaInlineRail';
@@ -48,6 +49,17 @@ export function ProfileFilterStrip<T extends string>({
     onChange(key);
     setOpen(false);
   };
+
+  useEffect(() => {
+    if (!open) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [open]);
 
   return (
     <>
@@ -124,9 +136,11 @@ export function ProfileFilterStrip<T extends string>({
         </div>
       </div>
 
-      {open ? (
-        <div
-          className="fixed inset-0 z-[1350] flex items-end bg-slate-950/45 backdrop-blur-sm sm:hidden"
+      {open && typeof document !== 'undefined'
+        ? createPortal(
+            <div
+              className="fixed inset-0 z-[2147483000] flex items-end bg-slate-950/45 backdrop-blur-sm sm:hidden"
+              style={{ isolation: 'isolate' }}
           role="presentation"
           onMouseDown={event => {
             if (event.currentTarget === event.target) setOpen(false);
@@ -212,8 +226,10 @@ export function ProfileFilterStrip<T extends string>({
               </button>
             </div>
           </div>
-        </div>
-      ) : null}
+        </div>,
+          document.body,
+        )
+        : null}
     </>
   );
 }
