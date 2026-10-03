@@ -71,10 +71,7 @@ fn percentile(mut values: Vec<i64>, p: f64) -> Option<i64> {
         return Some(values[lower]);
     }
     let weight = position - lower as f64;
-    Some(
-        ((values[lower] as f64 * (1.0 - weight)) + (values[upper] as f64 * weight))
-            .round() as i64,
-    )
+    Some(((values[lower] as f64 * (1.0 - weight)) + (values[upper] as f64 * weight)).round() as i64)
 }
 
 pub async fn create_market_signal(
@@ -167,12 +164,20 @@ pub async fn create_market_signal(
                     "demand" | "seeker" | "need" | "needed" | "request" | "buyer"
                 )
             });
-            if demand { "demand" } else { "supply" }
+            if demand {
+                "demand"
+            } else {
+                "supply"
+            }
         });
 
     // A response to a supply listing is a demand-side signal.
     // A response to a demand listing is a supply-side signal.
-    let signal_side = if listing_side == "demand" { "supply" } else { "demand" };
+    let signal_side = if listing_side == "demand" {
+        "supply"
+    } else {
+        "demand"
+    };
 
     let metadata_city = metadata
         .get("city")
@@ -201,7 +206,8 @@ pub async fn create_market_signal(
         })
         .unwrap_or_else(|| "IDR".to_string());
     let signal_type = normalize_signal_type(payload.signal_type.as_deref());
-    let source = clean_text(payload.source.as_deref(), 64).unwrap_or_else(|| "content_detail".to_string());
+    let source =
+        clean_text(payload.source.as_deref(), 64).unwrap_or_else(|| "content_detail".to_string());
     let quantity_unit = clean_text(payload.quantity_unit.as_deref(), 32);
     let idempotency_key = headers
         .get("x-idempotency-key")

@@ -18,8 +18,8 @@ use sqlx::Row;
 use std::{collections::HashMap, env, sync::Arc};
 use uuid::Uuid;
 
-use super::{auth_claims_from_headers, AppState};
 use super::market_signals::market_signal_summary;
+use super::{auth_claims_from_headers, AppState};
 
 const MAX_OBSERVATIONS: i64 = 1500;
 const MIN_CONFIDENT_SAMPLE: usize = 8;
@@ -595,16 +595,10 @@ async fn build_market_response(
         .await
         .unwrap_or(None);
 
-    let negotiation_signals = market_signal_summary(
-        state,
-        category,
-        city,
-        unit,
-        &source.currency,
-        days,
-    )
-    .await
-    .unwrap_or_default();
+    let negotiation_signals =
+        market_signal_summary(state, category, city, unit, &source.currency, days)
+            .await
+            .unwrap_or_default();
 
     let mut alerts = Vec::<Value>::new();
     let source_alert = price_alert(Some(source.price_cents), &market);
