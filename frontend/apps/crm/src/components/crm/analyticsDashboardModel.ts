@@ -12,10 +12,6 @@ export type TrendRange = 7 | 30 | 90;
 export type ChartStyle = 'line' | 'bar' | 'area';
 export type BreakdownMetric = 'listings' | 'orders' | 'kyc' | 'pipeline';
 
-type Timestamped = {
-  created_at?: string | null;
-};
-
 function validTime(value?: string | null): number | null {
   if (!value) return null;
   const time = new Date(value).getTime();
@@ -37,7 +33,7 @@ function formatDayLabel(time: number, range: TrendRange): string {
 
 function activityIsRegistration(action: string): boolean {
   const normalized = action.toLowerCase();
-  return normalized.includes('register') || normalized.includes('signup') || normalized.includes('sign_up');
+  return normalized.includes('register') || normalized.includes('signup') || normalized.includes('sign_up') || normalized.includes('registrasi') || normalized.includes('pendaftaran') || normalized.includes('user baru');
 }
 
 function metricTimes(data: DashboardData, metric: TrendMetric): number[] {
