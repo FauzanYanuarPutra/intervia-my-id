@@ -4,9 +4,11 @@ import CrmAnalyticsDashboard from './CrmAnalyticsDashboard';
 
 export function OperationsOverview({
   data,
+  accessToken,
   onOpen,
 }: {
   data: DashboardData;
+  accessToken: string;
   onOpen: (page: "users" | "listings" | "transactions" | "disputes") => void;
 }) {
   const openSupport = data.tickets.filter(ticket =>
@@ -34,7 +36,7 @@ export function OperationsOverview({
         </div>
       </div>
 
-      <CrmAnalyticsDashboard data={data} compact />
+      <CrmAnalyticsDashboard data={data} accessToken={accessToken} compact />
 
       <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
         {cards.map(([label, value, destination]) => (
