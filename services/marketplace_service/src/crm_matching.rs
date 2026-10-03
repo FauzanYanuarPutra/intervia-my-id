@@ -596,7 +596,8 @@ fn score_candidate(requirement: &RequirementItem, candidate: &CandidateItem) -> 
     let quality = listing_quality_score(candidate);
     let freshness = freshness_score(candidate.updated_at);
 
-    let total = if semantic_relevance < 0.35 {
+    let too_far = distance_km.map(|distance| distance > 50.0).unwrap_or(false);
+    let total = if semantic_relevance < 0.35 || too_far {
         0.0
     } else {
         (keyword_fit
