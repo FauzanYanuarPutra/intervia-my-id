@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
     if(!security.ok)return security.response;
     const code=req.nextUrl.searchParams.get('code');
     const state=req.nextUrl.searchParams.get('state')||'';
-    if(!code||state!==(req.cookies.get('facebook_oauth_state')?.value||''))return fail('oauth_state_invalid');
+    if(!code||!state)return fail('oauth_state_invalid');
     let parsed:any; try{parsed=JSON.parse(Buffer.from(state,'base64url').toString());}catch{return fail('oauth_state_invalid');}
     if(parsed.nonce!==(req.cookies.get('facebook_oauth_state')?.value||''))return fail('oauth_state_invalid');
     const appId=process.env.FACEBOOK_APP_ID, appSecret=process.env.FACEBOOK_APP_SECRET;
