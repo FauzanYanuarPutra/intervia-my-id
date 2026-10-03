@@ -140,6 +140,13 @@ type QuickApplyData = {
 
 const QUICK_APPLY_KEY = 'lajukan_quick_apply_v1';
 
+type TransactionIntermediaryOption = {
+  email: string;
+  user_id: string;
+  display_name: string;
+  note?: string | null;
+};
+
 type DealKind =
   | 'job'
   | 'service'
@@ -755,6 +762,12 @@ export default function ContentDetailClient({
   const [item, setItem] = useState<ContentItem | null>(initialItem);
   const [loading, setLoading] = useState(false);
   const [showOfferModal, setShowOfferModal] = useState(false);
+  const [showIntermediaryModal, setShowIntermediaryModal] = useState(false);
+  const [intermediaryMode, setIntermediaryMode] = useState<'managed' | 'direct' | null>(null);
+  const [selectedIntermediaryEmail, setSelectedIntermediaryEmail] = useState('');
+  const [intermediaries, setIntermediaries] = useState<TransactionIntermediaryOption[]>([]);
+  const [intermediariesLoading, setIntermediariesLoading] = useState(false);
+  const [intermediariesError, setIntermediariesError] = useState<string | null>(null);
   const [showApplyModal, setShowApplyModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
