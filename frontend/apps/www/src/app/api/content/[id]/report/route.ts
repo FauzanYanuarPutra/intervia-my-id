@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { parseJsonBody } from '@/lib/serverRequest';
 import { requireAuth } from '@/lib/serverAuth';
+import { enforceRateLimit, getClientIp } from '@/lib/rateLimit';
 
 const MARKETPLACE_URL =
   process.env.INTERNAL_MARKETPLACE_URL ||
@@ -21,6 +22,22 @@ export async function POST(
 ) {
   const auth = await requireAuth(req);
   if (!auth.ok) return auth.res;
+
+  const ipLimit = await enforceRateLimit({
+    key: `content-report:ip:${getClientIp(req)}`,
+    limit: 30,
+    windowSeconds: 3600,
+    message: 'Too many reports. Please retry later.',
+  });
+  if (!ipLimit.ok) return ipLimit.response;
+
+  const userLimit = await enforceRateLimit({
+    key: `content-report:user:${auth.ctx.userId}`,
+    limit: 10,
+    windowSeconds: 3600,
+    message: 'Too many reports. Please retry later.',
+  });
+  if (!userLimit.ok) return userLimit.response;
 
   const body = await parseJsonBody(req);
   if (!body.ok) return body.response;
