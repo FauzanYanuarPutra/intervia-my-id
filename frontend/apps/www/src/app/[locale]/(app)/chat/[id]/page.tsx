@@ -2298,7 +2298,7 @@ export default function ChatRoomPage() {
   const handleBack = useAppBack(router, '/chat');
 
   const handleOpenStructuredContent = useCallback(
-    async (contentId: string, href: string) => {
+    async (contentId: string, href = '') => {
       const safeHref = href.trim();
       const safeContentId = contentId.trim();
       if (!safeHref && !safeContentId) {
