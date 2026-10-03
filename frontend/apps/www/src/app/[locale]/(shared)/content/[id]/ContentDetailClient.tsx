@@ -93,6 +93,7 @@ export type ContentItem = {
   slug?: string;
   type: string;
   content_type?: string;
+  category?: string;
   title: string;
   summary?: string | null;
   body?: string | null;
