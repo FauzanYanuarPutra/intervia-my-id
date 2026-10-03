@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { ArrowLeft, ArrowRight, MapPin, Sparkles } from 'lucide-react';
-import { Link, useParams } from '@/i18n/navigation';
+import { useParams } from 'next/navigation';
+import { Link } from '@/i18n/navigation';
 
 type Match = {
   id: string;
