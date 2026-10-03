@@ -198,17 +198,29 @@ try {
         # application/Dockerfile failures. Keep them out of engine restart logic
         # and retry with lower build concurrency before giving up.
         return (
+            # Docker Hub / registry authentication and DNS failures.
+            $OutputText -match "(?i)auth\.docker\.io" -or
+            $OutputText -match "(?i)registry-1\.docker\.io" -or
+            $OutputText -match "(?i)failed to fetch anonymous token" -or
+            $OutputText -match "(?i)failed to authorize" -or
+            $OutputText -match "(?i)failed to resolve source metadata" -or
+            # DNS / socket failures emitted by BuildKit, Go, Node and curl.
+            $OutputText -match "(?i)dial tcp: lookup .*: no such host" -or
+            $OutputText -match "(?i)lookup .*: no such host" -or
+            $OutputText -match "(?i)temporary failure in name resolution" -or
+            $OutputText -match "(?i)could not resolve host" -or
+            $OutputText -match "(?i)getaddrinfo.*(?:ENOTFOUND|EAI_AGAIN)" -or
+            $OutputText -match "(?i)name or service not known" -or
+            $OutputText -match "(?i)network is unreachable" -or
+            # HTTP/TLS/connection timeouts and transient upstream errors.
             $OutputText -match "(?i)TLS handshake timeout" -or
             $OutputText -match "(?i)context deadline exceeded" -or
             $OutputText -match "(?i)i/o timeout" -or
-            $OutputText -match "(?i)connection (?:reset|closed) by peer" -or
+            $OutputText -match "(?i)connection (?:reset|closed|timed out) by peer" -or
+            $OutputText -match "(?i)connection timed out" -or
             $OutputText -match "(?i)unexpected EOF" -or
-            $OutputText -match "(?i)temporary failure in name resolution" -or
-            $OutputText -match "(?i)network is unreachable" -or
-            $OutputText -match "(?i)registry-1\.docker\.io" -or
-            $OutputText -match "(?i)failed to resolve source metadata" -or
             $OutputText -match "(?i)too many requests" -or
-            $OutputText -match "(?i)HTTP (?:502|503|504)" -or
+            $OutputText -match "(?i)HTTP (?:429|502|503|504)" -or
             $OutputText -match "(?i)received unexpected HTTP status"
         )
     }
@@ -731,8 +743,11 @@ try {
                                 $AdaptiveLimit = [math]::Max(1, [math]::Ceiling($AdaptiveLimit / 2))
                             }
                             $env:COMPOSE_PARALLEL_LIMIT = $AdaptiveLimit.ToString()
-                            Write-Warning "Docker registry/network transient detected. Retry $RegistryAttempt/3 dengan paralelisme $AdaptiveLimit..."
-                            Start-Sleep -Seconds ([math]::Min(15, $RegistryAttempt * 4))
+                            Write-Warning "Docker registry/network transient detected. Retry $RegistryAttempt/5 dengan paralelisme $AdaptiveLimit..."
+                            # Give DNS/TLS/upstream services time to recover without
+                            # hammering the registry. Delay grows with each attempt.
+                            $RetryDelaySeconds = [math]::Min(30, [math]::Max(4, [math]::Pow(2, $RegistryAttempt)))
+                            Start-Sleep -Seconds $RetryDelaySeconds
 
                             $RegistryRetryProbe = Invoke-DockerNative -Arguments (@($ComposeArgs) + $BuildArgs)
                             $RegistryRetryProbe.Output | ForEach-Object { Write-Output $_ }
@@ -743,12 +758,12 @@ try {
 
                             $RegistryRetryText = ($RegistryRetryProbe.Output -join [Environment]::NewLine)
                             if (-not (Test-DockerRegistryFailure -OutputText $RegistryRetryText)) {
-                                throw "Docker Compose build gagal karena error non-network. Periksa error build di atas."
+                                throw "Docker Compose build gagal karena setelah retry muncul error aplikasi/build yang bukan network/registry. Periksa error build di atas."
                             }
                         }
 
                         if (-not $RegistryRetrySucceeded) {
-                            throw "Docker Compose build gagal karena Docker registry/network tetap tidak tersedia setelah 3 retry."
+                            throw "Docker Compose build gagal karena Docker registry/network tetap tidak tersedia setelah 5 retry. Cek DNS/Internet/VPN/proxy lalu jalankan ulang."
                         }
                     }
                     elseif ((Test-DockerResourceFailure -OutputText $BuildText) -and ($AdaptiveLimit -gt 1)) {
