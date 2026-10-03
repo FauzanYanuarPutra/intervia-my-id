@@ -2657,7 +2657,7 @@ async fn record_content_view_dedup(
     .fetch_optional(&mut **db)
     .await?;
 
-    if owner_id == actor_user_id {
+    if actor_user_id == Some(owner_id) {
         return Ok(());
     }
 
