@@ -5962,7 +5962,12 @@ async fn update_transaction_intermediary_status(
             "Perantara Lajukan siap",
             &format!(
                 "Perantara {} menyetujui transaksi {}. Seller dapat melanjutkan persetujuan transaksi.",
-                intermediary_status(&updated.transaction_meta),
+                updated
+                    .transaction_meta
+                    .get("intermediary")
+                    .and_then(|value| value.get("email"))
+                    .and_then(Value::as_str)
+                    .unwrap_or("Lajukan"),
                 updated.id
             ),
             json!({
