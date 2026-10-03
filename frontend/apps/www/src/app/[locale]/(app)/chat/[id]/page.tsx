@@ -5649,6 +5649,7 @@ export default function ChatRoomPage() {
           },
           body: JSON.stringify({
             signal_type: amountCents ? 'price_indication' : 'inquiry',
+            market_side: toMarketSideValue(listingActionDraft.listingSide),
             amount_cents: amountCents,
             currency: listingActionDraft.currency,
             source: 'chat_listing_negotiation',
