@@ -9,7 +9,7 @@ import Script from 'next/script';
 import type { ReactNode } from 'react';
 
 import { Providers } from '@/components/Providers';
-import GoogleAdSense from '@/components/ads/GoogleAdSense';
+import GoogleAdSenseUnit from '@/components/common/GoogleAdSenseUnit';
 import ScrollToTop from '@/components/common/ScrollToTop';
 import {
   organizationSchema,
@@ -76,7 +76,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       <body className="app-cohesive-theme m-0 min-h-screen min-h-[var(--app-document-viewport-height)] w-full overflow-x-hidden bg-[color:var(--app-surface-muted)] p-0 font-sans text-[color:var(--app-text)] antialiased">
         <ScrollToTop />
         <Providers>{children}</Providers>
-        <GoogleAdSense />
+        <GoogleAdSenseUnit slot="4886770179" />
       </body>
     </html>
   );
