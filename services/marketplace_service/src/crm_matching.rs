@@ -250,8 +250,8 @@ fn normalize_match_phrase(input: &str) -> String {
 
     // Common Indonesian produce shorthand: "mangga HR" and
     // "mangga harum manis" describe the same variety in many listings.
-    if normalized.iter().any(|token| *token == "mangga")
-        && normalized.iter().any(|token| *token == "hr")
+    if normalized.contains(&"mangga")
+        && normalized.contains(&"hr")
     {
         return normalized
             .into_iter()
@@ -1272,7 +1272,7 @@ pub async fn run_match(
     let mut ranked = candidates
         .iter()
         .map(|candidate| {
-            let score = score_candidate(&requirement_for_score, candidate);
+            let score = score_candidate(requirement_for_score, candidate);
             (candidate, score)
         })
         .collect::<Vec<_>>();
@@ -2728,11 +2728,12 @@ pub async fn public_matches(
                     ),
             ),
             "similarity" => b.score.similarity.partial_cmp(&a.score.similarity),
-            "worth" | "best" | "balanced" | _ => b
+            "worth" | "best" | "balanced" => b
                 .score
                 .worth
                 .partial_cmp(&a.score.worth)
                 .or_else(|| b.score.total.partial_cmp(&a.score.total)),
+            _ => std::cmp::Ordering::Equal,
         };
         ordering.unwrap_or(std::cmp::Ordering::Equal)
     });
