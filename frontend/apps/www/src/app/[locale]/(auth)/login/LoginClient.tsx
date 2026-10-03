@@ -56,6 +56,12 @@ export default function LoginClient() {
 
   const normalizedUsername = normalizeUsername(username);
   const normalizedEmail = email.trim().toLowerCase();
+  const facebookError = searchParams.get('error') === 'account_exists_use_existing_login'
+    ? (isId
+      ? 'Email ini sudah punya akun Lajukan. Masuk dulu dengan metode yang sudah terhubung.'
+      : 'This email already has a Lajukan account. Sign in with the existing method first.')
+    : '';
+
   const otpCooldownLeft = Math.max(0, otpResendAt - Date.now());
   const otpCooldownSeconds = Math.ceil(otpCooldownLeft / 1000);
   const canSubmit =
@@ -225,6 +231,12 @@ export default function LoginClient() {
       totalSteps={1}
       progressLabel={isId ? 'Masuk' : 'Sign in'}
     >
+      {facebookError ? (
+        <div className="rounded-[14px] border border-amber-200 bg-amber-50 px-3.5 py-3 text-xs font-semibold leading-5 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300">
+          {facebookError}
+        </div>
+      ) : null}
+
       <form onSubmit={handleSubmit} className="space-y-3.5">
         <a
           href={googleHref}
