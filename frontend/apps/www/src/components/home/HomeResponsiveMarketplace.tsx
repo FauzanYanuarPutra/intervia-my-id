@@ -2609,10 +2609,10 @@ function RecommendationsLoadingSkeleton({
         {Array.from({ length: 5 }).map((_, index) => (
           <div
             key={index}
-            className="w-[calc((100vw-32px)/2.08)] shrink-0 sm:w-[180px] md:w-[190px] lg:w-[200px] xl:w-[210px]"
+            className="min-w-0 shrink-0 basis-[68vw] min-[430px]:basis-[58vw] sm:basis-[200px] md:basis-[215px] lg:basis-[225px] xl:basis-[235px] 2xl:basis-[245px]"
           >
             <div className="overflow-hidden rounded-2xl border border-zinc-200/80 bg-white">
-              <Skeleton className="aspect-square w-full rounded-none" />
+              <Skeleton className="aspect-[16/10] w-full rounded-none" />
               <div className="space-y-2 p-3">
                 <Skeleton className="h-3.5 w-4/5 rounded" />
                 <Skeleton className="h-4 w-2/5 rounded" />
@@ -2732,7 +2732,7 @@ function HomeListingCarouselSection({
         <div className="relative mt-1.5 min-w-0">
           <div
             ref={emblaRef}
-            className="min-w-0 cursor-grab overflow-hidden active:cursor-grabbing"
+            className="min-w-0 cursor-grab overflow-hidden touch-pan-y active:cursor-grabbing"
           >
             <div
               className="
@@ -2749,13 +2749,13 @@ function HomeListingCarouselSection({
                   key={item.id}
                   className="
                     min-w-0 shrink-0 grow-0 select-none
-                    basis-[78vw]
-                    min-[430px]:basis-[72vw]
-                    sm:basis-[210px]
-                    md:basis-[225px]
-                    lg:basis-[240px]
-                    xl:basis-[250px]
-                    2xl:basis-[260px]
+                    basis-[68vw]
+                    min-[430px]:basis-[58vw]
+                    sm:basis-[200px]
+                    md:basis-[215px]
+                    lg:basis-[225px]
+                    xl:basis-[235px]
+                    2xl:basis-[245px]
                   "
                   style={{ backfaceVisibility: 'hidden' }}
                 >
@@ -2875,7 +2875,7 @@ export function PublicReferencesSection({
               key={item.id}
               className="
                 flex
-                w-[min(82vw,280px)]
+                w-[min(68vw,245px)]
                 shrink-0
                 flex-col
                 overflow-hidden
@@ -2887,9 +2887,9 @@ export function PublicReferencesSection({
                 hover:-translate-y-0.5
                 hover:border-emerald-200
                 hover:shadow-[0_14px_30px_-24px_rgba(16,185,129,0.35)]
-                sm:w-[250px]
-                md:w-[270px]
-                lg:w-[280px]
+                sm:w-[220px]
+                md:w-[230px]
+                lg:w-[240px]
               "
               style={{ backfaceVisibility: 'hidden' }}
             >
@@ -2905,16 +2905,17 @@ export function PublicReferencesSection({
                 "
               >
                 {/* IMAGE */}
-                <div className="relative aspect-[16/8.8] w-full shrink-0 overflow-hidden bg-emerald-50 dark:bg-emerald-950/30">
+                <div className="relative aspect-[16/9] w-full shrink-0 overflow-hidden bg-emerald-50 dark:bg-emerald-950/30">
                   {item.image || item.fallbackImage ? (
                     <Image
                       src={item.image || item.fallbackImage || ''}
                       alt={item.title}
                       fill
                       sizes="
-                        (max-width: 640px) 82vw,
-                        (max-width: 1024px) 250px,
-                        280px
+                        (max-width: 430px) 68vw,
+                        (max-width: 640px) 58vw,
+                        (max-width: 1024px) 230px,
+                        240px
                       "
                       className={cn(
                         'transition-transform duration-300 group-hover:scale-[1.025]',
@@ -3134,7 +3135,7 @@ function RecommendationCard({
       {/* IMAGE */}
       <div
         className={cn(
-          'relative aspect-[4/3] w-full shrink-0 overflow-hidden',
+          'relative aspect-[16/10] w-full shrink-0 overflow-hidden',
           isDemand
             ? 'bg-amber-100 dark:bg-amber-950/45'
             : 'bg-emerald-50 dark:bg-emerald-950/30',
@@ -3145,7 +3146,7 @@ function RecommendationCard({
             src={image}
             alt={item.title || fallbackTitle}
             fill
-            sizes="(max-width: 640px) 76vw, 240px"
+            sizes="(max-width: 430px) 68vw, (max-width: 640px) 58vw, 225px"
             loading="lazy"
             draggable={false}
             className="
@@ -3267,8 +3268,8 @@ function RecommendationCard({
           min-w-0
           flex-1
           flex-col
-          p-2.5
-          sm:p-3
+          p-2
+          sm:p-2.5
         "
       >
         {/* TITLE */}
@@ -3302,7 +3303,7 @@ function RecommendationCard({
           <p
             title={price}
             className={cn(
-              'mt-1.5 truncate text-[14px] font-black leading-tight tracking-[-0.025em] min-[360px]:text-[15px] sm:text-base',
+              'mt-1 truncate text-[13px] font-black leading-tight tracking-[-0.025em] min-[360px]:text-[14px] sm:text-[15px]',
               isDemand
                 ? 'text-amber-700 dark:text-amber-300'
                 : 'text-emerald-700 dark:text-emerald-400',
@@ -3315,7 +3316,7 @@ function RecommendationCard({
         {locationLabel ? (
           <p
             title={locationLabel}
-            className="mt-1.5 flex min-w-0 items-center gap-1.5 truncate text-[9px] font-semibold leading-4 text-slate-600 dark:text-slate-400 min-[360px]:text-[10px] sm:text-[11px]"
+            className="mt-1 flex min-w-0 items-center gap-1.5 truncate text-[9px] font-semibold leading-4 text-slate-600 dark:text-slate-400 min-[360px]:text-[10px] sm:text-[11px]"
           >
             <MapPin className="h-3 w-3 shrink-0" aria-hidden="true" />
             <span className="truncate">{locationLabel}</span>
