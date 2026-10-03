@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { extractContentId } from '@/lib/content/routes';
 import { requireAuth } from '@/lib/serverAuth';
-import { enforceRateLimit, getClientIp } from '@/lib/rateLimit';
+import {
+  enforceRateLimit,
+  getClientIp,
+  getDeviceFingerprint,
+} from '@/lib/rateLimit';
 
 const MARKETPLACE_URL =
   process.env.INTERNAL_MARKETPLACE_URL ||
@@ -31,6 +35,14 @@ export async function POST(
       message: 'Too many negotiation attempts. Please retry later.',
     });
     if (!userLimit.ok) return userLimit.response;
+
+    const deviceLimit = await enforceRateLimit({
+      key: `market-signal:device:${getDeviceFingerprint(req)}`,
+      limit: 90,
+      windowSeconds: 3600,
+      message: 'Too many negotiation attempts. Please retry later.',
+    });
+    if (!deviceLimit.ok) return deviceLimit.response;
 
     const { id } = await params;
     const resolvedId = extractContentId(id) || id;
