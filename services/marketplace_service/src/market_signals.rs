@@ -333,6 +333,93 @@ pub async fn create_market_signal(
     }
 }
 
+pub async fn market_signal_risk_queue(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    let Some(claims) = super::auth::auth_claims_from_headers(&headers, &state.jwt_secret) else {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({"error": "unauthorized"})),
+        )
+            .into_response();
+    };
+
+    let allowed = claims.roles.iter().any(|role| {
+        matches!(
+            role.trim().to_ascii_lowercase().as_str(),
+            "moderator" | "admin" | "super_admin"
+        )
+    }) || claims
+        .perms
+        .iter()
+        .any(|permission| permission.eq_ignore_ascii_case("market:risk:review"));
+
+    if !allowed {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({"error": "risk review permission required"})),
+        )
+            .into_response();
+    }
+
+    let rows = match sqlx::query(
+        r#"
+        SELECT
+          e.id,
+          e.signal_id,
+          e.actor_id,
+          e.content_id,
+          e.risk_score,
+          e.decision,
+          e.reasons,
+          e.created_at,
+          i.title,
+          i.owner_id
+        FROM market_signal_risk_events e
+        JOIN content_items i ON i.id = e.content_id
+        WHERE e.decision <> 'allow'
+        ORDER BY e.created_at DESC
+        LIMIT 100
+        "#,
+    )
+    .fetch_all(&state.db)
+    .await
+    {
+        Ok(value) => value,
+        Err(error) => {
+            tracing::error!("market signal risk queue failed: {:?}", error);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "risk queue unavailable"})),
+            )
+                .into_response();
+        }
+    };
+
+    let items = rows
+        .into_iter()
+        .map(|row| {
+            json!({
+                "id": row.get::<Uuid, _>("id"),
+                "signal_id": row.get::<Uuid, _>("signal_id"),
+                "actor_id": row.get::<Uuid, _>("actor_id"),
+                "content_id": row.get::<Uuid, _>("content_id"),
+                "risk_score": row.get::<i16, _>("risk_score"),
+                "decision": row.get::<String, _>("decision"),
+                "reasons": row.get::<serde_json::Value, _>("reasons"),
+                "created_at": row.get::<chrono::DateTime<chrono::Utc>, _>("created_at"),
+                "content": {
+                    "title": row.get::<String, _>("title"),
+                    "owner_id": row.get::<Uuid, _>("owner_id")
+                }
+            })
+        })
+        .collect::<Vec<_>>();
+
+    (StatusCode::OK, Json(json!({"items": items}))).into_response()
+}
+
 pub async fn market_signal_summary(
     state: &Arc<AppState>,
     category: Option<&str>,
