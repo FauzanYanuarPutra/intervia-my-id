@@ -66,10 +66,21 @@ export function useEmblaWheelGestures(
 
       const deltaX = normalizeWheelDelta(event.deltaX, event.deltaMode);
       const deltaY = normalizeWheelDelta(event.deltaY, event.deltaMode);
-      const useHorizontalDelta =
-        event.shiftKey || Math.abs(deltaX) >= Math.abs(deltaY);
-      const delta = useHorizontalDelta ? deltaX || deltaY : deltaY;
+      const absX = Math.abs(deltaX);
+      const absY = Math.abs(deltaY);
 
+      // Never hijack an ordinary vertical page scroll just because the
+      // pointer happens to be over a horizontal carousel. Only consume a
+      // wheel event when the input is intentionally horizontal (or the user
+      // explicitly holds Shift for horizontal scrolling).
+      const horizontalIntent =
+        event.shiftKey
+          ? absX > 0 || absY > 0
+          : absX > 0 && absX > absY * 1.15;
+
+      if (!horizontalIntent) return;
+
+      const delta = event.shiftKey ? deltaX || deltaY : deltaX;
       if (Math.abs(delta) < 1) return;
 
       const canScrollInDirection =
