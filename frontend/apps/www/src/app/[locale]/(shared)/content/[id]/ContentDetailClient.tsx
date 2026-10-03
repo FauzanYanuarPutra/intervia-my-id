@@ -1050,7 +1050,6 @@ export default function ContentDetailClient({
       return;
     }
 
-    setOfferFlowMode('offer');
     setOfferAmount('');
     setOfferMessage('');
     setOfferError(null);
@@ -1202,7 +1201,6 @@ export default function ContentDetailClient({
       setShowOfferModal(false);
       setOfferAmount('');
       setOfferMessage('');
-      setOfferFlowMode('offer');
       setCreatedDealHandoff(null);
       setChatError(null);
       router.push(`/chat/${encodeURIComponent(roomId)}`);
