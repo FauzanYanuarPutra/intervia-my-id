@@ -1311,6 +1311,9 @@ export default function ContentDetailClient({
               market_side: toMarketSideValue(listingSide),
               content_url: listingHref,
               negotiation: true,
+              transaction_id: transactionId,
+              intermediary_mode: intermediaryMode,
+              intermediary_email: intermediaryMode === 'managed' ? selectedIntermediaryEmail : null,
             },
           },
         }),
@@ -1356,6 +1359,9 @@ export default function ContentDetailClient({
         slug: item?.slug || null,
         content_url: listingHref,
         owner_id: peerUserId,
+        transaction_id: transactionId,
+        intermediary_mode: intermediaryMode,
+        intermediary_email: intermediaryMode === 'managed' ? selectedIntermediaryEmail : null,
         location:
           (typeof itemMeta.location === 'string' && itemMeta.location) ||
           (typeof itemMeta.city === 'string' && itemMeta.city) ||
@@ -1374,7 +1380,7 @@ export default function ContentDetailClient({
         },
       );
 
-      // Keep the listing snapshot available to the chat without creating an order/transaction.
+      // Keep the listing snapshot and transaction context available to the chat.
       await authFetch(
         `/api/chat/rooms/${encodeURIComponent(roomId)}/messages`,
         {
