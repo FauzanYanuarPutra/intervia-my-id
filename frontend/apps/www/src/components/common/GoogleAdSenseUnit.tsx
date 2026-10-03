@@ -29,14 +29,18 @@ export function GoogleAdSenseUnit({
   const [adState, setAdState] = useState<'pending' | 'filled' | 'unfilled'>('pending');
 
   useEffect(() => {
+    let alive = true;
     pushedRef.current = false;
-    setAdState('pending');
+    queueMicrotask(() => {
+      if (alive) setAdState('pending');
+    });
     if (retryTimerRef.current !== null) {
       window.clearTimeout(retryTimerRef.current);
       retryTimerRef.current = null;
     }
 
     return () => {
+      alive = false;
       if (retryTimerRef.current !== null) {
         window.clearTimeout(retryTimerRef.current);
         retryTimerRef.current = null;
