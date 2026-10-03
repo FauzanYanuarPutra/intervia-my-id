@@ -12,6 +12,11 @@ type ContentLike = {
   owner_id?: string;
   rating?: number | null;
   review_count?: number | null;
+  view_count?: number | string | null;
+  views_count?: number | string | null;
+  like_count?: number | string | null;
+  favorite_count?: number | string | null;
+  favorites_count?: number | string | null;
   seller_stats?: {
     rating?: number | null;
     review_count?: number | null;
@@ -144,6 +149,16 @@ export async function GET(req: NextRequest) {
         ? contentItems.filter((item) => String(item.owner_id ?? '') === ownerId)
         : contentItems;
       stats.total_content = owned.length;
+      stats.profile_views = owned.reduce((sum, item) => {
+        const value = Number(item.view_count ?? item.views_count ?? 0);
+        return sum + (Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0);
+      }, 0);
+      stats.total_favorites = owned.reduce((sum, item) => {
+        const value = Number(
+          item.like_count ?? item.favorite_count ?? item.favorites_count ?? 0,
+        );
+        return sum + (Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0);
+      }, 0);
 
       const sellerStat = owned.find((item) => {
         const count = normalizeReviewCount(item.seller_stats?.review_count);
