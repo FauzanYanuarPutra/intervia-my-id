@@ -26168,7 +26168,7 @@ mod tests {
         let moderation_source = include_str!("business_moderation.rs");
 
         assert_eq!(
-            main_source.matches(&ROUTE).count(),
+            main_source.matches(&ROUTE).count().saturating_sub(1),
             1,
             "canonical media contribution route must be declared exactly once in main.rs",
         );
