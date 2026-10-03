@@ -7,6 +7,7 @@ import { Sparkles } from 'lucide-react';
 import GlobalLoader from '@/components/GlobalLoader';
 import NetworkStatus from '@/components/common/NetworkStatus';
 import { GlobalPreferenceDock } from '@/components/common/GlobalPreferenceDock';
+import { GoogleAdSenseUnit } from '@/components/common/GoogleAdSenseUnit';
 import { LocalizedAnchor } from '@/components/navigation/LocalizedAnchor';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
@@ -157,6 +158,17 @@ export default function ClientLayoutWrapper({
   const isImmersiveRoute = meta.immersive === true;
   const showFooter = showFooterMobile || showFooterDesktop;
   const routeIntent = resolveRouteIntent(pathname, meta.routeIntent);
+  const showSiteAd =
+    !isImmersiveRoute &&
+    ![
+      'chat',
+      'notifications',
+      'settings',
+      'dashboard',
+      'manage',
+      'profile',
+      'create',
+    ].includes(routeIntent);
 
   useBodyScrollLock(isImmersiveRoute, {
     resetScroll: true,
@@ -240,7 +252,17 @@ export default function ClientLayoutWrapper({
             initialState={initialMaintenanceState}
             locale={locale}
           >
-            {children}
+            <>
+              {children}
+              {showSiteAd ? (
+                <div className="mx-auto w-full max-w-[1200px] px-3 pb-4 pt-2 sm:px-4 lg:px-5">
+                  <GoogleAdSenseUnit
+                    key={pathname || 'root'}
+                    slot="2055669263"
+                  />
+                </div>
+              ) : null}
+            </>
           </StackMaintenanceGate>
         </div>
         <PersonalAiFloatingLauncher
