@@ -5,7 +5,7 @@ import CrmAnalyticsDashboard from './CrmAnalyticsDashboard';
 
 const money=(c:number)=>new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(Math.max(0,c)/100);
 
-export function AnalyticsWorkspace({ data }: { data: DashboardData }) {
+export function AnalyticsWorkspace({ data, accessToken }: { data: DashboardData; accessToken: string }) {
   const transactions = data.orders.map(order => ({
     amountCents: order.amount_final_cents || order.amount_estimate_cents || 0,
   }));
@@ -26,7 +26,7 @@ export function AnalyticsWorkspace({ data }: { data: DashboardData }) {
         title="Analytics CRM"
         description="Grafik interaktif dari data live yang sedang dimuat CRM. Filter chart bekerja langsung di snapshot yang sama dengan workspace lain."
       />
-      <CrmAnalyticsDashboard data={data} />
+      <CrmAnalyticsDashboard data={data} accessToken={accessToken} />
 
       <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_12px_34px_-28px_rgba(15,23,42,0.6)]">
