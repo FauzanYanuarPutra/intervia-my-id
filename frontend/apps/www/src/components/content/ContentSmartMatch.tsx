@@ -1,7 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ArrowRight, Check, Image as ImageIcon, MapPin, Sparkles, ThumbsDown } from 'lucide-react';
+import useEmblaCarousel from 'embla-carousel-react';
+import {
+  ArrowRight,
+  Check,
+  Image as ImageIcon,
+  MapPin,
+  Sparkles,
+  ThumbsDown,
+} from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 
 type SmartMatch = {
@@ -52,6 +60,7 @@ type SmartMatchAiPayload = {
 
 function money(value: number | null | undefined, currency = 'IDR') {
   if (!Number.isFinite(value as number)) return '';
+
   try {
     return new Intl.NumberFormat('id-ID', {
       style: 'currency',
@@ -71,6 +80,24 @@ function budgetLabel(item: SmartMatch) {
   if (item.budget_max) return `≤ ${money(item.budget_max, item.currency)}`;
   if (item.budget_min) return `≥ ${money(item.budget_min, item.currency)}`;
   return '';
+}
+
+function contentTypeLabel(contentType: string | undefined, locale: 'id' | 'en') {
+  const value = (contentType || '').trim().toLowerCase();
+
+  if (locale === 'en') {
+    if (value.includes('request') || value.includes('demand')) return 'Need';
+    if (value.includes('offer') || value.includes('supply')) return 'Offer';
+    if (value.includes('service')) return 'Service';
+    if (value.includes('product')) return 'Product';
+    return 'Listing';
+  }
+
+  if (value.includes('request') || value.includes('demand')) return 'Kebutuhan';
+  if (value.includes('offer') || value.includes('supply')) return 'Penawaran';
+  if (value.includes('service')) return 'Jasa';
+  if (value.includes('product')) return 'Produk';
+  return 'Listing';
 }
 
 export function ContentSmartMatch({
@@ -95,20 +122,38 @@ export function ContentSmartMatch({
 }) {
   const [payload, setPayload] = useState<SmartMatchPayload | null>(null);
   const [aiPayload, setAiPayload] = useState<SmartMatchAiPayload | null>(null);
-  const [sort, setSort] = useState<'worth' | 'similarity' | 'nearest' | 'cheapest'>('worth');
+  const [sort, setSort] = useState<
+    'worth' | 'similarity' | 'nearest' | 'cheapest'
+  >('worth');
   const [loading, setLoading] = useState(true);
   const [aiLoading, setAiLoading] = useState(false);
-  const [feedbackSaving, setFeedbackSaving] = useState<Record<string, boolean>>({});
+  const [feedbackSaving, setFeedbackSaving] = useState<Record<string, boolean>>(
+    {},
+  );
   const [feedbackRevision, setFeedbackRevision] = useState(0);
+
+  const [sortViewportRef] = useEmblaCarousel({
+    align: 'start',
+    containScroll: 'trimSnaps',
+    dragFree: true,
+  });
+  const [matchesViewportRef] = useEmblaCarousel({
+    align: 'start',
+    containScroll: 'trimSnaps',
+    dragFree: true,
+  });
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    setAiPayload(null);
-    fetch(`/api/content/${encodeURIComponent(contentId)}/matches?sort=${sort}&limit=8`, {
-      credentials: 'include',
-      cache: 'no-store',
-    })
+
+    fetch(
+      `/api/content/${encodeURIComponent(contentId)}/matches?sort=${sort}&limit=8`,
+      {
+        credentials: 'include',
+        cache: 'no-store',
+      },
+    )
       .then(response => (response.ok ? response.json() : null))
       .then((data: SmartMatchPayload | null) => {
         if (!cancelled) setPayload(data);
@@ -119,6 +164,7 @@ export function ContentSmartMatch({
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
+
     return () => {
       cancelled = true;
     };
@@ -138,31 +184,28 @@ export function ContentSmartMatch({
     const timeout = window.setTimeout(() => controller.abort(), 2200);
     setAiLoading(true);
 
-    fetch(
-      '/api/content/' + encodeURIComponent(contentId) + '/matches/ai',
-      {
-        method: 'POST',
-        credentials: 'include',
-        cache: 'no-store',
-        signal: controller.signal,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          locale,
-          source: {
-            id: contentId,
-            title: source?.title || '',
-            summary: source?.summary || '',
-            body: source?.body || '',
-            category: source?.category || '',
-            content_type: source?.content_type || '',
-            price_cents: source?.price_cents ?? null,
-            price_unit: source?.price_unit || '',
-            city: source?.city || '',
-          },
-          candidates: results.slice(0, 8),
-        }),
-      },
-    )
+    fetch('/api/content/' + encodeURIComponent(contentId) + '/matches/ai', {
+      method: 'POST',
+      credentials: 'include',
+      cache: 'no-store',
+      signal: controller.signal,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        locale,
+        source: {
+          id: contentId,
+          title: source?.title || '',
+          summary: source?.summary || '',
+          body: source?.body || '',
+          category: source?.category || '',
+          content_type: source?.content_type || '',
+          price_cents: source?.price_cents ?? null,
+          price_unit: source?.price_unit || '',
+          city: source?.city || '',
+        },
+        candidates: results.slice(0, 8),
+      }),
+    })
       .then(response => (response.ok ? response.json() : null))
       .then((data: SmartMatchAiPayload | null) => {
         if (!cancelled && data?.available) setAiPayload(data);
@@ -207,8 +250,12 @@ export function ContentSmartMatch({
     ? [...results].sort((a, b) => {
         const aiA = aiOrder.get(a.id);
         const aiB = aiOrder.get(b.id);
+
         if (aiA == null && aiB == null) {
-          return (b.worth_score ?? b.score ?? 0) - (a.worth_score ?? a.score ?? 0);
+          return (
+            (b.worth_score ?? b.score ?? 0) -
+            (a.worth_score ?? a.score ?? 0)
+          );
         }
         if (aiA == null) return 1;
         if (aiB == null) return -1;
@@ -222,7 +269,9 @@ export function ContentSmartMatch({
   ) => {
     if (feedbackSaving[matchId]) return;
 
-    const previous = results.find(item => item.id === matchId)?.viewer_feedback ?? null;
+    const previous =
+      results.find(item => item.id === matchId)?.viewer_feedback ?? null;
+
     setFeedbackSaving(current => ({ ...current, [matchId]: true }));
     setPayload(current =>
       current
@@ -279,185 +328,285 @@ export function ContentSmartMatch({
     }
   };
 
-  const isRequest = intent === 'request' || intent === 'demand' || intent === 'seeker';
+  const isRequest =
+    intent === 'request' || intent === 'demand' || intent === 'seeker';
   const title = isRequest
-    ? locale === 'id' ? 'Yang mungkin cocok dengan kebutuhanmu' : 'Potential matches for your need'
-    : locale === 'id' ? 'Yang mungkin sedang membutuhkan' : 'People who may need this';
+    ? locale === 'id'
+      ? 'Rekomendasi yang cocok'
+      : 'Recommended matches'
+    : locale === 'id'
+      ? 'Yang mungkin membutuhkan ini'
+      : 'People who may need this';
+
+  const matchCount = payload?.count ?? results.length;
 
   return (
-    <section className="overflow-hidden rounded-[22px] bg-gradient-to-br from-emerald-700 via-emerald-800 to-emerald-950 text-white shadow-[0_18px_50px_-28px_rgba(4,120,87,0.65)]" data-testid="content-smart-match">
-      <div className="flex items-start justify-between gap-3 p-3.5 pb-0 sm:p-4 sm:pb-0">
+    <section
+      className="overflow-hidden rounded-[22px] bg-gradient-to-br from-emerald-700 via-emerald-800 to-emerald-950 text-white shadow-[0_18px_50px_-28px_rgba(4,120,87,0.65)]"
+      data-testid="content-smart-match"
+    >
+      <div className="flex items-start justify-between gap-3 px-3.5 pt-3.5 sm:px-4 sm:pt-4">
         <div className="min-w-0">
           <div className="flex items-center gap-2 text-emerald-100">
-            <Sparkles className="h-4 w-4 shrink-0" />
+            <Sparkles className="h-4 w-4 shrink-0" aria-hidden="true" />
             <span className="text-[10px] font-black uppercase tracking-[0.14em]">
               Smart Match
             </span>
           </div>
-          <h2 className="mt-0.5 text-base font-black text-white sm:text-lg">{title}</h2>
-          <p className="mt-2 text-[11px] leading-4.5 text-emerald-50/85">
+          <h2 className="mt-1 text-base font-black leading-tight text-white sm:text-lg">
+            {title}
+          </h2>
+          <p className="mt-1.5 max-w-2xl text-[11px] leading-4 text-emerald-50/80">
             {locale === 'id'
-              ? 'Pilihan listing yang paling relevan dari isi, lokasi, harga, dan kualitas.'
-              : 'The most relevant listings based on content, location, price, and quality.'}
+              ? 'Lajukan memilih posting yang paling relevan berdasarkan isi, lokasi, harga, dan kecocokan.'
+              : 'Lajukan surfaces the most relevant posts based on content, location, price, and fit.'}
           </p>
         </div>
+
         <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[10px] font-black text-emerald-800 shadow-sm">
-          {loading ? '...' : aiLoading ? 'AI merapikan...' : `${payload?.count ?? results.length} match`}
+          {loading
+            ? '...'
+            : aiLoading
+              ? 'AI'
+              : `${matchCount.toLocaleString(locale === 'id' ? 'id-ID' : 'en-US')} match`}
         </span>
       </div>
 
       {!loading && results.length > 1 ? (
-        <Link
-          href={`/content/${contentId}/matches`}
-          className="mx-3.5 mb-2 flex items-center justify-between rounded-xl bg-white/10 sm:mx-4 px-3 py-2.5 text-[11px] font-black text-white ring-1 ring-white/10 transition hover:bg-white/15"
-        >
-          <span>Lihat & bandingkan {results.length} match</span>
-          <ArrowRight className="h-3.5 w-3.5" />
-        </Link>
+        <div className="mt-3 px-3.5 sm:px-4">
+          <Link
+            href={`/content/${contentId}/matches`}
+            className="flex items-center justify-between rounded-xl bg-white/10 px-3 py-2.5 text-[11px] font-black text-white ring-1 ring-white/10 transition hover:bg-white/15"
+          >
+            <span>
+              {locale === 'id'
+                ? `Lihat semua ${results.length} rekomendasi`
+                : `View all ${results.length} recommendations`}
+            </span>
+            <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+          </Link>
+        </div>
       ) : null}
 
       {!loading && results.length === 0 ? (
-        <div className="mx-3.5 mt-3 rounded-2xl border border-dashed border-white/20 bg-white/[0.07] p-3.5">
+        <div className="mx-3.5 mt-3 rounded-xl border border-dashed border-white/20 bg-white/[0.07] p-3 sm:mx-4">
           <p className="text-xs font-black text-white">
             {requestError
-              ? locale === 'id' ? 'Smart Match belum bisa mengambil data.' : 'Smart Match could not load the data.'
-              : locale === 'id' ? 'Belum ada match yang sangat kuat — kandidat yang masih relevan tetap ditampilkan.' : 'No very strong match yet — relevant lower-score candidates are still shown.'}
+              ? locale === 'id'
+                ? 'Rekomendasi belum bisa dimuat.'
+                : 'Recommendations could not be loaded.'
+              : locale === 'id'
+                ? 'Belum ada posting yang cukup cocok.'
+                : 'No sufficiently relevant posts yet.'}
           </p>
-          <p className="mt-1 text-[11px] leading-5 text-emerald-50/70">
+          <p className="mt-1 text-[11px] leading-4 text-emerald-50/70">
             {requestError
-              ? locale === 'id' ? 'Coba buka lagi beberapa saat. Fitur ini tetap aktif di belakang layar.' : 'Try again shortly. The matching engine remains active in the background.'
-              : locale === 'id' ? 'Semakin sering kamu menekan Sesuai atau Tidak sesuai, semakin jelas sinyal yang dipakai Lajukan untuk mengurutkan kandidat berikutnya.' : 'The more you mark matches as suitable or unsuitable, the better Lajukan can learn your preference for future rankings.'}
+              ? locale === 'id'
+                ? 'Coba buka halaman lagi beberapa saat.'
+                : 'Try opening the page again shortly.'
+              : locale === 'id'
+                ? 'Posting baru akan otomatis ikut dipertimbangkan.'
+                : 'New posts will be considered automatically.'}
           </p>
         </div>
       ) : null}
 
-      <div className="mx-3.5 mt-3 flex gap-1.5 overflow-x-auto pb-1 sm:mx-4">
-        {([
-          ['worth', locale === 'id' ? 'Paling cocok' : 'Best fit'],
-          ['similarity', locale === 'id' ? 'Paling mirip' : 'Most similar'],
-          ['nearest', locale === 'id' ? 'Terdekat' : 'Nearest'],
-          ['cheapest', locale === 'id' ? 'Harga' : 'Price'],
-        ] as const).map(([value, label]) => (
-          <button
-            key={value}
-            type="button"
-            onClick={() => setSort(value)}
-            className={`shrink-0 rounded-full px-3 py-1.5 text-[10px] font-black transition ${sort === value ? 'bg-white text-emerald-800 shadow-sm' : 'bg-white/10 text-emerald-50 ring-1 ring-white/10 hover:bg-white/15'}`}
+      {!loading && results.length > 0 ? (
+        <>
+          <div className="mt-3 overflow-hidden" ref={sortViewportRef}>
+            <div className="flex gap-1.5 px-3.5 sm:px-4">
+              {(
+                [
+                  ['worth', locale === 'id' ? 'Paling cocok' : 'Best fit'],
+                  [
+                    'similarity',
+                    locale === 'id' ? 'Paling mirip' : 'Most similar',
+                  ],
+                  ['nearest', locale === 'id' ? 'Terdekat' : 'Nearest'],
+                  ['cheapest', locale === 'id' ? 'Harga' : 'Price'],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setSort(value)}
+                  aria-pressed={sort === value}
+                  className={`shrink-0 rounded-full px-3 py-1.5 text-[10px] font-black transition ${
+                    sort === value
+                      ? 'bg-white text-emerald-800 shadow-sm'
+                      : 'bg-white/10 text-emerald-50 ring-1 ring-white/10 hover:bg-white/15'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div
+            className="mt-3 overflow-hidden"
+            ref={matchesViewportRef}
+            aria-label={
+              locale === 'id'
+                ? 'Rekomendasi Smart Match'
+                : 'Smart Match recommendations'
+            }
           >
-            {label}
-          </button>
-        ))}
-      </div>
+            <div className="flex gap-3 px-3.5 pb-3.5 sm:px-4 sm:pb-4">
+              {displayResults.slice(0, 6).map(match => {
+                const fit = Math.round(
+                  aiAssessment.get(match.id)?.fit ??
+                    match.score ??
+                    match.similarity_score ??
+                    0,
+                );
+                const typeLabel = contentTypeLabel(match.content_type, locale);
+
+                return (
+                  <article
+                    key={match.id}
+                    className="flex min-w-0 shrink-0 basis-[84%] flex-col overflow-hidden rounded-2xl bg-white text-slate-950 shadow-[0_14px_32px_-24px_rgba(0,0,0,0.55)] ring-1 ring-white/10 sm:basis-[48%] lg:basis-[31%]"
+                  >
+                    <Link
+                      href={`/content/${match.id}`}
+                      aria-label={match.title}
+                      className="relative block h-36 overflow-hidden bg-emerald-50 sm:h-40"
+                    >
+                      {match.cover_image?.trim() ? (
+                        <img
+                          src={match.cover_image.trim()}
+                          alt=""
+                          loading="lazy"
+                          decoding="async"
+                          className="h-full w-full object-cover transition-transform duration-300 hover:scale-[1.025]"
+                        />
+                      ) : (
+                        <span className="grid h-full w-full place-items-center bg-gradient-to-br from-emerald-50 via-slate-50 to-white text-emerald-700">
+                          <ImageIcon
+                            className="h-8 w-8"
+                            aria-hidden="true"
+                          />
+                        </span>
+                      )}
+
+                      <div className="absolute inset-x-2 top-2 flex items-center justify-between gap-2">
+                        <span className="rounded-full bg-slate-950/75 px-2 py-1 text-[9px] font-black text-white backdrop-blur">
+                          {typeLabel}
+                        </span>
+                        <span className="rounded-full bg-white px-2 py-1 text-[9px] font-black text-emerald-800 shadow-sm">
+                          {fit}%
+                        </span>
+                      </div>
+                    </Link>
+
+                    <div className="flex flex-1 flex-col p-3">
+                      <Link
+                        href={`/content/${match.id}`}
+                        className="line-clamp-2 text-sm font-black leading-5 text-[color:var(--app-text)] hover:underline"
+                      >
+                        {match.title}
+                      </Link>
+
+                      <div className="mt-1.5 flex min-h-4 flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-semibold text-slate-500">
+                        {match.city ? (
+                          <span className="truncate">{match.city}</span>
+                        ) : null}
+                        {match.distance_km != null ? (
+                          <span className="inline-flex items-center gap-0.5">
+                            <MapPin className="h-3 w-3" aria-hidden="true" />
+                            {match.distance_km < 1
+                              ? '<1 km'
+                              : `${match.distance_km} km`}
+                          </span>
+                        ) : null}
+                      </div>
+
+                      <div className="mt-2 flex items-center justify-between gap-2">
+                        <span className="min-w-0 truncate text-xs font-black text-[color:var(--app-text)]">
+                          {budgetLabel(match) ||
+                            (locale === 'id' ? 'Harga nego' : 'Negotiable')}
+                        </span>
+                        <Link
+                          href={`/content/${match.id}`}
+                          aria-label={
+                            locale === 'id'
+                              ? 'Lihat posting'
+                              : 'View listing'
+                          }
+                          className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100"
+                        >
+                          <ArrowRight
+                            className="h-3.5 w-3.5"
+                            aria-hidden="true"
+                          />
+                        </Link>
+                      </div>
+
+                      {aiAssessment.get(match.id)?.reason ||
+                      match.reasons?.[0] ? (
+                        <p className="mt-2 line-clamp-2 text-[10px] leading-4 text-slate-500">
+                          {aiAssessment.get(match.id)?.reason ||
+                            match.reasons?.[0]}
+                        </p>
+                      ) : null}
+
+                      <div className="mt-auto grid grid-cols-2 gap-1.5 pt-3">
+                        <button
+                          type="button"
+                          disabled={Boolean(feedbackSaving[match.id])}
+                          onClick={() =>
+                            void submitFeedback(match.id, 'approved')
+                          }
+                          className={`inline-flex min-h-8 items-center justify-center gap-1 rounded-lg px-2 text-[10px] font-black transition disabled:opacity-50 ${
+                            match.viewer_feedback === 'approved'
+                              ? 'bg-emerald-700 text-white'
+                              : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100'
+                          }`}
+                        >
+                          <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                          {locale === 'id' ? 'Sesuai' : 'Good fit'}
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={Boolean(feedbackSaving[match.id])}
+                          onClick={() =>
+                            void submitFeedback(match.id, 'rejected')
+                          }
+                          className={`inline-flex min-h-8 items-center justify-center gap-1 rounded-lg px-2 text-[10px] font-black transition disabled:opacity-50 ${
+                            match.viewer_feedback === 'rejected'
+                              ? 'bg-slate-700 text-white'
+                              : 'bg-slate-50 text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          <ThumbsDown
+                            className="h-3.5 w-3.5"
+                            aria-hidden="true"
+                          />
+                          {locale === 'id' ? 'Tidak cocok' : 'Not for me'}
+                        </button>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      ) : null}
 
       {loading ? (
-        <div className="mx-3.5 mt-3 grid gap-2 sm:mx-4 sm:grid-cols-2">
-          {[1, 2].map(item => <div key={item} className="h-24 animate-pulse rounded-2xl bg-white/70 dark:bg-white/5" />)}
+        <div className="px-3.5 pb-3.5 pt-3 sm:px-4 sm:pb-4">
+          <div className="flex gap-3 overflow-hidden">
+            {[1, 2].map(item => (
+              <div
+                key={item}
+                className="h-72 shrink-0 basis-[84%] animate-pulse rounded-2xl bg-white/10 sm:basis-[48%]"
+              />
+            ))}
+          </div>
         </div>
-      ) : (
-        <div className="mt-3 grid gap-2 sm:grid-cols-2">
-          {displayResults.slice(0, 6).map(match => (
-            <article
-              key={match.id}
-              className="group relative min-w-0 overflow-hidden rounded-2xl bg-white p-3 text-slate-950 shadow-sm ring-1 ring-white/10 transition hover:-translate-y-0.5 hover:shadow-lg"
-            >
-              <Link
-                href={`/content/${match.id}`}
-                aria-label={match.title}
-                className="absolute left-3 top-3 h-20 w-20 overflow-hidden rounded-xl bg-slate-100 sm:h-24 sm:w-24"
-              >
-                {match.cover_image?.trim() ? (
-                  <img
-                    src={match.cover_image.trim()}
-                    alt=""
-                    loading="lazy"
-                    decoding="async"
-                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-                  />
-                ) : (
-                  <span className="grid h-full w-full place-items-center bg-gradient-to-br from-emerald-50 to-slate-100 text-emerald-700">
-                    <ImageIcon className="h-6 w-6" />
-                  </span>
-                )}
-              </Link>
-              <div className="flex min-h-20 items-start justify-between gap-2 pl-[92px] sm:min-h-24 sm:pl-[112px]">
-                <div className="min-w-0">
-                  <Link
-                    href={`/content/${match.id}`}
-                    className="line-clamp-2 text-sm font-bold leading-5 text-[color:var(--app-text)] hover:underline"
-                  >
-                    {match.title}
-                  </Link>
-                  <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-semibold text-slate-500">
-                    {match.city ? <span>{match.city}</span> : null}
-                    {match.distance_km != null ? <span className="inline-flex items-center gap-0.5"><MapPin className="h-3 w-3" />{match.distance_km < 1 ? '<1 km' : `${match.distance_km} km`}</span> : null}
-                  </div>
-                </div>
-                <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-black text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300">
-                  {Math.round(
-                    aiAssessment.get(match.id)?.fit ??
-                      match.score ??
-                      match.similarity_score ??
-                      0,
-                  )}% cocok
-                </span>
-              </div>
-
-              <div className="mt-2 flex items-center justify-between gap-2 pl-[92px] sm:pl-[112px]">
-                <span className="truncate text-xs font-bold text-[color:var(--app-text)]">{budgetLabel(match) || (locale === 'id' ? 'Harga nego' : 'Negotiable')}</span>
-                <Link
-                  href={`/content/${match.id}`}
-                  aria-label={locale === 'id' ? 'Lihat listing' : 'View listing'}
-                  className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300"
-                >
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </Link>
-              </div>
-
-              <div className="mt-2.5 grid grid-cols-2 gap-1.5">
-                <button
-                  type="button"
-                  disabled={Boolean(feedbackSaving[match.id])}
-                  onClick={() => void submitFeedback(match.id, 'approved')}
-                  className={`inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl px-2 text-[10px] font-black transition disabled:opacity-50 ${
-                    match.viewer_feedback === 'approved'
-                      ? 'bg-emerald-700 text-white'
-                      : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100'
-                  }`}
-                >
-                  <Check className="h-3.5 w-3.5" />
-                  {locale === 'id' ? 'Sesuai' : 'Suitable'}
-                </button>
-                <button
-                  type="button"
-                  disabled={Boolean(feedbackSaving[match.id])}
-                  onClick={() => void submitFeedback(match.id, 'rejected')}
-                  className={`inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl px-2 text-[10px] font-black transition disabled:opacity-50 ${
-                    match.viewer_feedback === 'rejected'
-                      ? 'bg-slate-700 text-white'
-                      : 'bg-slate-50 text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100'
-                  }`}
-                >
-                  <ThumbsDown className="h-3.5 w-3.5" />
-                  {locale === 'id' ? 'Tidak sesuai' : 'Not suitable'}
-                </button>
-              </div>
-              {aiAssessment.get(match.id)?.reason || match.reasons?.[0] ? (
-                <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-slate-500">
-                  {aiAssessment.get(match.id)?.reason || match.reasons?.[0]}
-                  {match.similarity_score != null
-                    ? ' · Mirip ' +
-                      Math.round(
-                        aiAssessment.get(match.id)?.similarity ??
-                          match.similarity_score,
-                      ) +
-                      '%'
-                    : ''}
-                </p>
-              ) : null}
-            </article>
-          ))}
-        </div>
-      )}
+      ) : null}
     </section>
   );
 }
