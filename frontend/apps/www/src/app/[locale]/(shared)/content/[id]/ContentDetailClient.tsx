@@ -1099,6 +1099,42 @@ export default function ContentDetailClient({
     await startDealFlow();
   };
 
+  const loadIntermediaryOptions = async () => {
+    setIntermediariesLoading(true);
+    setIntermediariesError(null);
+    try {
+      const response = await authFetch('/api/transactions/intermediaries');
+      const payload = await response.json().catch(() => []);
+      if (!response.ok) {
+        throw new Error(
+          typeof payload?.error === 'string'
+            ? payload.error
+            : locale === 'id'
+              ? 'Pilihan perantara belum bisa dimuat.'
+              : 'Intermediary options could not be loaded.',
+        );
+      }
+      setIntermediaries(
+        Array.isArray(payload)
+          ? payload.filter((option): option is TransactionIntermediaryOption =>
+              Boolean(option?.email && option?.user_id),
+            )
+          : [],
+      );
+    } catch (error) {
+      setIntermediaries([]);
+      setIntermediariesError(
+        error instanceof Error
+          ? error.message
+          : locale === 'id'
+            ? 'Pilihan perantara belum bisa dimuat.'
+            : 'Intermediary options could not be loaded.',
+      );
+    } finally {
+      setIntermediariesLoading(false);
+    }
+  };
+
   const startDealFlow = async () => {
     if (!user) {
       const callbackUrl = `/${locale}/content/${contentId || resolvedContentId}`;
@@ -1108,6 +1144,23 @@ export default function ContentDetailClient({
 
     setOfferAmount('');
     setOfferMessage('');
+    setOfferError(null);
+    setIntermediaryMode(null);
+    setSelectedIntermediaryEmail('');
+    setShowOfferModal(false);
+    setShowIntermediaryModal(true);
+    void loadIntermediaryOptions();
+  };
+
+  const chooseIntermediaryMode = (
+    mode: 'managed' | 'direct',
+    email = '',
+  ) => {
+    if (mode === 'managed' && !email) return;
+    setIntermediaryMode(mode);
+    setSelectedIntermediaryEmail(email);
+    setIntermediariesError(null);
+    setShowIntermediaryModal(false);
     setOfferError(null);
     setShowOfferModal(true);
   };
