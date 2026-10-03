@@ -4893,7 +4893,10 @@ export default function ChatRoomPage() {
   ]);
 
   const handlePublishStructuredDraft = useCallback(
-    async (messageId: string, meta: StructuredChatPayload | null) => {
+    async (
+      messageId: string,
+      meta: StructuredChatPayload | null | undefined = null,
+    ) => {
       const draftId =
         typeof meta?.draft_id === 'string' && meta.draft_id.trim()
           ? meta.draft_id.trim()
@@ -9981,52 +9984,6 @@ export default function ChatRoomPage() {
               </button>
             </div>
 
-            {false && canListingActionDirect && (
-              <div className="mb-3 grid gap-2 sm:grid-cols-2">
-                <button
-                  type="button"
-                  onClick={() =>
-                    applyListingActionMode(listingActionDraft, 'direct')
-                  }
-                  className={`ui-feed-tile rounded-2xl border px-3 py-3 text-left transition ${
-                    listingActionMode === 'direct'
-                      ? 'border-[color:var(--app-accent-border)] bg-[color:color-mix(in_srgb,_var(--app-accent)_14%,_transparent)]'
-                      : 'border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-muted)]'
-                  }`}
-                >
-                  <p className="text-[11px] font-semibold text-[color:var(--app-accent)]">
-                    {chatLocale === 'id'
-                      ? 'Lanjut langsung'
-                      : 'Proceed directly'}
-                  </p>
-                  <p className="mt-1 text-xs text-[color:var(--app-text-soft)]">
-                    {chatLocale === 'id'
-                      ? 'Pakai harga listing dan buat tiket deal sekarang.'
-                      : 'Use the listed price and create the deal ticket now.'}
-                  </p>
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    applyListingActionMode(listingActionDraft, 'offer')
-                  }
-                  className={`ui-feed-tile rounded-2xl border px-3 py-3 text-left transition ${
-                    listingActionMode === 'offer'
-                      ? 'border-[color:var(--app-info-border)] bg-[color:color-mix(in_srgb,_var(--app-info)_12%,_transparent)]'
-                      : 'border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-muted)]'
-                  }`}
-                >
-                  <p className="text-[11px] font-semibold text-[color:var(--app-info)]">
-                    {chatLocale === 'id' ? 'Nego dulu' : 'Negotiate first'}
-                  </p>
-                  <p className="mt-1 text-xs text-[color:var(--app-text-soft)]">
-                    {chatLocale === 'id'
-                      ? 'Kirim nominal, scope, catatan.'
-                      : 'Send a starting amount, scope, and note to open negotiation.'}
-                  </p>
-                </button>
-              </div>
-            )}
 
             {canListingActionAskPrice && (
               <div className="ui-feed-row mb-3 rounded-2xl border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-muted)] p-3">
