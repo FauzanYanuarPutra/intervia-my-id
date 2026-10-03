@@ -3,11 +3,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowRight,
+  BadgeCheck,
   CheckCircle2,
+  ClipboardCheck,
   ExternalLink,
   Loader2,
   LogIn,
+  Megaphone,
+  Search,
   ShieldCheck,
+  Sparkles,
+  UsersRound,
   X,
 } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
@@ -112,66 +118,199 @@ function listingLabel(item: ContentItem): string {
 }
 
 function WhatsAppStepIcon() {
+  return (
+    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/14 text-white shadow-sm ring-1 ring-white/10">
+      <BrandSocialIcon brand="whatsapp" className="h-5 w-5" />
+    </span>
+  );
+}
+
+export default function CommunityJoinClient({
+  isId,
+}: {
+  isId: boolean;
+}) {
+  const { isAuthenticated, loading: authLoading } = useAuth();
+
+  const [listings, setListings] = useState<ContentItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [selectedGroup, setSelectedGroup] =
+    useState<CommunityGroup | null>(null);
+
   useEffect(() => {
-    if (!selectedGroup) return;
+    if (!isAuthenticated) {
+      setListings([]);
+      setLoading(false);
+      setError('');
+      return;
+    }
 
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setSelectedGroup(null);
-      }
+    let alive = true;
+
+    setLoading(true);
+    setError('');
+
+    fetch('/api/my-listings?status=active&limit=50', {
+      cache: 'no-store',
+      credentials: 'include',
+    })
+      .then(async response => {
+        const payload = await response.json().catch(() => null);
+
+        if (!response.ok) {
+          throw new Error(
+            payload?.error ||
+              (isId
+                ? 'Listing kamu belum bisa diperiksa.'
+                : 'Your listings could not be checked.'),
+          );
+        }
+
+        return extractContentItems(payload);
+      })
+      .then(items => {
+        if (!alive) return;
+
+        setListings(items);
+      })
+      .catch(err => {
+        if (!alive) return;
+
+        setListings([]);
+
+        setError(
+          err instanceof Error
+            ? err.message
+            : isId
+              ? 'Gagal memeriksa listing.'
+              : 'Could not check listings.',
+        );
+      })
+      .finally(() => {
+        if (alive) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      alive = false;
     };
+  }, [isAuthenticated, isId]);
 
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [selectedGroup]);
+  const ready = useMemo(
+    () => hasCommunityJoinReadyListing(listings),
+    [listings],
+  );
+
+  const role = useMemo(
+    () => classifyCommunityJoinRole(listings),
+    [listings],
+  );
+
+  const listing = listings.find(item => {
+    const title = String(item.title || '').trim();
+    const category = String(
+      item.category || item.content_type || '',
+    ).trim();
+
+    return title.length >= 3 && category.length >= 2;
+  });
+
+  const openCommunity = () => {
+    if (
+      !isAuthenticated ||
+      !ready ||
+      loading ||
+      authLoading
+    ) {
+      return;
+    }
+
+    window.open(
+      COMMUNITY_DESTINATION,
+      '_blank',
+      'noopener,noreferrer',
+    );
+  };
+
+  const actionLabel = authLoading
+    ? isId
+      ? 'Menyiapkan...'
+      : 'Preparing...'
+    : !isAuthenticated
+      ? isId
+        ? 'Login untuk lanjut'
+        : 'Log in to continue'
+      : loading
+        ? isId
+          ? 'Memeriksa...'
+          : 'Checking...'
+        : ready
+          ? isId
+            ? 'Lanjut ke WhatsApp'
+            : 'Continue to WhatsApp'
+          : isId
+            ? 'Buat 1 listing dulu'
+            : 'Create 1 listing first';
 
   return (
-    <main className="min-h-[100svh] bg-[color:var(--app-surface-muted)] px-2.5 pb-[calc(7.5rem+env(safe-area-inset-bottom))] pt-2.5 sm:px-4 sm:pb-10 sm:pt-4 lg:pb-8">
+    <main className="min-h-[100svh] bg-[color:var(--app-surface-muted)] px-2.5 pb-[calc(9.5rem+env(safe-area-inset-bottom))] pt-3 sm:px-4 sm:pb-12 sm:pt-5 lg:pb-10">
       <section className="mx-auto max-w-2xl space-y-2.5">
         <header className="overflow-hidden rounded-[22px] border border-emerald-100 bg-white shadow-[0_18px_38px_-30px_rgba(15,23,42,0.35)]">
-          <div className="bg-[linear-gradient(145deg,#064e3b_0%,#047857_55%,#059669_100%)] px-4 py-4 text-white sm:px-5 sm:py-5">
+          <div className="bg-[linear-gradient(145deg,#064e3b_0%,#047857_52%,#065f46_100%)] px-4 py-4 text-white sm:px-5 sm:py-5">
             <div className="flex items-start gap-3">
               <WhatsAppStepIcon />
+
               <div className="min-w-0 flex-1">
-                <p className="text-[9px] font-black uppercase tracking-[0.14em] text-white/80">
-                  {isId ? 'Komunitas Lajukan' : 'Lajukan Community'}
+                <p className="text-[10px] font-black uppercase tracking-[0.12em] text-white/90">
+                  {isId
+                    ? 'Komunitas Rantai Usaha Lokal'
+                    : 'Local Business Chain Community'}
                 </p>
-                <h1 className="mt-1 text-[20px] font-black leading-[1.08] tracking-[-0.03em] sm:text-[22px]">
+
+                <h1 className="mt-0.5 text-lg font-black leading-tight tracking-[-0.025em] text-white sm:text-xl">
                   {isId
-                    ? 'Temukan orang yang relevan untuk usahamu.'
-                    : 'Find relevant people for your business.'}
+                    ? 'Lihat komunitas dulu, gabung saat siap'
+                    : 'Explore first, join when you are ready'}
                 </h1>
-                <p className="mt-1.5 max-w-xl text-[12px] leading-5 text-white/88">
+
+                <p className="mt-1 max-w-2xl text-[12px] leading-5 text-white/90 sm:text-[13px] sm:leading-5">
                   {isId
-                    ? 'Lihat grupnya dulu tanpa login. Saat siap masuk, cukup login dan punya 1 listing aktif.'
-                    : 'Explore first without logging in. When you are ready, just log in and have 1 active listing.'}
+                    ? 'Kamu tidak perlu login untuk melihat grup dan manfaatnya. Login + 1 listing aktif hanya diminta saat kamu benar-benar mau masuk ke WhatsApp.'
+                    : 'You can explore the groups without logging in. Login + 1 active listing is only needed when you are ready to enter WhatsApp.'}
                 </p>
               </div>
             </div>
 
-            <div className="mt-3 grid grid-cols-3 gap-1.5">
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
               {[
                 [
-                  isId ? 'Tanpa login' : 'No login',
-                  isId ? 'untuk melihat' : 'to explore',
+                  isId ? '7 grup' : '7 groups',
+                  isId
+                    ? 'pilih sesuai kebutuhan'
+                    : 'choose by need',
                 ],
                 [
-                  isId ? '1 listing aktif' : '1 active listing',
-                  isId ? 'sebelum masuk' : 'before joining',
+                  isId ? '1 listing' : '1 listing',
+                  isId
+                    ? 'untuk membaca peran'
+                    : 'to read your role',
                 ],
                 [
-                  'WhatsApp',
-                  isId ? 'saat siap' : 'when ready',
+                  isId ? 'WhatsApp' : 'WhatsApp',
+                  isId ? 'setelah siap' : 'when ready',
                 ],
               ].map(([value, label]) => (
                 <div
                   key={value}
-                  className="min-w-0 rounded-xl bg-black/10 px-2 py-2 ring-1 ring-white/12"
+                  className="min-w-0 rounded-xl bg-black/10 px-2.5 py-2 ring-1 ring-white/15 backdrop-blur-[2px]"
                 >
-                  <p className="truncate text-[11px] font-black text-white sm:text-[12px]">
+                  <p className="truncate text-[13px] font-black text-white">
                     {value}
                   </p>
-                  <p className="mt-0.5 truncate text-[9px] font-semibold text-white/72 sm:text-[10px]">
+
+                  <p className="mt-0.5 text-[10px] font-semibold text-white/80 sm:text-[11px]">
                     {label}
                   </p>
                 </div>
@@ -179,32 +318,43 @@ function WhatsAppStepIcon() {
             </div>
           </div>
 
-          <div className="flex items-start gap-2.5 px-4 py-3 sm:px-5">
-            <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
-              <ShieldCheck className="h-3.5 w-3.5" />
-            </span>
-            <p className="min-w-0 text-[11px] leading-4.5 text-zinc-600 sm:text-[12px]">
-              {isId
-                ? 'Alurnya dibuat sederhana: lihat dulu → login saat siap → 1 listing aktif → masuk WhatsApp.'
-                : 'The flow stays simple: explore → log in when ready → 1 active listing → join WhatsApp.'}
-            </p>
+          <div className="px-4 py-3.5 sm:px-5">
+            <div className="flex items-center gap-2">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
+                <ShieldCheck className="h-4 w-4" />
+              </div>
+
+              <p className="min-w-0 flex-1 text-[12px] font-semibold leading-5 text-zinc-700 sm:text-[13px]">
+                {isId
+                  ? 'Kamu bebas melihat dulu. Saat sudah siap bergabung, login membantu kami mengenali akunmu dan mencocokkanmu ke komunitas yang paling relevan.'
+                  : 'The goal is simple: match you with the most relevant group and keep the community focused.'}
+              </p>
+            </div>
           </div>
         </header>
 
-        <section className="overflow-hidden rounded-[20px] border border-zinc-100 bg-white shadow-[0_12px_28px_-26px_rgba(15,23,42,0.3)]">
-          <div className="flex items-center gap-2.5 border-b border-zinc-100 px-4 py-3 sm:px-4">
+        <section className="rounded-[20px] border border-zinc-100 bg-white px-4 py-3 shadow-[0_12px_28px_-26px_rgba(15,23,42,0.3)] sm:px-4">
+          <div className="flex items-center gap-2 pb-1.5">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-700">
+              <Sparkles className="h-3.5 w-3.5" />
+            </div>
+
             <div className="min-w-0 flex-1">
-              <h2 className="text-[14px] font-black text-zinc-950 sm:text-[15px]">
-                {isId ? 'Pilih yang paling relevan' : 'Choose what is relevant'}
-              </h2>
-              <p className="mt-0.5 text-[10px] leading-4 text-zinc-500">
+              <h2 className="text-sm font-black text-zinc-950 sm:text-[15px]">
                 {isId
-                  ? 'Ketuk untuk melihat isi singkatnya.'
-                  : 'Tap a group for a quick preview.'}
+                  ? 'Pilih sesuai kebutuhanmu'
+                  : 'Choose what you need'}
+              </h2>
+
+              <p className="text-[11px] leading-4 text-zinc-500">
+                {isId
+                  ? 'Ketuk grup untuk lihat manfaat singkat.'
+                  : 'Tap a group for a quick benefit preview.'}
               </p>
             </div>
-            <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[9px] font-black text-emerald-700">
-              {COMMUNITY_GROUPS.length} {isId ? 'grup' : 'groups'}
+
+            <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-extrabold text-emerald-700">
+              {COMMUNITY_GROUPS.length}
             </span>
           </div>
 
@@ -214,74 +364,170 @@ function WhatsAppStepIcon() {
                 key={group.nameId}
                 type="button"
                 onClick={() => setSelectedGroup(group)}
-                className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left transition hover:bg-zinc-50 active:bg-zinc-100 sm:px-4"
+                className="flex min-h-12 w-full items-center gap-2.5 rounded-xl px-1.5 py-2 text-left transition hover:bg-zinc-50 active:bg-zinc-100"
               >
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-zinc-50 text-[16px] ring-1 ring-zinc-100">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-zinc-50 text-base">
                   {group.icon}
                 </span>
+
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[12px] font-extrabold leading-4.5 text-zinc-900 sm:text-[13px]">
+                  <span className="block whitespace-normal text-[12px] font-extrabold leading-5 text-zinc-900 sm:text-[13px]">
                     {isId ? group.nameId : group.nameEn}
                   </span>
-                  <span className="mt-0.5 block line-clamp-2 text-[10px] leading-4 text-zinc-500 sm:text-[11px]">
-                    {isId ? group.descriptionId : group.descriptionEn}
+
+                  <span className="mt-0.5 block whitespace-normal text-[10px] leading-4 text-zinc-600 sm:text-[11px]">
+                    {isId
+                      ? group.descriptionId
+                      : group.descriptionEn}
                   </span>
                 </span>
-                <ArrowRight className="h-3.5 w-3.5 shrink-0 text-zinc-300" />
+
+                <ArrowRight className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
               </button>
             ))}
           </div>
         </section>
 
-        <section className="rounded-[20px] border border-emerald-100 bg-white px-4 py-3 sm:px-4">
+        <section className="rounded-[20px] border border-emerald-100 bg-white px-4 py-3.5 shadow-[0_12px_28px_-26px_rgba(15,23,42,0.28)] sm:px-4">
           <div className="flex items-start gap-2.5">
-            <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
-              <CheckCircle2 className="h-4 w-4" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <h2 className="text-[13px] font-black text-zinc-950 sm:text-[14px]">
-                {isId ? 'Kenapa ada syarat listing?' : 'Why is a listing required?'}
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
+              <BadgeCheck className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-sm font-black text-zinc-950 sm:text-[15px]">
+                {isId ? 'Kenapa jangan lewatkan?' : 'Why not miss out?'}
               </h2>
-              <p className="mt-1 text-[10.5px] leading-4.5 text-zinc-600 sm:text-[11px]">
+              <p className="mt-0.5 text-[11px] leading-4.5 text-zinc-600">
                 {isId
-                  ? 'Supaya komunitas tetap punya konteks usaha nyata, bukan sekadar grup promosi acak. Listing bisa berupa produk, jasa, atau kebutuhan.'
-                  : 'It keeps the community grounded in real business context. Your listing can be a product, service, or need.'}
+                  ? 'Kalau kamu punya kebutuhan atau penawaran nyata, komunitas ini memberi jalur tambahan untuk ditemukan, menemukan orang yang relevan, dan membuka peluang kerja sama.'
+                  : 'More than a WhatsApp group: the goal is to make business needs easier to discover by the right people.'}
               </p>
             </div>
           </div>
 
-          <div className="mt-2.5 grid grid-cols-3 gap-1.5">
+          <div className="mt-3 grid gap-2 sm:grid-cols-3">
             {[
-              isId ? 'Produk' : 'Product',
-              isId ? 'Jasa' : 'Service',
-              isId ? 'Kebutuhan' : 'Need',
-            ].map(item => (
-              <div
-                key={item}
-                className="rounded-xl bg-zinc-50 px-2 py-2 text-center text-[10px] font-extrabold text-zinc-700 ring-1 ring-zinc-100"
-              >
-                {item}
+              {
+                icon: Search,
+                title: isId ? 'Lebih mudah ditemukan' : 'Easier to discover',
+                body: isId
+                  ? 'Posting kebutuhan atau penawaran membuat konteks usahamu jelas.'
+                  : 'A listing makes your business need or offer easier to understand.',
+              },
+              {
+                icon: UsersRound,
+                title: isId ? 'Temukan koneksi usaha' : 'Find business connections',
+                body: isId
+                  ? 'Buka peluang bertemu supplier, pembeli, partner, atau penawar yang relevan.'
+                  : 'Create opportunities to meet relevant suppliers, buyers, partners, or offers.',
+              },
+              {
+                icon: Megaphone,
+                title: isId ? 'Peluang dibantu promosi' : 'Promotion opportunities',
+                body: isId
+                  ? 'Listing yang jelas lebih siap untuk dibantu ditemukan atau dipromosikan.'
+                  : 'A clear listing is easier to surface or promote when relevant.',
+              },
+            ].map(item => {
+              const Icon = item.icon;
+              return (
+                <div
+                  key={item.title}
+                  className="min-w-0 rounded-[15px] border border-zinc-100 bg-zinc-50 px-3 py-2.5"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white text-emerald-700 ring-1 ring-zinc-100">
+                      <Icon className="h-3.5 w-3.5" />
+                    </span>
+                    <p className="text-[11px] font-black leading-4 text-zinc-900">
+                      {item.title}
+                    </p>
+                  </div>
+                  <p className="mt-1.5 text-[10px] leading-4 text-zinc-600">
+                    {item.body}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="rounded-[20px] border border-zinc-100 bg-white px-4 py-3.5 shadow-[0_12px_28px_-26px_rgba(15,23,42,0.26)] sm:px-4">
+          <div className="flex items-start gap-2.5">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-700">
+              <ClipboardCheck className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-sm font-black text-zinc-950 sm:text-[15px]">
+                {isId ? 'Kenapa perlu 1 listing sebelum gabung?' : 'Why do you need 1 listing before joining?'}
+              </h2>
+              <p className="mt-0.5 text-[11px] leading-4.5 text-zinc-600">
+                {isId
+                  ? 'Supaya komunitas tidak menjadi grup promosi acak. Listing memberi gambaran sederhana tentang apa yang kamu punya atau sedang cari.'
+                  : 'This keeps the community focused. A listing gives a simple picture of what you offer or what you need.'}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-2.5 rounded-[14px] bg-amber-50 px-3 py-2.5">
+            <p className="text-[10.5px] font-semibold leading-4.5 text-amber-950">
+              {isId
+                ? 'Tidak perlu sempurna. Cukup mulai dari 1 hal nyata: produk yang kamu tawarkan, jasa yang kamu punya, atau kebutuhan yang sedang kamu cari.'
+                : 'It does not need to be perfect. Start with one real thing: a product you offer, a service you provide, or a need you are looking for.'}
+            </p>
+          </div>
+        </section>
+
+        <section className="rounded-[20px] border border-emerald-100 bg-white px-4 py-3 shadow-[0_12px_28px_-26px_rgba(15,23,42,0.28)] sm:px-4">
+          <div className="flex items-start gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
+              <ClipboardCheck className="h-4 w-4" />
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <h2 className="text-sm font-black text-zinc-950 sm:text-[15px]">
+                {isId
+                  ? 'Sudah siap? Tinggal 2 langkah ringan'
+                  : 'When you join, there are only 2 light steps'}
+              </h2>
+
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                {[
+                  [
+                    isId ? '1. Login' : '1. Log in',
+                    isId
+                      ? 'Login untuk menghubungkan aktivitas komunitas dengan akunmu.'
+                      : 'So Lajukan can identify your account.',
+                  ],
+                  [
+                    isId ? '2. 1 listing aktif' : '2. 1 active listing',
+                    isId
+                      ? '1 listing aktif membantu membaca apakah kamu sedang menawarkan atau mencari sesuatu.'
+                      : 'So your business role can be matched.',
+                  ],
+                ].map(([title, body]) => (
+                  <div
+                    key={title}
+                    className="rounded-xl bg-zinc-50 px-3 py-2.5"
+                  >
+                    <p className="text-[11px] font-extrabold text-zinc-900">
+                      {title}
+                    </p>
+
+                    <p className="mt-0.5 text-[10px] leading-4.5 text-zinc-600">
+                      {body}
+                    </p>
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
           </div>
         </section>
 
         {isAuthenticated ? (
-          <section
-            className={`rounded-[20px] border px-4 py-3.5 shadow-[0_12px_28px_-26px_rgba(15,23,42,0.26)] sm:px-4 ${
-              ready
-                ? 'border-emerald-100 bg-emerald-50/70'
-                : 'border-amber-100 bg-amber-50/70'
-            }`}
-          >
-            <div className="flex items-start gap-2.5">
-              <div
-                className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${
-                  ready
-                    ? 'bg-white text-emerald-700'
-                    : 'bg-white text-amber-700'
-                }`}
-              >
+          <section className="rounded-[20px] border border-zinc-100 bg-white px-4 py-3 shadow-[0_12px_28px_-26px_rgba(15,23,42,0.26)] sm:px-4">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
                 {loading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
@@ -290,50 +536,64 @@ function WhatsAppStepIcon() {
               </div>
 
               <div className="min-w-0 flex-1">
-                <p className="text-[9px] font-black uppercase tracking-[0.12em] text-zinc-500">
-                  {isId ? 'Status akun' : 'Account status'}
+                <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-zinc-500">
+                  {isId ? 'Status kamu' : 'Your status'}
                 </p>
 
                 {error ? (
-                  <p className="mt-0.5 text-[11px] font-semibold leading-4.5 text-amber-700">
+                  <p className="text-[10px] font-semibold text-amber-700">
                     {error}
                   </p>
                 ) : ready ? (
                   <>
-                    <p className="mt-0.5 text-[13px] font-black leading-5 text-emerald-800">
+                    <p className="whitespace-normal text-[13px] font-black text-emerald-700">
                       {isId ? role.labelId : role.labelEn}
                     </p>
+
                     {listing ? (
-                      <p className="mt-0.5 line-clamp-2 text-[10px] leading-4 text-zinc-600">
-                        {isId ? 'Terbaca dari:' : 'Based on:'} {listingLabel(listing)}
+                      <p className="whitespace-normal text-[11px] leading-4 text-zinc-600">
+                        {isId ? 'Dibaca dari:' : 'Read from:'}{' '}
+                        {listingLabel(listing)}
                       </p>
                     ) : null}
                   </>
                 ) : loading ? (
-                  <p className="mt-0.5 text-[11px] leading-4.5 text-zinc-600">
-                    {isId ? 'Memeriksa listing aktif…' : 'Checking active listings…'}
+                  <p className="text-[11px] text-zinc-600">
+                    {isId
+                      ? 'Mencocokkan listing kamu…'
+                      : 'Matching your listing…'}
                   </p>
                 ) : (
-                  <p className="mt-0.5 text-[11px] leading-4.5 text-zinc-600">
+                  <p className="text-[11px] leading-5 text-zinc-600">
                     {isId
-                      ? 'Belum ada 1 listing aktif. Buat satu dulu supaya bisa lanjut.'
-                      : 'No active listing yet. Create one to continue.'}
+                      ? 'Belum ada 1 listing aktif yang bisa dipakai untuk membaca peranmu.'
+                      : 'There is no active listing yet that can be used to read your role.'}
                   </p>
                 )}
               </div>
             </div>
           </section>
-        ) : null}
+        ) : (
+          <section className="flex items-start gap-2.5 rounded-[18px] border border-zinc-100 bg-white px-3 py-2.5">
+            <LogIn className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
 
-        <div className="fixed inset-x-2 bottom-[calc(4.55rem+env(safe-area-inset-bottom))] z-[30] lg:static lg:px-0">
-          <div className="mx-auto w-full max-w-2xl rounded-[18px] border border-emerald-100 bg-white/95 p-1.5 shadow-[0_18px_42px_-24px_rgba(15,23,42,0.55)] backdrop-blur-xl lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none lg:backdrop-blur-0">
+            <p className="min-w-0 flex-1 text-[11px] leading-5 text-zinc-700">
+              {isId
+                ? 'Belum perlu login sekarang. Login baru diminta saat kamu menekan tombol gabung.'
+                : 'No login needed yet. We only ask you to log in when you continue to join.'}
+            </p>
+          </section>
+        )}
+
+        <div className="fixed inset-x-2 bottom-[calc(4.65rem+env(safe-area-inset-bottom))] z-[30] lg:static lg:mt-1 lg:px-0">
+          <div className="mx-auto w-full max-w-2xl rounded-[17px] border border-emerald-100 bg-white/95 p-1.5 shadow-[0_18px_42px_-24px_rgba(15,23,42,0.55)] backdrop-blur-xl lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none lg:backdrop-blur-0">
             {!isAuthenticated ? (
               <Link
                 href={loginHref()}
-                className="flex min-h-11 w-full items-center justify-center gap-2 rounded-[14px] bg-emerald-700 px-4 text-[12px] font-black text-white shadow-sm transition hover:bg-emerald-800 active:scale-[0.99] sm:text-[13px]"
+                className="flex min-h-11 w-full items-center justify-center gap-2 rounded-[13px] bg-emerald-700 px-4 text-[12px] font-black text-white shadow-sm transition hover:bg-emerald-800 active:scale-[0.99] sm:text-[13px]"
               >
                 <LogIn className="h-3.5 w-3.5" />
-                <span>{isId ? 'Login untuk lanjut' : 'Log in to continue'}</span>
+                <span>{isId ? 'Login untuk gabung komunitas' : 'Log in to join the community'}</span>
                 <ArrowRight className="h-3.5 w-3.5" />
               </Link>
             ) : ready ? (
@@ -341,7 +601,7 @@ function WhatsAppStepIcon() {
                 type="button"
                 onClick={openCommunity}
                 disabled={loading || authLoading}
-                className="flex min-h-11 w-full items-center justify-center gap-2 rounded-[14px] bg-emerald-700 px-4 text-[12px] font-black text-white shadow-sm transition hover:bg-emerald-800 active:scale-[0.99] disabled:cursor-wait disabled:opacity-60 sm:text-[13px]"
+                className="flex min-h-11 w-full items-center justify-center gap-2 rounded-[13px] bg-emerald-700 px-4 text-[12px] font-black text-white shadow-sm transition hover:bg-emerald-800 active:scale-[0.99] disabled:cursor-wait disabled:opacity-60 sm:text-[13px]"
               >
                 <BrandSocialIcon brand="whatsapp" className="h-4 w-4" />
                 <span>{actionLabel}</span>
@@ -350,8 +610,9 @@ function WhatsAppStepIcon() {
             ) : (
               <Link
                 href="/create"
-                className="flex min-h-11 w-full items-center justify-center gap-2 rounded-[14px] bg-emerald-700 px-4 text-[12px] font-black text-white shadow-sm transition hover:bg-emerald-800 active:scale-[0.99] sm:text-[13px]"
+                className="flex min-h-11 w-full items-center justify-center gap-2 rounded-[13px] bg-emerald-700 px-4 text-[12px] font-black text-white shadow-sm transition hover:bg-emerald-800 active:scale-[0.99] sm:text-[13px]"
               >
+                <ClipboardCheck className="h-3.5 w-3.5" />
                 <span>{actionLabel}</span>
                 <ArrowRight className="h-3.5 w-3.5" />
               </Link>
@@ -359,10 +620,10 @@ function WhatsAppStepIcon() {
           </div>
         </div>
 
-        <p className="px-2 text-center text-[9.5px] leading-4 text-zinc-400">
+        <p className="px-2 text-center text-[11px] leading-5 text-zinc-500">
           {isId
-            ? 'Lihat tanpa login. Login + 1 listing aktif baru diperlukan saat kamu benar-benar mau masuk.'
-            : 'Explore without login. Login + 1 active listing are only required when you continue.'}
+            ? 'Lihat dulu tanpa login. Saat kamu benar-benar siap bergabung, login + 1 listing aktif dipakai untuk menjaga komunitas tetap relevan.'
+            : 'Browse freely first. Requirements are only requested when you are ready to enter the WhatsApp community.'}
         </p>
       </section>
 
@@ -380,25 +641,24 @@ function WhatsAppStepIcon() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="community-group-title"
-            aria-describedby="community-group-description"
-            className="max-h-[calc(100svh-1rem)] w-full max-w-md overflow-hidden rounded-[22px] bg-white shadow-2xl"
+            className="w-full max-w-md overflow-hidden rounded-[22px] bg-white shadow-2xl max-h-[calc(100svh-1rem)]"
           >
             <div className="flex items-start gap-2.5 border-b border-zinc-100 px-3.5 py-3">
-              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-50 text-xl">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-xl">
                 {selectedGroup.icon}
               </span>
 
               <div className="min-w-0 flex-1">
                 <h3
                   id="community-group-title"
-                  className="text-[15px] font-black leading-5 text-zinc-950"
+                  className="text-base font-black text-zinc-950"
                 >
-                  {isId ? selectedGroup.nameId : selectedGroup.nameEn}
+                  {isId
+                    ? selectedGroup.nameId
+                    : selectedGroup.nameEn}
                 </h3>
-                <p
-                  id="community-group-description"
-                  className="mt-1 text-[11px] leading-4.5 text-zinc-600"
-                >
+
+                <p className="mt-1 text-[12px] leading-5 text-zinc-600">
                   {isId
                     ? selectedGroup.descriptionId
                     : selectedGroup.descriptionEn}
@@ -409,39 +669,31 @@ function WhatsAppStepIcon() {
                 type="button"
                 onClick={() => setSelectedGroup(null)}
                 aria-label={isId ? 'Tutup' : 'Close'}
-                className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-zinc-100 text-zinc-600"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-zinc-600"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="max-h-[calc(100svh-10.5rem)] overflow-y-auto overscroll-contain px-4 py-3.5">
-              <p className="text-[9px] font-black uppercase tracking-[0.12em] text-emerald-700">
-                {isId ? 'Yang bisa kamu cari' : 'What you can find'}
+            <div className="max-h-[calc(100svh-10.5rem)] overflow-y-auto overscroll-contain px-4 py-4">
+              <p className="mb-2 text-[10px] font-extrabold uppercase tracking-[0.12em] text-emerald-700">
+                {isId ? 'Manfaat' : 'Benefits'}
               </p>
 
-              <ul className="mt-2.5 space-y-2">
+              <ul className="space-y-2">
                 {(isId
                   ? selectedGroup.benefitsId
                   : selectedGroup.benefitsEn
                 ).map(benefit => (
                   <li
                     key={benefit}
-                    className="flex items-start gap-2.5 rounded-xl bg-zinc-50 px-3 py-2 text-[11px] leading-4.5 text-zinc-700"
+                    className="flex items-start gap-2.5 text-[12px] leading-5 text-zinc-700"
                   >
                     <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />
                     <span>{benefit}</span>
                   </li>
                 ))}
               </ul>
-
-              <div className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50/70 px-3 py-2.5">
-                <p className="text-[10px] font-semibold leading-4.5 text-emerald-900">
-                  {isId
-                    ? 'Kamu tetap bisa lihat grup lain kapan saja. Pilih yang paling dekat dengan kebutuhanmu.'
-                    : 'You can still explore other groups anytime. Choose the one closest to your need.'}
-                </p>
-              </div>
             </div>
 
             <div className="border-t border-zinc-100 p-3.5">
@@ -449,11 +701,12 @@ function WhatsAppStepIcon() {
                 <Link
                   href={loginHref()}
                   onClick={() => setSelectedGroup(null)}
-                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[14px] bg-emerald-700 px-4 text-[12px] font-black text-white"
+                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-4 text-[13px] font-extrabold text-white"
                 >
                   <LogIn className="h-3.5 w-3.5" />
-                  {isId ? 'Login untuk lanjut' : 'Log in to continue'}
-                  <ArrowRight className="h-3.5 w-3.5" />
+                  {isId
+                    ? 'Login untuk lanjut gabung'
+                    : 'Log in to continue'}
                 </Link>
               ) : ready ? (
                 <button
@@ -463,20 +716,27 @@ function WhatsAppStepIcon() {
                     openCommunity();
                   }}
                   disabled={loading || authLoading}
-                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[14px] bg-emerald-700 px-4 text-[12px] font-black text-white disabled:opacity-60"
+                  className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-4 text-xs font-extrabold text-white disabled:opacity-60"
                 >
-                  <BrandSocialIcon brand="whatsapp" className="h-4 w-4" />
-                  {isId ? 'Lanjut ke WhatsApp' : 'Continue to WhatsApp'}
+                  <BrandSocialIcon
+                    brand="whatsapp"
+                    className="h-4 w-4"
+                  />
+                  {isId
+                    ? 'Lanjut ke WhatsApp'
+                    : 'Continue to WhatsApp'}
                   <ExternalLink className="h-3.5 w-3.5" />
                 </button>
               ) : (
                 <Link
                   href="/create"
                   onClick={() => setSelectedGroup(null)}
-                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[14px] bg-emerald-700 px-4 text-[12px] font-black text-white"
+                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-4 text-[13px] font-extrabold text-white"
                 >
-                  {isId ? 'Buat 1 listing dulu' : 'Create 1 listing first'}
-                  <ArrowRight className="h-3.5 w-3.5" />
+                  <ClipboardCheck className="h-3.5 w-3.5" />
+                  {isId
+                    ? 'Buat 1 listing dulu'
+                    : 'Create 1 listing first'}
                 </Link>
               )}
             </div>
