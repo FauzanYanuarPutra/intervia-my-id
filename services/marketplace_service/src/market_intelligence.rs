@@ -242,6 +242,23 @@ fn stats(observations: &[PriceObservation]) -> Option<MarketStats> {
     })
 }
 
+fn market_position_insight(price_position: &str) -> (&'static str, &'static str) {
+    match price_position {
+        "above" => (
+            "Harga listing berada di atas pusat pasar.",
+            "Cek kualitas, spesifikasi, ongkir, dan kondisi barang sebelum mengubah harga.",
+        ),
+        "below" => (
+            "Harga listing berada di bawah pusat pasar.",
+            "Cek stok, kualitas, promo, dan biaya sebelum menaikkan harga.",
+        ),
+        _ => (
+            "Harga listing masih dekat dengan pusat pasar.",
+            "Tidak ada sinyal harga besar yang perlu ditindaklanjuti.",
+        ),
+    }
+}
+
 fn price_alert(source_price: Option<i64>, market: &MarketStats) -> Value {
     let Some(price) = source_price else {
         return json!({
@@ -647,6 +664,8 @@ async fn build_market_response(
         None
     };
 
+    let (headline, action) = market_position_insight(&price_position);
+
     Ok(json!({
         "source_id": source.content_id,
         "scope": {
@@ -667,16 +686,8 @@ async fn build_market_response(
         },
         "insight": {
             "price_position": price_position,
-            "headline": match price_position.as_str() {
-                "above" => "Harga listing berada di atas pusat pasar.",
-                "below" => "Harga listing berada di bawah pusat pasar.",
-                _ => "Harga listing masih dekat dengan pusat pasar."
-            },
-            "action": match price_position.as_str() {
-                "above" => "Cek kualitas, spesifikasi, ongkir, dan kondisi barang sebelum mengubah harga.",
-                "below" => "Cek stok, kualitas, promo, dan biaya sebelum menaikkan harga.",
-                _ => "Tidak ada sinyal harga besar yang perlu ditindaklanjuti."
-            }
+            "headline": headline,
+            "action": action
         },
         "alerts": alerts,
         "intelligence": {
@@ -814,5 +825,36 @@ pub async fn record_price_snapshot(state: &Arc<AppState>, content_id: Uuid, owne
     .await
     {
         tracing::warn!("market snapshot insert failed: {:?}", error);
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::market_position_insight;
+
+    #[test]
+    fn market_position_insight_covers_supported_positions() {
+        assert_eq!(
+            market_position_insight("above"),
+            (
+                "Harga listing berada di atas pusat pasar.",
+                "Cek kualitas, spesifikasi, ongkir, dan kondisi barang sebelum mengubah harga."
+            )
+        );
+        assert_eq!(
+            market_position_insight("below"),
+            (
+                "Harga listing berada di bawah pusat pasar.",
+                "Cek stok, kualitas, promo, dan biaya sebelum menaikkan harga."
+            )
+        );
+        assert_eq!(
+            market_position_insight("within"),
+            (
+                "Harga listing masih dekat dengan pusat pasar.",
+                "Tidak ada sinyal harga besar yang perlu ditindaklanjuti."
+            )
+        );
     }
 }
