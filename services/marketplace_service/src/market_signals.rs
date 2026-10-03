@@ -15,6 +15,7 @@ use super::{auth::user_id_from_auth, market_signal_risk, AppState};
 #[derive(Debug, Deserialize)]
 pub struct CreateMarketSignal {
     pub signal_type: Option<String>,
+    pub market_side: Option<String>,
     pub amount_cents: Option<i64>,
     pub currency: Option<String>,
     pub quantity: Option<f64>,
