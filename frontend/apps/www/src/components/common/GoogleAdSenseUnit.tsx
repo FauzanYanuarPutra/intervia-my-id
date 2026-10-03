@@ -98,7 +98,8 @@ export function GoogleAdSenseUnit({
         ref={insRef}
         className="adsbygoogle"
         style={{ display: 'block', minHeight: 0 }}
-        data-ad-format="autorelaxed"
+        data-ad-format="auto"
+        data-full-width-responsive="true"
         data-ad-client={ADSENSE_CLIENT}
         data-ad-slot={slot}
       />
