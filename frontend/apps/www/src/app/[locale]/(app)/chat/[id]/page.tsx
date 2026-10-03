@@ -6843,21 +6843,7 @@ export default function ChatRoomPage() {
               </span>
             )}
 
-            {!PROMO_ONLY_MODE ? (
-              <button
-                onClick={() => setShowTransactionsDrawer(prev => !prev)}
-                className="inline-flex min-h-[26px] shrink-0 items-center gap-1 rounded-md bg-zinc-100/70 px-2 text-[11px] font-semibold text-zinc-600 transition-all duration-150 hover:bg-zinc-200/80 hover:text-zinc-900 active:scale-95 dark:bg-zinc-800/40 dark:text-zinc-400 dark:hover:bg-zinc-800/80 dark:hover:text-zinc-200"
-                aria-label={
-                  chatLocale === 'id' ? 'Buka transaksi' : 'Open transactions'
-                }
-                title={chatLocale === 'id' ? 'Transaksi' : 'Transactions'}
-              >
-                <ReceiptText className="h-3.5 w-3.5 opacity-70" />
-                <span>
-                  {chatLocale === 'id' ? 'Transaksi' : 'Transactions'}
-                </span>
-              </button>
-            ) : null}
+
           </div>
         </div>
       </header>
@@ -6884,107 +6870,7 @@ export default function ChatRoomPage() {
         </div>
       ) : null}
 
-      {!PROMO_ONLY_MODE && roomSummaryTransaction ? (
-        <div className="shrink-0 border-b border-black/5 bg-[#f7f5f3]/85 py-1.5 pl-[max(0.625rem,env(safe-area-inset-left))] pr-[max(0.625rem,env(safe-area-inset-right))] dark:border-white/6 dark:bg-[#162028]/85 sm:px-4">
-          <div className="mx-auto w-full max-w-[920px]">
-            <div className="rounded-[18px] border border-black/5 bg-white/90 px-3 py-2 shadow-[0_10px_24px_-24px_rgba(17,27,33,0.45)]  dark:border-white/8 dark:bg-[#202c33]/90">
-              <button
-                type="button"
-                onClick={() => setRoomSummaryExpanded(prev => !prev)}
-                aria-expanded={roomSummaryExpanded}
-                className="flex w-full min-w-0 items-center gap-3 text-left"
-              >
-                <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#e7f8ef] text-[#128c7e] dark:bg-[#123d32] dark:text-[#25d366]">
-                  <ReceiptText className="h-4.5 w-4.5" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[10px] font-bold uppercase tracking-[0.14em] text-[#128c7e] dark:text-[#25d366]">
-                    {chatLocale === 'id'
-                      ? 'Transaksi aktif'
-                      : 'Active transaction'}
-                  </span>
-                  <span className="mt-0.5 block truncate text-sm font-bold text-[#111b21] dark:text-[#e9edef]">
-                    {roomSummaryTxnTitle}
-                  </span>
-                  <span className="mt-0.5 block truncate text-xs font-semibold text-[#667781] dark:text-[#8696a0]">
-                    {roomSummaryTxnWaitingParty}
-                  </span>
-                </span>
-                <span className="hidden shrink-0 text-right sm:block">
-                  <span className="block text-sm font-bold text-[#128c7e] dark:text-[#25d366]">
-                    {formatMoney(
-                      roomSummaryTransaction.amount_cents,
-                      roomSummaryTransaction.currency,
-                    )}
-                  </span>
-                  <span className="text-[11px] font-semibold text-[#667781] dark:text-[#8696a0]">
-                    {roomSummaryTxnProgress}%
-                  </span>
-                </span>
-                <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#f0f2f5] text-[#54656f] dark:bg-[#111b21] dark:text-[#aebac1]">
-                  {roomSummaryExpanded ? (
-                    <ChevronUp className="h-4 w-4" />
-                  ) : (
-                    <ChevronDown className="h-4 w-4" />
-                  )}
-                </span>
-              </button>
 
-              <div className="mt-2 flex items-center gap-2 sm:hidden">
-                <span className="shrink-0 text-xs font-bold text-[#128c7e] dark:text-[#25d366]">
-                  {formatMoney(
-                    roomSummaryTransaction.amount_cents,
-                    roomSummaryTransaction.currency,
-                  )}
-                </span>
-                <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[#e9edef] dark:bg-[#111b21]">
-                  <div
-                    className="h-full rounded-full bg-[#25d366]"
-                    style={{ width: `${roomSummaryTxnProgress}%` }}
-                  />
-                </div>
-                <span className="shrink-0 text-[11px] font-bold text-[#667781] dark:text-[#8696a0]">
-                  {roomSummaryTxnProgress}%
-                </span>
-              </div>
-
-              <div
-                className={`grid transition-[grid-template-rows,opacity] duration-200 ease-out ${
-                  roomSummaryExpanded
-                    ? 'mt-3 grid-rows-[1fr] opacity-100'
-                    : 'mt-0 grid-rows-[0fr] opacity-0'
-                }`}
-              >
-                <div className="min-h-0 overflow-hidden">
-                  <div className="flex flex-wrap gap-2 border-t border-black/5 pt-3 dark:border-white/8">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowTransactionsDrawer(true);
-                        setSelectedTransaction(roomSummaryTransaction);
-                      }}
-                      className="inline-flex min-h-[38px] items-center justify-center rounded-full bg-[#f0f2f5] px-4 text-sm font-medium text-[#111b21] transition hover:bg-[#e9edef] dark:bg-[#111b21] dark:text-[#dfe7ea] dark:hover:bg-[#1a252c]"
-                    >
-                      {chatLocale === 'id'
-                        ? 'Lihat transaksi'
-                        : 'Open transaction'}
-                    </button>
-                    {roomSummaryTxnShouldPay ? (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          openPaymentForTransaction({
-                            id: roomSummaryTransaction.id,
-                            amount_cents: roomSummaryTransaction.amount_cents,
-                            currency: roomSummaryTransaction.currency,
-                          })
-                        }
-                        className="inline-flex min-h-[38px] items-center justify-center gap-2 rounded-full bg-[#25d366] px-4 text-sm font-semibold text-[#111b21] shadow-[0_18px_32px_-24px_rgba(37,211,102,0.55)] transition hover:bg-[#22c55e]"
-                      >
-                        <Wallet className="h-4 w-4" />
-                        {chatLocale === 'id' ? 'Bayar sekarang' : 'Pay now'}
-                      </button>
-                    ) : null}
                   </div>
 
                   <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
@@ -10379,11 +10265,7 @@ export default function ChatRoomPage() {
                   ? chatLocale === 'id'
                     ? 'Memproses...'
                     : 'Processing...'
-                  : listingActionMode === 'direct'
-                    ? chatLocale === 'id'
-                      ? 'Buat Deal'
-                      : 'Create Deal Ticket'
-                    : chatLocale === 'id'
+                  : chatLocale === 'id'
                     ? 'Kirim negosiasi'
                     : 'Send negotiation'}
               </button>
