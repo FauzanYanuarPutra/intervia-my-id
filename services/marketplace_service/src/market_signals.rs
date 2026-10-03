@@ -148,22 +148,27 @@ pub async fn create_market_signal(
     }
 
     let metadata = row.get::<serde_json::Value, _>("metadata");
-    let listing_side = {
-        let candidates = [
-            metadata.get("listing_side").and_then(|v| v.as_str()),
-            metadata.get("market_side").and_then(|v| v.as_str()),
-            metadata.get("listing_intent").and_then(|v| v.as_str()),
-            metadata.get("market_intent").and_then(|v| v.as_str()),
-            metadata.get("intent").and_then(|v| v.as_str()),
-        ];
-        let demand = candidates.iter().flatten().any(|v| {
-            matches!(
-                v.trim().to_ascii_lowercase().as_str(),
-                "demand" | "seeker" | "need" | "needed" | "request" | "buyer"
-            )
+    let listing_side = payload
+        .market_side
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| matches!(*value, "demand" | "supply"))
+        .unwrap_or_else(|| {
+            let candidates = [
+                metadata.get("listing_side").and_then(|v| v.as_str()),
+                metadata.get("market_side").and_then(|v| v.as_str()),
+                metadata.get("listing_intent").and_then(|v| v.as_str()),
+                metadata.get("market_intent").and_then(|v| v.as_str()),
+                metadata.get("intent").and_then(|v| v.as_str()),
+            ];
+            let demand = candidates.iter().flatten().any(|v| {
+                matches!(
+                    v.trim().to_ascii_lowercase().as_str(),
+                    "demand" | "seeker" | "need" | "needed" | "request" | "buyer"
+                )
+            });
+            if demand { "demand" } else { "supply" }
         });
-        if demand { "demand" } else { "supply" }
-    };
 
     // A response to a supply listing is a demand-side signal.
     // A response to a demand listing is a supply-side signal.
