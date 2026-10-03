@@ -2273,6 +2273,11 @@ async fn main() -> anyhow::Result<()> {
             get(crm_matching::public_matches),
         )
         .route(
+            "/v1/content/{id}/matches/feedback",
+            get(crm_matching::get_public_matching_feedback)
+                .post(crm_matching::create_public_matching_feedback),
+        )
+        .route(
             "/v1/content/{id}/market-intelligence",
             get(market_intelligence::market_intelligence),
         )
