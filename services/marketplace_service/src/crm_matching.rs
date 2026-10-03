@@ -1988,16 +1988,12 @@ mod tests {
 
     #[test]
     fn mangga_hr_normalizes_to_harum_manis_alias() {
-        assert_eq!(
-            normalize_match_phrase("Mangga HR"),
-            "mangga harum manis"
-        );
+        assert_eq!(normalize_match_phrase("Mangga HR"), "mangga harum manis");
         assert_eq!(
             normalize_match_phrase("Mangga Harum Manis"),
             "mangga harum manis"
         );
     }
-
 }
 
 #[derive(Debug, Deserialize, Default)]
