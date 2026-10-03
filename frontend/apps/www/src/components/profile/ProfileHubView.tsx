@@ -1757,10 +1757,24 @@ export function ProfileHubView(props: ProfileHubViewProps) {
         const normalized = normalizeProfileSocialResponse(payload, isId);
 
         if (!response.ok || !normalized) {
+          const serverMessage =
+            payload &&
+            typeof payload === 'object' &&
+            !Array.isArray(payload) &&
+            typeof (payload as Record<string, unknown>).error === 'string'
+              ? String((payload as Record<string, unknown>).error).trim()
+              : payload &&
+                  typeof payload === 'object' &&
+                  !Array.isArray(payload) &&
+                  typeof (payload as Record<string, unknown>).message === 'string'
+                ? String((payload as Record<string, unknown>).message).trim()
+                : '';
+
           throw new Error(
-            isId
-              ? 'Gagal memperbarui koneksi.'
-              : 'Failed to update the connection.',
+            serverMessage ||
+              (isId
+                ? 'Gagal memperbarui koneksi.'
+                : 'Failed to update the connection.'),
           );
         }
 
