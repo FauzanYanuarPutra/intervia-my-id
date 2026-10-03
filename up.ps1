@@ -738,7 +738,7 @@ try {
                     }
                     elseif (Test-DockerRegistryFailure -OutputText $BuildText) {
                         $RegistryRetrySucceeded = $false
-                        for ($RegistryAttempt = 1; $RegistryAttempt -le 3; $RegistryAttempt++) {
+                        for ($RegistryAttempt = 1; $RegistryAttempt -le 5; $RegistryAttempt++) {
                             if ($RegistryAttempt -gt 1 -and $AdaptiveLimit -gt 1) {
                                 $AdaptiveLimit = [math]::Max(1, [math]::Ceiling($AdaptiveLimit / 2))
                             }
