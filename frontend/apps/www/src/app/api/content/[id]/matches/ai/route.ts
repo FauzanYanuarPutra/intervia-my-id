@@ -145,6 +145,7 @@ export async function POST(
   let feedbackHistory: Array<{
     matched_content_id: string;
     feedback_type: 'approved' | 'rejected';
+    candidate_snapshot: Record<string, unknown>;
     note: string;
     created_at: string;
   }> = [];
@@ -171,10 +172,20 @@ export async function POST(
             .map(item => {
               const value = record(item);
               const type = text(value.feedback_type, 32);
+              const snapshot = record(value.candidate_snapshot);
               return {
                 matched_content_id: text(value.matched_content_id, 120),
                 feedback_type:
                   type === 'approved' ? 'approved' : type === 'rejected' ? 'rejected' : null,
+                candidate_snapshot: {
+                  id: text(snapshot.id, 120),
+                  title: text(snapshot.title, 180),
+                  summary: text(snapshot.summary, 400),
+                  content_type: text(snapshot.content_type, 60),
+                  category: text(snapshot.category, 120),
+                  city: text(snapshot.city, 100),
+                  tags: list(snapshot.tags, 12, 80),
+                },
                 note: text(value.note, 300),
                 created_at: text(value.created_at, 80),
               };
@@ -185,6 +196,7 @@ export async function POST(
               ): item is {
                 matched_content_id: string;
                 feedback_type: 'approved' | 'rejected';
+                candidate_snapshot: Record<string, unknown>;
                 note: string;
                 created_at: string;
               } => Boolean(item.matched_content_id && item.feedback_type),
