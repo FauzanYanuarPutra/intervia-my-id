@@ -55,6 +55,9 @@ export const rootMetadata: Metadata = {
       'max-video-preview': -1,
     },
   },
+  other: {
+    'google-adsense-account': 'ca-pub-7020398942986974',
+  },
   openGraph: {
     type: 'website',
     siteName: 'Lajukan',
