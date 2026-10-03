@@ -5919,6 +5919,26 @@ async fn update_transaction_intermediary_status(
     )
     .await;
 
+    if next_status == "accepted" {
+        push_notification_best_effort(
+            state,
+            updated.seller_id,
+            "transaction",
+            "transaction.intermediary_accepted",
+            "Perantara Lajukan siap",
+            &format!(
+                "Perantara {} menyetujui transaksi {}. Seller dapat melanjutkan persetujuan transaksi.",
+                intermediary_status(&updated.transaction_meta),
+                updated.id
+            ),
+            json!({
+                "transaction_id": updated.id,
+                "intermediary_status": "accepted"
+            }),
+        )
+        .await;
+    }
+
     if next_status == "declined" {
         push_notification_best_effort(
             state,
