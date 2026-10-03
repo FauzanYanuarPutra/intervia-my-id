@@ -957,7 +957,7 @@ export async function proxy(req: NextRequest) {
 export const config = {
   matcher: [
     '/api/:path*',
-    '/((?!_next/static|_next/image|favicon.ico|robots.txt).*)',
+    '/((?!_next/static|_next/image|favicon.ico|robots.txt|ads.txt).*)',
     '/twa/:path*',
   ],
 };
