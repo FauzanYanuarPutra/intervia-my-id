@@ -213,6 +213,20 @@ fn json_f64(metadata: &Value, keys: &[&str]) -> Option<f64> {
     None
 }
 
+fn normalize_match_phrase(input: &str) -> String {
+    input
+        .chars()
+        .map(|c| if c.is_alphanumeric() || c.is_whitespace() { c.to_ascii_lowercase() } else { ' ' })
+        .collect::<String>()
+        .split_whitespace()
+        .filter(|token| !matches!(
+            *token,
+            "untuk" | "dengan" | "yang" | "dan" | "atau" | "di" | "ke" | "dari" | "harga" | "butuh" | "membutuhkan"
+        ))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 fn tokens(input: &str) -> HashSet<String> {
     const STOPWORDS: &[&str] = &[
         "dan", "yang", "untuk", "dari", "dengan", "butuh", "ingin", "cari", "mau", "tolong",
@@ -471,6 +485,21 @@ fn score_candidate(requirement: &RequirementItem, candidate: &CandidateItem) -> 
         title_overlap as f64 / title_need_tokens.len() as f64
     };
     let similarity = ((token_f1 * 0.65 + title_similarity * 0.35) * 100.0).clamp(0.0, 100.0);
+    let compact_need = normalize_match_phrase(&requirement.title);
+    let compact_candidate = normalize_match_phrase(&candidate.title);
+    let phrase_match = !compact_need.is_empty()
+        && (compact_candidate.contains(&compact_need) || compact_need.contains(&compact_candidate));
+    let semantic_relevance = if phrase_match {
+        1.0
+    } else if title_overlap >= 2 {
+        0.85
+    } else if title_overlap == 1 {
+        0.55
+    } else if token_f1 >= 0.35 {
+        0.65
+    } else {
+        0.0
+    };
     let keyword_fit = (similarity * 0.25).min(25.0);
 
     let requirement_category =
@@ -535,15 +564,19 @@ fn score_candidate(requirement: &RequirementItem, candidate: &CandidateItem) -> 
     let quality = listing_quality_score(candidate);
     let freshness = freshness_score(candidate.updated_at);
 
-    let total = (keyword_fit
-        + category_fit
-        + location_fit
-        + price_fit
-        + trust
-        + availability
-        + quality
-        + freshness)
-        .clamp(0.0, 100.0);
+    let total = if semantic_relevance < 0.35 {
+        0.0
+    } else {
+        (keyword_fit
+            + category_fit
+            + location_fit
+            + price_fit
+            + trust
+            + availability
+            + quality
+            + freshness)
+            .clamp(0.0, 100.0)
+    };
 
     let price_value = match (candidate.price_cents, budget_min, budget_max) {
         (Some(price), Some(min), Some(max)) if max > min => {
