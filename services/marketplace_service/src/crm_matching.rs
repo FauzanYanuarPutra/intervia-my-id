@@ -2210,6 +2210,7 @@ pub async fn get_public_matching_feedback(
         r#"
         SELECT
             metadata->>'matched_content_id' AS matched_content_id,
+            metadata->'candidate_snapshot' AS candidate_snapshot,
             feedback_type,
             note,
             created_at
@@ -2242,6 +2243,7 @@ pub async fn get_public_matching_feedback(
                     Some(json!({
                         "matched_content_id": matched_content_id,
                         "feedback_type": row.get::<String, _>("feedback_type"),
+                        "candidate_snapshot": row.get::<Option<Value>, _>("candidate_snapshot"),
                         "note": row.get::<Option<String>, _>("note"),
                         "created_at": row.get::<DateTime<Utc>, _>("created_at"),
                     }))
