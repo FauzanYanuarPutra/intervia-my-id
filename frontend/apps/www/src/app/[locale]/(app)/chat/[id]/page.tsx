@@ -3390,7 +3390,7 @@ export default function ChatRoomPage() {
       const data = await res.json().catch(() => ({}));
       const payload =
         data && typeof data === 'object'
-          ? (data as { messages?: unknown[]; data?: unknown[]; peer_read_at?: unknown })
+          ? (data as { messages?: unknown[]; data?: unknown[] })
           : {};
       const list = Array.isArray(payload.messages)
         ? payload.messages
@@ -3398,9 +3398,6 @@ export default function ChatRoomPage() {
           ? payload.data
           : [];
       if (!res.ok) return;
-      setPeerReadAt(
-        typeof payload.peer_read_at === 'string' ? payload.peer_read_at : null,
-      );
       if (
         requestId !== messageLoadRequestRef.current ||
         requestRoomId !== canonicalRoomId
