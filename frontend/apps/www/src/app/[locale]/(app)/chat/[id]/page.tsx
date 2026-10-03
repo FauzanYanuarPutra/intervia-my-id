@@ -2717,6 +2717,7 @@ export default function ChatRoomPage() {
   const [showVoiceCall, setShowVoiceCall] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showStickerPanel, setShowStickerPanel] = useState(false);
+  const [emojiKeyboardHeightPx, setEmojiKeyboardHeightPx] = useState(320);
   const [showCameraModal, setShowCameraModal] = useState(false);
   const [showListingActionModal, setShowListingActionModal] = useState(false);
   const [listingActionMode, setListingActionMode] =
@@ -2726,6 +2727,7 @@ export default function ChatRoomPage() {
   const [listingActionAmount, setListingActionAmount] = useState('');
   const [listingActionMessage, setListingActionMessage] = useState('');
   const [listingActionSubmitting, setListingActionSubmitting] = useState(false);
+  // Legacy transaction records are kept for history; active UI no longer opens a transaction drawer.
   const [showTransactionsDrawer, setShowTransactionsDrawer] = useState(false);
   const [roomSummaryExpanded, setRoomSummaryExpanded] = useState(false);
   const [transactionsLoading, setTransactionsLoading] = useState(false);
@@ -2902,6 +2904,37 @@ export default function ChatRoomPage() {
   const sendPointerHandledRef = useRef(false);
   const sendShouldRefocusComposerRef = useRef(false);
   const composerRef = useRef<HTMLDivElement>(null);
+
+  const captureNativeKeyboardHeight = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const viewport = window.visualViewport;
+    const keyboardInset = viewport
+      ? Math.max(0, window.innerHeight - viewport.height)
+      : 0;
+    if (keyboardInset >= 120) {
+      setEmojiKeyboardHeightPx(Math.round(Math.min(520, Math.max(280, keyboardInset))));
+      return;
+    }
+    setEmojiKeyboardHeightPx(
+      Math.round(Math.min(420, Math.max(280, window.innerHeight * 0.38))),
+    );
+  }, []);
+
+  const toggleEmojiKeyboard = useCallback(() => {
+    captureNativeKeyboardHeight();
+    messageInputRef.current?.blur();
+    setShowAttachmentActions(false);
+    setShowStickerPanel(false);
+    setShowEmojiPicker(previous => !previous);
+  }, [captureNativeKeyboardHeight]);
+
+  const toggleStickerKeyboard = useCallback(() => {
+    captureNativeKeyboardHeight();
+    messageInputRef.current?.blur();
+    setShowAttachmentActions(false);
+    setShowEmojiPicker(false);
+    setShowStickerPanel(previous => !previous);
+  }, [captureNativeKeyboardHeight]);
 
   useEffect(() => {
     if (!showEmojiPicker && !showStickerPanel) return;
@@ -5516,17 +5549,21 @@ export default function ChatRoomPage() {
   );
 
   const openListingActionModal = useCallback(
-    (meta: StructuredChatPayload, mode: OfferFlowMode) => {
+    (meta: StructuredChatPayload) => {
       const contentId =
         typeof meta.content_id === 'string' ? meta.content_id : '';
       if (!contentId) {
         notify({
-          title: 'Listing tidak valid',
-          description: 'Listing ini tidak bisa dipakai untuk transaksi.',
+          title: chatLocale === 'id' ? 'Listing tidak valid' : 'Invalid listing',
+          description:
+            chatLocale === 'id'
+              ? 'Listing ini belum bisa dipakai untuk negosiasi.'
+              : 'This listing cannot be used for negotiation yet.',
           variant: 'error',
         });
         return;
       }
+
       const listingSide = resolveListingSide({
         type: meta.content_type,
         metadata: meta,
@@ -5534,24 +5571,6 @@ export default function ChatRoomPage() {
         summary: meta.summary,
       });
       const pricingMode = inferPricingMode(meta);
-      if (mode === 'direct' && listingSide === 'demand') {
-        notify({
-          title: 'Gunakan mode offer',
-          description:
-            'Listing ini mencari respons, jadi gunakan mode offer / proposal.',
-          variant: 'info',
-        });
-        return;
-      }
-      if (mode === 'direct' && pricingMode === 'request') {
-        notify({
-          title: 'Gunakan tawaran',
-          description:
-            'Listing ini menggunakan ask-price. Silakan kirim tawaran / tanya harga.',
-          variant: 'info',
-        });
-        return;
-      }
       const amountCents = parseMoneyCents(meta.price_cents);
       const fallbackRequestCents = parseMoneyCents(
         meta.suggested_budget_cents ?? meta.min_budget_cents,
@@ -5584,24 +5603,35 @@ export default function ChatRoomPage() {
         ),
         pricingMode,
       };
+
       setListingActionDraft(draft);
-      applyListingActionMode(draft, mode);
+      applyListingActionMode(draft, 'offer');
       setShowListingActionModal(true);
     },
-    [applyListingActionMode, notify],
+    [applyListingActionMode, chatLocale, notify],
   );
 
   const submitListingAction = useCallback(async () => {
     if (!listingActionDraft || !canonicalRoomId) return;
+
     const parsedAmount = Number(listingActionAmount || '0');
-    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
-      notify({ title: 'Nominal tidak valid.', variant: 'error' });
+    const hasAmount = Number.isFinite(parsedAmount) && parsedAmount > 0;
+    const hasMessage = listingActionMessage.trim().length > 0;
+    if (!hasAmount && !hasMessage) {
+      notify({
+        title:
+          chatLocale === 'id'
+            ? 'Tulis nominal atau pesan negosiasi.'
+            : 'Enter an amount or negotiation message.',
+        variant: 'error',
+      });
       return;
     }
-    const amountCents = Math.floor(parsedAmount * 100);
-    if (amountCents <= 0) {
+
+    const amountCents = hasAmount ? Math.floor(parsedAmount * 100) : undefined;
+    if (amountCents !== undefined && amountCents <= 0) {
       notify({
-        title: 'Nominal harus lebih dari 0.',
+        title: chatLocale === 'id' ? 'Nominal tidak valid.' : 'Invalid amount.',
         variant: 'error',
       });
       return;
@@ -5609,139 +5639,60 @@ export default function ChatRoomPage() {
 
     setListingActionSubmitting(true);
     try {
-      const createdAt = new Date().toISOString();
-      const interactionReference = buildInteractionReference(
-        listingActionMode === 'direct' ? 'TRX' : 'OFF',
-        listingActionDraft.contentId,
-      );
-      const safetyChecklist = {
-        identity_confirmed: true,
-        platform_payment_confirmed: true,
-        item_detail_confirmed: true,
-        anti_scam_acknowledged: true,
-      };
-      const riskFlags = detectFraudSignals(listingActionMessage).map(signal =>
-        signal.severity === 'high'
-          ? 'off_platform_or_otp_risk'
-          : 'payment_confirmation_risk',
-      );
-      const offerRes = await authFetch('/api/transactions/offer', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          content_id: listingActionDraft.contentId,
-          amount_cents: amountCents,
-          currency: listingActionDraft.currency,
-          offer_message: listingActionMessage.trim() || undefined,
-          deal_kind: listingActionDraft.dealKind,
-          fulfillment_mode: listingActionDraft.fulfillmentMode,
-          safety_checklist: safetyChecklist,
-          risk_flags: riskFlags,
-          transaction_meta: {
-            source: 'chat_listing_card',
-            flow_mode: listingActionMode,
-            pricing_mode: listingActionDraft.pricingMode,
-            market_side: toMarketSideValue(listingActionDraft.listingSide),
-            ticket: {
-              reference: interactionReference,
-              kind: listingActionMode === 'direct' ? 'transaction' : 'offer',
-              created_at: createdAt,
-              next_step:
-                'Open transaction detail to review the structured card and next actions.',
-            },
+      const response = await authFetch(
+        `/api/content/${encodeURIComponent(listingActionDraft.contentId)}/market-signals`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Idempotency-Key': createIdempotencyKey('chat-market-signal'),
           },
-        }),
-      });
-      const offerData = asObject(await offerRes.json().catch(() => ({})));
-      if (!offerRes.ok) {
+          body: JSON.stringify({
+            signal_type: amountCents ? 'price_indication' : 'inquiry',
+            market_side: toMarketSideValue(listingActionDraft.listingSide),
+            amount_cents: amountCents,
+            currency: listingActionDraft.currency,
+            source: 'chat_listing_negotiation',
+          }),
+        },
+      );
+      const data = asObject(await response.json().catch(() => ({})));
+      if (!response.ok) {
         throw new Error(
-          typeof offerData.error === 'string'
-            ? offerData.error
-            : 'Gagal membuat penawaran',
+          typeof data.error === 'string'
+            ? data.error
+            : chatLocale === 'id'
+              ? 'Sinyal negosiasi belum bisa disimpan.'
+              : 'Negotiation signal could not be saved.',
         );
       }
 
-      const resolvedAmount =
-        typeof offerData.amount_cents === 'number'
-          ? offerData.amount_cents
-          : amountCents;
-      const resolvedCurrency =
-        typeof offerData.currency === 'string'
-          ? offerData.currency
-          : listingActionDraft.currency;
-      const resolvedStatus =
-        typeof offerData.status === 'string'
-          ? offerData.status
-          : typeof offerData.transaction_status === 'string'
-            ? offerData.transaction_status
-            : 'pending';
-      const summary =
-        listingActionMode === 'direct'
-          ? `Direct purchase: ${formatMoney(resolvedAmount, resolvedCurrency)}`
-          : listingActionDraft.listingSide === 'demand'
-            ? `Need response: ${formatMoney(resolvedAmount, resolvedCurrency)}`
-            : `Offer: ${formatMoney(resolvedAmount, resolvedCurrency)}`;
-      const payload = {
-        transaction_id: typeof offerData.id === 'string' ? offerData.id : '',
-        content_id: listingActionDraft.contentId,
-        content_title: listingActionDraft.title,
-        content_url: listingActionDraft.contentUrl,
-        amount_cents: resolvedAmount,
-        currency: resolvedCurrency,
-        offer_message: listingActionMessage.trim() || undefined,
-        market_side: toMarketSideValue(listingActionDraft.listingSide),
-        created_at: createdAt,
-        buyer_id:
-          typeof offerData.buyer_id === 'string'
-            ? offerData.buyer_id
-            : user?.id,
-        seller_id:
-          typeof offerData.seller_id === 'string'
-            ? offerData.seller_id
-            : undefined,
-        deal_kind:
-          typeof offerData.deal_kind === 'string'
-            ? offerData.deal_kind
-            : listingActionDraft.dealKind,
-        fulfillment_mode:
-          typeof offerData.fulfillment_mode === 'string'
-            ? offerData.fulfillment_mode
-            : listingActionDraft.fulfillmentMode,
-        snapshot_listing:
-          Object.keys(asObject(offerData.snapshot_listing)).length > 0
-            ? asObject(offerData.snapshot_listing)
-            : undefined,
-        safety_checklist: safetyChecklist,
-        risk_flags: riskFlags,
-        status: resolvedStatus,
-        protection_status:
-          typeof offerData.protection_status === 'string'
-            ? offerData.protection_status
-            : 'awaiting_funding',
-        flow_mode: listingActionMode,
-        ticket: {
-          reference: interactionReference,
-          kind: listingActionMode === 'direct' ? 'transaction' : 'offer',
-          status: resolvedStatus,
-          created_at: createdAt,
-          next_step:
-            'Open the detail panel to see amount, scope, and transaction progress.',
-        },
-      };
+      const summaryParts = [
+        chatLocale === 'id' ? 'Saya mau negosiasi.' : 'I would like to negotiate.',
+        amountCents
+          ? `${chatLocale === 'id' ? 'Nominal yang saya ajukan' : 'My proposed amount'}: ${formatMoney(amountCents, listingActionDraft.currency)}`
+          : '',
+        listingActionMessage.trim(),
+      ].filter(Boolean);
 
-      await sendPayload(
-        summary,
-        listingActionMode === 'direct' ? 'transaction' : 'offer',
-        [JSON.stringify(payload)],
-      );
+      await sendPayload(summaryParts.join('\n'), 'text', []);
+
       setShowListingActionModal(false);
       setListingActionDraft(null);
       setListingActionAmount('');
       setListingActionMessage('');
+      notify({
+        title: chatLocale === 'id' ? 'Negosiasi dikirim.' : 'Negotiation sent.',
+        variant: 'success',
+      });
     } catch (error) {
       notify({
         title:
-          error instanceof Error ? error.message : 'Gagal memproses transaksi',
+          error instanceof Error
+            ? error.message
+            : chatLocale === 'id'
+              ? 'Gagal mengirim negosiasi.'
+              : 'Failed to send negotiation.',
         variant: 'error',
       });
     } finally {
@@ -5753,9 +5704,8 @@ export default function ChatRoomPage() {
     listingActionAmount,
     authFetch,
     listingActionMessage,
-    listingActionMode,
+    chatLocale,
     notify,
-    user?.id,
     sendPayload,
   ]);
 
@@ -6265,52 +6215,6 @@ export default function ChatRoomPage() {
     },
     [authFetch, loadRoomTransactions, prompt, sendPayload, user?.id],
   );
-
-  useEffect(() => {
-    if (!showTransactionsDrawer) return;
-    loadRoomTransactions();
-  }, [showTransactionsDrawer, loadRoomTransactions]);
-
-  useEffect(() => {
-    if (!canonicalRoomId || roomAllowed !== true || roomReadOnly || isDraftRoom)
-      return;
-    if (!hasTransactionMessages) return;
-    if (typeof window === 'undefined' || typeof document === 'undefined') {
-      return;
-    }
-
-    void refreshRoomTransactionsSilently();
-
-    const refresh = () => {
-      if (document.visibilityState === 'hidden') return;
-      void refreshRoomTransactionsSilently();
-    };
-
-    window.addEventListener('focus', refresh);
-    document.addEventListener('visibilitychange', refresh);
-
-    return () => {
-      window.removeEventListener('focus', refresh);
-      document.removeEventListener('visibilitychange', refresh);
-    };
-  }, [
-    canonicalRoomId,
-    roomAllowed,
-    roomReadOnly,
-    isDraftRoom,
-    hasTransactionMessages,
-    refreshRoomTransactionsSilently,
-  ]);
-
-  useEffect(() => {
-    setShowTransactionsDrawer(false);
-    setSelectedTransaction(null);
-    setRoomTransactions([]);
-    setTransactionsError(null);
-    setTxnActionError(null);
-    setTxnActionInfo(null);
-    setTxnActionLoading(null);
-  }, [canonicalRoomId]);
 
   const timelineItems = useMemo<TimelineItem[]>(() => {
     if (messages.length === 0) return [];
@@ -6937,21 +6841,7 @@ export default function ChatRoomPage() {
               </span>
             )}
 
-            {!PROMO_ONLY_MODE ? (
-              <button
-                onClick={() => setShowTransactionsDrawer(prev => !prev)}
-                className="inline-flex min-h-[26px] shrink-0 items-center gap-1 rounded-md bg-zinc-100/70 px-2 text-[11px] font-semibold text-zinc-600 transition-all duration-150 hover:bg-zinc-200/80 hover:text-zinc-900 active:scale-95 dark:bg-zinc-800/40 dark:text-zinc-400 dark:hover:bg-zinc-800/80 dark:hover:text-zinc-200"
-                aria-label={
-                  chatLocale === 'id' ? 'Buka transaksi' : 'Open transactions'
-                }
-                title={chatLocale === 'id' ? 'Transaksi' : 'Transactions'}
-              >
-                <ReceiptText className="h-3.5 w-3.5 opacity-70" />
-                <span>
-                  {chatLocale === 'id' ? 'Transaksi' : 'Transactions'}
-                </span>
-              </button>
-            ) : null}
+
           </div>
         </div>
       </header>
@@ -6978,107 +6868,7 @@ export default function ChatRoomPage() {
         </div>
       ) : null}
 
-      {!PROMO_ONLY_MODE && roomSummaryTransaction ? (
-        <div className="shrink-0 border-b border-black/5 bg-[#f7f5f3]/85 py-1.5 pl-[max(0.625rem,env(safe-area-inset-left))] pr-[max(0.625rem,env(safe-area-inset-right))] dark:border-white/6 dark:bg-[#162028]/85 sm:px-4">
-          <div className="mx-auto w-full max-w-[920px]">
-            <div className="rounded-[18px] border border-black/5 bg-white/90 px-3 py-2 shadow-[0_10px_24px_-24px_rgba(17,27,33,0.45)]  dark:border-white/8 dark:bg-[#202c33]/90">
-              <button
-                type="button"
-                onClick={() => setRoomSummaryExpanded(prev => !prev)}
-                aria-expanded={roomSummaryExpanded}
-                className="flex w-full min-w-0 items-center gap-3 text-left"
-              >
-                <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#e7f8ef] text-[#128c7e] dark:bg-[#123d32] dark:text-[#25d366]">
-                  <ReceiptText className="h-4.5 w-4.5" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[10px] font-bold uppercase tracking-[0.14em] text-[#128c7e] dark:text-[#25d366]">
-                    {chatLocale === 'id'
-                      ? 'Transaksi aktif'
-                      : 'Active transaction'}
-                  </span>
-                  <span className="mt-0.5 block truncate text-sm font-bold text-[#111b21] dark:text-[#e9edef]">
-                    {roomSummaryTxnTitle}
-                  </span>
-                  <span className="mt-0.5 block truncate text-xs font-semibold text-[#667781] dark:text-[#8696a0]">
-                    {roomSummaryTxnWaitingParty}
-                  </span>
-                </span>
-                <span className="hidden shrink-0 text-right sm:block">
-                  <span className="block text-sm font-bold text-[#128c7e] dark:text-[#25d366]">
-                    {formatMoney(
-                      roomSummaryTransaction.amount_cents,
-                      roomSummaryTransaction.currency,
-                    )}
-                  </span>
-                  <span className="text-[11px] font-semibold text-[#667781] dark:text-[#8696a0]">
-                    {roomSummaryTxnProgress}%
-                  </span>
-                </span>
-                <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#f0f2f5] text-[#54656f] dark:bg-[#111b21] dark:text-[#aebac1]">
-                  {roomSummaryExpanded ? (
-                    <ChevronUp className="h-4 w-4" />
-                  ) : (
-                    <ChevronDown className="h-4 w-4" />
-                  )}
-                </span>
-              </button>
 
-              <div className="mt-2 flex items-center gap-2 sm:hidden">
-                <span className="shrink-0 text-xs font-bold text-[#128c7e] dark:text-[#25d366]">
-                  {formatMoney(
-                    roomSummaryTransaction.amount_cents,
-                    roomSummaryTransaction.currency,
-                  )}
-                </span>
-                <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[#e9edef] dark:bg-[#111b21]">
-                  <div
-                    className="h-full rounded-full bg-[#25d366]"
-                    style={{ width: `${roomSummaryTxnProgress}%` }}
-                  />
-                </div>
-                <span className="shrink-0 text-[11px] font-bold text-[#667781] dark:text-[#8696a0]">
-                  {roomSummaryTxnProgress}%
-                </span>
-              </div>
-
-              <div
-                className={`grid transition-[grid-template-rows,opacity] duration-200 ease-out ${
-                  roomSummaryExpanded
-                    ? 'mt-3 grid-rows-[1fr] opacity-100'
-                    : 'mt-0 grid-rows-[0fr] opacity-0'
-                }`}
-              >
-                <div className="min-h-0 overflow-hidden">
-                  <div className="flex flex-wrap gap-2 border-t border-black/5 pt-3 dark:border-white/8">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowTransactionsDrawer(true);
-                        setSelectedTransaction(roomSummaryTransaction);
-                      }}
-                      className="inline-flex min-h-[38px] items-center justify-center rounded-full bg-[#f0f2f5] px-4 text-sm font-medium text-[#111b21] transition hover:bg-[#e9edef] dark:bg-[#111b21] dark:text-[#dfe7ea] dark:hover:bg-[#1a252c]"
-                    >
-                      {chatLocale === 'id'
-                        ? 'Lihat transaksi'
-                        : 'Open transaction'}
-                    </button>
-                    {roomSummaryTxnShouldPay ? (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          openPaymentForTransaction({
-                            id: roomSummaryTransaction.id,
-                            amount_cents: roomSummaryTransaction.amount_cents,
-                            currency: roomSummaryTransaction.currency,
-                          })
-                        }
-                        className="inline-flex min-h-[38px] items-center justify-center gap-2 rounded-full bg-[#25d366] px-4 text-sm font-semibold text-[#111b21] shadow-[0_18px_32px_-24px_rgba(37,211,102,0.55)] transition hover:bg-[#22c55e]"
-                      >
-                        <Wallet className="h-4 w-4" />
-                        {chatLocale === 'id' ? 'Bayar sekarang' : 'Pay now'}
-                      </button>
-                    ) : null}
                   </div>
 
                   <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
@@ -9275,11 +9065,7 @@ export default function ChatRoomPage() {
                 <div className="flex shrink-0 items-center gap-0.5">
                   <button
                     type="button"
-                    onClick={() => {
-                      setShowAttachmentActions(false);
-                      setShowEmojiPicker(prev => !prev);
-                      setShowStickerPanel(false);
-                    }}
+                    onClick={toggleEmojiKeyboard}
                     disabled={isPeerBlocked || roomReadOnly}
                     className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[#54656f] transition hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-50 dark:text-[#aebac1] dark:hover:bg-white/5 min-[380px]:h-11 min-[380px]:w-11"
                     title="Emoji"
@@ -9290,11 +9076,7 @@ export default function ChatRoomPage() {
 
                   <button
                     type="button"
-                    onClick={() => {
-                      setShowAttachmentActions(false);
-                      setShowStickerPanel(prev => !prev);
-                      setShowEmojiPicker(false);
-                    }}
+                    onClick={toggleStickerKeyboard}
                     disabled={isPeerBlocked || roomReadOnly}
                     className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[#54656f] transition hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-50 max-[420px]:hidden dark:text-[#aebac1] dark:hover:bg-white/5 min-[480px]:h-11 min-[480px]:w-11"
                     title={chatLocale === 'id' ? 'Stiker' : 'Stickers'}
@@ -9608,6 +9390,7 @@ export default function ChatRoomPage() {
             <ChatComposerPicker
               locale={chatLocale}
               mode={showEmojiPicker ? 'emoji' : 'sticker'}
+              keyboardHeightPx={emojiKeyboardHeightPx}
               disabled={isPeerBlocked || roomReadOnly}
               onClose={() => {
                 setShowEmojiPicker(false);
@@ -10320,7 +10103,7 @@ export default function ChatRoomPage() {
               </button>
             </div>
 
-            {canListingActionDirect && (
+            {false && canListingActionDirect && (
               <div className="mb-3 grid gap-2 sm:grid-cols-2">
                 <button
                   type="button"
@@ -10480,1037 +10263,14 @@ export default function ChatRoomPage() {
                   ? chatLocale === 'id'
                     ? 'Memproses...'
                     : 'Processing...'
-                  : listingActionMode === 'direct'
-                    ? chatLocale === 'id'
-                      ? 'Buat Deal'
-                      : 'Create Deal Ticket'
-                    : listingActionDraft.listingSide === 'demand'
-                      ? chatLocale === 'id'
-                        ? 'Kirim Respons'
-                        : 'Send Response'
-                      : chatLocale === 'id'
-                        ? 'Kirim Offer'
-                        : 'Send Offer'}
+                  : chatLocale === 'id'
+                    ? 'Kirim negosiasi'
+                    : 'Send negotiation'}
               </button>
             </div>
           </div>
         </div>
       )}
-
-      {showTransactionsDrawer && (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_45%,_transparent)] lg:items-stretch lg:justify-end"
-          onClick={() => setShowTransactionsDrawer(false)}
-        >
-          <div
-            className="ui-feed-section flex h-[min(84dvh,var(--app-visual-viewport-height,100dvh))] max-h-[var(--app-visual-viewport-height,100dvh)] w-full min-w-0 flex-col overflow-hidden rounded-t-[28px] border border-b-0 border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] px-3 pb-[calc(0.875rem+env(safe-area-inset-bottom))] pt-3 shadow-2xl sm:h-[min(78dvh,var(--app-visual-viewport-height,100dvh))] sm:max-w-xl lg:h-full lg:max-h-full lg:max-w-md lg:rounded-none lg:border-y-0 lg:border-r-0 lg:border-l lg:p-4"
-            onClick={event => event.stopPropagation()}
-          >
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <div>
-                <p className="text-xs uppercase tracking-wide text-[color:var(--app-text-soft)]">
-                  {chatLocale === 'id' ? 'Daftar transaksi' : 'Order list'}
-                </p>
-                <h3 className="text-sm font-semibold text-[color:var(--app-text-soft)]">
-                  {chatLocale === 'id'
-                    ? `Riwayat transaksi ${roomName}`
-                    : `Transaction history ${roomName}`}
-                </h3>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => void loadRoomTransactions()}
-                  className="rounded-full p-2 text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-surface-muted)]"
-                  title="Refresh"
-                >
-                  <Loader2
-                    className={`h-4 w-4 ${transactionsLoading ? 'animate-spin' : ''}`}
-                  />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowTransactionsDrawer(false)}
-                  className="rounded-full p-2 text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-surface-muted)]"
-                  title="Close"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-4 pr-0.5 sm:pb-8 sm:pr-1">
-              {transactionsLoading ? (
-                <div className="flex items-center gap-2 py-6 text-sm text-[color:var(--app-text-soft)]">
-                  <Loader2 className="h-4 w-4 animate-spin text-[color:var(--app-accent)]" />
-                  {chatLocale === 'id'
-                    ? 'Memuat transaksi...'
-                    : 'Loading transactions...'}
-                </div>
-              ) : transactionsError ? (
-                <div className="ui-feed-row rounded-xl border border-[color:color-mix(in_srgb,_var(--app-danger-border)_30%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-danger)_10%,_transparent)] p-3 text-xs text-[color:var(--app-danger)]">
-                  <p>{transactionsError}</p>
-                  <button
-                    type="button"
-                    onClick={() => void loadRoomTransactions()}
-                    className="mt-3 inline-flex rounded-full border border-[color:color-mix(in_srgb,_var(--app-danger-border)_45%,_transparent)] px-3 py-1.5 font-semibold text-[color:var(--app-danger)] transition hover:bg-[color:color-mix(in_srgb,_var(--app-danger)_8%,_transparent)]"
-                  >
-                    {chatLocale === 'id' ? 'Coba lagi' : 'Try again'}
-                  </button>
-                </div>
-              ) : roomTransactions.length === 0 ? (
-                <div className="ui-feed-row rounded-xl border border-dashed border-[color:var(--app-border-strong)] p-4 text-xs text-[color:var(--app-text-soft)]">
-                  {chatLocale === 'id'
-                    ? 'Belum ada transaksi di room ini.'
-                    : 'No transactions in this room yet.'}
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {roomTransactions.map(txn => {
-                    const status = normalizeTransactionStatus(
-                      txn.status || txn.transaction_status,
-                    );
-                    const protection = String(
-                      txn.protection_status || 'awaiting_funding',
-                    )
-                      .trim()
-                      .toLowerCase();
-                    const paymentStatus = resolveTransactionPaymentStatus(txn);
-                    const title =
-                      typeof txn.snapshot_listing?.title === 'string'
-                        ? txn.snapshot_listing.title
-                        : typeof txn.content_id === 'string'
-                          ? `Content ${txn.content_id}`
-                          : 'Transaction';
-                    const isSelected = selectedTransaction?.id === txn.id;
-                    const txnProgressPercent =
-                      getTransactionProgressPercent(txn);
-                    const txnIsTerminal =
-                      status === 'completed' || status === 'cancelled';
-                    const txnWaitingParty = getTransactionWaitingParty(
-                      txn,
-                      user?.id,
-                    );
-                    const txnCoverImage = normalizeAttachmentUrl(
-                      txn.snapshot_listing?.cover_image,
-                    );
-                    const txnWalletLabel = resolveTransactionWalletLabel(
-                      txn,
-                      chatLocale,
-                    );
-                    const txnShortId = formatShortTransactionId(txn.id);
-                    return (
-                      <button
-                        key={txn.id}
-                        type="button"
-                        onClick={() => setSelectedTransaction(txn)}
-                        className={`ui-feed-row w-full rounded-2xl border p-3 text-left transition ${
-                          isSelected
-                            ? 'border-[color:color-mix(in_srgb,_var(--app-accent)_70%,_transparent)] bg-[color:var(--app-accent-soft)]'
-                            : 'border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] hover:bg-[color:var(--app-surface-muted)]'
-                        }`}
-                      >
-                        <div className="flex items-start gap-3">
-                          {txnCoverImage ? (
-                            <img
-                              src={txnCoverImage}
-                              alt={title}
-                              className="h-14 w-14 shrink-0 rounded-2xl object-cover sm:h-16 sm:w-16"
-                              loading="lazy"
-                            />
-                          ) : (
-                            <span
-                              className={`mt-1.5 h-2.5 w-2.5 rounded-full ${statusDot(status)}`}
-                            />
-                          )}
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-start justify-between gap-2">
-                              <p className="truncate text-xs font-semibold text-[color:var(--app-text-soft)]">
-                                {title}
-                              </p>
-                              <span className="text-[10px] text-[color:var(--app-text-soft)]">
-                                {formatDateTimeLabel(
-                                  txn.updated_at || txn.created_at,
-                                )}
-                              </span>
-                            </div>
-                            <p className="mt-1 text-sm font-bold text-[color:var(--app-accent)]">
-                              {formatMoney(txn.amount_cents, txn.currency)}
-                            </p>
-                            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-[color:var(--app-text-soft)]">
-                              <span>{txnShortId}</span>
-                              <span>|</span>
-                              <span>{txnWalletLabel}</span>
-                            </div>
-                            <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
-                              <span
-                                className={`rounded-full border px-2 py-0.5 ${statusTone(status)}`}
-                              >
-                                {formatTransactionStatusLabel(
-                                  status,
-                                  chatLocale,
-                                )}
-                              </span>
-                              <span
-                                className={`rounded-full border px-2 py-0.5 ${protectionTone(protection)}`}
-                              >
-                                {formatProtectionStatusLabel(
-                                  protection,
-                                  chatLocale,
-                                )}
-                              </span>
-                              <span
-                                className={`rounded-full border px-2 py-0.5 ${
-                                  protection === 'refunded'
-                                    ? protectionTone(protection)
-                                    : paymentTone(paymentStatus)
-                                }`}
-                              >
-                                {formatPaymentStatusLabel(txn, chatLocale)}
-                              </span>
-                            </div>
-                            <div className="mt-2">
-                              <div className="flex items-center justify-between text-[10px] text-[color:var(--app-text-soft)]">
-                                <span>
-                                  {txnIsTerminal
-                                    ? chatLocale === 'id'
-                                      ? 'Status'
-                                      : 'Status'
-                                    : 'Progress'}
-                                </span>
-                                <span>
-                                  {txnIsTerminal
-                                    ? formatTransactionStatusLabel(
-                                        status,
-                                        chatLocale,
-                                      )
-                                    : `${txnProgressPercent}%`}
-                                </span>
-                              </div>
-                              {!txnIsTerminal || status === 'completed' ? (
-                                <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[color:var(--app-surface-muted)]">
-                                  <div
-                                    className="h-full rounded-full bg-gradient-to-r from-[color:var(--app-info)] via-[color:var(--app-accent)] to-[color:var(--app-accent)]"
-                                    style={{ width: `${txnProgressPercent}%` }}
-                                  />
-                                </div>
-                              ) : null}
-                              <p className="mt-1 truncate text-[10px] font-medium text-[color:var(--app-text-soft)]">
-                                {txnWaitingParty}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {selectedTransaction && (
-        <div className="ui-layer-modal fixed inset-0 flex items-end justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_60%,_transparent)] pt-[calc(0.5rem+env(safe-area-inset-top))] md:items-center md:p-3">
-          <div className="ui-feed-section max-h-[min(90dvh,calc(var(--app-visual-viewport-height,100dvh)-0.5rem))] w-full min-w-0 overflow-y-auto rounded-t-[28px] border border-b-0 border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] px-3 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3 shadow-2xl sm:px-4 md:max-w-2xl md:rounded-2xl md:border md:p-5">
-            <div className="mb-3 flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-xs uppercase tracking-wide text-[color:var(--app-text-soft)]">
-                  {chatLocale === 'id' ? 'Detail transaksi' : 'Order detail'}
-                </p>
-                <h3 className="mt-1 truncate text-sm font-semibold text-[color:var(--app-text-soft)] sm:text-base">
-                  {String(
-                    selectedTransaction.snapshot_listing?.title ||
-                      selectedTransaction.content_id ||
-                      'Transaction',
-                  )}
-                </h3>
-                <p className="mt-1 text-[11px] text-[color:var(--app-text-soft)]">
-                  ID: {selectedTransaction.id}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedTransaction(null)}
-                className="rounded-full p-1.5 text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-surface-muted)]"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="mb-3 flex flex-wrap items-center gap-1.5 text-[11px]">
-              <span
-                className={`rounded-full border px-2 py-0.5 ${statusTone(selectedTxnStatus)}`}
-              >
-                {formatTransactionStatusLabel(selectedTxnStatus, chatLocale)}
-              </span>
-              <span
-                className={`rounded-full border px-2 py-0.5 ${protectionTone(
-                  selectedTxnProtectionStatus,
-                )}`}
-              >
-                {formatProtectionStatusLabel(
-                  selectedTxnProtectionStatus,
-                  chatLocale,
-                )}
-              </span>
-              <span
-                className={`rounded-full border px-2 py-0.5 ${
-                  selectedTxnProtectionStatus === 'refunded'
-                    ? protectionTone(selectedTxnProtectionStatus)
-                    : paymentTone(selectedTxnPaymentStatus)
-                }`}
-              >
-                {chatLocale === 'id' ? 'Pembayaran' : 'Payment'}:{' '}
-                {formatPaymentStatusLabel(selectedTransaction, chatLocale)}
-              </span>
-              <span className="rounded-full border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] px-2 py-0.5 text-[color:var(--app-text-soft)]">
-                {selectedTxnIsBuyer
-                  ? chatLocale === 'id'
-                    ? 'Peran: Pembeli'
-                    : 'Role: Buyer'
-                  : selectedTxnIsSeller
-                    ? chatLocale === 'id'
-                      ? 'Peran: Penjual'
-                      : 'Role: Seller'
-                    : chatLocale === 'id'
-                      ? 'Penonton'
-                      : 'Viewer'}
-              </span>
-            </div>
-            {(Object.keys(selectedTxnTicket).length > 0 ||
-              selectedTxnSideLabel) && (
-              <div className="mb-3 flex flex-wrap items-center gap-1.5 text-[11px]">
-                {typeof selectedTxnTicket.reference === 'string' &&
-                  selectedTxnTicket.reference.trim() && (
-                    <span className="rounded-full border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] px-2 py-0.5 text-[color:var(--app-text-soft)]">
-                      Ref: {selectedTxnTicket.reference}
-                    </span>
-                  )}
-                <span className="rounded-full border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] px-2 py-0.5 text-[color:var(--app-text-soft)]">
-                  {selectedTxnSideLabel}
-                </span>
-              </div>
-            )}
-
-            <div
-              className={`mb-3 rounded-xl border p-3 ${outcomeToneClass(
-                selectedTxnOutcome.tone,
-              )}`}
-            >
-              <div className="flex items-start gap-2.5">
-                {selectedTxnOutcome.terminal ? (
-                  selectedTxnOutcome.tone === 'success' ? (
-                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
-                  ) : (
-                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                  )
-                ) : (
-                  <Clock className="mt-0.5 h-4 w-4 shrink-0" />
-                )}
-                <div className="min-w-0">
-                  <p className="text-sm font-bold">
-                    {selectedTxnOutcome.title}
-                  </p>
-                  <p className="mt-1 text-xs font-medium leading-5 opacity-90">
-                    {selectedTxnOutcome.description}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="mb-3 rounded-xl border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-3">
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--app-text-soft)]">
-                  {chatLocale === 'id'
-                    ? selectedTxnOutcome.terminal
-                      ? 'Status alur'
-                      : 'Progress transaksi'
-                    : selectedTxnOutcome.terminal
-                      ? 'Flow status'
-                      : 'Transaction progress'}
-                </p>
-                <span className="rounded-full border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] px-2 py-0.5 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
-                  {selectedTxnOutcome.terminal
-                    ? selectedTxnOutcome.progressLabel
-                    : `${selectedTxnProgressPercent}%`}
-                </span>
-              </div>
-              {!selectedTxnOutcome.terminal ||
-              selectedTxnStatus === 'completed' ? (
-                <div className="h-2 w-full overflow-hidden rounded-full bg-[color:var(--app-surface-muted)]">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-[color:var(--app-info)] via-[color:var(--app-accent)] to-[color:var(--app-accent)] transition-all"
-                    style={{ width: `${selectedTxnProgressPercent}%` }}
-                  />
-                </div>
-              ) : null}
-              <p className="mt-2 text-xs text-[color:var(--app-text-soft)]">
-                {selectedTxnWaitingParty}
-              </p>
-              <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                {selectedTxnSteps.map((step, index) => (
-                  <div
-                    key={`${selectedTransaction.id}-step-${step.key}`}
-                    className={`rounded-lg border px-2 py-1.5 text-[11px] ${transactionStepToneClass(step)}`}
-                  >
-                    <p className="font-semibold">
-                      {index + 1}. {step.label}
-                    </p>
-                    <p className="mt-0.5">
-                      {transactionStepStateLabel(step, chatLocale)}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {typeof selectedTransaction.snapshot_listing?.cover_image ===
-              'string' &&
-              selectedTransaction.snapshot_listing.cover_image.trim() && (
-                <img
-                  src={normalizeAttachmentUrl(
-                    selectedTransaction.snapshot_listing.cover_image,
-                  )}
-                  alt={String(
-                    selectedTransaction.snapshot_listing?.title || 'Listing',
-                  )}
-                  className="mb-3 h-36 w-full rounded-xl object-cover"
-                  loading="lazy"
-                />
-              )}
-
-            <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
-              <div className="rounded-lg border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-2">
-                <p className="text-[color:var(--app-text-soft)]">Nominal</p>
-                <p className="mt-0.5 font-bold text-[color:var(--app-accent)]">
-                  {formatMoney(
-                    selectedTransaction.amount_cents,
-                    selectedTransaction.currency,
-                  )}
-                </p>
-              </div>
-              <div className="rounded-lg border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-2">
-                <p className="text-[color:var(--app-text-soft)]">
-                  {chatLocale === 'id' ? 'Jenis' : 'Deal'}
-                </p>
-                <p className="mt-0.5 font-semibold text-[color:var(--app-text-soft)]">
-                  {formatDealKindLabel(
-                    selectedTransaction.deal_kind,
-                    chatLocale,
-                  )}
-                </p>
-              </div>
-              <div className="rounded-lg border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-2">
-                <p className="text-[color:var(--app-text-soft)]">
-                  {chatLocale === 'id' ? 'Pemenuhan' : 'Fulfillment'}
-                </p>
-                <p className="mt-0.5 font-semibold text-[color:var(--app-text-soft)]">
-                  {formatFulfillmentModeLabel(
-                    selectedTransaction.fulfillment_mode,
-                    chatLocale,
-                  )}
-                </p>
-              </div>
-              <div className="rounded-lg border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-2">
-                <p className="text-[color:var(--app-text-soft)]">
-                  {chatLocale === 'id' ? 'Update terakhir' : 'Last update'}
-                </p>
-                <p className="mt-0.5 font-semibold text-[color:var(--app-text-soft)]">
-                  {formatDateTimeLabel(
-                    selectedTransaction.updated_at ||
-                      selectedTransaction.created_at,
-                  )}
-                </p>
-              </div>
-            </div>
-
-            {!selectedTxnOutcome.terminal &&
-              typeof selectedTxnTicket.next_step === 'string' &&
-              selectedTxnTicket.next_step.trim() && (
-                <div className="mt-3 rounded-lg border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-2.5 text-xs text-[color:var(--app-text-soft)]">
-                  <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[color:var(--app-text-soft)]">
-                    Next Step
-                  </p>
-                  <p>{String(selectedTxnTicket.next_step)}</p>
-                </div>
-              )}
-
-            {selectedTxnLatestDelivery ? (
-              <div className="mt-3 rounded-lg border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-2.5 text-xs text-[color:var(--app-text-soft)]">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--app-text-soft)]">
-                      {`Delivery ${selectedTxnLatestDelivery.attemptNumber || selectedTxnDelivery.attemptsUsed}/${selectedTxnDelivery.maxAttempts}`}
-                    </p>
-                    <p className="mt-1 font-semibold text-[color:var(--app-text)]">
-                      {selectedTxnLatestDelivery.title ||
-                        (chatLocale === 'id'
-                          ? 'Paket pengiriman terbaru'
-                          : 'Latest delivery package')}
-                    </p>
-                  </div>
-                  <span className="rounded-full border border-[color:var(--app-border-strong)] px-2 py-0.5 text-[11px] font-semibold">
-                    {selectedTxnLatestDelivery.reviewStatus === 'accepted'
-                      ? chatLocale === 'id'
-                        ? 'Diterima'
-                        : 'Accepted'
-                      : selectedTxnLatestDelivery.reviewStatus ===
-                          'revision_requested'
-                        ? chatLocale === 'id'
-                          ? 'Perlu revisi'
-                          : 'Revision requested'
-                        : chatLocale === 'id'
-                          ? 'Menunggu review'
-                          : 'Waiting review'}
-                  </span>
-                </div>
-                {selectedTxnLatestDelivery.note ? (
-                  <p className="mt-2 text-[11px] text-[color:color-mix(in_srgb,_var(--app-text-soft)_92%,_transparent)]">
-                    {selectedTxnLatestDelivery.note}
-                  </p>
-                ) : null}
-                <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
-                  <span>
-                    Proof / links:{' '}
-                    {selectedTxnLatestDelivery.attachments.length}
-                  </span>
-                  {selectedTxnLatestDelivery.buyerFeedbackNote ? (
-                    <span>Buyer feedback captured</span>
-                  ) : null}
-                </div>
-                {selectedTxnLatestDelivery.attachments.length > 0 ? (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {selectedTxnLatestDelivery.attachments
-                      .slice(0, 3)
-                      .map((attachment, index) =>
-                        attachment.url ? (
-                          <a
-                            key={`${selectedTransaction.id}-delivery-attachment-${index}`}
-                            href={attachment.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="rounded-full border border-[color:var(--app-border-strong)] px-2 py-0.5 text-[11px] font-semibold text-[color:var(--app-info)]"
-                          >
-                            {attachment.label || `Link ${index + 1}`}
-                          </a>
-                        ) : (
-                          <span
-                            key={`${selectedTransaction.id}-delivery-attachment-${index}`}
-                            className="rounded-full border border-[color:var(--app-border-strong)] px-2 py-0.5 text-[11px] font-semibold"
-                          >
-                            {attachment.label ||
-                              attachment.externalRef ||
-                              `Ref ${index + 1}`}
-                          </span>
-                        ),
-                      )}
-                  </div>
-                ) : null}
-                {selectedTxnLatestDelivery.buyerFeedbackNote ? (
-                  <div className="mt-2 rounded-lg border border-[color:color-mix(in_srgb,_var(--app-info-border)_35%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-info)_10%,_transparent)] px-2.5 py-2 text-[11px] text-[color:var(--app-text)]">
-                    <span className="font-semibold">Buyer note:</span>{' '}
-                    {selectedTxnLatestDelivery.buyerFeedbackNote}
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-
-            <details
-              className="mt-3 rounded-lg border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-2.5"
-              open
-            >
-              <summary className="cursor-pointer list-none text-[11px] font-semibold uppercase tracking-wide text-[color:var(--app-text-soft)]">
-                {chatLocale === 'id'
-                  ? 'Ringkasan aktivitas'
-                  : 'Activity summary'}
-              </summary>
-              <div className="mt-2 max-h-44 space-y-2 overflow-y-auto pr-1">
-                {(
-                  selectedTransaction.timeline ||
-                  buildFallbackTimeline(selectedTransaction)
-                ).map((item, index) => (
-                  <div
-                    key={`${selectedTransaction.id}-timeline-${index}`}
-                    className="flex items-start gap-2 text-xs text-[color:var(--app-text-soft)]"
-                  >
-                    <span className="mt-1 h-1.5 w-1.5 rounded-full bg-[color:var(--app-accent)]" />
-                    <div>
-                      <p className="font-semibold">
-                        {timelineStatusLabel(item, chatLocale)}
-                      </p>
-                      {'description' in item &&
-                      typeof item.description === 'string' &&
-                      item.description.trim() ? (
-                        <p className="text-[11px] text-[color:color-mix(in_srgb,_var(--app-text-soft)_90%,_transparent)]">
-                          {timelineDescriptionLabel(
-                            item.description,
-                            chatLocale,
-                          )}
-                        </p>
-                      ) : null}
-                      <p className="text-[11px] text-[color:var(--app-text-soft)]">
-                        {item.at
-                          ? formatChatMessageTime(item.at, chatLocale)
-                          : '-'}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </details>
-
-            {(selectedTransaction.offer_message ||
-              selectedTransaction.response_message) && (
-              <details className="mt-3 rounded-lg border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-2.5">
-                <summary className="cursor-pointer list-none text-[11px] font-semibold uppercase tracking-wide text-[color:var(--app-text-soft)]">
-                  {chatLocale === 'id'
-                    ? 'Catatan negosiasi'
-                    : 'Negotiation notes'}
-                </summary>
-                <div className="mt-2 space-y-2">
-                  {selectedTransaction.offer_message ? (
-                    <div className="rounded-lg border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-2.5 text-xs text-[color:var(--app-text-soft)]">
-                      <p className="mb-1 text-[11px] uppercase tracking-wide text-[color:var(--app-text-soft)]">
-                        {chatLocale === 'id' ? 'Catatan pembeli' : 'Buyer note'}
-                      </p>
-                      <p>{selectedTransaction.offer_message}</p>
-                    </div>
-                  ) : null}
-                  {selectedTransaction.response_message ? (
-                    <div className="rounded-lg border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-2.5 text-xs text-[color:var(--app-text-soft)]">
-                      <p className="mb-1 text-[11px] uppercase tracking-wide text-[color:var(--app-text-soft)]">
-                        {chatLocale === 'id'
-                          ? 'Catatan penjual'
-                          : 'Seller note'}
-                      </p>
-                      <p>{selectedTransaction.response_message}</p>
-                    </div>
-                  ) : null}
-                </div>
-              </details>
-            )}
-
-            <details className="mt-3 rounded-lg border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-2.5">
-              <summary className="cursor-pointer list-none text-[11px] font-semibold uppercase tracking-wide text-[color:var(--app-text-soft)]">
-                {chatLocale === 'id' ? 'Keamanan & risiko' : 'Safety & risk'}
-              </summary>
-              {Array.isArray(selectedTransaction.risk_flags) &&
-              selectedTransaction.risk_flags.length > 0 ? (
-                <div className="mt-2 rounded-lg border border-[color:color-mix(in_srgb,_var(--app-warning-border)_40%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-warning)_10%,_transparent)] p-2.5">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--app-warning)]">
-                    Risk Flags
-                  </p>
-                  <div className="mt-1 flex flex-wrap gap-1.5">
-                    {selectedTransaction.risk_flags.map((flag, idx) => (
-                      <span
-                        key={`${selectedTransaction.id}-risk-${idx}`}
-                        className="rounded-full border border-[color:color-mix(in_srgb,_var(--app-warning-border)_40%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-warning)_15%,_transparent)] px-2 py-0.5 text-[11px] text-[color:var(--app-warning)]"
-                      >
-                        {String(flag)}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <p className="mt-2 text-xs text-[color:var(--app-text-soft)]">
-                  Tidak ada risk flag.
-                </p>
-              )}
-
-              {Object.keys(asObject(selectedTransaction.safety_checklist))
-                .length > 0 ? (
-                <div className="mt-2 rounded-lg border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-2.5">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--app-text-soft)]">
-                    Safety Checklist
-                  </p>
-                  <div className="mt-1.5 space-y-1.5">
-                    {Object.entries(
-                      asObject(selectedTransaction.safety_checklist),
-                    ).map(([key, value]) => (
-                      <div
-                        key={`${selectedTransaction.id}-safety-${key}`}
-                        className="flex items-center gap-2 text-xs text-[color:var(--app-text-soft)]"
-                      >
-                        <span
-                          className={`inline-block h-2 w-2 rounded-full ${
-                            Boolean(value)
-                              ? 'bg-[color:var(--app-accent)]'
-                              : 'bg-[color:var(--app-surface)]'
-                          }`}
-                        />
-                        <span>{humanizeStatus(key)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <p className="mt-2 text-xs text-[color:var(--app-text-soft)]">
-                  Checklist keamanan belum tersedia.
-                </p>
-              )}
-            </details>
-
-            {txnActionError ? (
-              <div className="mt-3 rounded-lg border border-[color:color-mix(in_srgb,_var(--app-danger-border)_40%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-danger)_10%,_transparent)] p-2 text-xs text-[color:var(--app-danger)]">
-                {txnActionError}
-              </div>
-            ) : null}
-            {txnActionInfo ? (
-              <div className="mt-3 rounded-lg border border-[color:color-mix(in_srgb,_var(--app-accent-border)_40%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-accent)_10%,_transparent)] p-2 text-xs text-[color:var(--app-accent)]">
-                {txnActionInfo}
-              </div>
-            ) : null}
-
-            <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
-              {selectedTxnCanCounter && (
-                <button
-                  type="button"
-                  disabled={
-                    txnActionLoading === `counter:${selectedTransaction.id}`
-                  }
-                  onClick={() => void runCounterOffer(selectedTransaction)}
-                  className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-info)_20%,_transparent)] px-3 py-1.5 text-xs font-semibold text-[color:var(--app-info)] hover:bg-[color:color-mix(in_srgb,_var(--app-info)_30%,_transparent)] disabled:opacity-60"
-                >
-                  {txnActionLoading === `counter:${selectedTransaction.id}`
-                    ? chatLocale === 'id'
-                      ? 'Memproses...'
-                      : 'Processing...'
-                    : chatLocale === 'id'
-                      ? 'Ajukan balik'
-                      : 'Counter Offer'}
-                </button>
-              )}
-              {selectedTxnShouldPay && (
-                <button
-                  type="button"
-                  disabled={Boolean(txnActionLoading)}
-                  onClick={() =>
-                    openPaymentForTransaction({
-                      id: selectedTransaction.id,
-                      amount_cents: selectedTransaction.amount_cents,
-                      currency: selectedTransaction.currency,
-                    })
-                  }
-                  className="inline-flex items-center gap-1 rounded-full bg-[color:color-mix(in_srgb,_var(--app-info)_20%,_transparent)] px-3 py-1.5 text-xs font-semibold text-[color:var(--app-info)] hover:bg-[color:color-mix(in_srgb,_var(--app-info)_30%,_transparent)] disabled:opacity-60"
-                >
-                  <Wallet className="h-3.5 w-3.5" />
-                  {chatLocale === 'id' ? 'Bayar' : 'Pay'}
-                </button>
-              )}
-              {selectedTxnCanAccept && (
-                <button
-                  type="button"
-                  disabled={
-                    txnActionLoading === `accept:${selectedTransaction.id}`
-                  }
-                  onClick={() =>
-                    void runTransactionAction('accept', selectedTransaction)
-                  }
-                  className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-accent)_20%,_transparent)] px-3 py-1.5 text-xs font-semibold text-[color:var(--app-accent)] hover:bg-[color:color-mix(in_srgb,_var(--app-accent)_30%,_transparent)] disabled:opacity-60"
-                >
-                  {txnActionLoading === `accept:${selectedTransaction.id}`
-                    ? chatLocale === 'id'
-                      ? 'Memproses...'
-                      : 'Processing...'
-                    : chatLocale === 'id'
-                      ? 'Terima'
-                      : 'Accept'}
-                </button>
-              )}
-              {selectedTxnCanStart && (
-                <button
-                  type="button"
-                  disabled={
-                    txnActionLoading === `start:${selectedTransaction.id}`
-                  }
-                  onClick={() =>
-                    void runTransactionAction('start', selectedTransaction)
-                  }
-                  className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-info)_20%,_transparent)] px-3 py-1.5 text-xs font-semibold text-[color:var(--app-info)] hover:bg-[color:color-mix(in_srgb,_var(--app-info)_30%,_transparent)] disabled:opacity-60"
-                >
-                  {txnActionLoading === `start:${selectedTransaction.id}`
-                    ? chatLocale === 'id'
-                      ? 'Memproses...'
-                      : 'Processing...'
-                    : chatLocale === 'id'
-                      ? 'Mulai'
-                      : 'Start'}
-                </button>
-              )}
-              {selectedTxnCanDeliver && (
-                <button
-                  type="button"
-                  disabled={Boolean(txnActionLoading)}
-                  onClick={() =>
-                    router.push(
-                      `/transactions?focus_transaction_id=${encodeURIComponent(
-                        selectedTransaction.id,
-                      )}&delivery_action=deliver`,
-                    )
-                  }
-                  className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-group-talent)_20%,_transparent)] px-3 py-1.5 text-xs font-semibold text-[color:var(--app-group-talent)] hover:bg-[color:color-mix(in_srgb,_var(--app-group-talent)_30%,_transparent)] disabled:opacity-60"
-                >
-                  {chatLocale === 'id'
-                    ? 'Buka Workspace Pengiriman'
-                    : 'Open Delivery Workspace'}
-                </button>
-              )}
-              {selectedTxnCanComplete && (
-                <button
-                  type="button"
-                  disabled={Boolean(txnActionLoading)}
-                  onClick={() =>
-                    router.push(
-                      `/transactions?focus_transaction_id=${encodeURIComponent(
-                        selectedTransaction.id,
-                      )}&delivery_action=review_accept`,
-                    )
-                  }
-                  className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-accent)_20%,_transparent)] px-3 py-1.5 text-xs font-semibold text-[color:var(--app-accent)] hover:bg-[color:color-mix(in_srgb,_var(--app-accent)_30%,_transparent)] disabled:opacity-60"
-                >
-                  {chatLocale === 'id' ? 'Review Hasil' : 'Review Delivery'}
-                </button>
-              )}
-              {selectedTxnCanCancel && (
-                <button
-                  type="button"
-                  disabled={
-                    txnActionLoading === `cancel:${selectedTransaction.id}`
-                  }
-                  onClick={() =>
-                    void runTransactionAction('cancel', selectedTransaction)
-                  }
-                  className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-danger)_20%,_transparent)] px-3 py-1.5 text-xs font-semibold text-[color:var(--app-danger)] hover:bg-[color:color-mix(in_srgb,_var(--app-danger)_30%,_transparent)] disabled:opacity-60"
-                >
-                  {txnActionLoading === `cancel:${selectedTransaction.id}`
-                    ? chatLocale === 'id'
-                      ? 'Memproses...'
-                      : 'Processing...'
-                    : chatLocale === 'id'
-                      ? 'Batalkan'
-                      : 'Cancel'}
-                </button>
-              )}
-              {selectedTxnCanDispute && (
-                <button
-                  type="button"
-                  disabled={
-                    txnActionLoading === `dispute:${selectedTransaction.id}`
-                  }
-                  onClick={() =>
-                    void runTransactionAction('dispute', selectedTransaction)
-                  }
-                  className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-warning)_20%,_transparent)] px-3 py-1.5 text-xs font-semibold text-[color:var(--app-warning)] hover:bg-[color:color-mix(in_srgb,_var(--app-warning)_30%,_transparent)] disabled:opacity-60"
-                >
-                  {txnActionLoading === `dispute:${selectedTransaction.id}`
-                    ? chatLocale === 'id'
-                      ? 'Memproses...'
-                      : 'Processing...'
-                    : chatLocale === 'id'
-                      ? 'Komplain'
-                      : 'Dispute'}
-                </button>
-              )}
-            </div>
-
-            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex flex-wrap items-center gap-2">
-                <Link
-                  href={`/transactions?focus_transaction_id=${encodeURIComponent(selectedTransaction.id)}`}
-                  className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-accent)_18%,_transparent)] px-3 py-1.5 text-xs font-semibold text-[color:var(--app-accent)] hover:bg-[color:color-mix(in_srgb,_var(--app-accent)_24%,_transparent)]"
-                >
-                  {chatLocale === 'id' ? 'Workspace order' : 'Order workspace'}
-                </Link>
-                <Link
-                  href="/support"
-                  className="rounded-full bg-[color:var(--app-surface-muted)] px-3 py-1.5 text-xs font-semibold text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-surface-muted)]"
-                >
-                  {chatLocale === 'id' ? 'Hubungi support' : 'Contact support'}
-                </Link>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedTransaction(null)}
-                className="w-full rounded-full bg-[color:var(--app-accent)] px-3 py-2 text-xs font-semibold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)] sm:w-auto sm:py-1.5"
-              >
-                Tutup
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Incoming Call */}
-      {roomKind === 'direct' && incomingCall && channelRef.current && (
-        <IncomingCall
-          callId={incomingCall.callId}
-          callerId={incomingCall.callerId}
-          callerName={incomingCall.callerName}
-          callerAvatar={incomingCall.callerAvatar}
-          callerAvatarStyle={incomingCall.callerAvatarStyle}
-          callType={incomingCall.callType}
-          onAccept={async () => {
-            try {
-              void soundManager.unlock();
-              channelRef.current?.push('call_accept', {
-                call_id: incomingCall.callId,
-              });
-              setActiveCallId(incomingCall.callId);
-              setActiveCallIsCaller(false);
-              const callType = incomingCall.callType;
-              setIncomingCall(null);
-              setTimeout(() => {
-                if (callType === 'video') setShowVideoCall(true);
-                else setShowVoiceCall(true);
-              }, 100);
-            } catch {
-              setActiveCallIsCaller(false);
-              setIncomingCall(null);
-            }
-          }}
-          onReject={() => {
-            try {
-              channelRef.current?.push('call_reject', {
-                call_id: incomingCall.callId,
-              });
-            } catch {}
-            setIncomingCall(null);
-          }}
-        />
-      )}
-
-      {/* Video Call */}
-      {roomKind === 'direct' &&
-        showVideoCall &&
-        user?.id &&
-        canonicalRoomId &&
-        activeCallId &&
-        channelRef.current && (
-          <VideoCall
-            roomId={canonicalRoomId}
-            userId={user.id}
-            callId={activeCallId}
-            channel={channelRef.current}
-            isCaller={activeCallIsCaller}
-            onClose={() => {
-              setShowVideoCall(false);
-              setActiveCallId(null);
-              setActiveCallIsCaller(false);
-            }}
-          />
-        )}
-
-      {/* Voice Call */}
-      {roomKind === 'direct' &&
-        showVoiceCall &&
-        user?.id &&
-        canonicalRoomId &&
-        activeCallId &&
-        channelRef.current && (
-          <VoiceCall
-            roomId={canonicalRoomId}
-            userId={user.id}
-            callId={activeCallId}
-            channel={channelRef.current}
-            isCaller={activeCallIsCaller}
-            userName={roomName}
-            onClose={() => {
-              setShowVoiceCall(false);
-              setActiveCallId(null);
-              setActiveCallIsCaller(false);
-            }}
-          />
-        )}
-
-      {showDraftMediaPreview && draftAttachments.length > 0 && activeDraftAttachment ? (
-        <div
-          className="fixed inset-0 z-[11500] flex h-[100dvh] w-screen flex-col bg-[#0b141a] text-white"
-          role="dialog"
-          aria-modal="true"
-          aria-label={chatLocale === 'id' ? 'Pratinjau & kirim media' : 'Preview & send media'}
-        >
-          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 px-3 py-2.5 sm:px-5">
-            <div className="min-w-0">
-              <p className="text-sm font-bold">{chatLocale === 'id' ? 'Kirim media' : 'Send media'}</p>
-              <p className="text-[10px] font-semibold text-white/55">
-                {activeDraftAttachmentIndex + 1}/{draftAttachments.length}
-                {isUploadingAttachments ? (chatLocale === 'id' ? ' · Mengunggah…' : ' · Uploading…') : ''}
-              </p>
-            </div>
-            <button type="button" onClick={() => setShowDraftMediaPreview(false)} className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/10" aria-label={chatLocale === 'id' ? 'Tutup pratinjau' : 'Close preview'}>
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-          <div className="flex min-h-0 flex-1 items-center justify-center px-3 py-3 sm:px-8">
-            <div className="relative flex h-full w-full max-w-5xl items-center justify-center overflow-hidden rounded-2xl bg-black/35">
-              {activeDraftAttachment.type === 'image' && activeDraftAttachment.previewUrl ? (
-                <img src={activeDraftAttachment.previewUrl} alt={activeDraftAttachment.name} className="max-h-full max-w-full object-contain" />
-              ) : activeDraftAttachment.type === 'video' && activeDraftAttachment.previewUrl ? (
-                <video src={activeDraftAttachment.previewUrl} controls playsInline className="max-h-full max-w-full object-contain" />
-              ) : activeDraftAttachment.type === 'audio' && activeDraftAttachment.previewUrl ? (
-                <div className="flex w-full max-w-xl flex-col items-center gap-4 rounded-2xl bg-white/8 p-6">
-                  <Mic className="h-10 w-10 text-[#25d366]" />
-                  <audio src={activeDraftAttachment.previewUrl} controls className="w-full" />
-                </div>
-              ) : (
-                <div className="flex max-w-md flex-col items-center gap-3 rounded-2xl bg-white/8 p-6 text-center">
-                  <FileText className="h-12 w-12 text-white/70" />
-                  <p className="text-sm font-bold">{activeDraftAttachment.name}</p>
-                  <p className="text-xs text-white/55">{formatFileSize(activeDraftAttachment.size)}</p>
-                </div>
-              )}
-              {draftAttachments.length > 1 ? (
-                <>
-                  <button type="button" onClick={() => showDraftAttachmentAtOffset(-1)} className="absolute left-2 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/55" aria-label={chatLocale === 'id' ? 'Media sebelumnya' : 'Previous media'}><ChevronLeft className="h-5 w-5" /></button>
-                  <button type="button" onClick={() => showDraftAttachmentAtOffset(1)} className="absolute right-2 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/55" aria-label={chatLocale === 'id' ? 'Media berikutnya' : 'Next media'}><ChevronRight className="h-5 w-5" /></button>
-                </>
-              ) : null}
-            </div>
-          </div>
-          <div className="shrink-0 border-t border-white/10 bg-[#111b21] px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2.5 sm:px-5">
-            <div className="mx-auto flex w-full max-w-5xl gap-2 overflow-x-auto pb-2">
-              {draftAttachments.slice(0, 20).map((attachment, index) => (
-                <button key={attachment.id} type="button" onClick={() => setActiveDraftAttachmentId(attachment.id)} className={'relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border ' + (attachment.id === activeDraftAttachment.id ? 'border-[#25d366] ring-2 ring-[#25d366]/35' : 'border-white/10 opacity-70')} aria-label={(chatLocale === 'id' ? 'Pilih media ' : 'Select media ') + String(index + 1)}>
-                  {attachment.type === 'image' && attachment.previewUrl ? <img src={attachment.previewUrl} alt="" className="h-full w-full object-cover" /> : attachment.type === 'video' && attachment.previewUrl ? <video src={attachment.previewUrl} muted playsInline className="h-full w-full object-cover" /> : attachment.type === 'audio' ? <div className="flex h-full w-full items-center justify-center bg-[#0b141a] text-[#25d366]"><Mic className="h-4 w-4" /></div> : <div className="flex h-full w-full items-center justify-center bg-white/8 text-white/70"><FileText className="h-4 w-4" /></div>}
-                  {attachment.status === 'uploading' ? <span className="absolute inset-0 flex items-center justify-center bg-black/40"><Loader2 className="h-3.5 w-3.5 animate-spin" /></span> : null}
-                </button>
-              ))}
-              {draftAttachments.length > 20 ? (
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-white/8 text-xs font-bold text-white/75">
-                  +{draftAttachments.length - 20}
-                </div>
-              ) : null}
-            </div>
-            <div className="mx-auto flex w-full max-w-5xl items-end gap-2">
-              <button
-                type="button"
-                onClick={handleChooseFile}
-                disabled={isUploadingAttachments}
-                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/10 text-white disabled:opacity-40"
-                aria-label={chatLocale === 'id' ? 'Tambah media' : 'Add media'}
-                title={chatLocale === 'id' ? 'Tambah media' : 'Add media'}
-              >
-                <Paperclip className="h-5 w-5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => removeDraftAttachment(activeDraftAttachment.id)}
-                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/10 text-white"
-                aria-label={chatLocale === 'id' ? 'Hapus media ini' : 'Remove this media'}
-                title={chatLocale === 'id' ? 'Hapus media ini' : 'Remove this media'}
-              >
-                <Trash2 className="h-5 w-5" />
-              </button>
-              <textarea value={newMessage} onChange={event => setNewMessage(event.target.value)} rows={2} placeholder={chatLocale === 'id' ? 'Tambahkan keterangan…' : 'Add a caption…'} className="min-h-11 min-w-0 flex-1 resize-none rounded-2xl border border-white/10 bg-[#202c33] px-3 py-2 text-sm font-medium text-white outline-none placeholder:text-white/40 focus:border-[#25d366]" />
-              <button type="button" onClick={() => void handleSend()} disabled={sending || isUploadingAttachments || isPeerBlocked || roomReadOnly} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#25d366] text-[#0b141a] disabled:cursor-not-allowed disabled:opacity-45" aria-label={chatLocale === 'id' ? 'Kirim media' : 'Send media'}>
-                {sending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
 
       <ChatMediaLightbox
         viewer={mediaViewer}

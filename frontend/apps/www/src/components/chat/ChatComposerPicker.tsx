@@ -24,6 +24,7 @@ type Props = {
   onClose: () => void;
   onEmojiSelect: (emoji: string) => void;
   onStickerSelect: (emoji: string) => void;
+  keyboardHeightPx?: number;
 };
 
 const EMOJI_CATEGORIES: EmojiCategory[] = [
@@ -58,6 +59,7 @@ export function ChatComposerPicker({
   onClose,
   onEmojiSelect,
   onStickerSelect,
+  keyboardHeightPx = 320,
 }: Props) {
   const [categoryId, setCategoryId] = useState('recent');
   const [recent, setRecent] = useState<string[]>(() => {
@@ -101,7 +103,10 @@ export function ChatComposerPicker({
 
   return (
     <section
-      className="w-full shrink-0 overflow-hidden rounded-[18px] border border-black/[0.06] bg-white shadow-[0_-16px_40px_-28px_rgba(15,23,42,0.5)] dark:border-white/[0.08] dark:bg-[#111b21]"
+      style={{
+        height: `clamp(280px, ${Math.max(280, Math.min(520, keyboardHeightPx))}px, 520px)`,
+      }}
+      className="flex w-full shrink-0 min-h-0 flex-col overflow-hidden rounded-[18px] border border-black/[0.06] bg-white shadow-[0_-16px_40px_-28px_rgba(15,23,42,0.5)] dark:border-white/[0.08] dark:bg-[#111b21]"
       aria-label={
         locale === 'id'
           ? mode === 'emoji' ? 'Papan emoji' : 'Papan stiker'
@@ -152,7 +157,7 @@ export function ChatComposerPicker({
               </button>
             ))}
           </div>
-          <div className="h-[min(18dvh,176px)] min-h-[118px] overflow-y-auto overscroll-contain p-2">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2">
             <div className="grid grid-cols-8 gap-0.5 min-[420px]:grid-cols-9 sm:grid-cols-10 md:grid-cols-12">
               {(activeCategory?.items || []).map((emoji, index) => (
                 <button
@@ -176,7 +181,7 @@ export function ChatComposerPicker({
         </>
       ) : (
         <>
-          <div className="h-[min(18dvh,176px)] min-h-[118px] overflow-y-auto overscroll-contain p-2">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2">
             <div className="grid grid-cols-4 gap-1 min-[420px]:grid-cols-5 sm:grid-cols-6 md:grid-cols-8">
               {STICKERS.map(sticker => (
                 <button
