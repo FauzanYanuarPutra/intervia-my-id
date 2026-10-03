@@ -7430,7 +7430,7 @@ export default function ChatRoomPage() {
                                     ? 'visible'
                                     : 'hidden',
                                 }}
-                                className="z-[2147482000] w-[150px] max-w-[calc(100vw-12px)] overflow-y-auto overscroll-contain rounded-[11px] border border-black/[0.08] bg-white/[0.98] p-0.5 shadow-[0_8px_26px_rgba(17,27,33,0.20),0_2px_7px_rgba(17,27,33,0.08)] backdrop-blur-xl [scrollbar-width:thin] dark:border-white/[0.08] dark:bg-[#233138]/[0.98] dark:shadow-[0_10px_30px_rgba(0,0,0,0.40)]"
+                                className="pointer-events-auto z-[2147482000] w-[142px] max-w-[calc(100vw-12px)] overflow-y-auto overscroll-contain rounded-[10px] border border-black/[0.08] bg-white/[0.98] p-0.5 shadow-[0_8px_26px_rgba(17,27,33,0.20),0_2px_7px_rgba(17,27,33,0.08)] backdrop-blur-xl [scrollbar-width:thin] dark:border-white/[0.08] dark:bg-[#233138]/[0.98] dark:shadow-[0_10px_30px_rgba(0,0,0,0.40)]"
                               >
                             {isOwn && status === 'failed' ? (
                               <button
@@ -7438,7 +7438,7 @@ export default function ChatRoomPage() {
                                 role="menuitem"
                                 onClick={() => handleRetryMessage(msg)}
                                 disabled={sending}
-                                className="flex min-h-7 w-full items-center gap-1.5 rounded-[8px] px-2 text-left text-[10.5px] font-semibold text-[#008f72] transition-[background-color,color] duration-150 hover:bg-[#f0f2f5] focus:bg-[#f0f2f5] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#25d366]/25 disabled:cursor-not-allowed disabled:opacity-50 dark:text-[#25d366] dark:hover:bg-[#2a3942] dark:focus:bg-[#2a3942]"
+                                className="flex min-h-7 w-full items-center gap-1 rounded-[7px] px-1.5 text-left text-[10px] font-semibold text-[#008f72] transition-[background-color,color] duration-150 hover:bg-[#f0f2f5] focus:bg-[#f0f2f5] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#25d366]/25 disabled:cursor-not-allowed disabled:opacity-50 dark:text-[#25d366] dark:hover:bg-[#2a3942] dark:focus:bg-[#2a3942]"
                               >
                                 <Send className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                 {chatLocale === 'id'
@@ -7453,7 +7453,7 @@ export default function ChatRoomPage() {
                                 setOpenMessageActionsId(null);
                                 handleReplyToMessage(msg);
                               }}
-                              className="flex min-h-7 w-full items-center gap-1.5 rounded-[8px] px-2 text-left text-[10.5px] font-medium text-[#111b21] transition-[background-color,color] duration-150 hover:bg-[#f0f2f5] focus:bg-[#f0f2f5] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#25d366]/20 dark:text-[#e9edef] dark:hover:bg-[#2a3942] dark:focus:bg-[#2a3942]"
+                              className="flex min-h-7 w-full items-center gap-1 rounded-[7px] px-1.5 text-left text-[10px] font-medium text-[#111b21] transition-[background-color,color] duration-150 hover:bg-[#f0f2f5] focus:bg-[#f0f2f5] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#25d366]/20 dark:text-[#e9edef] dark:hover:bg-[#2a3942] dark:focus:bg-[#2a3942]"
                             >
                               <Reply className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                               {chatLocale === 'id' ? 'Balas' : 'Reply'}
@@ -7465,7 +7465,7 @@ export default function ChatRoomPage() {
                                 setOpenMessageActionsId(null);
                                 handleQuoteMessage(msg);
                               }}
-                              className="flex min-h-8 w-full items-center gap-2 rounded-[9px] px-2.5 text-left text-[11.5px] font-medium text-[#111b21] transition-[background-color,color] duration-150 hover:bg-[#f0f2f5] focus:bg-[#f0f2f5] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#25d366]/20 dark:text-[#e9edef] dark:hover:bg-[#2a3942] dark:focus:bg-[#2a3942]"
+                              className="flex min-h-7 w-full items-center gap-1.5 rounded-[7px] px-1.5 text-left text-[10px] font-medium text-[#111b21] transition-[background-color,color] duration-150 hover:bg-[#f0f2f5] focus:bg-[#f0f2f5] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#25d366]/20 dark:text-[#e9edef] dark:hover:bg-[#2a3942] dark:focus:bg-[#2a3942]"
                             >
                               <Quote className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                               {chatLocale === 'id' ? 'Kutip' : 'Quote'}
