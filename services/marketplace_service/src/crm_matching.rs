@@ -2733,10 +2733,8 @@ pub async fn public_matches(
                 .worth
                 .partial_cmp(&a.score.worth)
                 .or_else(|| b.score.total.partial_cmp(&a.score.total)),
+            _ => std::cmp::Ordering::Equal,
         };
-        let ordering = if ordering.is_none() && !matches!(sort_by, "price" | "similarity" | "worth" | "best" | "balanced") {
-            b.score.worth.partial_cmp(&a.score.worth)
-        } else { ordering };
         ordering.unwrap_or(std::cmp::Ordering::Equal)
     });
 
