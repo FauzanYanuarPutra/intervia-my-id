@@ -5584,6 +5584,339 @@ fn merge_json_objects(base: Value, extension: Value) -> Value {
     Value::Object(merged)
 }
 
+#[derive(Debug, Serialize, Clone)]
+struct TransactionIntermediaryCandidate {
+    email: String,
+    user_id: Uuid,
+    display_name: String,
+    note: Option<String>,
+}
+
+fn intermediary_mode(transaction_meta: &Value) -> &str {
+    transaction_meta
+        .get("intermediary")
+        .and_then(|value| value.get("mode"))
+        .and_then(Value::as_str)
+        .unwrap_or("direct")
+}
+
+fn intermediary_status(transaction_meta: &Value) -> &str {
+    transaction_meta
+        .get("intermediary")
+        .and_then(|value| value.get("status"))
+        .and_then(Value::as_str)
+        .unwrap_or("not_requested")
+}
+
+fn intermediary_user_id(transaction_meta: &Value) -> Option<Uuid> {
+    transaction_meta
+        .get("intermediary")
+        .and_then(|value| value.get("user_id"))
+        .and_then(Value::as_str)
+        .and_then(|value| Uuid::parse_str(value).ok())
+}
+
+async fn resolve_transaction_intermediary_candidate(
+    db: &PgPool,
+    email: &str,
+) -> Result<Option<TransactionIntermediaryCandidate>, sqlx::Error> {
+    let normalized = email.trim().to_lowercase();
+    if normalized.is_empty() {
+        return Ok(None);
+    }
+
+    sqlx::query_as::<_, (String, Uuid, Option<String>, Option<String>)>(
+        r#"
+        SELECT
+            candidate.email::text,
+            urm.user_id,
+            candidate.display_name,
+            candidate.note
+        FROM transaction_intermediary_candidates candidate
+        JOIN users_read_model urm
+          ON lower(urm.email::text) = lower(candidate.email::text)
+        WHERE candidate.enabled = TRUE
+          AND lower(candidate.email::text) = $1
+          AND urm.identity_deleted_at IS NULL
+          AND COALESCE(urm.status, 'active') = 'active'
+        LIMIT 1
+        "#,
+    )
+    .bind(&normalized)
+    .fetch_optional(db)
+    .await
+    .map(|row| row.map(|(email, user_id, display_name, note)| TransactionIntermediaryCandidate {
+        email,
+        user_id,
+        display_name: display_name.unwrap_or_else(|| "Perantara Lajukan".to_string()),
+        note,
+    }))
+}
+
+async fn list_transaction_intermediaries(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+
+    let _ = user_id;
+
+    match sqlx::query_as::<_, (String, Uuid, Option<String>, Option<String>)>(
+        r#"
+        SELECT
+            candidate.email::text,
+            urm.user_id,
+            candidate.display_name,
+            candidate.note
+        FROM transaction_intermediary_candidates candidate
+        JOIN users_read_model urm
+          ON lower(urm.email::text) = lower(candidate.email::text)
+        WHERE candidate.enabled = TRUE
+          AND urm.identity_deleted_at IS NULL
+          AND COALESCE(urm.status, 'active') = 'active'
+        ORDER BY candidate.email ASC
+        "#,
+    )
+    .fetch_all(&state.db)
+    .await
+    {
+        Ok(rows) => (
+            StatusCode::OK,
+            Json(rows
+                .into_iter()
+                .map(|(email, user_id, display_name, note)| TransactionIntermediaryCandidate {
+                    email,
+                    user_id,
+                    display_name: display_name.unwrap_or_else(|| "Perantara Lajukan".to_string()),
+                    note,
+                })
+                .collect::<Vec<_>>()),
+        )
+            .into_response(),
+        Err(error) => {
+            tracing::error!("list_transaction_intermediaries error: {:?}", error);
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load intermediary options",
+            )
+            .into_response()
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct TransactionIntermediaryActionRequest {
+    response_message: Option<String>,
+}
+
+async fn accept_transaction_intermediary(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<TransactionIntermediaryActionRequest>,
+) -> impl IntoResponse {
+    update_transaction_intermediary_status(
+        &state,
+        &headers,
+        id,
+        "accepted",
+        payload.response_message,
+    )
+    .await
+}
+
+async fn decline_transaction_intermediary(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<TransactionIntermediaryActionRequest>,
+) -> impl IntoResponse {
+    update_transaction_intermediary_status(
+        &state,
+        &headers,
+        id,
+        "declined",
+        payload.response_message,
+    )
+    .await
+}
+
+async fn update_transaction_intermediary_status(
+    state: &Arc<AppState>,
+    headers: &HeaderMap,
+    id: Uuid,
+    next_status: &str,
+    response_message: Option<String>,
+) -> axum::response::Response {
+    let actor_id = match user_id_from_auth(headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+
+    if !matches!(next_status, "accepted" | "declined") {
+        return err(StatusCode::BAD_REQUEST, "invalid intermediary status").into_response();
+    }
+
+    let mut tx = match state.db.begin().await {
+        Ok(tx) => tx,
+        Err(error) => {
+            tracing::error!("update intermediary begin error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update intermediary").into_response();
+        }
+    };
+
+    let txn = match sqlx::query_as::<_, TransactionRow>(
+        r#"
+        SELECT
+            id, content_id, buyer_id, seller_id, amount_cents, currency,
+            transaction_status AS status, protection_status, deal_kind, fulfillment_mode,
+            snapshot_listing, safety_checklist, risk_flags, transaction_meta,
+            offer_message, response_message, created_at, updated_at
+        FROM transactions
+        WHERE id = $1
+        FOR UPDATE
+        "#,
+    )
+    .bind(id)
+    .fetch_optional(&mut *tx)
+    .await
+    {
+        Ok(Some(row)) => row,
+        Ok(None) => return err(StatusCode::NOT_FOUND, "transaction not found").into_response(),
+        Err(error) => {
+            tracing::error!("update intermediary transaction read error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load transaction").into_response();
+        }
+    };
+
+    if intermediary_mode(&txn.transaction_meta) != "managed" {
+        return err(StatusCode::CONFLICT, "transaction does not use a Lajukan intermediary").into_response();
+    }
+
+    if intermediary_user_id(&txn.transaction_meta) != Some(actor_id) {
+        return err(StatusCode::FORBIDDEN, "only the selected intermediary can perform this action").into_response();
+    }
+
+    let current_status = intermediary_status(&txn.transaction_meta);
+    if next_status == "accepted" && current_status == "accepted" {
+        return Json(TransactionResponse::from(txn)).into_response();
+    }
+    if next_status == "declined" && matches!(current_status, "declined" | "completed") {
+        return Json(TransactionResponse::from(txn)).into_response();
+    }
+
+    let mut next_meta = merge_json_objects(
+        txn.transaction_meta.clone(),
+        json!({
+            "intermediary": {
+                "status": next_status,
+                "responded_by": actor_id,
+                "responded_at": Utc::now(),
+                "response_message": response_message.clone()
+            }
+        }),
+    );
+
+    if next_status == "declined" && matches!(txn.status.as_str(), "pending" | "accepted") {
+        let wallet_environment = parse_transaction_wallet_environment(&txn.transaction_meta);
+        if txn.status == "accepted" {
+            let _ = wallet_environment;
+        }
+        next_meta = merge_json_objects(
+            next_meta,
+            json!({
+                "intermediary": {
+                    "status": "declined",
+                    "cancelled_at": Utc::now()
+                }
+            }),
+        );
+    }
+
+    let next_transaction_status = if next_status == "declined" && txn.status == "pending" {
+        "cancelled"
+    } else {
+        txn.status.as_str()
+    };
+
+    let updated = match sqlx::query_as::<_, TransactionRow>(
+        r#"
+        UPDATE transactions
+        SET
+            transaction_status = $2,
+            response_message = COALESCE($3, response_message),
+            protection_status = $4,
+            transaction_meta = $5,
+            updated_at = NOW()
+        WHERE id = $1
+        RETURNING
+            id, content_id, buyer_id, seller_id, amount_cents, currency,
+            transaction_status AS status, protection_status, deal_kind, fulfillment_mode,
+            snapshot_listing, safety_checklist, risk_flags, transaction_meta,
+            offer_message, response_message, created_at, updated_at
+        "#,
+    )
+    .bind(txn.id)
+    .bind(next_transaction_status)
+    .bind(response_message.clone())
+    .bind(protection_status_for_transaction(next_transaction_status))
+    .bind(next_meta)
+    .fetch_one(&mut *tx)
+    .await
+    {
+        Ok(row) => row,
+        Err(error) => {
+            tracing::error!("update intermediary transaction error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update intermediary").into_response();
+        }
+    };
+
+    if let Err(error) = tx.commit().await {
+        tracing::error!("update intermediary commit error: {:?}", error);
+        return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update intermediary").into_response();
+    }
+
+    let title = if next_status == "accepted" {
+        "Perantara Lajukan menerima permintaan"
+    } else {
+        "Perantara Lajukan menolak permintaan"
+    };
+    push_notification_best_effort(
+        state,
+        updated.buyer_id,
+        "transaction",
+        "transaction.intermediary_status",
+        title,
+        &format!("Transaksi {}: status perantara {}.", updated.id, next_status),
+        json!({
+            "transaction_id": updated.id,
+            "intermediary_status": next_status
+        }),
+    )
+    .await;
+
+    if next_status == "declined" {
+        push_notification_best_effort(
+            state,
+            updated.seller_id,
+            "transaction",
+            "transaction.intermediary_declined",
+            "Perantara Lajukan menolak transaksi",
+            &format!("Transaksi {} tidak dilanjutkan dengan perantara.", updated.id),
+            json!({
+                "transaction_id": updated.id,
+                "intermediary_status": "declined"
+            }),
+        )
+        .await;
+    }
+
+    Json(TransactionResponse::from(updated)).into_response()
+}
+
 fn sanitize_risk_flags(value: Option<Value>) -> Value {
     let mut flags: Vec<String> = Vec::new();
     if let Some(Value::Array(items)) = value {
