@@ -142,13 +142,15 @@ export async function POST(
 
   const candidateIds = new Set(candidates.map(candidate => candidate.id));
 
-  let feedbackHistory: Array<{
+  type MatchFeedback = {
     matched_content_id: string;
     feedback_type: 'approved' | 'rejected';
     candidate_snapshot: Record<string, unknown>;
     note: string;
     created_at: string;
-  }> = [];
+  };
+
+  let feedbackHistory: MatchFeedback[] = [];
 
   try {
     const feedbackResponse = await fetch(
@@ -169,38 +171,34 @@ export async function POST(
       };
       feedbackHistory = Array.isArray(feedbackPayload.feedback)
         ? feedbackPayload.feedback
-            .map(item => {
+            .map((item): MatchFeedback | null => {
               const value = record(item);
               const type = text(value.feedback_type, 32);
+
+              if (type !== 'approved' && type !== 'rejected') {
+                return null;
+              }
+
               const snapshot = record(value.candidate_snapshot);
+              const candidateSnapshot: Record<string, unknown> = {
+                id: text(snapshot.id, 120),
+                title: text(snapshot.title, 180),
+                summary: text(snapshot.summary, 400),
+                content_type: text(snapshot.content_type, 60),
+                category: text(snapshot.category, 120),
+                city: text(snapshot.city, 100),
+                tags: list(snapshot.tags, 12, 80),
+              };
+
               return {
                 matched_content_id: text(value.matched_content_id, 120),
-                feedback_type:
-                  type === 'approved' ? 'approved' : type === 'rejected' ? 'rejected' : null,
-                candidate_snapshot: {
-                  id: text(snapshot.id, 120),
-                  title: text(snapshot.title, 180),
-                  summary: text(snapshot.summary, 400),
-                  content_type: text(snapshot.content_type, 60),
-                  category: text(snapshot.category, 120),
-                  city: text(snapshot.city, 100),
-                  tags: list(snapshot.tags, 12, 80),
-                },
+                feedback_type: type,
+                candidate_snapshot: candidateSnapshot,
                 note: text(value.note, 300),
                 created_at: text(value.created_at, 80),
               };
             })
-            .filter(
-              (
-                item,
-              ): item is {
-                matched_content_id: string;
-                feedback_type: 'approved' | 'rejected';
-                candidate_snapshot: Record<string, unknown>;
-                note: string;
-                created_at: string;
-              } => Boolean(item.matched_content_id && item.feedback_type),
-            )
+            .filter((item): item is MatchFeedback => item !== null && Boolean(item.matched_content_id))
             .slice(0, 50)
         : [];
     }
