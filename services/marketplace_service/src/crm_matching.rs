@@ -216,13 +216,31 @@ fn json_f64(metadata: &Value, keys: &[&str]) -> Option<f64> {
 fn normalize_match_phrase(input: &str) -> String {
     let normalized = input
         .chars()
-        .map(|c| if c.is_alphanumeric() || c.is_whitespace() { c.to_ascii_lowercase() } else { ' ' })
+        .map(|c| {
+            if c.is_alphanumeric() || c.is_whitespace() {
+                c.to_ascii_lowercase()
+            } else {
+                ' '
+            }
+        })
         .collect::<String>()
         .split_whitespace()
-        .filter(|token| !matches!(
-            *token,
-            "untuk" | "dengan" | "yang" | "dan" | "atau" | "di" | "ke" | "dari" | "harga" | "butuh" | "membutuhkan"
-        ))
+        .filter(|token| {
+            !matches!(
+                *token,
+                "untuk"
+                    | "dengan"
+                    | "yang"
+                    | "dan"
+                    | "atau"
+                    | "di"
+                    | "ke"
+                    | "dari"
+                    | "harga"
+                    | "butuh"
+                    | "membutuhkan"
+            )
+        })
         .collect::<Vec<_>>();
 
     // Common Indonesian produce shorthand: "mangga HR" and
