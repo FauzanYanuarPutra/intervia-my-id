@@ -139,17 +139,25 @@ export default function CommunityJoinClient({
     useState<CommunityGroup | null>(null);
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      setListings([]);
-      setLoading(false);
-      setError('');
-      return;
-    }
-
     let alive = true;
 
-    setLoading(true);
-    setError('');
+    if (!isAuthenticated) {
+      queueMicrotask(() => {
+        if (!alive) return;
+        setListings([]);
+        setLoading(false);
+        setError('');
+      });
+      return () => {
+        alive = false;
+      };
+    }
+
+    queueMicrotask(() => {
+      if (!alive) return;
+      setLoading(true);
+      setError('');
+    });
 
     fetch('/api/my-listings?status=active&limit=50', {
       cache: 'no-store',
