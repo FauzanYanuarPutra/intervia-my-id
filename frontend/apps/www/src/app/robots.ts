@@ -35,7 +35,17 @@ export default function robots(): MetadataRoute.Robots {
   return {
     rules: [
       { userAgent: '*', allow: '/', disallow: DISALLOW_ROUTES },
-      { userAgent: ['Googlebot', 'Googlebot-Image', 'Googlebot-News'], allow: '/', disallow: DISALLOW_ROUTES },
+      {
+        userAgent: [
+          'Googlebot',
+          'Googlebot-Image',
+          'Googlebot-News',
+          'Mediapartners-Google',
+          'Google-Display-Ads-Bot',
+        ],
+        allow: '/',
+        disallow: DISALLOW_ROUTES,
+      },
       { userAgent: 'Bingbot', allow: '/', disallow: DISALLOW_ROUTES },
     ],
     sitemap: [
