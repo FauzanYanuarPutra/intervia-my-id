@@ -50,6 +50,18 @@ export const CreateOfferSchema = z
       .optional(),
     risk_flags: z.array(z.string().min(1)).max(20).optional(),
   })
+  .superRefine((value, ctx) => {
+    if (
+      value.intermediary_mode === 'managed' &&
+      !value.intermediary_email
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['intermediary_email'],
+        message: 'intermediary_email is required for managed transactions',
+      });
+    }
+  })
   .strip();
 
 export const CreateCounterOfferSchema = z
