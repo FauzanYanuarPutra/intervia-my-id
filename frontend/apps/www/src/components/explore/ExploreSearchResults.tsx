@@ -61,7 +61,7 @@ function ResultTypeTabs({ payload, activeTab, locale, searchSide = 'supply', onS
   const tabs = SUPPLY_RESULT_TABS.filter(tab => tab === 'all' || Boolean(payload.groups[tab as GlobalSearchGroupKey]?.available && (payload.groups[tab as GlobalSearchGroupKey].total > 0 || tab === activeTab)));
   if (tabs.length <= 1) return null;
   return (
-    <div className="mt-3 rounded-[16px] border border-zinc-200/80 bg-white p-2 dark:border-zinc-800 dark:bg-zinc-950 sm:p-2.5">
+    <div className="rounded-[16px] border border-zinc-200/80 bg-white p-2 dark:border-zinc-800 dark:bg-zinc-950 sm:p-2.5">
       <div className="flex items-center justify-between gap-3 px-1 pb-2">
         <p className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 sm:text-[11px]">{isId ? 'Jenis hasil' : 'Result type'}</p>
         {activeTab !== 'all' ? <button type="button" onClick={() => onSelectTab('all')} className="text-[10px] font-bold text-emerald-700 hover:underline dark:text-emerald-400 sm:text-[11px]">{isId ? 'Semua hasil' : 'All results'}</button> : null}
@@ -297,7 +297,7 @@ function SkeletonSection({
   const count = kind === 'videos' ? 8 : 6;
 
   return (
-    <section className="mt-3 rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3.5 sm:p-4">
+    <section className="rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3.5 sm:p-4">
       <div className="flex items-end justify-between gap-3">
         <div>
           <Skeleton variant="line" className="h-4 w-32" />
@@ -569,5 +569,5 @@ export function ExploreSearchResults({ payload, loading, error, locale, compact 
       : SEARCH_GROUPS.filter(
           groupKey => groupKey === activeTab,
         );
-  return <>{loading || error ? <div role="status" className="mt-3 flex items-center justify-between gap-3 rounded-[12px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-2 text-xs font-semibold text-[color:var(--app-text-soft)]"><span>{loading ? (isId ? 'Memperbarui hasil. Hasil terakhir tetap ditampilkan.' : 'Refreshing results. The latest available results remain visible.') : (isId ? 'Pembaruan gagal. Hasil terakhir yang tersedia tetap ditampilkan.' : 'Refresh failed. The latest available results remain visible.')}</span>{error && onRetry ? <button type="button" onClick={onRetry} className="shrink-0 font-bold text-[color:var(--app-accent)]">{isId ? 'Coba lagi' : 'Retry'}</button> : null}</div> : null}<ResultTypeTabs payload={visiblePayload} activeTab={activeTab} locale={locale} searchSide={searchSide} onSelectTab={onSelectTab} />{groups.map(groupKey => <SearchGroupSection key={groupKey} groupKey={groupKey} group={visiblePayload.groups[groupKey]} locale={locale} compact={compact && activeTab === 'all'} onSelectTab={onSelectTab} onNextCursor={onNextCursor} />)}</>;
+  return <div className="min-w-0 space-y-3 sm:space-y-4">{loading || error ? <div role="status" className="flex items-center justify-between gap-3 rounded-[12px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-2 text-xs font-semibold text-[color:var(--app-text-soft)]"><span>{loading ? (isId ? 'Memperbarui hasil. Hasil terakhir tetap ditampilkan.' : 'Refreshing results. The latest available results remain visible.') : (isId ? 'Pembaruan gagal. Hasil terakhir yang tersedia tetap ditampilkan.' : 'Refresh failed. The latest available results remain visible.')}</span>{error && onRetry ? <button type="button" onClick={onRetry} className="shrink-0 font-bold text-[color:var(--app-accent)]">{isId ? 'Coba lagi' : 'Retry'}</button> : null}</div> : null}<ResultTypeTabs payload={visiblePayload} activeTab={activeTab} locale={locale} searchSide={searchSide} onSelectTab={onSelectTab} />{groups.map(groupKey => <SearchGroupSection key={groupKey} groupKey={groupKey} group={visiblePayload.groups[groupKey]} locale={locale} compact={compact && activeTab === 'all'} onSelectTab={onSelectTab} onNextCursor={onNextCursor} />)}</div>;
 }
