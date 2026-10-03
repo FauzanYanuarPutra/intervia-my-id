@@ -650,6 +650,75 @@ type HomeWalletBalancesResponse = {
 
 const HERO_TAGS = ['Bahan Lokal', 'Siap Ekspor', 'Kemasan', 'Mesin UMKM'];
 
+const HOME_RECOMMENDATION_CACHE_TTL_MS = 10 * 60_000;
+const HOME_RECOMMENDATION_CACHE_PREFIX = 'lajukan-home-recommendations-v3';
+
+function homeRecommendationCacheKey(
+  locale: string,
+  userId: string,
+  viewerLocationKey: string,
+): string {
+  return [
+    HOME_RECOMMENDATION_CACHE_PREFIX,
+    locale || 'id',
+    userId || 'public',
+    viewerLocationKey || 'global',
+  ].join(':');
+}
+
+function readHomeRecommendationCache(
+  key: string,
+): {
+  recommendations?: RecommendationItem[];
+  demandRecommendations?: RecommendationItem[];
+} | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.sessionStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as {
+      savedAt?: number;
+      recommendations?: RecommendationItem[];
+      demandRecommendations?: RecommendationItem[];
+    };
+    if (
+      typeof parsed.savedAt !== 'number' ||
+      Date.now() - parsed.savedAt > HOME_RECOMMENDATION_CACHE_TTL_MS
+    ) {
+      window.sessionStorage.removeItem(key);
+      return null;
+    }
+    return {
+      recommendations: Array.isArray(parsed.recommendations) ? parsed.recommendations : [],
+      demandRecommendations: Array.isArray(parsed.demandRecommendations) ? parsed.demandRecommendations : [],
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeHomeRecommendationCache(
+  key: string,
+  value: {
+    recommendations: RecommendationItem[];
+    demandRecommendations: RecommendationItem[];
+  },
+): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.sessionStorage.setItem(
+      key,
+      JSON.stringify({
+        savedAt: Date.now(),
+        recommendations: value.recommendations.slice(0, 12),
+        demandRecommendations: value.demandRecommendations.slice(0, 12),
+      }),
+    );
+  } catch {
+    // Best-effort snapshot for slow/offline Home.
+  }
+}
+
 type HomeAvatarProp =
   | 'crate'
   | 'cart'
@@ -4203,7 +4272,28 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
     : '';
 
   useEffect(() => {
+    const cacheKey = homeRecommendationCacheKey(
+      locale,
+      userId || '',
+      viewerLocationKey,
+    );
+    const cached = readHomeRecommendationCache(cacheKey);
+    if (cached?.recommendations?.length) {
+      setRecommendations(cached.recommendations);
+      setRecommendationsLoading(false);
+    }
+    if (cached?.demandRecommendations?.length) {
+      setDemandRecommendations(cached.demandRecommendations);
+      setDemandRecommendationsLoading(false);
+    }
+  }, [locale, userId, viewerLocationKey]);
+  useEffect(() => {
     let active = true;
+    const recommendationCacheKey = homeRecommendationCacheKey(
+      locale,
+      userId || '',
+      viewerLocationKey,
+    );
     const listingController = new AbortController();
     const demandController = new AbortController();
     const referenceController = new AbortController();
@@ -4469,9 +4559,18 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
 
         if (!active) return;
         setRecommendations(listingItems);
+        const currentDemand =
+          readHomeRecommendationCache(recommendationCacheKey)?.demandRecommendations || [];
+        writeHomeRecommendationCache(recommendationCacheKey, {
+          recommendations: listingItems,
+          demandRecommendations: currentDemand,
+        });
       } catch {
         if (!active) return;
-        setRecommendations([]);
+        const cached = readHomeRecommendationCache(recommendationCacheKey);
+        if (!cached?.recommendations?.length) {
+          setRecommendations([]);
+        }
       } finally {
         if (active) setRecommendationsLoading(false);
       }
@@ -4509,9 +4608,18 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
 
         if (!active) return;
         setDemandRecommendations(listingItems);
+        const currentSupply =
+          readHomeRecommendationCache(recommendationCacheKey)?.recommendations || [];
+        writeHomeRecommendationCache(recommendationCacheKey, {
+          recommendations: currentSupply,
+          demandRecommendations: listingItems,
+        });
       } catch {
         if (!active) return;
-        setDemandRecommendations([]);
+        const cached = readHomeRecommendationCache(recommendationCacheKey);
+        if (!cached?.demandRecommendations?.length) {
+          setDemandRecommendations([]);
+        }
       } finally {
         if (active) setDemandRecommendationsLoading(false);
       }
