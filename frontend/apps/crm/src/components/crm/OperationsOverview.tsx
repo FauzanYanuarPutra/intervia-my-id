@@ -1,7 +1,14 @@
 import { Card, EmptyState, StatusBadge } from 'lajukan-ui';
 import type { DashboardData } from './models';
+import CrmAnalyticsDashboard from './CrmAnalyticsDashboard';
 
-export function OperationsOverview({ data, onOpen }: { data: DashboardData; onOpen: (page: "users" | "listings" | "transactions" | "disputes") => void }) {
+export function OperationsOverview({
+  data,
+  onOpen,
+}: {
+  data: DashboardData;
+  onOpen: (page: "users" | "listings" | "transactions" | "disputes") => void;
+}) {
   const openSupport = data.tickets.filter(ticket =>
     ['open', 'in_progress', 'pending_customer'].includes(ticket.status),
   ).length;
@@ -20,12 +27,14 @@ export function OperationsOverview({ data, onOpen }: { data: DashboardData; onOp
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-end justify-between gap-3">
         <div>
-          <p className="text-lg font-black tracking-tight text-slate-950">Ringkasan hari ini</p>
-          <p className="mt-0.5 text-xs text-slate-400">Angka dari data yang benar-benar tersedia.</p>
+          <p className="text-lg font-black tracking-tight text-slate-950">Dashboard utama</p>
+          <p className="mt-0.5 text-xs text-slate-400">Snapshot operasional dan pertumbuhan dari data live yang tersedia.</p>
         </div>
       </div>
+
+      <CrmAnalyticsDashboard data={data} compact />
 
       <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
         {cards.map(([label, value, destination]) => (
@@ -37,7 +46,11 @@ export function OperationsOverview({ data, onOpen }: { data: DashboardData; onOp
           >
             <div className="flex items-center justify-between gap-2">
               <p className="text-xs font-bold text-slate-500">{label}</p>
-              {Number(value) > 0 ? <StatusBadge tone="warning">Cek</StatusBadge> : <span className="text-[10px] font-bold text-slate-300">OK</span>}
+              {Number(value) > 0 ? (
+                <StatusBadge tone="warning">Cek</StatusBadge>
+              ) : (
+                <span className="text-[10px] font-bold text-slate-300">OK</span>
+              )}
             </div>
             <p className="mt-2 text-2xl font-black tracking-tight text-slate-950">{value}</p>
             <p className="mt-1 text-[10px] font-bold text-slate-400">Buka workspace →</p>
@@ -57,7 +70,16 @@ export function OperationsOverview({ data, onOpen }: { data: DashboardData; onOp
                 <p className="text-sm font-bold text-slate-900">{activity.title}</p>
                 <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
                   <p className="line-clamp-2 text-xs leading-5 text-slate-400">{activity.body}</p>
-                  {activity.at ? <time className="shrink-0 text-[10px] font-semibold text-slate-300">{new Date(activity.at).toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</time> : null}
+                  {activity.at ? (
+                    <time className="shrink-0 text-[10px] font-semibold text-slate-300">
+                      {new Date(activity.at).toLocaleString('id-ID', {
+                        day: '2-digit',
+                        month: 'short',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </time>
+                  ) : null}
                 </div>
               </div>
             ))}
