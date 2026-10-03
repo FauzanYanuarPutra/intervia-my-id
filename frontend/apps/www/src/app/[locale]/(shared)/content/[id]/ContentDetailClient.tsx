@@ -1435,17 +1435,6 @@ export default function ContentDetailClient({
         },
       );
 
-      await authFetch(
-        `/api/chat/rooms/${encodeURIComponent(roomId)}/messages`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: {
-            content: item?.title || (locale === 'id' ? 'Listing' : 'Listing'),
-          },
-        },
-      ).catch(() => null);
-
       // Keep the listing snapshot available to the chat without creating an order/transaction.
       await authFetch(
         `/api/chat/rooms/${encodeURIComponent(roomId)}/messages`,
