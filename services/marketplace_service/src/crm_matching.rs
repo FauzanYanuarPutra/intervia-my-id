@@ -21,7 +21,7 @@ use uuid::Uuid;
 use super::{auth_claims_from_headers, has_agent_access, push_notification_best_effort, AppState};
 
 const MATCHING_SCHEMA_VERSION: &str = "lajukan-match-schema-v1";
-const MATCHING_SCORE_VERSION: &str = "lajukan-match-score-v1";
+const MATCHING_SCORE_VERSION: &str = "lajukan-match-score-v2";
 const MAX_REQUIREMENTS: i64 = 100;
 const MAX_CANDIDATES: i64 = 100;
 const TOP_RESULTS: usize = 25;
@@ -437,6 +437,8 @@ fn freshness_score(updated_at: DateTime<Utc>) -> f64 {
 struct CandidateScore {
     total: f64,
     similarity: f64,
+    semantic_relevance: f64,
+    category_fit: f64,
     worth: f64,
     breakdown: Value,
     matched_fields: Vec<String>,
@@ -598,8 +600,10 @@ fn score_candidate(requirement: &RequirementItem, candidate: &CandidateItem) -> 
     let quality = listing_quality_score(candidate);
     let freshness = freshness_score(candidate.updated_at);
 
-    let too_far = distance_km.map(|distance| distance > 50.0).unwrap_or(false);
-    let total = if semantic_relevance < 0.35 || too_far {
+    // Distance is a ranking signal, not a hard rejection. Cross-city/cross-province
+    // commodity trade is a valid use case; a listing should only be hidden for
+    // irrelevance, not because the supplier is far away.
+    let total = if semantic_relevance < 0.35 {
         0.0
     } else {
         (keyword_fit
@@ -665,6 +669,12 @@ fn score_candidate(requirement: &RequirementItem, candidate: &CandidateItem) -> 
     }
     if let Some(distance) = distance_km {
         reasons.push(format!("Perkiraan jarak {:.1} km.", distance));
+        if distance > 50.0 {
+            warnings.push(
+                "Lokasi cukup jauh, tetapi match tetap dipertahankan karena kebutuhan dan produk relevan."
+                    .to_string(),
+            );
+        }
     } else if req_city.is_some() && req_city == cand_city {
         reasons.push("Kota kebutuhan dan penyedia sama.".to_string());
     } else if req_city.is_some() {
@@ -686,6 +696,8 @@ fn score_candidate(requirement: &RequirementItem, candidate: &CandidateItem) -> 
     CandidateScore {
         total,
         similarity,
+        semantic_relevance,
+        category_fit,
         worth,
         breakdown: json!({
             "keyword_category_fit": (keyword_fit + category_fit).round(),
@@ -705,6 +717,18 @@ fn score_candidate(requirement: &RequirementItem, candidate: &CandidateItem) -> 
         reasons,
         warnings,
     }
+}
+
+fn passes_public_match_filter(score: &CandidateScore) -> bool {
+    if score.total < 45.0 {
+        return false;
+    }
+
+    // Prefer a combination of meaningful textual similarity and a compatible
+    // marketplace category. This keeps obvious matches such as "mangga" ↔
+    // "mangga HR grosir" visible even when descriptions contain many extra words.
+    (score.similarity >= 14.0 && score.category_fit >= 14.0)
+        || (score.similarity >= 18.0 && score.semantic_relevance >= 0.55)
 }
 
 async fn ensure_review(
@@ -2251,7 +2275,7 @@ pub async fn public_matches(
 
     let results = ranked
         .into_iter()
-        .filter(|entry| entry.score.total >= 55.0 && entry.score.similarity >= 18.0)
+        .filter(|entry| passes_public_match_filter(&entry.score))
         .take(limit as usize)
         .map(|entry| {
             let score_label = if entry.score.total >= 85.0 {
@@ -2460,7 +2484,7 @@ pub async fn notify_new_listing_matches(
             };
             score_candidate(&candidate_requirement, &source)
         };
-        if score.total >= 55.0 {
+        if passes_public_match_filter(&score) {
             scored.push((candidate, score.total));
         }
     }
