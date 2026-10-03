@@ -20,12 +20,22 @@ export async function GET(req: NextRequest) {
         deviceLimit: 80,
         windowSeconds: 900,
       },
-      async ctx =>
-        fetch(MARKETPLACE_URL + '/v1/transaction-intermediaries', {
-          method: 'GET',
-          headers: buildForwardAuthHeaders(ctx),
-          cache: 'no-store',
-        }),
+      async ctx => {
+        const response = await fetch(
+          MARKETPLACE_URL + '/v1/transaction-intermediaries',
+          {
+            method: 'GET',
+            headers: buildForwardAuthHeaders(ctx),
+            cache: 'no-store',
+          },
+        );
+
+        return new NextResponse(response.body, {
+          status: response.status,
+          statusText: response.statusText,
+          headers: response.headers,
+        });
+      },
     );
   } catch (error) {
     console.error('[TRANSACTION_INTERMEDIARIES_ERROR]', error);
