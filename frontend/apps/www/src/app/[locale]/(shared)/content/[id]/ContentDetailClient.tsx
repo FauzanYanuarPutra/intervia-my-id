@@ -1271,7 +1271,7 @@ export default function ContentDetailClient({
       setShowDealChoiceModal(true);
       return;
     }
-    await startDealFlow(pricingMode === 'fixed' ? 'direct' : 'offer');
+    await startDealFlow();
   };
 
   const ensureTransactionEligible = async () => {
@@ -1293,392 +1293,188 @@ export default function ContentDetailClient({
     return true;
   };
 
-  const startDealFlow = async (mode: 'offer' | 'direct') => {
-    const allowed = await ensureTransactionEligible();
-    if (!allowed) return;
-    setOfferFlowMode(mode);
-    const directPrefillMessage =
-      displayType === 'tool_rental'
-        ? locale === 'id'
-          ? 'Halo kak, saya mau sewa. Jadwal, deposit, ambilnya gimana?'
-          : 'Hi, I want to proceed with this rental. Please share the available schedule, deposit, and pickup details.'
-        : displayType === 'property'
-          ? locale === 'id'
-            ? 'Halo kak, saya tertarik lokasi ini. Bisa survey kapan?'
-            : 'Hi, I want to proceed with this location. Please share the viewing steps and key deal terms.'
-          : displayType === 'service' || displayType === 'profile'
-            ? locale === 'id'
-              ? 'Halo kak, saya mau lanjut jasa ini. Mulainya gimana?'
-              : 'Hi, I want to proceed with this service. Please share the start steps, timeline, and key work details.'
-            : displayType === 'product'
-              ? locale === 'id'
-                ? 'Halo kak, saya mau order. Stok dan ongkirnya ada?'
-                : 'Hi, I want to proceed at the listed price. Please confirm stock, delivery, and payment steps.'
-              : locale === 'id'
-                ? 'Halo kak, saya mau lanjut. Langkah berikutnya apa?'
-                : 'Hi, I want to proceed based on the listing details. Please share the next steps.';
-    if (mode === 'direct' && listPriceCents > 0) {
-      setOfferAmount(String(Math.round(listPriceCents / 100)));
-      setOfferMessage(directPrefillMessage);
-    } else {
-      setOfferAmount('');
-      setOfferMessage('');
+  const startDealFlow = async () => {
+    if (!user) {
+      const callbackUrl = `/${locale}/content/${contentId || resolvedContentId}`;
+      router.push(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
+      return;
     }
+
+    setOfferFlowMode('offer');
+    setOfferAmount('');
+    setOfferMessage('');
+    setOfferError(null);
     setShowDealChoiceModal(false);
     setShowOfferModal(true);
   };
 
   const handleMakeOffer = async () => {
-    if (!resolvedContentId) return;
+    if (!resolvedContentId || !peerUserId || isSelfPeer) return;
+
     const numericAmount = parseInt(offerAmount.replace(/\D/g, ''), 10);
-    const fallbackDirectAmount =
-      listPriceCents > 0 ? Math.round(listPriceCents / 100) : 0;
     const finalAmount =
       Number.isFinite(numericAmount) && numericAmount > 0
         ? numericAmount
-        : offerFlowMode === 'direct'
-          ? fallbackDirectAmount
-          : 0;
+        : 0;
 
-    const canRespondWithoutAmount =
-      isDemandListing &&
-      offerFlowMode === 'offer' &&
-      offerMessage.trim().length > 0;
-
-    if (!finalAmount && !canRespondWithoutAmount) {
+    const canSendWithoutAmount = offerMessage.trim().length > 0;
+    if (!finalAmount && !canSendWithoutAmount) {
       setOfferError(
-        isDemandListing
-          ? locale === 'id'
-            ? 'Isi nominal atau tulis scope respons terlebih dulu.'
-            : 'Enter an amount or describe your response scope first.'
-          : locale === 'id'
-            ? 'Masukkan nominal terlebih dulu.'
-            : 'Please enter an amount.',
+        locale === 'id'
+          ? 'Tulis nominal atau jelaskan kebutuhan/penawaran dulu.'
+          : 'Enter a price or explain your request first.',
       );
       return;
     }
 
     setOfferError(null);
     setSubmitting(true);
+
     try {
       const amountCents = finalAmount > 0 ? finalAmount * 100 : undefined;
-      const createdAt = new Date().toISOString();
-      const interactionReference = buildInteractionReference(
-        offerFlowMode === 'direct' ? 'TRX' : 'OFF',
-        resolvedContentId || item?.id || '',
+      const idempotencyKey = createIdempotencyKey('market-signal');
+
+      const signalResponse = await authFetch(
+        `/api/content/${encodeURIComponent(resolvedContentId)}/market-signals`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Idempotency-Key': idempotencyKey,
+          },
+          body: JSON.stringify({
+            signal_type: amountCents ? 'price_indication' : 'inquiry',
+            amount_cents: amountCents,
+            currency: baseCurrency,
+            source: 'content_detail_negotiation',
+          }),
+        },
       );
 
-      const dealKind:
-        | 'job'
-        | 'service'
-        | 'product'
-        | 'property'
-        | 'tool_rental'
-        | 'profile'
-        | 'other' =
-        displayType === 'job'
-          ? 'job'
-          : displayType === 'tool_rental'
-            ? 'tool_rental'
-            : displayType === 'service'
-              ? 'service'
-              : displayType === 'property'
-                ? 'property'
-                : displayType === 'profile'
-                  ? 'profile'
-                  : displayType === 'product'
-                    ? 'product'
-                    : 'other';
-      const localFulfillmentMode =
-        displayType === 'service' || displayType === 'profile'
-          ? 'remote'
-          : displayType === 'tool_rental'
-            ? 'pickup'
-            : displayType === 'job'
-              ? 'onsite'
-              : displayType === 'property'
-                ? 'onsite'
-                : 'shipping';
-      const safetyChecklist = {
-        identity_confirmed: true,
-        platform_payment_confirmed: true,
-        item_detail_confirmed: true,
-        anti_scam_acknowledged: true,
-      };
-      const riskFlags =
-        /whatsapp|telegram|transfer langsung|outside platform/i.test(
-          offerMessage,
-        )
-          ? ['off_platform_payment_risk']
-          : [];
+      const signalData = await signalResponse.json().catch(() => ({}));
+      if (!signalResponse.ok) {
+        throw new Error(
+          typeof signalData?.error === 'string'
+            ? signalData.error
+            : locale === 'id'
+              ? 'Sinyal negosiasi belum bisa disimpan.'
+              : 'The negotiation signal could not be saved.',
+        );
+      }
 
-      const res = await authFetch('/api/transactions/offer', {
+      const chatRes = await authFetch('/api/chat/dm', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Idempotency-Key': createIdempotencyKey('offer'),
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          content_id: resolvedContentId,
-          amount_cents: amountCents,
-          currency: baseCurrency,
-          offer_message: offerMessage.trim() || undefined,
-          deal_kind: dealKind,
-          fulfillment_mode: localFulfillmentMode,
-          safety_checklist: safetyChecklist,
-          risk_flags: riskFlags,
-          transaction_meta: {
-            source: 'content_detail',
-            pricing_mode: pricingMode,
-            promo_label: item?.promo_label || undefined,
-            market_side: toMarketSideValue(listingSide),
-            ticket: {
-              reference: interactionReference,
-              kind: offerFlowMode === 'direct' ? 'transaction' : 'offer',
-              created_at: createdAt,
-              next_step:
-                locale === 'id'
-                  ? 'Lanjut di chat biar detail tersimpan.'
-                  : 'Continue the discussion in chat so scope, price, and timeline stay clear.',
+          peer_user_id: peerUserId,
+          lead: {
+            source: 'content_negotiation',
+            name: item?.title || 'Listing',
+            sector: sectorId,
+            value_cents: amountCents,
+            currency: baseCurrency,
+            content_id: resolvedContentId,
+            metadata: {
+              content_type: item?.type || item?.content_type,
+              slug: item?.slug,
+              market_side: toMarketSideValue(listingSide),
+              content_url: listingHref,
+              negotiation: true,
             },
           },
         }),
       });
 
-      const data = await res.json().catch(() => ({}));
-
-      if (res.ok) {
-        const transactionId = typeof data?.id === 'string' ? data.id : '';
-        const resolvedAmount =
-          typeof data?.amount_cents === 'number'
-            ? data.amount_cents
-            : (amountCents ?? null);
-        const resolvedCurrency =
-          typeof data?.currency === 'string' ? data.currency : baseCurrency;
-        const resolvedStatus =
-          typeof data?.status === 'string'
-            ? data.status
-            : typeof data?.transaction_status === 'string'
-              ? data.transaction_status
-              : 'pending';
-        const resolvedProtectionStatus =
-          typeof data?.protection_status === 'string'
-            ? data.protection_status
-            : 'awaiting_funding';
-
-        const offerPayload = {
-          transaction_id: transactionId,
-          content_id: resolvedContentId,
-          content_title: item?.title ?? 'Listing',
-          content_url: listingHref,
-          amount_cents: resolvedAmount,
-          currency: resolvedCurrency,
-          offer_message: offerMessage.trim() || undefined,
-          market_side: toMarketSideValue(listingSide),
-          created_at: createdAt,
-          buyer_id:
-            typeof data?.buyer_id === 'string' ? data.buyer_id : user?.id,
-          seller_id:
-            typeof data?.seller_id === 'string'
-              ? data.seller_id
-              : item?.owner_id,
-          deal_kind:
-            typeof data?.deal_kind === 'string' ? data.deal_kind : dealKind,
-          fulfillment_mode:
-            typeof data?.fulfillment_mode === 'string'
-              ? data.fulfillment_mode
-              : localFulfillmentMode,
-          protection_status: resolvedProtectionStatus,
-          snapshot_listing:
-            typeof data?.snapshot_listing === 'object'
-              ? data.snapshot_listing
-              : {
-                  title: item?.title,
-                  cover_image: item?.cover_image,
-                  pricing_mode: pricingMode,
-                  market_side: toMarketSideValue(listingSide),
-                  content_url: listingHref,
-                },
-          safety_checklist: safetyChecklist,
-          risk_flags: riskFlags,
-          status: resolvedStatus,
-          flow_mode: offerFlowMode,
-          ticket: {
-            reference: interactionReference,
-            kind: offerFlowMode === 'direct' ? 'transaction' : 'offer',
-            status: resolvedStatus,
-            created_at: createdAt,
-            next_step:
-              locale === 'id'
-                ? 'Buka detail di chat untuk cek nominal, status, dan tindak lanjut.'
-                : 'Open the chat detail to review amount, status, and next actions.',
-          },
-        };
-
-        let roomId = '';
-        try {
-          const sellerPeerId =
-            (typeof data?.seller_id === 'string' && isUuidLike(data.seller_id)
-              ? data.seller_id
-              : peerUserId) || '';
-          const isSelfSeller =
-            Boolean(user?.id) &&
-            Boolean(sellerPeerId) &&
-            (user?.id || '').trim().toLowerCase() ===
-              sellerPeerId.toLowerCase();
-          if (sellerPeerId) {
-            if (isSelfSeller) {
-              throw new Error(
-                locale === 'id'
-                  ? 'Tidak bisa membuat room chat ke akun sendiri.'
-                  : 'Cannot create chat room with your own account.',
-              );
-            }
-            const chatRes = await authFetch('/api/chat/dm', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                peer_user_id: sellerPeerId,
-                lead: {
-                  source: 'offer',
-                  name: item?.title || 'Listing',
-                  sector: sectorId,
-                  value_cents: resolvedAmount ?? undefined,
-                  currency: resolvedCurrency,
-                  content_id: resolvedContentId,
-                  metadata: {
-                    transaction_id: transactionId,
-                    content_type: item?.type || item?.content_type,
-                    slug: item?.slug,
-                    flow_mode: offerFlowMode,
-                  },
-                },
-              }),
-            });
-
-            const chatPayload = await chatRes.json().catch(() => ({}));
-            if (!chatRes.ok) {
-              throw new Error(
-                chatPayload?.error || 'Failed to create chat room',
-              );
-            }
-            roomId = chatPayload?.room_id || chatPayload?.data?.room_id || '';
-
-            if (roomId) {
-              const amountSummary =
-                resolvedAmount != null
-                  ? formatCurrency(resolvedAmount, resolvedCurrency)
-                  : locale === 'id'
-                    ? 'nominal menyusul'
-                    : 'amount to follow';
-              const summary =
-                offerFlowMode === 'direct'
-                  ? `${locale === 'id' ? 'Deal langsung' : 'Direct deal'}: ${amountSummary}`
-                  : isDemandListing
-                    ? `${locale === 'id' ? 'Respons kebutuhan' : 'Need response'}: ${amountSummary}`
-                    : `Offer: ${amountSummary}`;
-              await authFetch(
-                `/api/chat/rooms/${encodeURIComponent(roomId)}/messages`,
-                {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    content: summary,
-                    type: offerFlowMode === 'direct' ? 'transaction' : 'offer',
-                    attachments: [JSON.stringify(offerPayload)],
-                  }),
-                },
-              );
-            }
-          } else {
-            throw new Error(
-              locale === 'id'
-                ? 'Seller listing tidak valid untuk membuat room chat.'
-                : 'Listing seller is invalid for chat room creation.',
-            );
-          }
-        } catch (chatError) {
-          console.error('[OFFER_CHAT_MESSAGE_ERROR]', chatError);
-        }
-
-        setRelatedTx({
-          id: transactionId,
-          content_id: resolvedContentId,
-          status: resolvedStatus,
-          protection_status: resolvedProtectionStatus,
-          amount_cents: resolvedAmount,
-          currency: resolvedCurrency,
-          created_at:
-            typeof data?.created_at === 'string' ? data.created_at : createdAt,
-          updated_at:
-            typeof data?.updated_at === 'string' ? data.updated_at : createdAt,
-          transaction_meta:
-            typeof data?.transaction_meta === 'object'
-              ? (data.transaction_meta as Record<string, unknown>)
-              : {
-                  ticket: offerPayload.ticket,
-                },
-        });
-        setShowOfferModal(false);
-        setOfferAmount('');
-        setOfferMessage('');
-        setOfferFlowMode('offer');
-
-        if (offerFlowMode === 'direct' && transactionId) {
-          router.push(
-            `/transactions?transaction_id=${encodeURIComponent(transactionId)}&open_payment=1`,
-          );
-          return;
-        }
-
-        setCreatedDealHandoff({
-          transactionId,
-          roomId,
-          amountCents: resolvedAmount,
-          currency: resolvedCurrency,
-          status: resolvedStatus,
-          protectionStatus: resolvedProtectionStatus,
-          flowMode: offerFlowMode,
-        });
-
-        if (!roomId) {
-          setChatError(
-            locale === 'id'
-              ? 'Offer dibuat. Kalau chat belum muncul, tekan tombol chat.'
-              : 'Offer created, but chat room is not available yet. Please start chat manually.',
-          );
-        } else {
-          setChatError(null);
-        }
-      } else {
-        const errorData =
-          data && typeof data === 'object'
-            ? (data as Record<string, unknown>)
-            : {};
-        const errorMessage =
-          (typeof errorData.error === 'string' && errorData.error) ||
-          'Failed to submit offer';
-        if (errorData.code === 'verification_required') {
-          if (errorData.buyer_verified === false) {
-            setShowOfferModal(false);
-            setVerificationPrompt(readTransactionVerification(user));
-            return;
-          }
-          setOfferError(
-            locale === 'id'
-              ? 'Transaksi belum bisa diproses. Lanjut chat atau coba lagi.'
-              : 'This transaction cannot be processed right now. Continue in chat or try again later.',
-          );
-          return;
-        }
-        setOfferError(errorMessage);
+      const chatPayload = await chatRes.json().catch(() => ({}));
+      if (!chatRes.ok) {
+        throw new Error(chatPayload?.error || 'Failed to create chat room');
       }
+
+      const roomId = chatPayload?.room_id || chatPayload?.data?.room_id;
+      if (!roomId) throw new Error('Chat room not returned');
+
+      const messageParts = [
+        locale === 'id' ? 'Saya tertarik dan mau negosiasi.' : 'I am interested and would like to negotiate.',
+        finalAmount
+          ? `${locale === 'id' ? 'Nominal yang saya ajukan' : 'My proposed amount'}: ${formatCurrency(amountCents || 0, baseCurrency)}`
+          : '',
+        offerMessage.trim(),
+      ].filter(Boolean);
+
+      const itemMeta = (item?.metadata as Record<string, unknown> | null) || {};
+      const listingPayload = {
+        source: 'content_detail_negotiation',
+        snapshot_at: new Date().toISOString(),
+        content_id: resolvedContentId || item?.id,
+        content_title: item?.title,
+        summary: item?.summary || '',
+        cover_image: item?.cover_image || '',
+        pricing_mode: pricingMode,
+        price_cents: typeof item?.price_cents === 'number' ? item.price_cents : 0,
+        currency: item?.currency || 'IDR',
+        content_type: item?.type || item?.content_type || 'content',
+        market_side: toMarketSideValue(listingSide),
+        slug: item?.slug || null,
+        content_url: listingHref,
+        owner_id: peerUserId,
+        location:
+          (typeof itemMeta.location === 'string' && itemMeta.location) ||
+          (typeof itemMeta.city === 'string' && itemMeta.city) ||
+          (typeof itemMeta.region === 'string' ? itemMeta.region : ''),
+      };
+
+      await authFetch(
+        `/api/chat/rooms/${encodeURIComponent(roomId)}/messages`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content: messageParts.join('\n'),
+            type: 'text',
+          }),
+        },
+      );
+
+      await authFetch(
+        `/api/chat/rooms/${encodeURIComponent(roomId)}/messages`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: {
+            content: item?.title || (locale === 'id' ? 'Listing' : 'Listing'),
+          },
+        },
+      ).catch(() => null);
+
+      // Keep the listing snapshot available to the chat without creating an order/transaction.
+      await authFetch(
+        `/api/chat/rooms/${encodeURIComponent(roomId)}/messages`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content: item?.title || 'Listing',
+            type: 'listing',
+            attachments: [JSON.stringify(listingPayload)],
+          }),
+        },
+      ).catch(() => null);
+
+      setShowOfferModal(false);
+      setOfferAmount('');
+      setOfferMessage('');
+      setOfferFlowMode('offer');
+      setCreatedDealHandoff(null);
+      setChatError(null);
+      router.push(`/chat/${encodeURIComponent(roomId)}`);
     } catch (error) {
-      console.error(error);
+      console.error('[NEGOTIATION_FLOW_ERROR]', error);
       setOfferError(
-        locale === 'id'
-          ? 'Terjadi error saat mengirim offer.'
-          : 'Error submitting offer.',
+        error instanceof Error
+          ? error.message
+          : locale === 'id'
+            ? 'Negosiasi belum bisa dikirim. Coba lagi.'
+            : 'Negotiation could not be sent. Please try again.',
       );
     } finally {
       setSubmitting(false);
@@ -6036,164 +5832,128 @@ export default function ContentDetailClient({
       </Modal>
 
       {showOfferModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_50%,_transparent)] p-3">
-          <div className="max-h-[calc(var(--app-viewport-height)-2rem)] w-full max-w-md overflow-y-auto rounded-[28px] bg-white/98 p-5 shadow-[0_28px_56px_-32px_rgba(15,23,42,0.32)] dark:bg-slate-950/96 dark:shadow-[0_32px_60px_-36px_rgba(2,6,23,0.8)]">
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-3"
+          onClick={() => {
+            if (!submitting) setShowOfferModal(false);
+          }}
+        >
+          <div
+            className="max-h-[min(88dvh,760px)] w-full max-w-md overflow-y-auto rounded-t-[28px] bg-white p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-[0_-20px_60px_-30px_rgba(15,23,42,.45)] dark:bg-slate-950 sm:rounded-[28px] sm:pb-5"
+            onClick={event => event.stopPropagation()}
+          >
             <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-base font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                  {offerFlowMode === 'direct'
-                    ? locale === 'id'
-                      ? 'Konfirmasi Pembelian Langsung'
-                      : 'Confirm Direct Purchase'
-                    : offerLabel}
+              <div className="min-w-0">
+                <p className="text-[11px] font-black uppercase tracking-[0.12em] text-[color:var(--app-accent)]">
+                  {locale === 'id' ? 'NEGOSIASI' : 'NEGOTIATION'}
+                </p>
+                <h2 className="mt-1 text-xl font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                  {locale === 'id' ? 'Tanya & nego dulu' : 'Ask & negotiate first'}
                 </h2>
-                <p className="mt-1 text-xs text-[color:var(--app-text)]">
-                  {offerFlowMode === 'direct'
-                    ? locale === 'id'
-                      ? 'Cek nominal, lalu kirim konfirmasi.'
-                      : 'Review amount and send confirmation. Seller will receive a direct purchase request.'
-                    : offerPrompt}
+                <p className="mt-1 text-sm leading-5 text-[color:var(--app-text-soft)]">
+                  {locale === 'id'
+                    ? 'Belum ada checkout atau pembayaran. Kita buka chat, lalu sepakati harga dan detailnya langsung.'
+                    : 'No checkout or payment here. Start a chat and agree on the price and details directly.'}
                 </p>
               </div>
               <button
                 type="button"
-                onClick={() => {
-                  setShowOfferModal(false);
-                  setOfferFlowMode('offer');
-                }}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] transition hover:bg-[color:var(--app-accent-soft)]"
+                disabled={submitting}
+                onClick={() => setShowOfferModal(false)}
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] disabled:opacity-50"
                 aria-label={locale === 'id' ? 'Tutup' : 'Close'}
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="mt-4 space-y-3">
-              <div
-                className={`${detailInsetCompactClass} text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]`}
-              >
+            <div className="mt-4 rounded-2xl bg-[color:var(--app-surface-muted)] p-3">
+              <p className="text-sm font-semibold text-[color:var(--app-text)]">
                 {item.title}
-              </div>
-              {offerFlowMode === 'direct' ? (
-                <button
-                  type="button"
-                  onClick={() => setOfferFlowMode('offer')}
-                  className={`${detailTextLinkClass} text-left text-xs`}
-                >
-                  {locale === 'id'
-                    ? 'Perlu nego dulu? Ubah ke penawaran biasa.'
-                    : 'Need to negotiate first? Switch to a regular offer.'}
-                </button>
+              </p>
+              {hasPrice ? (
+                <p className="mt-1 text-xs text-[color:var(--app-text-soft)]">
+                  {locale === 'id' ? 'Harga saat ini' : 'Current listed price'}:{' '}
+                  {priceLabelWithUnit}
+                </p>
               ) : null}
-              {offerFlowMode === 'offer' && suggestedOfferCents.length > 0 && (
-                <div>
-                  <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[color:var(--app-text)]">
-                    {locale === 'id' ? 'Nominal cepat' : 'Quick amounts'}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {suggestedOfferCents.map(value => (
-                      <button
-                        key={value}
-                        type="button"
-                        onClick={() =>
-                          setOfferAmount(String(Math.round(value / 100)))
-                        }
-                        className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-[color:var(--app-text)] transition hover:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_40%,white)] hover:text-[color:var(--app-accent)] dark:bg-slate-900 dark:text-[color:var(--app-text-soft)] dark:hover:bg-[color:color-mix(in_srgb,var(--app-accent)_18%,rgba(15,23,42,0.96))]"
-                      >
-                        {formatCurrency(value, baseCurrency)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+            </div>
+
+            <div className="mt-4 space-y-3">
               <div>
-                <label className="mb-1 block text-xs font-medium text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                  {offerFlowMode === 'direct'
-                    ? locale === 'id'
-                      ? 'Nominal checkout (IDR) *'
-                      : 'Checkout amount (IDR) *'
-                    : isDemandListing
-                      ? locale === 'id'
-                        ? 'Nominal respons (opsional)'
-                        : 'Response amount (optional)'
-                      : offerAmountLabel}
+                <label className="mb-1.5 block text-xs font-bold text-[color:var(--app-text)]">
+                  {locale === 'id'
+                    ? 'Harga yang kamu ajukan (opsional)'
+                    : 'Your proposed price (optional)'}
                 </label>
                 <input
                   type="text"
                   inputMode="numeric"
                   value={offerAmount}
-                  onChange={e => setOfferAmount(e.target.value)}
-                  placeholder={offerAmountPlaceholder}
-                  readOnly={offerFlowMode === 'direct' && listPriceCents > 0}
-                  className="h-11 w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-sm focus:border-[color:var(--app-accent-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] dark:focus:ring-[color:color-mix(in_srgb,_var(--app-accent)_40%,_transparent)]"
+                  onChange={event => setOfferAmount(event.target.value)}
+                  placeholder={locale === 'id' ? 'Contoh: 7000' : 'Example: 7000'}
+                  className="h-12 w-full rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 text-base font-semibold outline-none focus:border-[color:var(--app-accent)] focus:ring-2 focus:ring-[color:var(--app-accent)]/15"
                 />
               </div>
+
               <div>
-                <label className="mb-1 block text-xs font-medium text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                  {isDemandListing
-                    ? locale === 'id'
-                      ? 'Scope / catatan respons'
-                      : 'Response scope / notes'
-                    : locale === 'id'
-                      ? 'Pesan (Opsional)'
-                      : 'Message (Optional)'}
+                <label className="mb-1.5 block text-xs font-bold text-[color:var(--app-text)]">
+                  {locale === 'id' ? 'Pesan untuk penjual' : 'Message to seller'}
                 </label>
                 <textarea
                   value={offerMessage}
-                  onChange={e => setOfferMessage(e.target.value)}
+                  onChange={event => setOfferMessage(event.target.value)}
+                  rows={4}
                   placeholder={
-                    offerFlowMode === 'direct'
-                      ? locale === 'id'
-                        ? 'Tambahkan catatan konfirmasi, jadwal, atau metode pembayaran...'
-                        : 'Add confirmation notes, schedule, or payment method...'
-                      : offerMessagePlaceholder
+                    locale === 'id'
+                      ? 'Contoh: Kalau ambil 20 kg, bisa harga berapa? Stok dan ongkirnya bagaimana?'
+                      : 'Example: If I take 20 kg, what price can you offer? How about stock and delivery?'
                   }
-                  rows={3}
-                  className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2 text-sm focus:border-[color:var(--app-accent-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] dark:focus:ring-[color:color-mix(in_srgb,_var(--app-accent)_40%,_transparent)]"
+                  className="w-full resize-none rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 py-3 text-sm outline-none focus:border-[color:var(--app-accent)] focus:ring-2 focus:ring-[color:var(--app-accent)]/15"
                 />
               </div>
+
+              {offerError ? (
+                <p className="rounded-xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 dark:bg-red-950/30 dark:text-red-300">
+                  {offerError}
+                </p>
+              ) : null}
             </div>
 
-            {offerError ? (
-              <div className="mt-4 rounded-xl border border-[color:var(--app-danger-border)] bg-[color:var(--app-danger-soft)] px-3 py-2 text-xs font-semibold text-[color:var(--app-danger)]">
-                {offerError}
-              </div>
-            ) : null}
-
-            <div className="mt-5 flex flex-wrap gap-2">
+            <div className="mt-4 flex gap-2">
               <button
-                onClick={() => {
-                  setShowOfferModal(false);
-                  setOfferFlowMode('offer');
-                }}
-                className={detailSecondaryButtonClass}
+                type="button"
+                disabled={submitting}
+                onClick={() => setShowOfferModal(false)}
+                className="inline-flex min-h-12 flex-1 items-center justify-center rounded-2xl border border-[color:var(--app-border-strong)] px-4 text-sm font-bold text-[color:var(--app-text)] disabled:opacity-50"
               >
                 {locale === 'id' ? 'Batal' : 'Cancel'}
               </button>
               <button
+                type="button"
                 onClick={handleMakeOffer}
-                disabled={
-                  submitting ||
-                  (isDemandListing
-                    ? !offerAmount.trim() && !offerMessage.trim()
-                    : !offerAmount.trim())
-                }
-                className="inline-flex flex-1 items-center justify-center rounded-[12px] bg-[color:var(--app-accent)] px-4 py-2 text-xs font-semibold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={submitting}
+                className="inline-flex min-h-12 flex-1 items-center justify-center rounded-2xl bg-[color:var(--app-accent)] px-4 text-sm font-bold text-[color:var(--app-text-inverse)] shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {submitting
                   ? locale === 'id'
-                    ? 'Mengirim...'
-                    : 'Submitting...'
-                  : offerFlowMode === 'direct'
-                    ? locale === 'id'
-                      ? 'Konfirmasi Beli Langsung'
-                      : 'Confirm Direct Purchase'
-                    : offerSubmitLabel}
+                    ? 'Membuka chat...'
+                    : 'Opening chat...'
+                  : locale === 'id'
+                    ? 'Lanjut negosiasi'
+                    : 'Continue negotiation'}
               </button>
             </div>
+
+            <p className="mt-3 text-center text-[10px] leading-4 text-[color:var(--app-text-soft)]">
+              {locale === 'id'
+                ? 'Nominal ini hanya sinyal negosiasi, bukan checkout, pembayaran, atau order.'
+                : 'This amount is only a negotiation signal, not a checkout, payment, or order.'}
+            </p>
           </div>
         </div>
       )}
+
     </div>
   );
 }
