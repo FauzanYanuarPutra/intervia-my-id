@@ -1,0 +1,2 @@
+-- Data repair migration is intentionally irreversible: normal titles are not
+-- changed, while exact duplicated intent prefixes are collapsed once.
