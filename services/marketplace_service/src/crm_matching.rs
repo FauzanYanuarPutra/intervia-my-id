@@ -214,7 +214,7 @@ fn json_f64(metadata: &Value, keys: &[&str]) -> Option<f64> {
 }
 
 fn normalize_match_phrase(input: &str) -> String {
-    let normalized = input
+    let normalized_source = input
         .chars()
         .map(|c| {
             if c.is_alphanumeric() || c.is_whitespace() {
@@ -223,7 +223,9 @@ fn normalize_match_phrase(input: &str) -> String {
                 ' '
             }
         })
-        .collect::<String>()
+        .collect::<String>();
+
+    let normalized = normalized_source
         .split_whitespace()
         .filter(|token| {
             !matches!(
