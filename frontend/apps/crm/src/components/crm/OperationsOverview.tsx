@@ -1,7 +1,8 @@
 import { Card, EmptyState, StatusBadge } from 'lajukan-ui';
 import type { DashboardData } from './models';
+import CrmAnalyticsDashboard from './CrmAnalyticsDashboard';
 
-export function OperationsOverview({ data, onOpen }: { data: DashboardData; onOpen: (page: "users" | "listings" | "transactions" | "disputes") => void }) {
+export function OperationsOverview({ data, accessToken, onOpen }: { data: DashboardData; accessToken: string; onOpen: (page: "users" | "listings" | "transactions" | "disputes") => void }) {
   const openSupport = data.tickets.filter(ticket =>
     ['open', 'in_progress', 'pending_customer'].includes(ticket.status),
   ).length;
@@ -26,6 +27,8 @@ export function OperationsOverview({ data, onOpen }: { data: DashboardData; onOp
           <p className="mt-0.5 text-xs text-slate-400">Angka dari data yang benar-benar tersedia.</p>
         </div>
       </div>
+
+      <CrmAnalyticsDashboard data={data} accessToken={accessToken} compact />
 
       <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
         {cards.map(([label, value, destination]) => (
