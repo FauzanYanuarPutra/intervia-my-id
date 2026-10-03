@@ -245,12 +245,12 @@ fn normalize_match_phrase(input: &str) -> String {
 
     // Common Indonesian produce shorthand: "mangga HR" and
     // "mangga harum manis" describe the same variety in many listings.
-    if normalized.iter().any(|token| token == "mangga")
-        && normalized.iter().any(|token| token == "hr")
+    if normalized.iter().any(|token| *token == "mangga")
+        && normalized.iter().any(|token| *token == "hr")
     {
         return normalized
             .into_iter()
-            .filter(|token| token != "hr")
+            .filter(|token| *token != "hr")
             .chain(["harum", "manis"])
             .collect::<Vec<_>>()
             .join(" ");
