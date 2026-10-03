@@ -46,7 +46,7 @@ RUN if [ ! -d migrations ]; then \
 # and make the one-shot migration service fail deterministically at build time.
 RUN set -eu; \
     duplicate_versions="$(find migrations -maxdepth 1 -type f -name '*.sql' ! -name '*.down.sql' -printf '%f\n' \
-      | awk -F_ '{print \$1}' \
+      | awk -F_ '{print $1}' \
       | sort \
       | uniq -d)"; \
     if [ -n "$duplicate_versions" ]; then \
