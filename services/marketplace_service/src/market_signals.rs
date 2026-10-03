@@ -314,7 +314,7 @@ pub async fn create_market_signal(
                 })),
             )
                 .into_response()
-        },
+        }
         Ok(None) => (
             StatusCode::OK,
             Json(json!({
