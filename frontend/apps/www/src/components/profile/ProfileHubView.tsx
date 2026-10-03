@@ -1468,7 +1468,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
   const { items: inboxNotifications } = useNotificationInbox();
   const [activeHubTab, setActiveHubTab] = useState<HubTab>('ringkas');
   const [socialModal, setSocialModal] = useState<SocialModalTab | null>(null);
-  const [profileSocial, setProfileSocial] = useState<ProfileSocialState | null>(null);
+  const [backendSocial, setBackendSocial] = useState<ProfileSocialState | null>(null);
   const [followBusyIds, setFollowBusyIds] = useState<string[]>([]);
   const [socialLoading, setSocialLoading] = useState(false);
   const [socialError, setSocialError] = useState<string | null>(null);
@@ -1710,7 +1710,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
         );
       }
 
-      setProfileSocial(normalized);
+      setBackendSocial(normalized);
     } catch (error) {
       setSocialError(
         error instanceof Error && error.message
@@ -1729,7 +1729,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
   }, [loadProfileSocial]);
 
   const followedIds = useMemo(
-    () => new Set((profileSocial?.following || []).map(item => item.id)),
+    () => new Set((backendSocial?.following || []).map(item => item.id)),
     [profileSocial],
   );
 
@@ -1764,7 +1764,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
           );
         }
 
-        setProfileSocial(normalized);
+        setBackendSocial(normalized);
         setSocialError(null);
       } catch (error) {
         setSocialError(
@@ -2000,15 +2000,15 @@ export function ProfileHubView(props: ProfileHubViewProps) {
       ),
     [isId, metadataRecord, metadataSocial, profileSocial],
   );
-  const followingUsers = profileSocial
-    ? profileSocial.following
+  const followingUsers = backendSocial
+    ? backendSocial.following
     : metadataFollowingUsers;
-  const followerUsers = profileSocial
-    ? profileSocial.followers
+  const followerUsers = backendSocial
+    ? backendSocial.followers
     : metadataFollowerUsers;
 
-  const followerCount = profileSocial
-    ? Math.max(profileSocial.followersCount, profileSocial.followers.length)
+  const followerCount = backendSocial
+    ? Math.max(backendSocial.followersCount, backendSocial.followers.length)
     : Math.max(
         followerUsers.length,
         readSocialNumber(metadataRecord?.followers_count),
@@ -2017,8 +2017,8 @@ export function ProfileHubView(props: ProfileHubViewProps) {
         readSocialNumber(profileSocial?.followers_count),
       );
 
-  const followingCount = profileSocial
-    ? Math.max(profileSocial.followingCount, profileSocial.following.length)
+  const followingCount = backendSocial
+    ? Math.max(backendSocial.followingCount, backendSocial.following.length)
     : Math.max(
         followingUsers.length,
         readSocialNumber(metadataRecord?.following_count),
