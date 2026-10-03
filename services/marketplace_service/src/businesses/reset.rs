@@ -94,7 +94,7 @@ pub(crate) enum ResetError {
 
 impl From<sqlx::Error> for ResetError {
     fn from(error: sqlx::Error) -> Self {
-        tracing::error!("business data reset database error: {error:?}");
+        eprintln!("business data reset database error: {error:?}");
         Self::Database
     }
 }
