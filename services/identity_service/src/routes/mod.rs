@@ -10,7 +10,7 @@ pub mod users;
 pub mod verification;
 
 pub use auth::{
-    change_password, login, login_phone, logout, me, oauth_google, refresh_token, register,
+    change_password, login, login_phone, logout, me, oauth_facebook, oauth_google, refresh_token, register,
     reset_password,
 };
 pub use governance::{
