@@ -2207,6 +2207,7 @@ pub async fn public_matches(
 
     let results = ranked
         .into_iter()
+        .filter(|entry| entry.score.total >= 55.0 && entry.score.similarity >= 18.0)
         .take(limit as usize)
         .map(|entry| {
             let score_label = if entry.score.total >= 85.0 {
