@@ -12,6 +12,7 @@ import {
   Mail,
   ShieldCheck,
   UserRound,
+  Facebook,
 } from 'lucide-react';
 import AuthFlowShell from '@/components/auth/AuthFlowShell';
 import {
@@ -289,7 +290,17 @@ export default function RegisterWithOTP() {
       totalSteps={1}
       progressLabel={isId ? 'Daftar' : 'Register'}
     >
-      <form onSubmit={handleSubmit} className="space-y-3.5">
+      <form onSubmit={handleSubmit} className="space-y-3.5">      <div className="space-y-2.5">
+        <a href={`/api/auth/google?callbackUrl=${encodeURIComponent(`/${locale}/onboarding`)}`} className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-[14px] border border-[color:var(--app-border)] bg-white px-4 text-sm font-bold text-[color:var(--app-text)] dark:bg-[color:var(--app-surface-strong)]">
+          Lanjutkan dengan Google
+        </a>
+        <a href={`/api/auth/facebook?callbackUrl=${encodeURIComponent(`/${locale}/onboarding`)}`} className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-[14px] bg-[#1877f2] px-4 text-sm font-bold text-white">
+          <Facebook className="h-5 w-5 fill-current" /> Lanjutkan dengan Facebook
+        </a>
+      </div>
+      <div className="flex items-center gap-3"><span className="h-px flex-1 bg-[color:var(--app-border)]" /><span className="text-[10px] font-bold uppercase">atau daftar dengan email</span><span className="h-px flex-1 bg-[color:var(--app-border)]" /></div>
+
+
         <div className="flex items-start gap-3 rounded-[16px] border border-[color:color-mix(in_srgb,var(--app-accent)_18%,var(--app-border))] bg-[color:var(--app-accent-soft)] px-3.5 py-3">
           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]">
             <ShieldCheck className="h-4 w-4" />
