@@ -731,7 +731,7 @@ pub(crate) async fn create_media_contribution(
             .bind(&uploader_username)
             .bind(risk.score)
             .bind(risk.level)
-            .bind(json!(&risk.flags))
+            .bind(serde_json::json!(&risk.flags))
             .execute(&state.db)
             .await
         }
