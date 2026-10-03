@@ -31,6 +31,9 @@ pub struct Config {
     pub failed_login_delay_ms: u64,
     pub cors_origins: Vec<String>,
     pub google_client_id: Option<String>,
+    pub facebook_app_id: Option<String>,
+    pub facebook_app_secret: Option<String>,
+    pub facebook_graph_version: String,
 }
 
 impl Config {
@@ -139,6 +142,18 @@ impl Config {
                 .ok()
                 .map(|value| value.trim().to_string())
                 .filter(|value| !value.is_empty()),
+            facebook_app_id: env::var("FACEBOOK_APP_ID")
+                .ok()
+                .map(|value| value.trim().to_string())
+                .filter(|value| !value.is_empty()),
+            facebook_app_secret: env::var("FACEBOOK_APP_SECRET")
+                .ok()
+                .map(|value| value.trim().to_string())
+                .filter(|value| !value.is_empty()),
+            facebook_graph_version: env::var("FACEBOOK_GRAPH_VERSION")
+                .unwrap_or_else(|_| "v24.0".to_string())
+                .trim()
+                .to_string(),
         }
     }
 
