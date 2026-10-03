@@ -2728,7 +2728,7 @@ export default function ChatRoomPage() {
   const [listingActionMessage, setListingActionMessage] = useState('');
   const [listingActionSubmitting, setListingActionSubmitting] = useState(false);
   // Legacy transaction records are kept for history; active UI no longer opens a transaction drawer.
-  const [showTransactionsDrawer] = useState(false);
+  const [showTransactionsDrawer, setShowTransactionsDrawer] = useState(false);
   const [roomSummaryExpanded, setRoomSummaryExpanded] = useState(false);
   const [transactionsLoading, setTransactionsLoading] = useState(false);
   const [transactionsError, setTransactionsError] = useState<string | null>(
