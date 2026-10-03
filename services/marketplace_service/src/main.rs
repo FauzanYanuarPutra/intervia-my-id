@@ -2650,12 +2650,11 @@ async fn record_content_view_dedup(
         return Ok(());
     };
 
-    let owner_id = sqlx::query_scalar::<_, Uuid>(
-        "SELECT owner_id FROM content_items WHERE id = $1",
-    )
-    .bind(content_id)
-    .fetch_optional(&mut **db)
-    .await?;
+    let owner_id =
+        sqlx::query_scalar::<_, Uuid>("SELECT owner_id FROM content_items WHERE id = $1")
+            .bind(content_id)
+            .fetch_optional(&mut **db)
+            .await?;
 
     if actor_user_id == Some(owner_id) {
         return Ok(());
