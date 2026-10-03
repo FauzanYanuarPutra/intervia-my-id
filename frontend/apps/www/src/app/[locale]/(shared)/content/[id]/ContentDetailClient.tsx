@@ -659,6 +659,35 @@ function saveQuickApply(data: QuickApplyData) {
   }
 }
 
+function unwrapContentClientPayload(value: unknown): ContentItem | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  if (record.id) return record as ContentItem;
+
+  for (const key of ['data', 'content', 'item', 'listing', 'result']) {
+    const nested = record[key];
+    if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+      const nestedRecord = nested as Record<string, unknown>;
+      if (nestedRecord.id) return nestedRecord as ContentItem;
+    }
+  }
+
+  for (const key of ['items', 'results', 'listings', 'contents']) {
+    const collection = record[key];
+    if (!Array.isArray(collection)) continue;
+    const first = collection.find(
+      entry =>
+        entry &&
+        typeof entry === 'object' &&
+        !Array.isArray(entry) &&
+        Boolean((entry as Record<string, unknown>).id),
+    );
+    if (first) return first as ContentItem;
+  }
+
+  return null;
+}
+
 function isUuidLike(value: unknown): value is string {
   if (typeof value !== 'string') return false;
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
@@ -790,7 +819,9 @@ export default function ContentDetailClient({
           `/api/content/${resolvedContentId}?include_owner=1`,
         );
         if (res.ok) {
-          const data = await res.json();
+          const rawData = await res.json().catch(() => null);
+          const data = unwrapContentClientPayload(rawData);
+          if (!data) return;
           setItem(data);
 
           // Redirect to slug URL if slug exists and current URL doesn't have it
