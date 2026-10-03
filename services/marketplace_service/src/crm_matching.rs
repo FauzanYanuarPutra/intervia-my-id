@@ -15,13 +15,13 @@ use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sqlx::Row;
-use std::{collections::HashSet, sync::Arc};
+use std::{collections::{HashMap, HashSet}, sync::Arc};
 use uuid::Uuid;
 
 use super::{auth_claims_from_headers, has_agent_access, push_notification_best_effort, AppState};
 
 const MATCHING_SCHEMA_VERSION: &str = "lajukan-match-schema-v1";
-const MATCHING_SCORE_VERSION: &str = "lajukan-match-score-v2";
+const MATCHING_SCORE_VERSION: &str = "lajukan-match-score-v3";
 const MAX_REQUIREMENTS: i64 = 100;
 const MAX_CANDIDATES: i64 = 100;
 const TOP_RESULTS: usize = 25;
@@ -602,19 +602,35 @@ fn score_candidate(requirement: &RequirementItem, candidate: &CandidateItem) -> 
 
     // Distance is a ranking signal, not a hard rejection. Cross-city/cross-province
     // commodity trade is a valid use case; a listing should only be hidden for
-    // irrelevance, not because the supplier is far away.
-    let total = if semantic_relevance < 0.35 {
-        0.0
+    // genuine irrelevance, not because the supplier is far away.
+    //
+    // Weak-but-related candidates intentionally receive a lower discovery score
+    // instead of being hard-zeroed. This keeps cases like "mangga" vs "mangga HR"
+    // visible even when distance, price, or listing quality are not ideal.
+    let raw_total = (keyword_fit
+        + category_fit
+        + location_fit
+        + price_fit
+        + trust
+        + availability
+        + quality
+        + freshness)
+        .clamp(0.0, 100.0);
+
+    let total = if semantic_relevance >= 0.35 {
+        raw_total
+    } else if similarity >= 8.0 || category_fit >= 14.0 {
+        (similarity * 0.50
+            + category_fit * 0.55
+            + location_fit * 0.12
+            + price_fit * 0.08
+            + trust * 0.05
+            + availability * 0.05
+            + quality * 0.05
+            + freshness * 0.05)
+            .clamp(6.0, 44.0)
     } else {
-        (keyword_fit
-            + category_fit
-            + location_fit
-            + price_fit
-            + trust
-            + availability
-            + quality
-            + freshness)
-            .clamp(0.0, 100.0)
+        0.0
     };
 
     let price_value = match (candidate.price_cents, budget_min, budget_max) {
@@ -719,16 +735,45 @@ fn score_candidate(requirement: &RequirementItem, candidate: &CandidateItem) -> 
     }
 }
 
+fn apply_viewer_feedback(score: &mut CandidateScore, feedback: Option<&str>) {
+    match feedback {
+        Some("approved") => {
+            score.total = (score.total + 10.0).clamp(0.0, 100.0);
+            score.worth = (score.worth + 10.0).clamp(0.0, 100.0);
+            if let Some(object) = score.breakdown.as_object_mut() {
+                object.insert("viewer_feedback_boost".to_string(), json!(10));
+            }
+            score.reasons.push(
+                "Kamu sebelumnya menilai match ini sesuai; sinyal itu dipakai untuk memprioritaskan kembali."
+                    .to_string(),
+            );
+        }
+        Some("rejected") => {
+            score.total = (score.total * 0.62).clamp(0.0, 100.0);
+            score.worth = (score.worth * 0.58).clamp(0.0, 100.0);
+            if let Some(object) = score.breakdown.as_object_mut() {
+                object.insert("viewer_feedback_penalty".to_string(), json!(-42));
+            }
+            score.warnings.push(
+                "Kamu sebelumnya menilai match ini tidak sesuai; rankingnya diturunkan."
+                    .to_string(),
+            );
+        }
+        _ => {}
+    }
+}
+
 fn passes_public_match_filter(score: &CandidateScore) -> bool {
-    if score.total < 45.0 {
+    // Match is now a ranked discovery surface, not an on/off gate. Keep any
+    // candidate with a meaningful textual/category relationship visible, while
+    // still excluding content that has no useful relation at all.
+    if score.total < 6.0 {
         return false;
     }
 
-    // Prefer a combination of meaningful textual similarity and a compatible
-    // marketplace category. This keeps obvious matches such as "mangga" ↔
-    // "mangga HR grosir" visible even when descriptions contain many extra words.
-    (score.similarity >= 14.0 && score.category_fit >= 14.0)
-        || (score.similarity >= 18.0 && score.semantic_relevance >= 0.55)
+    score.similarity >= 8.0
+        || score.semantic_relevance > 0.0
+        || score.category_fit >= 14.0
 }
 
 async fn ensure_review(
@@ -1230,6 +1275,50 @@ pub async fn run_match(
             (candidate, score)
         })
         .collect::<Vec<_>>();
+
+    let viewer_feedback = match sqlx::query(
+        r#"
+        SELECT metadata->>'matched_content_id' AS matched_content_id, feedback_type
+        FROM crm_matching_feedback
+        WHERE created_by = $1
+          AND feedback_source = 'requester'
+          AND metadata->>'source_content_id' = $2
+        ORDER BY created_at DESC
+        LIMIT 100
+        "#,
+    )
+    .bind(owner_id)
+    .bind(source.id.to_string())
+    .fetch_all(&state.db)
+    .await
+    {
+        Ok(rows) => {
+            let mut map = HashMap::<String, String>::new();
+            for row in rows.into_iter().rev() {
+                if let Some(candidate_id) =
+                    row.get::<Option<String>, _>("matched_content_id")
+                {
+                    let candidate_id = candidate_id.trim().to_string();
+                    if !candidate_id.is_empty() {
+                        map.insert(
+                            candidate_id,
+                            row.get::<String, _>("feedback_type"),
+                        );
+                    }
+                }
+            }
+            map
+        }
+        Err(error) => {
+            tracing::warn!("load viewer match feedback failed: {:?}", error);
+            HashMap::new()
+        }
+    };
+
+    for entry in &mut ranked {
+        let feedback = viewer_feedback.get(&entry.item.id.to_string()).map(String::as_str);
+        apply_viewer_feedback(&mut entry.score, feedback);
+    }
 
     ranked.sort_by(|a, b| {
         b.1.total
@@ -2013,6 +2102,40 @@ mod tests {
     }
 
     #[test]
+    fn weak_related_match_is_kept_for_discovery() {
+        let score = CandidateScore {
+            total: 28.0,
+            similarity: 20.0,
+            semantic_relevance: 0.2,
+            category_fit: 5.0,
+            worth: 25.0,
+            breakdown: json!({}),
+            matched_fields: Vec::new(),
+            missing_fields: Vec::new(),
+            reasons: Vec::new(),
+            warnings: Vec::new(),
+        };
+        assert!(passes_public_match_filter(&score));
+    }
+
+    #[test]
+    fn unrelated_match_is_filtered() {
+        let score = CandidateScore {
+            total: 0.0,
+            similarity: 0.0,
+            semantic_relevance: 0.0,
+            category_fit: 0.0,
+            worth: 0.0,
+            breakdown: json!({}),
+            matched_fields: Vec::new(),
+            missing_fields: Vec::new(),
+            reasons: Vec::new(),
+            warnings: Vec::new(),
+        };
+        assert!(!passes_public_match_filter(&score));
+    }
+
+    #[test]
     fn mangga_hr_normalizes_to_harum_manis_alias() {
         assert_eq!(normalize_match_phrase("Mangga HR"), "mangga harum manis");
         assert_eq!(
@@ -2028,6 +2151,21 @@ pub struct PublicMatchQuery {
     pub limit: Option<i64>,
 }
 
+#[derive(Debug, Deserialize, Default)]
+pub struct PublicMatchingFeedbackRequest {
+    pub matched_content_id: Uuid,
+    pub feedback_type: String,
+    pub note: Option<String>,
+}
+
+fn normalize_feedback_type(value: &str) -> Option<&'static str> {
+    match text(value).as_str() {
+        "approved" | "relevant" | "suitable" | "sesuai" => Some("approved"),
+        "rejected" | "irrelevant" | "not_suitable" | "tidak_sesuai" => Some("rejected"),
+        _ => None,
+    }
+}
+
 fn public_match_sort(value: Option<&str>) -> &str {
     match value.unwrap_or("best").trim().to_ascii_lowercase().as_str() {
         "nearest" | "closest" => "nearest",
@@ -2035,6 +2173,280 @@ fn public_match_sort(value: Option<&str>) -> &str {
         "similar" | "similarity" | "match" => "similarity",
         "worth" | "value" | "best" | "balanced" => "worth",
         _ => "worth",
+    }
+}
+
+/// Return the latest viewer feedback for a listing's Smart Match candidates.
+pub async fn get_public_matching_feedback(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+) -> impl IntoResponse {
+    let actor = match auth_claims_from_headers(&headers, &state.jwt_secret)
+        .and_then(|claims| Uuid::parse_str(&claims.sub).ok())
+    {
+        Some(id) => id,
+        None => return unauthorized(),
+    };
+
+    let owns_source = sqlx::query_scalar::<_, bool>(
+        "SELECT EXISTS(SELECT 1 FROM content_items WHERE id = $1 AND owner_id = $2)",
+    )
+    .bind(id)
+    .bind(actor)
+    .fetch_one(&state.db)
+    .await
+    .unwrap_or(false);
+
+    if !owns_source {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({"error": "listing owner access required"})),
+        )
+            .into_response();
+    }
+
+    let rows = sqlx::query(
+        r#"
+        SELECT
+            metadata->>'matched_content_id' AS matched_content_id,
+            feedback_type,
+            note,
+            created_at
+        FROM crm_matching_feedback
+        WHERE created_by = $1
+          AND feedback_source = 'requester'
+          AND metadata->>'source_content_id' = $2
+        ORDER BY created_at DESC
+        LIMIT 100
+        "#,
+    )
+    .bind(actor)
+    .bind(id.to_string())
+    .fetch_all(&state.db)
+    .await;
+
+    match rows {
+        Ok(rows) => {
+            let mut seen = HashSet::<String>::new();
+            let feedback = rows
+                .into_iter()
+                .filter_map(|row| {
+                    let matched_content_id = row
+                        .get::<Option<String>, _>("matched_content_id")?
+                        .trim()
+                        .to_string();
+                    if matched_content_id.is_empty() || !seen.insert(matched_content_id.clone()) {
+                        return None;
+                    }
+                    Some(json!({
+                        "matched_content_id": matched_content_id,
+                        "feedback_type": row.get::<String, _>("feedback_type"),
+                        "note": row.get::<Option<String>, _>("note"),
+                        "created_at": row.get::<DateTime<Utc>, _>("created_at"),
+                    }))
+                })
+                .collect::<Vec<_>>();
+
+            (
+                StatusCode::OK,
+                Json(json!({"feedback": feedback})),
+            )
+                .into_response()
+        }
+        Err(error) => {
+            tracing::error!("load public matching feedback failed: {:?}", error);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "failed to load matching feedback"})),
+            )
+                .into_response()
+        }
+    }
+}
+
+/// Persist an owner's explicit Smart Match judgement for a candidate.
+pub async fn create_public_matching_feedback(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<PublicMatchingFeedbackRequest>,
+) -> impl IntoResponse {
+    let actor = match auth_claims_from_headers(&headers, &state.jwt_secret)
+        .and_then(|claims| Uuid::parse_str(&claims.sub).ok())
+    {
+        Some(id) => id,
+        None => return unauthorized(),
+    };
+
+    let feedback_type = match normalize_feedback_type(&payload.feedback_type) {
+        Some(value) => value,
+        None => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": "feedback_type must be approved/rejected"})),
+            )
+                .into_response()
+        }
+    };
+
+    let source = sqlx::query_as::<_, CandidateItem>(
+        r#"
+        SELECT
+            id, owner_id, title, summary, body, content_type, category, tags,
+            price_cents, rating, review_count, cover_image,
+            COALESCE(metadata, '{}'::jsonb) AS metadata, updated_at
+        FROM content_items
+        WHERE id = $1 AND owner_id = $2
+        LIMIT 1
+        "#,
+    )
+    .bind(id)
+    .bind(actor)
+    .fetch_optional(&state.db)
+    .await;
+
+    let source = match source {
+        Ok(Some(row)) => row,
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({"error": "source listing not found"})),
+            )
+                .into_response()
+        }
+        Err(error) => {
+            tracing::error!("load source for public matching feedback failed: {:?}", error);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "failed to load source listing"})),
+            )
+                .into_response();
+        }
+    };
+
+    let candidate = sqlx::query_as::<_, CandidateItem>(
+        r#"
+        SELECT
+            id, owner_id, title, summary, body, content_type, category, tags,
+            price_cents, rating, review_count, cover_image,
+            COALESCE(metadata, '{}'::jsonb) AS metadata, updated_at
+        FROM content_items
+        WHERE id = $1
+          AND owner_id <> $2
+          AND content_status = 'active'
+        LIMIT 1
+        "#,
+    )
+    .bind(payload.matched_content_id)
+    .bind(actor)
+    .fetch_optional(&state.db)
+    .await;
+
+    let candidate = match candidate {
+        Ok(Some(row)) => row,
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({"error": "matched listing not found"})),
+            )
+                .into_response()
+        }
+        Err(error) => {
+            tracing::error!("load matched listing for feedback failed: {:?}", error);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "failed to load matched listing"})),
+            )
+                .into_response();
+        }
+    };
+
+    let note = payload
+        .note
+        .as_deref()
+        .unwrap_or_default()
+        .chars()
+        .filter(|ch| !ch.is_control())
+        .collect::<String>()
+        .trim()
+        .chars()
+        .take(500)
+        .collect::<String>();
+
+    let candidate_snapshot = json!({
+        "id": candidate.id,
+        "title": candidate.title.chars().take(180).collect::<String>(),
+        "summary": candidate.summary.as_deref().unwrap_or_default().chars().take(400).collect::<String>(),
+        "content_type": candidate.content_type,
+        "category": candidate.category,
+        "tags": candidate.tags.clone().unwrap_or_default(),
+        "city": city_from(&candidate.metadata),
+        "price_cents": candidate.price_cents,
+    });
+
+    let metadata = json!({
+        "source_content_id": source.id,
+        "matched_content_id": candidate.id,
+        "candidate_snapshot": candidate_snapshot,
+        "feedback_ui": "smart_match",
+    });
+
+    let inserted = sqlx::query(
+        r#"
+        INSERT INTO crm_matching_feedback (
+            connection_id, matching_candidate_id, requirement_review_id,
+            feedback_source, feedback_type, reason_code, note, metadata, created_by
+        )
+        VALUES (NULL, NULL, NULL, 'requester', $1, 'viewer_judgement', $2, $3, $4)
+        RETURNING id, created_at
+        "#,
+    )
+    .bind(feedback_type)
+    .bind(if note.is_empty() { None } else { Some(note.as_str()) })
+    .bind(metadata)
+    .bind(actor)
+    .fetch_one(&state.db)
+    .await;
+
+    match inserted {
+        Ok(row) => {
+            write_audit(
+                &state.db,
+                "matching_feedback",
+                &row.get::<Uuid, _>("id").to_string(),
+                "matching_feedback.viewer_judged",
+                Some(actor),
+                None,
+                Some(json!({
+                    "source_content_id": source.id,
+                    "matched_content_id": candidate.id,
+                    "feedback_type": feedback_type,
+                })),
+                if note.is_empty() { None } else { Some(note.clone()) },
+            )
+            .await;
+
+            (
+                StatusCode::CREATED,
+                Json(json!({
+                    "ok": true,
+                    "source_content_id": source.id,
+                    "matched_content_id": candidate.id,
+                    "feedback_type": feedback_type,
+                    "created_at": row.get::<DateTime<Utc>, _>("created_at"),
+                })),
+            )
+                .into_response()
+        }
+        Err(error) => {
+            tracing::error!("create public matching feedback failed: {:?}", error);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "failed to save matching feedback"})),
+            )
+                .into_response()
+        }
     }
 }
 
@@ -2311,6 +2723,7 @@ pub async fn public_matches(
                 "rating": entry.item.rating,
                 "review_count": entry.item.review_count,
                 "updated_at": entry.item.updated_at,
+                "viewer_feedback": viewer_feedback.get(&entry.item.id.to_string()),
             })
         })
         .collect::<Vec<_>>();
