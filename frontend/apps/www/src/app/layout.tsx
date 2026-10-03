@@ -59,6 +59,13 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: serializeJsonLd(websiteSchema) }}
         />
+        <Script
+          id="google-adsense"
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7020398942986974"
+          crossOrigin="anonymous"
+          strategy="afterInteractive"
+        />
       </head>
       <body className="app-cohesive-theme m-0 min-h-screen min-h-[var(--app-document-viewport-height)] w-full overflow-x-hidden bg-[color:var(--app-surface-muted)] p-0 font-sans text-[color:var(--app-text)] antialiased">
         <ScrollToTop />
