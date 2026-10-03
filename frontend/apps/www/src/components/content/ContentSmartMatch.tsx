@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ArrowRight, MapPin, Sparkles } from 'lucide-react';
+import { ArrowRight, Check, MapPin, Sparkles, ThumbsDown } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 
 type SmartMatch = {
@@ -19,6 +19,7 @@ type SmartMatch = {
   similarity_score?: number | null;
   worth_score?: number | null;
   score_label?: string;
+  viewer_feedback?: 'approved' | 'rejected' | null;
   reasons?: string[];
   warnings?: string[];
   rating?: number | null;
@@ -96,6 +97,8 @@ export function ContentSmartMatch({
   const [sort, setSort] = useState<'worth' | 'similarity' | 'nearest' | 'cheapest'>('worth');
   const [loading, setLoading] = useState(true);
   const [aiLoading, setAiLoading] = useState(false);
+  const [feedbackSaving, setFeedbackSaving] = useState<Record<string, boolean>>({});
+  const [feedbackRevision, setFeedbackRevision] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -189,6 +192,7 @@ export function ContentSmartMatch({
     source?.price_cents,
     source?.price_unit,
     source?.city,
+    feedbackRevision,
   ]);
 
   const requestError = !loading && payload === null;
@@ -210,6 +214,69 @@ export function ContentSmartMatch({
         return aiA - aiB;
       })
     : results;
+
+  const submitFeedback = async (
+    matchId: string,
+    feedbackType: 'approved' | 'rejected',
+  ) => {
+    if (feedbackSaving[matchId]) return;
+
+    const previous = results.find(item => item.id === matchId)?.viewer_feedback ?? null;
+    setFeedbackSaving(current => ({ ...current, [matchId]: true }));
+    setPayload(current =>
+      current
+        ? {
+            ...current,
+            results: (current.results ?? []).map(item =>
+              item.id === matchId
+                ? { ...item, viewer_feedback: feedbackType }
+                : item,
+            ),
+          }
+        : current,
+    );
+
+    try {
+      const response = await fetch(
+        `/api/content/${encodeURIComponent(contentId)}/matches/feedback`,
+        {
+          method: 'POST',
+          credentials: 'include',
+          cache: 'no-store',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            matched_content_id: matchId,
+            feedback_type: feedbackType,
+          }),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error('feedback failed');
+      }
+
+      setFeedbackRevision(current => current + 1);
+    } catch {
+      setPayload(current =>
+        current
+          ? {
+              ...current,
+              results: (current.results ?? []).map(item =>
+                item.id === matchId
+                  ? { ...item, viewer_feedback: previous }
+                  : item,
+              ),
+            }
+          : current,
+      );
+    } finally {
+      setFeedbackSaving(current => {
+        const next = { ...current };
+        delete next[matchId];
+        return next;
+      });
+    }
+  };
 
   const isRequest = intent === 'request' || intent === 'demand' || intent === 'seeker';
   const title = isRequest
@@ -253,12 +320,12 @@ export function ContentSmartMatch({
           <p className="text-xs font-bold text-[color:var(--app-text)]">
             {requestError
               ? locale === 'id' ? 'Smart Match belum bisa mengambil data.' : 'Smart Match could not load the data.'
-              : locale === 'id' ? 'Belum ada match yang cukup cocok.' : 'No strong match yet.'}
+              : locale === 'id' ? 'Belum ada match yang sangat kuat — kandidat yang masih relevan tetap ditampilkan.' : 'No very strong match yet — relevant lower-score candidates are still shown.'}
           </p>
           <p className="mt-1 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
             {requestError
               ? locale === 'id' ? 'Coba buka lagi beberapa saat. Fitur ini tetap aktif di belakang layar.' : 'Try again shortly. The matching engine remains active in the background.'
-              : locale === 'id' ? 'Saat ada posting yang relevan, Lajukan akan menampilkannya di sini.' : 'When a relevant listing appears, Lajukan will show it here.'}
+              : locale === 'id' ? 'Semakin sering kamu menekan Sesuai atau Tidak sesuai, semakin jelas sinyal yang dipakai Lajukan untuk mengurutkan kandidat berikutnya.' : 'The more you mark matches as suitable or unsuitable, the better Lajukan can learn your preference for future rankings.'}
           </p>
         </div>
       ) : null}
@@ -288,14 +355,18 @@ export function ContentSmartMatch({
       ) : (
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
           {displayResults.slice(0, 6).map(match => (
-            <Link
+            <article
               key={match.id}
-              href={`/content/${match.id}`}
               className="group min-w-0 rounded-2xl bg-white p-3 ring-1 ring-slate-200/80 transition hover:-translate-y-0.5 hover:shadow-md dark:bg-slate-950 dark:ring-slate-800"
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="line-clamp-2 text-sm font-bold leading-5 text-[color:var(--app-text)]">{match.title}</p>
+                  <Link
+                    href={`/content/${match.id}`}
+                    className="line-clamp-2 text-sm font-bold leading-5 text-[color:var(--app-text)] hover:underline"
+                  >
+                    {match.title}
+                  </Link>
                   <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-semibold text-[color:var(--app-text-soft)]">
                     {match.city ? <span>{match.city}</span> : null}
                     {match.distance_km != null ? <span className="inline-flex items-center gap-0.5"><MapPin className="h-3 w-3" />{match.distance_km < 1 ? '<1 km' : `${match.distance_km} km`}</span> : null}
@@ -313,7 +384,42 @@ export function ContentSmartMatch({
 
               <div className="mt-2 flex items-center justify-between gap-2">
                 <span className="truncate text-xs font-bold text-[color:var(--app-text)]">{budgetLabel(match) || (locale === 'id' ? 'Harga nego' : 'Negotiable')}</span>
-                <ArrowRight className="h-3.5 w-3.5 shrink-0 text-[color:var(--app-text-soft)] transition group-hover:translate-x-0.5" />
+                <Link
+                  href={`/content/${match.id}`}
+                  aria-label={locale === 'id' ? 'Lihat listing' : 'View listing'}
+                  className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300"
+                >
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              </div>
+
+              <div className="mt-2.5 grid grid-cols-2 gap-1.5">
+                <button
+                  type="button"
+                  disabled={Boolean(feedbackSaving[match.id])}
+                  onClick={() => void submitFeedback(match.id, 'approved')}
+                  className={`inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl px-2 text-[10px] font-black transition disabled:opacity-50 ${
+                    match.viewer_feedback === 'approved'
+                      ? 'bg-emerald-700 text-white'
+                      : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-400/20'
+                  }`}
+                >
+                  <Check className="h-3.5 w-3.5" />
+                  {locale === 'id' ? 'Sesuai' : 'Suitable'}
+                </button>
+                <button
+                  type="button"
+                  disabled={Boolean(feedbackSaving[match.id])}
+                  onClick={() => void submitFeedback(match.id, 'rejected')}
+                  className={`inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl px-2 text-[10px] font-black transition disabled:opacity-50 ${
+                    match.viewer_feedback === 'rejected'
+                      ? 'bg-slate-700 text-white'
+                      : 'bg-slate-50 text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100 dark:bg-white/5 dark:text-white/70 dark:ring-white/10'
+                  }`}
+                >
+                  <ThumbsDown className="h-3.5 w-3.5" />
+                  {locale === 'id' ? 'Tidak sesuai' : 'Not suitable'}
+                </button>
               </div>
               {aiAssessment.get(match.id)?.reason || match.reasons?.[0] ? (
                 <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-[color:var(--app-text-soft)]">
@@ -328,7 +434,7 @@ export function ContentSmartMatch({
                     : ''}
                 </p>
               ) : null}
-            </Link>
+            </article>
           ))}
         </div>
       )}
