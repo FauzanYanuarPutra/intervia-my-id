@@ -2556,6 +2556,29 @@ async fn set_profile_follow(
         ));
     }
 
+    // Do not create a dangling follow when the requested profile no longer
+    // exists in the community identity table.
+    let target_exists = sqlx::query_scalar::<_, bool>(
+        r#"
+        SELECT EXISTS (
+          SELECT 1
+          FROM forum.lajukan_forum_users
+          WHERE id = $1
+        )
+        "#,
+    )
+    .bind(&target_user_id)
+    .fetch_one(&state.db)
+    .await
+    .map_err(internal_error)?;
+
+    if !target_exists {
+        return Err(ApiError::new(
+            StatusCode::NOT_FOUND,
+            "Profil yang ingin diikuti tidak ditemukan",
+        ));
+    }
+
     if active {
         sqlx::query(
             r#"
