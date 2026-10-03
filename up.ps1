@@ -311,7 +311,7 @@ try {
         # Do not call `docker desktop status` during the hot startup path.
         # On some Docker Desktop builds this command can block while the Linux
         # engine is starting, making the launcher look frozen before preflight.
-        $DesktopVersionProbe = Invoke-DockerNative -Arguments @("desktop", "version", "--short") -Silent -TimeoutSeconds 10
+        $DesktopVersionProbe = Invoke-DockerNative -Arguments @("desktop", "version", "--short") -Silent -TimeoutSeconds 5
         $DesktopVersionText = ($DesktopVersionProbe.Output -join " ").Trim()
         if ($DesktopVersionProbe.ExitCode -eq 0 -and $DesktopVersionText) {
             Write-Host "Docker Desktop CLI: $DesktopVersionText" -ForegroundColor DarkGray
@@ -461,13 +461,13 @@ try {
         $DockerRecoveryState.Reason = $Reason
         Write-Warning "Docker Engine gagal pada saat $Reason. Mencoba bounded recovery Docker Desktop (attempt $($DockerRecoveryState.AttemptCount)/4)..."
 
-        $RestartProbe = Invoke-DockerNative -Arguments @("desktop", "restart", "--timeout", "120")
+        $RestartProbe = Invoke-DockerNative -Arguments @("desktop", "restart", "--timeout", "60")
         if ($RestartProbe.ExitCode -ne 0) {
             $RestartDetails = ($RestartProbe.Output -join " ").Trim()
             Write-Warning "docker desktop restart gagal: $RestartDetails"
             Write-Warning "Mencoba docker desktop start sebagai fallback..."
 
-            $StartProbe = Invoke-DockerNative -Arguments @("desktop", "start", "--timeout", "120")
+            $StartProbe = Invoke-DockerNative -Arguments @("desktop", "start", "--timeout", "60")
             if ($StartProbe.ExitCode -ne 0) {
                 $StartDetails = ($StartProbe.Output -join " ").Trim()
                 Write-Warning "docker desktop start juga gagal: $StartDetails"
@@ -475,9 +475,9 @@ try {
                 return $false
             }
         }
-        for ($RecoveryAttempt = 1; $RecoveryAttempt -le 24; $RecoveryAttempt++) {
-            Start-Sleep -Seconds 5
-            $RecoveryProbe = Invoke-DockerNative -Arguments @("info", "--format", "{{json .ServerVersion}}") -TimeoutSeconds 15
+        for ($RecoveryAttempt = 1; $RecoveryAttempt -le 15; $RecoveryAttempt++) {
+            Start-Sleep -Seconds 2
+            $RecoveryProbe = Invoke-DockerNative -Arguments @("info", "--format", "{{json .ServerVersion}}") -TimeoutSeconds 5
             if ($RecoveryProbe.ExitCode -eq 0) {
                 $DockerRecoveryState.Succeeded = $true
                 $DockerRecoveryState.Reason = "recovered"
@@ -494,13 +494,15 @@ try {
     # Compose config validation does not guarantee that the Docker daemon is
     # healthy. Probe the actual Engine API before resolving/building the stack.
     # This catches Docker Desktop Linux-engine failures such as HTTP 500 on
-    # /_ping before a 22-image build is started.
+    # Do not block local development for a long series of identical probes.
+    # Two short probes are enough to distinguish a ready Engine from a startup
+    # glitch; recovery then takes over immediately instead of waiting ~90s.
     Write-Host "Checking Docker Engine..." -ForegroundColor Cyan
     $EngineReady = $false
     $EngineProbeOutput = @()
     $EngineExitCode = 1
-    for ($Attempt = 1; $Attempt -le 6; $Attempt++) {
-        $EngineProbe = Invoke-DockerNative -Arguments @("info", "--format", "{{json .ServerVersion}}") -TimeoutSeconds 15
+    for ($Attempt = 1; $Attempt -le 2; $Attempt++) {
+        $EngineProbe = Invoke-DockerNative -Arguments @("info", "--format", "{{json .ServerVersion}}") -TimeoutSeconds 5
         $EngineProbeOutput = @($EngineProbe.Output)
         $EngineExitCode = $EngineProbe.ExitCode
         if (Test-DockerEngineHealthy -ProbeOutput $EngineProbeOutput -ExitCode $EngineExitCode) {
@@ -508,8 +510,8 @@ try {
             break
         }
 
-        if ($Attempt -lt 6) {
-            Start-Sleep -Seconds 3
+        if ($Attempt -eq 1) {
+            Start-Sleep -Seconds 1
         }
     }
 
