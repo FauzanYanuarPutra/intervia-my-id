@@ -9,7 +9,7 @@ import Script from 'next/script';
 import type { ReactNode } from 'react';
 
 import { Providers } from '@/components/Providers';
-import GoogleAdSenseUnit from '@/components/common/GoogleAdSenseUnit';
+import GoogleAdSense from '@/components/ads/GoogleAdSense';
 import ScrollToTop from '@/components/common/ScrollToTop';
 import {
   organizationSchema,
@@ -53,11 +53,6 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           {EARLY_THEME_SCRIPT}
         </Script>
         <script
-          async
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7020398942986974"
-          crossOrigin="anonymous"
-        />
-        <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: serializeJsonLd(organizationSchema) }}
         />
@@ -76,7 +71,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       <body className="app-cohesive-theme m-0 min-h-screen min-h-[var(--app-document-viewport-height)] w-full overflow-x-hidden bg-[color:var(--app-surface-muted)] p-0 font-sans text-[color:var(--app-text)] antialiased">
         <ScrollToTop />
         <Providers>{children}</Providers>
-        <GoogleAdSenseUnit slot="4886770179" />
+        <GoogleAdSense />
       </body>
     </html>
   );
