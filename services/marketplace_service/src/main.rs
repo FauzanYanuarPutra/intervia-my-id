@@ -14113,7 +14113,11 @@ async fn delete_content(
     let deleted = sqlx::query_as::<_, ContentRow>(
         r#"
         UPDATE content_items
-        SET content_status = 'deleted', updated_at = NOW()
+        SET content_status = 'deleted',
+            deleted_at = COALESCE(deleted_at, NOW()),
+            deleted_by = $2,
+            delete_reason = COALESCE(delete_reason, 'user_deleted'),
+            updated_at = NOW()
         WHERE id = $1
         RETURNING
             id, owner_id, content_type, slug, title, summary, body, price_cents, price_unit,
@@ -14128,6 +14132,7 @@ async fn delete_content(
         "#,
     )
     .bind(existing.id)
+    .bind(user_id)
     .fetch_one(&state.db)
     .await;
 
