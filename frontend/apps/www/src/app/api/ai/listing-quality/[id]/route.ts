@@ -150,13 +150,19 @@ function inferLocalQuality(item: Record<string, unknown>): Omit<QualityResult, '
       title: `Isi terlihat lebih cocok sebagai ${likelyLabel}`,
       detail: `Saat ini listing tercatat sebagai ${currentLabel}, tetapi teks utama berulang kali menyebut karakteristik ${likelyLabel.toLowerCase()}.`,
     });
+    const fixConfidence = Math.min(
+      0.99,
+      0.68 +
+        Math.min(productScore + serviceScore + jobScore, 7) * 0.04 +
+        (likelyType === 'product' && productScore >= 2 ? 0.08 : 0),
+    );
     quickFixes.push({
       id: 'change-type',
       label: `Ubah ke ${likelyLabel}`,
       description: `Perbaiki jenis listing tanpa membuka form.`,
-      confidence: Math.min(0.99, 0.62 + Math.min(productScore + serviceScore + jobScore, 6) * 0.05),
+      confidence: fixConfidence,
       patch: { content_type: likelyType },
-      safeAutoApply: true,
+      safeAutoApply: fixConfidence >= 0.72,
     });
   }
 
