@@ -166,7 +166,7 @@ try {
 
                 if (-not $Process.WaitForExit($TimeoutSeconds * 1000)) {
                     try { $Process.Kill($true) } catch {}
-                    try { $Process.WaitForExit(2000) } catch {}
+                    try { [void]$Process.WaitForExit(2000) } catch {}
 
                     $TimedOutOutput = @(
                         ("Docker command timeout after " + $TimeoutSeconds + "s: docker " + ($Arguments -join " "))
