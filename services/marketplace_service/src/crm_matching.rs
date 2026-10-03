@@ -1277,45 +1277,54 @@ pub async fn run_match(
         })
         .collect::<Vec<_>>();
 
-    let viewer_feedback = match sqlx::query(
-        r#"
-        SELECT metadata->>'matched_content_id' AS matched_content_id, feedback_type
-        FROM crm_matching_feedback
-        WHERE created_by = $1
-          AND feedback_source = 'requester'
-          AND metadata->>'source_content_id' = $2
-        ORDER BY created_at DESC
-        LIMIT 100
-        "#,
-    )
-    .bind(owner_id)
-    .bind(source.id.to_string())
-    .fetch_all(&state.db)
-    .await
-    {
-        Ok(rows) => {
-            let mut map = HashMap::<String, String>::new();
-            for row in rows.into_iter().rev() {
-                if let Some(candidate_id) = row.get::<Option<String>, _>("matched_content_id") {
-                    let candidate_id = candidate_id.trim().to_string();
-                    if !candidate_id.is_empty() {
-                        map.insert(candidate_id, row.get::<String, _>("feedback_type"));
+    let viewer_feedback = if let Some(requester_user_id) = requirement.requester_user_id {
+        match sqlx::query(
+            r#"
+            SELECT metadata->>'matched_content_id' AS matched_content_id, feedback_type
+            FROM crm_matching_feedback
+            WHERE created_by = $1
+              AND feedback_source = 'requester'
+              AND metadata->>'source_content_id' = $2
+            ORDER BY created_at DESC
+            LIMIT 100
+            "#,
+        )
+        .bind(requester_user_id)
+        .bind(requirement.source_id.to_string())
+        .fetch_all(&state.db)
+        .await
+        {
+            Ok(rows) => {
+                let mut map = HashMap::<String, String>::new();
+                for row in rows.into_iter().rev() {
+                    if let Some(candidate_id) =
+                        row.get::<Option<String>, _>("matched_content_id")
+                    {
+                        let candidate_id = candidate_id.trim().to_string();
+                        if !candidate_id.is_empty() {
+                            map.insert(
+                                candidate_id,
+                                row.get::<String, _>("feedback_type"),
+                            );
+                        }
                     }
                 }
+                map
             }
-            map
+            Err(error) => {
+                tracing::warn!("load viewer match feedback failed: {:?}", error);
+                HashMap::new()
+            }
         }
-        Err(error) => {
-            tracing::warn!("load viewer match feedback failed: {:?}", error);
-            HashMap::new()
-        }
+    } else {
+        HashMap::new()
     };
 
     for entry in &mut ranked {
         let feedback = viewer_feedback
-            .get(&entry.item.id.to_string())
+            .get(&entry.0.id.to_string())
             .map(String::as_str);
-        apply_viewer_feedback(&mut entry.score, feedback);
+        apply_viewer_feedback(&mut entry.1, feedback);
     }
 
     ranked.sort_by(|a, b| {
@@ -2662,6 +2671,52 @@ pub async fn public_matches(
                 target_budget_max: budget_max,
             });
         }
+    }
+
+    let viewer_feedback = match sqlx::query(
+        r#"
+        SELECT metadata->>'matched_content_id' AS matched_content_id, feedback_type
+        FROM crm_matching_feedback
+        WHERE created_by = $1
+          AND feedback_source = 'requester'
+          AND metadata->>'source_content_id' = $2
+        ORDER BY created_at DESC
+        LIMIT 100
+        "#,
+    )
+    .bind(owner_id)
+    .bind(source.id.to_string())
+    .fetch_all(&state.db)
+    .await
+    {
+        Ok(rows) => {
+            let mut map = HashMap::<String, String>::new();
+            for row in rows.into_iter().rev() {
+                if let Some(candidate_id) =
+                    row.get::<Option<String>, _>("matched_content_id")
+                {
+                    let candidate_id = candidate_id.trim().to_string();
+                    if !candidate_id.is_empty() {
+                        map.insert(
+                            candidate_id,
+                            row.get::<String, _>("feedback_type"),
+                        );
+                    }
+                }
+            }
+            map
+        }
+        Err(error) => {
+            tracing::warn!("load viewer match feedback failed: {:?}", error);
+            HashMap::new()
+        }
+    };
+
+    for entry in &mut ranked {
+        let feedback = viewer_feedback
+            .get(&entry.item.id.to_string())
+            .map(String::as_str);
+        apply_viewer_feedback(&mut entry.score, feedback);
     }
 
     ranked.sort_by(|a, b| {
