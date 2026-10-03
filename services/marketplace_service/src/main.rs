@@ -25421,6 +25421,46 @@ async fn update_transaction_status(
         return err(StatusCode::CONFLICT, "invalid transaction state").into_response();
     }
 
+    if managed_intermediary
+        && matches!(next_status, "in_progress" | "delivered" | "completed")
+    {
+        let payment_paid = txn
+            .transaction_meta
+            .get("payment")
+            .and_then(Value::as_object)
+            .and_then(|payment| payment.get("status"))
+            .and_then(Value::as_str)
+            .map(|status| status.eq_ignore_ascii_case("paid"))
+            .unwrap_or(false);
+
+        if !payment_paid {
+            return err(
+                StatusCode::CONFLICT,
+                "managed transaction must be funded before work can continue",
+            )
+            .into_response();
+        }
+
+        if next_status == "completed" {
+            let delivery_accepted = txn
+                .transaction_meta
+                .get("delivery")
+                .and_then(Value::as_object)
+                .and_then(|delivery| delivery.get("latest_status"))
+                .and_then(Value::as_str)
+                .map(|status| status.eq_ignore_ascii_case("accepted"))
+                .unwrap_or(false);
+
+            if txn.status != "delivered" || !delivery_accepted {
+                return err(
+                    StatusCode::CONFLICT,
+                    "managed transaction can only be completed after buyer accepts delivery",
+                )
+                .into_response();
+            }
+        }
+    }
+
     if next_status == "cancelled" && txn.status == "completed" {
         let now = Utc::now();
         let deadline = completed_transaction_correction_deadline(txn.updated_at);
