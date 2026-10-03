@@ -828,7 +828,6 @@ pub async fn record_price_snapshot(state: &Arc<AppState>, content_id: Uuid, owne
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::market_position_insight;
