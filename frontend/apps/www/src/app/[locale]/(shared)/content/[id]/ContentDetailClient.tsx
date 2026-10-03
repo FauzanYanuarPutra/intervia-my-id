@@ -5378,9 +5378,13 @@ export default function ContentDetailClient({
                   {locale === 'id' ? 'Tanya & nego dulu' : 'Ask & negotiate first'}
                 </h2>
                 <p className="mt-1 text-sm leading-5 text-[color:var(--app-text-soft)]">
-                  {locale === 'id'
-                    ? 'Belum ada checkout atau pembayaran. Kita buka chat, lalu sepakati harga dan detailnya langsung.'
-                    : 'No checkout or payment here. Start a chat and agree on the price and details directly.'}
+                  {intermediaryMode === 'managed'
+                    ? locale === 'id'
+                      ? `Mode perantara: ${selectedIntermediaryEmail}. Penawaran akan menjadi transaksi Lajukan dan menunggu persetujuan pihak terkait sebelum dana dapat ditahan.`
+                      : `Managed mode: ${selectedIntermediaryEmail}. This offer becomes a Lajukan transaction and waits for the required approvals before funds can be held.`
+                    : locale === 'id'
+                      ? 'Mode langsung/COD. Ini hanya negosiasi dan chat; pembayaran di luar flow perantara Lajukan tidak mendapat perlindungan custody Lajukan.'
+                      : 'Direct/COD mode. This is negotiation and chat only; payments outside the Lajukan intermediary flow are not protected by Lajukan custody.'}
                 </p>
               </div>
               <button
@@ -5473,9 +5477,13 @@ export default function ContentDetailClient({
             </div>
 
             <p className="mt-3 text-center text-[10px] leading-4 text-[color:var(--app-text-soft)]">
-              {locale === 'id'
-                ? 'Nominal ini hanya sinyal negosiasi, bukan checkout, pembayaran, atau order.'
-                : 'This amount is only a negotiation signal, not a checkout, payment, or order.'}
+              {intermediaryMode === 'managed'
+                ? locale === 'id'
+                  ? 'Dengan perantara, nominal ini menjadi bagian dari transaksi Lajukan. Dana baru ditahan setelah penawaran diterima dan perantara menyetujui.'
+                  : 'With an intermediary, this amount becomes part of a Lajukan transaction. Funds are held only after the offer and intermediary are accepted.'
+                : locale === 'id'
+                  ? 'Tanpa perantara: gunakan COD atau metode yang bisa kamu verifikasi. Penipuan di luar flow perantara bukan perlindungan custody Lajukan.'
+                  : 'Without an intermediary: use COD or a payment method you can verify. Fraud outside the intermediary flow is not protected by Lajukan custody.'}
             </p>
           </div>
         </div>
