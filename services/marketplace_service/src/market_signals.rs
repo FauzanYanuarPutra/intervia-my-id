@@ -53,7 +53,7 @@ fn median(mut values: Vec<i64>) -> Option<i64> {
     }
     values.sort_unstable();
     let middle = values.len() / 2;
-    if values.len() % 2 == 0 {
+    if values.len().is_multiple_of(2) {
         Some(((values[middle - 1] as i128 + values[middle] as i128) / 2) as i64)
     } else {
         Some(values[middle])
