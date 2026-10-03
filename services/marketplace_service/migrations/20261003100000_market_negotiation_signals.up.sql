@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS market_negotiation_signals (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY,
   content_id UUID NOT NULL REFERENCES content_items(id) ON DELETE CASCADE,
   actor_id UUID NOT NULL,
   signal_side TEXT NOT NULL CHECK (signal_side IN ('demand', 'supply')),
