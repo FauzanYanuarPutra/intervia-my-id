@@ -4594,6 +4594,8 @@ export default function ContentDetailClient({
                     </p>
                   ) : null}
 
+                  {ownerQualityAssistant}
+
                   <div className="mt-4 border-y border-[color:var(--app-border)] lg:hidden">
                     <div className="py-3">
                       <p className="text-xs font-semibold text-[color:var(--app-text-soft)]">
@@ -4848,7 +4850,6 @@ export default function ContentDetailClient({
                   ) : null}
                 </div>
 
-                {ownerQualityAssistant}
                 <div className="lg:hidden">{ownerProfileCard}</div>
 
                 {!isOwner ? (
