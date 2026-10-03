@@ -12,8 +12,8 @@ import {
   Mail,
   ShieldCheck,
   UserRound,
-  Facebook,
 } from 'lucide-react';
+import { FacebookBrandIcon } from '@/components/auth/FacebookBrandIcon';
 import AuthFlowShell from '@/components/auth/AuthFlowShell';
 import {
   AvatarBuilder,
@@ -295,7 +295,7 @@ export default function RegisterWithOTP() {
           Lanjutkan dengan Google
         </a>
         <a href={`/api/auth/facebook?callbackUrl=${encodeURIComponent(`/${locale}/onboarding`)}`} className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-[14px] bg-[#1877f2] px-4 text-sm font-bold text-white">
-          <Facebook className="h-5 w-5 fill-current" /> Lanjutkan dengan Facebook
+          <FacebookBrandIcon className="h-5 w-5" /> Lanjutkan dengan Facebook
         </a>
       </div>
       <div className="flex items-center gap-3"><span className="h-px flex-1 bg-[color:var(--app-border)]" /><span className="text-[10px] font-bold uppercase">atau daftar dengan email</span><span className="h-px flex-1 bg-[color:var(--app-border)]" /></div>
