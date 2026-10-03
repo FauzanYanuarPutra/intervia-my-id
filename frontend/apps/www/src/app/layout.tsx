@@ -52,11 +52,6 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           {EARLY_THEME_SCRIPT}
         </Script>
         <script
-          async
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7020398942986974"
-          crossOrigin="anonymous"
-        />
-        <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: serializeJsonLd(organizationSchema) }}
         />

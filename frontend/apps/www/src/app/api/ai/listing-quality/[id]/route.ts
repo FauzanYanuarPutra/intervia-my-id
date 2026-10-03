@@ -66,14 +66,36 @@ function asRecord(value: unknown): Record<string, unknown> {
 }
 
 function normalizeType(value: unknown): string {
-  const raw = cleanText(value, 80).toLowerCase();
-  if (raw === 'products' || raw === 'product') return 'product';
-  if (raw === 'services' || raw === 'service') return 'service';
-  if (raw === 'jobs' || raw === 'job') return 'job';
-  if (raw === 'property' || raw === 'properties') return 'property';
+  const raw = cleanText(value, 100).toLowerCase().replace(/[^a-z0-9_]+/g, '');
+  if (
+    ['product', 'products', 'produk', 'menawarkanproduk', 'menjualproduk', 'barang', 'jualan'].includes(raw)
+  ) return 'product';
+  if (
+    ['service', 'services', 'jasa', 'menawarkanjasa', 'menyediakanjasa', 'layanan'].includes(raw)
+  ) return 'service';
+  if (
+    ['job', 'jobs', 'lowongan', 'loker', 'menawarkanpekerjaan'].includes(raw)
+  ) return 'job';
+  if (['property', 'properties', 'properti', 'realestate', 'rumah', 'tanah'].includes(raw)) return 'property';
   if (raw.includes('rental') || raw.includes('sewa')) return 'tool_rental';
-  if (raw.includes('company') || raw.includes('business')) return 'company';
+  if (raw.includes('company') || raw.includes('business') || raw.includes('perusahaan')) return 'company';
   return raw || 'other';
+}
+
+function normalizePriceUnit(value: unknown): string {
+  const raw = cleanText(value, 80).toLowerCase().replace(/\s+/g, ' ');
+  if (!raw) return '';
+  if (['per proyek', 'proyek', 'project', 'per project'].includes(raw)) return 'project';
+  if (['per sesi', 'sesi', 'session'].includes(raw)) return 'session';
+  if (['per jam', 'jam', 'hour', 'per hour'].includes(raw)) return 'hour';
+  if (['per hari', 'hari', 'day', 'per day'].includes(raw)) return 'day';
+  if (['per bulan', 'bulan', 'month', 'per month'].includes(raw)) return 'month';
+  if (['per tahun', 'tahun', 'year', 'per year'].includes(raw)) return 'year';
+  if (['per kg', 'kg', 'kilogram', 'kilo'].includes(raw)) return 'kg';
+  if (['per pcs', 'pcs', 'piece', 'item'].includes(raw)) return 'pcs';
+  if (['per buah', 'buah'].includes(raw)) return 'pcs';
+  if (['liter', 'per liter', 'l'].includes(raw)) return 'liter';
+  return raw.replace(/^per\s+/, '');
 }
 
 function typeLabel(type: string): string {
@@ -102,7 +124,7 @@ function inferLocalQuality(item: Record<string, unknown>): Omit<QualityResult, '
   const combined = `${title} ${summary} ${body} ${JSON.stringify(formValues)}`.toLowerCase();
 
   const currentType = normalizeType(item.content_type || item.type);
-  const priceUnit = cleanText(item.price_unit || formValues.price_unit, 80).toLowerCase();
+  const priceUnit = normalizePriceUnit(item.price_unit || formValues.price_unit);
   const price = Number(item.price_cents);
 
   const productScore = scoreKeyword(combined, [
@@ -141,7 +163,7 @@ function inferLocalQuality(item: Record<string, unknown>): Omit<QualityResult, '
   const issues: QualityResult['issues'] = [];
   const quickFixes: QuickFix[] = [];
 
-  if (likelyType !== currentType && likelyType !== 'other' && currentType !== 'other') {
+  if (likelyType !== currentType && likelyType !== 'other') {
     const currentLabel = typeLabel(currentType);
     const likelyLabel = typeLabel(likelyType);
     issues.push({
@@ -150,13 +172,19 @@ function inferLocalQuality(item: Record<string, unknown>): Omit<QualityResult, '
       title: `Isi terlihat lebih cocok sebagai ${likelyLabel}`,
       detail: `Saat ini listing tercatat sebagai ${currentLabel}, tetapi teks utama berulang kali menyebut karakteristik ${likelyLabel.toLowerCase()}.`,
     });
+    const fixConfidence = Math.min(
+      0.99,
+      0.68 +
+        Math.min(productScore + serviceScore + jobScore, 7) * 0.04 +
+        (likelyType === 'product' && productScore >= 2 ? 0.08 : 0),
+    );
     quickFixes.push({
       id: 'change-type',
       label: `Ubah ke ${likelyLabel}`,
       description: `Perbaiki jenis listing tanpa membuka form.`,
-      confidence: Math.min(0.99, 0.62 + Math.min(productScore + serviceScore + jobScore, 6) * 0.05),
+      confidence: fixConfidence,
       patch: { content_type: likelyType },
-      safeAutoApply: true,
+      safeAutoApply: fixConfidence >= 0.72,
     });
   }
 
@@ -199,9 +227,16 @@ function inferLocalQuality(item: Record<string, unknown>): Omit<QualityResult, '
       ]
     : undefined;
 
+  const evidenceScore = productScore + serviceScore + jobScore;
   const confidence = likelyType === 'other'
     ? 0.54
-    : Math.min(0.98, 0.55 + Math.min(productScore + serviceScore + jobScore, 7) * 0.055 + (likelyType !== currentType ? 0.08 : 0));
+    : Math.min(
+        0.98,
+        0.55 +
+          Math.min(evidenceScore, 9) * 0.055 +
+          (likelyType !== currentType ? 0.08 : 0) +
+          (likelyType === 'product' && productScore >= 2 ? 0.08 : 0),
+      );
 
   return {
     status: issues.length ? 'review' : 'ok',
@@ -270,12 +305,24 @@ ${JSON.stringify({
     const allowedTypes = new Set(['product','service','job','property','tool_rental','company','other']);
     if (!allowedTypes.has(aiType)) return base;
     const aiConfidence = Math.max(0, Math.min(1, Number(parsed.confidence)));
+    const baseType = base.likelyType;
+    const acceptAiType =
+      aiType === baseType ||
+      ((baseType === 'other' || base.confidence < 0.75) && aiConfidence >= 0.88);
     return {
       ...base,
-      likelyThing: cleanText(parsed.likelyThing, 180) || base.likelyThing,
-      likelyType: aiType as QualityResult['likelyType'],
-      confidence: Math.max(base.confidence, aiConfidence || 0),
-      explanation: cleanText(parsed.explanation, 600) || base.explanation,
+      likelyThing:
+        acceptAiType
+          ? cleanText(parsed.likelyThing, 180) || base.likelyThing
+          : base.likelyThing,
+      likelyType: (acceptAiType ? aiType : baseType) as QualityResult['likelyType'],
+      confidence: acceptAiType
+        ? Math.max(base.confidence, aiConfidence || 0)
+        : base.confidence,
+      explanation:
+        acceptAiType
+          ? cleanText(parsed.explanation, 600) || base.explanation
+          : base.explanation,
     };
   } catch {
     return base;
