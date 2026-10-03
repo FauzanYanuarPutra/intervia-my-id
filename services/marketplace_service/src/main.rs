@@ -15908,7 +15908,24 @@ async fn fund_transaction(
         return Json(TransactionResponse::from(txn)).into_response();
     }
 
-    if !matches!(txn.status.as_str(), "pending" | "accepted") {
+    let managed_intermediary = intermediary_mode(&txn.transaction_meta) == "managed";
+
+    if managed_intermediary {
+        if txn.status != "accepted" {
+            return err(
+                StatusCode::CONFLICT,
+                "managed transactions can only be funded after the seller accepts",
+            )
+            .into_response();
+        }
+        if intermediary_status(&txn.transaction_meta) != "accepted" {
+            return err(
+                StatusCode::CONFLICT,
+                "the selected intermediary must accept before funding",
+            )
+            .into_response();
+        }
+    } else if !matches!(txn.status.as_str(), "pending" | "accepted") {
         return err(StatusCode::CONFLICT, "invalid transaction state").into_response();
     }
 
@@ -15956,7 +15973,18 @@ async fn fund_transaction(
         }
     };
 
-    if let Err(e) = hold_transaction_funds_tx(&mut tx, &txn, wallet_environment.as_str()).await {
+    let hold_result = if managed_intermediary {
+        hold_transaction_funds_with_intermediary_tx(
+            &mut tx,
+            &txn,
+            wallet_environment.as_str(),
+        )
+        .await
+    } else {
+        hold_transaction_funds_tx(&mut tx, &txn, wallet_environment.as_str()).await
+    };
+
+    if let Err(e) = hold_result {
         match e {
             WalletTransitionError::InsufficientFunds => {
                 return (
@@ -16001,6 +16029,7 @@ async fn fund_transaction(
                 "payment_method": "wallet_balance",
                 "wallet_environment": wallet_environment.as_str(),
                 "source": "wallet_balance",
+                "custody_mode": if managed_intermediary { "intermediary" } else { "lajukan_escrow" },
                 "reward_coin_amount": reward_coin_application.coin_amount,
                 "reward_coin_discount_cents": reward_coin_application.discount_cents,
                 "reward_coin_already_applied": reward_coin_application.already_applied
