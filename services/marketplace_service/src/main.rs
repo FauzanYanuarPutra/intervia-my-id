@@ -5819,6 +5819,13 @@ async fn update_transaction_intermediary_status(
     if next_status == "declined" && matches!(current_status, "declined" | "completed") {
         return Json(TransactionResponse::from(txn)).into_response();
     }
+    if next_status == "declined" && current_status == "active" {
+        return err(
+            StatusCode::CONFLICT,
+            "an intermediary cannot decline after funds have entered custody",
+        )
+        .into_response();
+    }
 
     let mut next_meta = merge_json_objects(
         txn.transaction_meta.clone(),
@@ -5848,7 +5855,9 @@ async fn update_transaction_intermediary_status(
         );
     }
 
-    let next_transaction_status = if next_status == "declined" && txn.status == "pending" {
+    let next_transaction_status = if next_status == "declined"
+        && matches!(txn.status.as_str(), "pending" | "accepted")
+    {
         "cancelled"
     } else {
         txn.status.as_str()
@@ -25318,6 +25327,18 @@ async fn update_transaction_status(
                 "status_context": {
                     "status": next_status,
                     "data": context
+                }
+            }),
+        );
+    }
+    if next_status == "completed" && managed_intermediary {
+        merged_transaction_meta = merge_json_objects(
+            merged_transaction_meta,
+            json!({
+                "intermediary": {
+                    "status": "completed",
+                    "completed_by": user_id,
+                    "completed_at": Utc::now()
                 }
             }),
         );
