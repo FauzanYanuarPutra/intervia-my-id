@@ -2742,6 +2742,59 @@ pub async fn oauth_google(
         .into_response()
 }
 
+pub async fn oauth_facebook(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(payload): Json<FacebookOAuthRequest>,
+) -> impl IntoResponse {
+    let (ip_address, user_agent) = extract_audit_info(&headers);
+    let app_id = match state.config.facebook_app_id.as_deref() { Some(v)=>v, None=>return (StatusCode::SERVICE_UNAVAILABLE,Json(json!({"error":"facebook oauth not configured"}))).into_response() };
+    let app_secret = match state.config.facebook_app_secret.as_deref() { Some(v)=>v, None=>return (StatusCode::SERVICE_UNAVAILABLE,Json(json!({"error":"facebook oauth not configured"}))).into_response() };
+    let identity = match verify_facebook_access_token(app_id,app_secret,&state.config.facebook_graph_version,&payload.access_token).await {
+        Ok(v)=>v, Err(e)=>return (StatusCode::UNAUTHORIZED,Json(json!({"error":e}))).into_response()
+    };
+    let user_id = match sqlx::query_scalar::<_,Uuid>("SELECT user_id FROM core.user_identities WHERE provider='facebook' AND provider_user_id=$1 LIMIT 1")
+        .bind(&identity.provider_user_id).fetch_optional(&state.db).await {
+        Ok(Some(id))=>id,
+        Ok(None)=>{
+            match sqlx::query_scalar::<_,Uuid>("SELECT id FROM core.users WHERE lower(email::text)=lower($1) AND deleted_at IS NULL LIMIT 1")
+                .bind(&identity.email).fetch_optional(&state.db).await {
+                Ok(Some(_))=>return (StatusCode::CONFLICT,Json(json!({"error":"account_exists_use_existing_login"}))).into_response(),
+                Err(_)=>return (StatusCode::INTERNAL_SERVER_ERROR,Json(json!({"error":"database error"}))).into_response(),
+                Ok(None)=>{}
+            }
+            let id=Uuid::new_v4();
+            let username=generate_google_username(&state,&identity.email,identity.name.as_deref()).await;
+            if sqlx::query("INSERT INTO core.users(id,email,email_verified,password_hash,status,is_active) VALUES($1,$2,true,NULL,'active',true)")
+                .bind(id).bind(&identity.email).execute(&state.db).await.is_err() {
+                return (StatusCode::CONFLICT,Json(json!({"error":"account_creation_conflict"}))).into_response();
+            }
+            let avatar=identity.picture.clone().unwrap_or_else(||DEFAULT_PROFILE_AVATAR.to_string());
+            if sqlx::query("INSERT INTO core.user_profiles(user_id,full_name,username,picture,metadata) VALUES($1,$2,$3,$4,$5)")
+                .bind(id).bind(identity.name.clone()).bind(username).bind(&avatar)
+                .bind(json!({"avatar_url":avatar,"avatar_source":"facebook","auth_provider":"facebook"}))
+                .execute(&state.db).await.is_err() {
+                let _=sqlx::query("DELETE FROM core.users WHERE id=$1").bind(id).execute(&state.db).await;
+                return (StatusCode::INTERNAL_SERVER_ERROR,Json(json!({"error":"database error"}))).into_response();
+            }
+            id
+        }
+        Err(_)=>return (StatusCode::INTERNAL_SERVER_ERROR,Json(json!({"error":"database error"}))).into_response()
+    };
+    if sqlx::query("INSERT INTO core.user_identities(user_id,provider,provider_user_id,email,email_verified,raw_profile,last_login_at) VALUES($1,'facebook',$2,$3,true,$4,NOW()) ON CONFLICT(provider,provider_user_id) DO UPDATE SET email=EXCLUDED.email,email_verified=true,raw_profile=EXCLUDED.raw_profile,last_login_at=NOW()")
+        .bind(user_id).bind(&identity.provider_user_id).bind(&identity.email).bind(&identity.raw_profile).execute(&state.db).await.is_err() {
+        return (StatusCode::INTERNAL_SERVER_ERROR,Json(json!({"error":"database error"}))).into_response();
+    }
+    let username=sqlx::query_scalar::<_,String>("SELECT username FROM core.user_profiles WHERE user_id=$1").bind(user_id).fetch_optional(&state.db).await.ok().flatten().unwrap_or_else(||"user".into());
+    let rp=get_roles_permissions_from_db(&state,user_id).await.unwrap_or(RolesPermissions{roles:vec![],permissions:vec![]});
+    let access_token=match create_access_token(&state.config.jwt_secret,user_id,username,ACCESS_TOKEN_EXP_HOURS,rp.roles.clone(),rp.permissions.clone()){Ok(v)=>v,Err(_)=>return (StatusCode::INTERNAL_SERVER_ERROR,Json(json!({"error":"token creation failed"}))).into_response()};
+    let refresh=generate_opaque_refresh_token().await;
+    let hash=match hash_refresh_token(&refresh).await{Ok(v)=>v,Err(_)=>return (StatusCode::INTERNAL_SERVER_ERROR,Json(json!({"error":"token creation failed"}))).into_response()};
+    let session=match store_refresh_session(&state,user_id,&hash,Utc::now()+Duration::days(state.config.refresh_token_exp_days),None).await{Ok(v)=>v,Err(_)=>return (StatusCode::INTERNAL_SERVER_ERROR,Json(json!({"error":"token creation failed"}))).into_response()};
+    record_audit_log(state,"user".into(),"oauth.facebook.login.success",Some(user_id),Some(user_id),Some(json!({"provider":"facebook"})),(ip_address,user_agent)).await;
+    (StatusCode::OK,Json(json!({"access_token":access_token,"token_type":"Bearer","expires_in":ACCESS_TOKEN_EXP_HOURS*3600,"refresh_token":refresh,"session_id":session,"user":{"id":user_id,"email":identity.email,"roles":rp.roles,"permissions":rp.permissions}}))).into_response()
+}
+
 #[derive(Debug, Deserialize)]
 pub struct RefreshRequest {
     pub session_id: Uuid,
