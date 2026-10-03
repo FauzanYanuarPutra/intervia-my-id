@@ -891,9 +891,13 @@ export default function ContentDetailClient({
       item.owner_id || item.owner_profile?.id || '',
     ).trim();
     const actorId = String(user?.id || '').trim();
-    if (!actorId || !targetUserId || actorId === targetUserId) return;
 
-    const trackingKey = `${resolvedContentId}:${actorId}`;
+    // Owner self-views are not counted. Anonymous users are allowed to
+    // generate a view event; the marketplace service deduplicates them
+    // server-side by listing + viewer fingerprint + day.
+    if (actorId && targetUserId && actorId === targetUserId) return;
+
+    const trackingKey = `${resolvedContentId}:${actorId || 'guest'}`;
     if (trackedContentViewRef.current === trackingKey) return;
     trackedContentViewRef.current = trackingKey;
 
@@ -902,40 +906,48 @@ export default function ContentDetailClient({
       item.title,
       item.slug,
     );
+    const properties: Record<string, unknown> = {
+      entity_label: item.title,
+      href: contentHref,
+      target_href: contentHref,
+      source: 'content',
+      surface: 'content',
+      action: 'view',
+      viewer_mode: actorId ? 'authenticated' : 'anonymous',
+    };
+
+    if (targetUserId) {
+      properties.target_user_id = targetUserId;
+      properties.target_username =
+        item.owner_profile?.username ||
+        item.owner_profile?.full_name ||
+        item.title ||
+        '';
+      properties.target_name =
+        item.owner_profile?.full_name ||
+        item.owner_profile?.username ||
+        item.title ||
+        '';
+    }
+
+    if (actorId) {
+      properties.actor_user_id = actorId;
+      properties.actor_username = String(user?.username || '').trim();
+      properties.actor_name =
+        user?.fullName ||
+        user?.full_name ||
+        user?.username ||
+        user?.email ||
+        '';
+      properties.actor_avatar_url = user?.avatarUrl || user?.avatar_url || '';
+    }
+
     void trackLajukanEvent('content.viewed', {
       entityType: 'content',
       entityId: resolvedContentId,
       page: contentHref,
-      properties: {
-        entity_label: item.title,
-        href: contentHref,
-        target_href: contentHref,
-        target_user_id: targetUserId,
-        target_username:
-          item.owner_profile?.username ||
-          item.owner_profile?.full_name ||
-          item.title ||
-          '',
-        target_name:
-          item.owner_profile?.full_name ||
-          item.owner_profile?.username ||
-          item.title ||
-          '',
-        actor_user_id: actorId,
-        actor_username: String(user?.username || '').trim(),
-        actor_name:
-          user?.fullName ||
-          user?.full_name ||
-          user?.username ||
-          user?.email ||
-          '',
-        actor_avatar_url: user?.avatarUrl || user?.avatar_url || '',
-        source: 'content',
-        surface: 'content',
-        action: 'view',
-      },
-    });
-  }, [item, locale, resolvedContentId, user]);
+      properties,
+    });  }, [item, locale, resolvedContentId, user]);
 
   useEffect(() => {
     if (showApplyModal) setApplyError(null);
