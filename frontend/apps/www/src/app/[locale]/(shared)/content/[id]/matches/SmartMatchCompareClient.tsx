@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ArrowLeft, ArrowRight, MapPin, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, MapPin, Sparkles, ThumbsDown } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { Link } from '@/i18n/navigation';
 
@@ -24,6 +24,7 @@ type Match = {
   rating?: number | null;
   review_count?: number | null;
   matched_fields?: string[];
+  viewer_feedback?: 'approved' | 'rejected' | null;
 };
 
 function money(value?: number | null, currency = 'IDR') {
@@ -49,6 +50,7 @@ export default function SmartMatchCompareClient() {
   const contentId = String(params.id || '');
   const [matches, setMatches] = useState<Match[]>([]);
   const [loading, setLoading] = useState(true);
+  const [feedbackSaving, setFeedbackSaving] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (!contentId) return;
@@ -69,6 +71,50 @@ export default function SmartMatchCompareClient() {
       });
     return () => { cancelled = true; };
   }, [contentId]);
+
+  const submitFeedback = async (
+    matchId: string,
+    feedbackType: 'approved' | 'rejected',
+  ) => {
+    if (feedbackSaving[matchId]) return;
+    const previous = matches.find(match => match.id === matchId)?.viewer_feedback ?? null;
+
+    setFeedbackSaving(current => ({ ...current, [matchId]: true }));
+    setMatches(current =>
+      current.map(match =>
+        match.id === matchId ? { ...match, viewer_feedback: feedbackType } : match,
+      ),
+    );
+
+    try {
+      const response = await fetch(
+        `/api/content/${encodeURIComponent(contentId)}/matches/feedback`,
+        {
+          method: 'POST',
+          credentials: 'include',
+          cache: 'no-store',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            matched_content_id: matchId,
+            feedback_type: feedbackType,
+          }),
+        },
+      );
+      if (!response.ok) throw new Error('feedback failed');
+    } catch {
+      setMatches(current =>
+        current.map(match =>
+          match.id === matchId ? { ...match, viewer_feedback: previous } : match,
+        ),
+      );
+    } finally {
+      setFeedbackSaving(current => {
+        const next = { ...current };
+        delete next[matchId];
+        return next;
+      });
+    }
+  };
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
@@ -100,8 +146,8 @@ export default function SmartMatchCompareClient() {
         </div>
       ) : matches.length === 0 ? (
         <div className="mt-4 rounded-3xl border border-slate-200 p-8 text-center dark:border-slate-800">
-          <p className="font-bold text-[color:var(--app-text)]">Belum ada kecocokan yang cukup kuat.</p>
-          <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">Lajukan akan mencoba mencocokkan lagi ketika ada listing baru yang relevan.</p>
+          <p className="font-bold text-[color:var(--app-text)]">Belum ada kecocokan yang sangat kuat.</p>
+          <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">Kandidat yang masih punya hubungan produk/kategori tetap dipertahankan dengan skor lebih kecil agar tidak hilang hanya karena jaraknya jauh.</p>
         </div>
       ) : (
         <>
@@ -114,7 +160,7 @@ export default function SmartMatchCompareClient() {
                     <h2 className="mt-1 line-clamp-2 text-base font-black text-[color:var(--app-text)]">{match.title}</h2>
                   </div>
                   <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-black text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300">
-                    {Math.round(match.worth_score ?? match.score ?? 0)}% worth
+                    {Math.round(match.score ?? match.similarity_score ?? 0)}% cocok
                   </span>
                 </div>
 
@@ -143,6 +189,35 @@ export default function SmartMatchCompareClient() {
                 >
                   Lihat listing <ArrowRight className="h-3.5 w-3.5" />
                 </Link>
+
+                <div className="mt-2.5 grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    disabled={Boolean(feedbackSaving[match.id])}
+                    onClick={() => void submitFeedback(match.id, 'approved')}
+                    className={`inline-flex min-h-10 items-center justify-center gap-1.5 rounded-2xl px-3 text-xs font-black transition disabled:opacity-50 ${
+                      match.viewer_feedback === 'approved'
+                        ? 'bg-emerald-700 text-white'
+                        : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-400/20'
+                    }`}
+                  >
+                    <Check className="h-3.5 w-3.5" />
+                    Sesuai
+                  </button>
+                  <button
+                    type="button"
+                    disabled={Boolean(feedbackSaving[match.id])}
+                    onClick={() => void submitFeedback(match.id, 'rejected')}
+                    className={`inline-flex min-h-10 items-center justify-center gap-1.5 rounded-2xl px-3 text-xs font-black transition disabled:opacity-50 ${
+                      match.viewer_feedback === 'rejected'
+                        ? 'bg-slate-700 text-white'
+                        : 'bg-slate-50 text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100 dark:bg-white/5 dark:text-white/70 dark:ring-white/10'
+                    }`}
+                  >
+                    <ThumbsDown className="h-3.5 w-3.5" />
+                    Tidak sesuai
+                  </button>
+                </div>
               </article>
             ))}
           </div>
