@@ -15314,6 +15314,28 @@ async fn create_offer(
                 }),
             )
             .await;
+            if let Some(candidate) = intermediary_candidate.as_ref() {
+                push_notification_best_effort(
+                    &state,
+                    candidate.user_id,
+                    "transaction",
+                    "transaction.intermediary_requested",
+                    "Permintaan perantara Lajukan",
+                    &format!(
+                        "Kamu diminta menjadi perantara untuk transaksi {} sebesar {}.",
+                        row.id,
+                        amount_label
+                    ),
+                    json!({
+                        "transaction_id": row.id,
+                        "content_id": row.content_id,
+                        "intermediary_email": candidate.email,
+                        "intermediary_status": "requested"
+                    }),
+                )
+                .await;
+            }
+
             push_notification_best_effort(
                 &state,
                 row.buyer_id,
