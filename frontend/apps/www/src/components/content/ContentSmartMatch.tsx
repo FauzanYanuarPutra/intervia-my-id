@@ -132,11 +132,6 @@ export function ContentSmartMatch({
   );
   const [feedbackRevision, setFeedbackRevision] = useState(0);
 
-  const [sortViewportRef] = useEmblaCarousel({
-    align: 'start',
-    containScroll: 'trimSnaps',
-    dragFree: true,
-  });
   const [matchesViewportRef] = useEmblaCarousel({
     align: 'start',
     containScroll: 'trimSnaps',
