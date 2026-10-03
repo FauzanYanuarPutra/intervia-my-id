@@ -342,68 +342,86 @@ export function ContentSmartMatch({
 
   return (
     <section
-      className="overflow-hidden rounded-[22px] bg-gradient-to-br from-emerald-700 via-emerald-800 to-emerald-950 text-white shadow-[0_18px_50px_-28px_rgba(4,120,87,0.65)]"
+      className="overflow-hidden rounded-[20px] bg-gradient-to-br from-emerald-800 via-emerald-900 to-slate-950 text-white shadow-[0_18px_45px_-30px_rgba(4,120,87,0.75)]"
       data-testid="content-smart-match"
     >
-      <div className="flex items-start justify-between gap-3 px-3.5 pt-3.5 sm:px-4 sm:pt-4">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 text-emerald-100">
-            <Sparkles className="h-4 w-4 shrink-0" aria-hidden="true" />
-            <span className="text-[10px] font-black uppercase tracking-[0.14em]">
-              Smart Match
-            </span>
+      <div className="px-3.5 pb-3 pt-3.5 sm:px-4 sm:pb-3.5 sm:pt-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 text-emerald-200">
+              <Sparkles className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span className="text-[10px] font-black uppercase tracking-[0.14em]">
+                Smart Match
+              </span>
+            </div>
+            <h2 className="mt-1 text-[15px] font-black leading-5 text-white sm:text-base">
+              {title}
+            </h2>
           </div>
-          <h2 className="mt-1 text-base font-black leading-tight text-white sm:text-lg">
-            {title}
-          </h2>
-          <p className="mt-1.5 max-w-2xl text-[11px] leading-4 text-emerald-50/80">
-            {locale === 'id'
-              ? 'Lajukan memilih posting yang paling relevan berdasarkan isi, lokasi, harga, dan kecocokan.'
-              : 'Lajukan surfaces the most relevant posts based on content, location, price, and fit.'}
-          </p>
+
+          <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[10px] font-black text-emerald-900 shadow-sm">
+            {loading
+              ? '...'
+              : aiLoading
+                ? 'AI'
+                : matchCount.toLocaleString(locale === 'id' ? 'id-ID' : 'en-US')}
+          </span>
         </div>
 
-        <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[10px] font-black text-emerald-800 shadow-sm">
-          {loading
-            ? '...'
-            : aiLoading
-              ? 'AI'
-              : `${matchCount.toLocaleString(locale === 'id' ? 'id-ID' : 'en-US')} match`}
-        </span>
+        {!loading && results.length > 0 ? (
+          <div className="mt-3 flex items-center gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {(
+              [
+                ['worth', locale === 'id' ? 'Paling cocok' : 'Best fit'],
+                ['similarity', locale === 'id' ? 'Paling mirip' : 'Most similar'],
+                ['nearest', locale === 'id' ? 'Terdekat' : 'Nearest'],
+                ['cheapest', locale === 'id' ? 'Harga' : 'Price'],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setSort(value)}
+                aria-pressed={sort === value}
+                className={
+                  sort === value
+                    ? 'shrink-0 rounded-full bg-white px-3 py-1.5 text-[10px] font-black text-emerald-900 shadow-sm'
+                    : 'shrink-0 rounded-full bg-white/10 px-3 py-1.5 text-[10px] font-bold text-emerald-50/80 ring-1 ring-white/10 hover:bg-white/15'
+                }
+              >
+                {label}
+              </button>
+            ))}
+
+            {results.length > 0 ? (
+              <Link
+                href={`/content/${contentId}/matches`}
+                className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1.5 text-[10px] font-bold text-white/85 hover:bg-white/10"
+              >
+                {locale === 'id' ? 'Semua' : 'All'}
+                <ArrowRight className="h-3 w-3" aria-hidden="true" />
+              </Link>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
-      {!loading && results.length > 1 ? (
-        <div className="mt-3 px-3.5 sm:px-4">
-          <Link
-            href={`/content/${contentId}/matches`}
-            className="flex items-center justify-between rounded-xl bg-white/10 px-3 py-2.5 text-[11px] font-black text-white ring-1 ring-white/10 transition hover:bg-white/15"
-          >
-            <span>
-              {locale === 'id'
-                ? `Lihat semua ${results.length} rekomendasi`
-                : `View all ${results.length} recommendations`}
-            </span>
-            <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-          </Link>
-        </div>
-      ) : null}
-
       {!loading && results.length === 0 ? (
-        <div className="mx-3.5 mt-3 rounded-xl border border-dashed border-white/20 bg-white/[0.07] p-3 sm:mx-4">
+        <div className="mx-3.5 mb-3.5 rounded-2xl bg-white/[0.08] p-3.5 ring-1 ring-white/10 sm:mx-4 sm:mb-4">
           <p className="text-xs font-black text-white">
             {requestError
               ? locale === 'id'
-                ? 'Rekomendasi belum bisa dimuat.'
-                : 'Recommendations could not be loaded.'
+                ? 'Smart Match belum tersedia.'
+                : 'Smart Match is temporarily unavailable.'
               : locale === 'id'
-                ? 'Belum ada posting yang cukup cocok.'
-                : 'No sufficiently relevant posts yet.'}
+                ? 'Belum ada yang cukup cocok.'
+                : 'No strong matches yet.'}
           </p>
-          <p className="mt-1 text-[11px] leading-4 text-emerald-50/70">
+          <p className="mt-1 text-[11px] leading-4 text-emerald-100/70">
             {requestError
               ? locale === 'id'
-                ? 'Coba buka halaman lagi beberapa saat.'
-                : 'Try opening the page again shortly.'
+                ? 'Coba buka lagi beberapa saat.'
+                : 'Try opening this again shortly.'
               : locale === 'id'
                 ? 'Posting baru akan otomatis ikut dipertimbangkan.'
                 : 'New posts will be considered automatically.'}
@@ -412,201 +430,198 @@ export function ContentSmartMatch({
       ) : null}
 
       {!loading && results.length > 0 ? (
-        <>
-          <div className="mt-3 overflow-hidden" ref={sortViewportRef}>
-            <div className="flex gap-1.5 px-3.5 sm:px-4">
-              {(
-                [
-                  ['worth', locale === 'id' ? 'Paling cocok' : 'Best fit'],
-                  [
-                    'similarity',
-                    locale === 'id' ? 'Paling mirip' : 'Most similar',
-                  ],
-                  ['nearest', locale === 'id' ? 'Terdekat' : 'Nearest'],
-                  ['cheapest', locale === 'id' ? 'Harga' : 'Price'],
-                ] as const
-              ).map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setSort(value)}
-                  aria-pressed={sort === value}
-                  className={`shrink-0 rounded-full px-3 py-1.5 text-[10px] font-black transition ${
-                    sort === value
-                      ? 'bg-white text-emerald-800 shadow-sm'
-                      : 'bg-white/10 text-emerald-50 ring-1 ring-white/10 hover:bg-white/15'
-                  }`}
+        <div
+          className="overflow-hidden"
+          ref={matchesViewportRef}
+          aria-label={
+            locale === 'id'
+              ? 'Rekomendasi Smart Match'
+              : 'Smart Match recommendations'
+          }
+        >
+          <div className="flex gap-3 px-3.5 pb-3.5 sm:px-4 sm:pb-4">
+            {displayResults.slice(0, 6).map(match => {
+              const fit = Math.round(
+                aiAssessment.get(match.id)?.fit ??
+                  match.worth_score ??
+                  match.score ??
+                  match.similarity_score ??
+                  0,
+              );
+              const typeLabel = contentTypeLabel(match.content_type, locale);
+              const price = budgetLabel(match);
+              const reason =
+                aiAssessment.get(match.id)?.reason || match.reasons?.[0] || '';
+              const caution =
+                aiAssessment.get(match.id)?.caution || match.warnings?.[0] || '';
+
+              return (
+                <article
+                  key={match.id}
+                  className="group flex min-w-0 shrink-0 basis-[84%] flex-col overflow-hidden rounded-[18px] bg-white text-slate-950 shadow-[0_14px_30px_-24px_rgba(0,0,0,0.6)] ring-1 ring-white/10 sm:basis-[48%] lg:basis-[31%]"
                 >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div
-            className="mt-3 overflow-hidden"
-            ref={matchesViewportRef}
-            aria-label={
-              locale === 'id'
-                ? 'Rekomendasi Smart Match'
-                : 'Smart Match recommendations'
-            }
-          >
-            <div className="flex gap-3 px-3.5 pb-3.5 sm:px-4 sm:pb-4">
-              {displayResults.slice(0, 6).map(match => {
-                const fit = Math.round(
-                  aiAssessment.get(match.id)?.fit ??
-                    match.score ??
-                    match.similarity_score ??
-                    0,
-                );
-                const typeLabel = contentTypeLabel(match.content_type, locale);
-
-                return (
-                  <article
-                    key={match.id}
-                    className="flex min-w-0 shrink-0 basis-[84%] flex-col overflow-hidden rounded-2xl bg-white text-slate-950 shadow-[0_14px_32px_-24px_rgba(0,0,0,0.55)] ring-1 ring-white/10 sm:basis-[48%] lg:basis-[31%]"
+                  <Link
+                    href={`/content/${match.id}`}
+                    aria-label={match.title}
+                    className="relative block aspect-[1.3/1] overflow-hidden bg-slate-100"
                   >
+                    {match.cover_image?.trim() ? (
+                      <img
+                        src={match.cover_image.trim()}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                        className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+                      />
+                    ) : (
+                      <span className="grid h-full w-full place-items-center bg-gradient-to-br from-emerald-50 via-slate-50 to-white text-emerald-700">
+                        <ImageIcon
+                          className="h-8 w-8"
+                          aria-hidden="true"
+                        />
+                      </span>
+                    )}
+
+                    <div className="absolute inset-x-2 top-2 flex items-center justify-between gap-2">
+                      <span className="max-w-[70%] truncate rounded-full bg-black/60 px-2 py-1 text-[9px] font-black text-white backdrop-blur">
+                        {typeLabel}
+                      </span>
+                      {fit > 0 ? (
+                        <span className="rounded-full bg-white px-2 py-1 text-[9px] font-black text-emerald-900 shadow-sm">
+                          {fit}% cocok
+                        </span>
+                      ) : null}
+                    </div>
+                  </Link>
+
+                  <div className="flex min-h-0 flex-1 flex-col p-3">
                     <Link
                       href={`/content/${match.id}`}
-                      aria-label={match.title}
-                      className="relative block h-36 overflow-hidden bg-emerald-50 sm:h-40"
+                      className="line-clamp-2 text-[13px] font-black leading-5 text-slate-950 hover:underline sm:text-sm"
                     >
-                      {match.cover_image?.trim() ? (
-                        <img
-                          src={match.cover_image.trim()}
-                          alt=""
-                          loading="lazy"
-                          decoding="async"
-                          className="h-full w-full object-cover transition-transform duration-300 hover:scale-[1.025]"
-                        />
-                      ) : (
-                        <span className="grid h-full w-full place-items-center bg-gradient-to-br from-emerald-50 via-slate-50 to-white text-emerald-700">
-                          <ImageIcon
-                            className="h-8 w-8"
-                            aria-hidden="true"
-                          />
-                        </span>
-                      )}
-
-                      <div className="absolute inset-x-2 top-2 flex items-center justify-between gap-2">
-                        <span className="rounded-full bg-slate-950/75 px-2 py-1 text-[9px] font-black text-white backdrop-blur">
-                          {typeLabel}
-                        </span>
-                        <span className="rounded-full bg-white px-2 py-1 text-[9px] font-black text-emerald-800 shadow-sm">
-                          {fit}%
-                        </span>
-                      </div>
+                      {match.title}
                     </Link>
 
-                    <div className="flex flex-1 flex-col p-3">
-                      <Link
-                        href={`/content/${match.id}`}
-                        className="line-clamp-2 text-sm font-black leading-5 text-[color:var(--app-text)] hover:underline"
-                      >
-                        {match.title}
-                      </Link>
+                    <div className="mt-2 flex min-w-0 items-center gap-2">
+                      <span className="min-w-0 truncate text-xs font-black text-emerald-800">
+                        {price || (locale === 'id' ? 'Harga nego' : 'Negotiable')}
+                      </span>
+                      {match.city ? (
+                        <span className="h-1 w-1 shrink-0 rounded-full bg-slate-300" />
+                      ) : null}
+                      {match.city ? (
+                        <span className="min-w-0 truncate text-[10px] font-semibold text-slate-500">
+                          {match.city}
+                        </span>
+                      ) : null}
+                    </div>
 
-                      <div className="mt-1.5 flex min-h-4 flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-semibold text-slate-500">
-                        {match.city ? (
-                          <span className="truncate">{match.city}</span>
-                        ) : null}
+                    {(match.distance_km != null || match.rating != null) ? (
+                      <div className="mt-1 flex items-center gap-2 text-[10px] font-semibold text-slate-500">
                         {match.distance_km != null ? (
-                          <span className="inline-flex items-center gap-0.5">
+                          <span className="inline-flex items-center gap-1">
                             <MapPin className="h-3 w-3" aria-hidden="true" />
                             {match.distance_km < 1
                               ? '<1 km'
                               : `${match.distance_km} km`}
                           </span>
                         ) : null}
+                        {match.rating != null ? (
+                          <span>
+                            ★ {match.rating.toFixed(1)}
+                            {match.review_count ? ` · ${match.review_count}` : ''}
+                          </span>
+                        ) : null}
                       </div>
+                    ) : null}
 
-                      <div className="mt-2 flex items-center justify-between gap-2">
-                        <span className="min-w-0 truncate text-xs font-black text-[color:var(--app-text)]">
-                          {budgetLabel(match) ||
-                            (locale === 'id' ? 'Harga nego' : 'Negotiable')}
-                        </span>
-                        <Link
-                          href={`/content/${match.id}`}
-                          aria-label={
-                            locale === 'id'
-                              ? 'Lihat posting'
-                              : 'View listing'
-                          }
-                          className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100"
-                        >
-                          <ArrowRight
-                            className="h-3.5 w-3.5"
-                            aria-hidden="true"
-                          />
-                        </Link>
-                      </div>
+                    {reason ? (
+                      <p className="mt-2 line-clamp-2 rounded-xl bg-emerald-50 px-2.5 py-2 text-[10px] font-semibold leading-4 text-emerald-900">
+                        {reason}
+                      </p>
+                    ) : caution ? (
+                      <p className="mt-2 line-clamp-2 rounded-xl bg-amber-50 px-2.5 py-2 text-[10px] font-semibold leading-4 text-amber-900">
+                        {caution}
+                      </p>
+                    ) : null}
 
-                      {aiAssessment.get(match.id)?.reason ||
-                      match.reasons?.[0] ? (
-                        <p className="mt-2 line-clamp-2 text-[10px] leading-4 text-slate-500">
-                          {aiAssessment.get(match.id)?.reason ||
-                            match.reasons?.[0]}
-                        </p>
-                      ) : null}
+                    <div className="mt-auto flex items-center gap-1.5 pt-3">
+                      <button
+                        type="button"
+                        disabled={Boolean(feedbackSaving[match.id])}
+                        onClick={() =>
+                          void submitFeedback(match.id, 'approved')
+                        }
+                        aria-label={
+                          locale === 'id'
+                            ? 'Tandai cocok'
+                            : 'Mark as good fit'
+                        }
+                        title={
+                          locale === 'id'
+                            ? 'Tandai cocok'
+                            : 'Mark as good fit'
+                        }
+                        className={
+                          match.viewer_feedback === 'approved'
+                            ? 'inline-flex min-h-8 flex-1 items-center justify-center gap-1 rounded-xl bg-emerald-700 px-2.5 text-[10px] font-black text-white'
+                            : 'inline-flex min-h-8 flex-1 items-center justify-center gap-1 rounded-xl bg-emerald-50 px-2.5 text-[10px] font-black text-emerald-800 ring-1 ring-emerald-200 hover:bg-emerald-100'
+                        }
+                      >
+                        <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                        {locale === 'id' ? 'Cocok' : 'Good fit'}
+                      </button>
 
-                      <div className="mt-auto grid grid-cols-2 gap-1.5 pt-3">
-                        <button
-                          type="button"
-                          disabled={Boolean(feedbackSaving[match.id])}
-                          onClick={() =>
-                            void submitFeedback(match.id, 'approved')
-                          }
-                          className={`inline-flex min-h-8 items-center justify-center gap-1 rounded-lg px-2 text-[10px] font-black transition disabled:opacity-50 ${
-                            match.viewer_feedback === 'approved'
-                              ? 'bg-emerald-700 text-white'
-                              : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100'
-                          }`}
-                        >
-                          <Check className="h-3.5 w-3.5" aria-hidden="true" />
-                          {locale === 'id' ? 'Sesuai' : 'Good fit'}
-                        </button>
+                      <button
+                        type="button"
+                        disabled={Boolean(feedbackSaving[match.id])}
+                        onClick={() =>
+                          void submitFeedback(match.id, 'rejected')
+                        }
+                        aria-label={
+                          locale === 'id' ? 'Tidak cocok' : 'Not a fit'
+                        }
+                        title={
+                          locale === 'id' ? 'Tidak cocok' : 'Not a fit'
+                        }
+                        className={
+                          match.viewer_feedback === 'rejected'
+                            ? 'inline-flex min-h-8 items-center justify-center rounded-xl bg-slate-700 px-2.5 text-[10px] font-black text-white'
+                            : 'inline-flex min-h-8 items-center justify-center rounded-xl bg-slate-50 px-2.5 text-[10px] font-black text-slate-500 ring-1 ring-slate-200 hover:bg-slate-100'
+                        }
+                      >
+                        <ThumbsDown className="h-3.5 w-3.5" aria-hidden="true" />
+                      </button>
 
-                        <button
-                          type="button"
-                          disabled={Boolean(feedbackSaving[match.id])}
-                          onClick={() =>
-                            void submitFeedback(match.id, 'rejected')
-                          }
-                          className={`inline-flex min-h-8 items-center justify-center gap-1 rounded-lg px-2 text-[10px] font-black transition disabled:opacity-50 ${
-                            match.viewer_feedback === 'rejected'
-                              ? 'bg-slate-700 text-white'
-                              : 'bg-slate-50 text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100'
-                          }`}
-                        >
-                          <ThumbsDown
-                            className="h-3.5 w-3.5"
-                            aria-hidden="true"
-                          />
-                          {locale === 'id' ? 'Tidak cocok' : 'Not for me'}
-                        </button>
-                      </div>
+                      <Link
+                        href={`/content/${match.id}`}
+                        aria-label={
+                          locale === 'id' ? 'Lihat posting' : 'View listing'
+                        }
+                        className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-emerald-700 text-white transition hover:bg-emerald-800"
+                      >
+                        <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                      </Link>
                     </div>
-                  </article>
-                );
-              })}
-            </div>
+                  </div>
+                </article>
+              );
+            })}
           </div>
-        </>
+        </div>
       ) : null}
 
       {loading ? (
-        <div className="px-3.5 pb-3.5 pt-3 sm:px-4 sm:pb-4">
+        <div className="px-3.5 pb-3.5 sm:px-4 sm:pb-4">
           <div className="flex gap-3 overflow-hidden">
             {[1, 2].map(item => (
               <div
                 key={item}
-                className="h-72 shrink-0 basis-[84%] animate-pulse rounded-2xl bg-white/10 sm:basis-[48%]"
+                className="h-64 shrink-0 basis-[84%] animate-pulse rounded-[18px] bg-white/10 sm:basis-[48%]"
               />
             ))}
           </div>
         </div>
       ) : null}
     </section>
-  );
-}
+  );}
