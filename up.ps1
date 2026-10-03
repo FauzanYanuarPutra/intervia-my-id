@@ -74,8 +74,97 @@ try {
         param(
             [Parameter(Mandatory = $true)]
             [string[]]$Arguments,
-            [switch]$Silent
+            [switch]$Silent,
+            [ValidateRange(0, 3600)]
+            [int]$TimeoutSeconds = 0
         )
+
+        # Normal build/compose commands intentionally stream until they finish.
+        # Short Docker health probes can opt into a bounded timeout so a wedged
+        # Docker Desktop Linux engine cannot make the launcher appear frozen forever.
+        if ($TimeoutSeconds -gt 0) {
+            $PreviousErrorActionPreference = $ErrorActionPreference
+            $Process = $null
+            try {
+                $ErrorActionPreference = "Continue"
+
+                $StartInfo = [System.Diagnostics.ProcessStartInfo]::new()
+                $StartInfo.FileName = "docker.exe"
+                $StartInfo.UseShellExecute = $false
+                $StartInfo.RedirectStandardOutput = $true
+                $StartInfo.RedirectStandardError = $true
+                $StartInfo.CreateNoWindow = $true
+                foreach ($Argument in $Arguments) {
+                    [void]$StartInfo.ArgumentList.Add([string]$Argument)
+                }
+
+                $Process = [System.Diagnostics.Process]::new()
+                $Process.StartInfo = $StartInfo
+                [void]$Process.Start()
+
+                $StdoutTask = $Process.StandardOutput.ReadToEndAsync()
+                $StderrTask = $Process.StandardError.ReadToEndAsync()
+
+                if (-not $Process.WaitForExit($TimeoutSeconds * 1000)) {
+                    try { $Process.Kill($true) } catch {}
+                    try { $Process.WaitForExit(2000) } catch {}
+
+                    $TimedOutOutput = @(
+                        ("Docker command timeout after " + $TimeoutSeconds + "s: docker " + ($Arguments -join " "))
+                    )
+                    if (-not $Silent) {
+                        $TimedOutOutput | ForEach-Object { Write-Host $_ -ForegroundColor Yellow }
+                    }
+
+                    return [pscustomobject]@{
+                        ExitCode = 124
+                        Output = @($TimedOutOutput)
+                        Stdout = @($TimedOutOutput)
+                        Stderr = @()
+                    }
+                }
+
+                $Stdout = $StdoutTask.Result
+                $Stderr = $StderrTask.Result
+                $Output = @()
+
+                if (-not [string]::IsNullOrWhiteSpace($Stdout)) {
+                    $Output += $Stdout -split '[\r\n]+' | Where-Object { $_ -ne "" }
+                }
+                if (-not [string]::IsNullOrWhiteSpace($Stderr)) {
+                    $Output += $Stderr -split '[\r\n]+' | Where-Object { $_ -ne "" }
+                }
+
+                if (-not $Silent) {
+                    $Output | ForEach-Object { Write-Host $_ }
+                }
+
+                return [pscustomobject]@{
+                    ExitCode = $Process.ExitCode
+                    Output = @($Output)
+                    Stdout = @($Stdout -split '[\r\n]+' | Where-Object { $_ -ne "" })
+                    Stderr = @($Stderr -split '[\r\n]+' | Where-Object { $_ -ne "" })
+                }
+            }
+            catch {
+                $Message = "Docker probe gagal: $($_.Exception.Message)"
+                if (-not $Silent) {
+                    Write-Host $Message -ForegroundColor Yellow
+                }
+                return [pscustomobject]@{
+                    ExitCode = 1
+                    Output = @($Message)
+                    Stdout = @()
+                    Stderr = @($Message)
+                }
+            }
+            finally {
+                if ($Process) {
+                    $Process.Dispose()
+                }
+                $ErrorActionPreference = $PreviousErrorActionPreference
+            }
+        }
 
         # Stream Docker stdout/stderr directly so long BuildKit operations do not
         # look frozen while the launcher waits for the command to finish.
@@ -163,7 +252,7 @@ try {
         # Do not call `docker desktop status` during the hot startup path.
         # On some Docker Desktop builds this command can block while the Linux
         # engine is starting, making the launcher look frozen before preflight.
-        $DesktopVersionProbe = Invoke-DockerNative -Arguments @("desktop", "version", "--short") -Silent
+        $DesktopVersionProbe = Invoke-DockerNative -Arguments @("desktop", "version", "--short") -Silent -TimeoutSeconds 10
         $DesktopVersionText = ($DesktopVersionProbe.Output -join " ").Trim()
         if ($DesktopVersionProbe.ExitCode -eq 0 -and $DesktopVersionText) {
             Write-Host "Docker Desktop CLI: $DesktopVersionText" -ForegroundColor DarkGray
@@ -329,7 +418,7 @@ try {
         }
         for ($RecoveryAttempt = 1; $RecoveryAttempt -le 24; $RecoveryAttempt++) {
             Start-Sleep -Seconds 5
-            $RecoveryProbe = Invoke-DockerNative -Arguments @("info", "--format", "{{json .ServerVersion}}")
+            $RecoveryProbe = Invoke-DockerNative -Arguments @("info", "--format", "{{json .ServerVersion}}") -TimeoutSeconds 15
             if ($RecoveryProbe.ExitCode -eq 0) {
                 $DockerRecoveryState.Succeeded = $true
                 $DockerRecoveryState.Reason = "recovered"
@@ -352,7 +441,7 @@ try {
     $EngineProbeOutput = @()
     $EngineExitCode = 1
     for ($Attempt = 1; $Attempt -le 6; $Attempt++) {
-        $EngineProbe = Invoke-DockerNative -Arguments @("info", "--format", "{{json .ServerVersion}}")
+        $EngineProbe = Invoke-DockerNative -Arguments @("info", "--format", "{{json .ServerVersion}}") -TimeoutSeconds 15
         $EngineProbeOutput = @($EngineProbe.Output)
         $EngineExitCode = $EngineProbe.ExitCode
         if (Test-DockerEngineHealthy -ProbeOutput $EngineProbeOutput -ExitCode $EngineExitCode) {
