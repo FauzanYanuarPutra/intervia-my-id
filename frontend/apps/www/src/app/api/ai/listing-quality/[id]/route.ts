@@ -141,7 +141,7 @@ function inferLocalQuality(item: Record<string, unknown>): Omit<QualityResult, '
   const issues: QualityResult['issues'] = [];
   const quickFixes: QuickFix[] = [];
 
-  if (likelyType !== currentType && likelyType !== 'other' && currentType !== 'other') {
+  if (likelyType !== currentType && likelyType !== 'other') {
     const currentLabel = typeLabel(currentType);
     const likelyLabel = typeLabel(likelyType);
     issues.push({
@@ -199,9 +199,16 @@ function inferLocalQuality(item: Record<string, unknown>): Omit<QualityResult, '
       ]
     : undefined;
 
+  const evidenceScore = productScore + serviceScore + jobScore;
   const confidence = likelyType === 'other'
     ? 0.54
-    : Math.min(0.98, 0.55 + Math.min(productScore + serviceScore + jobScore, 7) * 0.055 + (likelyType !== currentType ? 0.08 : 0));
+    : Math.min(
+        0.98,
+        0.55 +
+          Math.min(evidenceScore, 9) * 0.055 +
+          (likelyType !== currentType ? 0.08 : 0) +
+          (likelyType === 'product' && productScore >= 2 ? 0.08 : 0),
+      );
 
   return {
     status: issues.length ? 'review' : 'ok',
