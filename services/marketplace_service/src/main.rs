@@ -20521,6 +20521,313 @@ async fn hold_transaction_funds_tx(
     Ok(())
 }
 
+async fn hold_transaction_funds_with_intermediary_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    txn: &TransactionRow,
+    environment: &str,
+) -> Result<(), WalletTransitionError> {
+    let Some(intermediary_id) = intermediary_user_id(&txn.transaction_meta) else {
+        return Err(WalletTransitionError::InvalidHeldBalance);
+    };
+
+    let existing_hold_count = sqlx::query_scalar::<_, i64>(
+        r#"
+        SELECT COUNT(1)
+        FROM wallet_ledger_entries
+        WHERE user_id = $1
+          AND reference_type = 'transaction'
+          AND reference_id = $2
+          AND entry_type = 'intermediary_custody_hold'
+          AND status = 'posted'
+        "#,
+    )
+    .bind(intermediary_id)
+    .bind(txn.id)
+    .fetch_one(&mut **tx)
+    .await?;
+    if existing_hold_count > 0 {
+        return Ok(());
+    }
+
+    let buyer_account =
+        lock_wallet_account_tx(tx, txn.buyer_id, environment, txn.currency.as_str()).await?;
+    let intermediary_account =
+        lock_wallet_account_tx(tx, intermediary_id, environment, txn.currency.as_str()).await?;
+
+    if buyer_account.available_balance_cents < txn.amount_cents {
+        return Err(WalletTransitionError::InsufficientFunds);
+    }
+
+    let updated_buyer = sqlx::query_as::<_, WalletAccountRow>(
+        r#"
+        UPDATE wallet_accounts
+        SET
+            available_balance_cents = $2,
+            updated_at = NOW()
+        WHERE id = $1
+        RETURNING
+            id, user_id, environment, currency, available_balance_cents, held_balance_cents,
+            total_topup_cents, total_spend_cents, status, metadata, created_at, updated_at
+        "#,
+    )
+    .bind(buyer_account.id)
+    .bind(buyer_account.available_balance_cents - txn.amount_cents)
+    .fetch_one(&mut **tx)
+    .await?;
+
+    let updated_intermediary = sqlx::query_as::<_, WalletAccountRow>(
+        r#"
+        UPDATE wallet_accounts
+        SET
+            held_balance_cents = $2,
+            updated_at = NOW()
+        WHERE id = $1
+        RETURNING
+            id, user_id, environment, currency, available_balance_cents, held_balance_cents,
+            total_topup_cents, total_spend_cents, status, metadata, created_at, updated_at
+        "#,
+    )
+    .bind(intermediary_account.id)
+    .bind(intermediary_account.held_balance_cents + txn.amount_cents)
+    .fetch_one(&mut **tx)
+    .await?;
+
+    insert_wallet_ledger_entry_tx(
+        tx,
+        txn.buyer_id,
+        &updated_buyer,
+        "debit",
+        txn.amount_cents,
+        updated_buyer.available_balance_cents,
+        "intermediary_custody_funding",
+        "transaction",
+        txn.id,
+        format!("Funds moved to Lajukan intermediary custody for transaction {}", txn.id),
+        json!({
+            "transaction_id": txn.id,
+            "custodian_user_id": intermediary_id,
+            "flow": "intermediary_custody",
+            "environment": environment
+        }),
+    )
+    .await?;
+
+    insert_wallet_ledger_entry_tx(
+        tx,
+        intermediary_id,
+        &updated_intermediary,
+        "credit",
+        txn.amount_cents,
+        updated_intermediary.available_balance_cents,
+        "intermediary_custody_hold",
+        "transaction",
+        txn.id,
+        format!("Funds held in intermediary custody for transaction {}", txn.id),
+        json!({
+            "transaction_id": txn.id,
+            "source_user_id": txn.buyer_id,
+            "flow": "intermediary_custody",
+            "held_balance_after_cents": updated_intermediary.held_balance_cents,
+            "environment": environment
+        }),
+    )
+    .await?;
+
+    Ok(())
+}
+
+async fn release_intermediary_transaction_funds_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    txn: &TransactionRow,
+    environment: &str,
+) -> Result<(), WalletTransitionError> {
+    let Some(intermediary_id) = intermediary_user_id(&txn.transaction_meta) else {
+        return Err(WalletTransitionError::InvalidHeldBalance);
+    };
+
+    let intermediary_account =
+        lock_wallet_account_tx(tx, intermediary_id, environment, txn.currency.as_str()).await?;
+    let seller_account =
+        lock_wallet_account_tx(tx, txn.seller_id, environment, txn.currency.as_str()).await?;
+
+    if intermediary_account.held_balance_cents < txn.amount_cents {
+        return Err(WalletTransitionError::InvalidHeldBalance);
+    }
+
+    let updated_intermediary = sqlx::query_as::<_, WalletAccountRow>(
+        r#"
+        UPDATE wallet_accounts
+        SET
+            held_balance_cents = $2,
+            updated_at = NOW()
+        WHERE id = $1
+        RETURNING
+            id, user_id, environment, currency, available_balance_cents, held_balance_cents,
+            total_topup_cents, total_spend_cents, status, metadata, created_at, updated_at
+        "#,
+    )
+    .bind(intermediary_account.id)
+    .bind(intermediary_account.held_balance_cents - txn.amount_cents)
+    .fetch_one(&mut **tx)
+    .await?;
+
+    let updated_seller = sqlx::query_as::<_, WalletAccountRow>(
+        r#"
+        UPDATE wallet_accounts
+        SET
+            available_balance_cents = $2,
+            updated_at = NOW()
+        WHERE id = $1
+        RETURNING
+            id, user_id, environment, currency, available_balance_cents, held_balance_cents,
+            total_topup_cents, total_spend_cents, status, metadata, created_at, updated_at
+        "#,
+    )
+    .bind(seller_account.id)
+    .bind(seller_account.available_balance_cents + txn.amount_cents)
+    .fetch_one(&mut **tx)
+    .await?;
+
+    insert_wallet_ledger_entry_tx(
+        tx,
+        intermediary_id,
+        &updated_intermediary,
+        "debit",
+        txn.amount_cents,
+        updated_intermediary.available_balance_cents,
+        "intermediary_custody_release",
+        "transaction",
+        txn.id,
+        format!("Funds released from intermediary custody for transaction {}", txn.id),
+        json!({
+            "transaction_id": txn.id,
+            "recipient_user_id": txn.seller_id,
+            "flow": "intermediary_custody_release",
+            "held_balance_after_cents": updated_intermediary.held_balance_cents,
+            "environment": environment
+        }),
+    )
+    .await?;
+
+    insert_wallet_ledger_entry_tx(
+        tx,
+        txn.seller_id,
+        &updated_seller,
+        "credit",
+        txn.amount_cents,
+        updated_seller.available_balance_cents,
+        "payment_release",
+        "transaction",
+        txn.id,
+        format!("Payment released from intermediary custody for transaction {}", txn.id),
+        json!({
+            "transaction_id": txn.id,
+            "custodian_user_id": intermediary_id,
+            "flow": "intermediary_custody_release",
+            "environment": environment
+        }),
+    )
+    .await?;
+
+    Ok(())
+}
+
+async fn refund_intermediary_transaction_funds_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    txn: &TransactionRow,
+    environment: &str,
+) -> Result<(), WalletTransitionError> {
+    let Some(intermediary_id) = intermediary_user_id(&txn.transaction_meta) else {
+        return Err(WalletTransitionError::InvalidHeldBalance);
+    };
+
+    let intermediary_account =
+        lock_wallet_account_tx(tx, intermediary_id, environment, txn.currency.as_str()).await?;
+    let buyer_account =
+        lock_wallet_account_tx(tx, txn.buyer_id, environment, txn.currency.as_str()).await?;
+
+    if intermediary_account.held_balance_cents < txn.amount_cents {
+        return Err(WalletTransitionError::InvalidHeldBalance);
+    }
+
+    let updated_intermediary = sqlx::query_as::<_, WalletAccountRow>(
+        r#"
+        UPDATE wallet_accounts
+        SET
+            held_balance_cents = $2,
+            updated_at = NOW()
+        WHERE id = $1
+        RETURNING
+            id, user_id, environment, currency, available_balance_cents, held_balance_cents,
+            total_topup_cents, total_spend_cents, status, metadata, created_at, updated_at
+        "#,
+    )
+    .bind(intermediary_account.id)
+    .bind(intermediary_account.held_balance_cents - txn.amount_cents)
+    .fetch_one(&mut **tx)
+    .await?;
+
+    let updated_buyer = sqlx::query_as::<_, WalletAccountRow>(
+        r#"
+        UPDATE wallet_accounts
+        SET
+            available_balance_cents = $2,
+            updated_at = NOW()
+        WHERE id = $1
+        RETURNING
+            id, user_id, environment, currency, available_balance_cents, held_balance_cents,
+            total_topup_cents, total_spend_cents, status, metadata, created_at, updated_at
+        "#,
+    )
+    .bind(buyer_account.id)
+    .bind(buyer_account.available_balance_cents + txn.amount_cents)
+    .fetch_one(&mut **tx)
+    .await?;
+
+    insert_wallet_ledger_entry_tx(
+        tx,
+        intermediary_id,
+        &updated_intermediary,
+        "debit",
+        txn.amount_cents,
+        updated_intermediary.available_balance_cents,
+        "intermediary_custody_refund",
+        "transaction",
+        txn.id,
+        format!("Funds returned from intermediary custody for transaction {}", txn.id),
+        json!({
+            "transaction_id": txn.id,
+            "recipient_user_id": txn.buyer_id,
+            "flow": "intermediary_custody_refund",
+            "held_balance_after_cents": updated_intermediary.held_balance_cents,
+            "environment": environment
+        }),
+    )
+    .await?;
+
+    insert_wallet_ledger_entry_tx(
+        tx,
+        txn.buyer_id,
+        &updated_buyer,
+        "credit",
+        txn.amount_cents,
+        updated_buyer.available_balance_cents,
+        "refund",
+        "transaction",
+        txn.id,
+        format!("Refund from intermediary custody for transaction {}", txn.id),
+        json!({
+            "transaction_id": txn.id,
+            "custodian_user_id": intermediary_id,
+            "flow": "intermediary_custody_refund",
+            "environment": environment
+        }),
+    )
+    .await?;
+
+    Ok(())
+}
+
 async fn sync_linked_transaction_after_topup_paid_tx(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     topup: &WalletTopupRow,
