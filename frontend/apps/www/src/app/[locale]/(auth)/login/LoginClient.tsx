@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import AuthFlowShell from '@/components/auth/AuthFlowShell';
 import { GoogleBrandIcon } from '@/components/auth/GoogleBrandIcon';
+import { Facebook } from 'lucide-react';
 import { CaptchaField } from '@/components/security/CaptchaField';
 import { useAuth } from '@/context/AuthContext';
 import { mapCommonAuthError } from '@/lib/authErrors';
@@ -256,6 +257,16 @@ export default function LoginClient() {
             </g>
           </svg>
           {isId ? 'Masuk / daftar dengan Google' : 'Sign in / register with Google'}
+        </a>
+
+        <a
+          href={`/api/auth/facebook?callbackUrl=${encodeURIComponent(
+            callbackUrl || `/${locale}/profile`,
+          )}`}
+          className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-[14px] border border-[#1877f2]/25 bg-[#1877f2] px-4 text-sm font-bold text-white transition hover:bg-[#166fe5]"
+        >
+          <Facebook className="h-5 w-5 fill-current" />
+          {isId ? 'Masuk / daftar dengan Facebook' : 'Sign in / register with Facebook'}
         </a>
 
         <div className="flex items-center gap-3">
